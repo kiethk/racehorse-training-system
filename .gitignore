@@ -9,6 +9,7 @@ frontend/.next/
 # Environment
 .env
 .env.local
+!.env*.example
 **/application-local.properties
 
 # IDE
