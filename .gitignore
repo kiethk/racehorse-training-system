@@ -1,0 +1,21 @@
+# Backend (Java/Maven)
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+
+# Environment
+.env
+.env.local
+**/application-local.properties
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
