@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  rtms-db:
+    image: postgres:16
+    container_name: rtms-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: rtms_user
+      POSTGRES_PASSWORD: rtms_password
+      POSTGRES_DB: rtms_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - rtms_pgdata:/var/lib/postgresql/data
+
+volumes:
+  rtms_pgdata:
