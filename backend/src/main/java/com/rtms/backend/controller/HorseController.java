@@ -1,18 +1,10 @@
-/**
- * HorseController — REFERENCE IMPLEMENTATION
- *
- * Đây là ví dụ mẫu về cách tạo REST Controller trong dự án.
- * Convention:
- *  - @RestController + @RequestMapping("/api/{resource}") — tất cả API đều đặt dưới /api/
- *  - Constructor injection (không dùng @Autowired trên field)
- *  - Trả về ApiResponse<T> thay vì trả thẳng entity — giữ nhất quán response format
- *  - KHÔNG xử lý business logic trong Controller — đưa vào Service layer khi logic phức tạp hơn
- */
 package com.rtms.backend.controller;
 
 import com.rtms.backend.dto.ApiResponse;
+import com.rtms.backend.dto.CreateHorseRequest;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.repository.HorseRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,17 +19,29 @@ public class HorseController {
         this.horseRepository = horseRepository;
     }
 
+    @PreAuthorize("hasAuthority('HORSE_VIEW')")
     @GetMapping
     public ApiResponse<List<Horse>> getAllHorses() {
         return ApiResponse.success(horseRepository.findAll());
     }
 
+    @PreAuthorize("hasAuthority('HORSE_CREATE')")
     @PostMapping
-    public ApiResponse<Horse> createHorse(@RequestBody Horse horse) {
+    public ApiResponse<Horse> createHorse(@RequestBody CreateHorseRequest request) {
+        Horse horse = new Horse();
+        horse.setName(request.getName());
+        horse.setBreed(request.getBreed());
+        horse.setDateOfBirth(request.getDateOfBirth());
+        horse.setStableLocation(request.getStableLocation());
+        horse.setOwnerId(request.getOwnerId());
+        // currentStatus KHÔNG set ở đây - để mặc định "ELIGIBLE" theo giá trị default
+        // trong Entity/DB
+
         Horse saved = horseRepository.save(horse);
         return ApiResponse.success(saved);
     }
 
+    @PreAuthorize("hasAuthority('HORSE_VIEW')")
     @GetMapping("/{id}")
     public ApiResponse<Horse> getHorseById(@PathVariable Long id) {
         Horse horse = horseRepository.findById(id)

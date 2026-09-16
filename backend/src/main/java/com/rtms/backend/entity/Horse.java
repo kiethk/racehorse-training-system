@@ -31,9 +31,6 @@ public class Horse {
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
-    @Column(name = "pedigree_info")
-    private String pedigreeInfo;
-
     @Column(name = "current_status", nullable = false)
     private String currentStatus = "ELIGIBLE";
 
@@ -91,14 +88,6 @@ public class Horse {
 
     public void setDateOfBirth(LocalDate dateOfBirth) {
         this.dateOfBirth = dateOfBirth;
-    }
-
-    public String getPedigreeInfo() {
-        return pedigreeInfo;
-    }
-
-    public void setPedigreeInfo(String pedigreeInfo) {
-        this.pedigreeInfo = pedigreeInfo;
     }
 
     public String getCurrentStatus() {
