@@ -8,6 +8,7 @@ import com.rtms.backend.repository.UserRepository;
 import com.rtms.backend.security.JwtUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +25,9 @@ public class AuthController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Value("${jwt.expiration}")
+    private long jwtExpirationMs;
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request, HttpServletResponse response) {
@@ -43,7 +47,7 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(false) // false because localhost (http, no https)
                 .path("/")
-                .maxAge(24 * 60 * 60) // 24 hours, in seconds
+                .maxAge(jwtExpirationMs / 1000) // Convert milliseconds to seconds
                 .sameSite("Lax")
                 .build();
 
@@ -54,4 +58,22 @@ public class AuthController {
 
         return ApiResponse.success(loginResponse);
     }
+
+    @PostMapping("/logout")
+    public ApiResponse<String> logout(HttpServletResponse response) {
+        // Tạo một cookie mới đè lên cookie cũ, với maxAge = 0 để trình duyệt xóa nó đi
+        ResponseCookie cookie = ResponseCookie.from("jwt_token", "") // Giá trị rỗng
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0) // Quan trọng nhất: 0 giây sẽ làm cookie hết hạn ngay lập tức
+                .sameSite("Lax")
+                .build();
+
+        // Gắn cookie vào response
+        response.addHeader("Set-Cookie", cookie.toString());
+
+        return ApiResponse.success("Logged out successfully");
+    }
+
 }
