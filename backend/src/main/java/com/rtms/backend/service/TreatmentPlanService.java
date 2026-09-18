@@ -6,6 +6,7 @@ import com.rtms.backend.dto.PrescriptionResponse;
 import com.rtms.backend.dto.TreatmentPlanResponse;
 import com.rtms.backend.entity.Prescription;
 import com.rtms.backend.entity.TreatmentPlan;
+import com.rtms.backend.repository.MedicalRecordRepository;
 import com.rtms.backend.repository.PrescriptionRepository;
 import com.rtms.backend.repository.TreatmentPlanRepository;
 import jakarta.transaction.Transactional;
@@ -15,16 +16,16 @@ import java.time.LocalDate;
 import java.util.List;
 @Service
 public class TreatmentPlanService {
-//    private final MedicalRecordRepository medicalRecordRepository;
+    private final MedicalRecordRepository medicalRecordRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final PrescriptionRepository prescriptionRepository;
 
     public TreatmentPlanService(
-//            MedicalRecordRepository medicalRecordRepository,
+            MedicalRecordRepository medicalRecordRepository,
             TreatmentPlanRepository treatmentPlanRepository,
             PrescriptionRepository prescriptionRepository)
     {
-//        this.medicalRecordRepository = medicalRecordRepository;
+        this.medicalRecordRepository = medicalRecordRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;
         this.prescriptionRepository = prescriptionRepository;
     }
@@ -34,7 +35,7 @@ public class TreatmentPlanService {
             Long medicalRecordId,
             CreateTreatmentPlanRequest request
     ) {
-//        medicalRecordRepository.findById(medicalRecordId).orElseThrow()
+        medicalRecordRepository.findById(medicalRecordId).orElseThrow(() -> new RuntimeException("Medical Record Not Found"));
 
         validateDates(
                 request.getStartDate(),
@@ -48,9 +49,7 @@ public class TreatmentPlanService {
         plan.setStartDate(request.getStartDate());
         plan.setEndDate(request.getEndDate());
 
-        TreatmentPlan saved = treatmentPlanRepository.save(plan);
-
-        return toTreatmentPlanResponse(saved);
+        return toTreatmentPlanResponse(treatmentPlanRepository.save(plan));
     }
 
     @Transactional
@@ -79,6 +78,7 @@ public class TreatmentPlanService {
     }
 
     public List<TreatmentPlanResponse> getByMedicalRecordId(Long medicalRecordId) {
+        medicalRecordRepository.findById(medicalRecordId).orElseThrow(() -> new RuntimeException("Medical Record Not Found"));
         return treatmentPlanRepository
                 .findByMedicalRecordId(medicalRecordId)
                 .stream()
