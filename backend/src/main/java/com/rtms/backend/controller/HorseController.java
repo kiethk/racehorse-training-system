@@ -2,9 +2,12 @@ package com.rtms.backend.controller;
 
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreateHorseRequest;
+import com.rtms.backend.dto.UpdateHorseStatusRequest;
 import com.rtms.backend.entity.Horse;
-import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.service.HorseService;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,39 +16,39 @@ import java.util.List;
 @RequestMapping("/api/horses")
 public class HorseController {
 
-    private final HorseRepository horseRepository;
+    private final HorseService horseService;
 
-    public HorseController(HorseRepository horseRepository) {
-        this.horseRepository = horseRepository;
+    public HorseController(HorseService horseService) {
+        this.horseService = horseService;
     }
 
     @PreAuthorize("hasAuthority('HORSE_VIEW')")
     @GetMapping
     public ApiResponse<List<Horse>> getAllHorses() {
-        return ApiResponse.success(horseRepository.findAll());
+        AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return ApiResponse.success(horseService.getAllHorses(currentUser));
     }
 
     @PreAuthorize("hasAuthority('HORSE_CREATE')")
     @PostMapping
     public ApiResponse<Horse> createHorse(@RequestBody CreateHorseRequest request) {
-        Horse horse = new Horse();
-        horse.setName(request.getName());
-        horse.setBreed(request.getBreed());
-        horse.setDateOfBirth(request.getDateOfBirth());
-        horse.setStableLocation(request.getStableLocation());
-        horse.setOwnerId(request.getOwnerId());
-        // currentStatus KHÔNG set ở đây - để mặc định "ELIGIBLE" theo giá trị default
-        // trong Entity/DB
-
-        Horse saved = horseRepository.save(horse);
-        return ApiResponse.success(saved);
+        return ApiResponse.success(horseService.createHorse(request));
     }
 
     @PreAuthorize("hasAuthority('HORSE_VIEW')")
     @GetMapping("/{id}")
     public ApiResponse<Horse> getHorseById(@PathVariable Long id) {
-        Horse horse = horseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Horse not found with id: " + id));
-        return ApiResponse.success(horse);
+        AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return ApiResponse.success(horseService.getHorseById(id, currentUser));
     }
+
+    @PreAuthorize("hasAuthority('HORSE_STATUS_EDIT')")
+    @PutMapping("/{id}/status")
+    public ApiResponse<Horse> updateHorseStatus(@PathVariable Long id,
+            @RequestBody UpdateHorseStatusRequest request) {
+        return ApiResponse.success(horseService.updateHorseStatus(id, request));
+    }
+
 }

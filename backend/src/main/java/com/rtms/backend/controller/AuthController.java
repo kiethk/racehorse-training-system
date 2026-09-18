@@ -3,55 +3,67 @@ package com.rtms.backend.controller;
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.LoginRequest;
 import com.rtms.backend.dto.LoginResponse;
-import com.rtms.backend.entity.User;
-import com.rtms.backend.repository.UserRepository;
-import com.rtms.backend.security.JwtUtil;
+import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.service.AuthService;
+import com.rtms.backend.service.AuthService.LoginResult;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final AuthService authService;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    @Value("${jwt.expiration}")
+    private long jwtExpirationMs;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request, HttpServletResponse response) {
+        LoginResult result = authService.login(request);
 
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Email or Password is incorrect"));
-
-        boolean passwordMatches = passwordEncoder.matches(request.getPassword(), user.getPasswordHash());
-        if (!passwordMatches) {
-            throw new RuntimeException("Email or Password is incorrect");
-        }
-
-        String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
-
-        // Send token via HttpOnly Cookie
-        ResponseCookie cookie = ResponseCookie.from("jwt_token", token)
+        ResponseCookie cookie = ResponseCookie.from("jwt_token", result.token())
                 .httpOnly(true)
                 .secure(false) // false because localhost (http, no https)
                 .path("/")
-                .maxAge(24 * 60 * 60) // 24 hours, in seconds
+                .maxAge(jwtExpirationMs / 1000) // Convert milliseconds to seconds
                 .sameSite("Lax")
                 .build();
 
         response.addHeader("Set-Cookie", cookie.toString());
 
-        LoginResponse loginResponse = new LoginResponse(
-                user.getId(), user.getFullName(), user.getEmail(), user.getRole().getName());
-
-        return ApiResponse.success(loginResponse);
+        return ApiResponse.success(result.loginResponse());
     }
+
+    @PostMapping("/logout")
+    public ApiResponse<String> logout(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from("jwt_token", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0)
+                .sameSite("Lax")
+                .build();
+
+        response.addHeader("Set-Cookie", cookie.toString());
+
+        return ApiResponse.success("Logged out successfully");
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<LoginResponse> getMe() {
+        // Lấy thông tin currentUser từ SecurityContext
+        AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+
+        return ApiResponse.success(authService.getMe(currentUser.getUserId()));
+    }
+
 }
