@@ -18,8 +18,8 @@ public class MedicalRecord {
     @Column(name = "veterinarian_id", nullable = false)
     private Long veterinarianId;
 
-    @Column(name = "source_training_session_id")
-    private Long sourceTrainingSessionId;
+    @Column(name = "source_training_workout_id")
+    private Long sourceTrainingWorkoutId;
 
     @Column(name = "examined_at", nullable = false)
     private LocalDateTime examinedAt;
@@ -81,12 +81,12 @@ public class MedicalRecord {
         this.veterinarianId = veterinarianId;
     }
 
-    public Long getSourceTrainingSessionId() {
-        return sourceTrainingSessionId;
+    public Long getSourceTrainingWorkoutId() {
+        return sourceTrainingWorkoutId;
     }
 
-    public void setSourceTrainingSessionId(Long sourceTrainingSessionId) {
-        this.sourceTrainingSessionId = sourceTrainingSessionId;
+    public void setSourceTrainingWorkoutId(Long sourceTrainingWorkoutId) {
+        this.sourceTrainingWorkoutId = sourceTrainingWorkoutId;
     }
 
     public LocalDateTime getExaminedAt() {

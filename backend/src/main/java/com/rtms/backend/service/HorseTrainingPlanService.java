@@ -7,12 +7,14 @@ import com.rtms.backend.dto.UpdatePlanStatusRequest;
 import com.rtms.backend.entity.Course;
 import com.rtms.backend.entity.CourseSubject;
 import com.rtms.backend.entity.HorseTrainingPlan;
-import com.rtms.backend.entity.TrainingSession;
+import com.rtms.backend.entity.Subject;
+import com.rtms.backend.entity.TrainingWorkout;
 import com.rtms.backend.repository.CourseRepository;
 import com.rtms.backend.repository.CourseSubjectRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.HorseTrainingPlanRepository;
-import com.rtms.backend.repository.TrainingSessionRepository;
+import com.rtms.backend.repository.SubjectRepository;
+import com.rtms.backend.repository.TrainingWorkoutRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,22 +29,25 @@ import java.util.stream.Collectors;
 public class HorseTrainingPlanService {
 
     private final HorseTrainingPlanRepository planRepository;
-    private final TrainingSessionRepository sessionRepository;
+    private final TrainingWorkoutRepository workoutRepository;
     private final CourseRepository courseRepository;
     private final CourseSubjectRepository courseSubjectRepository;
+    private final SubjectRepository subjectRepository;
     private final HorseRepository horseRepository;
-    private final InjuryRecordService injuryRecordService; // GỌI SANG MODULE CỦA THÀNH
+    private final InjuryRecordService injuryRecordService;
 
     public HorseTrainingPlanService(HorseTrainingPlanRepository planRepository,
-                                    TrainingSessionRepository sessionRepository,
+                                    TrainingWorkoutRepository workoutRepository,
                                     CourseRepository courseRepository,
                                     CourseSubjectRepository courseSubjectRepository,
+                                    SubjectRepository subjectRepository,
                                     HorseRepository horseRepository,
                                     InjuryRecordService injuryRecordService) {
         this.planRepository = planRepository;
-        this.sessionRepository = sessionRepository;
+        this.workoutRepository = workoutRepository;
         this.courseRepository = courseRepository;
         this.courseSubjectRepository = courseSubjectRepository;
+        this.subjectRepository = subjectRepository;
         this.horseRepository = horseRepository;
         this.injuryRecordService = injuryRecordService;
     }
@@ -58,79 +63,89 @@ public class HorseTrainingPlanService {
     public HorseTrainingPlanDetailResponse getPlanById(Long id) {
         HorseTrainingPlan plan = planRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Training plan not found with id: " + id));
-        List<TrainingSession> sessions = sessionRepository.findByPlanIdOrderBySessionDateAsc(id);
-        return new HorseTrainingPlanDetailResponse(plan, sessions);
+        List<TrainingWorkout> workouts = workoutRepository.findByPlanIdOrderByWorkoutDateAsc(id);
+        return new HorseTrainingPlanDetailResponse(plan, workouts);
     }
 
     @Transactional
     public HorseTrainingPlanDetailResponse createPlan(CreateHorseTrainingPlanRequest request, AuthenticatedUser currentUser) {
-        // 1. KIỂM TRA KHÓA HUẤN LUYỆN (GỌI SERVICE CỦA THÀNH)
+        // 1. KIỂM TRA KHÓA HUẤN LUYỆN
         TrainingLockStatusResponse lockStatus = injuryRecordService.getTrainingLockStatus(request.getHorseId());
         if (lockStatus.isLocked()) {
             throw new IllegalStateException("Chiến mã này đang bị KHÓA HUẤN LUYỆN (Trạng thái: "
                     + lockStatus.getCurrentStatus() + "). Không thể tạo kế hoạch mới!");
         }
 
-        // 2. Lấy thông tin Course và Subjects
+        // 2. KIỂM TRA TRÙNG LỊCH VỚI KẾ HOẠCH ACTIVE HIỆN TẠI
+        List<HorseTrainingPlan> activePlans = planRepository.findByHorseIdAndStatus(request.getHorseId(), "ACTIVE");
+        if (!activePlans.isEmpty()) {
+            HorseTrainingPlan currentActivePlan = activePlans.get(0);
+            if (!request.getStartDate().isAfter(currentActivePlan.getEndDate())) {
+                throw new IllegalStateException("Ngựa đang có kế hoạch huấn luyện ACTIVE kéo dài đến ngày "
+                        + currentActivePlan.getEndDate() + ". Bạn chỉ có thể lên lịch khóa mới sau ngày này!");
+            }
+        }
+
+        // 3. Lấy thông tin Course và danh sách bài tập liên kết
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new RuntimeException("Course not found with id: " + request.getCourseId()));
 
-        List<CourseSubject> subjects = courseSubjectRepository.findByCourseIdOrderByOrderIndexAsc(course.getId());
-        if (subjects.isEmpty()) {
+        List<CourseSubject> courseSubjects = courseSubjectRepository.findByCourseIdOrderByOrderIndexAsc(course.getId());
+        if (courseSubjects.isEmpty()) {
             throw new IllegalStateException("Khóa học này chưa có bài tập nào, không thể gán cho ngựa!");
         }
 
-        // 3. Chuẩn bị danh sách thứ tập (nếu không chọn thì mặc định T2, T4, T6)
+        // 4. Chuẩn bị danh sách thứ tập (mặc định T2, T4, T6)
         Set<String> selectedDays = (request.getTrainingDays() != null && !request.getTrainingDays().isEmpty())
                 ? request.getTrainingDays().stream().map(String::toUpperCase).collect(Collectors.toSet())
                 : Set.of("MONDAY", "WEDNESDAY", "FRIDAY");
 
-        // 4. Tạo trước HorseTrainingPlan (endDate tạm thời là startDate)
+        // 5. Tạo HorseTrainingPlan
         HorseTrainingPlan plan = new HorseTrainingPlan();
         plan.setHorseId(request.getHorseId());
         plan.setCourseId(request.getCourseId());
         plan.setTrainerId(currentUser.getUserId());
         plan.setStartDate(request.getStartDate());
-        plan.setEndDate(request.getStartDate()); // Sẽ cập nhật sau khi sinh xong các session
-        plan.setStatus("ACTIVE");
+        plan.setEndDate(request.getStartDate());
+        plan.setStatus(request.getStartDate().isAfter(LocalDate.now()) ? "UPCOMING" : "ACTIVE");
         plan.setNotes(request.getNotes());
 
         HorseTrainingPlan savedPlan = planRepository.save(plan);
 
-        // 5. TỰ ĐỘNG SINH CÁC BUỔI TẬP (TRAINING SESSIONS)
-        List<TrainingSession> createdSessions = new ArrayList<>();
+        // 6. TỰ ĐỘNG SINH CÁC BUỔI TẬP (TRAINING WORKOUTS)
+        List<TrainingWorkout> createdWorkouts = new ArrayList<>();
         LocalDate currentDate = request.getStartDate();
-        int sessionCount = 0;
+        int workoutCount = 0;
         int totalNeeded = course.getTotalSessions();
 
-        while (sessionCount < totalNeeded) {
+        while (workoutCount < totalNeeded) {
             String dayOfWeekName = currentDate.getDayOfWeek().name();
             if (selectedDays.contains(dayOfWeekName)) {
-                // Chọn môn học xoay vòng theo order_index
-                CourseSubject currentSubject = subjects.get(sessionCount % subjects.size());
+                CourseSubject currentCS = courseSubjects.get(workoutCount % courseSubjects.size());
+                Subject currentSubject = subjectRepository.findById(currentCS.getSubjectId())
+                        .orElseThrow(() -> new RuntimeException("Subject not found with id: " + currentCS.getSubjectId()));
 
-                TrainingSession session = new TrainingSession();
-                session.setPlanId(savedPlan.getId());
-                session.setSubjectId(currentSubject.getId());
-                session.setHorseId(request.getHorseId());
-                session.setAssignedToId(request.getAssignedToId());
-                session.setSessionDate(currentDate);
-                session.setSessionType(currentSubject.getName().toUpperCase().contains("TRIAL RUN") ? "TRIAL_RUN" : "REGULAR");
-                session.setStatus("SCHEDULED");
+                TrainingWorkout workout = new TrainingWorkout();
+                workout.setPlanId(savedPlan.getId());
+                workout.setSubjectId(currentSubject.getId());
+                workout.setHorseId(request.getHorseId());
+                workout.setAssignedToId(request.getAssignedToId());
+                workout.setWorkoutDate(currentDate);
+                workout.setWorkoutType(currentSubject.getName().toUpperCase().contains("TRIAL RUN") ? "TRIAL_RUN" : "REGULAR");
+                workout.setStatus("SCHEDULED");
 
-                createdSessions.add(sessionRepository.save(session));
-                sessionCount++;
+                createdWorkouts.add(workoutRepository.save(workout));
+                workoutCount++;
             }
-            if (sessionCount < totalNeeded) {
+            if (workoutCount < totalNeeded) {
                 currentDate = currentDate.plusDays(1);
             }
         }
 
-        // 6. Cập nhật endDate chính xác là ngày của buổi tập cuối cùng
         savedPlan.setEndDate(currentDate);
         savedPlan = planRepository.save(savedPlan);
 
-        return new HorseTrainingPlanDetailResponse(savedPlan, createdSessions);
+        return new HorseTrainingPlanDetailResponse(savedPlan, createdWorkouts);
     }
 
     @Transactional

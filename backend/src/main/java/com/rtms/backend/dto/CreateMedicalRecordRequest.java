@@ -21,7 +21,7 @@ public class CreateMedicalRecordRequest {
 
     private String notes;
     private LocalDate followUpDate;
-    private Long sourceTrainingSessionId;
+    private Long sourceTrainingWorkoutId;
 
     public Long getHorseId() {
         return horseId;
@@ -79,11 +79,11 @@ public class CreateMedicalRecordRequest {
         this.followUpDate = followUpDate;
     }
 
-    public Long getSourceTrainingSessionId() {
-        return sourceTrainingSessionId;
+    public Long getSourceTrainingWorkoutId() {
+        return sourceTrainingWorkoutId;
     }
 
-    public void setSourceTrainingSessionId(Long sourceTrainingSessionId) {
-        this.sourceTrainingSessionId = sourceTrainingSessionId;
+    public void setSourceTrainingWorkoutId(Long sourceTrainingWorkoutId) {
+        this.sourceTrainingWorkoutId = sourceTrainingWorkoutId;
     }
 }

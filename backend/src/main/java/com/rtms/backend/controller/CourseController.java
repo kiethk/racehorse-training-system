@@ -2,10 +2,10 @@ package com.rtms.backend.controller;
 
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CourseDetailResponse;
+import com.rtms.backend.dto.CourseSubjectItemRequest;
+import com.rtms.backend.dto.CourseSubjectResponse;
 import com.rtms.backend.dto.CreateCourseRequest;
-import com.rtms.backend.dto.CreateCourseSubjectRequest;
 import com.rtms.backend.entity.Course;
-import com.rtms.backend.entity.CourseSubject;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.CourseService;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -48,8 +48,8 @@ public class CourseController {
 
     @PreAuthorize("hasAuthority('COURSE_CREATE')")
     @PostMapping("/{id}/subjects")
-    public ApiResponse<CourseSubject> addSubjectToCourse(@PathVariable Long id,
-                                                         @RequestBody CreateCourseSubjectRequest request) {
+    public ApiResponse<CourseSubjectResponse> addSubjectToCourse(@PathVariable Long id,
+                                                                 @RequestBody CourseSubjectItemRequest request) {
         return ApiResponse.success(courseService.addSubjectToCourse(id, request));
     }
 }

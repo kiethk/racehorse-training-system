@@ -6,8 +6,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "training_sessions")
-public class TrainingSession {
+@Table(name = "training_workouts")
+public class TrainingWorkout {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,8 +25,8 @@ public class TrainingSession {
     @Column(name = "assigned_to_id")
     private Long assignedToId;
 
-    @Column(name = "session_date", nullable = false)
-    private LocalDate sessionDate;
+    @Column(name = "workout_date", nullable = false)
+    private LocalDate workoutDate;
 
     @Column(name = "start_time")
     private LocalDateTime startTime;
@@ -34,8 +34,8 @@ public class TrainingSession {
     @Column(name = "end_time")
     private LocalDateTime endTime;
 
-    @Column(name = "session_type")
-    private String sessionType = "REGULAR"; // REGULAR, TRIAL_RUN
+    @Column(name = "workout_type")
+    private String workoutType = "REGULAR"; // REGULAR, TRIAL_RUN
 
     @Column(nullable = false)
     private String status = "SCHEDULED"; // SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
@@ -103,8 +103,8 @@ public class TrainingSession {
     public Long getAssignedToId() { return assignedToId; }
     public void setAssignedToId(Long assignedToId) { this.assignedToId = assignedToId; }
 
-    public LocalDate getSessionDate() { return sessionDate; }
-    public void setSessionDate(LocalDate sessionDate) { this.sessionDate = sessionDate; }
+    public LocalDate getWorkoutDate() { return workoutDate; }
+    public void setWorkoutDate(LocalDate workoutDate) { this.workoutDate = workoutDate; }
 
     public LocalDateTime getStartTime() { return startTime; }
     public void setStartTime(LocalDateTime startTime) { this.startTime = startTime; }
@@ -112,8 +112,8 @@ public class TrainingSession {
     public LocalDateTime getEndTime() { return endTime; }
     public void setEndTime(LocalDateTime endTime) { this.endTime = endTime; }
 
-    public String getSessionType() { return sessionType; }
-    public void setSessionType(String sessionType) { this.sessionType = sessionType; }
+    public String getWorkoutType() { return workoutType; }
+    public void setWorkoutType(String workoutType) { this.workoutType = workoutType; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
