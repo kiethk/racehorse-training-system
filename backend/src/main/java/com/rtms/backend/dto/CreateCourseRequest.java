@@ -7,7 +7,7 @@ public class CreateCourseRequest {
     private String description;
     private String targetGoal;
     private Integer totalSessions;
-    private List<CreateCourseSubjectRequest> subjects;
+    private List<CourseSubjectItemRequest> subjects;
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -21,6 +21,6 @@ public class CreateCourseRequest {
     public Integer getTotalSessions() { return totalSessions; }
     public void setTotalSessions(Integer totalSessions) { this.totalSessions = totalSessions; }
 
-    public List<CreateCourseSubjectRequest> getSubjects() { return subjects; }
-    public void setSubjects(List<CreateCourseSubjectRequest> subjects) { this.subjects = subjects; }
+    public List<CourseSubjectItemRequest> getSubjects() { return subjects; }
+    public void setSubjects(List<CourseSubjectItemRequest> subjects) { this.subjects = subjects; }
 }

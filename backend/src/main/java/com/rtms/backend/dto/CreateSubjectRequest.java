@@ -2,13 +2,16 @@ package com.rtms.backend.dto;
 
 import java.math.BigDecimal;
 
-public class CreateCourseSubjectRequest {
+public class CreateSubjectRequest {
+    private Long categoryId;
     private String name;
     private String description;
-    private String surfaceType;
+    private String surfaceType;        // TURF, DIRT, SYNTHETIC
     private BigDecimal targetDistanceMeters;
-    private String intensityLevel;
-    private Integer orderIndex;
+    private String intensityLevel;     // LOW, MEDIUM, HIGH
+
+    public Long getCategoryId() { return categoryId; }
+    public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -24,7 +27,4 @@ public class CreateCourseSubjectRequest {
 
     public String getIntensityLevel() { return intensityLevel; }
     public void setIntensityLevel(String intensityLevel) { this.intensityLevel = intensityLevel; }
-
-    public Integer getOrderIndex() { return orderIndex; }
-    public void setOrderIndex(Integer orderIndex) { this.orderIndex = orderIndex; }
 }

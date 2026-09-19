@@ -10,4 +10,5 @@ import java.util.List;
 public interface HorseTrainingPlanRepository extends JpaRepository<HorseTrainingPlan, Long> {
     List<HorseTrainingPlan> findByHorseId(Long horseId);
     List<HorseTrainingPlan> findByStatus(String status);
+    List<HorseTrainingPlan> findByHorseIdAndStatus(Long horseId, String status);
 }

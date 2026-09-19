@@ -1,7 +1,6 @@
 package com.rtms.backend.service;
 
 import com.rtms.backend.dto.CreateMedicalRecordRequest;
-import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.MedicalRecord;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.MedicalRecordRepository;
@@ -33,7 +32,7 @@ public class MedicalRecordService {
         record.setDiagnosis(request.getDiagnosis());
         record.setNotes(request.getNotes());
         record.setFollowUpDate(request.getFollowUpDate());
-        record.setSourceTrainingSessionId(request.getSourceTrainingSessionId());
+        record.setSourceTrainingWorkoutId(request.getSourceTrainingWorkoutId());
 
         return medicalRecordRepository.save(record);
     }

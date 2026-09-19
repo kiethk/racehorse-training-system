@@ -1,12 +1,15 @@
 package com.rtms.backend.service;
 
 import com.rtms.backend.dto.CourseDetailResponse;
+import com.rtms.backend.dto.CourseSubjectItemRequest;
+import com.rtms.backend.dto.CourseSubjectResponse;
 import com.rtms.backend.dto.CreateCourseRequest;
-import com.rtms.backend.dto.CreateCourseSubjectRequest;
 import com.rtms.backend.entity.Course;
 import com.rtms.backend.entity.CourseSubject;
+import com.rtms.backend.entity.Subject;
 import com.rtms.backend.repository.CourseRepository;
 import com.rtms.backend.repository.CourseSubjectRepository;
+import com.rtms.backend.repository.SubjectRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,10 +22,14 @@ public class CourseService {
 
     private final CourseRepository courseRepository;
     private final CourseSubjectRepository courseSubjectRepository;
+    private final SubjectRepository subjectRepository;
 
-    public CourseService(CourseRepository courseRepository, CourseSubjectRepository courseSubjectRepository) {
+    public CourseService(CourseRepository courseRepository,
+                         CourseSubjectRepository courseSubjectRepository,
+                         SubjectRepository subjectRepository) {
         this.courseRepository = courseRepository;
         this.courseSubjectRepository = courseSubjectRepository;
+        this.subjectRepository = subjectRepository;
     }
 
     public List<Course> getAllCourses() {
@@ -32,8 +39,11 @@ public class CourseService {
     public CourseDetailResponse getCourseById(Long id) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Course not found with id: " + id));
-        List<CourseSubject> subjects = courseSubjectRepository.findByCourseIdOrderByOrderIndexAsc(id);
-        return new CourseDetailResponse(course, subjects);
+
+        List<CourseSubject> courseSubjects = courseSubjectRepository.findByCourseIdOrderByOrderIndexAsc(id);
+        List<CourseSubjectResponse> responseSubjects = mapToResponseSubjects(courseSubjects);
+
+        return new CourseDetailResponse(course, responseSubjects);
     }
 
     @Transactional
@@ -42,7 +52,6 @@ public class CourseService {
             throw new IllegalArgumentException("Khóa học với tên '" + request.getName() + "' đã tồn tại!");
         }
 
-        // 1. Tạo và lưu Course
         Course course = new Course();
         course.setName(request.getName());
         course.setDescription(request.getDescription());
@@ -53,43 +62,63 @@ public class CourseService {
 
         Course savedCourse = courseRepository.save(course);
 
-        // 2. Nếu có danh sách subjects đi kèm, lưu từng subject
-        List<CourseSubject> savedSubjects = new ArrayList<>();
+        List<CourseSubject> savedCourseSubjects = new ArrayList<>();
         if (request.getSubjects() != null && !request.getSubjects().isEmpty()) {
             int defaultIndex = 1;
-            for (CreateCourseSubjectRequest subReq : request.getSubjects()) {
-                CourseSubject subject = new CourseSubject();
-                subject.setCourseId(savedCourse.getId());
-                subject.setName(subReq.getName());
-                subject.setDescription(subReq.getDescription());
-                subject.setSurfaceType(subReq.getSurfaceType());
-                subject.setTargetDistanceMeters(subReq.getTargetDistanceMeters());
-                subject.setIntensityLevel(subReq.getIntensityLevel());
-                subject.setOrderIndex(subReq.getOrderIndex() != null ? subReq.getOrderIndex() : defaultIndex++);
+            for (CourseSubjectItemRequest itemReq : request.getSubjects()) {
+                // Kiểm tra bài tập có tồn tại trong ngân hàng không
+                if (!subjectRepository.existsById(itemReq.getSubjectId())) {
+                    throw new IllegalArgumentException("Subject not found with id: " + itemReq.getSubjectId());
+                }
 
-                savedSubjects.add(courseSubjectRepository.save(subject));
+                CourseSubject cs = new CourseSubject();
+                cs.setCourseId(savedCourse.getId());
+                cs.setSubjectId(itemReq.getSubjectId());
+                cs.setOrderIndex(itemReq.getOrderIndex() != null ? itemReq.getOrderIndex() : defaultIndex++);
+
+                savedCourseSubjects.add(courseSubjectRepository.save(cs));
             }
         }
 
-        return new CourseDetailResponse(savedCourse, savedSubjects);
+        return new CourseDetailResponse(savedCourse, mapToResponseSubjects(savedCourseSubjects));
     }
 
     @Transactional
-    public CourseSubject addSubjectToCourse(Long courseId, CreateCourseSubjectRequest request) {
-        // Kiểm tra course có tồn tại không
+    public CourseSubjectResponse addSubjectToCourse(Long courseId, CourseSubjectItemRequest request) {
         if (!courseRepository.existsById(courseId)) {
             throw new RuntimeException("Course not found with id: " + courseId);
         }
 
-        CourseSubject subject = new CourseSubject();
-        subject.setCourseId(courseId);
-        subject.setName(request.getName());
-        subject.setDescription(request.getDescription());
-        subject.setSurfaceType(request.getSurfaceType());
-        subject.setTargetDistanceMeters(request.getTargetDistanceMeters());
-        subject.setIntensityLevel(request.getIntensityLevel());
-        subject.setOrderIndex(request.getOrderIndex());
+        Subject subject = subjectRepository.findById(request.getSubjectId())
+                .orElseThrow(() -> new IllegalArgumentException("Subject not found with id: " + request.getSubjectId()));
 
-        return courseSubjectRepository.save(subject);
+        CourseSubject cs = new CourseSubject();
+        cs.setCourseId(courseId);
+        cs.setSubjectId(request.getSubjectId());
+        cs.setOrderIndex(request.getOrderIndex());
+
+        CourseSubject saved = courseSubjectRepository.save(cs);
+        return new CourseSubjectResponse(saved.getId(), subject.getId(), subject.getName(),
+                subject.getDescription(), subject.getSurfaceType(), subject.getTargetDistanceMeters(),
+                subject.getIntensityLevel(), saved.getOrderIndex());
+    }
+
+    private List<CourseSubjectResponse> mapToResponseSubjects(List<CourseSubject> courseSubjects) {
+        List<CourseSubjectResponse> list = new ArrayList<>();
+        for (CourseSubject cs : courseSubjects) {
+            subjectRepository.findById(cs.getSubjectId()).ifPresent(sub -> {
+                list.add(new CourseSubjectResponse(
+                        cs.getId(),
+                        sub.getId(),
+                        sub.getName(),
+                        sub.getDescription(),
+                        sub.getSurfaceType(),
+                        sub.getTargetDistanceMeters(),
+                        sub.getIntensityLevel(),
+                        cs.getOrderIndex()
+                ));
+            });
+        }
+        return list;
     }
 }
