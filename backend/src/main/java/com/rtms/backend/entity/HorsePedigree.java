@@ -3,7 +3,7 @@ package com.rtms.backend.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name="horse_pedigrees")
+@Table(name = "horse_pedigrees")
 public class HorsePedigree {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -15,8 +15,20 @@ public class HorsePedigree {
     @Column(name = "sire_id")
     private Long sireId;
 
+    @Column(name = "sire_name")
+    private String sireName;
+
+    @Column(name = "sire_registration_number", length = 100)
+    private String sireRegistrationNumber;
+
     @Column(name = "dam_id")
     private Long damId;
+
+    @Column(name = "dam_name")
+    private String damName;
+
+    @Column(name = "dam_registration_number", length = 100)
+    private String damRegistrationNumber;
 
     @Column(name = "registry_name", length = 255)
     private String registryName;
@@ -27,7 +39,8 @@ public class HorsePedigree {
     @Column(name = "registration_number", length = 255)
     private String registrationNumber;
 
-    public HorsePedigree(Long id, Long sireId, Long horseId, Long damId, String registryName, String pedigreeNotes, String registrationNumber) {
+    public HorsePedigree(Long id, Long sireId, Long horseId, Long damId, String registryName, String pedigreeNotes,
+            String registrationNumber) {
         this.id = id;
         this.sireId = sireId;
         this.horseId = horseId;
@@ -71,6 +84,38 @@ public class HorsePedigree {
 
     public void setDamId(Long damId) {
         this.damId = damId;
+    }
+
+    public String getSireName() {
+        return sireName;
+    }
+
+    public void setSireName(String sireName) {
+        this.sireName = sireName;
+    }
+
+    public String getSireRegistrationNumber() {
+        return sireRegistrationNumber;
+    }
+
+    public void setSireRegistrationNumber(String sireRegistrationNumber) {
+        this.sireRegistrationNumber = sireRegistrationNumber;
+    }
+
+    public String getDamName() {
+        return damName;
+    }
+
+    public void setDamName(String damName) {
+        this.damName = damName;
+    }
+
+    public String getDamRegistrationNumber() {
+        return damRegistrationNumber;
+    }
+
+    public void setDamRegistrationNumber(String damRegistrationNumber) {
+        this.damRegistrationNumber = damRegistrationNumber;
     }
 
     public String getRegistryName() {

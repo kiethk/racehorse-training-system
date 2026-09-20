@@ -23,19 +23,22 @@ public class HorsePedigreeService {
     }
 
     public HorsePedigreeResponse getByHorseId(Long horseId) {
-        Horse horse = horseRepository.findById(horseId).orElseThrow(() -> new RuntimeException("Horse not found"));;
-        HorsePedigree pedigree = horsePedigreeRepository.findByHorseId(horseId).orElseThrow(()
-        -> new RuntimeException("Pedigree not found"));
+        Horse horse = horseRepository.findById(horseId).orElseThrow(() -> new RuntimeException("Horse not found"));
+
+        HorsePedigree pedigree = horsePedigreeRepository.findByHorseId(horseId)
+                .orElseThrow(() -> new RuntimeException("Pedigree not found"));
 
         Horse sire = null;
         Horse dam = null;
 
         if (pedigree.getSireId() != null) {
-            sire = horseRepository.findById(pedigree.getSireId()).orElse(null);;
+            sire = horseRepository.findById(pedigree.getSireId()).orElse(null);
+
         }
 
         if (pedigree.getDamId() != null) {
-            dam = horseRepository.findById(pedigree.getDamId()).orElse(null);;
+            dam = horseRepository.findById(pedigree.getDamId()).orElse(null);
+
         }
 
         return toResponse(pedigree, horse, sire, dam);
@@ -51,7 +54,8 @@ public class HorsePedigreeService {
         Horse dam = null;
 
         if (request.getSireId() != null) {
-            sire = horseRepository.findById(request.getSireId()).orElseThrow(() -> new RuntimeException("Sire not found"));
+            sire = horseRepository.findById(request.getSireId())
+                    .orElseThrow(() -> new RuntimeException("Sire not found"));
         }
 
         if (request.getDamId() != null) {
@@ -95,8 +99,7 @@ public class HorsePedigreeService {
                 toSummary(dam),
                 pedigree.getRegistrationNumber(),
                 pedigree.getRegistryName(),
-                pedigree.getPedigreeNotes()
-        );
+                pedigree.getPedigreeNotes());
     }
 
     private HorseSummaryResponse toSummary(Horse horse) {
@@ -109,7 +112,6 @@ public class HorsePedigreeService {
                 horse.getName(),
                 horse.getBreed(),
                 horse.getDateOfBirth(),
-                horse.getCurrentStatus()
-        );
+                horse.getCurrentStatus().name());
     }
 }

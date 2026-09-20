@@ -15,6 +15,8 @@ import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import com.rtms.backend.enums.HorseStatus;
+
 @Entity
 @Table(name = "horses")
 public class Horse {
@@ -31,11 +33,15 @@ public class Horse {
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "current_status", nullable = false)
-    private String currentStatus = "ELIGIBLE";
+    private HorseStatus currentStatus = HorseStatus.ELIGIBLE;
 
     @Column(name = "stable_location")
     private String stableLocation;
+
+    @Column(name = "current_stall_id", unique = true)
+    private Long currentStallId;
 
     @Column(name = "owner_id")
     private Long ownerId;
@@ -90,11 +96,11 @@ public class Horse {
         this.dateOfBirth = dateOfBirth;
     }
 
-    public String getCurrentStatus() {
+    public HorseStatus getCurrentStatus() {
         return currentStatus;
     }
 
-    public void setCurrentStatus(String currentStatus) {
+    public void setCurrentStatus(HorseStatus currentStatus) {
         this.currentStatus = currentStatus;
     }
 
@@ -104,6 +110,14 @@ public class Horse {
 
     public void setStableLocation(String stableLocation) {
         this.stableLocation = stableLocation;
+    }
+
+    public Long getCurrentStallId() {
+        return currentStallId;
+    }
+
+    public void setCurrentStallId(Long currentStallId) {
+        this.currentStallId = currentStallId;
     }
 
     public Long getOwnerId() {

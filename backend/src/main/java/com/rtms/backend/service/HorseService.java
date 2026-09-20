@@ -3,6 +3,7 @@ package com.rtms.backend.service;
 import com.rtms.backend.dto.CreateHorseRequest;
 import com.rtms.backend.dto.UpdateHorseStatusRequest;
 import com.rtms.backend.entity.Horse;
+import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.repository.HorseRepository;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -55,7 +56,7 @@ public class HorseService {
                 .orElseThrow(() -> new RuntimeException("Horse not found with id: " + id));
 
         // Cập nhật trạng thái mới
-        horse.setCurrentStatus(request.getStatus());
+        horse.setCurrentStatus(HorseStatus.valueOf(request.getStatus()));
 
         return horseRepository.save(horse);
     }

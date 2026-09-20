@@ -13,8 +13,6 @@ public class GroomProfile {
     @Column(name = "user_id")
     private Long userId;
 
-    @Column(name = "assigned_area")
-    private String assignedArea;
 
     @Column(name = "shift")
     private String shift;
@@ -27,13 +25,6 @@ public class GroomProfile {
         this.userId = userId;
     }
 
-    public String getAssignedArea() {
-        return assignedArea;
-    }
-
-    public void setAssignedArea(String assignedArea) {
-        this.assignedArea = assignedArea;
-    }
 
     public String getShift() {
         return shift;

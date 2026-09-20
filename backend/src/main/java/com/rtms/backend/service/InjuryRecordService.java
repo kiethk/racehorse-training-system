@@ -6,6 +6,7 @@ import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.HorseBodyRegion;
 import com.rtms.backend.entity.InjuryRecord;
 import com.rtms.backend.entity.MedicalRecord;
+import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.repository.HorseBodyRegionRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.InjuryRecordRepository;
@@ -15,9 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class InjuryRecordService {
-
-    private static final String STATUS_INJURED = "INJURED";
-    private static final String STATUS_ELIGIBLE = "ELIGIBLE";
 
     private final InjuryRecordRepository injuryRecordRepository;
     private final MedicalRecordRepository medicalRecordRepository;
@@ -67,8 +65,9 @@ public class InjuryRecordService {
 
         InjuryRecord savedInjury = injuryRecordRepository.save(injury);
 
-        // (@Transactional đảm bảo lưu InjuryRecord và cập nhật Horse luôn thực hiện cùng nhau)
-        horse.setCurrentStatus(STATUS_INJURED);
+        // (@Transactional đảm bảo lưu InjuryRecord và cập nhật Horse luôn thực hiện
+        // cùng nhau)
+        horse.setCurrentStatus(HorseStatus.INJURED);
         horseRepository.save(horse);
 
         return savedInjury;
@@ -78,7 +77,10 @@ public class InjuryRecordService {
         Horse horse = horseRepository.findById(horseId)
                 .orElseThrow(() -> new RuntimeException("Horse not found with id: " + horseId));
 
-        boolean locked = !STATUS_ELIGIBLE.equals(horse.getCurrentStatus());
-        return new TrainingLockStatusResponse(horseId, horse.getCurrentStatus(), locked);
+        boolean locked = horse.getCurrentStatus() != HorseStatus.ELIGIBLE;
+        return new TrainingLockStatusResponse(
+                horseId,
+                horse.getCurrentStatus().name(),
+                locked);
     }
 }
