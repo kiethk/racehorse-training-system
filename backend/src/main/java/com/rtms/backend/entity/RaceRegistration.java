@@ -52,14 +52,6 @@ public class RaceRegistration {
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
 
-    @Column(name = "final_position")
-    private Integer finalPosition;
-
-    @Column(name = "finish_time_seconds")
-    private BigDecimal finishTimeSeconds;
-
-    @Column(name = "prize_money")
-    private BigDecimal prizeMoney;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -199,30 +191,6 @@ public class RaceRegistration {
 
     public void setReviewedAt(LocalDateTime reviewedAt) {
         this.reviewedAt = reviewedAt;
-    }
-
-    public Integer getFinalPosition() {
-        return finalPosition;
-    }
-
-    public void setFinalPosition(Integer finalPosition) {
-        this.finalPosition = finalPosition;
-    }
-
-    public BigDecimal getFinishTimeSeconds() {
-        return finishTimeSeconds;
-    }
-
-    public void setFinishTimeSeconds(BigDecimal finishTimeSeconds) {
-        this.finishTimeSeconds = finishTimeSeconds;
-    }
-
-    public BigDecimal getPrizeMoney() {
-        return prizeMoney;
-    }
-
-    public void setPrizeMoney(BigDecimal prizeMoney) {
-        this.prizeMoney = prizeMoney;
     }
 
     public LocalDateTime getCreatedAt() {
