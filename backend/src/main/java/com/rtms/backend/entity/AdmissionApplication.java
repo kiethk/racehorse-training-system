@@ -50,6 +50,12 @@ public class AdmissionApplication {
     @Column(name = "vet_reviewed_at")
     private LocalDateTime vetReviewedAt;
 
+    @Column(name = "physical_exam_confirmed_at")
+    private LocalDateTime physicalExamConfirmedAt;
+
+    @Column(name = "vet_reviewed_by")
+    private Long vetReviewedBy;
+
     @Column(name = "trainer_id")
     private Long trainerId;
 
@@ -203,6 +209,22 @@ public class AdmissionApplication {
 
     public void setVetReviewedAt(LocalDateTime vetReviewedAt) {
         this.vetReviewedAt = vetReviewedAt;
+    }
+
+    public LocalDateTime getPhysicalExamConfirmedAt() {
+        return physicalExamConfirmedAt;
+    }
+
+    public void setPhysicalExamConfirmedAt(LocalDateTime physicalExamConfirmedAt) {
+        this.physicalExamConfirmedAt = physicalExamConfirmedAt;
+    }
+
+    public Long getVetReviewedBy() {
+        return vetReviewedBy;
+    }
+
+    public void setVetReviewedBy(Long vetReviewedBy) {
+        this.vetReviewedBy = vetReviewedBy;
     }
 
     public Long getTrainerId() {
