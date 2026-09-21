@@ -30,24 +30,16 @@ public class HorsePedigree {
     @Column(name = "dam_registration_number", length = 100)
     private String damRegistrationNumber;
 
-    @Column(name = "registry_name", length = 255)
-    private String registryName;
-
     @Column(name = "pedigree_notes", length = 2000)
     private String pedigreeNotes;
 
-    @Column(name = "registration_number", length = 255)
-    private String registrationNumber;
 
-    public HorsePedigree(Long id, Long sireId, Long horseId, Long damId, String registryName, String pedigreeNotes,
-            String registrationNumber) {
+    public HorsePedigree(Long id, Long sireId, Long horseId, Long damId, String pedigreeNotes) {
         this.id = id;
         this.sireId = sireId;
         this.horseId = horseId;
         this.damId = damId;
-        this.registryName = registryName;
         this.pedigreeNotes = pedigreeNotes;
-        this.registrationNumber = registrationNumber;
     }
 
     public HorsePedigree() {
@@ -118,27 +110,11 @@ public class HorsePedigree {
         this.damRegistrationNumber = damRegistrationNumber;
     }
 
-    public String getRegistryName() {
-        return registryName;
-    }
-
-    public void setRegistryName(String registryName) {
-        this.registryName = registryName;
-    }
-
     public String getPedigreeNotes() {
         return pedigreeNotes;
     }
 
     public void setPedigreeNotes(String pedigreeNotes) {
         this.pedigreeNotes = pedigreeNotes;
-    }
-
-    public String getRegistrationNumber() {
-        return registrationNumber;
-    }
-
-    public void setRegistrationNumber(String registrationNumber) {
-        this.registrationNumber = registrationNumber;
     }
 }
