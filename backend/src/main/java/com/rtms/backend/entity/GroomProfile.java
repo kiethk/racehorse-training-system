@@ -1,9 +1,7 @@
 package com.rtms.backend.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import com.rtms.backend.enums.GroomShift;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "groom_profiles")
@@ -14,23 +12,35 @@ public class GroomProfile {
     private Long userId;
 
 
-    @Column(name = "shift")
-    private String shift;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "shift", length = 50)
+    private GroomShift shift;
 
     public Long getUserId() {
         return userId;
     }
+
+    @Column(name = "trainer_id")
+    private Long trainerId;
 
     public void setUserId(Long userId) {
         this.userId = userId;
     }
 
 
-    public String getShift() {
+    public GroomShift getShift() {
         return shift;
     }
 
-    public void setShift(String shift) {
+    public void setShift(GroomShift shift) {
         this.shift = shift;
+    }
+
+    public Long getTrainerId() {
+        return trainerId;
+    }
+
+    public void setTrainerId(Long trainerId) {
+        this.trainerId = trainerId;
     }
 }

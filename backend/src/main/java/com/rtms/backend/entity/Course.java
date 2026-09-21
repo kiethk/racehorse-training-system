@@ -1,5 +1,6 @@
 package com.rtms.backend.entity;
 
+import com.rtms.backend.enums.CourseStatus;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -25,8 +26,9 @@ public class Course {
     @Column(name = "created_by_id")
     private Long createdById;
 
-    @Column(nullable = false)
-    private String status = "ACTIVE"; // ACTIVE, ARCHIVED
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private CourseStatus status = CourseStatus.ACTIVE;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -64,8 +66,8 @@ public class Course {
     public Long getCreatedById() { return createdById; }
     public void setCreatedById(Long createdById) { this.createdById = createdById; }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public CourseStatus getStatus() { return status; }
+    public void setStatus(CourseStatus status) { this.status = status; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

@@ -42,9 +42,9 @@ public class SubjectService {
         subject.setCategoryId(request.getCategoryId());
         subject.setName(request.getName());
         subject.setDescription(request.getDescription());
-        subject.setSurfaceType(request.getSurfaceType().toUpperCase());
+        subject.setSurfaceType(request.getSurfaceType());
         subject.setTargetDistanceMeters(request.getTargetDistanceMeters());
-        subject.setIntensityLevel(request.getIntensityLevel().toUpperCase());
+        subject.setIntensityLevel(request.getIntensityLevel());
 
         return subjectRepository.save(subject);
     }

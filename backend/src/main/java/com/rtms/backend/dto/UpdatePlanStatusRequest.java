@@ -1,8 +1,10 @@
 package com.rtms.backend.dto;
 
-public class UpdatePlanStatusRequest {
-    private String status; // ACTIVE, COMPLETED, PAUSED, CANCELLED
+import com.rtms.backend.enums.TrainingPlanStatus;
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+public class UpdatePlanStatusRequest {
+    private TrainingPlanStatus status;
+
+    public TrainingPlanStatus getStatus() { return status; }
+    public void setStatus(TrainingPlanStatus status) { this.status = status; }
 }

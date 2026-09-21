@@ -26,9 +26,6 @@ public class Area {
     @Column(name = "trainer_id")
     private Long trainerId;
 
-    @Column(name = "groom_id")
-    private Long groomId;
-
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -84,14 +81,6 @@ public class Area {
 
     public void setTrainerId(Long trainerId) {
         this.trainerId = trainerId;
-    }
-
-    public Long getGroomId() {
-        return groomId;
-    }
-
-    public void setGroomId(Long groomId) {
-        this.groomId = groomId;
     }
 
     public LocalDateTime getCreatedAt() {

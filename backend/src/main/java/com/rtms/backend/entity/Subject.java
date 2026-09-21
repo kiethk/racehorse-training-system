@@ -1,5 +1,7 @@
 package com.rtms.backend.entity;
 
+import com.rtms.backend.enums.IntensityLevel;
+import com.rtms.backend.enums.SurfaceType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,14 +23,16 @@ public class Subject {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "surface_type", nullable = false)
-    private String surfaceType; // TURF, DIRT, SYNTHETIC
+    @Enumerated(EnumType.STRING)
+    @Column(name = "surface_type", nullable = false, length = 30)
+    private SurfaceType surfaceType; // TURF, DIRT, SYNTHETIC
 
     @Column(name = "target_distance_meters")
     private BigDecimal targetDistanceMeters;
 
-    @Column(name = "intensity_level", nullable = false)
-    private String intensityLevel; // LOW, MEDIUM, HIGH
+    @Enumerated(EnumType.STRING)
+    @Column(name = "intensity_level", nullable = false, length = 20)
+    private IntensityLevel intensityLevel; // LOW, MEDIUM, HIGH
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -60,14 +64,14 @@ public class Subject {
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
-    public String getSurfaceType() { return surfaceType; }
-    public void setSurfaceType(String surfaceType) { this.surfaceType = surfaceType; }
+    public SurfaceType getSurfaceType() { return surfaceType; }
+    public void setSurfaceType(SurfaceType surfaceType) { this.surfaceType = surfaceType; }
 
     public BigDecimal getTargetDistanceMeters() { return targetDistanceMeters; }
     public void setTargetDistanceMeters(BigDecimal targetDistanceMeters) { this.targetDistanceMeters = targetDistanceMeters; }
 
-    public String getIntensityLevel() { return intensityLevel; }
-    public void setIntensityLevel(String intensityLevel) { this.intensityLevel = intensityLevel; }
+    public IntensityLevel getIntensityLevel() { return intensityLevel; }
+    public void setIntensityLevel(IntensityLevel intensityLevel) { this.intensityLevel = intensityLevel; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

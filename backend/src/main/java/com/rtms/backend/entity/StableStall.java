@@ -18,6 +18,9 @@ public class StableStall {
     @Column(name = "area_id", nullable = false)
     private Long areaId;
 
+    @Column(name = "groom_id")
+    private Long groomId;
+
     @Column(name = "stall_number", nullable = false)
     private Integer stallNumber;
 
@@ -59,6 +62,14 @@ public class StableStall {
 
     public void setAreaId(Long areaId) {
         this.areaId = areaId;
+    }
+
+    public Long getGroomId() {
+        return groomId;
+    }
+
+    public void setGroomId(Long groomId) {
+        this.groomId = groomId;
     }
 
     public Integer getStallNumber() {

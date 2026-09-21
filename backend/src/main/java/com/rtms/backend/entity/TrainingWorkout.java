@@ -1,5 +1,7 @@
 package com.rtms.backend.entity;
 
+import com.rtms.backend.enums.WorkoutStatus;
+import com.rtms.backend.enums.WorkoutType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -34,11 +36,13 @@ public class TrainingWorkout {
     @Column(name = "end_time")
     private LocalDateTime endTime;
 
-    @Column(name = "workout_type")
-    private String workoutType = "REGULAR"; // REGULAR, TRIAL_RUN
+    @Enumerated(EnumType.STRING)
+    @Column(name = "workout_type", length = 20)
+    private WorkoutType workoutType = WorkoutType.REGULAR;
 
-    @Column(nullable = false)
-    private String status = "SCHEDULED"; // SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private WorkoutStatus status = WorkoutStatus.SCHEDULED;
 
     @Column(name = "actual_distance_meters")
     private BigDecimal actualDistanceMeters;
@@ -112,11 +116,11 @@ public class TrainingWorkout {
     public LocalDateTime getEndTime() { return endTime; }
     public void setEndTime(LocalDateTime endTime) { this.endTime = endTime; }
 
-    public String getWorkoutType() { return workoutType; }
-    public void setWorkoutType(String workoutType) { this.workoutType = workoutType; }
+    public WorkoutType getWorkoutType() { return workoutType; }
+    public void setWorkoutType(WorkoutType workoutType) { this.workoutType = workoutType; }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public WorkoutStatus getStatus() { return status; }
+    public void setStatus(WorkoutStatus status) { this.status = status; }
 
     public BigDecimal getActualDistanceMeters() { return actualDistanceMeters; }
     public void setActualDistanceMeters(BigDecimal actualDistanceMeters) { this.actualDistanceMeters = actualDistanceMeters; }

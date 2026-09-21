@@ -1,5 +1,6 @@
 package com.rtms.backend.entity;
 
+import com.rtms.backend.enums.TrainingPlanStatus;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,8 +28,9 @@ public class HorseTrainingPlan {
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
-    @Column(nullable = false)
-    private String status = "ACTIVE"; // ACTIVE, COMPLETED, CANCELLED, PAUSED
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TrainingPlanStatus status = TrainingPlanStatus.ACTIVE;
 
     private String notes;
 
@@ -68,8 +70,8 @@ public class HorseTrainingPlan {
     public LocalDate getEndDate() { return endDate; }
     public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public TrainingPlanStatus getStatus() { return status; }
+    public void setStatus(TrainingPlanStatus status) { this.status = status; }
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
