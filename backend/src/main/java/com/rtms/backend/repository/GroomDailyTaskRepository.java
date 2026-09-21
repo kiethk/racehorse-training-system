@@ -1,6 +1,7 @@
 package com.rtms.backend.repository;
 
 import com.rtms.backend.entity.GroomDailyTask;
+import com.rtms.backend.enums.GroomTaskType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -17,4 +18,11 @@ public interface GroomDailyTaskRepository extends JpaRepository<GroomDailyTask, 
     List<GroomDailyTask> findByScheduledTimeBetween(LocalDateTime start, LocalDateTime end);
 
     List<GroomDailyTask> findByHorseId(Long horseId);
+
+    boolean existsByHorseIdAndTaskTypeAndScheduledTimeBetween(
+            Long horseId,
+            GroomTaskType taskType,
+            LocalDateTime start,
+            LocalDateTime end
+    );
 }

@@ -50,4 +50,12 @@ public class GroomDailyTaskController {
         GroomDailyTask completed = taskService.completeTask(id, currentUser);
         return ApiResponse.success(completed);
     }
+
+    @PostMapping("/generate-routine")
+    @PreAuthorize("hasAuthority('GROOM_DAILY_TASK_CREATE')")
+    public ApiResponse<List<GroomDailyTask>> generateRoutine(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        List<GroomDailyTask> tasks = taskService.generateDailyRoutineTasks(date);
+        return ApiResponse.success(tasks);
+    }
 }
