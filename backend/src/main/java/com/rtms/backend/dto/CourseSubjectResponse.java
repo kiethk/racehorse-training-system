@@ -1,5 +1,8 @@
 package com.rtms.backend.dto;
 
+import com.rtms.backend.enums.IntensityLevel;
+import com.rtms.backend.enums.SurfaceType;
+
 import java.math.BigDecimal;
 
 public class CourseSubjectResponse {
@@ -7,14 +10,14 @@ public class CourseSubjectResponse {
     private Long subjectId;
     private String subjectName;
     private String description;
-    private String surfaceType;
+    private SurfaceType surfaceType;
     private BigDecimal targetDistanceMeters;
-    private String intensityLevel;
+    private IntensityLevel intensityLevel;
     private Integer orderIndex;
 
     public CourseSubjectResponse(Long id, Long subjectId, String subjectName, String description,
-                                 String surfaceType, BigDecimal targetDistanceMeters,
-                                 String intensityLevel, Integer orderIndex) {
+                                 SurfaceType surfaceType, BigDecimal targetDistanceMeters,
+                                 IntensityLevel intensityLevel, Integer orderIndex) {
         this.id = id;
         this.subjectId = subjectId;
         this.subjectName = subjectName;
@@ -37,14 +40,14 @@ public class CourseSubjectResponse {
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
-    public String getSurfaceType() { return surfaceType; }
-    public void setSurfaceType(String surfaceType) { this.surfaceType = surfaceType; }
+    public SurfaceType getSurfaceType() { return surfaceType; }
+    public void setSurfaceType(SurfaceType surfaceType) { this.surfaceType = surfaceType; }
 
     public BigDecimal getTargetDistanceMeters() { return targetDistanceMeters; }
     public void setTargetDistanceMeters(BigDecimal targetDistanceMeters) { this.targetDistanceMeters = targetDistanceMeters; }
 
-    public String getIntensityLevel() { return intensityLevel; }
-    public void setIntensityLevel(String intensityLevel) { this.intensityLevel = intensityLevel; }
+    public IntensityLevel getIntensityLevel() { return intensityLevel; }
+    public void setIntensityLevel(IntensityLevel intensityLevel) { this.intensityLevel = intensityLevel; }
 
     public Integer getOrderIndex() { return orderIndex; }
     public void setOrderIndex(Integer orderIndex) { this.orderIndex = orderIndex; }

@@ -5,6 +5,7 @@ import com.rtms.backend.dto.CourseSubjectItemRequest;
 import com.rtms.backend.dto.CourseSubjectResponse;
 import com.rtms.backend.dto.CreateCourseRequest;
 import com.rtms.backend.entity.Course;
+import com.rtms.backend.enums.CourseStatus;
 import com.rtms.backend.entity.CourseSubject;
 import com.rtms.backend.entity.Subject;
 import com.rtms.backend.repository.CourseRepository;
@@ -58,7 +59,7 @@ public class CourseService {
         course.setTargetGoal(request.getTargetGoal());
         course.setTotalSessions(request.getTotalSessions());
         course.setCreatedById(currentUser.getUserId());
-        course.setStatus("ACTIVE");
+        course.setStatus(CourseStatus.ACTIVE);
 
         Course savedCourse = courseRepository.save(course);
 

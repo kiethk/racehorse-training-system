@@ -18,4 +18,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
     List<StableStall> findByAreaIdAndStatus(Long areaId, StallStatus status);
 
     Optional<StableStall> findByStallCode(String stallCode);
+
+    List<StableStall> findByGroomId(Long groomId);
+    List<StableStall> findByAreaIdAndGroomId(Long areaId, Long groomId);
 }

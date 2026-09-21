@@ -31,7 +31,13 @@ public class StableStallController {
     public ApiResponse<List<StableStall>> getStalls(
             @RequestParam(required = false) String areaCode,
             @RequestParam(required = false) AreaType areaType,
-            @RequestParam(required = false) StallStatus status) {
+            @RequestParam(required = false) StallStatus status,
+            @RequestParam(required = false) Long groomId) {
+
+        if (groomId != null) {
+            return ApiResponse.success(stableStallRepository.findByGroomId(groomId));
+        }
+
         if (areaCode != null) {
             Area area = areaRepository.findByCode(areaCode)
                     .orElseThrow(() -> new RuntimeException("Area not found with code: " + areaCode));
@@ -67,6 +73,18 @@ public class StableStallController {
 
         return ApiResponse.success(
                 stableStallRepository.findAll());
+    }
+
+    @PutMapping("/{id}/assign-groom")
+    @PreAuthorize("hasAnyAuthority('STABLE_STALL_UPDATE', 'TRAINING_PLAN_CREATE')")
+    public ApiResponse<StableStall> assignGroom(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long groomId) {
+        StableStall stall = stableStallRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Stable stall not found with id: " + id));
+
+        stall.setGroomId(groomId);
+        return ApiResponse.success(stableStallRepository.save(stall));
     }
 
     @GetMapping("/{id}")
