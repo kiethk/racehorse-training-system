@@ -46,6 +46,12 @@ public class Horse {
     @Column(name = "owner_id")
     private Long ownerId;
 
+    @Column(name = "registry_name")
+    private String registryName;
+
+    @Column(name = "registration_number")
+    private String registrationNumber;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -126,6 +132,22 @@ public class Horse {
 
     public void setOwnerId(Long ownerId) {
         this.ownerId = ownerId;
+    }
+
+    public String getRegistryName() {
+        return registryName;
+    }
+
+    public void setRegistryName(String registryName) {
+        this.registryName = registryName;
+    }
+
+    public String getRegistrationNumber() {
+        return registrationNumber;
+    }
+
+    public void setRegistrationNumber(String registrationNumber) {
+        this.registrationNumber = registrationNumber;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -67,9 +67,11 @@ public class HorsePedigreeService {
         pedigree.setHorseId(horseId);
         pedigree.setSireId(request.getSireId());
         pedigree.setDamId(request.getDamId());
-        pedigree.setRegistrationNumber(request.getRegistrationNumber());
-        pedigree.setRegistryName(request.getRegistryName());
         pedigree.setPedigreeNotes(request.getPedigreeNotes());
+
+        horse.setRegistrationNumber(request.getRegistrationNumber());
+        horse.setRegistryName(request.getRegistryName());
+        horse = horseRepository.save(horse);
 
         HorsePedigree saved = horsePedigreeRepository.save(pedigree);
 
@@ -97,8 +99,8 @@ public class HorsePedigreeService {
                 toSummary(horse),
                 toSummary(sire),
                 toSummary(dam),
-                pedigree.getRegistrationNumber(),
-                pedigree.getRegistryName(),
+                horse.getRegistrationNumber(),
+                horse.getRegistryName(),
                 pedigree.getPedigreeNotes());
     }
 

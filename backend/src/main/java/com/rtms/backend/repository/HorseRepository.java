@@ -19,4 +19,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface HorseRepository extends JpaRepository<Horse, Long> {
     List<Horse> findByOwnerId(Long ownerId);
+    List<Horse> findByRegistrationNumber(String registrationNumber);
 }
