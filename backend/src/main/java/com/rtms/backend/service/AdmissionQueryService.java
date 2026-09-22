@@ -5,10 +5,12 @@ import com.rtms.backend.dto.AdmissionSummaryResponse;
 import com.rtms.backend.entity.AdmissionApplication;
 import com.rtms.backend.entity.AdmissionDocument;
 import com.rtms.backend.entity.CandidateHorseProfile;
+import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.AdmissionDocumentRepository;
 import com.rtms.backend.repository.CandidateHorseProfileRepository;
+import com.rtms.backend.repository.StableStallRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,14 +21,17 @@ public class AdmissionQueryService {
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final CandidateHorseProfileRepository candidateHorseProfileRepository;
     private final AdmissionDocumentRepository admissionDocumentRepository;
+    private final StableStallRepository stableStallRepository;
 
     public AdmissionQueryService(
             AdmissionApplicationRepository admissionApplicationRepository,
             CandidateHorseProfileRepository candidateHorseProfileRepository,
-            AdmissionDocumentRepository admissionDocumentRepository) {
+            AdmissionDocumentRepository admissionDocumentRepository,
+            StableStallRepository stableStallRepository) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.admissionDocumentRepository = admissionDocumentRepository;
+        this.stableStallRepository = stableStallRepository;
     }
 
     public List<AdmissionSummaryResponse> getAdmissions(AdmissionStatus status) {
@@ -91,6 +96,14 @@ public class AdmissionQueryService {
 
         response.setResultingHorseId(admission.getResultingHorseId());
         response.setSubmittedAt(admission.getSubmittedAt());
+
+        response.setPhysicalExamConfirmedAt(admission.getPhysicalExamConfirmedAt());
+        response.setVetReviewedBy(admission.getVetReviewedBy());
+        response.setQuarantineStallCode(admission.getQuarantineStallId() == null
+                ? null
+                : stableStallRepository.findById(admission.getQuarantineStallId())
+                        .map(StableStall::getStallCode)
+                        .orElse(null));
 
         return response;
     }
