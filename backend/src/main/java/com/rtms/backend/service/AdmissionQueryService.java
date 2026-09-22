@@ -97,8 +97,6 @@ public class AdmissionQueryService {
         response.setResultingHorseId(admission.getResultingHorseId());
         response.setSubmittedAt(admission.getSubmittedAt());
 
-        response.setPhysicalExamConfirmedAt(admission.getPhysicalExamConfirmedAt());
-        response.setVetReviewedBy(admission.getVetReviewedBy());
         response.setQuarantineStallCode(admission.getQuarantineStallId() == null
                 ? null
                 : stableStallRepository.findById(admission.getQuarantineStallId())

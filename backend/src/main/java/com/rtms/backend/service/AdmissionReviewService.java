@@ -63,12 +63,19 @@ public class AdmissionReviewService {
                     "Physical exam must be confirmed");
         }
 
+        Long assignedVetId = admission.getVeterinarianId();
+        if (assignedVetId == null) {
+            admission.setVeterinarianId(actorId);
+        } else if (!assignedVetId.equals(actorId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Only the assigned veterinarian can review this admission");
+        }
+
         LocalDateTime now = LocalDateTime.now();
         admission.setVetDecision(decision);
         admission.setVetFeedback(request.getFeedback());
         admission.setVetReviewedAt(now);
-        admission.setVetReviewedBy(actorId);
-        admission.setPhysicalExamConfirmedAt(now);
 
         if (decision == ReviewDecision.REJECTED) {
             StableStall stall = stableStallRepository.findById(admission.getQuarantineStallId())
