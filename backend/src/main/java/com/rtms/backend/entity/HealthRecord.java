@@ -5,8 +5,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "medical_records")
-public class MedicalRecord {
+@Table(name = "health_records")
+public class HealthRecord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,11 +27,20 @@ public class MedicalRecord {
     @Column(name = "symptoms", columnDefinition = "TEXT")
     private String symptoms;
 
-    @Column(name = "clinical_findings", columnDefinition = "TEXT")
-    private String clinicalFindings;
+    @Column(name = "findings", columnDefinition = "TEXT")
+    private String findings;
 
-    @Column(name = "diagnosis", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "diagnosis", columnDefinition = "TEXT")
     private String diagnosis;
+
+    @Column(name = "record_type", nullable = false)
+    private String recordType = "ILLNESS";
+
+    @Column(name = "preventive_care_schedule_id")
+    private Long preventiveCareScheduleId;
+
+    @Column(name = "product_or_service")
+    private String productOrService;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
@@ -105,12 +114,12 @@ public class MedicalRecord {
         this.symptoms = symptoms;
     }
 
-    public String getClinicalFindings() {
-        return clinicalFindings;
+    public String getFindings() {
+        return findings;
     }
 
-    public void setClinicalFindings(String clinicalFindings) {
-        this.clinicalFindings = clinicalFindings;
+    public void setFindings(String findings) {
+        this.findings = findings;
     }
 
     public String getDiagnosis() {
@@ -119,6 +128,30 @@ public class MedicalRecord {
 
     public void setDiagnosis(String diagnosis) {
         this.diagnosis = diagnosis;
+    }
+
+    public String getRecordType() {
+        return recordType;
+    }
+
+    public void setRecordType(String recordType) {
+        this.recordType = recordType;
+    }
+
+    public Long getPreventiveCareScheduleId() {
+        return preventiveCareScheduleId;
+    }
+
+    public void setPreventiveCareScheduleId(Long preventiveCareScheduleId) {
+        this.preventiveCareScheduleId = preventiveCareScheduleId;
+    }
+
+    public String getProductOrService() {
+        return productOrService;
+    }
+
+    public void setProductOrService(String productOrService) {
+        this.productOrService = productOrService;
     }
 
     public String getNotes() {

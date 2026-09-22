@@ -16,8 +16,8 @@ public class InjuryRecord {
     @Column(name = "horse_id", nullable = false)
     private Long horseId;
 
-    @Column(name = "medical_record_id", nullable = false)
-    private Long medicalRecordId;
+    @Column(name = "health_record_id", nullable = false)
+    private Long healthRecordId;
 
     @Column(name = "injury_type", nullable = false)
     private String injuryType;
@@ -86,12 +86,12 @@ public class InjuryRecord {
         this.horseId = horseId;
     }
 
-    public Long getMedicalRecordId() {
-        return medicalRecordId;
+    public Long getHealthRecordId() {
+        return healthRecordId;
     }
 
-    public void setMedicalRecordId(Long medicalRecordId) {
-        this.medicalRecordId = medicalRecordId;
+    public void setHealthRecordId(Long healthRecordId) {
+        this.healthRecordId = healthRecordId;
     }
 
     public String getInjuryType() {

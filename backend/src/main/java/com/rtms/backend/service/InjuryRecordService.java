@@ -5,12 +5,12 @@ import com.rtms.backend.dto.TrainingLockStatusResponse;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.HorseBodyRegion;
 import com.rtms.backend.entity.InjuryRecord;
-import com.rtms.backend.entity.MedicalRecord;
+import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.repository.HorseBodyRegionRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.InjuryRecordRepository;
-import com.rtms.backend.repository.MedicalRecordRepository;
+import com.rtms.backend.repository.HealthRecordRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,29 +18,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class InjuryRecordService {
 
     private final InjuryRecordRepository injuryRecordRepository;
-    private final MedicalRecordRepository medicalRecordRepository;
+    private final HealthRecordRepository healthRecordRepository;
     private final HorseRepository horseRepository;
     private final HorseBodyRegionRepository horseBodyRegionRepository;
 
     public InjuryRecordService(InjuryRecordRepository injuryRecordRepository,
-            MedicalRecordRepository medicalRecordRepository,
+            HealthRecordRepository healthRecordRepository,
             HorseRepository horseRepository,
             HorseBodyRegionRepository horseBodyRegionRepository) {
         this.injuryRecordRepository = injuryRecordRepository;
-        this.medicalRecordRepository = medicalRecordRepository;
+        this.healthRecordRepository = healthRecordRepository;
         this.horseRepository = horseRepository;
         this.horseBodyRegionRepository = horseBodyRegionRepository;
     }
 
     @Transactional
     public InjuryRecord createInjuryRecord(CreateInjuryRecordRequest request) {
-        MedicalRecord medicalRecord = medicalRecordRepository.findById(request.getMedicalRecordId())
-                .orElseThrow(() -> new RuntimeException("Medical record not found with id: "
-                        + request.getMedicalRecordId()));
+        HealthRecord healthRecord = healthRecordRepository.findById(request.getHealthRecordId())
+                .orElseThrow(() -> new RuntimeException("Health record not found with id: "
+                        + request.getHealthRecordId()));
 
-        Horse horse = horseRepository.findById(medicalRecord.getHorseId())
+        Horse horse = horseRepository.findById(healthRecord.getHorseId())
                 .orElseThrow(() -> new RuntimeException("Horse not found with id: "
-                        + medicalRecord.getHorseId()));
+                        + healthRecord.getHorseId()));
 
         HorseBodyRegion bodyRegion = horseBodyRegionRepository.findById(request.getBodyRegionId())
                 .orElseThrow(() -> new RuntimeException("Body region not found with id: "
@@ -51,8 +51,8 @@ public class InjuryRecordService {
         }
 
         InjuryRecord injury = new InjuryRecord();
-        injury.setHorseId(medicalRecord.getHorseId());
-        injury.setMedicalRecordId(medicalRecord.getId());
+        injury.setHorseId(healthRecord.getHorseId());
+        injury.setHealthRecordId(healthRecord.getId());
         injury.setBodyRegionId(bodyRegion.getId());
         injury.setInjuryType(request.getInjuryType());
         injury.setSeverity(request.getSeverity());

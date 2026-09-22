@@ -85,7 +85,7 @@ public class AdmissionQueryService {
         response.setVetReviewedAt(admission.getVetReviewedAt());
 
         response.setTrainerId(admission.getTrainerId());
-        response.setTrainerDecision(admission.getTrainerDecision());
+
         response.setTrainerFeedback(admission.getTrainerFeedback());
         response.setTrainerReviewedAt(admission.getTrainerReviewedAt());
 
@@ -94,7 +94,7 @@ public class AdmissionQueryService {
         response.setManagerFeedback(admission.getManagerFeedback());
         response.setManagerReviewedAt(admission.getManagerReviewedAt());
 
-        response.setResultingHorseId(admission.getResultingHorseId());
+        response.setHorseId(admission.getHorseId());
         response.setSubmittedAt(admission.getSubmittedAt());
 
         response.setQuarantineStallCode(admission.getQuarantineStallId() == null

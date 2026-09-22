@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-public class CreateMedicalRecordRequest {
+public class CreateHealthRecordRequest {
     @NotNull
     private Long horseId;
 
@@ -14,10 +14,11 @@ public class CreateMedicalRecordRequest {
     private LocalDateTime examinedAt;
 
     private String symptoms;
-    private String clinicalFindings;
-
-    @NotBlank
+    private String findings;
     private String diagnosis;
+    private String recordType = "ILLNESS";
+    private Long preventiveCareScheduleId;
+    private String productOrService;
 
     private String notes;
     private LocalDate followUpDate;
@@ -47,12 +48,12 @@ public class CreateMedicalRecordRequest {
         this.symptoms = symptoms;
     }
 
-    public String getClinicalFindings() {
-        return clinicalFindings;
+    public String getFindings() {
+        return findings;
     }
 
-    public void setClinicalFindings(String clinicalFindings) {
-        this.clinicalFindings = clinicalFindings;
+    public void setFindings(String findings) {
+        this.findings = findings;
     }
 
     public String getDiagnosis() {
@@ -85,5 +86,29 @@ public class CreateMedicalRecordRequest {
 
     public void setSourceTrainingWorkoutId(Long sourceTrainingWorkoutId) {
         this.sourceTrainingWorkoutId = sourceTrainingWorkoutId;
+    }
+
+    public String getRecordType() {
+        return recordType;
+    }
+
+    public void setRecordType(String recordType) {
+        this.recordType = recordType;
+    }
+
+    public Long getPreventiveCareScheduleId() {
+        return preventiveCareScheduleId;
+    }
+
+    public void setPreventiveCareScheduleId(Long preventiveCareScheduleId) {
+        this.preventiveCareScheduleId = preventiveCareScheduleId;
+    }
+
+    public String getProductOrService() {
+        return productOrService;
+    }
+
+    public void setProductOrService(String productOrService) {
+        this.productOrService = productOrService;
     }
 }

@@ -15,19 +15,19 @@ public class PreventiveCareSchedule {
     @Column(name = "horse_id", nullable = false)
     private Long horseId;
 
-    @Column(name = "veterinarian_id", nullable = false)
+    @Column(name = "veterinarian_id")
     private Long veterinarianId;
 
     @Column(name = "care_type", nullable = false)
-    private String careType; // VACCINATION, DEWORMING, FARRIER
+    private String careType; // INITIAL_EXAM, VACCINATION, DEWORMING, FARRIER
 
-    @Column(name = "scheduled_date", nullable = false)
+    @Column(name = "scheduled_date")
     private LocalDate scheduledDate;
 
     private String description;
 
     @Column(nullable = false)
-    private String status = "SCHEDULED"; // SCHEDULED, COMPLETED, OVERDUE, CANCELLED
+    private String status = "PENDING"; // PENDING, COMPLETED, OVERDUE, CANCELLED
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

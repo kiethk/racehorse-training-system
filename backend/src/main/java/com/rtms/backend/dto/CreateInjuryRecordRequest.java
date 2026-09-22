@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 public class CreateInjuryRecordRequest {
     @NotNull
-    private Long medicalRecordId;
+    private Long healthRecordId;
 
     @NotNull
     private Long bodyRegionId;
@@ -30,12 +30,12 @@ public class CreateInjuryRecordRequest {
     private BigDecimal positionY;
     private BigDecimal positionZ;
 
-    public Long getMedicalRecordId() {
-        return medicalRecordId;
+    public Long getHealthRecordId() {
+        return healthRecordId;
     }
 
-    public void setMedicalRecordId(Long medicalRecordId) {
-        this.medicalRecordId = medicalRecordId;
+    public void setHealthRecordId(Long healthRecordId) {
+        this.healthRecordId = healthRecordId;
     }
 
     public Long getBodyRegionId() {

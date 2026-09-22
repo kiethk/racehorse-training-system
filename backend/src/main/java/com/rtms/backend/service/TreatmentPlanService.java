@@ -6,7 +6,7 @@ import com.rtms.backend.dto.PrescriptionResponse;
 import com.rtms.backend.dto.TreatmentPlanResponse;
 import com.rtms.backend.entity.Prescription;
 import com.rtms.backend.entity.TreatmentPlan;
-import com.rtms.backend.repository.MedicalRecordRepository;
+import com.rtms.backend.repository.HealthRecordRepository;
 import com.rtms.backend.repository.PrescriptionRepository;
 import com.rtms.backend.repository.TreatmentPlanRepository;
 import jakarta.transaction.Transactional;
@@ -16,26 +16,26 @@ import java.time.LocalDate;
 import java.util.List;
 @Service
 public class TreatmentPlanService {
-    private final MedicalRecordRepository medicalRecordRepository;
+    private final HealthRecordRepository healthRecordRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final PrescriptionRepository prescriptionRepository;
 
     public TreatmentPlanService(
-            MedicalRecordRepository medicalRecordRepository,
+            HealthRecordRepository healthRecordRepository,
             TreatmentPlanRepository treatmentPlanRepository,
             PrescriptionRepository prescriptionRepository)
     {
-        this.medicalRecordRepository = medicalRecordRepository;
+        this.healthRecordRepository = healthRecordRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;
         this.prescriptionRepository = prescriptionRepository;
     }
 
     @Transactional
     public TreatmentPlanResponse createTreatmentPlan(
-            Long medicalRecordId,
+            Long healthRecordId,
             CreateTreatmentPlanRequest request
     ) {
-        medicalRecordRepository.findById(medicalRecordId).orElseThrow(() -> new RuntimeException("Medical Record Not Found"));
+        healthRecordRepository.findById(healthRecordId).orElseThrow(() -> new RuntimeException("Health Record Not Found"));
 
         validateDates(
                 request.getStartDate(),
@@ -43,7 +43,7 @@ public class TreatmentPlanService {
         );
 
         TreatmentPlan plan = new TreatmentPlan();
-        plan.setMedicalRecordId(medicalRecordId);
+        plan.setHealthRecordId(healthRecordId);
         plan.setTreatmentName(request.getTreatmentName());
         plan.setInstructions(request.getInstructions());
         plan.setStartDate(request.getStartDate());
@@ -77,10 +77,10 @@ public class TreatmentPlanService {
         return toPrescriptionResponse(saved);
     }
 
-    public List<TreatmentPlanResponse> getByMedicalRecordId(Long medicalRecordId) {
-        medicalRecordRepository.findById(medicalRecordId).orElseThrow(() -> new RuntimeException("Medical Record Not Found"));
+    public List<TreatmentPlanResponse> getByHealthRecordId(Long healthRecordId) {
+        healthRecordRepository.findById(healthRecordId).orElseThrow(() -> new RuntimeException("Health Record Not Found"));
         return treatmentPlanRepository
-                .findByMedicalRecordId(medicalRecordId)
+                .findByHealthRecordId(healthRecordId)
                 .stream()
                 .map(this::toTreatmentPlanResponse)
                 .toList();
@@ -95,7 +95,7 @@ public class TreatmentPlanService {
                         .toList();
         return new TreatmentPlanResponse(
                 plan.getId(),
-                plan.getMedicalRecordId(),
+                plan.getHealthRecordId(),
                 plan.getTreatmentName(),
                 plan.getInstructions(),
                 plan.getStartDate(),

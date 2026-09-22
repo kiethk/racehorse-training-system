@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/medical-records")
+@RequestMapping("/api/health-records")
 public class TreatmentPlanController {
     private final TreatmentPlanService treatmentPlanService;
 
@@ -19,24 +19,24 @@ public class TreatmentPlanController {
         this.treatmentPlanService = treatmentPlanService;
     }
 
-    @PostMapping("/{medicalRecordId}/treatment-plans")
+    @PostMapping("/{healthRecordId}/treatment-plans")
     @PreAuthorize("hasAuthority('TREATMENT_PLAN_MANAGE')")
     public ApiResponse<TreatmentPlanResponse> createTreatmentPlan(
-            @PathVariable Long medicalRecordId,
+            @PathVariable Long healthRecordId,
             @Valid @RequestBody CreateTreatmentPlanRequest request
             ) {
         return ApiResponse.success(
-                treatmentPlanService.createTreatmentPlan(medicalRecordId, request)
+                treatmentPlanService.createTreatmentPlan(healthRecordId, request)
         );
     }
 
-    @GetMapping("/{medicalRecordId}/treatment-plans")
+    @GetMapping("/{healthRecordId}/treatment-plans")
     @PreAuthorize("hasAuthority('TREATMENT_PLAN_VIEW')")
     public ApiResponse<List<TreatmentPlanResponse>> getTreatmentPlans(
-            @PathVariable Long medicalRecordId
+            @PathVariable Long healthRecordId
     ) {
         return ApiResponse.success(
-                treatmentPlanService.getByMedicalRecordId(medicalRecordId)
+                treatmentPlanService.getByHealthRecordId(healthRecordId)
         );
     }
 }

@@ -53,10 +53,6 @@ public class AdmissionApplication {
     @Column(name = "trainer_id")
     private Long trainerId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "trainer_decision", length = 20)
-    private ReviewDecision trainerDecision;
-
     @Column(name = "trainer_feedback", columnDefinition = "TEXT")
     private String trainerFeedback;
 
@@ -76,8 +72,8 @@ public class AdmissionApplication {
     @Column(name = "manager_reviewed_at")
     private LocalDateTime managerReviewedAt;
 
-    @Column(name = "resulting_horse_id", unique = true)
-    private Long resultingHorseId;
+    @Column(name = "horse_id")
+    private Long horseId;
 
     @Column(name = "submitted_at", nullable = false)
     private LocalDateTime submittedAt;
@@ -213,14 +209,6 @@ public class AdmissionApplication {
         this.trainerId = trainerId;
     }
 
-    public ReviewDecision getTrainerDecision() {
-        return trainerDecision;
-    }
-
-    public void setTrainerDecision(ReviewDecision trainerDecision) {
-        this.trainerDecision = trainerDecision;
-    }
-
     public String getTrainerFeedback() {
         return trainerFeedback;
     }
@@ -269,12 +257,12 @@ public class AdmissionApplication {
         this.managerReviewedAt = managerReviewedAt;
     }
 
-    public Long getResultingHorseId() {
-        return resultingHorseId;
+    public Long getHorseId() {
+        return horseId;
     }
 
-    public void setResultingHorseId(Long resultingHorseId) {
-        this.resultingHorseId = resultingHorseId;
+    public void setHorseId(Long horseId) {
+        this.horseId = horseId;
     }
 
     public LocalDateTime getSubmittedAt() {

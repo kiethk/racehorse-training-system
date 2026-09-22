@@ -142,7 +142,7 @@ public class AdmissionManagerReviewService {
         admission.setManagerDecision(ReviewDecision.APPROVED);
         admission.setManagerFeedback(request.getFeedback());
         admission.setManagerReviewedAt(LocalDateTime.now());
-        admission.setResultingHorseId(horse.getId());
+        admission.setHorseId(horse.getId());
         admission.setStatus(AdmissionStatus.APPROVED);
 
         // 5. Release quarantine stall

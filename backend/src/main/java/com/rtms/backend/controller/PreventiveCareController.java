@@ -1,10 +1,10 @@
 package com.rtms.backend.controller;
 
 import com.rtms.backend.dto.ApiResponse;
-import com.rtms.backend.dto.CreatePreventiveCareRecordRequest;
+import com.rtms.backend.dto.CompletePreventiveCareScheduleRequest;
 import com.rtms.backend.dto.CreatePreventiveCareScheduleRequest;
 import com.rtms.backend.entity.Horse;
-import com.rtms.backend.entity.PreventiveCareRecord;
+import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.entity.PreventiveCareSchedule;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.PreventiveCareScheduleRepository;
@@ -47,19 +47,11 @@ public class PreventiveCareController {
 
     @PreAuthorize("hasAuthority('PREVENTIVE_CARE_CREATE')")
     @PostMapping("/{id}/records")
-    public ApiResponse<PreventiveCareRecord> recordCompletion(@PathVariable Long id,
-            @RequestBody CreatePreventiveCareRecordRequest request) {
-        PreventiveCareRecord savedRecord = preventiveCareService.recordCompletion(id, request);
-        return ApiResponse.success(savedRecord);
-    }
-
-    @PreAuthorize("hasAuthority('PREVENTIVE_CARE_VIEW')")
-    @GetMapping("/records")
-    public ApiResponse<List<PreventiveCareRecord>> getRecordsByHorse(@RequestParam Long horseId) {
+    public ApiResponse<HealthRecord> recordCompletion(@PathVariable Long id,
+            @RequestBody CompletePreventiveCareScheduleRequest request) {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
-
-        return ApiResponse.success(preventiveCareService.getRecordsByHorse(horseId, currentUser));
+        HealthRecord savedRecord = preventiveCareService.recordCompletion(id, request, currentUser);
+        return ApiResponse.success(savedRecord);
     }
-
 }

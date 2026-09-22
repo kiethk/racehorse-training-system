@@ -5,7 +5,7 @@ import java.util.List;
 
 public class TreatmentPlanResponse {
     private Long id;
-    private Long medicalRecordId;
+    private Long healthRecordId;
     private String treatmentName;
     private String instructions;
     private LocalDate startDate;
@@ -14,9 +14,9 @@ public class TreatmentPlanResponse {
 
     private List<PrescriptionResponse> prescriptions;
 
-    public TreatmentPlanResponse(Long id, Long medicalRecordId, String treatmentName, String instructions, LocalDate startDate, LocalDate endDate, String status, List<PrescriptionResponse> prescriptions) {
+    public TreatmentPlanResponse(Long id, Long healthRecordId, String treatmentName, String instructions, LocalDate startDate, LocalDate endDate, String status, List<PrescriptionResponse> prescriptions) {
         this.id = id;
-        this.medicalRecordId = medicalRecordId;
+        this.healthRecordId = healthRecordId;
         this.treatmentName = treatmentName;
         this.instructions = instructions;
         this.startDate = startDate;
@@ -33,12 +33,12 @@ public class TreatmentPlanResponse {
         this.id = id;
     }
 
-    public Long getMedicalRecordId() {
-        return medicalRecordId;
+    public Long getHealthRecordId() {
+        return healthRecordId;
     }
 
-    public void setMedicalRecordId(Long medicalRecordId) {
-        this.medicalRecordId = medicalRecordId;
+    public void setHealthRecordId(Long healthRecordId) {
+        this.healthRecordId = healthRecordId;
     }
 
     public String getTreatmentName() {

@@ -14,6 +14,7 @@ public class AdmissionDetailResponse {
     private Long ownerId;
     private AdmissionStatus status;
     private Long quarantineStallId;
+    private String quarantineStallCode;
 
     private CandidateHorseProfile candidate;
     private List<AdmissionDocument> documents;
@@ -27,10 +28,8 @@ public class AdmissionDetailResponse {
     private ReviewDecision vetDecision;
     private String vetFeedback;
     private LocalDateTime vetReviewedAt;
-    private String quarantineStallCode;
 
     private Long trainerId;
-    private ReviewDecision trainerDecision;
     private String trainerFeedback;
     private LocalDateTime trainerReviewedAt;
 
@@ -39,7 +38,7 @@ public class AdmissionDetailResponse {
     private String managerFeedback;
     private LocalDateTime managerReviewedAt;
 
-    private Long resultingHorseId;
+    private Long horseId;
     private LocalDateTime submittedAt;
 
     public Long getAdmissionId() {
@@ -72,6 +71,14 @@ public class AdmissionDetailResponse {
 
     public void setQuarantineStallId(Long quarantineStallId) {
         this.quarantineStallId = quarantineStallId;
+    }
+
+    public String getQuarantineStallCode() {
+        return quarantineStallCode;
+    }
+
+    public void setQuarantineStallCode(String quarantineStallCode) {
+        this.quarantineStallCode = quarantineStallCode;
     }
 
     public CandidateHorseProfile getCandidate() {
@@ -154,28 +161,12 @@ public class AdmissionDetailResponse {
         this.vetReviewedAt = vetReviewedAt;
     }
 
-    public String getQuarantineStallCode() {
-        return quarantineStallCode;
-    }
-
-    public void setQuarantineStallCode(String quarantineStallCode) {
-        this.quarantineStallCode = quarantineStallCode;
-    }
-
     public Long getTrainerId() {
         return trainerId;
     }
 
     public void setTrainerId(Long trainerId) {
         this.trainerId = trainerId;
-    }
-
-    public ReviewDecision getTrainerDecision() {
-        return trainerDecision;
-    }
-
-    public void setTrainerDecision(ReviewDecision trainerDecision) {
-        this.trainerDecision = trainerDecision;
     }
 
     public String getTrainerFeedback() {
@@ -226,12 +217,12 @@ public class AdmissionDetailResponse {
         this.managerReviewedAt = managerReviewedAt;
     }
 
-    public Long getResultingHorseId() {
-        return resultingHorseId;
+    public Long getHorseId() {
+        return horseId;
     }
 
-    public void setResultingHorseId(Long resultingHorseId) {
-        this.resultingHorseId = resultingHorseId;
+    public void setHorseId(Long horseId) {
+        this.horseId = horseId;
     }
 
     public LocalDateTime getSubmittedAt() {

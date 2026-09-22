@@ -14,8 +14,8 @@ public class TreatmentPlan {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "medical_record_id", nullable = false)
-    private Long medicalRecordId;
+    @Column(name = "health_record_id", nullable = false)
+    private Long healthRecordId;
 
     @Column(name = "treatment_name", nullable = false)
     private String treatmentName;
@@ -56,12 +56,12 @@ public class TreatmentPlan {
         this.id = id;
     }
 
-    public Long getMedicalRecordId() {
-        return medicalRecordId;
+    public Long getHealthRecordId() {
+        return healthRecordId;
     }
 
-    public void setMedicalRecordId(Long medicalRecordId) {
-        this.medicalRecordId = medicalRecordId;
+    public void setHealthRecordId(Long healthRecordId) {
+        this.healthRecordId = healthRecordId;
     }
 
     public String getTreatmentName() {
