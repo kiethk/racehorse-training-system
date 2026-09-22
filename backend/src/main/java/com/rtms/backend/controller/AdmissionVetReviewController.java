@@ -110,8 +110,6 @@ public class AdmissionVetReviewController {
         response.setVetDecision(admission.getVetDecision());
         response.setVetFeedback(admission.getVetFeedback());
         response.setVetReviewedAt(admission.getVetReviewedAt());
-        response.setPhysicalExamConfirmedAt(admission.getPhysicalExamConfirmedAt());
-        response.setVetReviewedBy(admission.getVetReviewedBy());
 
         response.setTrainerId(admission.getTrainerId());
         response.setTrainerDecision(admission.getTrainerDecision());

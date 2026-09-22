@@ -27,8 +27,6 @@ public class AdmissionDetailResponse {
     private ReviewDecision vetDecision;
     private String vetFeedback;
     private LocalDateTime vetReviewedAt;
-    private LocalDateTime physicalExamConfirmedAt;
-    private Long vetReviewedBy;
     private String quarantineStallCode;
 
     private Long trainerId;
@@ -154,22 +152,6 @@ public class AdmissionDetailResponse {
 
     public void setVetReviewedAt(LocalDateTime vetReviewedAt) {
         this.vetReviewedAt = vetReviewedAt;
-    }
-
-    public LocalDateTime getPhysicalExamConfirmedAt() {
-        return physicalExamConfirmedAt;
-    }
-
-    public void setPhysicalExamConfirmedAt(LocalDateTime physicalExamConfirmedAt) {
-        this.physicalExamConfirmedAt = physicalExamConfirmedAt;
-    }
-
-    public Long getVetReviewedBy() {
-        return vetReviewedBy;
-    }
-
-    public void setVetReviewedBy(Long vetReviewedBy) {
-        this.vetReviewedBy = vetReviewedBy;
     }
 
     public String getQuarantineStallCode() {
