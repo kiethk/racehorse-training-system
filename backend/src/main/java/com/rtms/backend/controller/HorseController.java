@@ -51,4 +51,12 @@ public class HorseController {
         return ApiResponse.success(horseService.updateHorseStatus(id, request));
     }
 
+    @PreAuthorize("hasAuthority('STABLE_STALL_UPDATE')")
+    @PutMapping("/{id}/assign-stall")
+    public ApiResponse<Horse> assignStall(
+            @PathVariable Long id,
+            @RequestParam Long stallId) {
+        return ApiResponse.success(horseService.assignStall(id, stallId));
+    }
+
 }

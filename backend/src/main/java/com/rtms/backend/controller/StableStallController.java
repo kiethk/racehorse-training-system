@@ -76,7 +76,7 @@ public class StableStallController {
     }
 
     @PutMapping("/{id}/assign-groom")
-    @PreAuthorize("hasAnyAuthority('STABLE_STALL_UPDATE', 'TRAINING_PLAN_CREATE')")
+    @PreAuthorize("hasAuthority('STABLE_STALL_UPDATE')")
     public ApiResponse<StableStall> assignGroom(
             @PathVariable Long id,
             @RequestParam(required = false) Long groomId) {
