@@ -1,8 +1,10 @@
 package com.rtms.backend.service;
 
 import com.rtms.backend.dto.CreateGroomIncidentReportRequest;
+import com.rtms.backend.dto.HandleIncidentRequest;
 import com.rtms.backend.entity.GroomIncidentReport;
 import com.rtms.backend.enums.IncidentSeverity;
+import com.rtms.backend.enums.IncidentStatus;
 import com.rtms.backend.repository.GroomIncidentReportRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -54,16 +56,69 @@ public class GroomIncidentReportService {
         return incidentReportRepository.save(report);
     }
 
-    public List<GroomIncidentReport> getReports(Long horseId, AuthenticatedUser currentUser) {
+    public List<GroomIncidentReport> getReports(Long horseId,
+                                                IncidentStatus status,
+                                                AuthenticatedUser currentUser) {
+        List<GroomIncidentReport> base;
+
         if (horseId != null) {
-            return incidentReportRepository.findByHorseId(horseId);
+            base = incidentReportRepository.findByHorseId(horseId);
+            if ("GROOM".equalsIgnoreCase(currentUser.getRole())) {
+                base = base.stream()
+                        .filter(r -> currentUser.getUserId().equals(r.getGroomId()))
+                        .toList();
+            }
+        } else if ("GROOM".equalsIgnoreCase(currentUser.getRole())) {
+            base = incidentReportRepository.findByGroomId(currentUser.getUserId());
+        } else {
+            base = incidentReportRepository.findAllByOrderByReportedAtDesc();
         }
 
-        if ("GROOM".equalsIgnoreCase(currentUser.getRole())) {
-            return incidentReportRepository.findByGroomId(currentUser.getUserId());
+        if (status == null) {
+            return base;
+        }
+        return base.stream().filter(r -> r.getStatus() == status).toList();
+    }
+
+    /**
+     * Tiếp nhận / kết luận một báo cáo sự cố.
+     *
+     * PHẠM VI: phần nối sang bệnh án (health_records.source_incident_id) thuộc
+     * module Thú y. Ở đây ta chỉ quản lý VÒNG ĐỜI của báo cáo. Khi đồng đội làm
+     * phần bệnh án, họ gọi API này với status = RESOLVED sau khi lưu bệnh án.
+     */
+    @Transactional
+    public GroomIncidentReport handleReport(Long id,
+                                            HandleIncidentRequest request,
+                                            AuthenticatedUser currentUser) {
+        GroomIncidentReport report = incidentReportRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy báo cáo sự cố #" + id));
+
+        IncidentStatus next = request.getStatus();
+        if (next == null) {
+            throw new IllegalArgumentException("Thiếu trạng thái mới!");
         }
 
-        return incidentReportRepository.findAllByOrderByReportedAtDesc();
+        IncidentStatus current = report.getStatus();
+        boolean valid = switch (current) {
+            case REPORTED  -> next == IncidentStatus.IN_REVIEW || next == IncidentStatus.DISMISSED;
+            case IN_REVIEW -> next == IncidentStatus.RESOLVED  || next == IncidentStatus.DISMISSED;
+            case RESOLVED, DISMISSED -> false;   // trạng thái kết thúc
+        };
+
+        if (!valid) {
+            throw new IllegalStateException(String.format(
+                    "Không thể chuyển báo cáo từ %s sang %s!", current, next));
+        }
+
+        report.setStatus(next);
+        report.setHandledById(currentUser.getUserId());
+        report.setHandledAt(LocalDateTime.now());
+        if (request.getHandlerNote() != null && !request.getHandlerNote().isBlank()) {
+            report.setHandlerNote(request.getHandlerNote().trim());
+        }
+
+        return incidentReportRepository.save(report);
     }
 
     public GroomIncidentReport getReportById(Long id) {

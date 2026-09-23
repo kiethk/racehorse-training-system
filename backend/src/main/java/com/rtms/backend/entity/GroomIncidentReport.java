@@ -1,6 +1,7 @@
 package com.rtms.backend.entity;
 
 import com.rtms.backend.enums.IncidentSeverity;
+import com.rtms.backend.enums.IncidentStatus;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -35,6 +36,22 @@ public class GroomIncidentReport {
     @Column(name = "reported_at")
     private LocalDateTime reportedAt;
 
+    // ===== THÊM MỚI (V45) =====
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private IncidentStatus status = IncidentStatus.REPORTED;
+
+    /** Thú y (hoặc Quản lý) đã tiếp nhận sự cố này. */
+    @Column(name = "handled_by_id")
+    private Long handledById;
+
+    @Column(name = "handled_at")
+    private LocalDateTime handledAt;
+
+    @Column(name = "handler_note", columnDefinition = "TEXT")
+    private String handlerNote;
+
     public GroomIncidentReport() {
     }
 
@@ -54,6 +71,9 @@ public class GroomIncidentReport {
         }
         if (severity == null) {
             severity = IncidentSeverity.MEDIUM;
+        }
+        if (status == null) {
+            status = IncidentStatus.REPORTED;
         }
     }
 
@@ -119,5 +139,37 @@ public class GroomIncidentReport {
 
     public void setReportedAt(LocalDateTime reportedAt) {
         this.reportedAt = reportedAt;
+    }
+
+    public IncidentStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(IncidentStatus status) {
+        this.status = status;
+    }
+
+    public Long getHandledById() {
+        return handledById;
+    }
+
+    public void setHandledById(Long handledById) {
+        this.handledById = handledById;
+    }
+
+    public LocalDateTime getHandledAt() {
+        return handledAt;
+    }
+
+    public void setHandledAt(LocalDateTime handledAt) {
+        this.handledAt = handledAt;
+    }
+
+    public String getHandlerNote() {
+        return handlerNote;
+    }
+
+    public void setHandlerNote(String handlerNote) {
+        this.handlerNote = handlerNote;
     }
 }

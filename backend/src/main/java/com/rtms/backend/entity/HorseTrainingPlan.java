@@ -1,9 +1,13 @@
 package com.rtms.backend.entity;
 
+import com.rtms.backend.config.TrainingDaySetConverter;
+import com.rtms.backend.enums.TrainingDay;
 import com.rtms.backend.enums.TrainingPlanStatus;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "horse_training_plans")
@@ -27,6 +31,28 @@ public class HorseTrainingPlan {
 
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
+
+    // ===== THÊM MỚI (V43) — KHUÔN MẪU CỦA KHOÁ =====
+
+    /**
+     * Các thứ trong tuần khoá này tập.
+     *
+     * Vì sao phải lưu: khi một lot bị huỷ (ngựa chấn thương, trời mưa...),
+     * không thể suy ngược "khoá này tập thứ mấy" từ các workout còn lại —
+     * bạn không phân biệt được "khoá không tập thứ Sáu" với "có tập nhưng
+     * buổi đó bị huỷ".
+     */
+    @Convert(converter = TrainingDaySetConverter.class)
+    @Column(name = "training_days", length = 100)
+    private Set<TrainingDay> trainingDays = new LinkedHashSet<>();
+
+    /**
+     * Groom mặc định của khoá (ảnh chụp lúc tạo plan).
+     * Một buổi lẻ có thể nhờ Groom khác dắt hộ — lúc đó workout.assignedToId
+     * khác giá trị này, và ta vẫn biết ai là người phụ trách chính.
+     */
+    @Column(name = "groom_id")
+    private Long groomId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -69,6 +95,12 @@ public class HorseTrainingPlan {
 
     public LocalDate getEndDate() { return endDate; }
     public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+
+    public Set<TrainingDay> getTrainingDays() { return trainingDays; }
+    public void setTrainingDays(Set<TrainingDay> trainingDays) { this.trainingDays = trainingDays; }
+
+    public Long getGroomId() { return groomId; }
+    public void setGroomId(Long groomId) { this.groomId = groomId; }
 
     public TrainingPlanStatus getStatus() { return status; }
     public void setStatus(TrainingPlanStatus status) { this.status = status; }

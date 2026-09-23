@@ -2,7 +2,9 @@ package com.rtms.backend.controller;
 
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreateGroomIncidentReportRequest;
+import com.rtms.backend.dto.HandleIncidentRequest;
 import com.rtms.backend.entity.GroomIncidentReport;
+import com.rtms.backend.enums.IncidentStatus;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.GroomIncidentReportService;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -34,9 +36,25 @@ public class GroomIncidentReportController {
     @PreAuthorize("hasAuthority('GROOM_INCIDENT_REPORT_VIEW')")
     public ApiResponse<List<GroomIncidentReport>> getReports(
             @RequestParam(required = false) Long horseId,
+            @RequestParam(required = false) IncidentStatus status,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        List<GroomIncidentReport> reports = incidentReportService.getReports(horseId, currentUser);
-        return ApiResponse.success(reports);
+        return ApiResponse.success(
+                incidentReportService.getReports(horseId, status, currentUser));
+    }
+
+    /**
+     * Thú y tiếp nhận hoặc kết luận sự cố.
+     * Dashboard Thú y gọi GET /api/groom-incident-reports?status=REPORTED
+     * để lấy danh sách chờ khám, rồi gọi endpoint này.
+     */
+    @PatchMapping("/{id}/handle")
+    @PreAuthorize("hasAuthority('GROOM_INCIDENT_REPORT_HANDLE')")
+    public ApiResponse<GroomIncidentReport> handleReport(
+            @PathVariable Long id,
+            @RequestBody HandleIncidentRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(
+                incidentReportService.handleReport(id, request, currentUser));
     }
 
     @GetMapping("/{id}")

@@ -27,11 +27,14 @@ class HorseServiceTest {
     @Mock
     private StableStallRepository stableStallRepository;
 
+    @Mock
+    private HorseTrainingPlanService trainingPlanService;
+
     private HorseService horseService;
 
     @BeforeEach
     void setUp() {
-        horseService = new HorseService(horseRepository, stableStallRepository);
+        horseService = new HorseService(horseRepository, stableStallRepository, trainingPlanService);
     }
 
     @Test
@@ -99,5 +102,43 @@ class HorseServiceTest {
 
         assertThrows(RuntimeException.class, () -> horseService.assignStall(1L, 999L));
         verify(horseRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateHorseStatus sang INJURED: kích hoạt cascade cancelFutureTrainingForHorse")
+    void testUpdateHorseStatus_Injured_TriggersCascade() {
+        Horse horse = new Horse();
+        horse.setId(1L);
+        horse.setCurrentStatus(com.rtms.backend.enums.HorseStatus.ELIGIBLE);
+
+        when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
+        when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
+
+        com.rtms.backend.dto.UpdateHorseStatusRequest req = new com.rtms.backend.dto.UpdateHorseStatusRequest();
+        req.setStatus("INJURED");
+
+        Horse updated = horseService.updateHorseStatus(1L, req);
+
+        assertEquals(com.rtms.backend.enums.HorseStatus.INJURED, updated.getCurrentStatus());
+        verify(trainingPlanService, times(1)).cancelFutureTrainingForHorse(eq(1L), anyString());
+    }
+
+    @Test
+    @DisplayName("updateHorseStatus sang ELIGIBLE: KHÔNG kích hoạt cascade huỷ huấn luyện")
+    void testUpdateHorseStatus_Eligible_NoCascade() {
+        Horse horse = new Horse();
+        horse.setId(1L);
+        horse.setCurrentStatus(com.rtms.backend.enums.HorseStatus.INJURED);
+
+        when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
+        when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
+
+        com.rtms.backend.dto.UpdateHorseStatusRequest req = new com.rtms.backend.dto.UpdateHorseStatusRequest();
+        req.setStatus("ELIGIBLE");
+
+        Horse updated = horseService.updateHorseStatus(1L, req);
+
+        assertEquals(com.rtms.backend.enums.HorseStatus.ELIGIBLE, updated.getCurrentStatus());
+        verify(trainingPlanService, never()).cancelFutureTrainingForHorse(anyLong(), anyString());
     }
 }

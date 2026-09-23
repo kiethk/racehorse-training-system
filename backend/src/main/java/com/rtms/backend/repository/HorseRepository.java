@@ -21,4 +21,5 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
     List<Horse> findByOwnerId(Long ownerId);
     List<Horse> findByRegistrationNumber(String registrationNumber);
     List<Horse> findByCurrentStallIdIsNotNull();
+    List<Horse> findByCurrentStallIdIn(List<Long> stallIds);
 }
