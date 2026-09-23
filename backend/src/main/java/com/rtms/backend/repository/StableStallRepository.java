@@ -23,6 +23,8 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
 
     List<StableStall> findByGroomId(Long groomId);
 
+    long countByGroomId(Long groomId);
+
     List<StableStall> findByAreaIdAndGroomId(Long areaId, Long groomId);
 
     @Query(value = """

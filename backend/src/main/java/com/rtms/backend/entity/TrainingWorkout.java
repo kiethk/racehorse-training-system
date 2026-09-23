@@ -1,10 +1,8 @@
 package com.rtms.backend.entity;
 
 import com.rtms.backend.enums.WorkoutStatus;
-import com.rtms.backend.enums.WorkoutType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -18,27 +16,19 @@ public class TrainingWorkout {
     @Column(name = "plan_id", nullable = false)
     private Long planId;
 
-    @Column(name = "subject_id", nullable = false)
-    private Long subjectId;
+    /**
+     * Lot mà chiến mã này tham gia.
+     * Ngày, giờ bắt đầu/kết thúc và bài tập đều lấy từ lot — workout không
+     * còn giữ bản sao nào của chúng nữa.
+     */
+    @Column(name = "lot_id", nullable = false)
+    private Long lotId;
 
     @Column(name = "horse_id", nullable = false)
     private Long horseId;
 
     @Column(name = "assigned_to_id")
     private Long assignedToId;
-
-    @Column(name = "workout_date", nullable = false)
-    private LocalDate workoutDate;
-
-    @Column(name = "start_time")
-    private LocalDateTime startTime;
-
-    @Column(name = "end_time")
-    private LocalDateTime endTime;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "workout_type", length = 20)
-    private WorkoutType workoutType = WorkoutType.REGULAR;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -98,26 +88,14 @@ public class TrainingWorkout {
     public Long getPlanId() { return planId; }
     public void setPlanId(Long planId) { this.planId = planId; }
 
-    public Long getSubjectId() { return subjectId; }
-    public void setSubjectId(Long subjectId) { this.subjectId = subjectId; }
+    public Long getLotId() { return lotId; }
+    public void setLotId(Long lotId) { this.lotId = lotId; }
 
     public Long getHorseId() { return horseId; }
     public void setHorseId(Long horseId) { this.horseId = horseId; }
 
     public Long getAssignedToId() { return assignedToId; }
     public void setAssignedToId(Long assignedToId) { this.assignedToId = assignedToId; }
-
-    public LocalDate getWorkoutDate() { return workoutDate; }
-    public void setWorkoutDate(LocalDate workoutDate) { this.workoutDate = workoutDate; }
-
-    public LocalDateTime getStartTime() { return startTime; }
-    public void setStartTime(LocalDateTime startTime) { this.startTime = startTime; }
-
-    public LocalDateTime getEndTime() { return endTime; }
-    public void setEndTime(LocalDateTime endTime) { this.endTime = endTime; }
-
-    public WorkoutType getWorkoutType() { return workoutType; }
-    public void setWorkoutType(WorkoutType workoutType) { this.workoutType = workoutType; }
 
     public WorkoutStatus getStatus() { return status; }
     public void setStatus(WorkoutStatus status) { this.status = status; }
@@ -153,5 +131,8 @@ public class TrainingWorkout {
     public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

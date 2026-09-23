@@ -20,10 +20,14 @@ public class HorseService {
 
     private final HorseRepository horseRepository;
     private final StableStallRepository stableStallRepository;
+    private final HorseTrainingPlanService trainingPlanService;
 
-    public HorseService(HorseRepository horseRepository, StableStallRepository stableStallRepository) {
+    public HorseService(HorseRepository horseRepository,
+                        StableStallRepository stableStallRepository,
+                        @org.springframework.context.annotation.Lazy HorseTrainingPlanService trainingPlanService) {
         this.horseRepository = horseRepository;
         this.stableStallRepository = stableStallRepository;
+        this.trainingPlanService = trainingPlanService;
     }
 
     public List<Horse> getAllHorses(AuthenticatedUser currentUser) {
@@ -56,14 +60,26 @@ public class HorseService {
         return horse;
     }
 
+    @Transactional
     public Horse updateHorseStatus(Long id, UpdateHorseStatusRequest request) {
         Horse horse = horseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Horse not found with id: " + id));
 
         // Cập nhật trạng thái mới
-        horse.setCurrentStatus(HorseStatus.valueOf(request.getStatus()));
+        HorseStatus newStatus = HorseStatus.valueOf(request.getStatus());
+        horse.setCurrentStatus(newStatus);
+        Horse saved = horseRepository.save(horse);
 
-        return horseRepository.save(horse);
+        // ===== THÊM MỚI: cascade huỷ huấn luyện =====
+        // Mọi trạng thái khác ELIGIBLE đều là khoá huấn luyện (khớp với
+        // InjuryRecordService.getTrainingLockStatus).
+        if (newStatus != HorseStatus.ELIGIBLE) {
+            trainingPlanService.cancelFutureTrainingForHorse(
+                    saved.getId(),
+                    "Chiến mã chuyển sang trạng thái " + newStatus);
+        }
+
+        return saved;
     }
 
     @Transactional
