@@ -13,4 +13,5 @@ public interface PreventiveCareScheduleRepository extends JpaRepository<Preventi
     List<PreventiveCareSchedule> findByStatusOrderByScheduledDateAsc(String status);
     List<PreventiveCareSchedule> findByHorseIdInAndScheduledDate(List<Long> horseIds,
                                                                   LocalDate scheduledDate);
+    List<PreventiveCareSchedule> findByHorseIdAndStatusIn(Long horseId, List<String> statuses);
 }

@@ -18,7 +18,7 @@ export function getNavigationForRole(role: Role): NavItem[] {
     case 'CLUB_MANAGER':
       return [
         { id: 'dashboard', label: 'Dashboard', href: dashboardHref },
-        { id: 'admissions', label: 'Admissions' },
+        { id: 'admissions', label: 'Admissions', href: '/manager/admissions' },
         { id: 'horses', label: 'Horses' },
         { id: 'stable', label: 'Stable' },
         { id: 'reports', label: 'Reports' },

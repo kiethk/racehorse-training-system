@@ -2,6 +2,8 @@ package com.rtms.backend.dto;
 
 import com.rtms.backend.entity.AdmissionDocument;
 import com.rtms.backend.entity.CandidateHorseProfile;
+import com.rtms.backend.entity.HealthRecord;
+import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.enums.ReviewDecision;
 
@@ -40,6 +42,12 @@ public class AdmissionDetailResponse {
 
     private Long horseId;
     private LocalDateTime submittedAt;
+
+    // Available REGULAR stalls for Manager to select during approval
+    private List<StableStall> availableRegularStalls;
+
+    // Initial health records created during Vet Q review
+    private List<HealthRecord> healthRecords;
 
     public Long getAdmissionId() {
         return admissionId;
@@ -231,5 +239,21 @@ public class AdmissionDetailResponse {
 
     public void setSubmittedAt(LocalDateTime submittedAt) {
         this.submittedAt = submittedAt;
+    }
+
+    public List<StableStall> getAvailableRegularStalls() {
+        return availableRegularStalls;
+    }
+
+    public void setAvailableRegularStalls(List<StableStall> availableRegularStalls) {
+        this.availableRegularStalls = availableRegularStalls;
+    }
+
+    public List<HealthRecord> getHealthRecords() {
+        return healthRecords;
+    }
+
+    public void setHealthRecords(List<HealthRecord> healthRecords) {
+        this.healthRecords = healthRecords;
     }
 }
