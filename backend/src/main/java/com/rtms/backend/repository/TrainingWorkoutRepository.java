@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -31,6 +32,9 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
 
     /** BR-10 — đếm số ngựa đang chiếm chỗ trong lot. */
     long countByLotIdAndStatusNot(Long lotId, WorkoutStatus status);
+
+    /** Danh sách buổi CÒN HIỆU LỰC trong lot — phải khớp với countByLotIdAndStatusNot. */
+    List<TrainingWorkout> findByLotIdAndStatusNot(Long lotId, WorkoutStatus status);
 
     /** BR-09 — Groom này đã phụ trách con nào khác trong cùng lot chưa? */
     boolean existsByLotIdAndAssignedToIdAndStatusNot(Long lotId,
@@ -75,4 +79,6 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
     List<Object[]> findByPlanIdWithLot(@Param("planId") Long planId);
 
     long countByPlanIdAndStatusNot(Long planId, WorkoutStatus status);
+
+    long countByPlanIdAndStatusNotIn(Long planId, Collection<WorkoutStatus> statuses);
 }

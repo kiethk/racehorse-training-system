@@ -1,7 +1,9 @@
 package com.rtms.backend.entity;
 
-import com.rtms.backend.enums.GroomShift;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "groom_profiles")
@@ -11,36 +13,19 @@ public class GroomProfile {
     @Column(name = "user_id")
     private Long userId;
 
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "shift", length = 50)
-    private GroomShift shift;
-
-    public Long getUserId() {
-        return userId;
-    }
-
+    /**
+     * Trainer quản lý chuyên môn trực tiếp Groom này (V29).
+     * Hiện chưa code nào ghi/đọc — Club Manager sẽ gán khi tạo tài khoản Groom.
+     * Giữ lại vì đã có trong thiết kế quan hệ Trainer -> Groom.
+     */
     @Column(name = "trainer_id")
     private Long trainerId;
 
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
+    // ĐÃ XOÁ (V46): field shift kiểu GroomShift — enum chết, xem V46 để biết lý do
 
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
 
-    public GroomShift getShift() {
-        return shift;
-    }
-
-    public void setShift(GroomShift shift) {
-        this.shift = shift;
-    }
-
-    public Long getTrainerId() {
-        return trainerId;
-    }
-
-    public void setTrainerId(Long trainerId) {
-        this.trainerId = trainerId;
-    }
+    public Long getTrainerId() { return trainerId; }
+    public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
 }

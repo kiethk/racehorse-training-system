@@ -1,18 +1,22 @@
 package com.rtms.backend.service;
 
+import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.entity.GroomDailyTask;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.GroomTaskType;
+import com.rtms.backend.enums.SopSlot;
 import com.rtms.backend.repository.GroomDailyTaskRepository;
 import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.repository.PreventiveCareScheduleRepository;
 import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.repository.SubjectRepository;
+import com.rtms.backend.repository.TrainingWorkoutRepository;
 import com.rtms.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -41,6 +45,15 @@ class GroomDailyTaskServiceTest {
     @Mock
     private StableStallRepository stableStallRepository;
 
+    @Mock
+    private TrainingWorkoutRepository workoutRepository;
+
+    @Mock
+    private PreventiveCareScheduleRepository preventiveCareScheduleRepository;
+
+    @Mock
+    private SubjectRepository subjectRepository;
+
     private GroomDailyTaskService taskService;
 
     @BeforeEach
@@ -49,12 +62,15 @@ class GroomDailyTaskServiceTest {
                 taskRepository,
                 horseRepository,
                 userRepository,
-                stableStallRepository
+                stableStallRepository,
+                workoutRepository,
+                preventiveCareScheduleRepository,
+                subjectRepository
         );
     }
 
     @Test
-    @DisplayName("1. Sinh việc thành công cho ngựa trong chuồng - Đủ 5 mốc việc chuẩn SOP")
+    @DisplayName("1. Sinh việc thành công cho ngựa trong chuồng - Đủ bộ việc chuẩn SOP")
     void testGenerateDailyRoutineTasks_Success() {
         // Arrange
         LocalDate targetDate = LocalDate.of(2026, 9, 22);
@@ -70,49 +86,55 @@ class GroomDailyTaskServiceTest {
 
         when(horseRepository.findByCurrentStallIdIsNotNull()).thenReturn(List.of(horse));
         when(stableStallRepository.findById(10L)).thenReturn(Optional.of(stall));
-        when(taskRepository.existsByHorseIdAndTaskTypeAndScheduledTimeBetween(anyLong(), any(), any(), any()))
-                .thenReturn(false);
-        when(taskRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskRepository.existsByHorseIdAndTaskTypeAndScheduledTimeBetween(
+                anyLong(), any(), any(), any())).thenReturn(false);
+        when(taskRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         // Act
         List<GroomDailyTask> result = taskService.generateDailyRoutineTasks(targetDate);
 
-        // Assert
-        assertNotNull(result);
-        assertEquals(5, result.size(), "Phải sinh đúng 5 task chuẩn theo SOP");
+        // Assert — số lượng bám theo enum, không hardcode con số 5
+        assertEquals(SopSlot.values().length, result.size(),
+                "Phải sinh đúng một task cho mỗi mốc SOP");
 
-        // Task 1: 05:30 FEEDING (Ăn sáng)
-        GroomDailyTask t1 = result.get(0);
-        assertEquals(4L, t1.getGroomId());
-        assertEquals(1L, t1.getHorseId());
-        assertEquals(GroomTaskType.FEEDING, t1.getTaskType());
-        assertEquals(LocalDateTime.of(2026, 9, 22, 5, 30), t1.getScheduledTime());
+        // Assert — từng mốc khớp enum. Đổi giờ trong SopSlot thì test tự đúng theo.
+        SopSlot[] slots = SopSlot.values();
+        for (int i = 0; i < slots.length; i++) {
+            GroomDailyTask task = result.get(i);
+            SopSlot slot = slots[i];
 
-        // Task 2: 06:00 MUCKING_OUT (Dọn chuồng ca sáng)
-        GroomDailyTask t2 = result.get(1);
-        assertEquals(GroomTaskType.MUCKING_OUT, t2.getTaskType());
-        assertEquals(LocalDateTime.of(2026, 9, 22, 6, 0), t2.getScheduledTime());
-
-        // Task 3: 09:30 GROOMING (Tắm rửa, dưỡng móng sau tập)
-        GroomDailyTask t3 = result.get(2);
-        assertEquals(GroomTaskType.GROOMING, t3.getTaskType());
-        assertEquals(LocalDateTime.of(2026, 9, 22, 9, 30), t3.getScheduledTime());
-
-        // Task 4: 11:30 FEEDING (Ăn trưa)
-        GroomDailyTask t4 = result.get(3);
-        assertEquals(GroomTaskType.FEEDING, t4.getTaskType());
-        assertEquals(LocalDateTime.of(2026, 9, 22, 11, 30), t4.getScheduledTime());
-
-        // Task 5: 16:30 FEEDING (Ăn chiều)
-        GroomDailyTask t5 = result.get(4);
-        assertEquals(GroomTaskType.FEEDING, t5.getTaskType());
-        assertEquals(LocalDateTime.of(2026, 9, 22, 16, 30), t5.getScheduledTime());
-
-        verify(taskRepository, times(1)).saveAll(anyList());
+            assertEquals(4L, task.getGroomId(),
+                    "Task phải thuộc về Groom phụ trách chuồng");
+            assertEquals(1L, task.getHorseId());
+            assertEquals(slot.getTaskType(), task.getTaskType(),
+                    "Sai loại việc ở mốc " + slot.name());
+            assertEquals(targetDate.atTime(slot.getTime()), task.getScheduledTime(),
+                    "Sai giờ ở mốc " + slot.name());
+            assertEquals(slot.getNote(), task.getNotes());
+            assertEquals(Boolean.FALSE, task.getIsCompleted(),
+                    "Task mới sinh phải ở trạng thái chưa hoàn thành");
+        }
     }
 
     @Test
-    @DisplayName("2. Tính Idempotent - Nếu các task đã tồn tại thì không sinh trùng lặp")
+    @DisplayName("1b. Không mốc SOP nào được rơi vào khung giờ vàng huấn luyện")
+    void testSopSlotsDoNotCollideWithGoldenHours() {
+        for (SopSlot slot : SopSlot.values()) {
+            boolean insideGoldenHours =
+                    !slot.getTime().isBefore(FarmSchedulePolicy.GOLDEN_HOURS_START)
+                 && slot.getTime().isBefore(FarmSchedulePolicy.GOLDEN_HOURS_END);
+
+            assertFalse(insideGoldenHours, String.format(
+                    "Mốc SOP %s (%s) rơi vào khung giờ vàng %s–%s — Groom sẽ bị kẹt "
+                  + "giữa việc chuồng trại và việc dắt ngựa ra sân!",
+                    slot.name(), slot.getTime(),
+                    FarmSchedulePolicy.GOLDEN_HOURS_START,
+                    FarmSchedulePolicy.GOLDEN_HOURS_END));
+        }
+    }
+
+    @Test
+    @DisplayName("2. BR-08 — Không sinh trùng nếu task đã tồn tại trong cửa sổ ±30 phút")
     void testGenerateDailyRoutineTasks_Idempotent() {
         // Arrange
         LocalDate targetDate = LocalDate.of(2026, 9, 22);
@@ -127,9 +149,8 @@ class GroomDailyTaskServiceTest {
 
         when(horseRepository.findByCurrentStallIdIsNotNull()).thenReturn(List.of(horse));
         when(stableStallRepository.findById(10L)).thenReturn(Optional.of(stall));
-        // Giả lập rằng task đã tồn tại trong DB
-        when(taskRepository.existsByHorseIdAndTaskTypeAndScheduledTimeBetween(anyLong(), any(), any(), any()))
-                .thenReturn(true);
+        when(taskRepository.existsByHorseIdAndTaskTypeAndScheduledTimeBetween(
+                anyLong(), any(), any(), any())).thenReturn(true);
 
         // Act
         List<GroomDailyTask> result = taskService.generateDailyRoutineTasks(targetDate);
@@ -177,5 +198,89 @@ class GroomDailyTaskServiceTest {
         assertNotNull(result);
         assertTrue(result.isEmpty());
         verify(taskRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("5. Aggregator: Gom việc từ 3 nguồn (SOP, Workout, Thú y) và sắp xếp đúng thứ tự thời gian")
+    void testTodayAggregatedTasks_ThreeSourcesSortedChronologically() {
+        LocalDate targetDate = LocalDate.of(2026, 10, 5);
+        com.rtms.backend.security.AuthenticatedUser groomUser =
+                new com.rtms.backend.security.AuthenticatedUser(4L, "groom@example.com", "GROOM");
+
+        // Nguồn 1: SOP task lúc 05:00
+        GroomDailyTask sopTask = new GroomDailyTask(4L, 1L, GroomTaskType.FEEDING,
+                targetDate.atTime(5, 0), "Cho ăn sáng");
+        sopTask.setId(101L);
+        sopTask.setIsCompleted(false);
+
+        when(taskRepository.findByGroomIdAndScheduledTimeBetween(eq(4L), any(), any()))
+                .thenReturn(List.of(sopTask));
+
+        // Nguồn 2: Workout JOIN Lot lúc 06:00
+        com.rtms.backend.entity.TrainingWorkout workout = new com.rtms.backend.entity.TrainingWorkout();
+        workout.setId(201L);
+        workout.setHorseId(1L);
+        workout.setStatus(com.rtms.backend.enums.WorkoutStatus.SCHEDULED);
+
+        com.rtms.backend.entity.TrainingLot lot = new com.rtms.backend.entity.TrainingLot();
+        lot.setId(10L);
+        lot.setSubjectId(50L);
+        lot.setStartTime(java.time.LocalTime.of(6, 0));
+        lot.setEndTime(java.time.LocalTime.of(7, 30));
+
+        when(workoutRepository.findGroomWorkoutsWithLot(4L, targetDate))
+                .thenReturn(List.<Object[]>of(new Object[]{workout, lot}));
+
+        // Nguồn 3: Stall + Thú y lúc 13:30 (VET_WINDOW_START)
+        StableStall stall = new StableStall();
+        stall.setId(10L);
+        stall.setGroomId(4L);
+        when(stableStallRepository.findByGroomId(4L)).thenReturn(List.of(stall));
+
+        Horse horse1 = new Horse();
+        horse1.setId(1L);
+        horse1.setName("Silver Moon");
+        horse1.setCurrentStallId(10L);
+        when(horseRepository.findByCurrentStallIdIn(List.of(10L))).thenReturn(List.of(horse1));
+
+        com.rtms.backend.entity.PreventiveCareSchedule schedule = new com.rtms.backend.entity.PreventiveCareSchedule();
+        schedule.setId(301L);
+        schedule.setHorseId(1L);
+        schedule.setCareType("Tiêm phòng cúm");
+        schedule.setDescription("Tiêm định kỳ 6 tháng");
+        schedule.setStatus("PENDING");
+
+        when(preventiveCareScheduleRepository.findByHorseIdInAndScheduledDate(List.of(1L), targetDate))
+                .thenReturn(List.of(schedule));
+
+        com.rtms.backend.entity.Subject subject = new com.rtms.backend.entity.Subject();
+        subject.setId(50L);
+        subject.setName("Chạy bền 1200m");
+        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject));
+
+        // Act
+        List<com.rtms.backend.dto.TodayTaskItemResponse> items =
+                taskService.getTodayAggregatedTasks(null, targetDate, groomUser);
+
+        // Assert
+        assertEquals(3, items.size());
+
+        // Item 1: SOP 05:00
+        assertEquals(com.rtms.backend.enums.TaskSource.SOP, items.get(0).getSource());
+        assertEquals(java.time.LocalTime.of(5, 0), items.get(0).getStartTime());
+        assertEquals("Silver Moon", items.get(0).getHorseName());
+        assertTrue(items.get(0).isActionable());
+
+        // Item 2: WORKOUT 06:00
+        assertEquals(com.rtms.backend.enums.TaskSource.WORKOUT, items.get(1).getSource());
+        assertEquals(java.time.LocalTime.of(6, 0), items.get(1).getStartTime());
+        assertEquals(java.time.LocalTime.of(7, 30), items.get(1).getEndTime());
+        assertTrue(items.get(1).getTitle().contains("Chạy bền 1200m"));
+        assertFalse(items.get(1).isActionable());
+
+        // Item 3: PREVENTIVE_CARE 13:30
+        assertEquals(com.rtms.backend.enums.TaskSource.PREVENTIVE_CARE, items.get(2).getSource());
+        assertEquals(FarmSchedulePolicy.VET_WINDOW_START, items.get(2).getStartTime());
+        assertFalse(items.get(2).isActionable());
     }
 }

@@ -1,13 +1,24 @@
 package com.rtms.backend.service;
 
+import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.dto.CreateGroomDailyTaskRequest;
+import com.rtms.backend.dto.TodayTaskItemResponse;
 import com.rtms.backend.entity.GroomDailyTask;
 import com.rtms.backend.entity.Horse;
+import com.rtms.backend.entity.PreventiveCareSchedule;
 import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.entity.Subject;
+import com.rtms.backend.entity.TrainingLot;
+import com.rtms.backend.entity.TrainingWorkout;
 import com.rtms.backend.enums.GroomTaskType;
+import com.rtms.backend.enums.SopSlot;
+import com.rtms.backend.enums.TaskSource;
 import com.rtms.backend.repository.GroomDailyTaskRepository;
 import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.repository.PreventiveCareScheduleRepository;
 import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.repository.SubjectRepository;
+import com.rtms.backend.repository.TrainingWorkoutRepository;
 import com.rtms.backend.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.security.access.AccessDeniedException;
@@ -17,7 +28,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class GroomDailyTaskService {
@@ -26,15 +42,24 @@ public class GroomDailyTaskService {
     private final HorseRepository horseRepository;
     private final UserRepository userRepository;
     private final StableStallRepository stableStallRepository;
+    private final TrainingWorkoutRepository workoutRepository;
+    private final PreventiveCareScheduleRepository preventiveCareScheduleRepository;
+    private final SubjectRepository subjectRepository;
 
     public GroomDailyTaskService(GroomDailyTaskRepository taskRepository,
                                  HorseRepository horseRepository,
                                  UserRepository userRepository,
-                                 StableStallRepository stableStallRepository) {
+                                 StableStallRepository stableStallRepository,
+                                 TrainingWorkoutRepository workoutRepository,
+                                 PreventiveCareScheduleRepository preventiveCareScheduleRepository,
+                                 SubjectRepository subjectRepository) {
         this.taskRepository = taskRepository;
         this.horseRepository = horseRepository;
         this.userRepository = userRepository;
         this.stableStallRepository = stableStallRepository;
+        this.workoutRepository = workoutRepository;
+        this.preventiveCareScheduleRepository = preventiveCareScheduleRepository;
+        this.subjectRepository = subjectRepository;
     }
 
     @Transactional
@@ -110,42 +135,213 @@ public class GroomDailyTaskService {
     public List<GroomDailyTask> generateDailyRoutineTasks(LocalDate date) {
         LocalDate targetDate = (date != null) ? date : LocalDate.now();
 
-        // Lấy tất cả ngựa đang ở trong chuồng
         List<Horse> horsesInStalls = horseRepository.findByCurrentStallIdIsNotNull();
         List<GroomDailyTask> generatedTasks = new ArrayList<>();
 
         for (Horse horse : horsesInStalls) {
-            // Tìm chuồng của ngựa
-            StableStall stall = stableStallRepository.findById(horse.getCurrentStallId()).orElse(null);
+            StableStall stall = stableStallRepository.findById(horse.getCurrentStallId())
+                    .orElse(null);
             if (stall == null || stall.getGroomId() == null) {
-                // Nếu chuồng chưa được gán Groom phụ trách thì tạm thời bỏ qua
-                continue;
+                continue;   // chuồng chưa gán Groom -> bỏ qua
             }
 
             Long groomId = stall.getGroomId();
 
-            // Định nghĩa 5 task chuẩn theo SOP
-            createTaskIfNotExist(generatedTasks, groomId, horse.getId(), GroomTaskType.FEEDING,
-                    targetDate.atTime(5, 30), "Cho ăn sáng theo khẩu phần dinh dưỡng đã duyệt");
-
-            createTaskIfNotExist(generatedTasks, groomId, horse.getId(), GroomTaskType.MUCKING_OUT,
-                    targetDate.atTime(6, 0), "Dọn phân, thay rơm lót chuồng đợt 1 trước giờ tập");
-
-            createTaskIfNotExist(generatedTasks, groomId, horse.getId(), GroomTaskType.GROOMING,
-                    targetDate.atTime(9, 30), "Ca tắm rửa toàn thân, chải lông và bôi dầu dưỡng móng sau buổi tập (09:30 - 11:00)");
-
-            createTaskIfNotExist(generatedTasks, groomId, horse.getId(), GroomTaskType.FEEDING,
-                    targetDate.atTime(11, 30), "Cho ăn trưa và kiểm tra bổ sung máng nước sạch");
-
-            createTaskIfNotExist(generatedTasks, groomId, horse.getId(), GroomTaskType.FEEDING,
-                    targetDate.atTime(16, 30), "Cho ăn chiều, bổ sung cỏ khô và dọn vệ sinh chuồng đợt 2");
+            // Duyệt enum thay vì 5 khối lặp gần giống nhau.
+            // Thêm việc SOP mới = thêm một dòng trong SopSlot, không đụng file này.
+            for (SopSlot slot : SopSlot.values()) {
+                createTaskIfNotExist(
+                        generatedTasks,
+                        groomId,
+                        horse.getId(),
+                        slot.getTaskType(),
+                        targetDate.atTime(slot.getTime()),
+                        slot.getNote());
+            }
         }
 
         if (generatedTasks.isEmpty()) {
             return new ArrayList<>();
         }
-
         return taskRepository.saveAll(generatedTasks);
+    }
+
+    /**
+     * MÀN HÌNH "TODAY CHECKLIST" — gom việc động từ 3 nguồn độc lập.
+     *
+     *   Nguồn 1: groom_daily_tasks        (SOP thường nhật)
+     *   Nguồn 2: training_workouts JOIN training_lots  (buổi tập được gán)
+     *   Nguồn 3: preventive_care_schedules (lịch thú y của ngựa trong chuồng mình)
+     *
+     * Lợi ích: Groom nhìn một màn hình là nắm trọn ngày — lúc nào cho ăn, lúc
+     * nào phải có mặt ở sân, lúc nào Vet tới tiêm.
+     */
+    public List<TodayTaskItemResponse> getTodayAggregatedTasks(Long groomId,
+                                                                LocalDate date,
+                                                                AuthenticatedUser currentUser) {
+        LocalDate targetDate = (date != null) ? date : LocalDate.now();
+
+        // Role GROOM luôn bị ép về chính mình; Trainer/Manager xem được của người khác.
+        // Giữ đúng quy ước đang dùng ở getDailyTasks().
+        Long targetGroomId;
+        if ("GROOM".equalsIgnoreCase(currentUser.getRole())) {
+            targetGroomId = currentUser.getUserId();
+        } else {
+            targetGroomId = (groomId != null) ? groomId : currentUser.getUserId();
+        }
+
+        // =============================================================
+        // B1 — NẠP DỮ LIỆU THÔ TỪ 3 NGUỒN
+        //
+        // Nạp hết trước, KHÔNG dựng item vội. Nhờ vậy bước B2 biết được
+        // toàn bộ id cần tra và gom vào một lần query duy nhất.
+        // =============================================================
+        LocalDateTime dayStart = targetDate.atStartOfDay();
+        LocalDateTime dayEnd = targetDate.atTime(23, 59, 59, 999999999);
+
+        // Nguồn 1 — SOP thường nhật
+        List<GroomDailyTask> sopTasks = taskRepository
+                .findByGroomIdAndScheduledTimeBetween(targetGroomId, dayStart, dayEnd);
+
+        // Nguồn 2 — Buổi tập (JOIN sang training_lots vì workout không còn giữ giờ)
+        List<WorkoutWithLot> workouts = workoutRepository
+                .findGroomWorkoutsWithLot(targetGroomId, targetDate)
+                .stream()
+                .map(WorkoutWithLot::of)
+                .toList();
+
+        // Nguồn 3 — Lịch thú y của ngựa trong chuồng mình
+        List<Long> stallIds = stableStallRepository.findByGroomId(targetGroomId).stream()
+                .map(StableStall::getId)
+                .toList();
+
+        List<Horse> myHorses = stallIds.isEmpty() ? List.of()
+                : horseRepository.findByCurrentStallIdIn(stallIds);
+
+        List<PreventiveCareSchedule> schedules = myHorses.isEmpty() ? List.of()
+                : preventiveCareScheduleRepository.findByHorseIdInAndScheduledDate(
+                        myHorses.stream().map(Horse::getId).toList(), targetDate);
+
+        // =============================================================
+        // B2 — GOM ID RỒI NẠP MỘT LẦN
+        //
+        // Trước đây mỗi task/workout gọi findById riêng -> N+1 query.
+        // Giờ số query là HẰNG SỐ, không phụ thuộc số ngựa.
+        // =============================================================
+
+        // Ngựa trong chuồng mình đã có sẵn tên từ B1 -> không cần query lại
+        Map<Long, String> horseNameById = new HashMap<>();
+        myHorses.forEach(h -> horseNameById.put(h.getId(), h.getName()));
+
+        // Chỉ những con CHƯA có tên mới phải tra thêm (ví dụ Trainer nhờ Groom
+        // này dắt hộ một con không thuộc chuồng của họ). Thường là rỗng.
+        Set<Long> neededHorseIds = new HashSet<>();
+        sopTasks.forEach(t -> neededHorseIds.add(t.getHorseId()));
+        workouts.forEach(wl -> neededHorseIds.add(wl.workout().getHorseId()));
+        neededHorseIds.removeAll(horseNameById.keySet());
+
+        if (!neededHorseIds.isEmpty()) {
+            horseRepository.findAllById(neededHorseIds)
+                    .forEach(h -> horseNameById.put(h.getId(), h.getName()));
+        }
+
+        Set<Long> subjectIds = new HashSet<>();
+        workouts.forEach(wl -> subjectIds.add(wl.lot().getSubjectId()));
+
+        Map<Long, String> subjectNameById = new HashMap<>();
+        if (!subjectIds.isEmpty()) {
+            subjectRepository.findAllById(subjectIds)
+                    .forEach(s -> subjectNameById.put(s.getId(), s.getName()));
+        }
+
+        // =============================================================
+        // B3 — DỰNG ITEM (không còn query nào nữa)
+        // =============================================================
+        List<TodayTaskItemResponse> items = new ArrayList<>();
+
+        for (GroomDailyTask task : sopTasks) {
+            items.add(new TodayTaskItemResponse(
+                    TaskSource.SOP,
+                    task.getId(),
+                    task.getScheduledTime().toLocalTime(),
+                    null,
+                    task.getHorseId(),
+                    nameOf(horseNameById, task.getHorseId()),
+                    toVietnamese(task.getTaskType()),
+                    task.getNotes(),
+                    Boolean.TRUE.equals(task.getIsCompleted()) ? "COMPLETED" : "PENDING",
+                    true));                       // chỉ SOP mới tick được
+        }
+
+        for (WorkoutWithLot wl : workouts) {
+            TrainingWorkout w = wl.workout();
+            TrainingLot lot = wl.lot();
+
+            items.add(new TodayTaskItemResponse(
+                    TaskSource.WORKOUT,
+                    w.getId(),
+                    lot.getStartTime(),
+                    lot.getEndTime(),
+                    w.getHorseId(),
+                    nameOf(horseNameById, w.getHorseId()),
+                    "Buổi tập · " + nameOf(subjectNameById, lot.getSubjectId()),
+                    "Dắt ngựa ra sân, hỗ trợ Trainer, nhận ngựa về sau buổi tập",
+                    w.getStatus().name(),
+                    false));                      // Trainer mới là người đóng buổi tập
+        }
+
+        for (PreventiveCareSchedule s : schedules) {
+            items.add(new TodayTaskItemResponse(
+                    TaskSource.PREVENTIVE_CARE,
+                    s.getId(),
+                    // Lịch thú y chỉ có scheduled_date, KHÔNG có giờ.
+                    // Dùng mốc đầu khung thú y để chèn đúng vị trí trên
+                    // dòng thời gian. Đây là lý do tồn tại của hằng số này.
+                    FarmSchedulePolicy.VET_WINDOW_START,
+                    FarmSchedulePolicy.VET_WINDOW_END,
+                    s.getHorseId(),
+                    nameOf(horseNameById, s.getHorseId()),
+                    "Thú y · " + s.getCareType(),
+                    s.getDescription(),
+                    s.getStatus(),
+                    false));              // Vet mới là người đóng
+        }
+
+        // =============================================================
+        // SẮP XẾP TUẦN TỰ THEO GIỜ
+        // =============================================================
+        items.sort(Comparator.comparing(TodayTaskItemResponse::getStartTime));
+        return items;
+    }
+
+    /** Tra tên từ Map đã nạp sẵn; không khớp thì hiện mã số như cũ. */
+    private String nameOf(Map<Long, String> nameById, Long id) {
+        return nameById.getOrDefault(id, "#" + id);
+    }
+
+    /**
+     * Cặp workout + lot trả về từ query JOIN.
+     * Dự án không dùng quan hệ JPA nên query trả Object[]; record này gói lại
+     * để khỏi phải ép kiểu lặp đi lặp lại ở nhiều chỗ.
+     */
+    private record WorkoutWithLot(TrainingWorkout workout, TrainingLot lot) {
+        static WorkoutWithLot of(Object[] row) {
+            return new WorkoutWithLot((TrainingWorkout) row[0], (TrainingLot) row[1]);
+        }
+    }
+
+    /** Nhãn tiếng Việt cho loại việc SOP. */
+    private String toVietnamese(GroomTaskType type) {
+        return switch (type) {
+            case FEEDING        -> "Cho ăn";
+            case MUCKING_OUT    -> "Dọn chuồng";
+            case GROOMING       -> "Tắm rửa & chải lông";
+            case HOOF_CARE      -> "Chăm sóc móng";
+            case HEALTH_CHECK   -> "Kiểm tra sức khoẻ";
+            case WORKOUT_ASSIST -> "Hỗ trợ buổi tập";
+            case VET_ASSIST     -> "Hỗ trợ thú y";
+            case SPECIAL_CARE   -> "Chăm sóc đặc biệt";
+        };
     }
 
     private void createTaskIfNotExist(List<GroomDailyTask> list, Long groomId, Long horseId,

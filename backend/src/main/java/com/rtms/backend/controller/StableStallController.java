@@ -7,6 +7,7 @@ import com.rtms.backend.enums.AreaType;
 import com.rtms.backend.enums.StallStatus;
 import com.rtms.backend.repository.AreaRepository;
 import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.service.StableStallService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,12 +19,15 @@ public class StableStallController {
 
     private final StableStallRepository stableStallRepository;
     private final AreaRepository areaRepository;
+    private final StableStallService stableStallService;
 
     public StableStallController(
             StableStallRepository stableStallRepository,
-            AreaRepository areaRepository) {
+            AreaRepository areaRepository,
+            StableStallService stableStallService) {
         this.stableStallRepository = stableStallRepository;
         this.areaRepository = areaRepository;
+        this.stableStallService = stableStallService;
     }
 
     @GetMapping
@@ -80,11 +84,7 @@ public class StableStallController {
     public ApiResponse<StableStall> assignGroom(
             @PathVariable Long id,
             @RequestParam(required = false) Long groomId) {
-        StableStall stall = stableStallRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Stable stall not found with id: " + id));
-
-        stall.setGroomId(groomId);
-        return ApiResponse.success(stableStallRepository.save(stall));
+        return ApiResponse.success(stableStallService.assignGroom(id, groomId));
     }
 
     @GetMapping("/{id}")

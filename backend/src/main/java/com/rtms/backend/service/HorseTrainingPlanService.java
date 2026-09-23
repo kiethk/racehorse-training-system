@@ -419,9 +419,9 @@ public class HorseTrainingPlanService {
 
         TrainingWorkout saved = workoutRepository.saveAndFlush(workout);
 
-        // Buổi cuối cùng của khoá -> plan tự chuyển COMPLETED
-        long remaining = workoutRepository.countByPlanIdAndStatusNot(
-                plan.getId(), WorkoutStatus.COMPLETED);
+        // Buổi cuối cùng của khoá -> plan tự chuyển COMPLETED (bỏ qua cả COMPLETED và CANCELLED)
+        long remaining = workoutRepository.countByPlanIdAndStatusNotIn(
+                plan.getId(), List.of(WorkoutStatus.COMPLETED, WorkoutStatus.CANCELLED));
         if (remaining == 0 && plan.getStatus() == TrainingPlanStatus.ACTIVE) {
             plan.setStatus(TrainingPlanStatus.COMPLETED);
             planRepository.save(plan);

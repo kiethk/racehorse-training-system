@@ -7,6 +7,7 @@ import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.Subject;
 import com.rtms.backend.entity.TrainingLot;
 import com.rtms.backend.entity.TrainingWorkout;
+import com.rtms.backend.enums.WorkoutStatus;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.SubjectRepository;
 import com.rtms.backend.repository.TrainingWorkoutRepository;
@@ -19,7 +20,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/lots")
@@ -94,19 +97,32 @@ public class TrainingLotController {
 
     private TrainingLotResponse toResponse(TrainingLot lot) {
         Subject subject = subjectRepository.findById(lot.getSubjectId()).orElse(null);
-        List<TrainingWorkout> workouts = workoutRepository.findByLotId(lot.getId());
 
-        List<String> horseNames = new ArrayList<>();
-        for (TrainingWorkout w : workouts) {
-            horseNames.add(horseRepository.findById(w.getHorseId())
-                    .map(Horse::getName).orElse("#" + w.getHorseId()));
+        // CHỈ lấy buổi còn hiệu lực. Nếu lấy cả buổi đã huỷ thì response tự mâu
+        // thuẫn: occupied đếm loại CANCELLED còn horseNames thì không.
+        List<TrainingWorkout> workouts = workoutRepository.findByLotIdAndStatusNot(lot.getId(), WorkoutStatus.CANCELLED);
+
+        // Nạp tên ngựa MỘT LẦN thay vì findById trong vòng lặp (bỏ N+1)
+        List<Long> horseIds = workouts.stream()
+                .map(TrainingWorkout::getHorseId)
+                .toList();
+        Map<Long, String> nameById = new HashMap<>();
+        if (!horseIds.isEmpty()) {
+            horseRepository.findAllById(horseIds)
+                    .forEach(h -> nameById.put(h.getId(), h.getName()));
         }
+
+        List<String> horseNames = horseIds.stream()
+                .map(id -> nameById.getOrDefault(id, "#" + id))
+                .toList();
 
         return new TrainingLotResponse(
                 lot,
                 subject != null ? subject.getName() : "#" + lot.getSubjectId(),
                 subject != null ? subject.getDurationMinutes() : null,
-                lotService.countOccupied(lot.getId()),
+                // Lấy thẳng size() của CHÍNH danh sách vừa dựng horseNames.
+                // Hai trường giờ đến từ một nguồn -> KHÔNG THỂ lệch nhau nữa.
+                workouts.size(),
                 horseNames);
     }
 }

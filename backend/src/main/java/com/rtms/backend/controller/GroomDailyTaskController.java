@@ -2,6 +2,7 @@ package com.rtms.backend.controller;
 
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreateGroomDailyTaskRequest;
+import com.rtms.backend.dto.TodayTaskItemResponse;
 import com.rtms.backend.entity.GroomDailyTask;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.GroomDailyTaskService;
@@ -57,5 +58,19 @@ public class GroomDailyTaskController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         List<GroomDailyTask> tasks = taskService.generateDailyRoutineTasks(date);
         return ApiResponse.success(tasks);
+    }
+
+    /**
+     * Màn hình "Today Checklist" — gom SOP + buổi tập + lịch thú y trong một ngày.
+     */
+    @GetMapping("/today")
+    @PreAuthorize("hasAuthority('GROOM_DAILY_TASK_VIEW')")
+    public ApiResponse<List<TodayTaskItemResponse>> getTodayTasks(
+            @RequestParam(required = false) Long groomId,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(
+                taskService.getTodayAggregatedTasks(groomId, date, currentUser));
     }
 }
