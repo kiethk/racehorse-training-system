@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { getNavigationForRole } from '@/config/navigation';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { Icon } from '@/components/ui/Icon';
-import { ROLE_LABELS } from '@/lib/roleRoute';
+import { ROLE_LABELS, getRoleRoute } from '@/lib/roleRoute';
 
 export function TopNav() {
   const { user, logout } = useAuth();
@@ -45,7 +45,12 @@ export function TopNav() {
       {/* Desktop Navigation */}
       <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">
         {navItems.map((item) => {
-          const isActive = item.href && pathname.startsWith(item.href);
+          const dashboardHref = getRoleRoute(user.role);
+          const isActive = item.href && (
+            item.href === dashboardHref
+              ? pathname === dashboardHref
+              : pathname.startsWith(item.href)
+          );
           
           if (item.href) {
             return (

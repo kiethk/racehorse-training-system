@@ -5,11 +5,13 @@ import com.rtms.backend.dto.AdmissionSummaryResponse;
 import com.rtms.backend.entity.AdmissionApplication;
 import com.rtms.backend.entity.AdmissionDocument;
 import com.rtms.backend.entity.CandidateHorseProfile;
+import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.AdmissionDocumentRepository;
 import com.rtms.backend.repository.CandidateHorseProfileRepository;
+import com.rtms.backend.repository.HealthRecordRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import org.springframework.stereotype.Service;
 
@@ -22,16 +24,19 @@ public class AdmissionQueryService {
     private final CandidateHorseProfileRepository candidateHorseProfileRepository;
     private final AdmissionDocumentRepository admissionDocumentRepository;
     private final StableStallRepository stableStallRepository;
+    private final HealthRecordRepository healthRecordRepository;
 
     public AdmissionQueryService(
             AdmissionApplicationRepository admissionApplicationRepository,
             CandidateHorseProfileRepository candidateHorseProfileRepository,
             AdmissionDocumentRepository admissionDocumentRepository,
-            StableStallRepository stableStallRepository) {
+            StableStallRepository stableStallRepository,
+            HealthRecordRepository healthRecordRepository) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.admissionDocumentRepository = admissionDocumentRepository;
         this.stableStallRepository = stableStallRepository;
+        this.healthRecordRepository = healthRecordRepository;
     }
 
     public List<AdmissionSummaryResponse> getAdmissions(AdmissionStatus status) {
@@ -102,6 +107,18 @@ public class AdmissionQueryService {
                 : stableStallRepository.findById(admission.getQuarantineStallId())
                         .map(StableStall::getStallCode)
                         .orElse(null));
+
+        // Available REGULAR stalls — always included so Manager can select during approval
+        response.setAvailableRegularStalls(
+                stableStallRepository.findAllAvailableRegularStallsOrdered());
+
+        // Health records for the horse created during Vet quarantine review
+        if (admission.getHorseId() != null) {
+            List<HealthRecord> healthRecords =
+                    healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(
+                            admission.getHorseId());
+            response.setHealthRecords(healthRecords);
+        }
 
         return response;
     }

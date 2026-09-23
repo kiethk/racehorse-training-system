@@ -2,18 +2,16 @@ package com.rtms.backend.service;
 
 import com.rtms.backend.dto.ManagerReviewRequest;
 import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.entity.CandidateHorseProfile;
 import com.rtms.backend.entity.Horse;
-import com.rtms.backend.entity.HorsePedigree;
+import com.rtms.backend.entity.PreventiveCareSchedule;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.enums.ReviewDecision;
 import com.rtms.backend.enums.StallStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
-import com.rtms.backend.repository.CandidateHorseProfileRepository;
-import com.rtms.backend.repository.HorsePedigreeRepository;
 import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.repository.PreventiveCareScheduleRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,22 +23,19 @@ import java.util.List;
 public class AdmissionManagerReviewService {
 
     private final AdmissionApplicationRepository admissionApplicationRepository;
-    private final CandidateHorseProfileRepository candidateHorseProfileRepository;
     private final StableStallRepository stableStallRepository;
     private final HorseRepository horseRepository;
-    private final HorsePedigreeRepository horsePedigreeRepository;
+    private final PreventiveCareScheduleRepository preventiveCareScheduleRepository;
 
     public AdmissionManagerReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
-            CandidateHorseProfileRepository candidateHorseProfileRepository,
             StableStallRepository stableStallRepository,
             HorseRepository horseRepository,
-            HorsePedigreeRepository horsePedigreeRepository) {
+            PreventiveCareScheduleRepository preventiveCareScheduleRepository) {
         this.admissionApplicationRepository = admissionApplicationRepository;
-        this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.stableStallRepository = stableStallRepository;
         this.horseRepository = horseRepository;
-        this.horsePedigreeRepository = horsePedigreeRepository;
+        this.preventiveCareScheduleRepository = preventiveCareScheduleRepository;
     }
 
     @Transactional
@@ -58,16 +53,27 @@ public class AdmissionManagerReviewService {
                     "Admission is not ready for manager review");
         }
 
+        if (admission.getHorseId() == null) {
+            throw new IllegalStateException("Admission is missing horseId");
+        }
+
+        Horse horse = horseRepository.findById(admission.getHorseId())
+                .orElseThrow(() -> new IllegalStateException("Horse not found"));
+
+        if (horse.getCurrentStatus() != HorseStatus.CANDIDATE) {
+            throw new IllegalStateException("Horse must be in CANDIDATE status");
+        }
+
         if (request.getDecision() == null) {
             throw new IllegalArgumentException("Decision is required");
         }
 
         if (request.getDecision() == ReviewDecision.REJECTED) {
-            return reject(admission, managerId, request);
+            return reject(admission, horse, managerId, request);
         }
 
         if (request.getDecision() == ReviewDecision.APPROVED) {
-            return approve(admission, managerId, request);
+            return approve(admission, horse, managerId, request);
         }
 
         throw new IllegalArgumentException("Unsupported review decision");
@@ -75,6 +81,7 @@ public class AdmissionManagerReviewService {
 
     private AdmissionApplication approve(
             AdmissionApplication admission,
+            Horse horse,
             Long managerId,
             ManagerReviewRequest request) {
 
@@ -93,47 +100,12 @@ public class AdmissionManagerReviewService {
                             "No available regular stall"));
         }
 
-        CandidateHorseProfile candidate = candidateHorseProfileRepository
-                .findByAdmissionId(admission.getId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "Candidate horse profile not found"));
-
-        // 2. Create Horse
-        Horse horse = new Horse();
-        horse.setName(candidate.getName());
-        horse.setBreed(candidate.getBreed());
-        horse.setDateOfBirth(candidate.getDateOfBirth());
-        horse.setOwnerId(admission.getOwnerId());
+        // 2. Update existing Horse
         horse.setCurrentStatus(HorseStatus.ELIGIBLE);
         horse.setCurrentStallId(regularStall.getId());
+        horseRepository.save(horse);
 
-        horse.setRegistryName(candidate.getRegistryName());
-        horse.setRegistrationNumber(candidate.getRegistrationNumber());
-
-        horse = horseRepository.save(horse);
-
-        // 3. Create Pedigree
-        HorsePedigree pedigree = new HorsePedigree();
-        pedigree.setHorseId(horse.getId());
-        pedigree.setPedigreeNotes(candidate.getPedigreeNotes());
-
-        pedigree.setSireName(candidate.getSireName());
-        pedigree.setSireRegistrationNumber(
-                candidate.getSireRegistrationNumber());
-
-        pedigree.setDamName(candidate.getDamName());
-        pedigree.setDamRegistrationNumber(
-                candidate.getDamRegistrationNumber());
-
-        pedigree.setSireId(resolveParentHorseId(
-                candidate.getSireRegistrationNumber()));
-
-        pedigree.setDamId(resolveParentHorseId(
-                candidate.getDamRegistrationNumber()));
-
-        horsePedigreeRepository.save(pedigree);
-
-        // Mark regular stall occupied
+        // 3. Mark regular stall occupied
         regularStall.setStatus(StallStatus.OCCUPIED);
         stableStallRepository.save(regularStall);
 
@@ -142,7 +114,6 @@ public class AdmissionManagerReviewService {
         admission.setManagerDecision(ReviewDecision.APPROVED);
         admission.setManagerFeedback(request.getFeedback());
         admission.setManagerReviewedAt(LocalDateTime.now());
-        admission.setHorseId(horse.getId());
         admission.setStatus(AdmissionStatus.APPROVED);
 
         // 5. Release quarantine stall
@@ -161,26 +132,9 @@ public class AdmissionManagerReviewService {
         return admissionApplicationRepository.save(admission);
     }
 
-    private Long resolveParentHorseId(String registrationNumber) {
-
-        if (registrationNumber == null
-                || registrationNumber.isBlank()) {
-            return null;
-        }
-
-        List<Horse> matches =
-                horseRepository
-                        .findByRegistrationNumber(registrationNumber);
-
-        if (matches.size() == 1) {
-            return matches.get(0).getId();
-        }
-
-        return null;
-    }
-
     private AdmissionApplication reject(
             AdmissionApplication admission,
+            Horse horse,
             Long managerId,
             ManagerReviewRequest request) {
 
@@ -201,6 +155,20 @@ public class AdmissionManagerReviewService {
             quarantineStall.setStatus(StallStatus.AVAILABLE);
             stableStallRepository.save(quarantineStall);
         }
+
+        // Update existing Horse
+        horse.setCurrentStatus(HorseStatus.REJECTED);
+        horse.setCurrentStallId(null);
+        horseRepository.save(horse);
+
+        // Cancel all PENDING and OVERDUE preventive care schedules for this horse
+        List<PreventiveCareSchedule> schedulesToCancel =
+                preventiveCareScheduleRepository.findByHorseIdAndStatusIn(
+                        horse.getId(), List.of("PENDING", "OVERDUE"));
+        for (PreventiveCareSchedule schedule : schedulesToCancel) {
+            schedule.setStatus("CANCELLED");
+        }
+        preventiveCareScheduleRepository.saveAll(schedulesToCancel);
 
         admission.setManagerId(managerId);
         admission.setManagerDecision(ReviewDecision.REJECTED);

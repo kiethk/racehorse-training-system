@@ -50,4 +50,14 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             """, nativeQuery = true)
     Optional<StableStall> findAvailableRegularStallByIdForUpdate(
             @Param("stallId") Long stallId);
+
+    @Query(value = """
+            SELECT ss.*
+            FROM stable_stalls ss
+            JOIN areas a ON a.id = ss.area_id
+            WHERE a.type = 'REGULAR'
+              AND ss.status = 'AVAILABLE'
+            ORDER BY a.code ASC, ss.stall_number ASC
+            """, nativeQuery = true)
+    List<StableStall> findAllAvailableRegularStallsOrdered();
 }
