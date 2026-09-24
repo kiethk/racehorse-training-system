@@ -39,3 +39,17 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   }
   return res.json();
 }
+
+/** Multipart upload uses the same cookie-backed API client as JSON requests. */
+export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    body,
+  });
+  const payload = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(payload?.message || `API error: ${res.status}`);
+  }
+  return payload as T;
+}
