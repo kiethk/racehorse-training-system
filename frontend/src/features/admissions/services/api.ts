@@ -1,5 +1,5 @@
-import { apiGet } from '@/services/api';
-import { AdmissionSummaryResponse } from '../types';
+import { apiGet, apiPost } from '@/services/api';
+import { AdmissionSummaryResponse, AdmissionDetailResponse, ManagerReviewRequest } from '../types';
 
 interface ApiResponse<T> {
   data: T;
@@ -8,8 +8,16 @@ interface ApiResponse<T> {
 }
 
 export const admissionsApi = {
-  getManagerReviewQueue: async (): Promise<AdmissionSummaryResponse[]> => {
-    const response = await apiGet<ApiResponse<AdmissionSummaryResponse[]>>('/api/admissions?status=MANAGER_REVIEW');
-    return response.data; 
+  getAdmissions: async (status?: string): Promise<AdmissionSummaryResponse[]> => {
+    const url = status ? `/api/admissions?status=${status}` : '/api/admissions';
+    const response = await apiGet<ApiResponse<AdmissionSummaryResponse[]>>(url);
+    return response.data;
   },
+  getAdmissionDetail: async (id: number): Promise<AdmissionDetailResponse> => {
+    const response = await apiGet<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}`);
+    return response.data;
+  },
+  managerReview: async (id: number, request: ManagerReviewRequest): Promise<void> => {
+    await apiPost<ApiResponse<void>>(`/api/admissions/${id}/manager-review`, request);
+  }
 };
