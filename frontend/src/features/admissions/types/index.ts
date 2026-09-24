@@ -17,6 +17,7 @@ export interface AdmissionSummaryResponse {
   dateOfBirth: string; // ISO date string
   submittedAt: string; // ISO datetime string
   quarantineStallId: number | null;
+  imageUrl?: string;
 }
 
 export interface AdmissionDocument {

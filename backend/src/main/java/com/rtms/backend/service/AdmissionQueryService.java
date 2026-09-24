@@ -131,6 +131,13 @@ public class AdmissionQueryService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Candidate horse profile not found"));
 
+        String imageUrl = admissionDocumentRepository.findByAdmissionId(admission.getId())
+                .stream()
+                .filter(doc -> doc.getDocumentType() == com.rtms.backend.enums.AdmissionDocumentType.HORSE_PHOTO)
+                .map(com.rtms.backend.entity.AdmissionDocument::getFileUrl)
+                .findFirst()
+                .orElse(null);
+
         return new AdmissionSummaryResponse(
                 admission.getId(),
                 admission.getStatus(),
@@ -138,7 +145,8 @@ public class AdmissionQueryService {
                 candidate.getBreed(),
                 candidate.getDateOfBirth(),
                 admission.getSubmittedAt(),
-                admission.getQuarantineStallId()
+                admission.getQuarantineStallId(),
+                imageUrl
         );
     }
 }
