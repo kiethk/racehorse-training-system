@@ -1,105 +1,92 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { RoleGuard } from '@/components/auth/RoleGuard';
 import { Panel } from '@/components/ui/Panel';
-import { ownerAdmissionsApi } from '@/features/admissions/services/ownerApi';
-import type { OwnerAdmissionDetail, AdmissionDocumentType } from '@/features/admissions/types/owner';
+import { Button } from '@/components/ui/Button';
+import { ownerAdmissionApi, type OwnerAdmissionDetail } from '@/features/admissions/services/ownerApi';
 
-const documentTypes: AdmissionDocumentType[] = [
+const TYPES = [
   'HORSE_PHOTO','REGISTRATION_DOCUMENT','PEDIGREE_CERTIFICATE','VACCINATION_RECORD',
-  'DEWORMING_RECORD','HEALTH_CERTIFICATE','PREVIOUS_MEDICAL_RECORD','PREVIOUS_INJURY_RECORD',
+  'DEWORMING_RECORD','HEALTH_CERTIFICATE','PREVIOUS_MEDICAL_RECORD','PREVIOUS_INJURY_RECORD'
 ];
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
-export default function OwnerAdmissionDetailPage({params}:{params:Promise<{id:string}>}) {
-  const {id}=use(params);
-  const admissionId=Number(id);
-  const [detail,setDetail]=useState<OwnerAdmissionDetail|null>(null);
-  const [error,setError]=useState('');
-  const [uploadError,setUploadError]=useState('');
-  const [uploading,setUploading]=useState(false);
-  const [file,setFile]=useState<File|null>(null);
-  const [type,setType]=useState<AdmissionDocumentType>('HORSE_PHOTO');
-  const [loading,setLoading]=useState(true);
-  useEffect(()=>{
-    if(!Number.isSafeInteger(admissionId)||admissionId<=0){setError('Invalid admission ID');setLoading(false);return;}
-    ownerAdmissionsApi.detail(admissionId).then(setDetail)
-      .catch(e=>setError(e instanceof Error?e.message:'Unable to load admission'))
-      .finally(()=>setLoading(false));
-  },[admissionId]);
-  async function upload(){
-    if(!file) return;
-    setUploading(true);setUploadError('');
-    try{
-      await ownerAdmissionsApi.uploadDocument(admissionId,file,type);
-      setFile(null);
-      setDetail(await ownerAdmissionsApi.detail(admissionId));
-    }catch(e){setUploadError(e instanceof Error?e.message:'Upload failed');}
-    finally{setUploading(false);}
+export default function OwnerAdmissionDetailPage() {
+  const params = useParams();
+  const search = useSearchParams();
+  const id = Number(params.id);
+  const [detail, setDetail] = useState<OwnerAdmissionDetail | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [type, setType] = useState(TYPES[0]);
+  const [date, setDate] = useState('');
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    if (!Number.isSafeInteger(id) || id < 1) return;
+    ownerAdmissionApi.detail(id).then(setDetail).catch(e=>setError(String(e)));
+  }, [id]);
+  async function upload(e: React.FormEvent) {
+    e.preventDefault(); if (!file) return;
+    setBusy(true); setError('');
+    try {
+      await ownerAdmissionApi.upload(id, file, type, date, note);
+      setDetail(await ownerAdmissionApi.detail(id)); setFile(null); setNote(''); setDate('');
+      const field = document.getElementById('document-file') as HTMLInputElement | null;
+      if (field) field.value = '';
+    } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed'); }
+    finally { setBusy(false); }
   }
-  const fields: {key:keyof NonNullable<OwnerAdmissionDetail['candidate']>; label:string}[]=[
-    {key:'name',label:'Name'},{key:'breed',label:'Breed'},{key:'dateOfBirth',label:'Date of birth'},
-    {key:'registrationNumber',label:'UELN'},{key:'registryName',label:'Registry'},
-    {key:'sireName',label:'Sire'},{key:'sireRegistrationNumber',label:'Sire UELN'},
-    {key:'damName',label:'Dam'},{key:'damRegistrationNumber',label:'Dam UELN'},
-    {key:'pedigreeNotes',label:'Pedigree notes'},
-  ];
-  return <RoleGuard allowedRoles={['HORSE_OWNER']}>
-    <AppShell><PageContainer>
-      <Link href="/owner/admissions" className="text-sm text-[var(--color-primary)]">← My admissions</Link>
-      {loading ? <p className="mt-5">Loading…</p> : error ? <p role="alert">{error}</p> : detail &&
-        <div className="mt-5 space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-2xl font-semibold">Admission #{detail.admissionId}</h1>
-            <span className="rounded-full bg-[var(--color-primary-soft)] px-3 py-1 text-sm">
-              {detail.status.replaceAll('_',' ')}
-            </span>
-          </div>
-          <Panel padded>
-            <h2 className="mb-4 font-semibold">Candidate profile · Submitted {new Date(detail.submittedAt).toLocaleDateString()}</h2>
-            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {fields.map(field=><div key={field.key}>
-                <dt className="text-xs text-[var(--color-text-muted)]">{field.label}</dt>
-                <dd className="mt-1 text-sm">{detail.candidate[field.key] || '—'}</dd>
-              </div>)}
-            </dl>
-          </Panel>
-          <Panel padded className="space-y-4">
-            <h2 className="font-semibold">Documents</h2>
-            {detail.documents.length===0 ? <p>No documents uploaded.</p> :
-              <ul className="space-y-2">{detail.documents.map(doc=><li key={doc.id}>
-                <a className="text-sm text-[var(--color-primary)] underline"
-                  href={doc.fileUrl.startsWith('/') ? `${apiUrl}${doc.fileUrl}` : doc.fileUrl}
-                  target="_blank" rel="noopener noreferrer">
-                    {doc.documentType.replaceAll('_',' ')} · {doc.uploadedAt.slice(0,10)}
-                </a>
+  const locked = detail?.status !== 'GROOM_REVIEW';
+  const apiRoot = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+  return <RoleGuard allowedRoles={['HORSE_OWNER']}><AppShell><PageContainer>
+    <div className="max-w-4xl space-y-5">
+      <Link href="/owner/admissions" className="underline text-sm">← My admissions</Link>
+      {search.get('created') === '1' && <p className="rounded bg-[var(--color-success-soft)] p-3">Admission submitted. Add supporting documents below.</p>}
+      {error && <p role="alert" className="text-[var(--color-danger)]">{error}</p>}
+      {!detail ? <p>Loading admission…</p> : <>
+        <header><h1 className="text-2xl font-semibold">{detail.candidate.name}</h1>
+          <p>Application #{detail.admissionId} · {detail.status.replaceAll('_',' ')}</p></header>
+        <Panel padded><h2 className="font-semibold mb-3">Submitted horse profile</h2>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            {Object.entries(detail.candidate).map(([key,value]) =>
+              <div key={key}><dt className="font-semibold">{key.replace(/([A-Z])/g,' $1')}</dt>
+                <dd>{value || 'Not provided'}</dd></div>)}
+          </dl></Panel>
+        <Panel padded><h2 className="font-semibold mb-3">Admission documents</h2>
+          {detail.documents.length === 0 ? <p className="text-sm mb-4">No documents uploaded.</p> :
+            <ul className="space-y-2 mb-4">{detail.documents.map(d =>
+              <li key={d.id} className="flex justify-between gap-3 border-b border-[var(--color-border)] py-2">
+                <span>{d.documentType.replaceAll('_',' ')}</span>
+                <a className="underline text-[var(--color-primary)]" href={d.fileUrl.startsWith('/') ? apiRoot+d.fileUrl : d.fileUrl}
+                  target="_blank" rel="noopener noreferrer">View / download</a>
               </li>)}</ul>}
-            {detail.status==='GROOM_REVIEW' && <div className="space-y-3 border-t pt-3">
-              <p className="text-xs text-[var(--color-text-secondary)]">Upload is available until Groom starts reviewing.</p>
-              <select className="rounded border p-2 text-sm" value={type}
-                onChange={e=>setType(e.target.value as AdmissionDocumentType)}>
-                {documentTypes.map(t=><option key={t} value={t}>{t.replaceAll('_',' ')}</option>)}
-              </select>
-              <input aria-label="Choose document" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
-                onChange={e=>setFile(e.target.files?.[0]||null)} />
-              <button type="button" onClick={upload} disabled={!file||uploading}
-                className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm text-white disabled:opacity-50">
-                {uploading?'Uploading…':'Upload document'}
-              </button>
-              {uploadError && <p role="alert" className="text-[var(--color-danger)]">{uploadError}</p>}
-            </div>}
-          </Panel>
-          {[
-            ['Groom feedback',detail.groomFeedback],['Veterinarian feedback',detail.vetFeedback],
-            ['Trainer feedback',detail.trainerFeedback],['Manager feedback',detail.managerFeedback]
-          ].filter(([,value])=>value).map(([label,value])=><Panel key={label} padded>
-            <h2 className="font-semibold">{label}</h2><p className="mt-2 text-sm">{value}</p>
-          </Panel>)}
-        </div>}
-    </PageContainer></AppShell>
-  </RoleGuard>;
+          {!locked ? <form onSubmit={upload} className="space-y-3 border-t border-[var(--color-border)] pt-4">
+            <p className="text-sm">Add files before Groom begins reviewing your application.</p>
+            <label className="block text-sm">Document type
+              <select className="block w-full border rounded p-2" value={type} onChange={e=>setType(e.target.value)}>
+                {TYPES.map(t=><option key={t} value={t}>{t.replaceAll('_',' ')}</option>)}</select></label>
+            <label className="block text-sm">File (PDF or image, maximum 10 MB)
+              <input id="document-file" required type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"
+                className="block mt-1" onChange={e=>setFile(e.target.files?.[0] || null)}/></label>
+            <label className="block text-sm">Record date
+              <input type="date" className="block border rounded p-2" value={date}
+                onChange={e=>setDate(e.target.value)}/></label>
+            <label className="block text-sm">Note
+              <textarea maxLength={2000} className="block w-full border rounded p-2" value={note}
+                onChange={e=>setNote(e.target.value)}/></label>
+            <Button type="submit" variant="primary" disabled={!file} loading={busy}>Upload document</Button>
+          </form> : <p className="text-sm">Documents are locked for review.</p>}
+        </Panel>
+        <Panel padded><h2 className="font-semibold mb-3">Review progress</h2>
+          {(['groomFeedback','vetFeedback','trainerFeedback','managerFeedback'] as const).map(k =>
+            <p className="text-sm mb-2" key={k}><strong>{k.replace('Feedback','')}:</strong> {detail[k] || 'Pending'}</p>)}
+        </Panel>
+      </>}
+    </div>
+  </PageContainer></AppShell></RoleGuard>;
 }
