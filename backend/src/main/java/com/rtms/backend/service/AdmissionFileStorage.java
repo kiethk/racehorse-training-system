@@ -12,7 +12,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -51,7 +50,7 @@ public class AdmissionFileStorage {
             Files.createDirectories(uploadRoot);
             Path destination = uploadRoot.resolve(storageKey);
             try (var stream = file.getInputStream()) {
-                Files.copy(stream, destination, StandardCopyOption.CREATE_NEW);
+                Files.copy(stream, destination);
             }
             return "local:" + storageKey;
         } catch (IOException ex) {
