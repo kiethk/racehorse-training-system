@@ -21,31 +21,40 @@ public class AdmissionManagerReviewController {
 
     private final AdmissionManagerReviewService admissionManagerReviewService;
     private final AdmissionQueryService admissionQueryService;
+    private final com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService;
 
     public AdmissionManagerReviewController(
             AdmissionManagerReviewService admissionManagerReviewService,
-            AdmissionQueryService admissionQueryService) {
+            AdmissionQueryService admissionQueryService,
+            com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService) {
         this.admissionManagerReviewService = admissionManagerReviewService;
         this.admissionQueryService = admissionQueryService;
+        this.ownerAdmissionService = ownerAdmissionService;
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VIEW')")
     public ApiResponse<List<AdmissionSummaryResponse>> getAdmissions(
-            @RequestParam(required = false) AdmissionStatus status) {
+            @RequestParam(required = false) AdmissionStatus status,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
 
         return ApiResponse.success(
-                admissionQueryService.getAdmissions(status)
+                "HORSE_OWNER".equals(currentUser.getRole())
+                        ? ownerAdmissionService.getMyAdmissions(currentUser.getUserId(), status)
+                        : admissionQueryService.getAdmissions(status)
         );
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VIEW')")
-    public ApiResponse<AdmissionDetailResponse> getAdmissionDetail(
-            @PathVariable Long id) {
+    public ApiResponse<?> getAdmissionDetail(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
 
         return ApiResponse.success(
-                admissionQueryService.getAdmissionDetail(id)
+                "HORSE_OWNER".equals(currentUser.getRole())
+                        ? ownerAdmissionService.getMyAdmission(currentUser.getUserId(), id)
+                        : admissionQueryService.getAdmissionDetail(id)
         );
     }
 

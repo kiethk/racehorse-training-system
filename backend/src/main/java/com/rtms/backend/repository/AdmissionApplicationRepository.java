@@ -20,6 +20,8 @@ public interface AdmissionApplicationRepository
 
     List<AdmissionApplication> findByOwnerId(Long ownerId);
 
+    List<AdmissionApplication> findByOwnerIdOrderBySubmittedAtDesc(Long ownerId);
+
     List<AdmissionApplication> findByStatus(AdmissionStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

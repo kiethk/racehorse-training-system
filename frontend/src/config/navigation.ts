@@ -49,7 +49,7 @@ export function getNavigationForRole(role: Role): NavItem[] {
       return [
         { id: 'dashboard', label: 'Dashboard', href: dashboardHref },
         { id: 'my-horses', label: 'My Horses' },
-        { id: 'admissions', label: 'Admissions' },
+        { id: 'admissions', label: 'Admissions', href: '/owner/admissions' },
         { id: 'racing', label: 'Racing' },
       ];
     default:

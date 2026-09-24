@@ -47,18 +47,21 @@ public class AdmissionVetReviewController {
     private final AdmissionDocumentRepository admissionDocumentRepository;
     private final StableStallRepository stableStallRepository;
     private final AdmissionReviewService admissionReviewService;
+    private final com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService;
 
     public AdmissionVetReviewController(
             AdmissionApplicationRepository admissionApplicationRepository,
             CandidateHorseProfileRepository candidateHorseProfileRepository,
             AdmissionDocumentRepository admissionDocumentRepository,
             StableStallRepository stableStallRepository,
-            AdmissionReviewService admissionReviewService) {
+            AdmissionReviewService admissionReviewService,
+            com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.admissionDocumentRepository = admissionDocumentRepository;
         this.stableStallRepository = stableStallRepository;
         this.admissionReviewService = admissionReviewService;
+        this.ownerAdmissionService = ownerAdmissionService;
     }
 
     @PostMapping("/{id}/vet-review")
@@ -74,11 +77,12 @@ public class AdmissionVetReviewController {
 
     @GetMapping("/{id}/documents")
     @PreAuthorize("hasAuthority('ADMISSION_DOCUMENT_VIEW')")
-    public ApiResponse<List<AdmissionDocumentResponse>> getDocuments(@PathVariable Long id) {
-        findAdmission(id);
+    public ApiResponse<List<AdmissionDocumentResponse>> getDocuments(@PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        ownerAdmissionService.assertViewerCanRead(id, currentUser);
         List<AdmissionDocumentResponse> documents = admissionDocumentRepository.findByAdmissionId(id)
                 .stream()
-                .map(this::toDocumentResponse)
+                .map(ownerAdmissionService::toDocumentResponse)
                 .toList();
         return ApiResponse.success(documents);
     }
