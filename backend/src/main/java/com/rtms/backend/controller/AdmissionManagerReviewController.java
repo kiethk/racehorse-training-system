@@ -20,32 +20,41 @@ import java.util.List;
 public class AdmissionManagerReviewController {
 
     private final AdmissionManagerReviewService admissionManagerReviewService;
-    private final AdmissionQueryService admissionQueryService;\n    private final com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService;
+    private final AdmissionQueryService admissionQueryService;
+    private final com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService;
 
     public AdmissionManagerReviewController(
             AdmissionManagerReviewService admissionManagerReviewService,
-            AdmissionQueryService admissionQueryService,\n            com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService) {
+            AdmissionQueryService admissionQueryService,
+            com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService) {
         this.admissionManagerReviewService = admissionManagerReviewService;
-        this.admissionQueryService = admissionQueryService;\n        this.ownerAdmissionService = ownerAdmissionService;
+        this.admissionQueryService = admissionQueryService;
+        this.ownerAdmissionService = ownerAdmissionService;
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VIEW')")
     public ApiResponse<List<AdmissionSummaryResponse>> getAdmissions(
-            @RequestParam(required = false) AdmissionStatus status,\n            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+            @RequestParam(required = false) AdmissionStatus status,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
 
         return ApiResponse.success(
-                "HORSE_OWNER".equals(currentUser.getRole())\n                        ? ownerAdmissionService.getMyAdmissions(currentUser.getUserId(), status)\n                        : admissionQueryService.getAdmissions(status)
+                "HORSE_OWNER".equals(currentUser.getRole())
+                        ? ownerAdmissionService.getMyAdmissions(currentUser.getUserId(), status)
+                        : admissionQueryService.getAdmissions(status)
         );
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VIEW')")
     public ApiResponse<?> getAdmissionDetail(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
 
         return ApiResponse.success(
-                admissionQueryService.getAdmissionDetail(id)
+                "HORSE_OWNER".equals(currentUser.getRole())
+                        ? ownerAdmissionService.getMyAdmission(currentUser.getUserId(), id)
+                        : admissionQueryService.getAdmissionDetail(id)
         );
     }
 
