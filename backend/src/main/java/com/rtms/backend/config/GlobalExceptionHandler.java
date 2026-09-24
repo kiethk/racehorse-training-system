@@ -1,7 +1,8 @@
 package com.rtms.backend.config;
 
 import com.rtms.backend.dto.ApiResponse;
-import org.springframework.http.HttpStatus;\nimport org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -35,7 +36,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(message));
     }
 
-    @ExceptionHandler(ResponseStatusException.class)\n    public ResponseEntity<ApiResponse<Object>> handleStatus(ResponseStatusException ex) {\n        return ResponseEntity.status(ex.getStatusCode())\n                .body(ApiResponse.error(ex.getReason() == null ? \"Request failed\" : ex.getReason()));\n    }\n\n    @ExceptionHandler(IllegalArgumentException.class)\n    public ResponseEntity<ApiResponse<Object>> handleBadRequest(IllegalArgumentException ex) {\n        return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage()));\n    }\n\n    @ExceptionHandler(RuntimeException.class)
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<Object>> handleStatus(ResponseStatusException ex) {
+        return ResponseEntity.status(ex.getStatusCode())
+                .body(ApiResponse.error(ex.getReason() == null ? "Request failed" : ex.getReason()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Object>> handleBadRequest(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Object>> handleRuntimeException(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage()));
