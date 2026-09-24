@@ -20,28 +20,28 @@ import java.util.List;
 public class AdmissionManagerReviewController {
 
     private final AdmissionManagerReviewService admissionManagerReviewService;
-    private final AdmissionQueryService admissionQueryService;
+    private final AdmissionQueryService admissionQueryService;\n    private final com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService;
 
     public AdmissionManagerReviewController(
             AdmissionManagerReviewService admissionManagerReviewService,
-            AdmissionQueryService admissionQueryService) {
+            AdmissionQueryService admissionQueryService,\n            com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService) {
         this.admissionManagerReviewService = admissionManagerReviewService;
-        this.admissionQueryService = admissionQueryService;
+        this.admissionQueryService = admissionQueryService;\n        this.ownerAdmissionService = ownerAdmissionService;
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VIEW')")
     public ApiResponse<List<AdmissionSummaryResponse>> getAdmissions(
-            @RequestParam(required = false) AdmissionStatus status) {
+            @RequestParam(required = false) AdmissionStatus status,\n            @AuthenticationPrincipal AuthenticatedUser currentUser) {
 
         return ApiResponse.success(
-                admissionQueryService.getAdmissions(status)
+                "HORSE_OWNER".equals(currentUser.getRole())\n                        ? ownerAdmissionService.getMyAdmissions(currentUser.getUserId(), status)\n                        : admissionQueryService.getAdmissions(status)
         );
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VIEW')")
-    public ApiResponse<AdmissionDetailResponse> getAdmissionDetail(
+    public ApiResponse<?> getAdmissionDetail(
             @PathVariable Long id) {
 
         return ApiResponse.success(

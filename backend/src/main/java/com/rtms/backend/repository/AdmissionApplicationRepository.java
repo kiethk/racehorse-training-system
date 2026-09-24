@@ -18,7 +18,7 @@ import java.util.Optional;
 public interface AdmissionApplicationRepository
         extends JpaRepository<AdmissionApplication, Long> {
 
-    List<AdmissionApplication> findByOwnerId(Long ownerId);
+    List<AdmissionApplication> findByOwnerId(Long ownerId);\n\n    List<AdmissionApplication> findByOwnerIdOrderBySubmittedAtDesc(Long ownerId);
 
     List<AdmissionApplication> findByStatus(AdmissionStatus status);
 
