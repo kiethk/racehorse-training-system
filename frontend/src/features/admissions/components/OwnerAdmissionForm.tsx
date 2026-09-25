@@ -4,8 +4,8 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
-import { ownerAdmissionApi, type CandidateForm } from '../services/ownerApi';
-import type { AdmissionDocumentType } from '../types/owner';
+import { ownerAdmissionsApi } from '../services/ownerApi';
+import type { CreateOwnerAdmissionRequest, AdmissionDocumentType } from '../types/owner';
 
 const TYPES: {value: AdmissionDocumentType; label: string}[] = [
   {value: 'HORSE_PHOTO', label: 'Horse photo'},
@@ -21,7 +21,7 @@ const inputClass = 'w-full rounded-md border border-[var(--color-border-strong)]
 
 export function OwnerAdmissionForm() {
   const router = useRouter();
-  const [form, setForm] = useState<CandidateForm>({name: '', breed: '', dateOfBirth: null, registrationNumber: null, registryName: null, sireName: null, sireRegistrationNumber: null, damName: null, damRegistrationNumber: null, pedigreeNotes: null});
+  const [form, setForm] = useState<CreateOwnerAdmissionRequest>({name: ''});
   const [uploads, setUploads] = useState<{file: File; documentType: AdmissionDocumentType; recordDate: string; note: string}[]>([]);
   const [selectedType, setSelectedType] = useState<AdmissionDocumentType>('HORSE_PHOTO');
   const [recordDate, setRecordDate] = useState('');
@@ -30,7 +30,7 @@ export function OwnerAdmissionForm() {
   const [error, setError] = useState('');
   const [createdId, setCreatedId] = useState<number | null>(null);
 
-  const fields: {key: keyof CandidateForm; label: string; required?: boolean; type?: string; hint?: string}[] = [
+  const fields: {key: keyof CreateOwnerAdmissionRequest; label: string; required?: boolean; type?: string; hint?: string}[] = [
     {key:'name', label:'Horse name', required:true},
     {key:'breed', label:'Breed'},
     {key:'dateOfBirth', label:'Date of birth', type:'date'},
@@ -41,8 +41,8 @@ export function OwnerAdmissionForm() {
     {key:'damName', label:'Dam name'},
     {key:'damRegistrationNumber', label:'Dam UELN', hint:'15 alphanumeric characters, if known'},
   ];
-  function change(key: keyof CandidateForm, value: string) {
-    setForm((current: CandidateForm) => ({...current, [key]: value}));
+  function change(key: keyof CreateOwnerAdmissionRequest, value: string) {
+    setForm(current => ({...current, [key]: value}));
   }
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -51,15 +51,15 @@ export function OwnerAdmissionForm() {
     let id = createdId;
     try {
       if (id === null) {
-        const created = await ownerAdmissionApi.create(
-          Object.fromEntries(Object.entries(form).filter(([, value]) => value !== '')) as CandidateForm
+        const created = await ownerAdmissionsApi.create(
+          Object.fromEntries(Object.entries(form).filter(([, value]) => value !== '')) as CreateOwnerAdmissionRequest
         );
         id = created.admissionId;
         setCreatedId(id);
       }
       for (const upload of uploads) {
-        await ownerAdmissionApi.upload(
-          id, upload.file, upload.documentType, upload.recordDate || '', upload.note || ''
+        await ownerAdmissionsApi.uploadDocument(
+          id, upload.file, upload.documentType, upload.recordDate || undefined, upload.note || undefined
         );
         setUploads(current => current.filter(item => item !== upload));
       }
