@@ -4,6 +4,7 @@ import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreateHorseRequest;
 import com.rtms.backend.dto.UpdateHorseStatusRequest;
 import com.rtms.backend.entity.Horse;
+import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.service.HorseService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,10 +25,12 @@ public class HorseController {
 
     @PreAuthorize("hasAuthority('HORSE_VIEW')")
     @GetMapping
-    public ApiResponse<List<Horse>> getAllHorses() {
+    public ApiResponse<List<Horse>> getAllHorses(
+            @RequestParam(required = false) Boolean mine,
+            @RequestParam(required = false) HorseStatus status) {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
-        return ApiResponse.success(horseService.getAllHorses(currentUser));
+        return ApiResponse.success(horseService.getAllHorses(currentUser, mine, status));
     }
 
     @PreAuthorize("hasAuthority('HORSE_CREATE')")

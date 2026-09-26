@@ -131,6 +131,14 @@ public class AdmissionQueryService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Candidate horse profile not found"));
 
+        // Mã chuồng cách ly cho màn hình danh sách của Trainer.
+        // Đơn chưa được xếp chuồng (GROOM_REVIEW, WAITING_FOR_STALL) -> null.
+        String stallCode = admission.getQuarantineStallId() == null
+                ? null
+                : stableStallRepository.findById(admission.getQuarantineStallId())
+                        .map(StableStall::getStallCode)
+                        .orElse(null);
+
         return new AdmissionSummaryResponse(
                 admission.getId(),
                 admission.getStatus(),
@@ -138,7 +146,8 @@ public class AdmissionQueryService {
                 candidate.getBreed(),
                 candidate.getDateOfBirth(),
                 admission.getSubmittedAt(),
-                admission.getQuarantineStallId()
+                admission.getQuarantineStallId(),
+                stallCode
         );
     }
 }

@@ -64,4 +64,33 @@ public class GroomIncidentReportController {
         GroomIncidentReport report = incidentReportService.getReportById(id);
         return ApiResponse.success(report);
     }
+
+    /**
+     * Đính ảnh vào báo cáo đã tạo.
+     * Dùng lại quyền GROOM_INCIDENT_REPORT_CREATE — không cần migration.
+     */
+    @PostMapping(value = "/{id}/image", consumes = "multipart/form-data")
+    @PreAuthorize("hasAuthority('GROOM_INCIDENT_REPORT_CREATE')")
+    public ApiResponse<GroomIncidentReport> uploadImage(
+            @PathVariable Long id,
+            @RequestPart("file") org.springframework.web.multipart.MultipartFile file,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(
+                incidentReportService.attachImage(id, file, currentUser));
+    }
+
+    /**
+     * Trả file ảnh inline để thẻ <img> hiển thị được ngay.
+     */
+    @GetMapping("/{id}/image")
+    @PreAuthorize("hasAuthority('GROOM_INCIDENT_REPORT_VIEW')")
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> getImage(@PathVariable Long id) {
+        org.springframework.core.io.Resource file = incidentReportService.loadImage(id);
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(incidentReportService.imageMediaType(id))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=incident-" + id)
+                .header("X-Content-Type-Options", "nosniff")
+                .body(file);
+    }
 }
+

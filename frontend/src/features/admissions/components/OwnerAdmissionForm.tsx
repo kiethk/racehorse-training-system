@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
-import { ownerAdmissionsApi } from '../services/ownerApi';
+import { ownerAdmissionApi } from '../services/ownerApi';
 import type { CreateOwnerAdmissionRequest, AdmissionDocumentType } from '../types/owner';
 
 const TYPES: {value: AdmissionDocumentType; label: string}[] = [
@@ -51,14 +51,14 @@ export function OwnerAdmissionForm() {
     let id = createdId;
     try {
       if (id === null) {
-        const created = await ownerAdmissionsApi.create(
+        const created = await ownerAdmissionApi.create(
           Object.fromEntries(Object.entries(form).filter(([, value]) => value !== '')) as CreateOwnerAdmissionRequest
         );
         id = created.admissionId;
         setCreatedId(id);
       }
       for (const upload of uploads) {
-        await ownerAdmissionsApi.uploadDocument(
+        await ownerAdmissionApi.upload(
           id, upload.file, upload.documentType, upload.recordDate || undefined, upload.note || undefined
         );
         setUploads(current => current.filter(item => item !== upload));
