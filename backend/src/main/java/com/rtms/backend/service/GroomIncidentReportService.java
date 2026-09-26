@@ -8,22 +8,30 @@ import com.rtms.backend.enums.IncidentStatus;
 import com.rtms.backend.repository.GroomIncidentReportRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class GroomIncidentReportService {
 
     private final GroomIncidentReportRepository incidentReportRepository;
     private final HorseRepository horseRepository;
+    private final AdmissionFileStorage fileStorage;
 
     public GroomIncidentReportService(GroomIncidentReportRepository incidentReportRepository,
-                                      HorseRepository horseRepository) {
+                                      HorseRepository horseRepository,
+                                      AdmissionFileStorage fileStorage) {
         this.incidentReportRepository = incidentReportRepository;
         this.horseRepository = horseRepository;
+        this.fileStorage = fileStorage;
     }
 
     @Transactional
@@ -125,4 +133,77 @@ public class GroomIncidentReportService {
         return incidentReportRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Incident report not found with id: " + id));
     }
+
+    /**
+     * Đính ảnh vào một báo cáo đã tạo.
+     *
+     * Vì sao tách làm HAI BƯỚC (tạo báo cáo -> rồi tải ảnh) mà không gộp:
+     * cần id của báo cáo để biết ảnh thuộc về ai. Đây đúng cách luồng Owner
+     * đang làm — tạo đơn rồi mới tải giấy tờ.
+     *
+     * Gọi lại lần nữa sẽ THAY ảnh cũ và xoá file cũ khỏi đĩa, tránh rác.
+     */
+    @Transactional
+    public GroomIncidentReport attachImage(Long reportId,
+                                           MultipartFile file,
+                                           AuthenticatedUser currentUser) {
+
+        GroomIncidentReport report = incidentReportRepository.findById(reportId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Không tìm thấy báo cáo sự cố #" + reportId));
+
+        // Chỉ người gửi báo cáo mới được đính ảnh.
+        // Thú y xem được nhưng không sửa được bằng chứng của Groom.
+        if ("GROOM".equalsIgnoreCase(currentUser.getRole())
+                && !currentUser.getUserId().equals(report.getGroomId())) {
+            throw new AccessDeniedException(
+                    "Bạn chỉ được đính ảnh vào báo cáo do chính mình gửi!");
+        }
+
+        // AdmissionFileStorage nhận cả PDF. Báo cáo sự cố thì chỉ nhận ảnh —
+        // chặn ở đây trước khi ghi xuống đĩa.
+        String mediaType = file.getContentType() == null
+                ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        if (!mediaType.startsWith("image/")) {
+            throw new IllegalArgumentException(
+                    "Chỉ nhận ảnh (JPEG, PNG, WebP) cho báo cáo sự cố!");
+        }
+
+        String oldKey = report.getImageUrl();
+        String newKey = fileStorage.store(file);   // tự kiểm dung lượng + định dạng
+
+        try {
+            report.setImageUrl(newKey);
+            GroomIncidentReport saved = incidentReportRepository.save(report);
+            fileStorage.deleteIfLocal(oldKey);     // dọn ảnh cũ SAU khi ghi DB thành công
+            return saved;
+        } catch (RuntimeException ex) {
+            fileStorage.deleteIfLocal(newKey);     // ghi DB hỏng -> không để lại file mồ côi
+            throw ex;
+        }
+    }
+
+    /**
+     * Nạp file ảnh để trả về cho trình duyệt.
+     *
+     * fileStorage.load() tự ném 404 nếu khoá không bắt đầu bằng "local:",
+     * tức là ảnh được lưu ngoài hệ thống — khi đó frontend dùng thẳng imageUrl.
+     */
+    public Resource loadImage(Long reportId) {
+        GroomIncidentReport report = getReportById(reportId);
+        if (report.getImageUrl() == null) {
+            throw new RuntimeException("Báo cáo #" + reportId + " không có ảnh đính kèm");
+        }
+        return fileStorage.load(report.getImageUrl());
+    }
+
+    /** Suy kiểu nội dung từ đuôi khoá lưu trữ, để trình duyệt hiển thị đúng. */
+    public MediaType imageMediaType(Long reportId) {
+        String key = getReportById(reportId).getImageUrl();
+        String lower = key == null ? "" : key.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".png"))  return MediaType.IMAGE_PNG;
+        if (lower.endsWith(".webp")) return MediaType.valueOf("image/webp");
+        return MediaType.IMAGE_JPEG;
+    }
 }
+

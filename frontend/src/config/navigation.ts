@@ -27,7 +27,9 @@ export function getNavigationForRole(role: Role): NavItem[] {
       return [
         { id: 'dashboard', label: 'Dashboard', href: dashboardHref },
         { id: 'admissions', label: 'Admissions', href: '/trainer/admissions' },
-        { id: 'training', label: 'Training' },
+        { id: 'stable', label: 'Stable', href: '/trainer/stable' },
+        { id: 'training', label: 'Training', href: '/trainer/courses' },
+        { id: 'schedule', label: 'Schedule', href: '/trainer/schedule' },
         { id: 'horses', label: 'Horses' },
         { id: 'racing', label: 'Racing' },
       ];
@@ -41,8 +43,9 @@ export function getNavigationForRole(role: Role): NavItem[] {
     case 'GROOM':
       return [
         { id: 'dashboard', label: 'Dashboard', href: dashboardHref },
+        { id: 'care-tasks', label: 'Daily Tasks', href: '/groom/tasks' },
+        { id: 'incidents', label: 'Incidents', href: '/groom/incidents' },
         { id: 'admissions', label: 'Admissions' },
-        { id: 'care-tasks', label: 'Care Tasks' },
         { id: 'stable', label: 'Stable' },
       ];
     case 'HORSE_OWNER':

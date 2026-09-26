@@ -29,11 +29,14 @@ class GroomIncidentReportServiceTest {
     @Mock
     private HorseRepository horseRepository;
 
+    @Mock
+    private AdmissionFileStorage fileStorage;
+
     private GroomIncidentReportService incidentReportService;
 
     @BeforeEach
     void setUp() {
-        incidentReportService = new GroomIncidentReportService(incidentReportRepository, horseRepository);
+        incidentReportService = new GroomIncidentReportService(incidentReportRepository, horseRepository, fileStorage);
     }
 
     @Test
@@ -142,4 +145,65 @@ class GroomIncidentReportServiceTest {
         assertEquals(1, results.size());
         assertEquals(5L, results.get(0).getGroomId());
     }
-}
+
+    @Test
+    @DisplayName("attachImage thành công: lưu ảnh mới, dọn ảnh cũ")
+    void testAttachImage_Success() {
+        GroomIncidentReport report = new GroomIncidentReport();
+        report.setId(10L);
+        report.setGroomId(5L);
+        report.setImageUrl("local:old.jpg");
+
+        when(incidentReportRepository.findById(10L)).thenReturn(Optional.of(report));
+        when(incidentReportRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        org.springframework.web.multipart.MultipartFile file =
+                mock(org.springframework.web.multipart.MultipartFile.class);
+        when(file.getContentType()).thenReturn("image/jpeg");
+        when(fileStorage.store(file)).thenReturn("local:new.jpg");
+
+        AuthenticatedUser groom = new AuthenticatedUser(5L, "groom@example.com", "GROOM");
+
+        GroomIncidentReport updated = incidentReportService.attachImage(10L, file, groom);
+
+        assertEquals("local:new.jpg", updated.getImageUrl());
+        verify(fileStorage).deleteIfLocal("local:old.jpg");
+    }
+
+    @Test
+    @DisplayName("attachImage: Groom khác không được đính ảnh vào báo cáo của người khác")
+    void testAttachImage_WrongGroom_ThrowsAccessDenied() {
+        GroomIncidentReport report = new GroomIncidentReport();
+        report.setId(10L);
+        report.setGroomId(5L);
+
+        when(incidentReportRepository.findById(10L)).thenReturn(Optional.of(report));
+
+        org.springframework.web.multipart.MultipartFile file =
+                mock(org.springframework.web.multipart.MultipartFile.class);
+
+        AuthenticatedUser otherGroom = new AuthenticatedUser(99L, "other@example.com", "GROOM");
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> incidentReportService.attachImage(10L, file, otherGroom));
+    }
+
+    @Test
+    @DisplayName("attachImage: từ chối file không phải ảnh (PDF)")
+    void testAttachImage_NonImage_ThrowsIllegalArgument() {
+        GroomIncidentReport report = new GroomIncidentReport();
+        report.setId(10L);
+        report.setGroomId(5L);
+
+        when(incidentReportRepository.findById(10L)).thenReturn(Optional.of(report));
+
+        org.springframework.web.multipart.MultipartFile file =
+                mock(org.springframework.web.multipart.MultipartFile.class);
+        when(file.getContentType()).thenReturn("application/pdf");
+
+        AuthenticatedUser groom = new AuthenticatedUser(5L, "groom@example.com", "GROOM");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> incidentReportService.attachImage(10L, file, groom));
+    }
+}
