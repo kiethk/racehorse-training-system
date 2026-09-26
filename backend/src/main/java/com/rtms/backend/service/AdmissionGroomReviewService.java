@@ -72,15 +72,20 @@ public class AdmissionGroomReviewService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Decision is required");
         }
 
+        String feedback = request.getFeedback() == null ? null : request.getFeedback().trim();
+        if (feedback == null || feedback.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Feedback is required for Groom review");
+        }
+
         if (request.getDecision() == ReviewDecision.REJECTED) {
-            return reject(admission, groomId, request.getFeedback());
+            return reject(admission, groomId, feedback);
         }
 
         if (request.getDecision() != ReviewDecision.APPROVED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported Groom decision");
         }
 
-        stampGroomReview(admission, groomId, ReviewDecision.APPROVED, request.getFeedback());
+        stampGroomReview(admission, groomId, ReviewDecision.APPROVED, feedback);
         return moveForwardIfCapacityAvailable(admission);
     }
 
@@ -162,8 +167,8 @@ public class AdmissionGroomReviewService {
         long availableRegularStalls = stableStallRepository.countAvailableRegularStalls();
         long occupiedQuarantineStalls = stableStallRepository.countOccupiedQuarantineStalls();
 
-        return availableQuarantineStalls >= 1
-                && availableRegularStalls >= occupiedQuarantineStalls + 1;
+        return AdmissionCapacityPolicy.isAvailable(
+                availableQuarantineStalls, availableRegularStalls, occupiedQuarantineStalls);
     }
 
     private Horse findReusableHorseOrCreateNew(

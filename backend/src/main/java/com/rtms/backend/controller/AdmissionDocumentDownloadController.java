@@ -1,6 +1,7 @@
 package com.rtms.backend.controller;
 
 import com.rtms.backend.entity.AdmissionDocument;
+import com.rtms.backend.enums.AdmissionDocumentType;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.AdmissionFileStorage;
 import com.rtms.backend.service.OwnerAdmissionService;
@@ -8,9 +9,12 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/admissions")
@@ -29,9 +33,16 @@ public class AdmissionDocumentDownloadController {
             @AuthenticationPrincipal AuthenticatedUser viewer) {
         AdmissionDocument document = service.getDocumentForViewer(id, documentId, viewer);
         Resource file = storage.load(document.getFileUrl());
+        String filename = document.getOriginalFileName() == null
+                ? "admission-document-" + documentId
+                : document.getOriginalFileName();
+        boolean isHorsePhoto = document.getDocumentType() == AdmissionDocumentType.HORSE_PHOTO;
+        ContentDisposition disposition = isHorsePhoto
+                ? ContentDisposition.inline().filename(filename, StandardCharsets.UTF_8).build()
+                : ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build();
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=admission-document-" + documentId)
+                .contentType(MediaTypeFactory.getMediaType(file).orElse(MediaType.APPLICATION_OCTET_STREAM))
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .header("X-Content-Type-Options", "nosniff")
                 .body(file);
     }

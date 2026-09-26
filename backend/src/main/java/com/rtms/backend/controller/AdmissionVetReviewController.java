@@ -136,6 +136,7 @@ public class AdmissionVetReviewController {
                 document.getId(),
                 document.getDocumentType(),
                 document.getFileUrl(),
+                document.getOriginalFileName(),
                 document.getRecordDate(),
                 document.getNote(),
                 document.getUploadedAt(),

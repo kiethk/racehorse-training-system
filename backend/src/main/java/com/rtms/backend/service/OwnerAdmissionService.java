@@ -73,7 +73,7 @@ public class OwnerAdmissionService {
                     String imageUrl = documents.findByAdmissionId(admission.getId())
                             .stream()
                             .filter(doc -> doc.getDocumentType() == com.rtms.backend.enums.AdmissionDocumentType.HORSE_PHOTO)
-                            .map(com.rtms.backend.entity.AdmissionDocument::getFileUrl)
+                            .map(fileStorage::downloadUrl)
                             .findFirst()
                             .orElse(null);
                     return new AdmissionSummaryResponse(admission.getId(), admission.getStatus(),
@@ -118,6 +118,7 @@ public class OwnerAdmissionService {
             document.setAdmissionId(admissionId);
             document.setDocumentType(type);
             document.setFileUrl(key);
+            document.setOriginalFileName(safeOriginalFileName(file.getOriginalFilename()));
             document.setRecordDate(recordDate);
             document.setNote(trimNullable(note));
             return toDocumentResponse(documents.save(document));
@@ -154,7 +155,7 @@ public class OwnerAdmissionService {
 
     public AdmissionDocumentResponse toDocumentResponse(AdmissionDocument document) {
         return new AdmissionDocumentResponse(document.getId(), document.getDocumentType(),
-                fileStorage.downloadUrl(document), document.getRecordDate(), document.getNote(),
+                fileStorage.downloadUrl(document), document.getOriginalFileName(), document.getRecordDate(), document.getNote(),
                 document.getUploadedAt(), MEDICAL_TYPES.contains(document.getDocumentType()));
     }
 
@@ -195,5 +196,14 @@ public class OwnerAdmissionService {
     private static String ueln(String value) {
         String normalized = trimNullable(value);
         return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
+    }
+
+    private static String safeOriginalFileName(String filename) {
+        if (filename == null || filename.isBlank()) return null;
+        String normalized = filename.replace('\\', '/');
+        String basename = normalized.substring(normalized.lastIndexOf('/') + 1)
+                .replaceAll("[\\p{Cntrl}]", "").trim();
+        if (basename.isEmpty()) return null;
+        return basename.length() <= 255 ? basename : basename.substring(basename.length() - 255);
     }
 }

@@ -124,11 +124,12 @@ class OwnerAdmissionServiceTest {
             doc.setId(33L); return doc;
         });
         when(files.downloadUrl(any())).thenReturn("/api/admissions/3/documents/33/file");
-        var file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", new byte[]{1,2,3});
+        var file = new MockMultipartFile("file", "C:\\fakepath\\photo.jpg", "image/jpeg", new byte[]{1,2,3});
         var result = service.upload(7L, 3L, AdmissionDocumentType.HORSE_PHOTO,
                 LocalDate.of(2026, 9, 1), "Arrival", file);
         assertEquals(33L, result.getId());
         assertEquals("/api/admissions/3/documents/33/file", result.getFileUrl());
+        assertEquals("photo.jpg", result.getOriginalFileName());
         verify(documents, times(1)).save(argThat(d -> d.getAdmissionId() == 3L));
     }
 

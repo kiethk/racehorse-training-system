@@ -1,6 +1,5 @@
 package com.rtms.backend.dto;
 
-import com.rtms.backend.entity.AdmissionDocument;
 import com.rtms.backend.entity.CandidateHorseProfile;
 import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.entity.StableStall;
@@ -14,12 +13,14 @@ public class AdmissionDetailResponse {
 
     private Long admissionId;
     private Long ownerId;
+    private String ownerName;
     private AdmissionStatus status;
     private Long quarantineStallId;
     private String quarantineStallCode;
 
     private CandidateHorseProfile candidate;
-    private List<AdmissionDocument> documents;
+    private List<AdmissionDocumentResponse> documents;
+    private AdmissionCapacitySummary capacity;
 
     private Long groomId;
     private ReviewDecision groomDecision;
@@ -65,6 +66,10 @@ public class AdmissionDetailResponse {
         this.ownerId = ownerId;
     }
 
+    public String getOwnerName() { return ownerName; }
+
+    public void setOwnerName(String ownerName) { this.ownerName = ownerName; }
+
     public AdmissionStatus getStatus() {
         return status;
     }
@@ -97,13 +102,17 @@ public class AdmissionDetailResponse {
         this.candidate = candidate;
     }
 
-    public List<AdmissionDocument> getDocuments() {
+    public List<AdmissionDocumentResponse> getDocuments() {
         return documents;
     }
 
-    public void setDocuments(List<AdmissionDocument> documents) {
+    public void setDocuments(List<AdmissionDocumentResponse> documents) {
         this.documents = documents;
     }
+
+    public AdmissionCapacitySummary getCapacity() { return capacity; }
+
+    public void setCapacity(AdmissionCapacitySummary capacity) { this.capacity = capacity; }
 
     public Long getGroomId() {
         return groomId;
