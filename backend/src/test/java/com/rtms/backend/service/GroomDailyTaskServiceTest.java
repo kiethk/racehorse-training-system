@@ -283,4 +283,58 @@ class GroomDailyTaskServiceTest {
         assertEquals(FarmSchedulePolicy.VET_WINDOW_START, items.get(2).getStartTime());
         assertFalse(items.get(2).isActionable());
     }
+
+    @Test
+    @DisplayName("6. Groom hoàn thành nhiệm vụ được giao thành công")
+    void testCompleteTask_Success() {
+        Long taskId = 50L;
+        com.rtms.backend.security.AuthenticatedUser groom =
+                new com.rtms.backend.security.AuthenticatedUser(4L, "groom@example.com", "GROOM");
+
+        GroomDailyTask task = new GroomDailyTask();
+        task.setId(taskId);
+        task.setGroomId(4L);
+        task.setIsCompleted(false);
+
+        when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+        when(taskRepository.save(any(GroomDailyTask.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        GroomDailyTask result = taskService.completeTask(taskId, groom);
+
+        assertNotNull(result);
+        assertTrue(result.getIsCompleted());
+        assertNotNull(result.getCompletedAt());
+        verify(taskRepository).save(task);
+    }
+
+    @Test
+    @DisplayName("7. Groom khác không được phép xác nhận hoàn thành nhiệm vụ của Groom phụ trách")
+    void testCompleteTask_WrongGroom_ThrowsAccessDenied() {
+        Long taskId = 50L;
+        com.rtms.backend.security.AuthenticatedUser otherGroom =
+                new com.rtms.backend.security.AuthenticatedUser(99L, "other@example.com", "GROOM");
+
+        GroomDailyTask task = new GroomDailyTask();
+        task.setId(taskId);
+        task.setGroomId(4L); // Thuộc groom 4L
+
+        when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> taskService.completeTask(taskId, otherGroom));
+        verify(taskRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("8. Không tìm thấy nhiệm vụ theo ID -> Ném RuntimeException")
+    void testCompleteTask_NotFound_ThrowsRuntimeException() {
+        Long taskId = 999L;
+        com.rtms.backend.security.AuthenticatedUser groom =
+                new com.rtms.backend.security.AuthenticatedUser(4L, "groom@example.com", "GROOM");
+
+        when(taskRepository.findById(taskId)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> taskService.completeTask(taskId, groom));
+    }
 }
+
