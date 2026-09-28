@@ -1,12 +1,14 @@
 'use client';
 
-import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
-import { EmptyState } from '@/components/ui/states';
+import { MetricCard } from '@/components/ui/MetricCard';
+import { Panel, SectionTitle } from '@/components/ui/Panel';
+import { Pill } from '@/components/ui/StatusBadge';
+import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { GroomAdmissionReview } from './GroomAdmissionReview';
 import { admissionsApi } from '../services/api';
 import type { AdmissionStatus, GroomQueueFilters, GroomQueueResponse } from '../types';
 
@@ -36,16 +38,17 @@ function toQuery(filters: GroomQueueFilters) {
   return query ? `?${query}` : '';
 }
 
-function statusTone(status: AdmissionStatus) {
-  if (status === 'GROOM_REVIEW') return 'text-[var(--color-primary)] bg-[var(--color-primary-soft)]';
-  if (status === 'WAITING_FOR_STALL') return 'text-[var(--color-warning)] bg-[var(--color-warning-soft)]';
-  if (status === 'APPROVED') return 'text-[var(--color-success)] bg-[var(--color-success-soft)]';
-  if (status === 'REJECTED') return 'text-[var(--color-danger)] bg-[var(--color-danger-soft)]';
-  return 'text-[var(--color-text-secondary)] bg-[var(--color-surface-muted)]';
-}
-
 function prettyStatus(status: AdmissionStatus) {
   return status.toLowerCase().replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function statusTone(status: AdmissionStatus): 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral' {
+  if (status === 'GROOM_REVIEW') return 'primary';
+  if (status === 'WAITING_FOR_STALL') return 'warning';
+  if (status === 'APPROVED') return 'success';
+  if (status === 'REJECTED') return 'danger';
+  if (status === 'VET_REVIEW' || status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW') return 'info';
+  return 'neutral';
 }
 
 export function GroomAdmissionsTable({ initialFilters }: { initialFilters: GroomQueueFilters }) {
@@ -55,9 +58,14 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
   const [result, setResult] = useState<GroomQueueResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAdmissionId, setSelectedAdmissionId] = useState<number | null>(null);
+  const [reviewVersion, setReviewVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setError(null);
     admissionsApi.getGroomQueue(applied)
       .then((data) => { if (active) setResult(data); })
       .catch((cause: unknown) => {
@@ -65,11 +73,23 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [applied]);
+  }, [applied, reviewVersion]);
+
+  const applications = useMemo(() => result?.content ?? [], [result]);
+
+  useEffect(() => {
+    if (applications.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedAdmissionId(null);
+      return;
+    }
+    if (!applications.some((application) => application.admissionId === selectedAdmissionId)) {
+      setSelectedAdmissionId(applications[0].admissionId);
+    }
+  }, [applications, selectedAdmissionId]);
 
   const apply = () => {
     const next = { ...draft, candidateName: draft.candidateName.trim(), page: 0 };
-    setLoading(true);
     setError(null);
     setApplied(next);
     router.replace(`/groom/admissions${toQuery(next)}`);
@@ -77,7 +97,6 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
 
   const clear = () => {
     setDraft(initial);
-    setLoading(true);
     setError(null);
     setApplied(initial);
     router.replace('/groom/admissions');
@@ -85,24 +104,47 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
 
   const changePage = (page: number) => {
     const next = { ...applied, page };
-    setLoading(true);
     setError(null);
     setApplied(next);
     setDraft(next);
     router.replace(`/groom/admissions${toQuery(next)}`);
   };
 
-  return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">Admission applications</h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Groom admission records</p>
-        </div>
-        {result && <p className="text-sm text-[var(--color-text-secondary)]">{result.totalElements} applications</p>}
-      </header>
+  const total = result?.totalElements ?? 0;
+  const awaitingReview = applications.filter((application) => application.status === 'GROOM_REVIEW').length;
+  const waitingForStall = applications.filter((application) => application.status === 'WAITING_FOR_STALL').length;
+  const rejected = applications.filter((application) => application.status === 'REJECTED').length;
 
-      <form className="grid gap-3 border-y border-[var(--color-border)] py-4 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(170px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto] xl:items-end" onSubmit={(event) => { event.preventDefault(); apply(); }}>
+  if (loading && !result) {
+    return <Panel><ListSkeleton rows={6} /></Panel>;
+  }
+
+  if (error && !result) {
+    return (
+      <Panel>
+        <EmptyState
+          icon="alert-triangle"
+          title="Unable to load applications"
+          description={error}
+          action={<Button size="sm" onClick={() => { setError(null); setReviewVersion((value) => value + 1); }}>Retry</Button>}
+        />
+      </Panel>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <MetricCard label="APPLICATIONS" value={total} unit="total" icon="users" tone="neutral" />
+        <MetricCard label="AWAITING MY REVIEW" value={awaitingReview} unit="applications" icon="clock" tone="warning" />
+        <MetricCard label="WAITING FOR STALL" value={waitingForStall} unit="applications" icon="shield" tone="info" />
+        <MetricCard label="REJECTED" value={rejected} unit="flagged" icon="alert-triangle" tone="danger" />
+      </div>
+
+      <form
+        className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(170px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto] xl:items-end"
+        onSubmit={(event) => { event.preventDefault(); apply(); }}
+      >
         <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
           Horse name
           <span className="relative mt-1.5 block">
@@ -130,62 +172,73 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
         </div>
       </form>
 
-      {error ? (
-        <div className="border-y border-[var(--color-border)] py-2">
-          <EmptyState icon="alert-triangle" title="Unable to load applications" description={error} action={<Button size="sm" onClick={() => { setLoading(true); setError(null); setApplied({ ...applied }); }}>Retry</Button>} />
-        </div>
-      ) : loading ? (
-        <div className="space-y-3 py-4" aria-label="Loading applications">
-          {Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-12 animate-pulse rounded bg-[var(--color-surface-muted)]" />)}
-        </div>
-      ) : result?.content.length === 0 ? (
-        <div className="border-y border-[var(--color-border)] py-2">
-          <EmptyState title={applied.candidateName || applied.status || applied.submittedFrom || applied.submittedTo ? 'No matching applications' : 'No applications'} description="Change the filters or clear them to see other records." action={<Button size="sm" onClick={clear}>Clear filters</Button>} />
-        </div>
-      ) : (
-        <>
-          <div className="overflow-x-auto border-y border-[var(--color-border)]">
-            <table className="w-full min-w-[760px] border-collapse text-left">
-              <thead>
-                <tr className="h-10 border-b border-[var(--color-border)] text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
-                  <th className="w-[38%] px-3">Horse</th>
-                  <th className="w-[24%] px-3">Status</th>
-                  <th className="w-[24%] px-3">Submitted</th>
-                  <th className="w-[14%] px-3 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result?.content.map((admission) => (
-                  <tr key={admission.admissionId} className="h-[62px] border-b border-[var(--color-border)] last:border-b-0 hover:bg-[var(--color-surface-muted)]/50">
-                    <td className="px-3">
-                      <div className="flex items-center gap-3">
-                        <HorseAvatar name={admission.candidateName} size={36} />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{admission.candidateName}</p>
-                          <p className="truncate text-xs text-[var(--color-text-muted)]">{admission.breed || 'Breed not provided'}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusTone(admission.status)}`}>{prettyStatus(admission.status)}</span></td>
-                    <td className="px-3 text-sm text-[var(--color-text-secondary)]">{new Date(admission.submittedAt).toLocaleDateString()}</td>
-                    <td className="px-3 text-center">
-                      <Link href={`/groom/admissions/${admission.admissionId}${toQuery(applied)}`} className="inline-flex h-8 min-w-16 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] px-3 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">View</Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-text-secondary)]">
-            <span>{result?.totalElements ? `Showing ${result.page * result.size + 1}-${Math.min((result.page + 1) * result.size, result.totalElements)} of ${result.totalElements}` : 'No records'}</span>
-            <div className="flex items-center gap-2">
-              <Button size="sm" icon="chevron-left" aria-label="Previous page" disabled={!result || result.page <= 0} onClick={() => result && changePage(result.page - 1)} />
-              <span className="min-w-20 text-center">Page {(result?.page ?? 0) + 1} of {Math.max(1, result?.totalPages ?? 1)}</span>
-              <Button size="sm" iconRight="chevron-right" aria-label="Next page" disabled={!result || result.page + 1 >= result.totalPages} onClick={() => result && changePage(result.page + 1)} />
+      {error && <div role="alert" className="border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]">{error}</div>}
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="w-full shrink-0 lg:w-1/3">
+          <Panel className="flex h-[750px] flex-col overflow-hidden">
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+              <SectionTitle>Admission applications</SectionTitle>
+              <span className="text-[11px] font-medium text-[var(--color-text-muted)]">{applications.length} results</span>
             </div>
-          </div>
-        </>
-      )}
-    </section>
+            <div className="flex-1 overflow-y-auto scroll-slim">
+              {applications.length === 0 ? (
+                <EmptyState title={total ? 'No matching applications' : 'No applications'} description="Change the filters or clear them to see other records." action={<Button size="sm" onClick={clear}>Clear filters</Button>} />
+              ) : (
+                <ul className="divide-y divide-[var(--color-border)]">
+                  {applications.map((admission) => {
+                    const selected = selectedAdmissionId === admission.admissionId;
+                    return (
+                      <li key={admission.admissionId}>
+                        <button type="button" onClick={() => setSelectedAdmissionId(admission.admissionId)} className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors outline-none ${selected ? 'bg-[var(--color-primary-subtle)]' : 'hover:bg-[var(--color-surface-subtle)]'}`}>
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <span className="truncate text-[13px] font-bold text-[var(--color-text-primary)]">{admission.candidateName}</span>
+                              <Pill tone={statusTone(admission.status)} size="sm">{prettyStatus(admission.status)}</Pill>
+                            </div>
+                            <div className="truncate text-[11px] text-[var(--color-text-muted)]">{admission.breed || 'Breed not provided'} · Submitted {new Date(admission.submittedAt).toLocaleDateString()}</div>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+            {result && result.totalElements > 0 && (
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+                <span>Showing {result.page * result.size + 1}-{Math.min((result.page + 1) * result.size, result.totalElements)} of {result.totalElements}</span>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" icon="chevron-left" aria-label="Previous page" disabled={result.page <= 0} onClick={() => changePage(result.page - 1)} />
+                  <span className="min-w-16 text-center">{result.page + 1}/{Math.max(1, result.totalPages)}</span>
+                  <Button size="sm" iconRight="chevron-right" aria-label="Next page" disabled={result.page + 1 >= result.totalPages} onClick={() => changePage(result.page + 1)} />
+                </div>
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        <div className="w-full lg:flex-1">
+          {selectedAdmissionId ? (
+            <Panel className="min-h-[750px] overflow-hidden p-0">
+              <GroomAdmissionReview
+                admissionId={selectedAdmissionId}
+                returnTo={`/groom/admissions${toQuery(applied)}`}
+                embedded
+                onUpdated={() => setReviewVersion((value) => value + 1)}
+              />
+            </Panel>
+          ) : (
+            <div className="flex h-[750px] items-center justify-center rounded-[var(--radius-md)] border-2 border-dashed border-[var(--color-border)]">
+              <div className="text-center text-[var(--color-text-muted)]">
+                <Icon name="clipboard" size={32} className="mx-auto mb-3 opacity-50" />
+                <p className="text-[14px] font-medium text-[var(--color-text-secondary)]">Select an application</p>
+                <p className="mt-1 text-[12px]">Choose an application from the list to view details</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
