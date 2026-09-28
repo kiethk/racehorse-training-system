@@ -239,4 +239,67 @@ class CourseServiceTest {
         assertThrows(RuntimeException.class,
                 () -> courseService.addSubjectToCourse(999L, req));
     }
+
+    // =================================================================
+    // durationMinutes — con số QUYẾT ĐỊNH ĐỘ DÀI LOT
+    // =================================================================
+
+    @Test
+    @DisplayName("Chi tiết khoá phải trả durationMinutes của từng bài tập")
+    void testGetCourseById_ReturnsDurationMinutes() {
+        Long courseId = 10L;
+        Course course = new Course();
+        course.setId(courseId);
+        course.setName("Sprint 2YO");
+
+        CourseSubject cs = new CourseSubject();
+        cs.setId(101L);
+        cs.setCourseId(courseId);
+        cs.setSubjectId(50L);
+        cs.setOrderIndex(1);
+
+        Subject sub = new Subject();
+        sub.setId(50L);
+        sub.setName("Khởi động & Chạy bền nhịp đều");
+        sub.setDurationMinutes(90);
+
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseSubjectRepository.findByCourseIdOrderByOrderIndexAsc(courseId))
+                .thenReturn(List.of(cs));
+        when(subjectRepository.findById(50L)).thenReturn(Optional.of(sub));
+
+        CourseDetailResponse response = courseService.getCourseById(courseId);
+
+        // Thiếu trường này thì màn chọn khoá chỉ hiện chữ "phút" trơ trọi,
+        // Trainer không biết khoá ngốn bao nhiêu khung giờ vàng.
+        assertEquals(90, response.getSubjects().get(0).getDurationMinutes());
+    }
+
+    @Test
+    @DisplayName("Thêm bài vào khoá cũng phải trả durationMinutes")
+    void testAddSubjectToCourse_ReturnsDurationMinutes() {
+        Long courseId = 10L;
+
+        Subject sub = new Subject();
+        sub.setId(50L);
+        sub.setName("Biến tốc tăng tốc nước rút");
+        sub.setDurationMinutes(60);
+
+        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
+        req.setSubjectId(50L);
+        req.setOrderIndex(2);
+
+        when(courseRepository.existsById(courseId)).thenReturn(true);
+        when(subjectRepository.findById(50L)).thenReturn(Optional.of(sub));
+        when(courseSubjectRepository.save(any(CourseSubject.class)))
+                .thenAnswer(i -> {
+                    CourseSubject saved = i.getArgument(0);
+                    saved.setId(999L);
+                    return saved;
+                });
+
+        CourseSubjectResponse res = courseService.addSubjectToCourse(courseId, req);
+
+        assertEquals(60, res.getDurationMinutes());
+    }
 }

@@ -54,7 +54,7 @@ export function RescheduleDialog({
     const endMins = toMinutes(newEndTime);
     if (startMins < WINDOW_START || endMins > WINDOW_END) {
       setError(
-        `Khung giờ mới (${newStartTime} – ${newEndTime}) nằm ngoài khung giờ vàng 06:00–10:00 (BR-03).`,
+        `Buổi tập chỉ được xếp trong khoảng 06:00 – 10:00. Giờ vừa chọn (${newStartTime} – ${newEndTime}) nằm ngoài khoảng này.`,
       );
       return;
     }

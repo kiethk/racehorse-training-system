@@ -210,7 +210,9 @@ public class AdmissionQueryService {
                                 admission.getSubmittedAt(),
                                 admission.getQuarantineStallId(),
                                 stallCode,
-                                imageUrl);
+                                imageUrl,
+                                admission.getTrainerId(),
+                                admission.getTrainerReviewedAt());
         }
 
         private AdmissionDocumentResponse toDocumentResponse(AdmissionDocument document) {

@@ -12,10 +12,14 @@ import { stableApi } from '@/features/stable/services/stableService';
 import type { IncidentReport, IncidentSeverity, IncidentStatus } from '../types';
 import type { Horse } from '@/features/stable/types';
 
-const STATUS_MAP: Record<IncidentStatus, { tone: 'warning' | 'info' | 'success'; label: string }> = {
+const STATUS_MAP: Record<
+  IncidentStatus,
+  { tone: 'warning' | 'info' | 'success' | 'neutral'; label: string }
+> = {
   REPORTED: { tone: 'warning', label: 'Đã gửi, chờ Thú y' },
-  ACKNOWLEDGED: { tone: 'info', label: 'Thú y đã tiếp nhận' },
+  IN_REVIEW: { tone: 'info', label: 'Thú y đang xử lý' },
   RESOLVED: { tone: 'success', label: 'Đã xử lý xong' },
+  DISMISSED: { tone: 'neutral', label: 'Không có vấn đề' },
 };
 
 const SEVERITY_MAP: Record<IncidentSeverity, { tone: 'neutral' | 'info' | 'warning' | 'danger'; label: string }> = {
@@ -90,8 +94,9 @@ export function IncidentList() {
           [
             { id: 'ALL', label: 'Tất cả' },
             { id: 'REPORTED', label: 'Chờ Thú y' },
-            { id: 'ACKNOWLEDGED', label: 'Đã tiếp nhận' },
+            { id: 'IN_REVIEW', label: 'Đang xử lý' },
             { id: 'RESOLVED', label: 'Đã xử lý xong' },
+            { id: 'DISMISSED', label: 'Không có vấn đề' },
           ] as const
         ).map((tab) => (
           <button

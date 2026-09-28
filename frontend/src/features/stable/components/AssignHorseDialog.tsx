@@ -61,7 +61,7 @@ export function AssignHorseDialog({
           Xếp ngựa vào chuồng {stall.stallCode}
         </h2>
         <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
-          Chọn một chiến mã chưa có chuồng để xếp vào ô chuồng này (BR-07: mỗi ngựa 1 chuồng).
+          Chọn một chiến mã chưa có chuồng để xếp vào ô này.
         </p>
 
         {isStallOccupied && (

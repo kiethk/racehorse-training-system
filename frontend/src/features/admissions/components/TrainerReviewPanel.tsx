@@ -13,26 +13,17 @@ import type {
   TrainerReviewRequest,
 } from '../types/trainer';
 
+/**
+ * Nhãn hiển thị cho người dùng — chỉ ghi ĐIỀU HỌ CẦN BIẾT ĐỂ CHỌN,
+ * không giải thích hệ thống hoạt động thế nào.
+ */
 const READINESS_OPTIONS: {
   value: RacingReadinessStatus;
   label: string;
-  hint: string;
 }[] = [
-  {
-    value: 'READY',
-    label: 'Sẵn sàng thi đấu',
-    hint: 'Hiếm gặp với ngựa mới nhập — chỉ chọn khi thật sự đã có nền tảng',
-  },
-  {
-    value: 'NEEDS_MORE_TRAINING',
-    label: 'Cần huấn luyện thêm',
-    hint: 'Lựa chọn thường gặp nhất với ngựa mới',
-  },
-  {
-    value: 'UNSUITABLE',
-    label: 'Không phù hợp',
-    hint: 'Kênh duy nhất để báo Quản lý rằng không nên nhận con này',
-  },
+  { value: 'READY', label: 'Sẵn sàng thi đấu' },
+  { value: 'NEEDS_MORE_TRAINING', label: 'Cần huấn luyện thêm' },
+  { value: 'UNSUITABLE', label: 'Không phù hợp' },
 ];
 
 const MIN_REMARKS = 20;
@@ -49,6 +40,8 @@ export function TrainerReviewPanel({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  /** Vừa nộp xong — hiện băng xác nhận để người dùng biết thao tác đã thành công. */
+  const [submitted, setSubmitted] = useState(false);
 
   const [form, setForm] = useState<TrainerReviewRequest>({
     readinessStatus: 'NEEDS_MORE_TRAINING',
@@ -121,8 +114,9 @@ export function TrainerReviewPanel({
     try {
       setSubmitting(true);
       await trainerAdmissionsApi.submitReview(admissionId, { ...form, remarks });
-      await load();    // nạp lại -> existingAssessment khác null -> form khoá
-      onSubmitted();   // báo danh sách bỏ đơn này khỏi hàng đợi
+      setSubmitted(true);   // báo thành công cho người dùng
+      await load();         // nạp lại -> existingAssessment khác null -> form khoá
+      onSubmitted();        // báo danh sách bỏ đơn này khỏi hàng đợi
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Nộp đánh giá thất bại.');
     } finally {
@@ -132,6 +126,18 @@ export function TrainerReviewPanel({
 
   return (
     <Panel padded>
+      {submitted && (
+        <div className="mb-4 flex items-start gap-2 rounded-[var(--radius-md)] bg-[var(--color-success-soft)] p-3 text-[12px] text-[var(--color-success)]">
+          <span>✅</span>
+          <div>
+            <strong>Đã gửi đánh giá thành công.</strong>
+            <div className="mt-0.5">
+              Hồ sơ đã chuyển sang Quản lý câu lạc bộ xem xét.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ============ HỒ SƠ ỨNG VIÊN ============ */}
       <SectionTitle>Hồ sơ ứng viên</SectionTitle>
       <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -156,8 +162,7 @@ export function TrainerReviewPanel({
 
       {horseMissing && (
         <p className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-warning-soft)] p-2 text-[12px] text-[var(--color-warning)]">
-          Đơn này chưa gắn hồ sơ chiến mã. Bước Groom phải tạo hồ sơ và xếp chuồng
-          cách ly trước khi Huấn luyện viên đánh giá được.
+          Chưa thể đánh giá: hồ sơ chiến mã chưa được lập.
         </p>
       )}
 
@@ -195,7 +200,7 @@ export function TrainerReviewPanel({
       </div>
       {healthRecords.length === 0 ? (
         <p className="mt-1 text-[12px] text-[var(--color-text-muted)]">
-          Chưa có dữ liệu khám. Module Thú y đang được xây dựng.
+          Chưa có dữ liệu khám.
         </p>
       ) : (
         <p className="mt-1 text-[12px]">{healthRecords.length} bản ghi khám</p>
@@ -246,13 +251,8 @@ export function TrainerReviewPanel({
                       setForm((f) => ({ ...f, readinessStatus: opt.value }))
                     }
                   />
-                  <span>
-                    <span className="text-[13px] text-[var(--color-text-primary)]">
-                      {opt.label}
-                    </span>
-                    <span className="block text-[11px] text-[var(--color-text-muted)]">
-                      {opt.hint}
-                    </span>
+                  <span className="text-[13px] text-[var(--color-text-primary)]">
+                    {opt.label}
                   </span>
                 </label>
               ))}
@@ -306,11 +306,12 @@ export function TrainerReviewPanel({
             </div>
           </div>
 
-          {/* --- Giải thích vì sao không có ô thể lực --- */}
-          <p className="rounded-[var(--radius-md)] bg-[var(--color-warning-soft)] p-2 text-[11px] text-[var(--color-warning)]">
-            Điểm thể lực để trống — ngựa đang cách ly nên không đưa ra đường chạy
-            chung để đo được. Chỉ số này sẽ chấm ở lần đánh giá định kỳ sau khi
-            ngựa chính thức nhập trại.
+          {/*
+            Ngựa đang cách ly nên chưa đo được thể lực. Người dùng chỉ cần biết
+            "sẽ chấm sau", không cần biết lý do kỹ thuật.
+          */}
+          <p className="text-[11px] text-[var(--color-text-muted)]">
+            Điểm thể lực sẽ được chấm ở lần đánh giá định kỳ sau khi chiến mã nhập trại.
           </p>
 
           {formError && (
@@ -328,7 +329,7 @@ export function TrainerReviewPanel({
               {submitting ? 'Đang nộp...' : 'Nộp đánh giá'}
             </Button>
             <span className="text-[11px] text-[var(--color-text-muted)]">
-              Nộp xong đơn tự chuyển sang bước Quản lý duyệt. Không sửa lại được.
+              Sau khi nộp sẽ không sửa lại được.
             </span>
           </div>
         </div>

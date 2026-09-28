@@ -27,10 +27,12 @@ public class HorseController {
     @GetMapping
     public ApiResponse<List<Horse>> getAllHorses(
             @RequestParam(required = false) Boolean mine,
+            @RequestParam(required = false) Boolean unassigned,
             @RequestParam(required = false) HorseStatus status) {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
-        return ApiResponse.success(horseService.getAllHorses(currentUser, mine, status));
+        return ApiResponse.success(
+                horseService.getAllHorses(currentUser, mine, unassigned, status));
     }
 
     @PreAuthorize("hasAuthority('HORSE_CREATE')")
@@ -54,11 +56,12 @@ public class HorseController {
         return ApiResponse.success(horseService.updateHorseStatus(id, request));
     }
 
+    /** Bỏ trống stallId = gỡ ngựa khỏi chuồng, giống assign-groom bỏ trống groomId. */
     @PreAuthorize("hasAuthority('STABLE_STALL_UPDATE')")
     @PutMapping("/{id}/assign-stall")
     public ApiResponse<Horse> assignStall(
             @PathVariable Long id,
-            @RequestParam Long stallId) {
+            @RequestParam(required = false) Long stallId) {
         return ApiResponse.success(horseService.assignStall(id, stallId));
     }
 
