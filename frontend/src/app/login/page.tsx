@@ -1,7 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { FormEvent, useEffect, useState, Suspense } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -10,9 +11,11 @@ import { getRoleRoute } from '@/lib/roleRoute';
 const inputClassName =
   'mt-1 h-10 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-focus)] focus:ring-2 focus:ring-[var(--color-focus)]/30';
 
-export default function LoginPage() {
+function LoginForm() {
   const { user, loading, isAuthenticated, login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const justRegistered = searchParams.get('registered') === '1';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -113,6 +116,17 @@ export default function LoginPage() {
               />
             </label>
 
+            {/* Success banner after registration */}
+            {justRegistered && (
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-[var(--color-success-soft,#f0fdf4)] px-3 py-2.5 text-[12px] text-[var(--color-success,#16a34a)]"
+              >
+                <Icon name="check" size={14} className="mt-0.5 shrink-0" />
+                <span>Account created successfully. Please sign in.</span>
+              </div>
+            )}
+
             {error && (
               <div
                 role="alert"
@@ -135,6 +149,17 @@ export default function LoginPage() {
               Sign in
             </button>
           </form>
+
+          {/* Link to registration */}
+          <p className="mt-5 text-center text-[12px] text-[var(--color-text-muted)]">
+            Don&apos;t have an account?{' '}
+            <Link
+              href="/register"
+              className="font-medium text-[var(--color-primary)] underline-offset-2 hover:underline"
+            >
+              Create account
+            </Link>
+          </p>
         </section>
 
         <p className="mt-4 text-center text-[11px] text-[var(--color-text-muted)]">
@@ -142,5 +167,13 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[var(--color-background)]" />}>
+      <LoginForm />
+    </Suspense>
   );
 }
