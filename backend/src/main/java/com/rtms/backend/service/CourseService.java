@@ -101,7 +101,7 @@ public class CourseService {
         CourseSubject saved = courseSubjectRepository.save(cs);
         return new CourseSubjectResponse(saved.getId(), subject.getId(), subject.getName(),
                 subject.getDescription(), subject.getSurfaceType(), subject.getTargetDistanceMeters(),
-                subject.getIntensityLevel(), saved.getOrderIndex());
+                subject.getIntensityLevel(), saved.getOrderIndex(), subject.getDurationMinutes());
     }
 
     private List<CourseSubjectResponse> mapToResponseSubjects(List<CourseSubject> courseSubjects) {
@@ -116,7 +116,8 @@ public class CourseService {
                         sub.getSurfaceType(),
                         sub.getTargetDistanceMeters(),
                         sub.getIntensityLevel(),
-                        cs.getOrderIndex()
+                        cs.getOrderIndex(),
+                        sub.getDurationMinutes()
                 ));
             });
         }

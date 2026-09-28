@@ -29,6 +29,7 @@ export function getNavigationForRole(role: Role): NavItem[] {
         { id: 'admissions', label: 'Admissions', href: '/trainer/admissions' },
         { id: 'stable', label: 'Stable', href: '/trainer/stable' },
         { id: 'training', label: 'Training', href: '/trainer/courses' },
+        { id: 'plans', label: 'Plans', href: '/trainer/plans' },
         { id: 'schedule', label: 'Schedule', href: '/trainer/schedule' },
         { id: 'horses', label: 'Horses' },
         { id: 'racing', label: 'Racing' },

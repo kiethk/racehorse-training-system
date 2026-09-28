@@ -39,11 +39,17 @@ async function postWithMessage<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const trainerAdmissionsApi = {
-  /** Hàng đợi đơn đang chờ Trainer đánh giá. */
-  getQueue: async (): Promise<AdmissionSummaryResponse[]> => {
-    const res = await apiGet<ApiResponse<AdmissionSummaryResponse[]>>(
-      '/api/admissions?status=TRAINER_REVIEW',
-    );
+  /**
+   * TẤT CẢ hồ sơ tiếp nhận — màn hình tự chia thành "chờ đánh giá" và
+   * "đã đánh giá".
+   *
+   * Vì sao không lọc sẵn theo status ở đây: sau khi Trainer đánh giá xong,
+   * hồ sơ chuyển sang bước Quản lý nên không còn trạng thái nào nghĩa là
+   * "Trainer đã duyệt". Lấy hết rồi chia ở client là cách rẻ nhất để vẫn
+   * xem lại được hồ sơ cũ, mà chỉ tốn một lời gọi.
+   */
+  getAll: async (): Promise<AdmissionSummaryResponse[]> => {
+    const res = await apiGet<ApiResponse<AdmissionSummaryResponse[]>>('/api/admissions');
     return res.data;
   },
 

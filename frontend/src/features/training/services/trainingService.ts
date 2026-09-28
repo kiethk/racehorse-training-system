@@ -11,7 +11,7 @@ import type {
   JoinableCohortResponse,
   CreateHorseTrainingPlanRequest,
   HorseTrainingPlanDetailResponse,
-  HorseTrainingPlan,
+  PlanSummaryResponse,
   CompleteWorkoutRequest,
   TrainingLotResponse,
   RescheduleLotRequest,
@@ -97,9 +97,10 @@ export const trainingApi = {
   getPlanById: async (id: number): Promise<HorseTrainingPlanDetailResponse> =>
     (await apiGet<ApiResponse<HorseTrainingPlanDetailResponse>>(`/api/training-plans/${id}`)).data,
 
-  getPlans: async (horseId?: number): Promise<HorseTrainingPlan[]> => {
+  /** Danh sách kế hoạch kèm tên ngựa, tên khoá và tiến độ. */
+  getPlans: async (horseId?: number): Promise<PlanSummaryResponse[]> => {
     const url = horseId ? `/api/training-plans?horseId=${horseId}` : '/api/training-plans';
-    return (await apiGet<ApiResponse<HorseTrainingPlan[]>>(url)).data;
+    return (await apiGet<ApiResponse<PlanSummaryResponse[]>>(url)).data;
   },
 
   // Vận hành Lot (Training Lots)

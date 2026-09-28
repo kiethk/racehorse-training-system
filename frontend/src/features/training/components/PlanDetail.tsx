@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { stableApi } from '@/features/stable/services/stableService';
+import type { UserSummary } from '@/features/stable/types';
 import { trainingApi } from '../services/trainingService';
 import type { HorseTrainingPlanDetailResponse, PlanWorkoutItemResponse } from '../types';
 import { CompleteWorkoutDialog } from './CompleteWorkoutDialog';
@@ -20,13 +22,19 @@ export function PlanDetail({ planId }: PlanDetailProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [activeWorkout, setActiveWorkout] = useState<PlanWorkoutItemResponse | null>(null);
+  /** Tra tên Groom — dùng lại endpoint danh bạ nhân sự của màn chuồng trại. */
+  const [grooms, setGrooms] = useState<UserSummary[]>([]);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await trainingApi.getPlanById(planId);
+      const [data, groomList] = await Promise.all([
+        trainingApi.getPlanById(planId),
+        stableApi.getGrooms(),
+      ]);
       setDetail(data);
+      setGrooms(groomList);
     } catch (err) {
       console.error('Lỗi khi nạp chi tiết kế hoạch:', err);
       setError('Không tải được thông tin kế hoạch huấn luyện.');
@@ -39,6 +47,11 @@ export function PlanDetail({ planId }: PlanDetailProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
+
+  const groomNameById = useMemo(
+    () => new Map(grooms.map((g) => [g.id, g.fullName] as const)),
+    [grooms],
+  );
 
   // Tính thanh tiến độ theo công thức: mẫu số trừ buổi đã huỷ (Plan 6)
   const progress = useMemo(() => {
@@ -70,7 +83,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-              Kế hoạch huấn luyện #{plan.id}
+              {detail.horseName ?? `Chiến mã #${plan.horseId}`}
             </h1>
             <Pill
               tone={
@@ -87,14 +100,17 @@ export function PlanDetail({ planId }: PlanDetailProps) {
             </Pill>
           </div>
           <p className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">
+            Khoá: <strong>{detail.courseName ?? `#${plan.courseId}`}</strong>
+          </p>
+          <p className="text-[12px] text-[var(--color-text-secondary)]">
             Từ {plan.startDate} đến {plan.endDate} • {workouts.length} buổi tập dự kiến
           </p>
         </div>
 
         <div className="flex gap-2">
-          <Link href="/trainer/courses">
+          <Link href="/trainer/plans">
             <Button variant="secondary" size="sm">
-              ← Danh sách khóa học
+              ← Danh sách kế hoạch
             </Button>
           </Link>
           <Link href="/trainer/schedule">
@@ -165,8 +181,37 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                   <div className="mt-1 text-[11px] text-[var(--color-text-secondary)] flex flex-wrap gap-3">
                     <span>📅 Ngày: <strong>{w.lotDate}</strong></span>
                     <span>⏱️ Khung giờ: <strong>{w.startTime} – {w.endTime}</strong></span>
-                    <span>🏷️ Lot ID: #{w.lotId}</span>
-                    {w.assignedGroomId && <span>👤 Groom: #{w.assignedGroomId}</span>}
+                    {/*
+                      lotId DÙNG CHUNG với các chiến mã khác, còn assignedGroomId
+                      là RIÊNG của con ngựa này. Hai thứ khác hẳn bản chất, nên
+                      phải ghi chữ rõ ràng — để cạnh nhau cùng dạng "#số" sẽ bị
+                      đọc thành "groom của lot", mà một lot có tới 6 groom.
+                    */}
+                    <span>
+                      🏷️ Lot #{w.lotId}
+                      {w.lotOccupancy && w.lotOccupancy > 1 && (
+                        <span className="text-[var(--color-text-muted)]">
+                          {' '}(chung với {w.lotOccupancy - 1} chiến mã khác)
+                        </span>
+                      )}
+                    </span>
+                    {/*
+                      Dùng ? : chứ KHÔNG dùng &&. Với && thì assignedGroomId = null
+                      sẽ không render gì cả, khiến trạng thái "chưa phân công"
+                      trở nên vô hình — trong khi đó mới là thông tin cần báo.
+                    */}
+                    {w.assignedGroomId ? (
+                      <span>
+                        👤 Người dắt:{' '}
+                        <strong>
+                          {groomNameById.get(w.assignedGroomId) ?? `#${w.assignedGroomId}`}
+                        </strong>
+                      </span>
+                    ) : (
+                      <span className="text-[var(--color-warning)]">
+                        ⚠ Chưa phân công Groom
+                      </span>
+                    )}
                   </div>
 
                   {w.status === 'COMPLETED' && (

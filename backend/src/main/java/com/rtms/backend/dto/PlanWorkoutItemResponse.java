@@ -31,6 +31,19 @@ public class PlanWorkoutItemResponse {
     private Integer performanceRating;
     private String trainerFeedback;
 
+    /**
+     * Tổng số chiến mã còn hiệu lực trong lot này.
+     *
+     * Vì sao cần: trang chi tiết kế hoạch chỉ hiển thị MỘT con ngựa, nên
+     * lotId trông như một con số vô nghĩa. Biết lot có mấy con thì Trainer
+     * mới thấy cơ chế ghép nhóm đang hoạt động — và hiểu rằng assignedGroomId
+     * là người dắt RIÊNG con này, không phải "groom của lot".
+     *
+     * Điền ở HorseTrainingPlanService.buildWorkoutItems bằng MỘT truy vấn gom
+     * cho toàn bộ lot của kế hoạch, không phải mỗi buổi một truy vấn.
+     */
+    private Integer lotOccupancy;
+
     public PlanWorkoutItemResponse(TrainingWorkout w, TrainingLot lot, String subjectName) {
         this.workoutId = w.getId();
         this.lotId = lot.getId();
@@ -51,6 +64,9 @@ public class PlanWorkoutItemResponse {
     }
 
     public void setWorkoutType(String workoutType) { this.workoutType = workoutType; }
+
+    public Integer getLotOccupancy() { return lotOccupancy; }
+    public void setLotOccupancy(Integer lotOccupancy) { this.lotOccupancy = lotOccupancy; }
 
     public Long getWorkoutId() { return workoutId; }
     public Long getLotId() { return lotId; }

@@ -1,35 +1,43 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Panel, SectionTitle } from '@/components/ui/Panel';
+import { useAuth } from '@/context/AuthContext';
+import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
-import type { AdmissionSummaryResponse } from '../types';
+import type { AdmissionSummaryResponse, AdmissionStatus } from '../types';
 import { TrainerReviewPanel } from './TrainerReviewPanel';
 
+type Tab = 'PENDING' | 'REVIEWED';
+
+const STATUS_LABEL: Partial<Record<AdmissionStatus, string>> = {
+  GROOM_REVIEW: 'Chờ chăm sóc viên',
+  WAITING_FOR_STALL: 'Chờ xếp chuồng',
+  VET_REVIEW: 'Chờ thú y',
+  TRAINER_REVIEW: 'Chờ bạn đánh giá',
+  MANAGER_REVIEW: 'Chờ quản lý duyệt',
+  APPROVED: 'Đã tiếp nhận',
+  REJECTED: 'Đã từ chối',
+};
+
 export function TrainerQueueList() {
-  const [queue, setQueue] = useState<AdmissionSummaryResponse[]>([]);
+  const { user } = useAuth();
+  const [admissions, setAdmissions] = useState<AdmissionSummaryResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [tab, setTab] = useState<Tab>('PENDING');
 
   const loadQueue = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await trainerAdmissionsApi.getQueue();
-      setQueue(data);
-      // Giữ nguyên lựa chọn nếu đơn đó còn trong hàng đợi, ngược lại chọn đơn đầu.
-      setSelectedId((prev) =>
-        prev && data.some((a) => a.admissionId === prev)
-          ? prev
-          : data[0]?.admissionId ?? null,
-      );
+      setAdmissions(await trainerAdmissionsApi.getAll());
     } catch (err) {
-      console.error('Không tải được hàng đợi tiếp nhận:', err);
-      setError('Không tải được danh sách đơn. Kiểm tra kết nối rồi thử lại.');
+      console.error('Không tải được danh sách tiếp nhận:', err);
+      setError('Không tải được danh sách hồ sơ. Kiểm tra kết nối rồi thử lại.');
     } finally {
       setLoading(false);
     }
@@ -39,6 +47,41 @@ export function TrainerQueueList() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadQueue();
   }, [loadQueue]);
+
+  const pending = useMemo(
+    () => admissions.filter((a) => a.status === 'TRAINER_REVIEW'),
+    [admissions],
+  );
+  /**
+   * Hồ sơ do CHÍNH Huấn luyện viên đang đăng nhập đánh giá.
+   *
+   * Lọc theo trainerId chứ không theo status, vì hai lý do:
+   *   - Nhiều Trainer cùng làm việc: lọc theo status sẽ cho thấy lẫn hồ sơ
+   *     của nhau, do status chỉ nói "đã qua bước Trainer", không nói ai duyệt.
+   *   - Bắt được cả hồ sơ bị Quản lý TỪ CHỐI sau khi mình đã đánh giá —
+   *     trường hợp mà lọc theo status bỏ sót, vì REJECTED cũng có thể do
+   *     Groom hoặc Thú y đặt từ trước khi tới bước Trainer.
+   */
+  const reviewed = useMemo(
+    () =>
+      admissions.filter(
+        (a) => a.trainerReviewedAt !== null && a.trainerId === user?.userId,
+      ),
+    [admissions, user?.userId],
+  );
+  const shown = tab === 'PENDING' ? pending : reviewed;
+
+  /**
+   * Hồ sơ đang mở ở cột phải — SUY RA lúc render, không đồng bộ bằng effect.
+   *
+   * Đổi tab làm lựa chọn cũ không còn trong danh sách, khi đó tự rơi về hồ sơ
+   * đầu tiên. Cách này tránh hẳn việc gọi setState trong effect, vốn gây thêm
+   * một lượt render thừa và bị lint chặn.
+   */
+  const activeId =
+    selectedId !== null && shown.some((a) => a.admissionId === selectedId)
+      ? selectedId
+      : shown[0]?.admissionId ?? null;
 
   if (loading) return <ListSkeleton rows={5} />;
 
@@ -64,18 +107,40 @@ export function TrainerQueueList() {
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         {/* ---------- Cột trái: hàng đợi ---------- */}
         <Panel padded>
-          <SectionTitle>Chờ đánh giá ({queue.length})</SectionTitle>
+          <div className="flex gap-1.5">
+            {([
+              ['PENDING', `Chờ đánh giá (${pending.length})`],
+              ['REVIEWED', `Đã đánh giá (${reviewed.length})`],
+            ] as [Tab, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setTab(key)}
+                className={`flex-1 rounded-[var(--radius-md)] px-2 py-1.5 text-[11px] font-medium transition ${
+                  tab === key
+                    ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)]'
+                    : 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-          {queue.length === 0 ? (
+          {shown.length === 0 ? (
             <EmptyState
               icon="clipboard"
-              title="Không có đơn nào"
-              description="Chưa có hồ sơ nào chuyển tới bước đánh giá của Huấn luyện viên."
+              title={tab === 'PENDING' ? 'Không có hồ sơ nào' : 'Chưa đánh giá hồ sơ nào'}
+              description={
+                tab === 'PENDING'
+                  ? 'Chưa có chiến mã nào chờ bạn đánh giá.'
+                  : 'Các hồ sơ bạn đã đánh giá sẽ hiện ở đây.'
+              }
             />
           ) : (
             <ul className="mt-3 space-y-2">
-              {queue.map((item) => {
-                const active = selectedId === item.admissionId;
+              {shown.map((item) => {
+                const active = activeId === item.admissionId;
                 return (
                   <li key={item.admissionId}>
                     <button
@@ -93,7 +158,7 @@ export function TrainerQueueList() {
                       <div className="text-[11px] text-[var(--color-text-muted)]">
                         {item.breed || 'Chưa rõ giống'}
                       </div>
-                      <div className="mt-1.5">
+                      <div className="mt-1.5 flex flex-wrap gap-1">
                         {item.quarantineStallCode ? (
                           <Pill tone="isolated" icon="shield" size="sm">
                             Chuồng {item.quarantineStallCode}
@@ -103,7 +168,29 @@ export function TrainerQueueList() {
                             Chưa xếp chuồng
                           </Pill>
                         )}
+                        {/* Tab "đã đánh giá" gộp nhiều trạng thái nên phải nói rõ hồ sơ đang ở đâu */}
+                        {tab === 'REVIEWED' && (
+                          <Pill
+                            tone={
+                              item.status === 'APPROVED'
+                                ? 'success'
+                                : item.status === 'REJECTED'
+                                ? 'danger'
+                                : 'info'
+                            }
+                            size="sm"
+                          >
+                            {STATUS_LABEL[item.status] ?? item.status}
+                          </Pill>
+                        )}
                       </div>
+
+                      {tab === 'REVIEWED' && item.trainerReviewedAt && (
+                        <div className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                          Bạn đánh giá ngày{' '}
+                          {new Date(item.trainerReviewedAt).toLocaleDateString('vi-VN')}
+                        </div>
+                      )}
                     </button>
                   </li>
                 );
@@ -113,8 +200,8 @@ export function TrainerQueueList() {
         </Panel>
 
         {/* ---------- Cột phải: hồ sơ + form ---------- */}
-        {selectedId ? (
-          <TrainerReviewPanel admissionId={selectedId} onSubmitted={loadQueue} />
+        {activeId ? (
+          <TrainerReviewPanel admissionId={activeId} onSubmitted={loadQueue} />
         ) : (
           <Panel padded>
             <EmptyState

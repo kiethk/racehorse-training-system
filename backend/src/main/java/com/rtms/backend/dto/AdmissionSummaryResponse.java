@@ -16,6 +16,22 @@ public class AdmissionSummaryResponse {
     private Long quarantineStallId;
     private String quarantineStallCode;
 
+    /**
+     * Dấu vết bước Huấn luyện viên.
+     *
+     * Vì sao cần ở DANH SÁCH chứ không chỉ ở màn chi tiết: đánh giá xong thì
+     * hồ sơ chuyển sang bước Quản lý, nên không còn trạng thái nào mang nghĩa
+     * "Trainer đã duyệt". Không có hai trường này thì màn hình chỉ suy được
+     * "hồ sơ đã qua bước Trainer" chứ không biết AI đã duyệt — nhiều Trainer
+     * sẽ thấy lẫn hồ sơ của nhau.
+     *
+     * trainerReviewedAt còn dùng để bắt cả hồ sơ bị Quản lý TỪ CHỐI sau khi
+     * Trainer đã đánh giá — trường hợp mà lọc theo status bỏ sót, vì REJECTED
+     * cũng có thể do Groom hoặc Thú y đặt từ trước đó.
+     */
+    private Long trainerId;
+    private LocalDateTime trainerReviewedAt;
+
     public AdmissionSummaryResponse(
             Long admissionId,
             AdmissionStatus status,
@@ -24,7 +40,8 @@ public class AdmissionSummaryResponse {
             LocalDate dateOfBirth,
             LocalDateTime submittedAt,
             Long quarantineStallId) {
-        this(admissionId, status, candidateName, breed, dateOfBirth, submittedAt, quarantineStallId, null);
+        this(admissionId, status, candidateName, breed, dateOfBirth, submittedAt,
+                quarantineStallId, null, null, null);
     }
 
     public AdmissionSummaryResponse(
@@ -36,6 +53,21 @@ public class AdmissionSummaryResponse {
             LocalDateTime submittedAt,
             Long quarantineStallId,
             String quarantineStallCode) {
+        this(admissionId, status, candidateName, breed, dateOfBirth, submittedAt,
+                quarantineStallId, quarantineStallCode, null, null);
+    }
+
+    public AdmissionSummaryResponse(
+            Long admissionId,
+            AdmissionStatus status,
+            String candidateName,
+            String breed,
+            LocalDate dateOfBirth,
+            LocalDateTime submittedAt,
+            Long quarantineStallId,
+            String quarantineStallCode,
+            Long trainerId,
+            LocalDateTime trainerReviewedAt) {
         this.admissionId = admissionId;
         this.status = status;
         this.candidateName = candidateName;
@@ -44,6 +76,8 @@ public class AdmissionSummaryResponse {
         this.submittedAt = submittedAt;
         this.quarantineStallId = quarantineStallId;
         this.quarantineStallCode = quarantineStallCode;
+        this.trainerId = trainerId;
+        this.trainerReviewedAt = trainerReviewedAt;
     }
 
     public Long getAdmissionId() {
@@ -83,5 +117,13 @@ public class AdmissionSummaryResponse {
      */
     public String getQuarantineStallCode() {
         return quarantineStallCode;
+    }
+
+    public Long getTrainerId() {
+        return trainerId;
+    }
+
+    public LocalDateTime getTrainerReviewedAt() {
+        return trainerReviewedAt;
     }
 }

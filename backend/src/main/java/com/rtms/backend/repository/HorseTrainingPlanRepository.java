@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
@@ -39,4 +40,14 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
 
     List<HorseTrainingPlan> findByTrainerIdAndStatusIn(Long trainerId,
                                                        List<TrainingPlanStatus> statuses);
+
+    /**
+     * Các kế hoạch ĐÃ TỚI NGÀY BẮT ĐẦU nhưng vẫn còn nhãn UPCOMING.
+     *
+     * createPlan đặt UPCOMING cho kế hoạch có startDate ở tương lai, nhưng
+     * không có gì tự chuyển nó sang ACTIVE khi ngày đó tới. Job nửa đêm dùng
+     * truy vấn này để dọn.
+     */
+    List<HorseTrainingPlan> findByStatusAndStartDateLessThanEqual(TrainingPlanStatus status,
+                                                                   LocalDate date);
 }

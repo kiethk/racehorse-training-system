@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
@@ -16,27 +17,39 @@ export function StableMap() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
   const [horses, setHorses] = useState<Horse[]>([]);
+  /**
+   * Ngựa CHƯA xếp chuồng — danh sách riêng cho hộp thoại xếp ngựa.
+   * Không dùng chung với `horses` được: `horses` lấy bằng mine=true nên
+   * backend đã loại hết ngựa chưa có chuồng, lọc lại ở client sẽ luôn rỗng.
+   */
+  const [unassignedHorses, setUnassignedHorses] = useState<Horse[]>([]);
   const [grooms, setGrooms] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [assignHorseStall, setAssignHorseStall] = useState<StableStall | null>(null);
   const [assignGroomStall, setAssignGroomStall] = useState<StableStall | null>(null);
+  /** Chuồng đang chờ xác nhận gỡ ngựa. */
+  const [unassignStall, setUnassignStall] = useState<StableStall | null>(null);
+  const [unassigning, setUnassigning] = useState(false);
+  const [unassignError, setUnassignError] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const [areasRes, stallsRes, horsesRes, groomsRes] = await Promise.all([
+      const [areasRes, stallsRes, horsesRes, groomsRes, unassignedRes] = await Promise.all([
         stableApi.getAreas(),
         stableApi.getStalls(),
-        stableApi.getHorses({ mine: true }),
+        stableApi.getHorses({ mine: true }),        // đã xếp chuồng -> vẽ lên ô
         stableApi.getGrooms(),
+        stableApi.getHorses({ unassigned: true }),  // chưa xếp -> cho hộp thoại
       ]);
       setAreas(areasRes);
       setStalls(stallsRes);
       setHorses(horsesRes);
       setGrooms(groomsRes);
+      setUnassignedHorses(unassignedRes);
     } catch (err) {
       console.error('Lỗi khi nạp dữ liệu chuồng trại:', err);
       setError('Không tải được sơ đồ chuồng trại. Vui lòng thử lại sau.');
@@ -107,7 +120,7 @@ export function StableMap() {
             Sơ đồ chuồng trại &amp; Phân công Groom
           </h1>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Theo dõi vị trí các chiến mã và gán Groom chăm sóc (BR-06: tối đa 3 chuồng/Groom, BR-07: mỗi ngựa 1 chuồng).
+            Theo dõi vị trí các chiến mã và phân công Groom chăm sóc.
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => loadAll()}>
@@ -212,6 +225,18 @@ export function StableMap() {
                           >
                             {isOccupied ? 'Đã có ngựa' : 'Xếp ngựa'}
                           </button>
+                          {isOccupied && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUnassignError(null);
+                                setUnassignStall(stall);
+                              }}
+                              className="flex-1 rounded px-2 py-1 text-[11px] font-medium text-center bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition"
+                            >
+                              Gỡ ngựa
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setAssignGroomStall(stall)}
@@ -234,7 +259,7 @@ export function StableMap() {
       <AssignHorseDialog
         open={assignHorseStall !== null}
         stall={assignHorseStall}
-        horses={horses}
+        horses={unassignedHorses}
         onClose={() => setAssignHorseStall(null)}
         onAssigned={loadAll}
       />
@@ -246,6 +271,50 @@ export function StableMap() {
         stallCountByGroom={stallCountByGroom}
         onClose={() => setAssignGroomStall(null)}
         onAssigned={loadAll}
+      />
+
+      <ConfirmDialog
+        open={unassignStall !== null}
+        tone="danger"
+        title={`Gỡ chiến mã khỏi chuồng ${unassignStall?.stallCode ?? ''}?`}
+        confirmLabel="Gỡ ngựa"
+        cancelLabel="Huỷ"
+        loading={unassigning}
+        description={
+          <div className="space-y-1.5">
+            <p>
+              Chiến mã{' '}
+              <strong>
+                {unassignStall ? horseByStallId.get(unassignStall.id)?.name ?? '' : ''}
+              </strong>{' '}
+              sẽ không còn ở chuồng nào.
+            </p>
+            <p>
+              Các buổi tập <strong>chưa diễn ra</strong> sẽ chuyển sang trạng thái
+              &quot;chưa phân công Groom&quot;. Buổi đã hoàn thành giữ nguyên.
+            </p>
+            {unassignError && (
+              <p className="text-[var(--color-danger)]">{unassignError}</p>
+            )}
+          </div>
+        }
+        onCancel={() => setUnassignStall(null)}
+        onConfirm={async () => {
+          if (!unassignStall) return;
+          const horse = horseByStallId.get(unassignStall.id);
+          if (!horse) return;
+          try {
+            setUnassigning(true);
+            setUnassignError(null);
+            await stableApi.unassignHorseFromStall(horse.id);
+            setUnassignStall(null);
+            await loadAll();
+          } catch (err) {
+            setUnassignError(err instanceof Error ? err.message : 'Gỡ ngựa thất bại.');
+          } finally {
+            setUnassigning(false);
+          }
+        }}
       />
     </div>
   );

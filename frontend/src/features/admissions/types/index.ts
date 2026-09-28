@@ -18,6 +18,10 @@ export interface AdmissionSummaryResponse {
   submittedAt: string; // ISO datetime string
   quarantineStallId: number | null;
   quarantineStallCode: string | null;
+  /** Huấn luyện viên đã đánh giá hồ sơ này. null = chưa ai đánh giá. */
+  trainerId: number | null;
+  /** Thời điểm đánh giá, dạng ISO. null = chưa đánh giá. */
+  trainerReviewedAt: string | null;
 }
 
 export interface AdmissionDocument {

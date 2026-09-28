@@ -147,7 +147,11 @@ public class AdmissionQueryService {
                 candidate.getDateOfBirth(),
                 admission.getSubmittedAt(),
                 admission.getQuarantineStallId(),
-                stallCode
+                stallCode,
+                // Để màn hình Huấn luyện viên lọc ra hồ sơ do CHÍNH MÌNH duyệt,
+                // thay vì chỉ suy được "đã qua bước Trainer" từ status.
+                admission.getTrainerId(),
+                admission.getTrainerReviewedAt()
         );
     }
 }

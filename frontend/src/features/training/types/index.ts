@@ -95,9 +95,16 @@ export interface JoinableCohortResponse {
   suggestedStartDate: string;
   trainingDays: TrainingDay[];
   horseCount: number;
+  /**
+   * Số buổi ĐỒNG PHA — cùng ngày, cùng bài tập.
+   * KHÔNG phải "số buổi chung lot": đồng pha chỉ là điều kiện CẦN.
+   * Nhóm vẫn bị tách lot nếu vượt sức chứa (BR-10) hoặc trùng Groom (BR-09).
+   */
   sharedSessions: number;
   totalSessions: number;
   waitDays: number;
+  /** Sức chứa một lot, backend trả về để không phải hardcode số 6. */
+  lotCapacity: number;
   note: string;
 }
 
@@ -111,7 +118,10 @@ export interface PlanWorkoutItemResponse {
   subjectName: string;
   workoutType: string;
   horseId: number;
+  /** Người dắt RIÊNG con ngựa này — KHÔNG phải "groom của lot". */
   assignedGroomId: number | null;
+  /** Tổng số chiến mã còn hiệu lực trong lot, để thấy cơ chế ghép nhóm. */
+  lotOccupancy: number | null;
   status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
   actualDistanceMeters: number | null;
   averageHeartRate: number | null;
@@ -134,6 +144,24 @@ export interface HorseTrainingPlan {
 export interface HorseTrainingPlanDetailResponse {
   plan: HorseTrainingPlan;
   workouts: PlanWorkoutItemResponse[];
+  horseName: string | null;
+  courseName: string | null;
+}
+
+/** Một dòng trong danh sách kế hoạch huấn luyện. */
+export interface PlanSummaryResponse {
+  planId: number;
+  horseId: number;
+  horseName: string;
+  courseId: number;
+  courseName: string;
+  startDate: string;
+  endDate: string;
+  status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  totalSessions: number;
+  completedSessions: number;
+  /** Buổi đã huỷ — bị trừ khỏi mẫu số khi tính tiến độ. */
+  cancelledSessions: number;
 }
 
 export interface CompleteWorkoutRequest {
