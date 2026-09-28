@@ -2,19 +2,26 @@ package com.rtms.backend.service;
 
 import com.rtms.backend.dto.LoginRequest;
 import com.rtms.backend.dto.LoginResponse;
+import com.rtms.backend.dto.OwnerRegistrationRequest;
+import com.rtms.backend.dto.OwnerRegistrationResponse;
+import com.rtms.backend.entity.Role;
 import com.rtms.backend.entity.User;
 import com.rtms.backend.repository.GroomProfileRepository;
+import com.rtms.backend.repository.RoleRepository;
 import com.rtms.backend.repository.TrainerProfileRepository;
 import com.rtms.backend.repository.UserRepository;
 import com.rtms.backend.repository.VeterinarianProfileRepository;
 import com.rtms.backend.security.JwtUtil;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
@@ -23,12 +30,14 @@ public class AuthService {
     private final GroomProfileRepository groomProfileRepository;
 
     public AuthService(UserRepository userRepository,
+            RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
             JwtUtil jwtUtil,
             VeterinarianProfileRepository veterinarianProfileRepository,
             TrainerProfileRepository trainerProfileRepository,
             GroomProfileRepository groomProfileRepository) {
         this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.veterinarianProfileRepository = veterinarianProfileRepository;
@@ -73,6 +82,59 @@ public class AuthService {
         };
 
         return new LoginResponse(user.getId(), user.getFullName(), user.getEmail(), role, profile);
+    }
+
+    /**
+     * Đăng ký tài khoản Horse Owner mới.
+     * Client không được phép chỉ định role — role luôn là HORSE_OWNER.
+     */
+    public OwnerRegistrationResponse registerOwner(OwnerRegistrationRequest request) {
+        // Validate required fields
+        if (request.getFullName() == null || request.getFullName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Full name is required");
+        }
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required");
+        }
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password is required");
+        }
+
+        // Normalize fields
+        String email = request.getEmail().trim().toLowerCase();
+        String fullName = request.getFullName().trim();
+        String phone = request.getPhone() == null || request.getPhone().isBlank()
+                ? null : request.getPhone().trim();
+        String address = request.getAddress() == null || request.getAddress().isBlank()
+                ? null : request.getAddress().trim();
+
+        // Reject duplicate email
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "An account with this email already exists");
+        }
+
+        // Load HORSE_OWNER role from DB
+        Role ownerRole = roleRepository.findByName("HORSE_OWNER")
+                .orElseThrow(() -> new IllegalStateException("HORSE_OWNER role not found in database"));
+
+        // Create user
+        User user = new User();
+        user.setFullName(fullName);
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setRole(ownerRole);
+        user.setPhone(phone);
+        user.setAddress(address);
+        user.setActive(true);
+
+        User saved = userRepository.save(user);
+
+        return new OwnerRegistrationResponse(
+                saved.getId(),
+                saved.getFullName(),
+                saved.getEmail(),
+                saved.getRole().getName());
     }
 
 }

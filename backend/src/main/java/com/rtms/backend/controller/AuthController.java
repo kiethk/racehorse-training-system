@@ -3,12 +3,16 @@ package com.rtms.backend.controller;
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.LoginRequest;
 import com.rtms.backend.dto.LoginResponse;
+import com.rtms.backend.dto.OwnerRegistrationRequest;
+import com.rtms.backend.dto.OwnerRegistrationResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.AuthService;
 import com.rtms.backend.service.AuthService.LoginResult;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -64,6 +68,13 @@ public class AuthController {
                 .getAuthentication().getPrincipal();
 
         return ApiResponse.success(authService.getMe(currentUser.getUserId()));
+    }
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<OwnerRegistrationResponse>> register(
+            @RequestBody OwnerRegistrationRequest request) {
+        OwnerRegistrationResponse response = authService.registerOwner(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response));
     }
 
 }

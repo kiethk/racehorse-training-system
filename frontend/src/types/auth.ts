@@ -12,3 +12,18 @@ export interface LoginRequest {
   email: string;
   password?: string;
 }
+
+export interface OwnerRegistrationRequest {
+  fullName: string;
+  email: string;
+  password: string;
+  phone?: string;
+  address?: string;
+}
+
+export interface OwnerRegistrationResponse {
+  userId: number;
+  fullName: string;
+  email: string;
+  role: string;
+}
