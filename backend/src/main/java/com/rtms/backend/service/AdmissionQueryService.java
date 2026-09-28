@@ -41,6 +41,7 @@ public class AdmissionQueryService {
     private final UserRepository userRepository;
     private final VetExamRepository vetExamRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public AdmissionQueryService(
             AdmissionApplicationRepository admissionApplicationRepository,
             CandidateHorseProfileRepository candidateHorseProfileRepository,
