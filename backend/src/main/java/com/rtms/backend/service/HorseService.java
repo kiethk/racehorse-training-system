@@ -70,10 +70,13 @@ public class HorseService {
         horse.setCurrentStatus(newStatus);
         Horse saved = horseRepository.save(horse);
 
-        // ===== THÊM MỚI: cascade huỷ huấn luyện =====
-        // Mọi trạng thái khác ELIGIBLE đều là khoá huấn luyện (khớp với
-        // InjuryRecordService.getTrainingLockStatus).
+        // A non-eligible administrative status may lock training, but changing
+        // the status back to ELIGIBLE never clears a Vet lock. Only a veterinary
+        // APPROVED decision is allowed to do that.
         if (newStatus != HorseStatus.ELIGIBLE) {
+            horse.setTrainingLocked(true);
+            horse.setTrainingLockReason("Horse status changed to " + newStatus);
+            horse.setTrainingLockUpdatedAt(java.time.LocalDateTime.now());
             trainingPlanService.cancelFutureTrainingForHorse(
                     saved.getId(),
                     "Chiến mã chuyển sang trạng thái " + newStatus);

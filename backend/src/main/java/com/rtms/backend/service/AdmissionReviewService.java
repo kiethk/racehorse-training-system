@@ -1,91 +1,79 @@
 package com.rtms.backend.service;
 
+import com.rtms.backend.config.ApiException;
+import com.rtms.backend.dto.CompleteVetExamRequest;
+import com.rtms.backend.dto.VetExamResponse;
 import com.rtms.backend.dto.VetReviewRequest;
-import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.entity.StableStall;
-import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.ReviewDecision;
-import com.rtms.backend.enums.StallStatus;
-import com.rtms.backend.repository.AdmissionApplicationRepository;
-import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.dto.VetReviewResponse;
+import com.rtms.backend.entity.*;
+import com.rtms.backend.enums.*;
+import com.rtms.backend.repository.*;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
-
+/** Compatibility adapter for the existing Admission Vet UI. */
 @Service
 public class AdmissionReviewService {
+    private final AdmissionApplicationRepository admissions;
+    private final VetExamRepository exams;
+    private final HorseRepository horses;
+    private final StableStallRepository stalls;
+    private final VetExamService vetExamService;
 
-    private final AdmissionApplicationRepository admissionApplicationRepository;
-    private final StableStallRepository stableStallRepository;
-
-    public AdmissionReviewService(
-            AdmissionApplicationRepository admissionApplicationRepository,
-            StableStallRepository stableStallRepository) {
-        this.admissionApplicationRepository = admissionApplicationRepository;
-        this.stableStallRepository = stableStallRepository;
+    public AdmissionReviewService(AdmissionApplicationRepository admissions,
+            VetExamRepository exams, HorseRepository horses, StableStallRepository stalls,
+            VetExamService vetExamService) {
+        this.admissions = admissions;
+        this.exams = exams;
+        this.horses = horses;
+        this.stalls = stalls;
+        this.vetExamService = vetExamService;
     }
 
     @Transactional
-    public AdmissionApplication reviewByVet(Long admissionId, VetReviewRequest request, Long actorId) {
-        AdmissionApplication admission = admissionApplicationRepository.findByIdForUpdate(admissionId)
-                .orElseThrow(() -> new RuntimeException(
-                        "Admission application not found with id: " + admissionId));
-
-        if (admission.getStatus() != AdmissionStatus.VET_REVIEW) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Admission application is not awaiting vet review");
+    public VetReviewResponse reviewByVet(Long admissionId, VetReviewRequest request, Long actorId) {
+        AdmissionApplication before = admissions.findById(admissionId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
+                        "RESOURCE_NOT_FOUND", "Admission not found"));
+        if (before.getStatus() != AdmissionStatus.VET_REVIEW
+                && before.getStatus() != AdmissionStatus.PENDING_RECHECK) {
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE",
+                    "Admission is not awaiting a vet examination");
         }
-        if (admission.getQuarantineStallId() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Admission application has no quarantine stall");
-        }
-
-        ReviewDecision decision = request.getDecision();
-        if (decision != ReviewDecision.APPROVED && decision != ReviewDecision.REJECTED) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Decision must be APPROVED or REJECTED");
-        }
-        if (decision == ReviewDecision.REJECTED
-                && (request.getFeedback() == null || request.getFeedback().isBlank())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Feedback is required when decision is REJECTED");
-        }
-        if (!Boolean.TRUE.equals(request.getPhysicalExamConfirmed())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Physical exam must be confirmed");
+        VetExam exam = exams.findFirstByAdmissionIdAndExamTypeOrderByCreatedAtDesc(admissionId,
+                before.getStatus() == AdmissionStatus.VET_REVIEW
+                        ? VetExamType.INITIAL : VetExamType.FOLLOW_UP)
+                .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT,
+                        "INVALID_REVIEW_STATE", "Admission has no veterinary exam request"));
+        if (exam.getStatus() == VetExamStatus.SCHEDULED) {
+            vetExamService.start(exam.getId(), actorId);
+        } else if (exam.getStatus() != VetExamStatus.IN_PROGRESS) {
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE",
+                    "Admission exam must be scheduled and started before review");
         }
 
-        Long assignedVetId = admission.getVeterinarianId();
-        if (assignedVetId == null) {
-            admission.setVeterinarianId(actorId);
-        } else if (!assignedVetId.equals(actorId)) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Only the assigned veterinarian can review this admission");
-        }
+        CompleteVetExamRequest completion = new CompleteVetExamRequest();
+        completion.setSymptoms(request.getSymptoms());
+        completion.setFindings(request.getFindings());
+        completion.setDiagnosis(request.getDiagnosis());
+        completion.setTreatment(request.getTreatment());
+        completion.setNote(request.getNotes() == null ? request.getFeedback() : request.getNotes());
+        completion.setVetDecision(request.getDecision());
+        completion.setRejectionReason(request.getRejectionReason() == null
+                ? request.getFeedback() : request.getRejectionReason());
+        completion.setFollowUpDate(request.getFollowUpDate());
+        completion.setMetrics(request.getMetrics());
+        VetExamResponse completed = vetExamService.complete(exam.getId(), completion, actorId);
 
-        LocalDateTime now = LocalDateTime.now();
-        admission.setVetDecision(decision);
-        admission.setVetFeedback(request.getFeedback());
-        admission.setVetReviewedAt(now);
-
-        if (decision == ReviewDecision.REJECTED) {
-            StableStall stall = stableStallRepository.findById(admission.getQuarantineStallId())
-                    .orElseThrow(() -> new RuntimeException(
-                            "Stable stall not found with id: " + admission.getQuarantineStallId()));
-            stall.setStatus(StallStatus.AVAILABLE);
-            admission.setStatus(AdmissionStatus.REJECTED);
-        } else {
-            admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
-        }
-        return admission;
+        AdmissionApplication admission = admissions.findById(admissionId).orElseThrow();
+        Horse horse = horses.findById(admission.getHorseId()).orElseThrow();
+        String qStallCode = Optional.ofNullable(admission.getQuarantineStallId())
+                .flatMap(stalls::findById).map(StableStall::getStallCode).orElse(null);
+        return new VetReviewResponse(admission.getId(), admission.getStatus(), actorId,
+                request.getDecision(), admission.getVetFeedback(), admission.getVetReviewedAt(),
+                horse.getId(), horse.getCurrentStatus(), admission.getQuarantineStallId(),
+                qStallCode, completed.status(), completed.healthRecordId(), completed.id());
     }
 }

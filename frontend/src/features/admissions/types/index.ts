@@ -3,6 +3,7 @@ export type AdmissionStatus =
   | 'GROOM_REVIEW'
   | 'WAITING_FOR_STALL'
   | 'VET_REVIEW'
+  | 'PENDING_RECHECK'
   | 'TRAINER_REVIEW'
   | 'MANAGER_REVIEW'
   | 'ADDITIONAL_INFORMATION_REQUIRED'
@@ -37,6 +38,9 @@ export interface HealthRecord {
   symptoms: string | null;
   findings: string | null;
   diagnosis: string | null;
+  treatment: string | null;
+  vetDecision: VetDecision | null;
+  rejectionReason: string | null;
   recordType: string;
   productOrService: string | null;
   notes: string | null;
@@ -97,6 +101,93 @@ export interface AdmissionDetailResponse {
 
   availableRegularStalls: StableStall[];
   healthRecords: HealthRecord[];
+  initialExamSchedule: InitialExamScheduleResponse | null;
+}
+
+export interface InitialExamScheduleResponse {
+  scheduleId: number;
+  careType: string;
+  status: string;
+  veterinarianId: number | null;
+  scheduledDate: string | null;
+  scheduledAt: string | null;
+}
+
+export type VetDecision = 'APPROVED' | 'RECHECK_REQUIRED' | 'REJECTED';
+export type VetExamType = 'URGENT' | 'INITIAL' | 'FOLLOW_UP' | 'ROUTINE';
+export type VetExamStatus = 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+
+export interface VetExamResponse {
+  id: number;
+  horseId: number;
+  admissionId: number | null;
+  examType: VetExamType;
+  status: VetExamStatus;
+  priority: number;
+  reason: string | null;
+  createdByUserId: number | null;
+  assignedVetId: number | null;
+  preferredVetId: number | null;
+  requestedForDate: string | null;
+  scheduledAt: string | null;
+  durationMinutes: number;
+  healthRecordId: number | null;
+  createdAt: string;
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+
+export interface HorseHealthMetricRequest {
+  heartRate?: number;
+  temperature?: number;
+  weight?: number;
+  respiratoryRate?: number;
+  hydrationStatus?: string;
+  bodyConditionScore?: number;
+  notes?: string;
+}
+
+export interface HorseHealthMetricResponse extends HorseHealthMetricRequest {
+  id: number;
+  horseId: number;
+  healthRecordId: number;
+  recordedAt: string;
+}
+
+export interface VetReviewRequest {
+  decision: VetDecision;
+  feedback?: string;
+  physicalExamConfirmed: boolean;
+  symptoms?: string;
+  findings?: string;
+  diagnosis?: string;
+  treatment?: string;
+  rejectionReason?: string;
+  notes?: string;
+  followUpDate?: string;
+  metrics?: HorseHealthMetricRequest[];
+}
+
+export interface VetReviewResponse {
+  admissionId: number;
+  status: AdmissionStatus;
+  veterinarianId: number;
+  decision: VetDecision;
+  feedback: string | null;
+  reviewedAt: string;
+  horseId: number;
+  horseStatus: string;
+  quarantineStallId: number;
+  quarantineStallCode: string;
+  initialExamStatus: string;
+  healthRecordId: number | null;
+  vetExamId: number;
 }
 
 export interface ManagerReviewRequest {

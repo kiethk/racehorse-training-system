@@ -3,6 +3,7 @@ package com.rtms.backend.entity;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import com.rtms.backend.enums.VetDecision;
 
 @Entity
 @Table(name = "health_records")
@@ -32,6 +33,16 @@ public class HealthRecord {
 
     @Column(name = "diagnosis", columnDefinition = "TEXT")
     private String diagnosis;
+
+    @Column(name = "treatment", columnDefinition = "TEXT")
+    private String treatment;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "vet_decision", length = 30)
+    private VetDecision vetDecision;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
 
     @Column(name = "record_type", nullable = false)
     private String recordType = "ILLNESS";
@@ -129,6 +140,13 @@ public class HealthRecord {
     public void setDiagnosis(String diagnosis) {
         this.diagnosis = diagnosis;
     }
+
+    public String getTreatment() { return treatment; }
+    public void setTreatment(String treatment) { this.treatment = treatment; }
+    public VetDecision getVetDecision() { return vetDecision; }
+    public void setVetDecision(VetDecision vetDecision) { this.vetDecision = vetDecision; }
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 
     public String getRecordType() {
         return recordType;

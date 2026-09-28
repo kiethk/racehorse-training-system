@@ -1,78 +1,51 @@
 package com.rtms.backend.controller;
 
-import com.rtms.backend.dto.AdmissionDetailResponse;
 import com.rtms.backend.dto.AdmissionDocumentResponse;
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.VetReviewRequest;
-import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.entity.AdmissionDocument;
-import com.rtms.backend.entity.CandidateHorseProfile;
-import com.rtms.backend.enums.AdmissionDocumentType;
-import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.dto.VetReviewResponse;
+import com.rtms.backend.dto.VetExamResponse;
 import com.rtms.backend.repository.AdmissionDocumentRepository;
-import com.rtms.backend.repository.CandidateHorseProfileRepository;
-import com.rtms.backend.repository.StableStallRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.AdmissionReviewService;
+import com.rtms.backend.service.OwnerAdmissionService;
+import com.rtms.backend.service.VetExamService;
 import jakarta.validation.Valid;
-import org.springframework.http.ResponseEntity;
+import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Set;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admissions")
 public class AdmissionVetReviewController {
+    private final AdmissionDocumentRepository documentRepository;
+    private final AdmissionReviewService reviewService;
+    private final OwnerAdmissionService ownerAdmissionService;
+    private final VetExamService vetExamService;
 
-    private static final Set<AdmissionDocumentType> MEDICAL_DOCUMENT_TYPES = EnumSet.of(
-            AdmissionDocumentType.VACCINATION_RECORD,
-            AdmissionDocumentType.DEWORMING_RECORD,
-            AdmissionDocumentType.HEALTH_CERTIFICATE,
-            AdmissionDocumentType.PREVIOUS_MEDICAL_RECORD,
-            AdmissionDocumentType.PREVIOUS_INJURY_RECORD);
-
-    private final AdmissionApplicationRepository admissionApplicationRepository;
-    private final CandidateHorseProfileRepository candidateHorseProfileRepository;
-    private final AdmissionDocumentRepository admissionDocumentRepository;
-    private final StableStallRepository stableStallRepository;
-    private final AdmissionReviewService admissionReviewService;
-    private final com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService;
-
-    public AdmissionVetReviewController(
-            AdmissionApplicationRepository admissionApplicationRepository,
-            CandidateHorseProfileRepository candidateHorseProfileRepository,
-            AdmissionDocumentRepository admissionDocumentRepository,
-            StableStallRepository stableStallRepository,
-            AdmissionReviewService admissionReviewService,
-            com.rtms.backend.service.OwnerAdmissionService ownerAdmissionService) {
-        this.admissionApplicationRepository = admissionApplicationRepository;
-        this.candidateHorseProfileRepository = candidateHorseProfileRepository;
-        this.admissionDocumentRepository = admissionDocumentRepository;
-        this.stableStallRepository = stableStallRepository;
-        this.admissionReviewService = admissionReviewService;
+    public AdmissionVetReviewController(AdmissionDocumentRepository documentRepository,
+            AdmissionReviewService reviewService, OwnerAdmissionService ownerAdmissionService,
+            VetExamService vetExamService) {
+        this.documentRepository = documentRepository;
+        this.reviewService = reviewService;
         this.ownerAdmissionService = ownerAdmissionService;
+        this.vetExamService = vetExamService;
+    }
+
+    @PostMapping("/{id}/initial-exam")
+    @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_GROOM_REVIEW')")
+    public ApiResponse<VetExamResponse> createInitialExam(@PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(vetExamService.createInitialExam(id, currentUser.getUserId()));
     }
 
     @PostMapping("/{id}/vet-review")
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VET_REVIEW')")
-    public ApiResponse<AdmissionDetailResponse> reviewByVet(
-            @PathVariable Long id,
+    public ApiResponse<VetReviewResponse> reviewByVet(@PathVariable Long id,
             @Valid @RequestBody VetReviewRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        AdmissionApplication admission = admissionReviewService.reviewByVet(
-                id, request, currentUser.getUserId());
-        return ApiResponse.success(toDetailResponse(admission, findCandidate(id)));
+        return ApiResponse.success(reviewService.reviewByVet(id, request, currentUser.getUserId()));
     }
 
     @GetMapping("/{id}/documents")
@@ -80,85 +53,7 @@ public class AdmissionVetReviewController {
     public ApiResponse<List<AdmissionDocumentResponse>> getDocuments(@PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         ownerAdmissionService.assertViewerCanRead(id, currentUser);
-        List<AdmissionDocumentResponse> documents = admissionDocumentRepository.findByAdmissionId(id)
-                .stream()
-                .map(ownerAdmissionService::toDocumentResponse)
-                .toList();
-        return ApiResponse.success(documents);
-    }
-
-    @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<ApiResponse<Object>> handleResponseStatusException(ResponseStatusException ex) {
-        return ResponseEntity.status(ex.getStatusCode())
-                .body(ApiResponse.error(ex.getReason()));
-    }
-
-    private AdmissionDetailResponse toDetailResponse(
-            AdmissionApplication admission,
-            CandidateHorseProfile candidate) {
-        AdmissionDetailResponse response = new AdmissionDetailResponse();
-
-        response.setAdmissionId(admission.getId());
-        response.setOwnerId(admission.getOwnerId());
-        response.setStatus(admission.getStatus());
-        response.setQuarantineStallId(admission.getQuarantineStallId());
-        response.setQuarantineStallCode(findStallCode(admission.getQuarantineStallId()));
-        response.setCandidate(candidate);
-
-        response.setGroomId(admission.getGroomId());
-        response.setGroomDecision(admission.getGroomDecision());
-        response.setGroomFeedback(admission.getGroomFeedback());
-        response.setGroomReviewedAt(admission.getGroomReviewedAt());
-
-        response.setVeterinarianId(admission.getVeterinarianId());
-        response.setVetDecision(admission.getVetDecision());
-        response.setVetFeedback(admission.getVetFeedback());
-        response.setVetReviewedAt(admission.getVetReviewedAt());
-
-        response.setTrainerId(admission.getTrainerId());
-
-        response.setTrainerFeedback(admission.getTrainerFeedback());
-        response.setTrainerReviewedAt(admission.getTrainerReviewedAt());
-
-        response.setManagerId(admission.getManagerId());
-        response.setManagerDecision(admission.getManagerDecision());
-        response.setManagerFeedback(admission.getManagerFeedback());
-        response.setManagerReviewedAt(admission.getManagerReviewedAt());
-
-        response.setHorseId(admission.getHorseId());
-        response.setSubmittedAt(admission.getSubmittedAt());
-
-        return response;
-    }
-
-    private AdmissionDocumentResponse toDocumentResponse(AdmissionDocument document) {
-        return new AdmissionDocumentResponse(
-                document.getId(),
-                document.getDocumentType(),
-                document.getFileUrl(),
-                document.getRecordDate(),
-                document.getNote(),
-                document.getUploadedAt(),
-                MEDICAL_DOCUMENT_TYPES.contains(document.getDocumentType()));
-    }
-
-    private AdmissionApplication findAdmission(Long id) {
-        return admissionApplicationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Admission application not found with id: " + id));
-    }
-
-    private CandidateHorseProfile findCandidate(Long admissionId) {
-        return candidateHorseProfileRepository.findByAdmissionId(admissionId)
-                .orElseThrow(() -> new RuntimeException(
-                        "Candidate horse profile not found for admission id: " + admissionId));
-    }
-
-    private String findStallCode(Long stallId) {
-        if (stallId == null) {
-            return null;
-        }
-        return stableStallRepository.findById(stallId)
-                .map(stall -> stall.getStallCode())
-                .orElseThrow(() -> new RuntimeException("Stable stall not found with id: " + stallId));
+        return ApiResponse.success(documentRepository.findByAdmissionId(id).stream()
+                .map(ownerAdmissionService::toDocumentResponse).toList());
     }
 }

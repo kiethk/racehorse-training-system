@@ -52,6 +52,21 @@ public class Horse {
     @Column(name = "registration_number")
     private String registrationNumber;
 
+    @Column(name = "training_locked", nullable = false)
+    private boolean trainingLocked;
+
+    @Column(name = "training_lock_reason", columnDefinition = "TEXT")
+    private String trainingLockReason;
+
+    @Column(name = "training_lock_review_date")
+    private LocalDate trainingLockReviewDate;
+
+    @Column(name = "training_lock_vet_id")
+    private Long trainingLockVetId;
+
+    @Column(name = "training_lock_updated_at")
+    private LocalDateTime trainingLockUpdatedAt;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -149,6 +164,17 @@ public class Horse {
     public void setRegistrationNumber(String registrationNumber) {
         this.registrationNumber = registrationNumber;
     }
+
+    public boolean isTrainingLocked() { return trainingLocked; }
+    public void setTrainingLocked(boolean trainingLocked) { this.trainingLocked = trainingLocked; }
+    public String getTrainingLockReason() { return trainingLockReason; }
+    public void setTrainingLockReason(String trainingLockReason) { this.trainingLockReason = trainingLockReason; }
+    public LocalDate getTrainingLockReviewDate() { return trainingLockReviewDate; }
+    public void setTrainingLockReviewDate(LocalDate trainingLockReviewDate) { this.trainingLockReviewDate = trainingLockReviewDate; }
+    public Long getTrainingLockVetId() { return trainingLockVetId; }
+    public void setTrainingLockVetId(Long trainingLockVetId) { this.trainingLockVetId = trainingLockVetId; }
+    public LocalDateTime getTrainingLockUpdatedAt() { return trainingLockUpdatedAt; }
+    public void setTrainingLockUpdatedAt(LocalDateTime trainingLockUpdatedAt) { this.trainingLockUpdatedAt = trainingLockUpdatedAt; }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

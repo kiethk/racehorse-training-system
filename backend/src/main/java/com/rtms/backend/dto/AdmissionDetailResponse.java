@@ -6,6 +6,7 @@ import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.enums.ReviewDecision;
+import com.rtms.backend.enums.VetDecision;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,7 +28,7 @@ public class AdmissionDetailResponse {
     private LocalDateTime groomReviewedAt;
 
     private Long veterinarianId;
-    private ReviewDecision vetDecision;
+    private VetDecision vetDecision;
     private String vetFeedback;
     private LocalDateTime vetReviewedAt;
 
@@ -48,6 +49,10 @@ public class AdmissionDetailResponse {
 
     // Initial health records created during Vet Q review
     private List<HealthRecord> healthRecords;
+    private InitialExamScheduleResponse initialExamSchedule;
+
+    public InitialExamScheduleResponse getInitialExamSchedule() { return initialExamSchedule; }
+    public void setInitialExamSchedule(InitialExamScheduleResponse initialExamSchedule) { this.initialExamSchedule = initialExamSchedule; }
 
     public Long getAdmissionId() {
         return admissionId;
@@ -145,11 +150,11 @@ public class AdmissionDetailResponse {
         this.veterinarianId = veterinarianId;
     }
 
-    public ReviewDecision getVetDecision() {
+    public VetDecision getVetDecision() {
         return vetDecision;
     }
 
-    public void setVetDecision(ReviewDecision vetDecision) {
+    public void setVetDecision(VetDecision vetDecision) {
         this.vetDecision = vetDecision;
     }
 

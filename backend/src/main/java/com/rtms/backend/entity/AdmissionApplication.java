@@ -2,6 +2,7 @@ package com.rtms.backend.entity;
 
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.enums.ReviewDecision;
+import com.rtms.backend.enums.VetDecision;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -42,7 +43,7 @@ public class AdmissionApplication {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "vet_decision", length = 20)
-    private ReviewDecision vetDecision;
+    private VetDecision vetDecision;
 
     @Column(name = "vet_feedback", columnDefinition = "TEXT")
     private String vetFeedback;
@@ -177,11 +178,11 @@ public class AdmissionApplication {
         this.veterinarianId = veterinarianId;
     }
 
-    public ReviewDecision getVetDecision() {
+    public VetDecision getVetDecision() {
         return vetDecision;
     }
 
-    public void setVetDecision(ReviewDecision vetDecision) {
+    public void setVetDecision(VetDecision vetDecision) {
         this.vetDecision = vetDecision;
     }
 

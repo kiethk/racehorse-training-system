@@ -1,7 +1,9 @@
 package com.rtms.backend.service;
 
 import com.rtms.backend.dto.AdmissionDetailResponse;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.dto.AdmissionSummaryResponse;
+import com.rtms.backend.dto.InitialExamScheduleResponse;
 import com.rtms.backend.entity.AdmissionApplication;
 import com.rtms.backend.entity.AdmissionDocument;
 import com.rtms.backend.entity.CandidateHorseProfile;
@@ -13,7 +15,10 @@ import com.rtms.backend.repository.AdmissionDocumentRepository;
 import com.rtms.backend.repository.CandidateHorseProfileRepository;
 import com.rtms.backend.repository.HealthRecordRepository;
 import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.repository.VetExamRepository;
+import com.rtms.backend.enums.VetExamType;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 
@@ -25,18 +30,21 @@ public class AdmissionQueryService {
     private final AdmissionDocumentRepository admissionDocumentRepository;
     private final StableStallRepository stableStallRepository;
     private final HealthRecordRepository healthRecordRepository;
+    private final VetExamRepository vetExamRepository;
 
     public AdmissionQueryService(
             AdmissionApplicationRepository admissionApplicationRepository,
             CandidateHorseProfileRepository candidateHorseProfileRepository,
             AdmissionDocumentRepository admissionDocumentRepository,
             StableStallRepository stableStallRepository,
-            HealthRecordRepository healthRecordRepository) {
+            HealthRecordRepository healthRecordRepository,
+            VetExamRepository vetExamRepository) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.admissionDocumentRepository = admissionDocumentRepository;
         this.stableStallRepository = stableStallRepository;
         this.healthRecordRepository = healthRecordRepository;
+        this.vetExamRepository = vetExamRepository;
     }
 
     public List<AdmissionSummaryResponse> getAdmissions(AdmissionStatus status) {
@@ -58,8 +66,7 @@ public class AdmissionQueryService {
 
         AdmissionApplication admission = admissionApplicationRepository
                 .findById(admissionId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Admission not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Admission not found"));
 
         CandidateHorseProfile candidate = candidateHorseProfileRepository
                 .findByAdmissionId(admissionId)
@@ -114,6 +121,8 @@ public class AdmissionQueryService {
 
         // Health records for the horse created during Vet quarantine review
         if (admission.getHorseId() != null) {
+            vetExamRepository.findFirstByAdmissionIdAndExamTypeOrderByCreatedAtDesc(admission.getId(), VetExamType.INITIAL)
+                    .map(InitialExamScheduleResponse::from).ifPresent(response::setInitialExamSchedule);
             List<HealthRecord> healthRecords =
                     healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(
                             admission.getHorseId());
