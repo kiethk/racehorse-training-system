@@ -15,9 +15,27 @@ public class CourseSubjectResponse {
     private IntensityLevel intensityLevel;
     private Integer orderIndex;
 
+    /**
+     * Thời lượng bài tập (phút) — con số QUYẾT ĐỊNH ĐỘ DÀI LOT khi hệ thống
+     * xếp lịch: lot.endTime = lot.startTime + durationMinutes.
+     *
+     * Không có trường này thì màn hình chọn khoá không cho Trainer thấy khoá
+     * sẽ ngốn bao nhiêu khung giờ vàng — đúng thứ họ cần để quyết định.
+     */
+    private Integer durationMinutes;
+
+    /** Giữ chữ ký 8 tham số cho các lời gọi đã có. */
     public CourseSubjectResponse(Long id, Long subjectId, String subjectName, String description,
                                  SurfaceType surfaceType, BigDecimal targetDistanceMeters,
                                  IntensityLevel intensityLevel, Integer orderIndex) {
+        this(id, subjectId, subjectName, description, surfaceType, targetDistanceMeters,
+                intensityLevel, orderIndex, null);
+    }
+
+    public CourseSubjectResponse(Long id, Long subjectId, String subjectName, String description,
+                                 SurfaceType surfaceType, BigDecimal targetDistanceMeters,
+                                 IntensityLevel intensityLevel, Integer orderIndex,
+                                 Integer durationMinutes) {
         this.id = id;
         this.subjectId = subjectId;
         this.subjectName = subjectName;
@@ -26,6 +44,7 @@ public class CourseSubjectResponse {
         this.targetDistanceMeters = targetDistanceMeters;
         this.intensityLevel = intensityLevel;
         this.orderIndex = orderIndex;
+        this.durationMinutes = durationMinutes;
     }
 
     public Long getId() { return id; }
@@ -51,4 +70,7 @@ public class CourseSubjectResponse {
 
     public Integer getOrderIndex() { return orderIndex; }
     public void setOrderIndex(Integer orderIndex) { this.orderIndex = orderIndex; }
+
+    public Integer getDurationMinutes() { return durationMinutes; }
+    public void setDurationMinutes(Integer durationMinutes) { this.durationMinutes = durationMinutes; }
 }

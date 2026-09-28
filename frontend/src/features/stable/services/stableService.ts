@@ -33,9 +33,21 @@ export const stableApi = {
   },
 
   /** mine=true -> chỉ ngựa trong khu Trainer phụ trách (BE-2.1). */
-  getHorses: async (opts?: { mine?: boolean; status?: HorseStatus }): Promise<Horse[]> => {
+  /**
+   * mine       -> ngựa trong khu Trainer phụ trách (đã xếp chuồng).
+   * unassigned -> ngựa CHƯA xếp chuồng, dùng cho hộp thoại xếp ngựa.
+   *
+   * Hai cờ loại trừ nhau: "khu của tôi" suy ra TỪ chuồng, nên ngựa chưa có
+   * chuồng không bao giờ thoả mine=true. Truyền cả hai sẽ luôn ra rỗng.
+   */
+  getHorses: async (opts?: {
+    mine?: boolean;
+    unassigned?: boolean;
+    status?: HorseStatus;
+  }): Promise<Horse[]> => {
     const params = new URLSearchParams();
     if (opts?.mine) params.set('mine', 'true');
+    if (opts?.unassigned) params.set('unassigned', 'true');
     if (opts?.status) params.set('status', opts.status);
     const qs = params.toString();
     return (await apiGet<ApiResponse<Horse[]>>(`/api/horses${qs ? `?${qs}` : ''}`)).data;
@@ -47,6 +59,16 @@ export const stableApi = {
   /** LƯU Ý: backend nhận @RequestParam, KHÔNG phải body. */
   assignHorseToStall: async (horseId: number, stallId: number): Promise<void> => {
     await putWithMessage(`/api/horses/${horseId}/assign-stall?stallId=${stallId}`);
+  },
+
+  /**
+   * Gỡ chiến mã khỏi chuồng — bỏ trống stallId.
+   * Nhất quán với assignGroomToStall(stallId, null).
+   *
+   * Các buổi tập chưa diễn ra sẽ thành "chưa phân công Groom".
+   */
+  unassignHorseFromStall: async (horseId: number): Promise<void> => {
+    await putWithMessage(`/api/horses/${horseId}/assign-stall`);
   },
 
   /** Bỏ trống groomId = gỡ Groom khỏi chuồng. */

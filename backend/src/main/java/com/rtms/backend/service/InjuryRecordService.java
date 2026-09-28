@@ -13,6 +13,7 @@ import com.rtms.backend.repository.InjuryRecordRepository;
 import com.rtms.backend.repository.HealthRecordRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
 
 @Service
 public class InjuryRecordService {
@@ -68,6 +69,9 @@ public class InjuryRecordService {
         // (@Transactional đảm bảo lưu InjuryRecord và cập nhật Horse luôn thực hiện
         // cùng nhau)
         horse.setCurrentStatus(HorseStatus.INJURED);
+        horse.setTrainingLocked(true);
+        horse.setTrainingLockReason(request.getDescription());
+        horse.setTrainingLockUpdatedAt(LocalDateTime.now());
         horseRepository.save(horse);
 
         return savedInjury;
@@ -77,10 +81,9 @@ public class InjuryRecordService {
         Horse horse = horseRepository.findById(horseId)
                 .orElseThrow(() -> new RuntimeException("Horse not found with id: " + horseId));
 
-        boolean locked = horse.getCurrentStatus() != HorseStatus.ELIGIBLE;
         return new TrainingLockStatusResponse(
                 horseId,
                 horse.getCurrentStatus().name(),
-                locked);
+                horse.isTrainingLocked());
     }
 }

@@ -9,7 +9,14 @@ import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { stableApi } from '@/features/stable/services/stableService';
 import type { Horse } from '@/features/stable/types';
 import { trainingApi } from '../services/trainingService';
-import type { Course, JoinableCohortResponse, TrainingDay, CreateHorseTrainingPlanRequest } from '../types';
+import type {
+  Course,
+  JoinableCohortResponse,
+  TrainingDay,
+  CreateHorseTrainingPlanRequest,
+  HorseTrainingPlanDetailResponse,
+} from '../types';
+import { EnrollmentResultSummary } from './EnrollmentResultSummary';
 
 const DAYS_OF_WEEK: { value: TrainingDay; label: string }[] = [
   { value: 'MONDAY', label: 'Thứ 2' },
@@ -29,6 +36,8 @@ export function EnrollmentForm() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [horses, setHorses] = useState<Horse[]>([]);
   const [cohorts, setCohorts] = useState<JoinableCohortResponse[]>([]);
+  /** Kết quả ghi danh — khác null thì thay form bằng màn tóm tắt. */
+  const [result, setResult] = useState<HorseTrainingPlanDetailResponse[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [cohortsLoading, setCohortsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,8 +154,10 @@ export function EnrollmentForm() {
 
       const result = await trainingApi.createPlan(payload);
       if (result && result.length > 0) {
-        // Chuyển tới kế hoạch đầu tiên vừa tạo
-        router.push(`/trainer/plans/${result[0].plan.id}`);
+        // KHÔNG nhảy thẳng tới plan đầu tiên: ghi danh nhóm tạo ra N kế hoạch,
+        // làm vậy là vứt N-1 kết quả. Hiện màn tóm tắt để Trainer thấy nhóm
+        // được xếp vào mấy lot và vì sao.
+        setResult(result);
       } else {
         router.push('/trainer/courses');
       }
@@ -168,6 +179,17 @@ export function EnrollmentForm() {
     );
   }
 
+  // Ghi danh xong -> thay toàn bộ form bằng màn tóm tắt kết quả
+  if (result) {
+    return (
+      <EnrollmentResultSummary
+        plans={result}
+        horses={horses}
+        onDone={() => router.push('/trainer/courses')}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
@@ -175,7 +197,7 @@ export function EnrollmentForm() {
           Ghi danh huấn luyện theo nhóm
         </h1>
         <p className="text-[12px] text-[var(--color-text-secondary)]">
-          Ghi danh nhiều chiến mã cùng lúc để ghép lot tự động, tối ưu hóa khung giờ vàng 06:00 – 10:00.
+          Chọn nhiều chiến mã cùng lúc để hệ thống tự xếp chung buổi tập.
         </p>
       </div>
 
@@ -242,8 +264,18 @@ export function EnrollmentForm() {
                       </div>
                       <div className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
                         {cohort.note} • Bắt đầu {cohort.suggestedStartDate} (chờ {cohort.waitDays} ngày)
-                        → Chung lot {cohort.sharedSessions}/{cohort.totalSessions} buổi
                       </div>
+                      {/*
+                        Đồng pha KHÔNG bảo đảm chung lot. Nhóm đã đầy thì con
+                        tiếp theo sẽ sang lot thứ hai trong cùng khung giờ vàng,
+                        và khung đó chỉ có 240 phút.
+                      */}
+                      {cohort.horseCount >= cohort.lotCapacity && (
+                        <div className="mt-1 text-[11px] text-[var(--color-warning)]">
+                          ⚠ Nhóm đã đủ {cohort.lotCapacity} chiến mã. Thêm con nữa sẽ
+                          phải tập ở buổi khác trong ngày.
+                        </div>
+                      )}
                     </div>
                     <Button
                       variant="secondary"

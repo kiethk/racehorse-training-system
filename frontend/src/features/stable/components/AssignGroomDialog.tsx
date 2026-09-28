@@ -62,7 +62,7 @@ export function AssignGroomDialog({
           Phân công Groom cho chuồng {stall.stallCode}
         </h2>
         <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
-          Mỗi Groom phụ trách tối đa 3 chuồng (BR-06). Bạn cũng có thể chọn gỡ Groom khỏi chuồng này.
+          Mỗi Groom phụ trách tối đa 3 chuồng. Để trống nếu muốn gỡ Groom khỏi chuồng này.
         </p>
 
         {error && (

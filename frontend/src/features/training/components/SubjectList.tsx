@@ -61,7 +61,7 @@ export function SubjectList() {
     }
     // Chặn thời lượng vượt quá 240 phút (khung giờ vàng 06:00 - 10:00)
     if (durationMinutes <= 0 || durationMinutes > 240) {
-      setFormError('Thời lượng phải từ 1 đến 240 phút (khung giờ vàng chỉ có 240 phút).');
+      setFormError('Thời lượng phải từ 1 đến 240 phút.');
       return;
     }
 

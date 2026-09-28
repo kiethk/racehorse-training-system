@@ -101,6 +101,14 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             @Param("stallId") Long stallId);
 
     @Query(value = """
+            SELECT ss.* FROM stable_stalls ss
+            JOIN areas a ON a.id = ss.area_id
+            WHERE ss.id = :stallId AND a.type = 'QUARANTINE'
+            FOR UPDATE OF ss
+            """, nativeQuery = true)
+    Optional<StableStall> findQuarantineStallByIdForUpdate(@Param("stallId") Long stallId);
+
+    @Query(value = """
             SELECT ss.*
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id

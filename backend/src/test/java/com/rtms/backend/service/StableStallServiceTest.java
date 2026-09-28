@@ -1,9 +1,11 @@
 package com.rtms.backend.service;
 
 import com.rtms.backend.config.FarmSchedulePolicy;
+import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.Role;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.entity.User;
+import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import com.rtms.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +19,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,11 +32,29 @@ class StableStallServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private HorseRepository horseRepository;
+
+    @Mock
+    private HorseTrainingPlanService planService;
+
     private StableStallService stableStallService;
 
     @BeforeEach
     void setUp() {
-        stableStallService = new StableStallService(stableStallRepository, userRepository);
+        stableStallService = new StableStallService(
+                stableStallRepository, userRepository, horseRepository, planService);
+    }
+
+    /** Dựng một Groom hợp lệ để dùng lại giữa các test. */
+    private User groom(Long id, String name) {
+        Role role = new Role();
+        role.setName("GROOM");
+        User u = new User();
+        u.setId(id);
+        u.setFullName(name);
+        u.setRole(role);
+        return u;
     }
 
     @Test
@@ -127,5 +149,96 @@ class StableStallServiceTest {
         assertNotNull(result);
         assertNull(result.getGroomId());
         verify(stableStallRepository).save(stall);
+    }
+
+    // =================================================================
+    // ĐỒNG BỘ GROOM CHO BUỔI TẬP TƯƠNG LAI
+    // =================================================================
+
+    @Test
+    @DisplayName("Đổi Groom: buổi tập tương lai của ngựa trong chuồng được chuyển sang Groom mới")
+    void testAssignGroom_ReassignsFutureWorkouts() {
+        StableStall stall = new StableStall();
+        stall.setId(10L);
+        stall.setGroomId(4L);
+
+        Horse horse = new Horse();
+        horse.setId(77L);
+        horse.setCurrentStallId(10L);
+
+        when(stableStallRepository.findById(10L)).thenReturn(Optional.of(stall));
+        when(userRepository.findById(5L)).thenReturn(Optional.of(groom(5L, "Groom B")));
+        when(stableStallRepository.countByGroomId(5L)).thenReturn(1L);
+        when(horseRepository.findByCurrentStallId(10L)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.save(any(StableStall.class))).thenAnswer(i -> i.getArgument(0));
+
+        stableStallService.assignGroom(10L, 5L);
+
+        // Buổi tập phải được chuyển sang ĐÚNG Groom mới, không phải Groom cũ
+        verify(planService).reassignFutureWorkoutsToGroom(77L, 5L);
+    }
+
+    @Test
+    @DisplayName("Gỡ Groom: buổi tập tương lai chuyển sang 'chưa phân công' (null)")
+    void testAssignGroom_Unassign_SetsWorkoutsToNull() {
+        StableStall stall = new StableStall();
+        stall.setId(10L);
+        stall.setGroomId(4L);
+
+        Horse horse = new Horse();
+        horse.setId(77L);
+        horse.setCurrentStallId(10L);
+
+        when(stableStallRepository.findById(10L)).thenReturn(Optional.of(stall));
+        when(horseRepository.findByCurrentStallId(10L)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.save(any(StableStall.class))).thenAnswer(i -> i.getArgument(0));
+
+        stableStallService.assignGroom(10L, null);
+
+        verify(planService).reassignFutureWorkoutsToGroom(eq(77L), isNull());
+    }
+
+    @Test
+    @DisplayName("Chuồng trống: không gọi đồng bộ buổi tập vì không có ngựa nào")
+    void testAssignGroom_EmptyStall_NoReassign() {
+        StableStall stall = new StableStall();
+        stall.setId(10L);
+
+        when(stableStallRepository.findById(10L)).thenReturn(Optional.of(stall));
+        when(userRepository.findById(5L)).thenReturn(Optional.of(groom(5L, "Groom B")));
+        when(stableStallRepository.countByGroomId(5L)).thenReturn(0L);
+        when(horseRepository.findByCurrentStallId(10L)).thenReturn(Optional.empty());
+        when(stableStallRepository.save(any(StableStall.class))).thenAnswer(i -> i.getArgument(0));
+
+        stableStallService.assignGroom(10L, 5L);
+
+        verify(planService, never()).reassignFutureWorkoutsToGroom(any(), any());
+    }
+
+    @Test
+    @DisplayName("BR-09: vướng xung đột lot thì KHÔNG ghi Groom mới vào chuồng")
+    void testAssignGroom_Br09Conflict_DoesNotSaveStall() {
+        StableStall stall = new StableStall();
+        stall.setId(10L);
+        stall.setGroomId(4L);
+
+        Horse horse = new Horse();
+        horse.setId(77L);
+        horse.setCurrentStallId(10L);
+
+        when(stableStallRepository.findById(10L)).thenReturn(Optional.of(stall));
+        when(userRepository.findById(5L)).thenReturn(Optional.of(groom(5L, "Groom B")));
+        when(stableStallRepository.countByGroomId(5L)).thenReturn(1L);
+        when(horseRepository.findByCurrentStallId(10L)).thenReturn(Optional.of(horse));
+        doThrow(new IllegalStateException("Groom này đang dắt 'Red Fox'"))
+                .when(planService).reassignFutureWorkoutsToGroom(77L, 5L);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> stableStallService.assignGroom(10L, 5L));
+
+        assertTrue(ex.getMessage().contains("Red Fox"));
+        // Đồng bộ phải chạy TRƯỚC khi ghi -> ném lỗi thì chuồng giữ Groom cũ
+        verify(stableStallRepository, never()).save(any());
+        assertEquals(4L, stall.getGroomId());
     }
 }

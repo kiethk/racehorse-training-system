@@ -19,6 +19,7 @@ export function getNavigationForRole(role: Role): NavItem[] {
       return [
         { id: 'dashboard', label: 'Dashboard', href: dashboardHref },
         { id: 'management', label: 'Management', href: '/manager/management' },
+        { id: 'staff', label: 'Staff', href: '/manager/staff' },
         { id: 'horses', label: 'Horses' },
         { id: 'stable', label: 'Stable' },
         { id: 'reports', label: 'Reports' },
@@ -29,6 +30,7 @@ export function getNavigationForRole(role: Role): NavItem[] {
         { id: 'admissions', label: 'Admissions', href: '/trainer/admissions' },
         { id: 'stable', label: 'Stable', href: '/trainer/stable' },
         { id: 'training', label: 'Training', href: '/trainer/courses' },
+        { id: 'plans', label: 'Plans', href: '/trainer/plans' },
         { id: 'schedule', label: 'Schedule', href: '/trainer/schedule' },
         { id: 'horses', label: 'Horses' },
         { id: 'racing', label: 'Racing' },
@@ -36,7 +38,7 @@ export function getNavigationForRole(role: Role): NavItem[] {
     case 'VETERINARIAN':
       return [
         { id: 'dashboard', label: 'Dashboard', href: dashboardHref },
-        { id: 'admissions', label: 'Admissions' },
+        { id: 'admissions', label: 'Admissions', href: '/veterinarian/admissions' },
         { id: 'health', label: 'Health' },
         { id: 'preventive-care', label: 'Preventive Care' },
       ];

@@ -31,8 +31,9 @@ public class PreventiveCareController {
     @PreAuthorize("hasAuthority('PREVENTIVE_CARE_CREATE')")
     @PostMapping
     public ApiResponse<PreventiveCareSchedule> createSchedule(
-            @RequestBody CreatePreventiveCareScheduleRequest request) {
-        return ApiResponse.success(preventiveCareService.createSchedule(request));
+            @RequestBody CreatePreventiveCareScheduleRequest request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(preventiveCareService.createSchedule(request, currentUser));
     }
 
     @PreAuthorize("hasAuthority('PREVENTIVE_CARE_VIEW')")

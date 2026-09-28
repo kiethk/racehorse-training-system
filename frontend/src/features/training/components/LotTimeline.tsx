@@ -83,7 +83,7 @@ export function LotTimeline() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-            Lịch Lot huấn luyện (Vận hành khung giờ vàng)
+            Lịch buổi tập trong ngày
           </h1>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
             Quan sát trực quan các lot tập từ 06:00 đến 10:00 và nhận diện các khe giờ còn trống.

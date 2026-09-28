@@ -9,16 +9,20 @@ import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.HealthRecordRepository;
 import com.rtms.backend.repository.PreventiveCareScheduleRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.config.ApiException;
+import org.springframework.http.HttpStatus;
 
 import org.springframework.security.access.AccessDeniedException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PreventiveCareService {
+    private static final Set<String> VET_CARE_TYPES = Set.of("ROUTINE_EXAM", "VACCINATION", "DEWORMING");
 
     private final PreventiveCareScheduleRepository scheduleRepository;
     private final HealthRecordRepository healthRecordRepository;
@@ -32,10 +36,14 @@ public class PreventiveCareService {
         this.horseRepository = horseRepository;
     }
 
-    public PreventiveCareSchedule createSchedule(CreatePreventiveCareScheduleRequest request) {
+    public PreventiveCareSchedule createSchedule(CreatePreventiveCareScheduleRequest request, AuthenticatedUser currentUser) {
+        if (!VET_CARE_TYPES.contains(request.getCareType() == null ? "" : request.getCareType())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Only ROUTINE_EXAM, VACCINATION and DEWORMING can be created here; INITIAL_EXAM is created by the Groom/admission flow");
+        }
         PreventiveCareSchedule schedule = new PreventiveCareSchedule();
         schedule.setHorseId(request.getHorseId());
-        schedule.setVeterinarianId(request.getVeterinarianId());
+        schedule.setVeterinarianId(currentUser.getUserId());
         schedule.setCareType(request.getCareType());
         schedule.setScheduledDate(request.getScheduledDate());
         schedule.setDescription(request.getDescription());
@@ -59,24 +67,27 @@ public class PreventiveCareService {
 
     @Transactional
     public HealthRecord recordCompletion(Long scheduleId, CompletePreventiveCareScheduleRequest request, AuthenticatedUser currentUser) {
-        PreventiveCareSchedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new RuntimeException("Schedule not found with id: " + scheduleId));
+        PreventiveCareSchedule schedule = scheduleRepository.findByIdForUpdate(scheduleId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Schedule not found"));
+        if (!"PENDING".equals(schedule.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE", "Schedule is not pending");
+        }
+        if ("INITIAL_EXAM".equals(schedule.getCareType())) {
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE",
+                    "INITIAL_EXAM must be completed through the admission vet review");
+        }
 
         HealthRecord record = new HealthRecord();
         record.setHorseId(schedule.getHorseId());
         record.setPreventiveCareScheduleId(schedule.getId());
         record.setRecordType(schedule.getCareType());
         
-        // VeterinarianId from request if provided, otherwise from schedule, otherwise from current user if they are a vet
-        if (request.getVeterinarianId() != null) {
-            record.setVeterinarianId(request.getVeterinarianId());
-        } else if (schedule.getVeterinarianId() != null) {
-            record.setVeterinarianId(schedule.getVeterinarianId());
-        } else {
-            record.setVeterinarianId(currentUser.getUserId());
+        if (schedule.getVeterinarianId() != null && !schedule.getVeterinarianId().equals(currentUser.getUserId())) {
+            throw new ApiException(HttpStatus.CONFLICT, "SCHEDULE_ASSIGNED_TO_OTHER_VET", "Schedule assigned to another veterinarian");
         }
-
-        record.setExaminedAt(request.getPerformedAt() != null ? request.getPerformedAt() : LocalDateTime.now());
+        record.setVeterinarianId(currentUser.getUserId());
+        schedule.setVeterinarianId(currentUser.getUserId());
+        record.setExaminedAt(LocalDateTime.now());
         record.setProductOrService(request.getProductOrService());
         record.setFindings(request.getResult());
         record.setNotes(request.getNotes());

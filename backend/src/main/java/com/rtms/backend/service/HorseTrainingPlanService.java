@@ -1,5 +1,6 @@
 package com.rtms.backend.service;
 
+import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.dto.*;
 import com.rtms.backend.entity.*;
 import com.rtms.backend.enums.TrainingDay;
@@ -54,23 +55,108 @@ public class HorseTrainingPlanService {
         this.areaRepository = areaRepository;
     }
 
-    public List<HorseTrainingPlan> getAllPlans() {
-        return planRepository.findAll();
+    /**
+     * Danh sách kế hoạch cho màn hình tra cứu.
+     *
+     * HEAD_TRAINER chỉ thấy kế hoạch của chính mình — giống cách GET /api/lots
+     * đang làm. Các vai khác thấy tất cả, hoặc lọc theo horseId.
+     */
+    public List<PlanSummaryResponse> getPlanSummaries(Long horseId, AuthenticatedUser currentUser) {
+        List<HorseTrainingPlan> plans;
+
+        if (horseId != null) {
+            plans = planRepository.findByHorseId(horseId);
+        } else if ("HEAD_TRAINER".equalsIgnoreCase(currentUser.getRole())) {
+            plans = planRepository.findByTrainerIdAndStatusIn(
+                    currentUser.getUserId(), List.of(TrainingPlanStatus.values()));
+        } else {
+            plans = planRepository.findAll();
+        }
+
+        return toSummaries(plans);
     }
 
-    public List<HorseTrainingPlan> getPlansByHorse(Long horseId) {
-        return planRepository.findByHorseId(horseId);
+    /**
+     * Ghép tên ngựa, tên khoá và ba con số tiến độ vào danh sách kế hoạch.
+     *
+     * Ba truy vấn gom, KHÔNG phải ba truy vấn mỗi dòng: nạp một lượt toàn bộ
+     * ngựa, khoá và số buổi theo trạng thái. Với 20 kế hoạch thì đây là
+     * 3 truy vấn thay vì 60.
+     */
+    private List<PlanSummaryResponse> toSummaries(List<HorseTrainingPlan> plans) {
+        if (plans.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> horseIds = new HashSet<>();
+        Set<Long> courseIds = new HashSet<>();
+        Set<Long> planIds = new HashSet<>();
+        plans.forEach(p -> {
+            horseIds.add(p.getHorseId());
+            courseIds.add(p.getCourseId());
+            planIds.add(p.getId());
+        });
+
+        Map<Long, String> horseNames = new HashMap<>();
+        horseRepository.findAllById(horseIds).forEach(h -> horseNames.put(h.getId(), h.getName()));
+
+        Map<Long, String> courseNames = new HashMap<>();
+        courseRepository.findAllById(courseIds).forEach(c -> courseNames.put(c.getId(), c.getName()));
+
+        // planId -> (trạng thái -> số buổi)
+        Map<Long, Map<WorkoutStatus, Integer>> countsByPlan = new HashMap<>();
+        for (Object[] row : workoutRepository.countByPlanIdsGroupedByStatus(planIds)) {
+            countsByPlan
+                    .computeIfAbsent((Long) row[0], k -> new EnumMap<>(WorkoutStatus.class))
+                    .put((WorkoutStatus) row[1], ((Number) row[2]).intValue());
+        }
+
+        List<PlanSummaryResponse> result = new ArrayList<>();
+        for (HorseTrainingPlan p : plans) {
+            Map<WorkoutStatus, Integer> counts =
+                    countsByPlan.getOrDefault(p.getId(), Map.of());
+            int total = counts.values().stream().mapToInt(Integer::intValue).sum();
+
+            result.add(new PlanSummaryResponse(
+                    p.getId(),
+                    p.getHorseId(),
+                    horseNames.getOrDefault(p.getHorseId(), "#" + p.getHorseId()),
+                    p.getCourseId(),
+                    courseNames.getOrDefault(p.getCourseId(), "#" + p.getCourseId()),
+                    p.getStartDate(),
+                    p.getEndDate(),
+                    p.getStatus(),
+                    total,
+                    counts.getOrDefault(WorkoutStatus.COMPLETED, 0),
+                    counts.getOrDefault(WorkoutStatus.CANCELLED, 0)));
+        }
+
+        // Kế hoạch mới nhất lên đầu
+        result.sort(Comparator.comparing(PlanSummaryResponse::getStartDate).reversed());
+        return result;
     }
 
     public HorseTrainingPlanDetailResponse getPlanById(Long id) {
         HorseTrainingPlan plan = planRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy kế hoạch #" + id));
-        return new HorseTrainingPlanDetailResponse(plan, buildWorkoutItems(id));
+
+        // Tên ngựa và tên khoá: entity chỉ mang id dạng số, phải ghép ở đây.
+        String horseName = horseRepository.findById(plan.getHorseId())
+                .map(Horse::getName)
+                .orElse("#" + plan.getHorseId());
+        String courseName = courseRepository.findById(plan.getCourseId())
+                .map(Course::getName)
+                .orElse("#" + plan.getCourseId());
+
+        return new HorseTrainingPlanDetailResponse(
+                plan, buildWorkoutItems(id), horseName, courseName);
     }
 
     /** Gom workout + lot + tên bài tập thành danh sách hiển thị. */
     private List<PlanWorkoutItemResponse> buildWorkoutItems(Long planId) {
         List<PlanWorkoutItemResponse> items = new ArrayList<>();
+        Set<Long> lotIds = new LinkedHashSet<>();
+
         for (Object[] row : workoutRepository.findByPlanIdWithLot(planId)) {
             TrainingWorkout w = (TrainingWorkout) row[0];
             TrainingLot lot = (TrainingLot) row[1];
@@ -81,7 +167,20 @@ public class HorseTrainingPlanService {
                 item.setWorkoutType(subject.getWorkoutType().name());
             }
             items.add(item);
+            lotIds.add(lot.getId());
         }
+
+        // Số ngựa mỗi lot — MỘT truy vấn gom cho cả kế hoạch, không phải
+        // mỗi buổi một truy vấn. Nhờ đó trang chi tiết thấy được cơ chế ghép
+        // nhóm đang hoạt động ("chung lot với 5 con khác").
+        if (!lotIds.isEmpty()) {
+            Map<Long, Integer> occupancyByLot = new HashMap<>();
+            for (Object[] row : workoutRepository.countActiveByLotIds(lotIds)) {
+                occupancyByLot.put((Long) row[0], ((Number) row[1]).intValue());
+            }
+            items.forEach(i -> i.setLotOccupancy(occupancyByLot.get(i.getLotId())));
+        }
+
         return items;
     }
 
@@ -287,6 +386,33 @@ public class HorseTrainingPlanService {
         return result;
     }
 
+    /**
+     * Chuyển các kế hoạch đã tới ngày bắt đầu từ UPCOMING sang ACTIVE.
+     *
+     * createPlan đặt UPCOMING cho kế hoạch có startDate ở tương lai, nhưng
+     * trước đây KHÔNG có gì chuyển nó sang ACTIVE khi ngày đó tới — nhãn
+     * trạng thái đứng yên mãi ở "sắp diễn ra" dù khoá đang chạy.
+     *
+     * Hàm này để job nửa đêm gọi. Nó chỉ lo phần HIỂN THỊ đúng trạng thái:
+     * việc đóng khoá đã được completeWorkout tự xử lý, không phụ thuộc job
+     * này chạy hay không (phòng trường hợp server tắt đúng đêm đó).
+     *
+     * @return số kế hoạch đã chuyển
+     */
+    @Transactional
+    public int activateStartedPlans(LocalDate asOf) {
+        List<HorseTrainingPlan> due = planRepository
+                .findByStatusAndStartDateLessThanEqual(TrainingPlanStatus.UPCOMING, asOf);
+
+        if (due.isEmpty()) {
+            return 0;
+        }
+
+        due.forEach(p -> p.setStatus(TrainingPlanStatus.ACTIVE));
+        planRepository.saveAll(due);
+        return due.size();
+    }
+
     @Transactional
     public HorseTrainingPlan updatePlanStatus(Long id, UpdatePlanStatusRequest request) {
         HorseTrainingPlan plan = planRepository.findById(id)
@@ -419,13 +545,33 @@ public class HorseTrainingPlanService {
 
         TrainingWorkout saved = workoutRepository.saveAndFlush(workout);
 
-        // Buổi cuối cùng của khoá -> plan tự chuyển COMPLETED (bỏ qua cả COMPLETED và CANCELLED)
+        // Hoàn thành được một buổi tập nghĩa là khoá ĐÃ BẮT ĐẦU.
+        //
+        // Vì sao chuyển trạng thái NGAY TẠI ĐÂY thay vì chỉ trông vào job nửa
+        // đêm: nếu server tắt đúng đêm đó thì plan kẹt ở UPCOMING vĩnh viễn,
+        // và điều kiện đóng khoá bên dưới không bao giờ đúng. Đây từng là lỗi
+        // thật — mọi kế hoạch tạo cho ngày tương lai đều không thể hoàn thành.
+        if (plan.getStatus() == TrainingPlanStatus.UPCOMING) {
+            plan.setStatus(TrainingPlanStatus.ACTIVE);
+        }
+
+        // Buổi cuối cùng của khoá -> plan tự chuyển COMPLETED.
+        //
+        // CANCELLED được coi là "đã giải quyết xong", không nằm trong remaining.
+        // Nhờ vậy khoá 12 buổi bị huỷ 1 vì mưa vẫn đóng được ở 11 buổi, thay vì
+        // treo mãi. Giao diện cũng trừ mẫu số tương ứng -> hiện 11/11 (100%).
+        //
+        // KHÔNG kiểm "status == ACTIVE" nữa: điều kiện đó khiến kế hoạch
+        // UPCOMING không bao giờ đóng được. Chỉ cần nó chưa đóng và chưa huỷ.
         long remaining = workoutRepository.countByPlanIdAndStatusNotIn(
                 plan.getId(), List.of(WorkoutStatus.COMPLETED, WorkoutStatus.CANCELLED));
-        if (remaining == 0 && plan.getStatus() == TrainingPlanStatus.ACTIVE) {
+        if (remaining == 0
+                && plan.getStatus() != TrainingPlanStatus.COMPLETED
+                && plan.getStatus() != TrainingPlanStatus.CANCELLED) {
             plan.setStatus(TrainingPlanStatus.COMPLETED);
-            planRepository.save(plan);
         }
+
+        planRepository.save(plan);
 
         TrainingLot lot = lotRepository.findById(saved.getLotId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lot của buổi tập"));
@@ -514,15 +660,21 @@ public class HorseTrainingPlanService {
 
             long waitDays = java.time.temporal.ChronoUnit.DAYS.between(today, suggested);
 
+            // Câu này hiển thị thẳng cho người dùng nên viết bằng từ thường,
+            // không dùng thuật ngữ nội bộ như "đồng pha" hay "lot".
+            //
+            // Lưu ý kỹ thuật cho người bảo trì: sharedSessions là số buổi CÙNG
+            // NGÀY CÙNG BÀI, không bảo đảm xếp chung được — nhóm vẫn bị tách
+            // nếu vượt sức chứa (BR-10) hoặc hai con cùng Groom (BR-09).
             String note = upcoming
-                    ? String.format("Đồng bộ hoàn toàn — chung trọn %d/%d buổi",
-                                    sharedSessions, totalSessions)
-                    : String.format("Chung %d/%d buổi, %d buổi cuối tập riêng",
+                    ? String.format("Tập chung trọn %d/%d buổi", sharedSessions, totalSessions)
+                    : String.format("Tập chung %d/%d buổi, %d buổi cuối tách riêng",
                                     sharedSessions, totalSessions, totalSessions - sharedSessions);
 
             result.add(new JoinableCohortResponse(
                     status, courseId, course.getName(), suggested, days,
-                    horseCount, sharedSessions, totalSessions, waitDays, note));
+                    horseCount, sharedSessions, totalSessions, waitDays,
+                    FarmSchedulePolicy.DEFAULT_LOT_CAPACITY, note));
         }
 
         // Nhóm chung được nhiều buổi nhất lên đầu
@@ -601,5 +753,105 @@ public class HorseTrainingPlanService {
         }
 
         return future.size();
+    }
+
+    // =================================================================
+    // ĐỒNG BỘ GROOM KHI ĐỔI CHUỒNG / ĐỔI NGƯỜI PHỤ TRÁCH
+    // =================================================================
+
+    /**
+     * Chuyển mọi buổi tập CHƯA diễn ra của một chiến mã sang Groom mới.
+     *
+     * VÌ SAO CẦN HÀM NÀY:
+     * workout.assignedToId là ẢNH CHỤP, lấy từ stall.groomId đúng một lần lúc
+     * tạo kế hoạch. Đổi Groom của chuồng, hoặc chuyển ngựa sang chuồng khác,
+     * đều KHÔNG tự cập nhật các workout đã sinh. Ba hậu quả:
+     *
+     *   1. Groom cũ vẫn thấy việc dắt con ngựa mình không còn chăm
+     *   2. Groom mới KHÔNG thấy việc đáng lẽ của mình
+     *   3. Nếu Groom mới đã có con khác trong cùng lot thì BR-09 bị vi phạm
+     *      NGOÀI ĐỜI — một người phải dắt 2 con cùng lúc — trong khi dữ liệu
+     *      vẫn trông hợp lệ vì workout chưa được cập nhật. Không query nào
+     *      phát hiện được.
+     *
+     * @param newGroomId Groom mới. Truyền null khi gỡ Groom khỏi chuồng hoặc
+     *                   gỡ ngựa khỏi chuồng — buổi tập thành "chưa phân công"
+     *                   để Trainer thấy mà xử lý, thay vì treo ở người không
+     *                   còn liên quan.
+     * @return số buổi tập đã chuyển
+     * @throws IllegalStateException nếu bất kỳ lot nào vi phạm BR-09
+     */
+    @Transactional
+    public int reassignFutureWorkoutsToGroom(Long horseId, Long newGroomId) {
+
+        List<TrainingWorkout> future =
+                workoutRepository.findFutureScheduledByHorse(horseId, LocalDate.now());
+
+        if (future.isEmpty()) {
+            return 0;   // ngựa chưa có kế hoạch nào -> không có gì để chuyển
+        }
+
+        // ---------- BƯỚC 1: KIỂM TRA BR-09 ----------
+        //
+        // Khối if này CHỈ bọc phần kiểm tra. Bước ghi bên dưới LUÔN chạy.
+        // Bỏ qua kiểm tra khi newGroomId == null vì "không ai phụ trách" thì
+        // không thể trùng với ai — và đó chính là trạng thái "chưa phân công"
+        // mà ta muốn ghi xuống.
+        //
+        // Cố ý duyệt HẾT rồi mới quyết định, thay vì ném lỗi ngay ở lot đầu:
+        //   - Người dùng thấy đủ các buổi bị vướng trong một lần, không phải
+        //     sửa từng cái rồi thử lại
+        //   - Không xen kẽ việc kiểm tra với việc ghi
+        if (newGroomId != null) {
+            List<String> conflicts = new ArrayList<>();
+
+            for (TrainingWorkout w : future) {
+                boolean busy = workoutRepository
+                        .existsByLotIdAndAssignedToIdAndHorseIdNotAndStatusNot(
+                                w.getLotId(), newGroomId, horseId, WorkoutStatus.CANCELLED);
+                if (busy) {
+                    // Chỉ truy vấn dựng thông báo KHI ĐÃ BIẾT CHẮC có vướng.
+                    conflicts.add(describeGroomConflict(w.getLotId(), newGroomId, horseId));
+                }
+            }
+
+            if (!conflicts.isEmpty()) {
+                throw new IllegalStateException(String.format(
+                        "Không giao được chiến mã này cho Groom đó: một Groom không dắt "
+                      + "được 2 chiến mã trong cùng một lot (BR-09).%n%s%n"
+                      + "Hãy dời lot sang khung giờ khác, hoặc chọn Groom khác.",
+                        String.join(System.lineSeparator(), conflicts)));
+            }
+        }
+
+        // ---------- BƯỚC 2: GHI ----------
+        //
+        // findFutureScheduledByHorse chỉ trả buổi SCHEDULED và lot_date >= hôm nay.
+        // Buổi đã COMPLETED giữ nguyên Groom cũ — đó là LỊCH SỬ, ghi nhận ai
+        // thực sự đã dắt hôm đó, không được sửa lại.
+        future.forEach(w -> w.setAssignedToId(newGroomId));
+        workoutRepository.saveAll(future);
+
+        return future.size();
+    }
+
+    /** Dựng câu mô tả một lot bị vướng BR-09. Chỉ gọi khi đã biết chắc có vướng. */
+    private String describeGroomConflict(Long lotId, Long newGroomId, Long movingHorseId) {
+        TrainingLot lot = lotRepository.findById(lotId).orElse(null);
+
+        String otherHorse = workoutRepository
+                .findByLotIdAndStatusNot(lotId, WorkoutStatus.CANCELLED).stream()
+                .filter(x -> newGroomId.equals(x.getAssignedToId())
+                          && !movingHorseId.equals(x.getHorseId()))
+                .findFirst()
+                .map(x -> horseRepository.findById(x.getHorseId())
+                        .map(Horse::getName)
+                        .orElse("#" + x.getHorseId()))
+                .orElse("(không xác định)");
+
+        return lot == null
+                ? String.format("  · lot #%d: Groom này đang dắt '%s'", lotId, otherHorse)
+                : String.format("  · %s lúc %s (lot #%d): Groom này đang dắt '%s'",
+                        lot.getLotDate(), lot.getStartTime(), lotId, otherHorse);
     }
 }

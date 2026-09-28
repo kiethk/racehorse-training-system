@@ -111,4 +111,8 @@ public class User {
     public void setActive(boolean active) {
         isActive = active;
     }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 }
