@@ -45,8 +45,14 @@ public class TrainingLotController {
 
     /**
      * Xem lịch lot theo khoảng ngày.
-     * Giúp Trainer biết ngày nào còn khe trống trước khi chọn ngày bắt đầu —
-     * biến quyết định mò mẫm thành quyết định có căn cứ.
+     *
+     * Mỗi vai trò có một nghĩa "lịch của tôi" khác nhau, nên phải rẽ nhánh
+     * chứ không thể dùng chung một biểu thức target:
+     *
+     *   HEAD_TRAINER : các lot MÌNH ĐỨNG DẠY   -> lọc lots.trainer_id
+     *   GROOM        : các lot MÌNH CÓ NGỰA     -> JOIN workouts.assigned_to_id
+     *   CLUB_MANAGER
+     *   HORSE_OWNER  : phải chỉ rõ xem lịch của Trainer nào
      */
     @GetMapping
     @PreAuthorize("hasAuthority('TRAINING_LOT_VIEW')")
@@ -54,14 +60,39 @@ public class TrainingLotController {
             @RequestParam(required = false) Long trainerId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "false") boolean includeCancelled,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
 
-        Long target = "HEAD_TRAINER".equalsIgnoreCase(currentUser.getRole())
-                ? currentUser.getUserId()
-                : (trainerId != null ? trainerId : currentUser.getUserId());
+        if (from.isAfter(to)) {
+            throw new IllegalArgumentException(
+                    "Khoảng ngày không hợp lệ: 'from' (" + from + ") sau 'to' (" + to + ")!");
+        }
+
+        String role = currentUser.getRole();
+        List<TrainingLot> lots;
+
+        if ("HEAD_TRAINER".equalsIgnoreCase(role)) {
+            // LUÔN dùng id của chính mình, kể cả khi client truyền trainerId
+            // của người khác — Trainer không xem trộm lịch đồng nghiệp.
+            lots = lotService.getLots(currentUser.getUserId(), from, to, includeCancelled);
+
+        } else if ("GROOM".equalsIgnoreCase(role)) {
+            // Groom KHÔNG sở hữu lot nào nên tra theo trainer_id sẽ luôn rỗng.
+            // Phải đi vòng qua workout.assignedToId.
+            lots = lotService.getGroomLots(currentUser.getUserId(), from, to);
+
+        } else {
+            // CLUB_MANAGER / HORSE_OWNER
+            if (trainerId == null) {
+                throw new IllegalArgumentException(
+                        "Thiếu tham số 'trainerId' — hãy chỉ rõ bạn muốn xem lịch lot "
+                      + "của Trainer nào!");
+            }
+            lots = lotService.getLots(trainerId, from, to, includeCancelled);
+        }
 
         List<TrainingLotResponse> result = new ArrayList<>();
-        for (TrainingLot lot : lotService.getLots(target, from, to)) {
+        for (TrainingLot lot : lots) {
             result.add(toResponse(lot));
         }
         return ApiResponse.success(result);

@@ -181,12 +181,13 @@ public class AdmissionQueryService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Candidate horse profile not found"));
 
-        String imageUrl = admissionDocumentRepository.findByAdmissionId(admission.getId())
-                .stream()
-                .filter(doc -> doc.getDocumentType() == com.rtms.backend.enums.AdmissionDocumentType.HORSE_PHOTO)
-                .map(fileStorage::downloadUrl)
-                .findFirst()
-                .orElse(null);
+        // Quarantine stall code is shown on the Trainer queue.
+        // Applications without an allocated stall return null.
+        String stallCode = admission.getQuarantineStallId() == null
+                ? null
+                : stableStallRepository.findById(admission.getQuarantineStallId())
+                        .map(StableStall::getStallCode)
+                        .orElse(null);
 
         return new AdmissionSummaryResponse(
                 admission.getId(),
@@ -196,7 +197,7 @@ public class AdmissionQueryService {
                 candidate.getDateOfBirth(),
                 admission.getSubmittedAt(),
                 admission.getQuarantineStallId(),
-                imageUrl
+                stallCode
         );
     }
 

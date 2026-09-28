@@ -12,8 +12,12 @@ import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.rtms.backend.entity.Area;
+import com.rtms.backend.repository.AreaRepository;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class HorseService {
@@ -21,20 +25,68 @@ public class HorseService {
     private final HorseRepository horseRepository;
     private final StableStallRepository stableStallRepository;
     private final HorseTrainingPlanService trainingPlanService;
+    private final AreaRepository areaRepository;
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        @org.springframework.context.annotation.Lazy HorseTrainingPlanService trainingPlanService) {
+                        @org.springframework.context.annotation.Lazy HorseTrainingPlanService trainingPlanService,
+                        AreaRepository areaRepository) {
         this.horseRepository = horseRepository;
         this.stableStallRepository = stableStallRepository;
         this.trainingPlanService = trainingPlanService;
+        this.areaRepository = areaRepository;
+    }
+
+    /**
+     * @param mine   true + vai trò HEAD_TRAINER -> chỉ ngựa trong khu mình phụ trách.
+     *               Suy qua Horse.currentStallId -> StableStall.areaId -> Area.trainerId,
+     *               không cần thêm cột nào vào bảng horses.
+     * @param status lọc theo trạng thái, ví dụ ELIGIBLE để bỏ ngựa CANDIDATE
+     *               khỏi danh sách ghi danh.
+     *
+     * Tham số TUỲ CHỌN: không truyền thì hành vi y hệt trước, nên không
+     * màn hình nào của actor khác bị ảnh hưởng.
+     */
+    public List<Horse> getAllHorses(AuthenticatedUser currentUser,
+                                    Boolean mine,
+                                    HorseStatus status) {
+
+        List<Horse> horses = "HORSE_OWNER".equals(currentUser.getRole())
+                ? horseRepository.findByOwnerId(currentUser.getUserId())
+                : horseRepository.findAll();
+
+        if (Boolean.TRUE.equals(mine) && "HEAD_TRAINER".equals(currentUser.getRole())) {
+            Long trainerId = currentUser.getUserId();
+
+            // Nạp MỘT LẦN các khu của Trainer này, rồi MỘT LẦN các chuồng thuộc
+            // các khu đó. Không findById trong vòng lặp -> tránh N+1.
+            Set<Long> myAreaIds = areaRepository.findAll().stream()
+                    .filter(a -> trainerId.equals(a.getTrainerId()))
+                    .map(Area::getId)
+                    .collect(Collectors.toSet());
+
+            Set<Long> myStallIds = stableStallRepository.findAll().stream()
+                    .filter(s -> myAreaIds.contains(s.getAreaId()))
+                    .map(StableStall::getId)
+                    .collect(Collectors.toSet());
+
+            horses = horses.stream()
+                    .filter(h -> h.getCurrentStallId() != null
+                              && myStallIds.contains(h.getCurrentStallId()))
+                    .toList();
+        }
+
+        if (status != null) {
+            horses = horses.stream()
+                    .filter(h -> h.getCurrentStatus() == status)
+                    .toList();
+        }
+
+        return horses;
     }
 
     public List<Horse> getAllHorses(AuthenticatedUser currentUser) {
-        if ("HORSE_OWNER".equals(currentUser.getRole())) {
-            return horseRepository.findByOwnerId(currentUser.getUserId());
-        }
-        return horseRepository.findAll();
+        return getAllHorses(currentUser, null, null);
     }
 
     public Horse createHorse(CreateHorseRequest request) {
