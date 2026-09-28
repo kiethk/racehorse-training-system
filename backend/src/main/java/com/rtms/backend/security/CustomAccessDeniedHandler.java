@@ -20,7 +20,7 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
                         AccessDeniedException accessDeniedException) throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json");
-        ApiResponse<Object> body = ApiResponse.error("You do not have permission to perform this action");
+        ApiResponse<Object> body = ApiResponse.error("You do not have permission to perform this action", "FORBIDDEN");
         response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 }

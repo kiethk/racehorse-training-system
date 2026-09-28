@@ -20,7 +20,7 @@ public class CustomAuthEntryPoint implements AuthenticationEntryPoint {
             AuthenticationException authException) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
-        ApiResponse<Object> body = ApiResponse.error("Authentication required - please log in");
+        ApiResponse<Object> body = ApiResponse.error("Authentication required - please log in", "UNAUTHENTICATED");
         response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 }

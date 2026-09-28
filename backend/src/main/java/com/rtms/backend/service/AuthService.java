@@ -1,5 +1,6 @@
 package com.rtms.backend.service;
 
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.dto.LoginRequest;
 import com.rtms.backend.dto.LoginResponse;
 import com.rtms.backend.entity.User;
@@ -9,6 +10,7 @@ import com.rtms.backend.repository.UserRepository;
 import com.rtms.backend.repository.VeterinarianProfileRepository;
 import com.rtms.backend.security.JwtUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -43,10 +45,10 @@ public class AuthService {
      */
     public LoginResult login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Email or Password is incorrect"));
+                .orElseThrow(() -> invalidCredentials());
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Email or Password is incorrect");
+            throw invalidCredentials();
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
@@ -54,6 +56,11 @@ public class AuthService {
                 user.getEmail(), user.getRole().getName());
 
         return new LoginResult(token, loginResponse);
+    }
+
+    private ApiException invalidCredentials() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS",
+                "Email or Password is incorrect");
     }
 
     // Inner record de tra ve ca token lan response body cung luc

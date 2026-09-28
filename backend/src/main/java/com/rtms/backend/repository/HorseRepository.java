@@ -14,7 +14,11 @@ import com.rtms.backend.entity.Horse;
 import java.util.List;
 import java.util.Optional;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -23,6 +27,10 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
     List<Horse> findByRegistrationNumber(String registrationNumber);
     List<Horse> findByCurrentStallIdIsNotNull();
     List<Horse> findByCurrentStallIdIn(List<Long> stallIds);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT h FROM Horse h WHERE h.id = :id")
+    Optional<Horse> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * Chiến mã đang ở một chuồng cụ thể.

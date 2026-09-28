@@ -17,12 +17,24 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+export class ApiError extends Error {
+  constructor(public status: number, message: string, public errorCode?: string) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+async function responseError(res: Response): Promise<ApiError> {
+  const payload = await res.json().catch(() => null);
+  return new ApiError(res.status, payload?.message || `API error: ${res.status}`, payload?.errorCode);
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     credentials: "include",
   });
   if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
+    throw await responseError(res);
   }
   return res.json();
 }
@@ -35,7 +47,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
+    throw await responseError(res);
   }
   return res.json();
 }
@@ -49,7 +61,7 @@ export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
   });
   const payload = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(payload?.message || `API error: ${res.status}`);
+    throw new ApiError(res.status, payload?.message || `API error: ${res.status}`, payload?.errorCode);
   }
   return payload as T;
 }
