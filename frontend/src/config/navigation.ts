@@ -45,7 +45,7 @@ export function getNavigationForRole(role: Role): NavItem[] {
         { id: 'dashboard', label: 'Dashboard', href: dashboardHref },
         { id: 'care-tasks', label: 'Daily Tasks', href: '/groom/tasks' },
         { id: 'incidents', label: 'Incidents', href: '/groom/incidents' },
-        { id: 'admissions', label: 'Admissions' },
+        { id: 'admissions', label: 'Admissions', href: '/groom/admissions' },
         { id: 'stable', label: 'Stable' },
       ];
     case 'HORSE_OWNER':

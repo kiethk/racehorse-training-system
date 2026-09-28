@@ -24,6 +24,9 @@ public class AdmissionDocument {
     @Column(name = "file_url", nullable = false, length = 1000)
     private String fileUrl;
 
+    @Column(name = "original_file_name", length = 255)
+    private String originalFileName;
+
     @Column(name = "record_date")
     private LocalDate recordDate;
 
@@ -70,6 +73,14 @@ public class AdmissionDocument {
 
     public void setFileUrl(String fileUrl) {
         this.fileUrl = fileUrl;
+    }
+
+    public String getOriginalFileName() {
+        return originalFileName;
+    }
+
+    public void setOriginalFileName(String originalFileName) {
+        this.originalFileName = originalFileName;
     }
 
     public LocalDate getRecordDate() {
