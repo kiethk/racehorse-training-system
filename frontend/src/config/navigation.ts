@@ -19,6 +19,7 @@ export function getNavigationForRole(role: Role): NavItem[] {
       return [
         { id: 'dashboard', label: 'Dashboard', href: dashboardHref },
         { id: 'management', label: 'Management', href: '/manager/management' },
+        { id: 'staff', label: 'Staff', href: '/manager/staff' },
         { id: 'horses', label: 'Horses' },
         { id: 'stable', label: 'Stable' },
         { id: 'reports', label: 'Reports' },

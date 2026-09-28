@@ -21,6 +21,8 @@ import com.rtms.backend.repository.HealthRecordRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import com.rtms.backend.repository.UserRepository;
 import com.rtms.backend.repository.VetExamRepository;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -41,7 +43,7 @@ public class AdmissionQueryService {
     private final UserRepository userRepository;
     private final VetExamRepository vetExamRepository;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public AdmissionQueryService(
             AdmissionApplicationRepository admissionApplicationRepository,
             CandidateHorseProfileRepository candidateHorseProfileRepository,
