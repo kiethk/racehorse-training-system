@@ -1,6 +1,7 @@
 package com.rtms.backend.dto;
 
 import com.rtms.backend.enums.AdmissionStatus;
+import jakarta.persistence.Column;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,6 +16,8 @@ public class AdmissionSummaryResponse {
     private LocalDateTime submittedAt;
     private Long quarantineStallId;
     private String quarantineStallCode;
+    private String imageUrl;
+
 
     /**
      * Dấu vết bước Huấn luyện viên.
@@ -32,6 +35,19 @@ public class AdmissionSummaryResponse {
     private Long trainerId;
     private LocalDateTime trainerReviewedAt;
 
+    // =================================================================
+    // CONSTRUCTOR
+    //
+    // Chỉ constructor ĐẦY ĐỦ (11 tham số) gán giá trị. Mọi bản rút gọn đều
+    // uỷ quyền xuống nó và truyền null cho phần thiếu.
+    //
+    // Quy tắc này quan trọng: nếu một bản rút gọn tự gán tay, thêm trường mới
+    // sau này sẽ phải sửa nhiều chỗ và rất dễ sót. Và tuyệt đối không để bản
+    // nào gọi this(...) với ĐÚNG danh sách tham số của chính nó — đó là đệ quy
+    // vô hạn, trình biên dịch báo "recursive constructor invocation".
+    // =================================================================
+
+    /** Chỉ dữ liệu cơ bản. */
     public AdmissionSummaryResponse(
             Long admissionId,
             AdmissionStatus status,
@@ -41,9 +57,10 @@ public class AdmissionSummaryResponse {
             LocalDateTime submittedAt,
             Long quarantineStallId) {
         this(admissionId, status, candidateName, breed, dateOfBirth, submittedAt,
-                quarantineStallId, null, null, null);
+                quarantineStallId, null, null, null, null);
     }
 
+    /** Thêm mã chuồng cách ly. */
     public AdmissionSummaryResponse(
             Long admissionId,
             AdmissionStatus status,
@@ -54,9 +71,10 @@ public class AdmissionSummaryResponse {
             Long quarantineStallId,
             String quarantineStallCode) {
         this(admissionId, status, candidateName, breed, dateOfBirth, submittedAt,
-                quarantineStallId, quarantineStallCode, null, null);
+                quarantineStallId, quarantineStallCode, null, null, null);
     }
 
+    /** Thêm ảnh chiến mã — dùng ở màn hình Chủ ngựa (OwnerAdmissionService). */
     public AdmissionSummaryResponse(
             Long admissionId,
             AdmissionStatus status,
@@ -66,8 +84,25 @@ public class AdmissionSummaryResponse {
             LocalDateTime submittedAt,
             Long quarantineStallId,
             String quarantineStallCode,
+            String imageUrl) {
+        this(admissionId, status, candidateName, breed, dateOfBirth, submittedAt,
+                quarantineStallId, quarantineStallCode, imageUrl, null, null);
+    }
+
+    /** Bản ĐẦY ĐỦ — nơi duy nhất gán giá trị. */
+    public AdmissionSummaryResponse(
+            Long admissionId,
+            AdmissionStatus status,
+            String candidateName,
+            String breed,
+            LocalDate dateOfBirth,
+            LocalDateTime submittedAt,
+            Long quarantineStallId,
+            String quarantineStallCode,
+            String imageUrl,
             Long trainerId,
-            LocalDateTime trainerReviewedAt) {
+            LocalDateTime trainerReviewedAt
+    ) {
         this.admissionId = admissionId;
         this.status = status;
         this.candidateName = candidateName;
@@ -78,6 +113,11 @@ public class AdmissionSummaryResponse {
         this.quarantineStallCode = quarantineStallCode;
         this.trainerId = trainerId;
         this.trainerReviewedAt = trainerReviewedAt;
+        this.imageUrl = imageUrl;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
     }
 
     public Long getAdmissionId() {

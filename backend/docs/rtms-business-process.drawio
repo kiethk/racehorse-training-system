@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="RTMS Business Process">
+    <mxGraphModel dx="2100" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1180" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Racehorse Training Management System - Business Process" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#1f2933;" vertex="1" parent="1">
+          <mxGeometry x="220" y="30" width="1680" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="laneOwner" value="Horse Owner" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;align=left;spacingLeft=18;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="2060" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="laneGroom" value="Groom" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eef8f0;strokeColor=#82b366;fontStyle=1;align=left;spacingLeft=18;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="210" width="2060" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="laneVet" value="Veterinarian" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f3eff8;strokeColor=#9673a6;fontStyle=1;align=left;spacingLeft=18;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="340" width="2060" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="laneTrainer" value="Trainer" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#6c8ebf;fontStyle=1;align=left;spacingLeft=18;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="470" width="2060" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="laneManager" value="Club Manager" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff7e6;strokeColor=#d79b00;fontStyle=1;align=left;spacingLeft=18;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="600" width="2060" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="laneSystem" value="RTMS System" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f6fa;strokeColor=#64748b;fontStyle=1;align=left;spacingLeft=18;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="730" width="2060" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="start" value="Start" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="170" y="125" width="80" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ownerSubmit" value="Submit admission form&#xa;+ upload documents" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="300" y="115" width="190" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="systemAdmission" value="Create Admission&#xa;status = GROOM_REVIEW&#xa;+ Candidate snapshot" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="530" y="770" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="groomQueue" value="Open Groom Admission Queue&#xa;GET /api/admissions?status=GROOM_REVIEW" style="shape=mxgraph.bpmn.task2;whiteSpace=wrap;rectStyle=rounded;size=10;html=1;container=1;expand=0;collapsible=0;taskMarker=user;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="530" y="230" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="groomCheck" value="Dossier complete&#xa;and valid?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="810" y="225" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="reject" value="Reject admission&#xa;Admission = REJECTED&#xa;Horse is not created" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="620" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="capacityCheck" value="Capacity available?&#xa;Q available &amp; REGULAR downstream capacity" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="215" width="180" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="waiting" value="Mark WAITING_FOR_STALL&#xa;Groom does not review again" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="760" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="systemAllocate" value="Lock capacity rows&#xa;+ lock Q stall&#xa;FOR UPDATE / SKIP LOCKED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="760" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="systemHorse" value="Create/reuse Horse by UELN&#xa;Horse = CANDIDATE&#xa;Q stall = OCCUPIED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1540" y="760" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="systemExam" value="Create/update pedigree&#xa;+ INITIAL_EXAM schedule&#xa;Admission = VET_REVIEW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1820" y="760" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="vetReview" value="Review candidate in quarantine&#xa;physical exam confirmed&#xa;POST /vet-review" style="shape=mxgraph.bpmn.task2;whiteSpace=wrap;rectStyle=rounded;size=10;html=1;container=1;expand=0;collapsible=0;taskMarker=user;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1820" y="360" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="vetDecision" value="Vet approve?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1580" y="355" width="140" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="trainerReview" value="Trainer assessment&#xa;racing readiness scores&#xa;Admission = MANAGER_REVIEW" style="shape=mxgraph.bpmn.task2;whiteSpace=wrap;rectStyle=rounded;size=10;html=1;container=1;expand=0;collapsible=0;taskMarker=user;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="490" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="managerReview" value="Final manager review&#xa;select REGULAR stall&#xa;POST /manager-review" style="shape=mxgraph.bpmn.task2;whiteSpace=wrap;rectStyle=rounded;size=10;html=1;container=1;expand=0;collapsible=0;taskMarker=user;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="620" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="managerDecision" value="Manager approve?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="790" y="615" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="approved" value="Admission APPROVED&#xa;Horse = ELIGIBLE&#xa;Move Q -> REGULAR stall" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="560" y="620" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="trainingPlan" value="Create training plan&#xa;assign trainer/groom/lot&#xa;generate workouts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="320" y="490" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="groomDaily" value="Groom daily work&#xa;care checklist + workouts&#xa;incident reports if needed" style="shape=mxgraph.bpmn.task2;whiteSpace=wrap;rectStyle=rounded;size=10;html=1;container=1;expand=0;collapsible=0;taskMarker=manual;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="300" y="235" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="healthLoop" value="Health care loop&#xa;preventive care / injury / treatment&#xa;updates Horse status" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="310" y="365" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="raceRegister" value="Race registration&#xa;for eligible horse" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="120" y="490" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="end" value="Operational horse lifecycle&#xa;continues" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="235" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ownerTrack" value="Owner tracks status&#xa;and feedback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="560" y="115" width="190" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="Legend" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="930" width="570" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=0;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="legend">
+          <mxGeometry x="20" y="35" width="32" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1t" value="Groom / success state" style="text;html=1;align=left;verticalAlign=middle;" vertex="1" parent="legend">
+          <mxGeometry x="62" y="32" width="180" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=0;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="legend">
+          <mxGeometry x="20" y="65" width="32" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2t" value="Veterinary / health step" style="text;html=1;align=left;verticalAlign=middle;" vertex="1" parent="legend">
+          <mxGeometry x="62" y="62" width="180" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=0;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="legend">
+          <mxGeometry x="280" y="35" width="32" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3t" value="System / trainer process" style="text;html=1;align=left;verticalAlign=middle;" vertex="1" parent="legend">
+          <mxGeometry x="322" y="32" width="190" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="" style="rounded=0;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="legend">
+          <mxGeometry x="280" y="65" width="32" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4t" value="Decision / waiting state" style="text;html=1;align=left;verticalAlign=middle;" vertex="1" parent="legend">
+          <mxGeometry x="322" y="62" width="190" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="Main admission status path: GROOM_REVIEW -> WAITING_FOR_STALL? -> VET_REVIEW -> TRAINER_REVIEW -> MANAGER_REVIEW -> APPROVED / REJECTED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f9fa;strokeColor=#cbd5e1;fontColor=#334155;align=left;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="680" y="930" width="850" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="start" target="ownerSubmit">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="ownerSubmit" target="systemAdmission">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="systemAdmission" target="groomQueue">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="groomQueue" target="groomCheck">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge5" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="groomCheck" target="reject">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge6" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="groomCheck" target="capacityCheck">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge7" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="capacityCheck" target="waiting">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge8" value="Retry when capacity changes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="waiting" target="systemAllocate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge9" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="capacityCheck" target="systemAllocate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="systemAllocate" target="systemHorse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="systemHorse" target="systemExam">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="systemExam" target="vetReview">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="vetReview" target="vetDecision">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge14" value="Reject" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="vetDecision" target="reject">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge15" value="Approve" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="vetDecision" target="trainerReview">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge16" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="trainerReview" target="managerReview">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge17" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="managerReview" target="managerDecision">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge18" value="Reject" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="managerDecision" target="reject">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge19" value="Approve" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="managerDecision" target="approved">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge20" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="approved" target="trainingPlan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge21" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="trainingPlan" target="groomDaily">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge22" value="Incident / care needed" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="groomDaily" target="healthLoop">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge23" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="trainingPlan" target="raceRegister">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge24" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="groomDaily" target="end">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge25" value="Status visible to owner" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=blockThin;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="systemAdmission" target="ownerTrack">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

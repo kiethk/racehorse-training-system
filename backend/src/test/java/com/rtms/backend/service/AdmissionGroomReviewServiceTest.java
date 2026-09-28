@@ -32,6 +32,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -105,6 +106,55 @@ class AdmissionGroomReviewServiceTest {
         verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
         verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
                 preventiveCareScheduleRepository);
+    }
+
+    @Test
+    @DisplayName("Groom approve thiếu regular reserve vẫn duyệt nhưng chờ stall")
+    void review_approveWithoutRegularReserve_waitingForStall() {
+        AdmissionApplication admission = admission();
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(2L);
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(1L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(1L);
+        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        AdmissionApplication result = service.review(1L, 7L,
+                request(ReviewDecision.APPROVED, "Documents verified"));
+
+        assertEquals(AdmissionStatus.WAITING_FOR_STALL, result.getStatus());
+        assertEquals(ReviewDecision.APPROVED, result.getGroomDecision());
+        verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
+                preventiveCareScheduleRepository);
+    }
+
+    @Test
+    @DisplayName("Groom review rejects blank feedback for both decisions")
+    void review_blankFeedback_isRejected() {
+        for (ReviewDecision decision : List.of(ReviewDecision.APPROVED, ReviewDecision.REJECTED)) {
+            AdmissionApplication admission = admission();
+            when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+
+            ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                    () -> service.review(1L, 7L, request(decision, "  \t ")));
+
+            assertEquals(400, exception.getStatusCode().value());
+        }
+        verify(admissionApplicationRepository, never()).save(any());
+        verifyNoInteractions(stableStallRepository, candidateHorseProfileRepository, horseRepository,
+                horsePedigreeRepository, preventiveCareScheduleRepository);
+    }
+
+    @Test
+    @DisplayName("Groom review trims feedback before persisting")
+    void review_trimsFeedback() {
+        AdmissionApplication admission = admission();
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        AdmissionApplication result = service.review(1L, 7L,
+                request(ReviewDecision.REJECTED, "  Missing vaccination record  "));
+
+        assertEquals("Missing vaccination record", result.getGroomFeedback());
     }
 
     @Test
@@ -215,7 +265,7 @@ class AdmissionGroomReviewServiceTest {
                 eq(20L), eq("INITIAL_EXAM"), any())).thenReturn(true);
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, null));
+        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "Verified"));
 
         assertEquals(AdmissionStatus.VET_REVIEW, result.getStatus());
         assertEquals(20L, result.getHorseId());
@@ -242,7 +292,7 @@ class AdmissionGroomReviewServiceTest {
         when(horseRepository.findByRegistrationNumber("FR1234567890123")).thenReturn(List.of(existingHorse));
 
         assertThrows(ResponseStatusException.class,
-                () -> service.review(1L, 7L, request(ReviewDecision.APPROVED, null)));
+                () -> service.review(1L, 7L, request(ReviewDecision.APPROVED, "Verified")));
 
         verify(horseRepository, never()).save(any());
         verify(admissionApplicationRepository, never()).save(any());
