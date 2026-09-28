@@ -70,9 +70,14 @@ public class OwnerAdmissionService {
                 .filter(admission -> status == null || admission.getStatus() == status)
                 .map(admission -> {
                     CandidateHorseProfile candidate = findCandidate(admission.getId());
+                    String imageUrl = documents.findByAdmissionId(admission.getId()).stream()
+                            .filter(d -> com.rtms.backend.enums.AdmissionDocumentType.HORSE_PHOTO.equals(d.getDocumentType()))
+                            .findFirst()
+                            .map(fileStorage::downloadUrl)
+                            .orElse(null);
                     return new AdmissionSummaryResponse(admission.getId(), admission.getStatus(),
                             candidate.getName(), candidate.getBreed(), candidate.getDateOfBirth(),
-                            admission.getSubmittedAt(), admission.getQuarantineStallId());
+                            admission.getSubmittedAt(), admission.getQuarantineStallId(), null, imageUrl);
                 })
                 .toList();
     }

@@ -1,11 +1,9 @@
 export type AdmissionStatus =
-  | 'SUBMITTED'
   | 'GROOM_REVIEW'
   | 'WAITING_FOR_STALL'
   | 'VET_REVIEW'
   | 'TRAINER_REVIEW'
   | 'MANAGER_REVIEW'
-  | 'ADDITIONAL_INFORMATION_REQUIRED'
   | 'APPROVED'
   | 'REJECTED';
 
@@ -18,6 +16,7 @@ export interface AdmissionSummaryResponse {
   submittedAt: string; // ISO datetime string
   quarantineStallId: number | null;
   quarantineStallCode: string | null;
+  imageUrl?: string | null;
 }
 
 export interface AdmissionDocument {

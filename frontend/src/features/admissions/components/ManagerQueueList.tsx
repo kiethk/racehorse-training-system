@@ -9,6 +9,7 @@ import { Pill } from '@/components/ui/StatusBadge';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { MetricCard } from '@/components/ui/MetricCard';
+import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { ManagerFinalReviewPanel } from './ManagerFinalReviewPanel';
 
 export function ManagerQueueList() {
@@ -98,12 +99,11 @@ export function ManagerQueueList() {
   const awaitingManager = admissions.filter((a) => a.status === 'MANAGER_REVIEW').length;
   const approvedCount = admissions.filter((a) => a.status === 'APPROVED').length;
   const issuesCount = admissions.filter((a) => 
-    a.status === 'ADDITIONAL_INFORMATION_REQUIRED' || a.status === 'REJECTED'
+    a.status === 'REJECTED'
   ).length;
 
   const statuses: { value: AdmissionStatus | 'ALL'; label: string }[] = [
     { value: 'ALL', label: 'All' },
-    { value: 'SUBMITTED', label: 'Submitted' },
     { value: 'GROOM_REVIEW', label: 'Groom Review' },
     { value: 'WAITING_FOR_STALL', label: 'Waiting for Stall' },
     { value: 'VET_REVIEW', label: 'Vet Review' },
@@ -126,7 +126,7 @@ export function ManagerQueueList() {
       {/* Two Column Layout */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* Left Column: List */}
-        <div className="w-full lg:w-1/3 shrink-0">
+        <div className="w-full lg:w-1/4 shrink-0">
           <Panel className="overflow-hidden flex flex-col h-[750px]">
             <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3 shrink-0">
               <SectionTitle>Admission applications</SectionTitle>
@@ -153,24 +153,23 @@ export function ManagerQueueList() {
                   const isSelected = selectedAdmissionId === admission.admissionId;
                   return (
                     <li key={admission.admissionId}>
-                      <button 
+                      <button
                         onClick={() => setSelectedAdmissionId(admission.admissionId)}
-                        className={`flex w-full text-left items-start gap-3 px-4 py-3 transition-colors outline-none
+                        className={`flex w-full text-left items-center gap-2.5 px-3 py-3 transition-colors outline-none
                           ${isSelected ? 'bg-[var(--color-primary-subtle)]' : 'hover:bg-[var(--color-surface-subtle)]'}
                         `}
                       >
+                        <HorseAvatar name={admission.candidateName} image={admission.imageUrl} size={38} />
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="truncate text-[13px] font-bold text-[var(--color-text-primary)]">
-                              {admission.candidateName}
-                            </div>
-                            <Pill tone={admission.status === 'APPROVED' ? 'success' : admission.status === 'REJECTED' ? 'danger' : admission.status === 'MANAGER_REVIEW' ? 'warning' : 'info'} size="sm">
-                              {admission.status.replace(/_/g, ' ')}
-                            </Pill>
+                          <div className="truncate text-[13px] font-bold text-[var(--color-text-primary)] mb-0.5">
+                            {admission.candidateName}
                           </div>
-                          <div className="truncate text-[11px] text-[var(--color-text-muted)]">
-                            {admission.breed} · Submitted {new Date(admission.submittedAt).toLocaleDateString()}
+                          <div className="truncate text-[11px] text-[var(--color-text-muted)] mb-1">
+                            {admission.breed}
                           </div>
+                          <Pill tone={admission.status === 'APPROVED' ? 'success' : admission.status === 'REJECTED' ? 'danger' : admission.status === 'MANAGER_REVIEW' ? 'warning' : 'info'} size="sm">
+                            {admission.status.replace(/_/g, ' ')}
+                          </Pill>
                         </div>
                       </button>
                     </li>
@@ -194,32 +193,40 @@ export function ManagerQueueList() {
                  <div className="p-6"><ListSkeleton rows={8} /></div>
                ) : (
                  <div className="flex flex-col h-[750px] overflow-y-auto scroll-slim">
-                    <div className="px-6 py-5 border-b border-[var(--color-border)] flex items-center justify-between shrink-0">
-                       <div>
-                         <h2 className="text-[20px] font-bold text-[var(--color-text-primary)] mb-2 flex items-center gap-2">
-                           {detailData.candidate?.name || 'Unknown Candidate'}
-                           <Pill tone="info" size="sm">{detailData.status.replace(/_/g, ' ')}</Pill>
-                         </h2>
-                         <div className="grid grid-cols-4 gap-6 text-[12px]">
-                           <div>
-                             <span className="text-[var(--color-text-muted)] block mb-1">OWNER ID</span>
-                             <span className="font-medium text-[var(--color-text-primary)]">#{detailData.ownerId}</span>
-                           </div>
-                           <div>
-                             <span className="text-[var(--color-text-muted)] block mb-1">BREED</span>
-                             <span className="font-medium text-[var(--color-text-primary)]">{detailData.candidate?.breed || '-'}</span>
-                           </div>
-                           <div>
-                             <span className="text-[var(--color-text-muted)] block mb-1">AGE / DOB</span>
-                             <span className="font-medium text-[var(--color-text-primary)]">
-                               {detailData.candidate?.dateOfBirth ? new Date(detailData.candidate.dateOfBirth).toLocaleDateString() : '-'}
-                             </span>
-                           </div>
-                           <div>
-                             <span className="text-[var(--color-text-muted)] block mb-1">SUBMITTED</span>
-                             <span className="font-medium text-[var(--color-text-primary)]">
-                               {new Date(detailData.submittedAt).toLocaleDateString()}
-                             </span>
+                   <div className="px-6 py-5 border-b border-[var(--color-border)] flex items-center justify-between shrink-0">
+                       <div className="flex items-start gap-4">
+                         <HorseAvatar
+                           name={detailData.candidate?.name || 'Unknown Candidate'}
+                           image={detailData.documents?.find(d => d.documentType === 'HORSE_PHOTO')?.fileUrl}
+                           size={64}
+                           rounded="md"
+                         />
+                         <div>
+                           <h2 className="text-[20px] font-bold text-[var(--color-text-primary)] mb-2 flex items-center gap-2">
+                             {detailData.candidate?.name || 'Unknown Candidate'}
+                             <Pill tone="info" size="sm">{detailData.status.replace(/_/g, ' ')}</Pill>
+                           </h2>
+                           <div className="grid grid-cols-4 gap-6 text-[12px]">
+                             <div>
+                               <span className="text-[var(--color-text-muted)] block mb-1">OWNER ID</span>
+                               <span className="font-medium text-[var(--color-text-primary)]">#{detailData.ownerId}</span>
+                             </div>
+                             <div>
+                               <span className="text-[var(--color-text-muted)] block mb-1">BREED</span>
+                               <span className="font-medium text-[var(--color-text-primary)]">{detailData.candidate?.breed || '-'}</span>
+                             </div>
+                             <div>
+                               <span className="text-[var(--color-text-muted)] block mb-1">AGE / DOB</span>
+                               <span className="font-medium text-[var(--color-text-primary)]">
+                                 {detailData.candidate?.dateOfBirth ? new Date(detailData.candidate.dateOfBirth).toLocaleDateString() : '-'}
+                               </span>
+                             </div>
+                             <div>
+                               <span className="text-[var(--color-text-muted)] block mb-1">SUBMITTED</span>
+                               <span className="font-medium text-[var(--color-text-primary)]">
+                                 {new Date(detailData.submittedAt).toLocaleDateString()}
+                               </span>
+                             </div>
                            </div>
                          </div>
                        </div>

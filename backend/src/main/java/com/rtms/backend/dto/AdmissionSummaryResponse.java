@@ -15,6 +15,7 @@ public class AdmissionSummaryResponse {
     private LocalDateTime submittedAt;
     private Long quarantineStallId;
     private String quarantineStallCode;
+    private String imageUrl;
 
     public AdmissionSummaryResponse(
             Long admissionId,
@@ -24,7 +25,7 @@ public class AdmissionSummaryResponse {
             LocalDate dateOfBirth,
             LocalDateTime submittedAt,
             Long quarantineStallId) {
-        this(admissionId, status, candidateName, breed, dateOfBirth, submittedAt, quarantineStallId, null);
+        this(admissionId, status, candidateName, breed, dateOfBirth, submittedAt, quarantineStallId, null, null);
     }
 
     public AdmissionSummaryResponse(
@@ -36,6 +37,19 @@ public class AdmissionSummaryResponse {
             LocalDateTime submittedAt,
             Long quarantineStallId,
             String quarantineStallCode) {
+        this(admissionId, status, candidateName, breed, dateOfBirth, submittedAt, quarantineStallId, quarantineStallCode, null);
+    }
+
+    public AdmissionSummaryResponse(
+            Long admissionId,
+            AdmissionStatus status,
+            String candidateName,
+            String breed,
+            LocalDate dateOfBirth,
+            LocalDateTime submittedAt,
+            Long quarantineStallId,
+            String quarantineStallCode,
+            String imageUrl) {
         this.admissionId = admissionId;
         this.status = status;
         this.candidateName = candidateName;
@@ -44,6 +58,11 @@ public class AdmissionSummaryResponse {
         this.submittedAt = submittedAt;
         this.quarantineStallId = quarantineStallId;
         this.quarantineStallCode = quarantineStallCode;
+        this.imageUrl = imageUrl;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
     }
 
     public Long getAdmissionId() {

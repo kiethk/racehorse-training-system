@@ -1,6 +1,6 @@
 interface HorseAvatarProps {
   name: string;
-  image?: string;
+  image?: string | null;
   size?: number;
   rounded?: 'sm' | 'md';
 }
@@ -21,6 +21,7 @@ export function HorseAvatar({ name, image, size = 36, rounded = 'sm' }: HorseAva
   }
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={image}
       alt={`${name} profile`}
