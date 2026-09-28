@@ -27,6 +27,7 @@ export interface AdmissionDocument {
   recordDate: string | null;
   note: string | null;
   uploadedAt: string;
+  originalFileName: string | null;
 }
 
 export interface HealthRecord {
@@ -55,6 +56,7 @@ export interface StableStall {
 export interface AdmissionDetailResponse {
   admissionId: number;
   ownerId: number;
+  ownerName: string | null;
   status: AdmissionStatus;
   quarantineStallId: number | null;
   quarantineStallCode: string | null;
@@ -97,6 +99,34 @@ export interface AdmissionDetailResponse {
 
   availableRegularStalls: StableStall[];
   healthRecords: HealthRecord[];
+  capacity: {
+    availableQuarantineStalls: number;
+    availableRegularStalls: number;
+    occupiedQuarantineStalls: number;
+    admissionCapacityAvailable: boolean;
+    blockingReason: 'NO_QUARANTINE_STALL' | 'REGULAR_RESERVE_INSUFFICIENT' | null;
+  };
+}
+
+export interface GroomQueueFilters {
+  candidateName: string;
+  status: AdmissionStatus | '';
+  submittedFrom: string;
+  submittedTo: string;
+  page: number;
+}
+
+export interface GroomQueueResponse {
+  content: AdmissionSummaryResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface GroomReviewRequest {
+  decision: 'APPROVED' | 'REJECTED';
+  feedback: string;
 }
 
 export interface ManagerReviewRequest {

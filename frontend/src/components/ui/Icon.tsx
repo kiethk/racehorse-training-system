@@ -5,6 +5,7 @@ type IconName =
   | 'plus'
   | 'chevron-down'
   | 'chevron-right'
+  | 'chevron-left'
   | 'bell'
   | 'lock'
   | 'more'
@@ -41,6 +42,8 @@ type IconName =
   | 'utensils'
   | 'horse'
   | 'camera'
+  | 'image'
+  | 'external-link'
   | 'star'
   | 'filter';
 
@@ -54,6 +57,7 @@ const paths: Record<IconName, ReactElement> = {
   plus: <path d="M12 5v14M5 12h14" />,
   'chevron-down': <path d="m6 9 6 6 6-6" />,
   'chevron-right': <path d="m9 6 6 6-6 6" />,
+  'chevron-left': <path d="m15 6-6 6 6 6" />,
   bell: (
     <>
       <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
@@ -230,6 +234,19 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <path d="M4 7h3l1.5-2h7L17 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z" />
       <circle cx="12" cy="13" r="3.5" />
+    </>
+  ),
+  image: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="m21 15-5-5L5 21" />
+    </>
+  ),
+  'external-link': (
+    <>
+      <path d="M14 3h7v7M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
     </>
   ),
   star: (
