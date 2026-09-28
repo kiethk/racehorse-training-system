@@ -31,6 +31,55 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             SELECT ss.*
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
+            WHERE a.type IN ('QUARANTINE', 'REGULAR')
+            ORDER BY ss.id ASC
+            FOR UPDATE
+            """, nativeQuery = true)
+    List<StableStall> lockAdmissionCapacityStallsForUpdate();
+
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM stable_stalls ss
+            JOIN areas a ON a.id = ss.area_id
+            WHERE a.type = 'QUARANTINE'
+              AND ss.status = 'AVAILABLE'
+            """, nativeQuery = true)
+    long countAvailableQuarantineStalls();
+
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM stable_stalls ss
+            JOIN areas a ON a.id = ss.area_id
+            WHERE a.type = 'QUARANTINE'
+              AND ss.status = 'OCCUPIED'
+            """, nativeQuery = true)
+    long countOccupiedQuarantineStalls();
+
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM stable_stalls ss
+            JOIN areas a ON a.id = ss.area_id
+            WHERE a.type = 'REGULAR'
+              AND ss.status = 'AVAILABLE'
+            """, nativeQuery = true)
+    long countAvailableRegularStalls();
+
+    @Query(value = """
+            SELECT ss.*
+            FROM stable_stalls ss
+            JOIN areas a ON a.id = ss.area_id
+            WHERE a.type = 'QUARANTINE'
+              AND ss.status = 'AVAILABLE'
+            ORDER BY a.code ASC, ss.stall_number ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
+    Optional<StableStall> findFirstAvailableQuarantineStallForUpdate();
+
+    @Query(value = """
+            SELECT ss.*
+            FROM stable_stalls ss
+            JOIN areas a ON a.id = ss.area_id
             WHERE a.type = 'REGULAR'
               AND ss.status = 'AVAILABLE'
             ORDER BY a.code ASC, ss.stall_number ASC

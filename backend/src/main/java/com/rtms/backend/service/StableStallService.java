@@ -3,8 +3,10 @@ package com.rtms.backend.service;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.entity.User;
+import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import com.rtms.backend.repository.UserRepository;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,11 +15,24 @@ public class StableStallService {
 
     private final StableStallRepository stableStallRepository;
     private final UserRepository userRepository;
+    private final HorseRepository horseRepository;
+    private final HorseTrainingPlanService planService;
 
+    /**
+     * @param planService dùng để đồng bộ Groom cho các buổi tập tương lai.
+     *                    Đánh @Lazy phòng xa, theo đúng cách HorseService đang
+     *                    tiêm lớp này — HorseTrainingPlanService có nhiều quan
+     *                    hệ, thêm quan hệ mới về sau sẽ không làm Spring chết
+     *                    lúc khởi động vì vòng phụ thuộc.
+     */
     public StableStallService(StableStallRepository stableStallRepository,
-                              UserRepository userRepository) {
+                              UserRepository userRepository,
+                              HorseRepository horseRepository,
+                              @Lazy HorseTrainingPlanService planService) {
         this.stableStallRepository = stableStallRepository;
         this.userRepository = userRepository;
+        this.horseRepository = horseRepository;
+        this.planService = planService;
     }
 
     /**
@@ -33,8 +48,13 @@ public class StableStallService {
         StableStall stall = stableStallRepository.findById(stallId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuồng #" + stallId));
 
-        // TH1: gỡ Groom khỏi chuồng -> không cần kiểm tra gì
+        // TH1: gỡ Groom khỏi chuồng -> không cần kiểm tra BR-06/BR-09,
+        // nhưng vẫn phải đồng bộ buổi tập: chúng thành "chưa phân công" để
+        // Trainer thấy mà xử lý, thay vì treo ở người không còn chăm con ngựa.
         if (groomId == null) {
+            horseRepository.findByCurrentStallId(stallId)
+                    .ifPresent(h -> planService.reassignFutureWorkoutsToGroom(h.getId(), null));
+
             stall.setGroomId(null);
             return stableStallRepository.save(stall);
         }
@@ -63,6 +83,15 @@ public class StableStallService {
                   + "để đảm bảo chất lượng chăm sóc và phúc lợi chiến mã!",
                     user.getFullName(), assignedCount, FarmSchedulePolicy.MAX_STALLS_PER_GROOM));
         }
+
+        // TH5: đồng bộ buổi tập tương lai của con ngựa đang ở chuồng này.
+        //
+        // PHẢI gọi TRƯỚC stall.setGroomId(). Nếu vướng BR-09 thì hàm này ném
+        // lỗi, @Transactional rollback, và chuồng giữ nguyên Groom cũ. Ghi
+        // trước rồi kiểm sau sẽ để lại trạng thái nửa vời nếu ai đó lỡ bỏ
+        // @Transactional khỏi phương thức này.
+        horseRepository.findByCurrentStallId(stallId)
+                .ifPresent(h -> planService.reassignFutureWorkoutsToGroom(h.getId(), groomId));
 
         stall.setGroomId(groomId);
         return stableStallRepository.save(stall);

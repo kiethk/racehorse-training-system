@@ -270,9 +270,32 @@ public class TrainingLotService {
     // ĐỌC
     // =================================================================
 
-    public List<TrainingLot> getLots(Long trainerId, LocalDate from, LocalDate to) {
-        return lotRepository
-                .findByTrainerIdAndLotDateBetweenOrderByLotDateAscStartTimeAsc(trainerId, from, to);
+    /**
+     * Lịch lot của Trainer.
+     *
+     * @param includeCancelled true thì trả về cả lot đã huỷ — dùng khi cần tra
+     *        cứu lịch sử hoặc giải trình. MẶC ĐỊNH false, vì lot đã huỷ không
+     *        còn chiếm khe giờ, hiện nó lên timeline chỉ khiến Trainer hiểu
+     *        nhầm là khe đó đang bận.
+     */
+    public List<TrainingLot> getLots(Long trainerId, LocalDate from, LocalDate to,
+                                     boolean includeCancelled) {
+        return includeCancelled
+                ? lotRepository.findByTrainerIdAndLotDateBetweenOrderByLotDateAscStartTimeAsc(
+                        trainerId, from, to)
+                : lotRepository.findActiveLotsInRange(trainerId, from, to);
+    }
+
+    /**
+     * Lịch lot của Groom — những lot mà groom này có ngựa phải dắt ra sân.
+     *
+     * Cố ý KHÔNG nhận cờ includeCancelled: màn hình của Groom là bảng công
+     * việc phải làm, mà một lot đã huỷ thì không còn là việc phải làm nữa.
+     * Trainer cần xem lại lịch sử để giải trình với Quản lý; Groom thì không.
+     * Nếu sau này đổi ý, chỉ cần thêm một query không lọc l.status.
+     */
+    public List<TrainingLot> getGroomLots(Long groomId, LocalDate from, LocalDate to) {
+        return lotRepository.findActiveGroomLotsInRange(groomId, from, to);
     }
 
     public TrainingLot findLotById(Long lotId) {

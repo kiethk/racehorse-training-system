@@ -4,6 +4,7 @@ import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreateHorseTrainingPlanRequest;
 import com.rtms.backend.dto.HorseTrainingPlanDetailResponse;
 import com.rtms.backend.dto.JoinableCohortResponse;
+import com.rtms.backend.dto.PlanSummaryResponse;
 import com.rtms.backend.dto.UpdatePlanStatusRequest;
 import com.rtms.backend.entity.HorseTrainingPlan;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -24,13 +25,19 @@ public class HorseTrainingPlanController {
         this.planService = planService;
     }
 
+    /**
+     * Danh sách kế hoạch kèm TÊN ngựa, TÊN khoá và tiến độ.
+     *
+     * Trước đây trả thẳng entity nên màn hình chỉ hiện được "kế hoạch #27,
+     * ngựa #15, khoá #3". Không có hàm nào ở frontend dùng dạng cũ nên đổi
+     * kiểu trả về không phá màn hình nào.
+     */
     @PreAuthorize("hasAuthority('TRAINING_PLAN_VIEW')")
     @GetMapping
-    public ApiResponse<List<HorseTrainingPlan>> getAllPlans(@RequestParam(required = false) Long horseId) {
-        if (horseId != null) {
-            return ApiResponse.success(planService.getPlansByHorse(horseId));
-        }
-        return ApiResponse.success(planService.getAllPlans());
+    public ApiResponse<List<PlanSummaryResponse>> getAllPlans(
+            @RequestParam(required = false) Long horseId,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(planService.getPlanSummaries(horseId, currentUser));
     }
 
     @PreAuthorize("hasAuthority('TRAINING_PLAN_VIEW')")

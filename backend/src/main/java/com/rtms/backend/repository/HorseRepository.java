@@ -31,4 +31,13 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT h FROM Horse h WHERE h.id = :id")
     Optional<Horse> findByIdForUpdate(@Param("id") Long id);
+
+    /**
+     * Chiến mã đang ở một chuồng cụ thể.
+     *
+     * Trả Optional vì horses.current_stall_id có ràng buộc UNIQUE — mỗi chuồng
+     * tối đa một con (BR-07). Dùng để kiểm chuồng đích đã có ngựa chưa, và để
+     * tìm con ngựa cần đồng bộ Groom khi chuồng đổi người phụ trách.
+     */
+    Optional<Horse> findByCurrentStallId(Long stallId);
 }

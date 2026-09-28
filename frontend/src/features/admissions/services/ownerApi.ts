@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from '@/services/api';
 import type { AdmissionSummaryResponse, AdmissionStatus } from '../types';
+import type { CreateOwnerAdmissionRequest } from '../types/owner';
 
 export type CandidateForm = {
   name: string; breed: string; dateOfBirth: string | null;
@@ -28,9 +29,9 @@ export const ownerAdmissionApi = {
   list: async () => (await apiGet<ApiResponse<AdmissionSummaryResponse[]>>('/api/owner/admissions')).data,
   detail: async (id: number) =>
     (await apiGet<ApiResponse<OwnerAdmissionDetail>>(`/api/owner/admissions/${id}`)).data,
-  create: async (data: CandidateForm) =>
+  create: async (data: CandidateForm | CreateOwnerAdmissionRequest) =>
     (await apiPost<ApiResponse<OwnerAdmissionDetail>>('/api/owner/admissions', data)).data,
-  upload: async (id: number, file: File, documentType: string, recordDate: string, note: string) => {
+  upload: async (id: number, file: File, documentType: string, recordDate?: string, note?: string) => {
     const body = new FormData();
     body.append('file', file);
     body.append('documentType', documentType);
@@ -44,3 +45,5 @@ export const ownerAdmissionApi = {
     return json.data;
   },
 };
+
+

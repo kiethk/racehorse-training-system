@@ -27,15 +27,32 @@ public class JoinableCohortResponse {
 
     private Set<TrainingDay> trainingDays;
     private Integer horseCount;
-    private Integer sharedSessions;       // số buổi sẽ được chung lot
+
+    /**
+     * Số buổi ĐỒNG PHA — cùng ngày, cùng bài tập.
+     *
+     * KHÔNG phải "số buổi chung lot". Đồng pha là ĐIỀU KIỆN CẦN để chung lot,
+     * không phải bảo đảm: nhóm vẫn bị tách sang lot thứ hai nếu vượt sức chứa
+     * (BR-10), hoặc nếu hai con cùng một Groom (BR-09).
+     */
+    private Integer sharedSessions;
+
     private Integer totalSessions;
     private Long waitDays;                // số ngày phải chờ tính từ hôm nay
+
+    /**
+     * Sức chứa một lot, để giao diện tự cảnh báo khi nhóm sắp tràn.
+     * Trả từ backend thay vì để frontend hardcode số 6.
+     */
+    private Integer lotCapacity;
+
     private String note;
 
     public JoinableCohortResponse(String cohortStatus, Long courseId, String courseName,
                                   LocalDate suggestedStartDate, Set<TrainingDay> trainingDays,
                                   Integer horseCount, Integer sharedSessions,
-                                  Integer totalSessions, Long waitDays, String note) {
+                                  Integer totalSessions, Long waitDays,
+                                  Integer lotCapacity, String note) {
         this.cohortStatus = cohortStatus;
         this.courseId = courseId;
         this.courseName = courseName;
@@ -45,8 +62,12 @@ public class JoinableCohortResponse {
         this.sharedSessions = sharedSessions;
         this.totalSessions = totalSessions;
         this.waitDays = waitDays;
+        this.lotCapacity = lotCapacity;
         this.note = note;
     }
+
+    public Integer getLotCapacity() { return lotCapacity; }
+    public void setLotCapacity(Integer lotCapacity) { this.lotCapacity = lotCapacity; }
 
     public String getCohortStatus() { return cohortStatus; }
     public Long getCourseId() { return courseId; }
