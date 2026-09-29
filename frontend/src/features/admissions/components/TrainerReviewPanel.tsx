@@ -207,12 +207,46 @@ export function TrainerReviewPanel({
       <div className="mt-5">
         <SectionTitle>Dữ liệu thú y</SectionTitle>
       </div>
-      {healthRecords.length === 0 && healthMetrics.length === 0 ? (
-        <p className="mt-1 text-[12px] text-[var(--color-text-muted)]">
-          Chưa có dữ liệu khám từ bác sĩ thú y.
-        </p>
-      ) : (
-        <div className="mt-2 space-y-3">
+      <div className="mt-2 space-y-3">
+        {/* Kết luận từ Bác sĩ thú y trong quy trình duyệt đơn */}
+        {admission.vetDecision ? (
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-[12px] space-y-1.5">
+            <div className="flex items-center justify-between font-medium">
+              <span className="text-[var(--color-text-primary)]">
+                Đánh giá tổng quan của Thú y
+                {admission.vetReviewedAt && (
+                  <span className="text-[var(--color-text-muted)] font-normal">
+                    {' '}· {new Date(admission.vetReviewedAt).toLocaleDateString('vi-VN')}
+                  </span>
+                )}
+              </span>
+              <span
+                className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                  admission.vetDecision === 'APPROVED'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : admission.vetDecision === 'RECHECK_REQUIRED'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-rose-100 text-rose-800'
+                }`}
+              >
+                {admission.vetDecision === 'APPROVED'
+                  ? 'ĐẠT'
+                  : admission.vetDecision === 'RECHECK_REQUIRED'
+                  ? 'CẦN KHÁM LẠI'
+                  : 'TỪ CHỐI'}
+              </span>
+            </div>
+            {admission.vetFeedback && (
+              <Row label="Nhận xét" value={admission.vetFeedback} />
+            )}
+          </div>
+        ) : (
+          healthRecords.length === 0 && healthMetrics.length === 0 && (
+            <p className="mt-1 text-[12px] text-[var(--color-text-muted)]">
+              Chưa có dữ liệu khám từ bác sĩ thú y.
+            </p>
+          )
+        )}
           {/* Chỉ số sinh hiệu gần nhất */}
           {healthMetrics.length > 0 && (
             <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-[12px]">
@@ -290,7 +324,6 @@ export function TrainerReviewPanel({
             </div>
           )}
         </div>
-      )}
 
       {/* ============ ĐÁNH GIÁ ============ */}
       <div className="mt-5">
