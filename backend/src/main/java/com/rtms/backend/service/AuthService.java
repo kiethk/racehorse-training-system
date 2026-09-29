@@ -5,19 +5,30 @@ import com.rtms.backend.dto.LoginRequest;
 import com.rtms.backend.dto.LoginResponse;
 import com.rtms.backend.dto.OwnerRegistrationRequest;
 import com.rtms.backend.dto.OwnerRegistrationResponse;
+import com.rtms.backend.entity.RefreshToken;
 import com.rtms.backend.entity.Role;
 import com.rtms.backend.entity.User;
 import com.rtms.backend.repository.GroomProfileRepository;
+import com.rtms.backend.repository.RefreshTokenRepository;
 import com.rtms.backend.repository.RoleRepository;
 import com.rtms.backend.repository.TrainerProfileRepository;
 import com.rtms.backend.repository.UserRepository;
 import com.rtms.backend.repository.VeterinarianProfileRepository;
 import com.rtms.backend.security.JwtUtil;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.util.Base64;
+import java.util.HexFormat;
 
 @Service
 public class AuthService {
@@ -30,6 +41,12 @@ public class AuthService {
     private final VeterinarianProfileRepository veterinarianProfileRepository;
     private final TrainerProfileRepository trainerProfileRepository;
     private final GroomProfileRepository groomProfileRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+
+    @Value("${jwt.refresh-expiration}")
+    private long refreshExpirationMs;
+
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(UserRepository userRepository,
             RoleRepository roleRepository,
@@ -37,7 +54,8 @@ public class AuthService {
             JwtUtil jwtUtil,
             VeterinarianProfileRepository veterinarianProfileRepository,
             TrainerProfileRepository trainerProfileRepository,
-            GroomProfileRepository groomProfileRepository) {
+            GroomProfileRepository groomProfileRepository,
+            RefreshTokenRepository refreshTokenRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -45,26 +63,84 @@ public class AuthService {
         this.veterinarianProfileRepository = veterinarianProfileRepository;
         this.trainerProfileRepository = trainerProfileRepository;
         this.groomProfileRepository = groomProfileRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
     }
 
-    /**
-     * Xac minh thong tin dang nhap, tra ve LoginResult chua (token, loginResponse).
-     * Controller se lay token gan vao Cookie, con loginResponse tra ve body.
-     * Nem RuntimeException neu sai thong tin.
-     */
+    @Transactional
     public LoginResult login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> invalidCredentials());
+
+        if (!user.isActive()) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_INACTIVE", "User is inactive");
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw invalidCredentials();
         }
 
-        String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
+        String accessToken = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
+        String rawRefreshToken = generateOpaqueToken();
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setTokenHash(hashToken(rawRefreshToken));
+        refreshToken.setExpiresAt(LocalDateTime.now().plusNanos(refreshExpirationMs * 1000000));
+        refreshTokenRepository.save(refreshToken);
+
         LoginResponse loginResponse = new LoginResponse(user.getId(), user.getFullName(),
                 user.getEmail(), user.getRole().getName());
 
-        return new LoginResult(token, loginResponse);
+        return new LoginResult(accessToken, rawRefreshToken, loginResponse);
+    }
+
+    @Transactional
+    public String refresh(String rawRefreshToken) {
+        String hash = hashToken(rawRefreshToken);
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "Invalid refresh token"));
+
+        if (refreshToken.getRevokedAt() != null) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "REVOKED_REFRESH_TOKEN", "Refresh token has been revoked");
+        }
+
+        if (refreshToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "EXPIRED_REFRESH_TOKEN", "Refresh token has expired");
+        }
+
+        User user = refreshToken.getUser();
+        if (!user.isActive()) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_INACTIVE", "User is inactive");
+        }
+
+        return jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
+    }
+
+    @Transactional
+    public void logout(String rawRefreshToken) {
+        if (rawRefreshToken != null && !rawRefreshToken.isBlank()) {
+            String hash = hashToken(rawRefreshToken);
+            refreshTokenRepository.findByTokenHash(hash).ifPresent(token -> {
+                token.setRevokedAt(LocalDateTime.now());
+                refreshTokenRepository.save(token);
+            });
+        }
+    }
+
+    private String generateOpaqueToken() {
+        byte[] randomBytes = new byte[32];
+        secureRandom.nextBytes(randomBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+    }
+
+    private String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Failed to hash token", e);
+        }
     }
 
     private ApiException invalidCredentials() {
@@ -72,8 +148,7 @@ public class AuthService {
                 "Email or Password is incorrect");
     }
 
-    // Inner record de tra ve ca token lan response body cung luc
-    public record LoginResult(String token, LoginResponse loginResponse) {
+    public record LoginResult(String token, String refreshToken, LoginResponse loginResponse) {
     }
 
     public LoginResponse getMe(Long userId) {
@@ -91,12 +166,7 @@ public class AuthService {
         return new LoginResponse(user.getId(), user.getFullName(), user.getEmail(), role, profile);
     }
 
-    /**
-     * Đăng ký tài khoản Horse Owner mới.
-     * Client không được phép chỉ định role — role luôn là HORSE_OWNER.
-     */
     public OwnerRegistrationResponse registerOwner(OwnerRegistrationRequest request) {
-        // Validate required fields
         if (request.getFullName() == null || request.getFullName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Full name is required");
         }
@@ -107,7 +177,6 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password is required");
         }
 
-        // Normalize fields
         String email = request.getEmail().trim().toLowerCase();
         String fullName = request.getFullName().trim();
         String phone = request.getPhone() == null || request.getPhone().isBlank()
@@ -115,17 +184,14 @@ public class AuthService {
         String address = request.getAddress() == null || request.getAddress().isBlank()
                 ? null : request.getAddress().trim();
 
-        // Reject duplicate email
         if (userRepository.findByEmail(email).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "An account with this email already exists");
         }
 
-        // Load HORSE_OWNER role from DB
         Role ownerRole = roleRepository.findByName("HORSE_OWNER")
                 .orElseThrow(() -> new IllegalStateException("HORSE_OWNER role not found in database"));
 
-        // Create user
         User user = new User();
         user.setFullName(fullName);
         user.setEmail(email);
