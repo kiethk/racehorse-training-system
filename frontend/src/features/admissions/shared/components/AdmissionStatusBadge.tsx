@@ -9,6 +9,7 @@ type Tone = 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral';
 export function statusTone(status: AdmissionStatus | string): Tone {
   if (status === 'GROOM_REVIEW') return 'primary';
   if (status === 'WAITING_FOR_STALL') return 'warning';
+  if (status === 'PENDING_RECHECK') return 'warning';
   if (status === 'APPROVED') return 'success';
   if (status === 'REJECTED') return 'danger';
   if (status === 'VET_REVIEW' || status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW') return 'info';
@@ -27,12 +28,6 @@ const toneStyles: Record<Tone, string> = {
 export function AdmissionStatusBadge({ status, size = 'md' }: { status: AdmissionStatus | string; size?: 'sm' | 'md' }) {
   const tone = statusTone(status);
   const style = toneStyles[tone];
-  
-  // Custom design for Admissions per user feedback:
-  // - No dot
-  // - More horizontal & vertical padding
-  // - font-medium
-  // - rounded-md instead of full pill
   
   const sizeStyle = size === 'sm' 
     ? 'px-2 py-0.5 text-[11px]' 

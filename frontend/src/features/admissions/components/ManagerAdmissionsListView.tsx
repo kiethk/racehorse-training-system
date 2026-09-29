@@ -12,6 +12,20 @@ import { admissionsApi } from '../services/api';
 import type { AdmissionSummaryResponse, AdmissionStatus } from '../types';
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
 
+const VALID_STATUSES: ReadonlyArray<AdmissionStatus | 'ALL'> = [
+  'ALL',
+  'GROOM_REVIEW',
+  'WAITING_FOR_STALL',
+  'VET_REVIEW',
+  'PENDING_RECHECK',
+  'TRAINER_REVIEW',
+  'MANAGER_REVIEW',
+  'APPROVED',
+  'REJECTED',
+];
+
+const FILTER_KEYS = ['candidateName', 'status', 'submittedFrom', 'submittedTo'] as const;
+
 interface ManagerQueueFilters {
   candidateName: string;
   status: AdmissionStatus | 'ALL';
@@ -31,12 +45,17 @@ export function ManagerAdmissionsListView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const urlFilters: ManagerQueueFilters = useMemo(() => ({
-    candidateName: searchParams.get('candidateName') || '',
-    status: (searchParams.get('status') as AdmissionStatus) || 'ALL',
-    submittedFrom: searchParams.get('submittedFrom') || '',
-    submittedTo: searchParams.get('submittedTo') || '',
-  }), [searchParams]);
+  const urlFilters: ManagerQueueFilters = useMemo(() => {
+    const rawStatus = searchParams.get('status') as AdmissionStatus | 'ALL' | null;
+    const safeStatus: AdmissionStatus | 'ALL' =
+      rawStatus && (VALID_STATUSES as ReadonlyArray<string>).includes(rawStatus) ? rawStatus : 'ALL';
+    return {
+      candidateName: searchParams.get('candidateName') || '',
+      status: safeStatus,
+      submittedFrom: searchParams.get('submittedFrom') || '',
+      submittedTo: searchParams.get('submittedTo') || '',
+    };
+  }, [searchParams]);
 
   const [admissions, setAdmissions] = useState<AdmissionSummaryResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,14 +144,20 @@ export function ManagerAdmissionsListView() {
     { value: 'GROOM_REVIEW', label: 'Groom Review' },
     { value: 'WAITING_FOR_STALL', label: 'Waiting for Stall' },
     { value: 'VET_REVIEW', label: 'Vet Review' },
+    { value: 'PENDING_RECHECK', label: 'Pending Recheck' },
     { value: 'TRAINER_REVIEW', label: 'Trainer Review' },
     { value: 'MANAGER_REVIEW', label: 'Manager Review' },
     { value: 'APPROVED', label: 'Approved' },
     { value: 'REJECTED', label: 'Rejected' },
   ];
   
-  const queryString = searchParams.toString();
-  const detailQuery = queryString ? `?${queryString}` : '';
+  // Only forward the known Admission filter keys — do not blindly copy all params
+  const detailParams = new URLSearchParams();
+  FILTER_KEYS.forEach((key) => {
+    const val = searchParams.get(key);
+    if (val) detailParams.set(key, val);
+  });
+  const detailQuery = detailParams.toString() ? `?${detailParams.toString()}` : '';
 
   return (
     <div className="space-y-6">

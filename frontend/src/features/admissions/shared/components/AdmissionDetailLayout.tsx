@@ -31,24 +31,10 @@ export function AdmissionDetailLayout({
           {pipeline}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {sections[0]}
-            {sections[1]}
+            {sections.map((section, idx) => (
+              <div key={idx}>{section}</div>
+            ))}
           </div>
-
-          {sections.length > 2 && (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {sections[2]}
-              {sections[3]}
-            </div>
-          )}
-          
-          {sections.length > 4 && (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {sections.slice(4).map((section, idx) => (
-                <div key={idx}>{section}</div>
-              ))}
-            </div>
-          )}
 
           {actions}
         </div>

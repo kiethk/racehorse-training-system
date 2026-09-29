@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ApiError } from '@/services/api';
 import { admissionsApi } from '../services/api';
 import type { AdmissionDetailResponse } from '../types';
 import { Panel, SectionTitle } from '@/components/ui/Panel';
@@ -54,12 +55,12 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
       setActionMode('INITIAL');
       onSuccess();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        // @ts-expect-error - Handle Axios error shape gracefully
-        setError(err.response?.data?.message || err.message || 'Failed to submit review');
-      } else {
-        setError('Failed to submit review');
-      }
+      const msg = err instanceof ApiError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : 'Failed to submit review';
+      setError(msg);
       setConfirmDecision(null);
     } finally {
       setSubmitting(false);
@@ -103,7 +104,7 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
           )}
           
           {actionMode === 'APPROVE' && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-top-1">
+            <div className="space-y-4">
               <div className="space-y-3">
                 <label className="text-[13px] font-medium text-[var(--color-text-primary)]">Stall Assignment</label>
                 <div className="flex gap-4">
@@ -178,7 +179,7 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
           )}
 
           {actionMode === 'REJECT' && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-top-1">
+            <div className="space-y-4">
               <div className="space-y-1">
                 <label className="text-[13px] font-medium text-[var(--color-text-primary)]">
                   Feedback <span className="text-[var(--color-danger)]">*</span>

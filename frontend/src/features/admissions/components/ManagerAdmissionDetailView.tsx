@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { ApiError } from '@/services/api';
 import { admissionsApi } from '../services/api';
 import type { AdmissionDetailResponse } from '../types';
 
@@ -45,15 +46,9 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
   }, [admissionId]);
 
   useEffect(() => {
-    let active = true;
-    admissionsApi.getAdmissionDetail(admissionId)
-      .then((data) => { if (active) setDetail(data); })
-      .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load this application.');
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [admissionId]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   if (loading) return <div className="p-6"><ListSkeleton rows={8} /></div>;
   if (error && !detail) return <EmptyState icon="alert-triangle" title="Unable to load application" description={error} action={<Button size="sm" onClick={() => void load()}>Retry</Button>} />;
@@ -87,7 +82,6 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
           <p className="text-[var(--color-text-primary)]">{detail.vetFeedback}</p>
         </div>
       )}
-      
       <div className="pt-2 border-t border-[var(--color-border)]">
         <span className="text-[var(--color-text-muted)] block mb-2 font-medium">Health Records</span>
         {detail.healthRecords && detail.healthRecords.length > 0 ? (
@@ -113,31 +107,31 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
   const reviewHistorySection = (
     <AdmissionInfoSection title="Review History">
       <div className="space-y-4">
-        {detail.groomReviewedAt && (
+        {detail.groomReviewedAt ? (
           <div className="space-y-1">
             <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Groom Review</h4>
-            <InfoRow label="Decision" value={detail.groomDecision || 'APPROVED'} />
+            <InfoRow label="Decision" value={detail.groomDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.groomReviewedAt)} />
-            <InfoRow label="Feedback" value={detail.groomFeedback || 'None'} />
+            <InfoRow label="Feedback" value={detail.groomFeedback} />
           </div>
-        )}
+        ) : null}
         
-        {detail.vetReviewedAt && (
+        {detail.vetReviewedAt ? (
           <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
             <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Veterinarian Review</h4>
             <InfoRow label="Decision" value={detail.vetDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.vetReviewedAt)} />
-            <InfoRow label="Feedback" value={detail.vetFeedback || 'None'} />
+            <InfoRow label="Feedback" value={detail.vetFeedback} />
           </div>
-        )}
+        ) : null}
         
-        {detail.trainerReviewedAt && (
+        {detail.trainerReviewedAt ? (
           <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
             <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Trainer Review</h4>
             <InfoRow label="Reviewed At" value={datetime(detail.trainerReviewedAt)} />
-            <InfoRow label="Feedback" value={detail.trainerFeedback || 'None'} />
+            <InfoRow label="Feedback" value={detail.trainerFeedback} />
           </div>
-        )}
+        ) : null}
         
         {!detail.groomReviewedAt && !detail.vetReviewedAt && !detail.trainerReviewedAt && (
           <span className="text-[var(--color-text-muted)] italic">No prior reviews recorded.</span>
