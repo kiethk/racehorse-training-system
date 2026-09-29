@@ -5,10 +5,7 @@ interface AdmissionDetailLayoutProps {
   returnTo: string;
   header: React.ReactNode;
   pipeline: React.ReactNode;
-  candidateSection: React.ReactNode;
-  capacitySection?: React.ReactNode;
-  horseOwnerSection: React.ReactNode;
-  documentSection: React.ReactNode;
+  sections: React.ReactNode[];
   actions?: React.ReactNode;
 }
 
@@ -16,10 +13,7 @@ export function AdmissionDetailLayout({
   returnTo,
   header,
   pipeline,
-  candidateSection,
-  capacitySection,
-  horseOwnerSection,
-  documentSection,
+  sections,
   actions,
 }: AdmissionDetailLayoutProps) {
   return (
@@ -37,14 +31,24 @@ export function AdmissionDetailLayout({
           {pipeline}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {candidateSection}
-            {capacitySection}
+            {sections[0]}
+            {sections[1]}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {documentSection}
-            {horseOwnerSection}
-          </div>
+          {sections.length > 2 && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {sections[2]}
+              {sections[3]}
+            </div>
+          )}
+          
+          {sections.length > 4 && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {sections.slice(4).map((section, idx) => (
+                <div key={idx}>{section}</div>
+              ))}
+            </div>
+          )}
 
           {actions}
         </div>

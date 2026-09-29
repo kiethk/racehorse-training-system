@@ -24,19 +24,22 @@ const toneStyles: Record<Tone, string> = {
   neutral: 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] border border-[var(--color-border)]',
 };
 
-export function AdmissionStatusBadge({ status, size }: { status: AdmissionStatus | string; size?: 'sm' | 'md' }) {
+export function AdmissionStatusBadge({ status, size = 'md' }: { status: AdmissionStatus | string; size?: 'sm' | 'md' }) {
   const tone = statusTone(status);
   const style = toneStyles[tone];
   
   // Custom design for Admissions per user feedback:
   // - No dot
   // - More horizontal & vertical padding
-  // - ~12px text (text-xs)
   // - font-medium
   // - rounded-md instead of full pill
   
+  const sizeStyle = size === 'sm' 
+    ? 'px-2 py-0.5 text-[11px]' 
+    : 'px-3 py-1 text-xs';
+  
   return (
-    <span className={`inline-flex items-center rounded-md font-medium px-3 py-1 text-xs whitespace-nowrap ${style}`}>
+    <span className={`inline-flex items-center rounded-md font-medium whitespace-nowrap ${sizeStyle} ${style}`}>
       {prettyStatus(status)}
     </span>
   );

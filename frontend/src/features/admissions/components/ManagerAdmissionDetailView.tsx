@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
-import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { admissionsApi } from '../services/api';
 import type { AdmissionDetailResponse } from '../types';
@@ -17,6 +16,10 @@ import { ManagerFinalReviewPanel } from './ManagerFinalReviewPanel';
 
 function date(value: string | null) {
   return value ? new Date(value).toLocaleDateString() : 'Not recorded';
+}
+
+function datetime(value: string | null) {
+  return value ? new Date(value).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' }) : 'Not recorded';
 }
 
 interface ManagerAdmissionDetailViewProps {
@@ -106,20 +109,40 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
       </div>
     </AdmissionInfoSection>
   );
-
-  const regularStallsSection = (
-    <AdmissionInfoSection title="Available Regular Stalls">
-      {detail.availableRegularStalls && detail.availableRegularStalls.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {detail.availableRegularStalls.map(stall => (
-            <Pill key={stall.id} tone="neutral" size="sm">
-              Stall {stall.stallCode}
-            </Pill>
-          ))}
-        </div>
-      ) : (
-        <span className="text-[var(--color-text-muted)] italic">No regular stalls currently available.</span>
-      )}
+  
+  const reviewHistorySection = (
+    <AdmissionInfoSection title="Review History">
+      <div className="space-y-4">
+        {detail.groomReviewedAt && (
+          <div className="space-y-1">
+            <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Groom Review</h4>
+            <InfoRow label="Decision" value={detail.groomDecision || 'APPROVED'} />
+            <InfoRow label="Reviewed At" value={datetime(detail.groomReviewedAt)} />
+            <InfoRow label="Feedback" value={detail.groomFeedback || 'None'} />
+          </div>
+        )}
+        
+        {detail.vetReviewedAt && (
+          <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
+            <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Veterinarian Review</h4>
+            <InfoRow label="Decision" value={detail.vetDecision} />
+            <InfoRow label="Reviewed At" value={datetime(detail.vetReviewedAt)} />
+            <InfoRow label="Feedback" value={detail.vetFeedback || 'None'} />
+          </div>
+        )}
+        
+        {detail.trainerReviewedAt && (
+          <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
+            <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Trainer Review</h4>
+            <InfoRow label="Reviewed At" value={datetime(detail.trainerReviewedAt)} />
+            <InfoRow label="Feedback" value={detail.trainerFeedback || 'None'} />
+          </div>
+        )}
+        
+        {!detail.groomReviewedAt && !detail.vetReviewedAt && !detail.trainerReviewedAt && (
+          <span className="text-[var(--color-text-muted)] italic">No prior reviews recorded.</span>
+        )}
+      </div>
     </AdmissionInfoSection>
   );
 
@@ -130,10 +153,12 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         returnTo={returnTo}
         header={<AdmissionDetailHeader detail={detail} horsePhotoUrl={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined} />}
         pipeline={<AdmissionPipeline detail={detail} />}
-        candidateSection={candidateSection}
-        capacitySection={healthSection}
-        horseOwnerSection={regularStallsSection}
-        documentSection={<AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />}
+        sections={[
+          candidateSection,
+          healthSection,
+          <AdmissionDocumentsSection key="docs" documents={detail.documents} assetUrl={admissionsApi.assetUrl} />,
+          reviewHistorySection,
+        ]}
         actions={<ManagerFinalReviewPanel detailData={detail} onSuccess={load} />}
       />
     </>

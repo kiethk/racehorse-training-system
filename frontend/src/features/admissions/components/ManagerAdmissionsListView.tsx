@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
@@ -26,12 +27,22 @@ const initialFilters: ManagerQueueFilters = {
 };
 
 export function ManagerAdmissionsListView() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const urlFilters: ManagerQueueFilters = useMemo(() => ({
+    candidateName: searchParams.get('candidateName') || '',
+    status: (searchParams.get('status') as AdmissionStatus) || 'ALL',
+    submittedFrom: searchParams.get('submittedFrom') || '',
+    submittedTo: searchParams.get('submittedTo') || '',
+  }), [searchParams]);
+
   const [admissions, setAdmissions] = useState<AdmissionSummaryResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const [draft, setDraft] = useState<ManagerQueueFilters>(initialFilters);
-  const [applied, setApplied] = useState<ManagerQueueFilters>(initialFilters);
+  const [draft, setDraft] = useState<ManagerQueueFilters>(urlFilters);
 
   useEffect(() => {
     let active = true;
@@ -52,23 +63,25 @@ export function ManagerAdmissionsListView() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraft(urlFilters);
+  }, [urlFilters]);
+
   const filteredAdmissions = useMemo(() => {
     return admissions
       .filter((a) => {
-        if (applied.status !== 'ALL' && a.status !== applied.status) return false;
-        if (applied.candidateName && !a.candidateName.toLowerCase().includes(applied.candidateName.toLowerCase())) return false;
+        if (urlFilters.status !== 'ALL' && a.status !== urlFilters.status) return false;
+        if (urlFilters.candidateName && !a.candidateName.toLowerCase().includes(urlFilters.candidateName.toLowerCase())) return false;
         
-        if (applied.submittedFrom || applied.submittedTo) {
-          // Both `submittedAt` and filter dates are ISO strings or standard date strings. 
-          // Safest to compare via Date object.
+        if (urlFilters.submittedFrom || urlFilters.submittedTo) {
           const submittedTime = new Date(a.submittedAt).getTime();
-          if (applied.submittedFrom) {
-            const fromTime = new Date(applied.submittedFrom).getTime();
+          if (urlFilters.submittedFrom) {
+            const fromTime = new Date(urlFilters.submittedFrom).getTime();
             if (submittedTime < fromTime) return false;
           }
-          if (applied.submittedTo) {
-            // Include the entire end day
-            const toDate = new Date(applied.submittedTo);
+          if (urlFilters.submittedTo) {
+            const toDate = new Date(urlFilters.submittedTo);
             toDate.setHours(23, 59, 59, 999);
             if (submittedTime > toDate.getTime()) return false;
           }
@@ -77,17 +90,26 @@ export function ManagerAdmissionsListView() {
         return true;
       })
       .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-  }, [admissions, applied]);
+  }, [admissions, urlFilters]);
+
+  const updateUrl = (filters: ManagerQueueFilters) => {
+    const params = new URLSearchParams();
+    if (filters.candidateName) params.set('candidateName', filters.candidateName.trim());
+    if (filters.status !== 'ALL') params.set('status', filters.status);
+    if (filters.submittedFrom) params.set('submittedFrom', filters.submittedFrom);
+    if (filters.submittedTo) params.set('submittedTo', filters.submittedTo);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   const apply = () => {
     setError(null);
-    setApplied({ ...draft, candidateName: draft.candidateName.trim() });
+    updateUrl({ ...draft, candidateName: draft.candidateName.trim() });
   };
 
   const clear = () => {
     setDraft(initialFilters);
     setError(null);
-    setApplied(initialFilters);
+    updateUrl(initialFilters);
   };
 
   if (loading) {
@@ -108,6 +130,9 @@ export function ManagerAdmissionsListView() {
     { value: 'APPROVED', label: 'Approved' },
     { value: 'REJECTED', label: 'Rejected' },
   ];
+  
+  const queryString = searchParams.toString();
+  const detailQuery = queryString ? `?${queryString}` : '';
 
   return (
     <div className="space-y-6">
@@ -183,7 +208,7 @@ export function ManagerAdmissionsListView() {
                       {new Date(admission.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Link href={`/manager/admissions/${admission.admissionId}`} className="inline-flex items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] px-4 py-1.5 text-xs font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)] transition-colors">
+                      <Link href={`/manager/admissions/${admission.admissionId}${detailQuery}`} className="inline-flex items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] px-4 py-1.5 text-xs font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)] transition-colors">
                         View
                       </Link>
                     </td>

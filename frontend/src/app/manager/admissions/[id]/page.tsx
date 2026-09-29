@@ -13,16 +13,24 @@ export default async function ManagerAdmissionDetailPage({
   params: RouteParams;
   searchParams: SearchParams;
 }) {
-  const [{ id }] = await Promise.all([params, searchParams]);
+  const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const admissionId = Number(id);
   const validId = Number.isSafeInteger(admissionId) && admissionId > 0;
+  
+  const query = new URLSearchParams();
+  Object.entries(resolvedSearchParams).forEach(([k, v]) => {
+    if (typeof v === 'string') query.set(k, v);
+    else if (Array.isArray(v)) v.forEach(item => query.append(k, item));
+  });
+  const qs = query.toString();
+  const returnTo = qs ? `/manager/admissions?${qs}` : '/manager/admissions';
 
   return (
     <RoleGuard allowedRoles={['CLUB_MANAGER']}>
       <AppShell>
         <PageContainer>
           {validId
-            ? <ManagerAdmissionDetailView admissionId={admissionId} returnTo="/manager/admissions" />
+            ? <ManagerAdmissionDetailView admissionId={admissionId} returnTo={returnTo} />
             : <p role="alert" className="text-sm text-[var(--color-danger)]">Invalid admission ID.</p>}
         </PageContainer>
       </AppShell>
