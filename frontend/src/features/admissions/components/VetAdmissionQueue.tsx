@@ -374,7 +374,7 @@ export function VetAdmissionQueue() {
   function handleReviewSuccess(result: VetReviewResponse) {
     const outcomeMessage =
       result.decision === 'APPROVED'
-        ? 'Admission approved! Training unlocked, regular stall assigned, and horse marked ELIGIBLE.'
+        ? 'Veterinary review approved! The admission moved to Trainer review; the horse remains a quarantined CANDIDATE.'
         : result.decision === 'RECHECK_REQUIRED'
           ? 'Recheck scheduled! Horse remains in quarantine with training locked until follow-up.'
           : 'Admission rejected! Quarantine stall released and training lock retained.';

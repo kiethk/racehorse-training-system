@@ -218,15 +218,9 @@ public class VetExamService {
             admission.setVetReviewedAt(now);
 
             if (decision == VetDecision.APPROVED) {
-                StableStall regular = stalls.findFirstAvailableRegularStallForUpdate()
-                        .orElseThrow(() -> conflict("No regular stall is available; admission was not approved"));
-                StableStall quarantine = lockQuarantine(admission);
-                regular.setStatus(StallStatus.OCCUPIED);
-                quarantine.setStatus(StallStatus.AVAILABLE);
-                horse.setCurrentStallId(regular.getId());
-                horse.setCurrentStatus(HorseStatus.ELIGIBLE);
-                unlockTraining(horse, vetId);
-                admission.setStatus(AdmissionStatus.APPROVED);
+                assertCandidateInQuarantine(admission, horse);
+                lockTraining(horse, "Admission pending trainer and manager review", null, vetId);
+                admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
             } else if (decision == VetDecision.RECHECK_REQUIRED) {
                 assertCandidateInQuarantine(admission, horse);
                 lockTraining(horse, "Veterinary recheck required", request.getFollowUpDate(), vetId);

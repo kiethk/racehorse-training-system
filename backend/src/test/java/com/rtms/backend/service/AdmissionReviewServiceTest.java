@@ -71,22 +71,21 @@ class AdmissionReviewServiceTest {
     }
 
     @Test
-    void approvedExamUsesCompatibilityAdapterAndReturnsFinalAdmissionState() {
+    void approvedExamUsesCompatibilityAdapterAndReturnsTrainerReviewState() {
         mockInitialLookup();
         when(vetExamService.start(20L, 5L)).thenReturn(examResponse(VetExamStatus.IN_PROGRESS, null));
         when(vetExamService.complete(eq(20L), any(), eq(5L))).thenAnswer(invocation -> {
-            admission.setStatus(AdmissionStatus.APPROVED);
+            admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
             admission.setVetDecision(VetDecision.APPROVED);
             admission.setVetReviewedAt(LocalDateTime.now());
-            horse.setCurrentStatus(HorseStatus.ELIGIBLE);
-            horse.setCurrentStallId(100L);
             return examResponse(VetExamStatus.COMPLETED, 30L);
         });
 
         var response = service.reviewByVet(1L, request(VetDecision.APPROVED), 5L);
 
-        assertEquals(AdmissionStatus.APPROVED, response.status());
-        assertEquals(HorseStatus.ELIGIBLE, response.horseStatus());
+        assertEquals(AdmissionStatus.TRAINER_REVIEW, response.status());
+        assertEquals(HorseStatus.CANDIDATE, response.horseStatus());
+        assertEquals(99L, response.quarantineStallId());
         assertEquals(VetExamStatus.COMPLETED, response.initialExamStatus());
         assertEquals(30L, response.healthRecordId());
         assertEquals(20L, response.vetExamId());

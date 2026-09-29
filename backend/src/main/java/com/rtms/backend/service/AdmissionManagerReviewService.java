@@ -103,6 +103,11 @@ public class AdmissionManagerReviewService {
         // 2. Update existing Horse
         horse.setCurrentStatus(HorseStatus.ELIGIBLE);
         horse.setCurrentStallId(regularStall.getId());
+        horse.setTrainingLocked(false);
+        horse.setTrainingLockReason(null);
+        horse.setTrainingLockReviewDate(null);
+        horse.setTrainingLockVetId(null);
+        horse.setTrainingLockUpdatedAt(LocalDateTime.now());
         horseRepository.save(horse);
 
         // 3. Mark regular stall occupied
