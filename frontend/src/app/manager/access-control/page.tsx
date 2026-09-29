@@ -2,18 +2,23 @@ import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { ManagementTabs } from '@/features/management/components/ManagementTabs';
+import { AccessControlView } from '@/features/access-control/components/AccessControlView';
 
 export const metadata: Metadata = {
-  title: 'Management | Manager',
+  title: 'Access Control | Manager',
 };
 
-export default function ManagerManagementPage() {
+export default function ManagerAccessControlPage() {
   return (
     <RoleGuard allowedRoles={['CLUB_MANAGER']}>
       <AppShell>
         <PageContainer>
-          <ManagementTabs />
+          <div>
+            <h1 className="text-[20px] font-semibold tracking-tight text-[var(--color-text-primary)] mb-4">
+              Access Control
+            </h1>
+            <AccessControlView />
+          </div>
         </PageContainer>
       </AppShell>
     </RoleGuard>
