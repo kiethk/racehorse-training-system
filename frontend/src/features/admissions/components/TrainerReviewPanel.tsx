@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { FieldLabel, Panel, SectionTitle } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { DetailSkeleton, EmptyState } from '@/components/ui/states';
+import { admissionsApi } from '../services/api';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
 import type {
   RacingReadinessStatus,
@@ -91,7 +92,7 @@ export function TrainerReviewPanel({
     );
   }
 
-  const { admission, horse, healthRecords, existingAssessment } = view;
+  const { admission, horse, healthRecords, healthMetrics, existingAssessment } = view;
   const readOnly = existingAssessment !== null;
   const horseMissing = horse === null;
 
@@ -175,22 +176,30 @@ export function TrainerReviewPanel({
           Không có giấy tờ nào.
         </p>
       ) : (
-        <ul className="mt-2 space-y-1">
-          {admission.documents.map((doc) => (
-            <li key={doc.id} className="text-[12px]">
-              <a
-                className="text-[var(--color-primary)] underline"
-                href={trainerAdmissionsApi.documentFileUrl(admissionId, doc.id)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {doc.documentType}
-              </a>
-              {doc.note && (
-                <span className="text-[var(--color-text-muted)]"> — {doc.note}</span>
-              )}
-            </li>
-          ))}
+        <ul className="mt-2 space-y-1.5">
+          {admission.documents.map((doc) => {
+            const fileHref = doc.fileUrl
+              ? admissionsApi.assetUrl(doc.fileUrl)
+              : trainerAdmissionsApi.documentFileUrl(admissionId, doc.id);
+            return (
+              <li key={doc.id} className="text-[12px] flex items-center gap-1.5">
+                <a
+                  className="text-[var(--color-primary)] font-medium underline hover:opacity-80"
+                  href={fileHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {doc.documentType}
+                </a>
+                {doc.originalFileName && (
+                  <span className="text-[var(--color-text-muted)]">({doc.originalFileName})</span>
+                )}
+                {doc.note && (
+                  <span className="text-[var(--color-text-muted)]"> — {doc.note}</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -198,12 +207,89 @@ export function TrainerReviewPanel({
       <div className="mt-5">
         <SectionTitle>Dữ liệu thú y</SectionTitle>
       </div>
-      {healthRecords.length === 0 ? (
+      {healthRecords.length === 0 && healthMetrics.length === 0 ? (
         <p className="mt-1 text-[12px] text-[var(--color-text-muted)]">
-          Chưa có dữ liệu khám.
+          Chưa có dữ liệu khám từ bác sĩ thú y.
         </p>
       ) : (
-        <p className="mt-1 text-[12px]">{healthRecords.length} bản ghi khám</p>
+        <div className="mt-2 space-y-3">
+          {/* Chỉ số sinh hiệu gần nhất */}
+          {healthMetrics.length > 0 && (
+            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-[12px]">
+              <div className="font-semibold text-[var(--color-text-primary)] mb-2">
+                Chỉ số sinh hiệu gần nhất ({new Date(healthMetrics[0].recordedAt).toLocaleDateString('vi-VN')})
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div>
+                  <span className="text-[var(--color-text-muted)]">Thân nhiệt:</span>{' '}
+                  <span className="font-medium">{healthMetrics[0].temperature != null ? `${healthMetrics[0].temperature} °C` : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--color-text-muted)]">Nhịp tim:</span>{' '}
+                  <span className="font-medium">{healthMetrics[0].heartRate != null ? `${healthMetrics[0].heartRate} bpm` : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--color-text-muted)]">Nhịp thở:</span>{' '}
+                  <span className="font-medium">{healthMetrics[0].respiratoryRate != null ? `${healthMetrics[0].respiratoryRate} bpm` : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--color-text-muted)]">Cân nặng:</span>{' '}
+                  <span className="font-medium">{healthMetrics[0].weight != null ? `${healthMetrics[0].weight} kg` : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--color-text-muted)]">Bù nước:</span>{' '}
+                  <span className="font-medium">{healthMetrics[0].hydrationStatus || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--color-text-muted)]">Điểm thể trạng:</span>{' '}
+                  <span className="font-medium">{healthMetrics[0].bodyConditionScore != null ? `${healthMetrics[0].bodyConditionScore}/9` : '—'}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bản ghi khám lâm sàng */}
+          {healthRecords.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-[12px] font-semibold text-[var(--color-text-primary)]">
+                Bản ghi khám lâm sàng ({healthRecords.length})
+              </div>
+              {healthRecords.map((hr) => (
+                <div
+                  key={hr.id}
+                  className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-[12px] space-y-1.5"
+                >
+                  <div className="flex items-center justify-between font-medium">
+                    <span>
+                      {hr.recordType || 'Khám nhập học'} · {new Date(hr.examinedAt).toLocaleDateString('vi-VN')}
+                    </span>
+                    {hr.vetDecision && (
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                          hr.vetDecision === 'APPROVED'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : hr.vetDecision === 'RECHECK_REQUIRED'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
+                        {hr.vetDecision === 'APPROVED'
+                          ? 'ĐẠT'
+                          : hr.vetDecision === 'RECHECK_REQUIRED'
+                          ? 'CẦN KHÁM LẠI'
+                          : 'TỪ CHỐI'}
+                      </span>
+                    )}
+                  </div>
+                  {hr.diagnosis && <Row label="Chẩn đoán" value={hr.diagnosis} />}
+                  {hr.symptoms && <Row label="Triệu chứng" value={hr.symptoms} />}
+                  {hr.treatment && <Row label="Điều trị" value={hr.treatment} />}
+                  {hr.notes && <Row label="Ghi chú" value={hr.notes} />}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ============ ĐÁNH GIÁ ============ */}

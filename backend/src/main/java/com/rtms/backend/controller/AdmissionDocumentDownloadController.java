@@ -7,6 +7,7 @@ import com.rtms.backend.service.AdmissionFileStorage;
 import com.rtms.backend.service.OwnerAdmissionService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ContentDisposition;
@@ -14,6 +15,7 @@ import org.springframework.http.MediaTypeFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
 @RestController
@@ -32,6 +34,11 @@ public class AdmissionDocumentDownloadController {
     public ResponseEntity<Resource> download(@PathVariable Long id, @PathVariable Long documentId,
             @AuthenticationPrincipal AuthenticatedUser viewer) {
         AdmissionDocument document = service.getDocumentForViewer(id, documentId, viewer);
+        if (document.getFileUrl() != null && !document.getFileUrl().startsWith("local:")) {
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(URI.create(document.getFileUrl()))
+                    .build();
+        }
         Resource file = storage.load(document.getFileUrl());
         String filename = document.getOriginalFileName() == null
                 ? "admission-document-" + documentId
