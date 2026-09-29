@@ -17,10 +17,16 @@ export default async function ManagerAdmissionDetailPage({
   const admissionId = Number(id);
   const validId = Number.isSafeInteger(admissionId) && admissionId > 0;
   
+  const FILTER_KEYS = ['candidateName', 'status', 'submittedFrom', 'submittedTo'] as const;
+  const VALID_STATUSES = ['ALL', 'GROOM_REVIEW', 'WAITING_FOR_STALL', 'VET_REVIEW', 'PENDING_RECHECK', 'TRAINER_REVIEW', 'MANAGER_REVIEW', 'APPROVED', 'REJECTED'];
+  
   const query = new URLSearchParams();
-  Object.entries(resolvedSearchParams).forEach(([k, v]) => {
-    if (typeof v === 'string') query.set(k, v);
-    else if (Array.isArray(v)) v.forEach(item => query.append(k, item));
+  FILTER_KEYS.forEach((key) => {
+    const v = resolvedSearchParams[key];
+    if (typeof v !== 'string' || !v) return;
+    // Validate status against allowed values
+    if (key === 'status' && !VALID_STATUSES.includes(v)) return;
+    query.set(key, v);
   });
   const qs = query.toString();
   const returnTo = qs ? `/manager/admissions?${qs}` : '/manager/admissions';

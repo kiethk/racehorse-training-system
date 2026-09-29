@@ -117,7 +117,8 @@ export function ManagerAdmissionsListView() {
     if (filters.status !== 'ALL') params.set('status', filters.status);
     if (filters.submittedFrom) params.set('submittedFrom', filters.submittedFrom);
     if (filters.submittedTo) params.set('submittedTo', filters.submittedTo);
-    router.replace(`${pathname}?${params.toString()}`);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
   };
 
   const apply = () => {
