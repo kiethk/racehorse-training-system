@@ -1,0 +1,695 @@
+'use client';
+
+import { useState } from 'react';
+import type { HorseFitnessTrendItem, ReadinessAssessment } from '../types';
+
+interface FitnessTrendChartProps {
+  trend: HorseFitnessTrendItem[];
+  readiness: ReadinessAssessment[];
+}
+
+type MetricView = 'ALL' | 'PERFORMANCE' | 'HEART_RATE' | 'SPEED_DISTANCE';
+
+export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) {
+  const [activeTab, setActiveTab] = useState<MetricView>('ALL');
+  const [hoveredPoint, setHoveredPoint] = useState<{
+    x: number;
+    y: number;
+    data: HorseFitnessTrendItem;
+  } | null>(null);
+
+  const [hoveredReadiness, setHoveredReadiness] = useState<{
+    x: number;
+    y: number;
+    data: ReadinessAssessment;
+  } | null>(null);
+
+  if (!trend || trend.length === 0) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-6 text-center">
+        <p className="text-sm font-medium text-[var(--color-text-secondary)]">
+          Chưa có dữ liệu buổi tập hoàn thành trong khoảng thời gian này
+        </p>
+        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+          Sau khi hoàn thành các buổi tập và ghi nhận chỉ số, biểu đồ thể lực sẽ tự động hiển thị ở đây.
+        </p>
+      </div>
+    );
+  }
+
+  // Sắp xếp theo ngày tăng dần
+  const sortedTrend = [...trend].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  const width = 800;
+  const height = 240;
+  const padding = { top: 25, right: 30, bottom: 40, left: 45 };
+  const chartW = width - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+
+  // Tính vị trí X theo index (hoặc date)
+  const getX = (index: number) => {
+    if (sortedTrend.length <= 1) return padding.left + chartW / 2;
+    return padding.left + (index / (sortedTrend.length - 1)) * chartW;
+  };
+
+  // Helper tính Y từ min, max
+  const getY = (val: number | null | undefined, minVal: number, maxVal: number) => {
+    if (val === null || val === undefined) return null;
+    const clamped = Math.max(minVal, Math.min(maxVal, val));
+    const ratio = (clamped - minVal) / (maxVal - minVal || 1);
+    return padding.top + chartH - ratio * chartH;
+  };
+
+  // Ánh xạ ngày của readiness vào vị trí X trên trục thời gian của trend
+  const getReadinessX = (assessmentDate: string) => {
+    const time = new Date(assessmentDate).getTime();
+    const firstTime = new Date(sortedTrend[0].date).getTime();
+    const lastTime = new Date(sortedTrend[sortedTrend.length - 1].date).getTime();
+
+    if (firstTime === lastTime) return padding.left + chartW / 2;
+    const ratio = (time - firstTime) / (lastTime - firstTime);
+    const clampedRatio = Math.max(0, Math.min(1, ratio));
+    return padding.left + clampedRatio * chartW;
+  };
+
+  // Tạo đường dẫn SVG Path từ danh sách điểm
+  const makePath = (
+    accessor: (d: HorseFitnessTrendItem) => number | null | undefined,
+    minVal: number,
+    maxVal: number
+  ) => {
+    const points: [number, number][] = [];
+    sortedTrend.forEach((d, i) => {
+      const v = accessor(d);
+      if (v !== null && v !== undefined) {
+        const x = getX(i);
+        const y = getY(v, minVal, maxVal);
+        if (y !== null) points.push([x, y]);
+      }
+    });
+
+    if (points.length === 0) return '';
+    if (points.length === 1) {
+      return `M ${points[0][0]} ${points[0][1]} L ${points[0][0] + 0.1} ${points[0][1]}`;
+    }
+
+    return points.reduce((acc, curr, idx) => {
+      return idx === 0 ? `M ${curr[0]} ${curr[1]}` : `${acc} L ${curr[0]} ${curr[1]}`;
+    }, '');
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header & Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
+        <div>
+          <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
+            Biểu Đồ Tiến Độ Thể Lực & Phong Độ
+          </h3>
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Theo dõi xu hướng thể lực qua các buổi tập và các đợt đánh giá định kỳ
+          </p>
+        </div>
+        <div className="flex rounded-[var(--radius-sm)] bg-[var(--color-surface-subtle)] p-0.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab('ALL')}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+              activeTab === 'ALL'
+                ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            Tất cả chỉ số
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('PERFORMANCE')}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+              activeTab === 'PERFORMANCE'
+                ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            Phong độ & Sẵn sàng
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('HEART_RATE')}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+              activeTab === 'HEART_RATE'
+                ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            Nhịp tim (BPM)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('SPEED_DISTANCE')}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+              activeTab === 'SPEED_DISTANCE'
+                ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            Vận tốc & Cự ly
+          </button>
+        </div>
+      </div>
+
+      {/* Chart 1: Performance Rating (1-10) + Readiness Assessment (Scatter markers) */}
+      {(activeTab === 'ALL' || activeTab === 'PERFORMANCE') && (
+        <div className="relative rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+              Phong độ thi đấu (1 - 10) & Điểm Đánh giá sẵn sàng
+            </span>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                Phong độ buổi tập (Rating)
+              </span>
+              <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
+                <span className="h-2.5 w-2.5 rotate-45 transform bg-purple-600" />
+                Đánh giá định kỳ (Readiness Score)
+              </span>
+            </div>
+          </div>
+
+          <div className="relative w-full overflow-x-auto">
+            <svg
+              viewBox={`0 0 ${width} ${height}`}
+              className="w-full min-w-[650px] overflow-visible"
+              style={{ maxHeight: '250px' }}
+            >
+              {/* Grid Lines */}
+              {[0, 2, 4, 6, 8, 10].map((val) => {
+                const y = getY(val, 0, 10) || 0;
+                return (
+                  <g key={val}>
+                    <line
+                      x1={padding.left}
+                      y1={y}
+                      x2={padding.left + chartW}
+                      y2={y}
+                      stroke="var(--color-border-subtle, #e5e7eb)"
+                      strokeDasharray="3 3"
+                    />
+                    <text
+                      x={padding.left - 8}
+                      y={y + 3}
+                      textAnchor="end"
+                      fontSize="10"
+                      fill="var(--color-text-muted, #9ca3af)"
+                    >
+                      {val}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* X Axis Labels */}
+              {sortedTrend.map((d, i) => {
+                if (sortedTrend.length > 12 && i % Math.ceil(sortedTrend.length / 10) !== 0) {
+                  return null;
+                }
+                const x = getX(i);
+                return (
+                  <text
+                    key={d.workoutId}
+                    x={x}
+                    y={padding.top + chartH + 18}
+                    textAnchor="middle"
+                    fontSize="9"
+                    fill="var(--color-text-secondary, #6b7280)"
+                  >
+                    {d.date.slice(5)}
+                  </text>
+                );
+              })}
+
+              {/* Path for Performance Rating */}
+              <path
+                d={makePath((d) => d.performanceRating, 0, 10)}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              {/* Points for Performance Rating */}
+              {sortedTrend.map((d, i) => {
+                const y = getY(d.performanceRating, 0, 10);
+                if (y === null) return null;
+                const x = getX(i);
+                return (
+                  <circle
+                    key={d.workoutId}
+                    cx={x}
+                    cy={y}
+                    r="4.5"
+                    fill="#10b981"
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                    className="cursor-pointer transition-transform hover:scale-150"
+                    onMouseEnter={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setHoveredPoint({ x: rect.left, y: rect.top, data: d });
+                    }}
+                    onMouseLeave={() => setHoveredPoint(null)}
+                  />
+                );
+              })}
+
+              {/* Scatter Markers for Readiness Assessments (Discrete, not connected) */}
+              {readiness &&
+                readiness.map((r) => {
+                  const score =
+                    r.fitnessScore !== null && r.fitnessScore !== undefined
+                      ? Number(r.fitnessScore)
+                      : null;
+                  if (score === null) return null;
+                  const x = getReadinessX(r.assessmentDate);
+                  const y = getY(score, 0, 10);
+                  if (y === null) return null;
+
+                  return (
+                    <polygon
+                      key={r.id}
+                      points={`${x},${y - 6} ${x + 6},${y} ${x},${y + 6} ${x - 6},${y}`}
+                      fill="#9333ea"
+                      stroke="#ffffff"
+                      strokeWidth="1.5"
+                      className="cursor-pointer transition-transform hover:scale-150"
+                      onMouseEnter={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setHoveredReadiness({ x: rect.left, y: rect.top, data: r });
+                      }}
+                      onMouseLeave={() => setHoveredReadiness(null)}
+                    />
+                  );
+                })}
+            </svg>
+          </div>
+        </div>
+      )}
+
+      {/* Chart 2: Heart Rate (bpm) with Danger Thresholds (220 & 100 bpm) */}
+      {(activeTab === 'ALL' || activeTab === 'HEART_RATE') && (
+        <div className="relative rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+              Nhịp Tim (BPM) & Ngưỡng An Toàn
+            </span>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
+                <span className="h-2 w-4 bg-rose-500 rounded-sm" />
+                Max HR
+              </span>
+              <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
+                <span className="h-2 w-4 bg-blue-500 rounded-sm" />
+                Avg HR
+              </span>
+              <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
+                <span className="h-2 w-4 bg-amber-500 rounded-sm" />
+                Recovery HR
+              </span>
+              <span className="flex items-center gap-1.5 text-rose-600 font-medium">
+                <span className="h-0.5 w-3 border-t-2 border-dashed border-rose-500" />
+                Ngưỡng Max: 220 bpm
+              </span>
+            </div>
+          </div>
+
+          <div className="relative w-full overflow-x-auto">
+            <svg
+              viewBox={`0 0 ${width} ${height}`}
+              className="w-full min-w-[650px] overflow-visible"
+              style={{ maxHeight: '250px' }}
+            >
+              {/* Grid Lines: 60, 100, 140, 180, 220, 240 */}
+              {[60, 100, 140, 180, 220, 240].map((val) => {
+                const y = getY(val, 50, 250) || 0;
+                const is220 = val === 220;
+                const is100 = val === 100;
+                return (
+                  <g key={val}>
+                    <line
+                      x1={padding.left}
+                      y1={y}
+                      x2={padding.left + chartW}
+                      y2={y}
+                      stroke={
+                        is220 ? '#ef4444' : is100 ? '#f59e0b' : 'var(--color-border-subtle, #e5e7eb)'
+                      }
+                      strokeWidth={is220 || is100 ? 1.5 : 1}
+                      strokeDasharray={is220 || is100 ? '4 4' : '3 3'}
+                    />
+                    <text
+                      x={padding.left - 8}
+                      y={y + 3}
+                      textAnchor="end"
+                      fontSize="10"
+                      fill={
+                        is220
+                          ? '#ef4444'
+                          : is100
+                          ? '#f59e0b'
+                          : 'var(--color-text-muted, #9ca3af)'
+                      }
+                      fontWeight={is220 || is100 ? '600' : 'normal'}
+                    >
+                      {val}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* X Axis Labels */}
+              {sortedTrend.map((d, i) => {
+                if (sortedTrend.length > 12 && i % Math.ceil(sortedTrend.length / 10) !== 0) {
+                  return null;
+                }
+                const x = getX(i);
+                return (
+                  <text
+                    key={d.workoutId}
+                    x={x}
+                    y={padding.top + chartH + 18}
+                    textAnchor="middle"
+                    fontSize="9"
+                    fill="var(--color-text-secondary, #6b7280)"
+                  >
+                    {d.date.slice(5)}
+                  </text>
+                );
+              })}
+
+              {/* Max HR Line */}
+              <path
+                d={makePath((d) => d.maxHeartRate, 50, 250)}
+                fill="none"
+                stroke="#f43f5e"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+
+              {/* Avg HR Line */}
+              <path
+                d={makePath((d) => d.averageHeartRate, 50, 250)}
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+
+              {/* Recovery HR Line */}
+              <path
+                d={makePath((d) => d.recoveryHeartRate, 50, 250)}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+
+              {/* Data points */}
+              {sortedTrend.map((d, i) => {
+                const x = getX(i);
+                const yMax = getY(d.maxHeartRate, 50, 250);
+                const yAvg = getY(d.averageHeartRate, 50, 250);
+                const yRec = getY(d.recoveryHeartRate, 50, 250);
+
+                return (
+                  <g key={d.workoutId}>
+                    {yMax !== null && (
+                      <circle
+                        cx={x}
+                        cy={yMax}
+                        r="3.5"
+                        fill="#f43f5e"
+                        stroke="#fff"
+                        strokeWidth="1"
+                        className="cursor-pointer hover:scale-150 transition-transform"
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setHoveredPoint({ x: rect.left, y: rect.top, data: d });
+                        }}
+                        onMouseLeave={() => setHoveredPoint(null)}
+                      />
+                    )}
+                    {yAvg !== null && (
+                      <circle
+                        cx={x}
+                        cy={yAvg}
+                        r="3.5"
+                        fill="#3b82f6"
+                        stroke="#fff"
+                        strokeWidth="1"
+                        className="cursor-pointer hover:scale-150 transition-transform"
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setHoveredPoint({ x: rect.left, y: rect.top, data: d });
+                        }}
+                        onMouseLeave={() => setHoveredPoint(null)}
+                      />
+                    )}
+                    {yRec !== null && (
+                      <circle
+                        cx={x}
+                        cy={yRec}
+                        r="3.5"
+                        fill="#f59e0b"
+                        stroke="#fff"
+                        strokeWidth="1"
+                        className="cursor-pointer hover:scale-150 transition-transform"
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setHoveredPoint({ x: rect.left, y: rect.top, data: d });
+                        }}
+                        onMouseLeave={() => setHoveredPoint(null)}
+                      />
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        </div>
+      )}
+
+      {/* Chart 3: Speed & Distance */}
+      {(activeTab === 'ALL' || activeTab === 'SPEED_DISTANCE') && (
+        <div className="relative rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+              Vận Tốc (km/h) & Cự Ly (m)
+            </span>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
+                <span className="h-2 w-4 bg-indigo-500 rounded-sm" />
+                Vận tốc tối đa (Top Speed)
+              </span>
+              <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
+                <span className="h-2 w-4 bg-cyan-500 rounded-sm" />
+                Vận tốc trung bình (Avg Speed)
+              </span>
+            </div>
+          </div>
+
+          <div className="relative w-full overflow-x-auto">
+            <svg
+              viewBox={`0 0 ${width} ${height}`}
+              className="w-full min-w-[650px] overflow-visible"
+              style={{ maxHeight: '250px' }}
+            >
+              {/* Grid Lines: 0 to 70 km/h */}
+              {[0, 15, 30, 45, 60, 75].map((val) => {
+                const y = getY(val, 0, 75) || 0;
+                return (
+                  <g key={val}>
+                    <line
+                      x1={padding.left}
+                      y1={y}
+                      x2={padding.left + chartW}
+                      y2={y}
+                      stroke="var(--color-border-subtle, #e5e7eb)"
+                      strokeDasharray="3 3"
+                    />
+                    <text
+                      x={padding.left - 8}
+                      y={y + 3}
+                      textAnchor="end"
+                      fontSize="10"
+                      fill="var(--color-text-muted, #9ca3af)"
+                    >
+                      {val}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* X Axis Labels */}
+              {sortedTrend.map((d, i) => {
+                if (sortedTrend.length > 12 && i % Math.ceil(sortedTrend.length / 10) !== 0) {
+                  return null;
+                }
+                const x = getX(i);
+                return (
+                  <text
+                    key={d.workoutId}
+                    x={x}
+                    y={padding.top + chartH + 18}
+                    textAnchor="middle"
+                    fontSize="9"
+                    fill="var(--color-text-secondary, #6b7280)"
+                  >
+                    {d.date.slice(5)}
+                  </text>
+                );
+              })}
+
+              {/* Top Speed Line */}
+              <path
+                d={makePath((d) => d.topSpeedKmh, 0, 75)}
+                fill="none"
+                stroke="#6366f1"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+
+              {/* Avg Speed Line */}
+              <path
+                d={makePath((d) => d.averageSpeedKmh, 0, 75)}
+                fill="none"
+                stroke="#06b6d4"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+
+              {/* Data points */}
+              {sortedTrend.map((d, i) => {
+                const x = getX(i);
+                const yTop = getY(d.topSpeedKmh, 0, 75);
+                const yAvg = getY(d.averageSpeedKmh, 0, 75);
+
+                return (
+                  <g key={d.workoutId}>
+                    {yTop !== null && (
+                      <circle
+                        cx={x}
+                        cy={yTop}
+                        r="3.5"
+                        fill="#6366f1"
+                        stroke="#fff"
+                        strokeWidth="1"
+                        className="cursor-pointer hover:scale-150 transition-transform"
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setHoveredPoint({ x: rect.left, y: rect.top, data: d });
+                        }}
+                        onMouseLeave={() => setHoveredPoint(null)}
+                      />
+                    )}
+                    {yAvg !== null && (
+                      <circle
+                        cx={x}
+                        cy={yAvg}
+                        r="3.5"
+                        fill="#06b6d4"
+                        stroke="#fff"
+                        strokeWidth="1"
+                        className="cursor-pointer hover:scale-150 transition-transform"
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setHoveredPoint({ x: rect.left, y: rect.top, data: d });
+                        }}
+                        onMouseLeave={() => setHoveredPoint(null)}
+                      />
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Tooltip for Workout Point */}
+      {hoveredPoint && (
+        <div
+          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 shadow-lg"
+          style={{
+            left: `${hoveredPoint.x}px`,
+            top: `${hoveredPoint.y - 10}px`,
+          }}
+        >
+          <p className="text-xs font-bold text-[var(--color-text-primary)]">
+            {hoveredPoint.data.date} • {hoveredPoint.data.subjectName}
+          </p>
+          <div className="mt-1 space-y-0.5 text-[11px] text-[var(--color-text-secondary)]">
+            <p>
+              Phong độ:{' '}
+              <span className="font-semibold text-emerald-600">
+                {hoveredPoint.data.performanceRating ?? 'N/A'}/10
+              </span>
+            </p>
+            <p>
+              Nhịp tim:{' '}
+              <span>
+                Avg {hoveredPoint.data.averageHeartRate ?? '-'} | Max{' '}
+                <strong className={hoveredPoint.data.maxHeartRate && hoveredPoint.data.maxHeartRate > 220 ? 'text-red-500' : ''}>
+                  {hoveredPoint.data.maxHeartRate ?? '-'}
+                </strong>{' '}
+                | Rec{' '}
+                <strong className={hoveredPoint.data.recoveryHeartRate && hoveredPoint.data.recoveryHeartRate > 100 ? 'text-amber-500' : ''}>
+                  {hoveredPoint.data.recoveryHeartRate ?? '-'}
+                </strong>{' '}
+                bpm
+              </span>
+            </p>
+            <p>
+              Tốc độ: Avg {hoveredPoint.data.averageSpeedKmh ?? '-'} km/h | Top{' '}
+              {hoveredPoint.data.topSpeedKmh ?? '-'} km/h
+            </p>
+            {hoveredPoint.data.distanceMeters && (
+              <p>Cự ly: {hoveredPoint.data.distanceMeters.toLocaleString()} m</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Tooltip for Readiness Point */}
+      {hoveredReadiness && (
+        <div
+          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-md border border-purple-200 bg-[var(--color-surface)] p-2.5 shadow-lg"
+          style={{
+            left: `${hoveredReadiness.x}px`,
+            top: `${hoveredReadiness.y - 10}px`,
+          }}
+        >
+          <p className="text-xs font-bold text-purple-700">
+            Đánh Giá Sẵn Sàng Định Kỳ • {hoveredReadiness.data.assessmentDate}
+          </p>
+          <div className="mt-1 space-y-0.5 text-[11px] text-[var(--color-text-secondary)]">
+            <p>
+              Điểm thể lực (Fitness Score):{' '}
+              <strong className="text-purple-700">
+                {hoveredReadiness.data.fitnessScore ?? 'Chưa chấm'}/10
+              </strong>
+            </p>
+            <p>
+              Trạng thái: <strong>{hoveredReadiness.data.readinessStatus}</strong>
+            </p>
+            {hoveredReadiness.data.estimatedMonthsToRace !== null && (
+              <p>Dự kiến sẵn sàng thi đấu: {hoveredReadiness.data.estimatedMonthsToRace} tháng</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

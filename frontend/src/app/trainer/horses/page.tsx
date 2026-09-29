@@ -1,19 +1,21 @@
-'use client';
-
+import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { TrainerDashboardView } from '@/features/training/components/TrainerDashboardView';
+import { TrainerHorseListView } from '@/features/training/components/TrainerHorseListView';
 
-export default function TrainerPage() {
+export const metadata: Metadata = {
+  title: 'Danh sách chiến mã | Huấn luyện viên',
+};
+
+export default function TrainerHorsesPage() {
   return (
     <RoleGuard allowedRoles={['HEAD_TRAINER']}>
       <AppShell>
         <PageContainer>
-          <TrainerDashboardView />
+          <TrainerHorseListView />
         </PageContainer>
       </AppShell>
     </RoleGuard>
   );
 }
-

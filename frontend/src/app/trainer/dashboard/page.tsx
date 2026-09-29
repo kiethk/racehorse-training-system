@@ -1,11 +1,14 @@
-'use client';
-
+import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { TrainerDashboardView } from '@/features/training/components/TrainerDashboardView';
 
-export default function TrainerPage() {
+export const metadata: Metadata = {
+  title: 'Dashboard Huấn luyện viên | RTMS',
+};
+
+export default function TrainerDashboardPage() {
   return (
     <RoleGuard allowedRoles={['HEAD_TRAINER']}>
       <AppShell>
@@ -16,4 +19,3 @@ export default function TrainerPage() {
     </RoleGuard>
   );
 }
-

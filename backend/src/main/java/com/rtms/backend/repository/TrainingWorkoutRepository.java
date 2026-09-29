@@ -128,4 +128,37 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
     long countByPlanIdAndStatusNot(Long planId, WorkoutStatus status);
 
     long countByPlanIdAndStatusNotIn(Long planId, Collection<WorkoutStatus> statuses);
+
+    /**
+     * Dùng cho biểu đồ thể lực (fitness-trend): các buổi tập đã hoàn thành của một chiến mã,
+     * sắp xếp theo ngày tăng dần để vẽ biểu đồ đường theo chuỗi thời gian.
+     *
+     * Khoảng ngày lọc NGAY TRONG SQL, không tải hết rồi cắt bằng stream ở Java.
+     * Service truyền mốc bao trùm khi người dùng bỏ trống from/to, nên không cần
+     * xử lý tham số null trong câu truy vấn.
+     */
+    @Query("""
+           SELECT w, l FROM TrainingWorkout w
+           JOIN TrainingLot l ON w.lotId = l.id
+           WHERE w.horseId = :horseId
+             AND w.status = com.rtms.backend.enums.WorkoutStatus.COMPLETED
+             AND l.lotDate BETWEEN :fromDate AND :toDate
+           ORDER BY l.lotDate ASC, l.startTime ASC
+           """)
+    List<Object[]> findCompletedWorkoutsWithLotAsc(@Param("horseId") Long horseId,
+                                                    @Param("fromDate") LocalDate fromDate,
+                                                    @Param("toDate") LocalDate toDate);
+
+    /**
+     * Dùng cho bộ 5 luật cảnh báo thể lực & dashboard: các buổi tập đã hoàn thành gần đây,
+     * sắp xếp theo ngày giảm dần (mới nhất trước).
+     */
+    @Query("""
+           SELECT w, l FROM TrainingWorkout w
+           JOIN TrainingLot l ON w.lotId = l.id
+           WHERE w.horseId = :horseId
+             AND w.status = com.rtms.backend.enums.WorkoutStatus.COMPLETED
+           ORDER BY l.lotDate DESC, l.startTime DESC
+           """)
+    List<Object[]> findCompletedWorkoutsWithLotDesc(@Param("horseId") Long horseId);
 }

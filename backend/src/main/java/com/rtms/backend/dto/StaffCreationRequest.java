@@ -18,7 +18,6 @@ public class StaffCreationRequest {
     // Head Trainer specific
     private String certificationNumber;
     private LocalDate certificationIssuedDate;
-    private Integer yearsOfExperience;
 
     // Groom specific
     private Long trainerId;
@@ -56,8 +55,6 @@ public class StaffCreationRequest {
     public LocalDate getCertificationIssuedDate() { return certificationIssuedDate; }
     public void setCertificationIssuedDate(LocalDate certificationIssuedDate) { this.certificationIssuedDate = certificationIssuedDate; }
 
-    public Integer getYearsOfExperience() { return yearsOfExperience; }
-    public void setYearsOfExperience(Integer yearsOfExperience) { this.yearsOfExperience = yearsOfExperience; }
 
     public Long getTrainerId() { return trainerId; }
     public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }

@@ -29,7 +29,6 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading }: AddStaffDia
   // Trainer specific
   const [certificationNumber, setCertificationNumber] = useState('');
   const [certificationIssuedDate, setCertificationIssuedDate] = useState('');
-  const [yearsOfExperience, setYearsOfExperience] = useState('');
 
   // Groom specific
   const [trainerId, setTrainerId] = useState('');
@@ -58,7 +57,6 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading }: AddStaffDia
       setSpecialization('');
       setCertificationNumber('');
       setCertificationIssuedDate('');
-      setYearsOfExperience('');
       setTrainerId('');
       setError('');
     }
@@ -102,7 +100,6 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading }: AddStaffDia
     } else if (role === 'HEAD_TRAINER') {
       request.certificationNumber = certificationNumber.trim();
       request.certificationIssuedDate = certificationIssuedDate || undefined;
-      request.yearsOfExperience = yearsOfExperience ? parseInt(yearsOfExperience, 10) : undefined;
     } else if (role === 'GROOM') {
       request.trainerId = trainerId ? parseInt(trainerId, 10) : undefined;
     }
@@ -279,17 +276,6 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading }: AddStaffDia
                       type="date"
                       value={certificationIssuedDate}
                       onChange={(e) => setCertificationIssuedDate(e.target.value)}
-                      className={inputClassName}
-                      disabled={loading}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[12px] font-medium text-[var(--color-text-primary)]">Years of Experience</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={yearsOfExperience}
-                      onChange={(e) => setYearsOfExperience(e.target.value)}
                       className={inputClassName}
                       disabled={loading}
                     />

@@ -22,6 +22,5 @@ export interface StaffCreationRequest {
   specialization?: string;
   certificationNumber?: string;
   certificationIssuedDate?: string;
-  yearsOfExperience?: number;
   trainerId?: number;
 }
