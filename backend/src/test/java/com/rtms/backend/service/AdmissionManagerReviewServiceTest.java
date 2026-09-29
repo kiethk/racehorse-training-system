@@ -61,6 +61,8 @@ class AdmissionManagerReviewServiceTest {
         h.setId(10L);
         h.setCurrentStatus(status);
         h.setCurrentStallId(99L);
+        h.setTrainingLocked(true);
+        h.setTrainingLockReason("Admission pending trainer and manager review");
         return h;
     }
 
@@ -121,6 +123,8 @@ class AdmissionManagerReviewServiceTest {
 
         assertEquals(HorseStatus.ELIGIBLE, horse.getCurrentStatus());
         assertEquals(20L, horse.getCurrentStallId());
+        assertFalse(horse.isTrainingLocked());
+        assertNull(horse.getTrainingLockReason());
         verify(horseRepository).save(horse);
 
         assertEquals(StallStatus.OCCUPIED, regularStall.getStatus());

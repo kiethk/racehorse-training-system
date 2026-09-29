@@ -32,15 +32,15 @@ interface DecisionCardConfig {
 const decisions: DecisionCardConfig[] = [
   {
     value: 'APPROVED',
-    title: 'Approve Admission',
-    subtitle: 'Medically sound & cleared',
+    title: 'Approve Vet Review',
+    subtitle: 'Medically cleared for Trainer review',
     description:
-      'The horse passes physical examination and biosecurity screening. Ready for normal stable entry and active training.',
+      'The horse passes physical examination and biosecurity screening. The admission can proceed to Trainer review.',
     outcomeNotes: [
-      'Horse transitions to ELIGIBLE status',
-      'Quarantine stall will be released',
-      'Regular stable stall will be assigned',
-      'Training lock will be lifted immediately',
+      'Vet decision is recorded as APPROVED',
+      'Admission moves to TRAINER_REVIEW',
+      'Horse remains a CANDIDATE in quarantine',
+      'Training stays locked until final Manager approval',
     ],
     icon: 'check',
     tone: 'success',
@@ -761,7 +761,7 @@ export function VetReviewForm({
             <div className="flex items-center gap-2 text-[12px] text-[var(--color-text-secondary)]">
               <Icon name="lock" size={14} className="text-[var(--color-text-muted)]" />
               <span>
-                Completing this review links the health record, unlocks or continues training lock, and updates stall assignments.
+                Completing this review links the health record and updates the veterinary stage of the admission workflow.
               </span>
             </div>
 
@@ -780,7 +780,7 @@ export function VetReviewForm({
                 }
               >
                 {decision === 'APPROVED'
-                  ? 'Complete & Approve Admission'
+                  ? 'Complete & Approve Vet Review'
                   : decision === 'RECHECK_REQUIRED'
                     ? 'Complete & Require Recheck'
                     : 'Complete & Reject Admission'}
@@ -793,7 +793,7 @@ export function VetReviewForm({
       {/* Confirmation Dialogs */}
       <ConfirmDialog
         open={showConfirm && decision === 'APPROVED'}
-        title="Approve Admission Examination?"
+        title="Approve Veterinary Review?"
         description={
           <div className="space-y-2 text-[13px]">
             <p>
@@ -801,13 +801,13 @@ export function VetReviewForm({
               communicable illness or disqualifying pathology.
             </p>
             <div className="rounded-[var(--radius-sm)] bg-[var(--color-success-soft)] p-2.5 text-[12px] text-[var(--color-success)] font-medium">
-              ✓ The training lock will be lifted.
-              <br />✓ Horse will be moved from quarantine ({quarantineStallCode || 'Quarantine'}) to an available regular stall.
-              <br />✓ Status will transition to ELIGIBLE.
+              ✓ Vet decision will be recorded as APPROVED.
+              <br />✓ Admission will move to Trainer review.
+              <br />✓ Horse remains a CANDIDATE in {quarantineStallCode || 'Quarantine'} with training locked.
             </div>
           </div>
         }
-        confirmLabel="Approve & Unlock Training"
+        confirmLabel="Approve Vet Review"
         cancelLabel="Back to Review"
         tone="primary"
         loading={submitting}

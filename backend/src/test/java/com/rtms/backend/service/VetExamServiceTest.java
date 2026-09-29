@@ -40,7 +40,6 @@ class VetExamServiceTest {
     AdmissionApplication admission;
     Horse horse;
     StableStall quarantine;
-    StableStall regular;
 
     @BeforeEach
     void setUp() {
@@ -68,27 +67,26 @@ class VetExamServiceTest {
         horse.setTrainingLocked(true);
 
         quarantine = stall(99L, "Q-1", StallStatus.OCCUPIED);
-        regular = stall(100L, "R-1", StallStatus.AVAILABLE);
     }
 
     @Test
-    void approvedIsFinalAndMovesHorseToReservedRegularStall() {
+    void approvedAdvancesToTrainerReviewAndKeepsCandidateInQuarantine() {
         mockCompletion();
-        when(stalls.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.of(regular));
         when(stalls.findQuarantineStallByIdForUpdate(99L)).thenReturn(Optional.of(quarantine));
 
         var result = service.complete(20L, completion(VetDecision.APPROVED), 5L);
 
         assertEquals(VetExamStatus.COMPLETED, result.status());
         assertEquals(30L, result.healthRecordId());
-        assertEquals(AdmissionStatus.APPROVED, admission.getStatus());
+        assertEquals(AdmissionStatus.TRAINER_REVIEW, admission.getStatus());
         assertEquals(VetDecision.APPROVED, admission.getVetDecision());
-        assertEquals(HorseStatus.ELIGIBLE, horse.getCurrentStatus());
-        assertEquals(100L, horse.getCurrentStallId());
-        assertFalse(horse.isTrainingLocked());
-        assertEquals(StallStatus.OCCUPIED, regular.getStatus());
-        assertEquals(StallStatus.AVAILABLE, quarantine.getStatus());
+        assertEquals(HorseStatus.CANDIDATE, horse.getCurrentStatus());
+        assertEquals(99L, horse.getCurrentStallId());
+        assertTrue(horse.isTrainingLocked());
+        assertEquals("Admission pending trainer and manager review", horse.getTrainingLockReason());
+        assertEquals(StallStatus.OCCUPIED, quarantine.getStatus());
         assertEquals(30L, exam.getHealthRecordId());
+        verify(stalls, never()).findFirstAvailableRegularStallForUpdate();
 
         ArgumentCaptor<HealthRecord> saved = ArgumentCaptor.forClass(HealthRecord.class);
         verify(records).save(saved.capture());
@@ -96,17 +94,16 @@ class VetExamServiceTest {
     }
 
     @Test
-    void approvalWithoutRegularStallRollsBackBeforeHealthRecord() {
-        mockCompletionLookups();
-        when(stalls.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.empty());
+    void approvalDoesNotRequireARegularStall() {
+        mockCompletion();
+        when(stalls.findQuarantineStallByIdForUpdate(99L)).thenReturn(Optional.of(quarantine));
 
-        ApiException error = assertThrows(ApiException.class,
-                () -> service.complete(20L, completion(VetDecision.APPROVED), 5L));
+        var result = service.complete(20L, completion(VetDecision.APPROVED), 5L);
 
-        assertEquals(HttpStatus.CONFLICT, error.getStatus());
-        assertTrue(error.getMessage().contains("No regular stall"));
-        assertEquals(VetExamStatus.IN_PROGRESS, exam.getStatus());
-        verify(records, never()).save(any());
+        assertEquals(VetExamStatus.COMPLETED, result.status());
+        assertEquals(AdmissionStatus.TRAINER_REVIEW, admission.getStatus());
+        verify(stalls, never()).findFirstAvailableRegularStallForUpdate();
+        verify(records).save(any());
     }
 
     @Test
