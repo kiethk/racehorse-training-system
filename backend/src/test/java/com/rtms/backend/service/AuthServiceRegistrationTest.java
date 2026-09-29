@@ -5,6 +5,7 @@ import com.rtms.backend.dto.OwnerRegistrationResponse;
 import com.rtms.backend.entity.Role;
 import com.rtms.backend.entity.User;
 import com.rtms.backend.repository.GroomProfileRepository;
+import com.rtms.backend.repository.RefreshTokenRepository;
 import com.rtms.backend.repository.RoleRepository;
 import com.rtms.backend.repository.TrainerProfileRepository;
 import com.rtms.backend.repository.UserRepository;
@@ -42,8 +43,10 @@ class AuthServiceRegistrationTest {
         TrainerProfileRepository trainerRepo = mock(TrainerProfileRepository.class);
         GroomProfileRepository groomRepo = mock(GroomProfileRepository.class);
 
+        RefreshTokenRepository refreshTokenRepository = mock(RefreshTokenRepository.class);
+
         authService = new AuthService(userRepository, roleRepository, passwordEncoder,
-                jwtUtil, vetRepo, trainerRepo, groomRepo);
+                jwtUtil, vetRepo, trainerRepo, groomRepo, refreshTokenRepository);
 
         horseOwnerRole = new Role();
         horseOwnerRole.setId(1L);

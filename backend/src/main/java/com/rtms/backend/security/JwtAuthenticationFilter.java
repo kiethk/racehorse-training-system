@@ -60,7 +60,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (request.getCookies() == null)
             return null;
         for (Cookie cookie : request.getCookies()) {
-            if ("jwt_token".equals(cookie.getName())) {
+            if ("rtms_access_token".equals(cookie.getName())) {
                 return cookie.getValue();
             }
         }
