@@ -17,12 +17,14 @@ export function getNavigationForRole(role: Role): NavItem[] {
   switch (role) {
     case 'CLUB_MANAGER':
       return [
-        { id: 'dashboard', label: 'Dashboard', href: dashboardHref },
-        { id: 'management', label: 'Management', href: '/manager/management' },
-        { id: 'staff', label: 'Staff', href: '/manager/staff' },
-        { id: 'horses', label: 'Horses' },
-        { id: 'stable', label: 'Stable' },
-        { id: 'reports', label: 'Reports' },
+        { id: 'dashboard',      label: 'Dashboard',      href: dashboardHref },
+        { id: 'admissions',     label: 'Admissions',     href: '/manager/admissions' },
+        { id: 'horses',         label: 'Horses' },
+        { id: 'staff',          label: 'Staff',          href: '/manager/staff' },
+        { id: 'access-control', label: 'Access Control', href: '/manager/access-control' },
+        { id: 'audit-log',      label: 'Audit Log',      href: '/manager/audit-log' },
+        { id: 'stable',         label: 'Stable' },
+        { id: 'reports',        label: 'Reports' },
       ];
     case 'HEAD_TRAINER':
       return [
