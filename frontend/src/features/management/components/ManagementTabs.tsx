@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Tabs } from '@/components/ui/Tabs';
 import { ManagerQueueList } from '@/features/admissions/components/ManagerQueueList';
-import { AccessControlPlaceholder } from './AccessControlPlaceholder';
+import { AccessControlView } from '@/features/access-control/components/AccessControlView';
 import { AuditLogPlaceholder } from './AuditLogPlaceholder';
 
 type ManagementTab = 'admission' | 'access' | 'audit';
@@ -37,7 +37,7 @@ export function ManagementTabs() {
 
       {/* Tab content */}
       {activeTab === 'admission' && <ManagerQueueList />}
-      {activeTab === 'access'    && <AccessControlPlaceholder />}
+      {activeTab === 'access'    && <AccessControlView />}
       {activeTab === 'audit'     && <AuditLogPlaceholder />}
     </div>
   );
