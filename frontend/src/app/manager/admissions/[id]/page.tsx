@@ -1,0 +1,31 @@
+import { AppShell } from '@/components/layout/AppShell';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { RoleGuard } from '@/components/auth/RoleGuard';
+import { ManagerAdmissionDetailView } from '@/features/admissions/components/ManagerAdmissionDetailView';
+
+type RouteParams = Promise<{ id: string }>;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function ManagerAdmissionDetailPage({
+  params,
+  searchParams,
+}: {
+  params: RouteParams;
+  searchParams: SearchParams;
+}) {
+  const [{ id }] = await Promise.all([params, searchParams]);
+  const admissionId = Number(id);
+  const validId = Number.isSafeInteger(admissionId) && admissionId > 0;
+
+  return (
+    <RoleGuard allowedRoles={['CLUB_MANAGER']}>
+      <AppShell>
+        <PageContainer>
+          {validId
+            ? <ManagerAdmissionDetailView admissionId={admissionId} returnTo="/manager/admissions" />
+            : <p role="alert" className="text-sm text-[var(--color-danger)]">Invalid admission ID.</p>}
+        </PageContainer>
+      </AppShell>
+    </RoleGuard>
+  );
+}

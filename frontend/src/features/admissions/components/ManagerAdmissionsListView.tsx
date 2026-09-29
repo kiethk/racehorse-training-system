@@ -1,0 +1,199 @@
+'use client';
+
+import { useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
+import { Panel } from '@/components/ui/Panel';
+import { Icon } from '@/components/ui/Icon';
+import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { admissionsApi } from '../services/api';
+import type { AdmissionSummaryResponse, AdmissionStatus } from '../types';
+import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
+
+interface ManagerQueueFilters {
+  candidateName: string;
+  status: AdmissionStatus | 'ALL';
+  submittedFrom: string;
+  submittedTo: string;
+}
+
+const initialFilters: ManagerQueueFilters = {
+  candidateName: '',
+  status: 'ALL',
+  submittedFrom: '',
+  submittedTo: '',
+};
+
+export function ManagerAdmissionsListView() {
+  const [admissions, setAdmissions] = useState<AdmissionSummaryResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [draft, setDraft] = useState<ManagerQueueFilters>(initialFilters);
+  const [applied, setApplied] = useState<ManagerQueueFilters>(initialFilters);
+
+  useEffect(() => {
+    let active = true;
+    async function loadQueue() {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await admissionsApi.getAdmissions();
+        if (active) setAdmissions(data);
+      } catch (err) {
+        console.error('Failed to load manager queue:', err);
+        if (active) setError('Failed to load admissions. Please try again.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadQueue();
+    return () => { active = false; };
+  }, []);
+
+  const filteredAdmissions = useMemo(() => {
+    return admissions
+      .filter((a) => {
+        if (applied.status !== 'ALL' && a.status !== applied.status) return false;
+        if (applied.candidateName && !a.candidateName.toLowerCase().includes(applied.candidateName.toLowerCase())) return false;
+        
+        if (applied.submittedFrom || applied.submittedTo) {
+          // Both `submittedAt` and filter dates are ISO strings or standard date strings. 
+          // Safest to compare via Date object.
+          const submittedTime = new Date(a.submittedAt).getTime();
+          if (applied.submittedFrom) {
+            const fromTime = new Date(applied.submittedFrom).getTime();
+            if (submittedTime < fromTime) return false;
+          }
+          if (applied.submittedTo) {
+            // Include the entire end day
+            const toDate = new Date(applied.submittedTo);
+            toDate.setHours(23, 59, 59, 999);
+            if (submittedTime > toDate.getTime()) return false;
+          }
+        }
+        
+        return true;
+      })
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  }, [admissions, applied]);
+
+  const apply = () => {
+    setError(null);
+    setApplied({ ...draft, candidateName: draft.candidateName.trim() });
+  };
+
+  const clear = () => {
+    setDraft(initialFilters);
+    setError(null);
+    setApplied(initialFilters);
+  };
+
+  if (loading) {
+    return (
+      <Panel>
+        <ListSkeleton rows={10} />
+      </Panel>
+    );
+  }
+
+  const statuses: { value: AdmissionStatus | 'ALL'; label: string }[] = [
+    { value: 'ALL', label: 'All statuses' },
+    { value: 'GROOM_REVIEW', label: 'Groom Review' },
+    { value: 'WAITING_FOR_STALL', label: 'Waiting for Stall' },
+    { value: 'VET_REVIEW', label: 'Vet Review' },
+    { value: 'TRAINER_REVIEW', label: 'Trainer Review' },
+    { value: 'MANAGER_REVIEW', label: 'Manager Review' },
+    { value: 'APPROVED', label: 'Approved' },
+    { value: 'REJECTED', label: 'Rejected' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-[20px] font-semibold tracking-tight text-[var(--color-text-primary)]">
+          Admissions
+        </h1>
+      </div>
+
+      <form
+        className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(170px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto] xl:items-end"
+        onSubmit={(event) => { event.preventDefault(); apply(); }}
+      >
+        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
+          Search horse name
+          <span className="relative mt-1.5 block">
+            <Icon name="search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+            <input value={draft.candidateName} onChange={(event) => setDraft({ ...draft, candidateName: event.target.value })} placeholder="Search horse name" className="h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] pl-9 pr-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]" />
+          </span>
+        </label>
+        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
+          Status
+          <select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as AdmissionStatus | 'ALL' })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">
+            {statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+          </select>
+        </label>
+        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
+          From
+          <input type="date" value={draft.submittedFrom} onChange={(event) => setDraft({ ...draft, submittedFrom: event.target.value })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]" />
+        </label>
+        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
+          To
+          <input type="date" min={draft.submittedFrom || undefined} value={draft.submittedTo} onChange={(event) => setDraft({ ...draft, submittedTo: event.target.value })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]" />
+        </label>
+        <div className="flex items-center gap-2 sm:col-span-2 xl:col-span-1">
+          <Button type="submit" variant="primary" size="sm">Apply</Button>
+          <Button type="button" variant="secondary" size="sm" onClick={clear}>Clear</Button>
+        </div>
+      </form>
+
+      {error && <div role="alert" className="border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]">{error}</div>}
+
+      <Panel className="overflow-hidden">
+        {filteredAdmissions.length === 0 ? (
+          <EmptyState title="No matching applications" description="Change the filters or clear them to see other records." action={<Button size="sm" onClick={clear}>Clear filters</Button>} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="border-b border-[var(--color-border)] text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
+                <tr>
+                  <th className="px-6 py-4">Horse</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4">Submitted</th>
+                  <th className="px-6 py-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)]">
+                {filteredAdmissions.map((admission) => (
+                  <tr key={admission.admissionId} className="hover:bg-[var(--color-surface-muted)] transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <HorseAvatar name={admission.candidateName} image={admission.imageUrl} size={32} rounded="md" />
+                        <div>
+                          <span className="font-semibold block">{admission.candidateName}</span>
+                          <span className="text-[11px] text-[var(--color-text-muted)]">{admission.breed}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <AdmissionStatusBadge status={admission.status} />
+                    </td>
+                    <td className="px-6 py-4 text-[var(--color-text-secondary)]">
+                      {new Date(admission.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Link href={`/manager/admissions/${admission.admissionId}`} className="inline-flex items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] px-4 py-1.5 text-xs font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)] transition-colors">
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
+}

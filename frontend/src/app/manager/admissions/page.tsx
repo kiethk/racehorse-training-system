@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { ManagerQueueList } from '@/features/admissions/components/ManagerQueueList';
+import { ManagerAdmissionsListView } from '@/features/admissions/components/ManagerAdmissionsListView';
 
 export const metadata: Metadata = {
   title: 'Admissions | Manager',
@@ -13,7 +13,7 @@ export default function ManagerAdmissionsPage() {
     <RoleGuard allowedRoles={['CLUB_MANAGER']}>
       <AppShell>
         <PageContainer>
-          <ManagerQueueList />
+          <ManagerAdmissionsListView />
         </PageContainer>
       </AppShell>
     </RoleGuard>
