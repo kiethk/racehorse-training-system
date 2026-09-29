@@ -4,15 +4,6 @@
  * Đây là file nền tảng dùng chung cho toàn bộ nhóm.
  * Mọi HTTP call tới backend đều phải đi qua các hàm ở đây,
  * không gọi fetch() trực tiếp ở component.
- *
- * Cách dùng:
- *   import { apiGet, apiPost } from "@/services/api";
- *   const data = await apiGet<ApiResponse<Horse[]>>("/api/horses");
- *
- * Convention:
- *   - GET  → apiGet<ResponseType>(path)
- *   - POST → apiPost<ResponseType>(path, body)
- *   - Thêm apiPut / apiDelete theo cùng pattern khi cần
  */
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -26,11 +17,51 @@ export class ApiError extends Error {
 
 async function responseError(res: Response): Promise<ApiError> {
   const payload = await res.json().catch(() => null);
-  return new ApiError(res.status, payload?.message || `API error: ${res.status}`, payload?.errorCode);
+  const msg = payload?.detail || payload?.message || `API error: ${res.status}`;
+  return new ApiError(res.status, msg, payload?.errorCode);
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function doFetch(path: string, options: RequestInit): Promise<Response> {
+  const isAuthEndpoint = [
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/refresh',
+    '/api/auth/logout'
+  ].includes(path);
+
+  let res = await fetch(`${API_URL}${path}`, options);
+
+  if (res.status === 401 && !isAuthEndpoint) {
+    if (!refreshPromise) {
+      refreshPromise = (async () => {
+        try {
+          const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+          });
+          return refreshRes.ok;
+        } catch {
+          return false;
+        } finally {
+          refreshPromise = null;
+        }
+      })();
+    }
+
+    const refreshed = await refreshPromise;
+    if (refreshed) {
+      // Retry original request exactly once
+      res = await fetch(`${API_URL}${path}`, options);
+    }
+  }
+
+  return res;
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await doFetch(path, {
     credentials: "include",
   });
   if (!res.ok) {
@@ -40,7 +71,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await doFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -53,7 +84,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await doFetch(path, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -67,14 +98,15 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
 
 /** Multipart upload uses the same cookie-backed API client as JSON requests. */
 export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await doFetch(path, {
     method: "POST",
     credentials: "include",
     body,
   });
   const payload = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new ApiError(res.status, payload?.message || `API error: ${res.status}`, payload?.errorCode);
+    const msg = payload?.detail || payload?.message || `API error: ${res.status}`;
+    throw new ApiError(res.status, msg, payload?.errorCode);
   }
   return payload as T;
 }

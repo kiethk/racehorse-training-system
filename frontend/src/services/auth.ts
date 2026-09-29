@@ -22,25 +22,5 @@ export async function logout(): Promise<ApiResponse<string>> {
 export async function registerOwner(
   request: OwnerRegistrationRequest,
 ): Promise<ApiResponse<OwnerRegistrationResponse>> {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL;
-  const res = await fetch(`${API_URL}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(request),
-  });
-
-  // Always parse the body so we can surface the backend's human-readable message
-  const payload = await res.json().catch(() => null);
-
-  if (!res.ok) {
-    // Spring's ResponseStatusException puts the reason in `detail` (RFC 9457) or `message`
-    const msg =
-      payload?.detail ||
-      payload?.message ||
-      `Registration failed (${res.status})`;
-    throw new Error(msg);
-  }
-
-  return payload as ApiResponse<OwnerRegistrationResponse>;
+  return apiPost<ApiResponse<OwnerRegistrationResponse>>('/api/auth/register', request);
 }
