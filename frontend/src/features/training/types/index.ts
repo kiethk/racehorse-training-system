@@ -197,3 +197,58 @@ export interface RescheduleLotRequest {
   reason?: string;
 }
 
+export interface HorseFitnessTrendItem {
+  workoutId: number;
+  date: string; // YYYY-MM-DD
+  subjectName: string;
+  distanceMeters: number | null;
+  averageSpeedKmh: number | null;
+  topSpeedKmh: number | null;
+  averageHeartRate: number | null;
+  maxHeartRate: number | null;
+  recoveryHeartRate: number | null;
+  performanceRating: number | null;
+}
+
+export interface HorseAlert {
+  ruleCode: string;
+  severity: 'WARNING' | 'DANGER';
+  title: string;
+  description: string;
+  triggeredAt: string;
+  metricValue: number;
+  thresholdValue: number;
+}
+
+export interface TrainerDashboardHorse {
+  horseId: number;
+  horseName: string;
+  breed?: string;
+  stallCode?: string;
+  planId: number | null;
+  courseName: string | null;
+  planStatus: string;
+  completedSessions: number;
+  totalSessions: number;
+  progressPercent: number;
+  latestPerformanceRating: number | null;
+  avgPerformanceRating30d: number | null;
+  alertCount: number;
+  alertsCount?: number;
+  alertTitles?: string[];
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface ReadinessAssessment {
+  id: number;
+  horseId: number;
+  readinessStatus: string;
+  fitnessScore: number | null;
+  conformationScore: number | null;
+  temperamentScore: number | null;
+  gaitQualityScore: number | null;
+  estimatedMonthsToRace: number | null;
+  assessmentDate: string;
+}
+

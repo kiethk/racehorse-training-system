@@ -12,7 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class HorseTrainingPlanService {
@@ -30,7 +33,19 @@ public class HorseTrainingPlanService {
     private final TrainingLotRepository lotRepository;
     private final StableStallRepository stableStallRepository;
     private final AreaRepository areaRepository;
+    private final GroomIncidentReportRepository incidentReportRepository;
 
+    /**
+     * CỐ Ý chỉ có MỘT constructor.
+     *
+     * Trước đây có thêm một bản rút gọn uỷ quyền xuống đây với
+     * incidentReportRepository = null, để khỏi phải sửa file test. Nhưng bản đó
+     * tạo ra một service THIẾU CHỨC NĂNG mà không báo lỗi: luật cảnh báo "sự cố
+     * lặp lại" bị bỏ qua im lặng. Một constructor dựng được object hỏng là thứ
+     * phải tránh — thà để trình biên dịch bắt lỗi còn hơn.
+     *
+     * Chỉ có một constructor nên Spring tự chọn, không cần @Autowired.
+     */
     public HorseTrainingPlanService(HorseTrainingPlanRepository planRepository,
                                     TrainingWorkoutRepository workoutRepository,
                                     CourseRepository courseRepository,
@@ -41,7 +56,8 @@ public class HorseTrainingPlanService {
                                     TrainingLotService lotService,
                                     TrainingLotRepository lotRepository,
                                     StableStallRepository stableStallRepository,
-                                    AreaRepository areaRepository) {
+                                    AreaRepository areaRepository,
+                                    GroomIncidentReportRepository incidentReportRepository) {
         this.planRepository = planRepository;
         this.workoutRepository = workoutRepository;
         this.courseRepository = courseRepository;
@@ -53,6 +69,7 @@ public class HorseTrainingPlanService {
         this.lotRepository = lotRepository;
         this.stableStallRepository = stableStallRepository;
         this.areaRepository = areaRepository;
+        this.incidentReportRepository = incidentReportRepository;
     }
 
     /**
@@ -853,5 +870,292 @@ public class HorseTrainingPlanService {
                 ? String.format("  · lot #%d: Groom này đang dắt '%s'", lotId, otherHorse)
                 : String.format("  · %s lúc %s (lot #%d): Groom này đang dắt '%s'",
                         lot.getLotDate(), lot.getStartTime(), lotId, otherHorse);
+    }
+
+    // =================================================================
+    // ĐỢT 7 — TIẾN ĐỘ, BIỂU ĐỒ THỂ LỰC & CẢNH BÁO
+    // =================================================================
+
+    /**
+     * Lấy chuỗi thời gian các buổi tập đã hoàn thành của một chiến mã (FE-7.2).
+     */
+    public List<HorseFitnessTrendItemResponse> getFitnessTrend(Long horseId, LocalDate fromDate, LocalDate toDate) {
+        // Bỏ trống thì dùng mốc bao trùm, để câu truy vấn luôn có BETWEEN cụ thể.
+        // Cách này tránh phải viết "(:from IS NULL OR ...)" trong JPQL — kiểu đó
+        // hay vướng lỗi ép kiểu tham số null trên PostgreSQL.
+        LocalDate from = fromDate != null ? fromDate : LocalDate.of(1900, 1, 1);
+        LocalDate to = toDate != null ? toDate : LocalDate.of(2999, 12, 31);
+
+        List<Object[]> rows = workoutRepository.findCompletedWorkoutsWithLotAsc(horseId, from, to);
+        List<HorseFitnessTrendItemResponse> items = new ArrayList<>();
+
+        for (Object[] row : rows) {
+            TrainingWorkout w = (TrainingWorkout) row[0];
+            TrainingLot lot = (TrainingLot) row[1];
+            Subject subject = subjectRepository.findById(lot.getSubjectId()).orElse(null);
+
+            HorseFitnessTrendItemResponse item = new HorseFitnessTrendItemResponse();
+            item.setWorkoutId(w.getId());
+            item.setDate(lot.getLotDate());
+            item.setSubjectName(subject != null ? subject.getName() : "Bài tập #" + lot.getSubjectId());
+            item.setDistanceMeters(w.getActualDistanceMeters());
+            item.setActualDurationMinutes(w.getActualDurationMinutes());
+            item.setAverageSpeedKmh(w.getAverageSpeedKmh());
+            item.setTopSpeedKmh(w.getTopSpeedKmh());
+            item.setAverageHeartRate(w.getAverageHeartRate());
+            item.setMaxHeartRate(w.getMaxHeartRate());
+            item.setRecoveryHeartRate(w.getRecoveryHeartRate());
+            item.setPerformanceRating(w.getPerformanceRating());
+            items.add(item);
+        }
+        return items;
+    }
+
+    /**
+     * Bộ 5 luật cảnh báo nguy cơ chấn thương và suy giảm thể lực.
+     * Tính toán động theo dữ liệu thời gian thực, không lưu bảng.
+     */
+    public List<HorseAlertResponse> getHorseAlerts(Long horseId) {
+        List<HorseAlertResponse> alerts = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+        LocalDate thirtyDaysAgo = today.minusDays(30);
+
+        List<Object[]> allCompleted = workoutRepository.findCompletedWorkoutsWithLotDesc(horseId);
+        List<Object[]> recentWorkoutsWithLot = allCompleted.stream()
+                .filter(r -> !((TrainingLot) r[1]).getLotDate().isBefore(thirtyDaysAgo))
+                .toList();
+
+        // Luật 1: Nhịp tim tối đa vượt ngưỡng (maxHeartRate > 220)
+        for (Object[] row : recentWorkoutsWithLot) {
+            TrainingWorkout w = (TrainingWorkout) row[0];
+            TrainingLot l = (TrainingLot) row[1];
+            if (w.getMaxHeartRate() != null && w.getMaxHeartRate() > 220) {
+                alerts.add(new HorseAlertResponse(
+                        "MAX_HEART_RATE_EXCEEDED",
+                        "Nhịp tim tối đa vượt ngưỡng an toàn",
+                        String.format("Ghi nhận nhịp tim tối đa %d bpm (ngưỡng an toàn <= 220 bpm) vào ngày %s.",
+                                w.getMaxHeartRate(), l.getLotDate()),
+                        "DANGER",
+                        l.getLotDate().atTime(l.getEndTime() != null ? l.getEndTime() : LocalTime.of(10, 0)),
+                        w.getMaxHeartRate().doubleValue(),
+                        220.0
+                ));
+                break; // Chỉ báo mốc gần nhất
+            }
+        }
+
+        // Luật 2: Hồi phục tim kém (recoveryHeartRate > 100)
+        for (Object[] row : recentWorkoutsWithLot) {
+            TrainingWorkout w = (TrainingWorkout) row[0];
+            TrainingLot l = (TrainingLot) row[1];
+            if (w.getRecoveryHeartRate() != null && w.getRecoveryHeartRate() > 100) {
+                alerts.add(new HorseAlertResponse(
+                        "POOR_RECOVERY_HEART_RATE",
+                        "Chỉ số hồi phục tim kém",
+                        String.format("Nhịp tim hồi phục sau buổi tập cao bất thường (%d bpm, ngưỡng an toàn <= 100 bpm) vào ngày %s.",
+                                w.getRecoveryHeartRate(), l.getLotDate()),
+                        "DANGER",
+                        l.getLotDate().atTime(l.getEndTime() != null ? l.getEndTime() : LocalTime.of(10, 0)),
+                        w.getRecoveryHeartRate().doubleValue(),
+                        100.0
+                ));
+                break;
+            }
+        }
+
+        // Luật 3: Phong độ tụt liên tục (performanceRating giảm 3 buổi liên tiếp)
+        List<TrainingWorkout> ratedWorkouts = recentWorkoutsWithLot.stream()
+                .map(r -> (TrainingWorkout) r[0])
+                .filter(w -> w.getPerformanceRating() != null)
+                .toList();
+
+        if (ratedWorkouts.size() >= 3) {
+            int r0 = ratedWorkouts.get(0).getPerformanceRating(); // Buổi mới nhất
+            int r1 = ratedWorkouts.get(1).getPerformanceRating(); // Buổi thứ 2
+            int r2 = ratedWorkouts.get(2).getPerformanceRating(); // Buổi thứ 3 (cũ nhất trong bộ 3)
+            if (r0 < r1 && r1 < r2) {
+                alerts.add(new HorseAlertResponse(
+                        "CONSECUTIVE_PERFORMANCE_DROP",
+                        "Phong độ suy giảm liên tiếp",
+                        String.format("Điểm phong độ giảm liên tiếp qua 3 buổi tập gần nhất (%d → %d → %d).",
+                                r2, r1, r0),
+                        "WARNING",
+                        LocalDateTime.now(),
+                        (double) r0,
+                        (double) r2
+                ));
+            }
+        }
+
+        // ĐÃ BỎ — Luật "khối lượng tăng đột biến" (tổng cự ly tuần này > 1.5 × tuần trước).
+        //
+        // Lý do: khoá huấn luyện XOAY VÒNG bài tập (orderedSubjects[i % n]), mà
+        // mỗi bài có cự ly rất khác nhau — chạy bền 1200m so với đi bộ thả lỏng.
+        // Nên tổng cự ly theo tuần dao động mạnh chỉ vì tuần đó rơi vào bài nào,
+        // chứ không phản ánh việc tăng tải thật. Ngưỡng 1.5× sẽ kêu vì lịch xoay
+        // bài, tạo báo động giả liên tục và làm người dùng mất tin vào cảnh báo.
+        //
+        // Muốn đo quá tải cho đúng thì phải so sánh TRONG CÙNG MỘT BÀI TẬP, hoặc
+        // dùng chỉ số chuẩn hoá theo cường độ — vượt phạm vi đồ án.
+
+        // Luật 4: Sự cố lặp lại (>= 2 báo cáo sự cố trong 14 ngày qua từ Groom)
+        //
+        // Không còn kiểm null: constructor giờ bắt buộc truyền repository này,
+        // nên nếu thiếu thì Spring báo lỗi ngay lúc khởi động chứ không để luật
+        // cảnh báo bị bỏ qua âm thầm lúc chạy.
+        LocalDateTime fourteenDaysAgoTime = today.minusDays(14).atStartOfDay();
+        long incidentCount = incidentReportRepository.countByHorseIdAndReportedAtAfter(horseId, fourteenDaysAgoTime);
+        if (incidentCount >= 2) {
+            alerts.add(new HorseAlertResponse(
+                    "REPEATED_INCIDENTS",
+                    "Cảnh báo sự cố sức khỏe lặp lại",
+                    String.format("Chiến mã có %d sự cố được Groom ghi nhận trong 14 ngày qua. Cần Thú y kiểm tra chuyên sâu.",
+                            incidentCount),
+                    "DANGER",
+                    LocalDateTime.now(),
+                    (double) incidentCount,
+                    2.0
+            ));
+        }
+
+        return alerts;
+    }
+
+    /**
+     * Bảng tiến độ và thể lực toàn khu của Trainer (FE-7.1).
+     */
+    public List<TrainerDashboardHorseResponse> getTrainerDashboard(AuthenticatedUser currentUser) {
+        Long trainerId = currentUser.getUserId();
+
+        // 1. Lấy tất cả khu vực do Trainer này phụ trách
+        Set<Long> myAreaIds = areaRepository.findAll().stream()
+                .filter(a -> trainerId.equals(a.getTrainerId()))
+                .map(Area::getId)
+                .collect(Collectors.toSet());
+
+        if (myAreaIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 2. Lấy tất cả chuồng thuộc các khu vực đó
+        List<StableStall> stalls = stableStallRepository.findAll().stream()
+                .filter(s -> myAreaIds.contains(s.getAreaId()))
+                .toList();
+
+        Map<Long, StableStall> stallMap = stalls.stream()
+                .collect(Collectors.toMap(StableStall::getId, s -> s, (s1, s2) -> s1));
+
+        Set<Long> stallIds = stallMap.keySet();
+
+        // 3. Lấy tất cả chiến mã đang ở trong các chuồng đó
+        List<Horse> horses = horseRepository.findAll().stream()
+                .filter(h -> h.getCurrentStallId() != null && stallIds.contains(h.getCurrentStallId()))
+                .toList();
+
+        if (horses.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 4. Lấy tất cả kế hoạch huấn luyện của Trainer
+        List<HorseTrainingPlan> allPlans = planRepository.findAll().stream()
+                .filter(p -> trainerId.equals(p.getTrainerId()))
+                .toList();
+
+        Map<Long, List<HorseTrainingPlan>> plansByHorse = allPlans.stream()
+                .collect(Collectors.groupingBy(HorseTrainingPlan::getHorseId));
+
+        Map<Long, Course> courseMap = courseRepository.findAll().stream()
+                .collect(Collectors.toMap(Course::getId, c -> c, (c1, c2) -> c1));
+
+        // Số buổi đã hoàn thành của MỌI kế hoạch — MỘT truy vấn gom.
+        // Trước đây gọi findByPlanIdOrderByIdAsc trong vòng lặp qua từng con
+        // ngựa: 11 con là 11 truy vấn thừa, và tăng tuyến tính theo quy mô trại.
+        Map<Long, Integer> completedByPlan = new HashMap<>();
+        Set<Long> planIds = allPlans.stream()
+                .map(HorseTrainingPlan::getId)
+                .collect(Collectors.toSet());
+        if (!planIds.isEmpty()) {
+            for (Object[] row : workoutRepository.countByPlanIdsGroupedByStatus(planIds)) {
+                if (row[1] == WorkoutStatus.COMPLETED) {
+                    completedByPlan.put((Long) row[0], ((Number) row[2]).intValue());
+                }
+            }
+        }
+
+        List<TrainerDashboardHorseResponse> result = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+        LocalDate thirtyDaysAgo = today.minusDays(30);
+
+        for (Horse horse : horses) {
+            TrainerDashboardHorseResponse resp = new TrainerDashboardHorseResponse();
+            resp.setHorseId(horse.getId());
+            resp.setHorseName(horse.getName());
+            resp.setBreed(horse.getBreed());
+
+            StableStall stall = stallMap.get(horse.getCurrentStallId());
+            resp.setStallCode(stall != null ? stall.getStallCode() : "—");
+
+            // Chọn kế hoạch ưu tiên: ACTIVE -> UPCOMING -> COMPLETED mới nhất
+            List<HorseTrainingPlan> horsePlans = plansByHorse.getOrDefault(horse.getId(), Collections.emptyList());
+            HorseTrainingPlan currentPlan = horsePlans.stream()
+                    .filter(p -> p.getStatus() == TrainingPlanStatus.ACTIVE)
+                    .findFirst()
+                    .orElseGet(() -> horsePlans.stream()
+                            .filter(p -> p.getStatus() == TrainingPlanStatus.UPCOMING)
+                            .findFirst()
+                            .orElseGet(() -> horsePlans.isEmpty() ? null : horsePlans.get(0)));
+
+            if (currentPlan != null) {
+                resp.setPlanId(currentPlan.getId());
+                resp.setPlanStatus(currentPlan.getStatus().name());
+                resp.setStartDate(currentPlan.getStartDate());
+                resp.setEndDate(currentPlan.getEndDate());
+
+                Course course = courseMap.get(currentPlan.getCourseId());
+                resp.setCourseName(course != null ? course.getName() : "Khoá #" + currentPlan.getCourseId());
+
+                int total = course != null && course.getTotalSessions() != null ? course.getTotalSessions() : 0;
+                // Số buổi đã hoàn thành lấy từ bản đồ đếm gom một lượt bên trên,
+                // KHÔNG truy vấn lại trong vòng lặp.
+                long completedExact = completedByPlan.getOrDefault(currentPlan.getId(), 0);
+
+                resp.setCompletedSessions((int) completedExact);
+                resp.setTotalSessions(total > 0 ? total : (int) completedExact);
+                double percent = total > 0 ? ((double) completedExact / total) * 100.0 : 0.0;
+                resp.setProgressPercent(Math.round(percent * 10.0) / 10.0);
+            } else {
+                resp.setPlanStatus("NONE");
+                resp.setCourseName("Chưa có kế hoạch");
+                resp.setCompletedSessions(0);
+                resp.setTotalSessions(0);
+                resp.setProgressPercent(0.0);
+            }
+
+            // Tính điểm phong độ từ các completed workouts của ngựa
+            List<Object[]> completedWorkouts = workoutRepository.findCompletedWorkoutsWithLotDesc(horse.getId()).stream()
+                    .filter(r -> !((TrainingLot) r[1]).getLotDate().isBefore(thirtyDaysAgo))
+                    .toList();
+            if (!completedWorkouts.isEmpty()) {
+                TrainingWorkout latestW = (TrainingWorkout) completedWorkouts.get(0)[0];
+                resp.setLatestPerformanceRating(latestW.getPerformanceRating());
+
+                double avg = completedWorkouts.stream()
+                        .map(r -> (TrainingWorkout) r[0])
+                        .filter(w -> w.getPerformanceRating() != null)
+                        .mapToInt(TrainingWorkout::getPerformanceRating)
+                        .average()
+                        .orElse(0.0);
+                resp.setAvgPerformanceRating30d(Math.round(avg * 10.0) / 10.0);
+            }
+
+            // Tính cảnh báo
+            List<HorseAlertResponse> horseAlerts = getHorseAlerts(horse.getId());
+            resp.setAlertsCount(horseAlerts.size());
+            resp.setAlertTitles(horseAlerts.stream().map(HorseAlertResponse::getTitle).toList());
+
+            result.add(resp);
+        }
+
+        return result;
     }
 }

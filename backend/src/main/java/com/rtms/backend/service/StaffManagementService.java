@@ -106,7 +106,6 @@ public class StaffManagementService {
                 trainer.setUserId(user.getId());
                 trainer.setCertificationNumber(request.getCertificationNumber().trim());
                 trainer.setCertificationIssuedDate(request.getCertificationIssuedDate());
-                trainer.setYearsOfExperience(request.getYearsOfExperience());
                 trainerProfileRepository.save(trainer);
                 break;
         }

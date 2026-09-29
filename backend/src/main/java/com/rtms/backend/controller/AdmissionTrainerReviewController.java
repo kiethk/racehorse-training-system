@@ -2,8 +2,12 @@ package com.rtms.backend.controller;
 
 import com.rtms.backend.dto.*;
 import com.rtms.backend.entity.AdmissionApplication;
+import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.entity.Horse;
+import com.rtms.backend.entity.HorseHealthMetric;
 import com.rtms.backend.entity.RacingReadinessAssessment;
+import com.rtms.backend.repository.HealthRecordRepository;
+import com.rtms.backend.repository.HorseHealthMetricRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.RacingReadinessAssessmentRepository;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -23,16 +27,22 @@ public class AdmissionTrainerReviewController {
     private final AdmissionQueryService queryService;
     private final HorseRepository horseRepository;
     private final RacingReadinessAssessmentRepository assessmentRepository;
+    private final HealthRecordRepository healthRecordRepository;
+    private final HorseHealthMetricRepository horseHealthMetricRepository;
 
     public AdmissionTrainerReviewController(
             AdmissionTrainerReviewService trainerReviewService,
             AdmissionQueryService queryService,
             HorseRepository horseRepository,
-            RacingReadinessAssessmentRepository assessmentRepository) {
+            RacingReadinessAssessmentRepository assessmentRepository,
+            HealthRecordRepository healthRecordRepository,
+            HorseHealthMetricRepository horseHealthMetricRepository) {
         this.trainerReviewService = trainerReviewService;
         this.queryService = queryService;
         this.horseRepository = horseRepository;
         this.assessmentRepository = assessmentRepository;
+        this.healthRecordRepository = healthRecordRepository;
+        this.horseHealthMetricRepository = horseHealthMetricRepository;
     }
 
     /**
@@ -50,11 +60,13 @@ public class AdmissionTrainerReviewController {
                 ? null
                 : horseRepository.findById(detail.getHorseId()).orElse(null);
 
-        // Module Thú y chưa ghi HealthRecord / HorseHealthMetric.
-        // Trả rỗng thay vì lỗi — FE hiển thị "chưa có dữ liệu".
-        // Khi họ xong thì thay 2 dòng này bằng query thật.
-        List<Object> healthRecords = List.of();
-        List<Object> healthMetrics = List.of();
+        List<HealthRecord> healthRecords = horse == null
+                ? List.of()
+                : healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(horse.getId());
+
+        List<HorseHealthMetric> healthMetrics = horse == null
+                ? List.of()
+                : horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(horse.getId());
 
         return ApiResponse.success(new TrainerAdmissionViewResponse(
                 detail,

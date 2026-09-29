@@ -58,14 +58,13 @@ SET license_number = EXCLUDED.license_number,
     license_issued_date = EXCLUDED.license_issued_date,
     specialization = EXCLUDED.specialization;
 
-INSERT INTO trainer_profiles (user_id, certification_number, certification_issued_date, years_of_experience)
-SELECT u.id, 'MOCK-TRAINER-001', DATE '2020-05-10', 8
+INSERT INTO trainer_profiles (user_id, certification_number, certification_issued_date)
+SELECT u.id, 'MOCK-TRAINER-001', DATE '2020-05-10'
 FROM users u
 WHERE u.email = 'mock.trainer@rtms.local'
 ON CONFLICT (user_id) DO UPDATE
 SET certification_number = EXCLUDED.certification_number,
-    certification_issued_date = EXCLUDED.certification_issued_date,
-    years_of_experience = EXCLUDED.years_of_experience;
+    certification_issued_date = EXCLUDED.certification_issued_date;
 
 -- Assign a small, visible care area to the mock groom.
 UPDATE stable_stalls

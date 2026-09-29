@@ -1,4 +1,4 @@
-import type { AdmissionDetailResponse } from './index';
+import type { AdmissionDetailResponse, HealthRecord, HorseHealthMetricResponse } from './index';
 
 /**
  * Khớp enums/RacingReadinessStatus.java.
@@ -45,13 +45,10 @@ export interface TrainerAdmissionView {
   admission: AdmissionDetailResponse;
   /** null nếu bước Groom chưa tạo hồ sơ Horse. Khi đó KHÔNG nộp đánh giá được. */
   horse: HorseSummary | null;
-  /**
-   * Backend đang trả rỗng CỨNG — module Thú y chưa ghi dữ liệu.
-   * Đây KHÔNG phải lỗi. Giao diện phải hiện "chưa có dữ liệu",
-   * khi nhóm Thú y xong thì backend đổi 2 dòng, frontend không sửa gì.
-   */
-  healthRecords: unknown[];
-  healthMetrics: unknown[];
+  /** Dữ liệu khám bệnh của Vet. */
+  healthRecords: HealthRecord[];
+  /** Dữ liệu chỉ số sinh hiệu (nhiệt độ, nhịp tim, nhịp thở...). */
+  healthMetrics: HorseHealthMetricResponse[];
   /** Khác null = đã đánh giá rồi -> form chuyển sang chỉ đọc. */
   existingAssessment: RacingReadinessAssessment | null;
 }

@@ -21,9 +21,6 @@ public class TrainerProfile {
     @Column(name = "certification_issued_date")
     private LocalDate certificationIssuedDate;
 
-    @Column(name = "years_of_experience")
-    private Integer yearsOfExperience;
-
     public Long getUserId() {
         return userId;
     }
@@ -48,11 +45,4 @@ public class TrainerProfile {
         this.certificationIssuedDate = certificationIssuedDate;
     }
 
-    public Integer getYearsOfExperience() {
-        return yearsOfExperience;
-    }
-
-    public void setYearsOfExperience(Integer yearsOfExperience) {
-        this.yearsOfExperience = yearsOfExperience;
-    }
 }
