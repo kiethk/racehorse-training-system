@@ -1,99 +1,64 @@
-package com.rtms.backend.entity;
+package com.rtms.backend.dto;
 
-import jakarta.persistence.*;
+import com.rtms.backend.entity.RaceRegistration;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-@Entity
-@Table(name = "race_registrations")
-public class RaceRegistration {
+public class RaceRegistrationResponse {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "horse_id", nullable = false)
     private Long horseId;
-
-    @Column(name = "trainer_id", nullable = false)
+    private String horseName;
+    private String horseRegistrationNumber;
     private Long trainerId;
-
-    @Column(name = "race_name", nullable = false)
     private String raceName;
-
-    @Column(name = "race_category")
     private String raceCategory;
-
     private String location;
-
-    @Column(name = "organizer")
-    private String organizer;
-
-    @Column(name = "source_url", length = 1000)
-    private String sourceUrl;
-
-    @Column(name = "nomination_deadline")
-    private LocalDate nominationDeadline;
-
-    @Column(name = "event_date", nullable = false)
     private LocalDate eventDate;
-
-    @Column(name = "event_time")
     private LocalTime eventTime;
-
-    @Column(name = "distance_meters")
+    private String organizer;
+    private String sourceUrl;
+    private LocalDate nominationDeadline;
     private BigDecimal distanceMeters;
-
-    @Column(name = "track_type")
     private String trackType;
-
-    @Column(name = "prize_details", columnDefinition = "TEXT")
     private String prizeDetails;
-
-    @Column(name = "selection_reason", columnDefinition = "TEXT")
     private String selectionReason;
-
-    @Column(name = "jockey_name")
-    private String jockeyName;
-
-    @Column(name = "entry_fee")
-    private BigDecimal entryFee;
-
-    @Column(name = "trainer_notes")
     private String trainerNotes;
-
-    private String status = "PENDING";
-
-    @Column(name = "reviewed_by_id")
+    private String status;
     private Long reviewedById;
-
-    @Column(name = "manager_feedback")
     private String managerFeedback;
-
-    @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
-
-
-    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    public RaceRegistrationResponse() {}
 
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (status == null) {
-            status = "PENDING";
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+    public RaceRegistrationResponse(RaceRegistration reg, String horseName, String horseRegistrationNumber) {
+        this.id = reg.getId();
+        this.horseId = reg.getHorseId();
+        this.horseName = horseName;
+        this.horseRegistrationNumber = horseRegistrationNumber;
+        this.trainerId = reg.getTrainerId();
+        this.raceName = reg.getRaceName();
+        this.raceCategory = reg.getRaceCategory();
+        this.location = reg.getLocation();
+        this.eventDate = reg.getEventDate();
+        this.eventTime = reg.getEventTime();
+        this.organizer = reg.getOrganizer();
+        this.sourceUrl = reg.getSourceUrl();
+        this.nominationDeadline = reg.getNominationDeadline();
+        this.distanceMeters = reg.getDistanceMeters();
+        this.trackType = reg.getTrackType();
+        this.prizeDetails = reg.getPrizeDetails();
+        this.selectionReason = reg.getSelectionReason();
+        this.trainerNotes = reg.getTrainerNotes();
+        this.status = reg.getStatus();
+        this.reviewedById = reg.getReviewedById();
+        this.managerFeedback = reg.getManagerFeedback();
+        this.reviewedAt = reg.getReviewedAt();
+        this.createdAt = reg.getCreatedAt();
     }
 
     public Long getId() {
@@ -110,6 +75,22 @@ public class RaceRegistration {
 
     public void setHorseId(Long horseId) {
         this.horseId = horseId;
+    }
+
+    public String getHorseName() {
+        return horseName;
+    }
+
+    public void setHorseName(String horseName) {
+        this.horseName = horseName;
+    }
+
+    public String getHorseRegistrationNumber() {
+        return horseRegistrationNumber;
+    }
+
+    public void setHorseRegistrationNumber(String horseRegistrationNumber) {
+        this.horseRegistrationNumber = horseRegistrationNumber;
     }
 
     public Long getTrainerId() {
@@ -144,6 +125,22 @@ public class RaceRegistration {
         this.location = location;
     }
 
+    public LocalDate getEventDate() {
+        return eventDate;
+    }
+
+    public void setEventDate(LocalDate eventDate) {
+        this.eventDate = eventDate;
+    }
+
+    public LocalTime getEventTime() {
+        return eventTime;
+    }
+
+    public void setEventTime(LocalTime eventTime) {
+        this.eventTime = eventTime;
+    }
+
     public String getOrganizer() {
         return organizer;
     }
@@ -168,38 +165,6 @@ public class RaceRegistration {
         this.nominationDeadline = nominationDeadline;
     }
 
-    public LocalDate getEventDate() {
-        return eventDate;
-    }
-
-    public void setEventDate(LocalDate eventDate) {
-        this.eventDate = eventDate;
-    }
-
-    public LocalTime getEventTime() {
-        return eventTime;
-    }
-
-    public void setEventTime(LocalTime eventTime) {
-        this.eventTime = eventTime;
-    }
-
-    public String getPrizeDetails() {
-        return prizeDetails;
-    }
-
-    public void setPrizeDetails(String prizeDetails) {
-        this.prizeDetails = prizeDetails;
-    }
-
-    public String getSelectionReason() {
-        return selectionReason;
-    }
-
-    public void setSelectionReason(String selectionReason) {
-        this.selectionReason = selectionReason;
-    }
-
     public BigDecimal getDistanceMeters() {
         return distanceMeters;
     }
@@ -216,20 +181,20 @@ public class RaceRegistration {
         this.trackType = trackType;
     }
 
-    public String getJockeyName() {
-        return jockeyName;
+    public String getPrizeDetails() {
+        return prizeDetails;
     }
 
-    public void setJockeyName(String jockeyName) {
-        this.jockeyName = jockeyName;
+    public void setPrizeDetails(String prizeDetails) {
+        this.prizeDetails = prizeDetails;
     }
 
-    public BigDecimal getEntryFee() {
-        return entryFee;
+    public String getSelectionReason() {
+        return selectionReason;
     }
 
-    public void setEntryFee(BigDecimal entryFee) {
-        this.entryFee = entryFee;
+    public void setSelectionReason(String selectionReason) {
+        this.selectionReason = selectionReason;
     }
 
     public String getTrainerNotes() {
@@ -276,7 +241,7 @@ public class RaceRegistration {
         return createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

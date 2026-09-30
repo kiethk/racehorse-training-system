@@ -35,7 +35,7 @@ export function getNavigationForRole(role: Role): NavItem[] {
         { id: 'plans', label: 'Plans', href: '/trainer/plans' },
         { id: 'schedule', label: 'Schedule', href: '/trainer/schedule' },
         { id: 'horses', label: 'Horses', href: '/trainer/horses' },
-        { id: 'racing', label: 'Racing' },
+        { id: 'racing', label: 'Racing', href: '/trainer/racing' },
       ];
     case 'VETERINARIAN':
       return [
