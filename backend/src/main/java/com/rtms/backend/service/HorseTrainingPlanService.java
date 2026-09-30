@@ -3,6 +3,7 @@ package com.rtms.backend.service;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.dto.*;
 import com.rtms.backend.entity.*;
+import com.rtms.backend.enums.LotStatus;
 import com.rtms.backend.enums.TrainingDay;
 import com.rtms.backend.enums.TrainingPlanStatus;
 import com.rtms.backend.enums.WorkoutStatus;
@@ -592,6 +593,17 @@ public class HorseTrainingPlanService {
 
         TrainingLot lot = lotRepository.findById(saved.getLotId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lot của buổi tập"));
+
+        // Khi toàn bộ buổi tập trong lot đã hoàn thành (hoặc bị huỷ), lot tự chuyển sang COMPLETED.
+        long remainingInLot = workoutRepository.countByLotIdAndStatusNotIn(
+                lot.getId(), List.of(WorkoutStatus.COMPLETED, WorkoutStatus.CANCELLED));
+        if (remainingInLot == 0
+                && lot.getStatus() != LotStatus.COMPLETED
+                && lot.getStatus() != LotStatus.CANCELLED) {
+            lot.setStatus(LotStatus.COMPLETED);
+            lotRepository.save(lot);
+        }
+
         Subject subject = subjectRepository.findById(lot.getSubjectId()).orElse(null);
 
         PlanWorkoutItemResponse item = new PlanWorkoutItemResponse(

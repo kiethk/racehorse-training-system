@@ -29,6 +29,8 @@ export interface Horse {
   currentStatus: HorseStatus;
   currentStallId: number | null;
   ownerId: number | null;
+  trainingLocked?: boolean;
+  registrationNumber?: string | null;
 }
 
 export interface UserSummary {

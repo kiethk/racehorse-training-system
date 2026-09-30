@@ -33,6 +33,9 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
     /** BR-10 — đếm số ngựa đang chiếm chỗ trong lot. */
     long countByLotIdAndStatusNot(Long lotId, WorkoutStatus status);
 
+    /** Đếm các buổi tập trong lot chưa xong (khác các trạng thái truyền vào). */
+    long countByLotIdAndStatusNotIn(Long lotId, Collection<WorkoutStatus> statuses);
+
     /** Danh sách buổi CÒN HIỆU LỰC trong lot — phải khớp với countByLotIdAndStatusNot. */
     List<TrainingWorkout> findByLotIdAndStatusNot(Long lotId, WorkoutStatus status);
 

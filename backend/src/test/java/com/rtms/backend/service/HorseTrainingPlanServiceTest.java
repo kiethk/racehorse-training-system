@@ -2,6 +2,7 @@ package com.rtms.backend.service;
 
 import com.rtms.backend.dto.*;
 import com.rtms.backend.entity.*;
+import com.rtms.backend.enums.LotStatus;
 import com.rtms.backend.enums.TrainingDay;
 import com.rtms.backend.enums.TrainingPlanStatus;
 import com.rtms.backend.enums.WorkoutStatus;
@@ -632,6 +633,84 @@ class HorseTrainingPlanServiceTest {
         assertEquals(TrainingPlanStatus.COMPLETED, plan.getStatus(),
                 "Kế hoạch phải tự động chuyển thành COMPLETED khi buổi cuối hoàn tất");
         verify(planRepository).save(plan);
+    }
+
+    @Test
+    @DisplayName("Buổi tập hoàn thành và tất cả buổi trong cùng lot đã xong -> Lot tự động chuyển sang COMPLETED")
+    void testCompleteWorkout_AllWorkoutsInLotCompleted_AutoCompletesLot() {
+        Long workoutId = 301L;
+        CompleteWorkoutRequest req = new CompleteWorkoutRequest();
+        req.setPerformanceRating(9);
+
+        TrainingWorkout workout = new TrainingWorkout();
+        workout.setId(workoutId);
+        workout.setPlanId(50L);
+        workout.setLotId(601L);
+        workout.setStatus(WorkoutStatus.SCHEDULED);
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(50L);
+        plan.setTrainerId(9L);
+        plan.setStatus(TrainingPlanStatus.ACTIVE);
+
+        TrainingLot lot = new TrainingLot();
+        lot.setId(601L);
+        lot.setSubjectId(77L);
+        lot.setStatus(LotStatus.SCHEDULED);
+
+        when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
+        when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
+        when(workoutRepository.saveAndFlush(any(TrainingWorkout.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workoutRepository.countByPlanIdAndStatusNotIn(eq(50L), anyList())).thenReturn(2L); // plan còn buổi khác
+        when(lotRepository.findById(601L)).thenReturn(Optional.of(lot));
+        when(workoutRepository.countByLotIdAndStatusNotIn(eq(601L), anyList())).thenReturn(0L); // tất cả buổi trong lot này đã xong
+
+        // Act
+        planService.completeWorkout(workoutId, req, trainerUser);
+
+        // Assert
+        assertEquals(LotStatus.COMPLETED, lot.getStatus(),
+                "Lot phải tự động chuyển thành COMPLETED khi tất cả buổi tập trong lot đã hoàn thành/huỷ");
+        verify(lotRepository).save(lot);
+    }
+
+    @Test
+    @DisplayName("Buổi tập hoàn thành nhưng lot vẫn còn buổi tập khác chưa xong -> Lot giữ nguyên SCHEDULED")
+    void testCompleteWorkout_OtherWorkoutsInLotStillRemaining_LotRemainsScheduled() {
+        Long workoutId = 302L;
+        CompleteWorkoutRequest req = new CompleteWorkoutRequest();
+        req.setPerformanceRating(7);
+
+        TrainingWorkout workout = new TrainingWorkout();
+        workout.setId(workoutId);
+        workout.setPlanId(50L);
+        workout.setLotId(602L);
+        workout.setStatus(WorkoutStatus.SCHEDULED);
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(50L);
+        plan.setTrainerId(9L);
+        plan.setStatus(TrainingPlanStatus.ACTIVE);
+
+        TrainingLot lot = new TrainingLot();
+        lot.setId(602L);
+        lot.setSubjectId(77L);
+        lot.setStatus(LotStatus.SCHEDULED);
+
+        when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
+        when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
+        when(workoutRepository.saveAndFlush(any(TrainingWorkout.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workoutRepository.countByPlanIdAndStatusNotIn(eq(50L), anyList())).thenReturn(2L);
+        when(lotRepository.findById(602L)).thenReturn(Optional.of(lot));
+        when(workoutRepository.countByLotIdAndStatusNotIn(eq(602L), anyList())).thenReturn(1L); // còn 1 buổi chưa xong
+
+        // Act
+        planService.completeWorkout(workoutId, req, trainerUser);
+
+        // Assert
+        assertEquals(LotStatus.SCHEDULED, lot.getStatus(),
+                "Lot vẫn phải giữ SCHEDULED vì còn buổi tập của ngựa khác chưa hoàn thành");
+        verify(lotRepository, never()).save(lot);
     }
 
     // =================================================================
