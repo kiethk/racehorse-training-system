@@ -77,15 +77,11 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
     if (userId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditMode(false);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSaveError('');
       fetchDetail(userId);
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDetail(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('');
     }
   }, [userId]);
