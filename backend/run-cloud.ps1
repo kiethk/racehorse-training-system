@@ -36,7 +36,7 @@ Get-Content $EnvFile | ForEach-Object {
     [System.Environment]::SetEnvironmentVariable($key, $value, "Process")
 }
 
-Write-Host "Cloud profile loaded. DB_URL = $env:DB_URL" -ForegroundColor Cyan
+Write-Host "Cloud profile loaded." -ForegroundColor Cyan
 Write-Host "Starting Spring Boot with profile: cloud ..." -ForegroundColor Green
 Write-Host ""
 
