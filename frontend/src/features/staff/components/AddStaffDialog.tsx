@@ -1,19 +1,20 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import type { StaffCreationRequest } from '../types';
+import type { StaffCreationRequest, StaffSummary } from '../types';
 
 interface AddStaffDialogProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (request: StaffCreationRequest) => Promise<void>;
   loading: boolean;
+  headTrainers: StaffSummary[];
 }
 
 const inputClassName =
   'mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-focus)] focus:ring-1 focus:ring-[var(--color-focus)]';
 
-export function AddStaffDialog({ open, onClose, onSubmit, loading }: AddStaffDialogProps) {
+export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers }: AddStaffDialogProps) {
   const [role, setRole] = useState<'GROOM' | 'VETERINARIAN' | 'HEAD_TRAINER'>('GROOM');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -286,15 +287,20 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading }: AddStaffDia
               {role === 'GROOM' && (
                 <>
                   <label className="block">
-                    <span className="text-[12px] font-medium text-[var(--color-text-primary)]">Trainer ID (Optional)</span>
-                    <input
-                      type="number"
+                    <span className="text-[12px] font-medium text-[var(--color-text-primary)]">Assigned Head Trainer (Optional)</span>
+                    <select
                       value={trainerId}
                       onChange={(e) => setTrainerId(e.target.value)}
                       className={inputClassName}
-                      placeholder="Assign to a Head Trainer"
                       disabled={loading}
-                    />
+                    >
+                      <option value="">Unassigned</option>
+                      {headTrainers.map(t => (
+                        <option key={t.userId} value={String(t.userId)}>
+                          {t.fullName} — #{t.userId}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 </>
               )}
