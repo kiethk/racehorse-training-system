@@ -22,3 +22,7 @@ backend/.env.cloud
 Thumbs.db
 
 ui-reference/
+tutorials/
+docs/
+.codex/
+uploads/
