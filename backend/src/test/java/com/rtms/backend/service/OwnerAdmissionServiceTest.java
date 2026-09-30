@@ -1,14 +1,21 @@
 package com.rtms.backend.service;
 
+import com.rtms.backend.dto.AdmissionDocumentMetadataRequest;
 import com.rtms.backend.dto.CreateOwnerAdmissionRequest;
-import com.rtms.backend.entity.*;
-import com.rtms.backend.enums.*;
-import com.rtms.backend.repository.*;
+import com.rtms.backend.entity.AdmissionApplication;
+import com.rtms.backend.entity.AdmissionDocument;
+import com.rtms.backend.entity.CandidateHorseProfile;
+import com.rtms.backend.enums.AdmissionDocumentType;
+import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.AdmissionDocumentRepository;
+import com.rtms.backend.repository.CandidateHorseProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -67,6 +74,64 @@ class OwnerAdmissionServiceTest {
         var candidate = ArgumentCaptor.forClass(CandidateHorseProfile.class);
         verify(candidates, times(1)).save(candidate.capture());
         assertEquals(101L, candidate.getValue().getAdmissionId());
+    }
+
+    @Test
+    void submitRejectsMissingRequiredDocumentBeforeSaving() {
+        List<AdmissionDocumentMetadataRequest> metadata = List.of(
+                new AdmissionDocumentMetadataRequest(
+                        AdmissionDocumentType.HORSE_PHOTO, null, null),
+                new AdmissionDocumentMetadataRequest(
+                        AdmissionDocumentType.REGISTRATION_DOCUMENT, null, null),
+                new AdmissionDocumentMetadataRequest(
+                        AdmissionDocumentType.PEDIGREE_CERTIFICATE, null, null),
+                new AdmissionDocumentMetadataRequest(
+                        AdmissionDocumentType.HEALTH_CERTIFICATE, null, null)
+                );
+
+        List<MultipartFile> uploads = List.of(
+                new MockMultipartFile(
+                        "files", "horse.png", "image/png", new byte[]{1}),
+                new MockMultipartFile(
+                        "files", "registration.pdf", "application/pdf", new byte[]{2}),
+                new MockMultipartFile(
+                        "files", "pedigree.pdf", "application/pdf", new byte[]{4}),
+                new MockMultipartFile(
+                        "files", "health.pdf", "application/pdf", new byte[]{4})
+        );
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                () -> service.submit(7L, request(), metadata, uploads)
+        );
+
+        assertEquals(400, error.getStatusCode().value());
+
+        verifyNoInteractions(admissions, candidates, documents, files);
+    }
+
+
+    @Test
+    void submitRejectsMetadataFileCountMismatchBeforeSaving() {
+        List<AdmissionDocumentMetadataRequest> metadata = List.of(
+                new AdmissionDocumentMetadataRequest(
+                        AdmissionDocumentType.HORSE_PHOTO, null, null)
+        );
+
+        List<MultipartFile> uploads = List.of();
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                () -> service.submit(7L, request(), metadata, uploads)
+        );
+
+        assertEquals(400, error.getStatusCode().value());
+        assertEquals(
+                "Document metadata count must match file count",
+                error.getReason()
+        );
+
+        verifyNoInteractions(admissions, candidates, documents, files);
     }
 
     @Test
