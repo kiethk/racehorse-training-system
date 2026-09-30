@@ -15,6 +15,10 @@ import type {
   CompleteWorkoutRequest,
   TrainingLotResponse,
   RescheduleLotRequest,
+  HorseFitnessTrendItem,
+  HorseAlert,
+  TrainerDashboardHorse,
+  ReadinessAssessment,
 } from '../types';
 
 interface ApiResponse<T> {
@@ -122,5 +126,40 @@ export const trainingApi = {
   completeWorkout: async (workoutId: number, data: CompleteWorkoutRequest): Promise<void> => {
     await patchWithMessage(`/api/workouts/${workoutId}/complete`, data);
   },
+
+  // Đợt 7: Dashboard, Thể lực & Cảnh báo
+  getDashboard: async (): Promise<TrainerDashboardHorse[]> => {
+    const res = await apiGet<ApiResponse<TrainerDashboardHorse[]>>('/api/training-plans/dashboard');
+    return res.data;
+  },
+
+  getFitnessTrend: async (horseId: number, from?: string, to?: string): Promise<HorseFitnessTrendItem[]> => {
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await apiGet<ApiResponse<HorseFitnessTrendItem[]>>(`/api/horses/${horseId}/fitness-trend${qs}`);
+    return res.data;
+  },
+
+  getHorseAlerts: async (horseId: number): Promise<HorseAlert[]> => {
+    const res = await apiGet<ApiResponse<HorseAlert[]>>(`/api/horses/${horseId}/alerts`);
+    return res.data;
+  },
+
+  getReadinessHistory: async (horseId: number, includeAdmission = false): Promise<ReadinessAssessment[]> => {
+    const res = await apiGet<ApiResponse<ReadinessAssessment[]>>(
+      `/api/admissions/horses/${horseId}/readiness-history?includeAdmission=${includeAdmission}`
+    );
+    return res.data;
+  },
+
+  getHorseById: async (horseId: number): Promise<{ id: number; name: string; ueln: string; status: string }> => {
+    const res = await apiGet<ApiResponse<{ id: number; name: string; ueln: string; status: string }>>(`/api/horses/${horseId}`);
+    return res.data;
+  },
 };
+
+export const trainingService = trainingApi;
+
 

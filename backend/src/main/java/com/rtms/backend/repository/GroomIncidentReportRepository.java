@@ -14,4 +14,6 @@ public interface GroomIncidentReportRepository extends JpaRepository<GroomIncide
     List<GroomIncidentReport> findByHorseId(Long horseId);
 
     List<GroomIncidentReport> findAllByOrderByReportedAtDesc();
+
+    long countByHorseIdAndReportedAtAfter(Long horseId, java.time.LocalDateTime after);
 }

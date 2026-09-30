@@ -10,7 +10,7 @@ frontend/.next/
 .env
 .env.local
 !.env*.example
-**/application-local.properties
+backend/.env.cloud
 
 # IDE
 .idea/

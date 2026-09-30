@@ -5,6 +5,7 @@ import com.rtms.backend.dto.CreateHorseTrainingPlanRequest;
 import com.rtms.backend.dto.HorseTrainingPlanDetailResponse;
 import com.rtms.backend.dto.JoinableCohortResponse;
 import com.rtms.backend.dto.PlanSummaryResponse;
+import com.rtms.backend.dto.TrainerDashboardHorseResponse;
 import com.rtms.backend.dto.UpdatePlanStatusRequest;
 import com.rtms.backend.entity.HorseTrainingPlan;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -23,6 +24,16 @@ public class HorseTrainingPlanController {
 
     public HorseTrainingPlanController(HorseTrainingPlanService planService) {
         this.planService = planService;
+    }
+
+    /**
+     * Dashboard tổng quan tiến độ và thể lực toàn khu của Trainer (FE-7.1).
+     */
+    @PreAuthorize("hasAuthority('TRAINING_PLAN_VIEW')")
+    @GetMapping("/dashboard")
+    public ApiResponse<List<TrainerDashboardHorseResponse>> getDashboard(
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(planService.getTrainerDashboard(currentUser));
     }
 
     /**

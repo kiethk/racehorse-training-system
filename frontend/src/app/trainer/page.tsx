@@ -1,12 +1,19 @@
 'use client';
 
 import { RoleGuard } from '@/components/auth/RoleGuard';
-import { RoleLanding } from '@/components/auth/RoleLanding';
+import { AppShell } from '@/components/layout/AppShell';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { TrainerDashboardView } from '@/features/training/components/TrainerDashboardView';
 
 export default function TrainerPage() {
   return (
     <RoleGuard allowedRoles={['HEAD_TRAINER']}>
-      <RoleLanding role="HEAD_TRAINER" />
+      <AppShell>
+        <PageContainer>
+          <TrainerDashboardView />
+        </PageContainer>
+      </AppShell>
     </RoleGuard>
   );
 }
+

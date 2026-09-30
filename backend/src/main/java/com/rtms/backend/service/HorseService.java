@@ -1,6 +1,8 @@
 package com.rtms.backend.service;
 
 import com.rtms.backend.dto.CreateHorseRequest;
+import com.rtms.backend.dto.HorseAlertResponse;
+import com.rtms.backend.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.dto.UpdateHorseStatusRequest;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.StableStall;
@@ -8,6 +10,7 @@ import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.enums.StallStatus;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.StableStallRepository;
+import java.time.LocalDate;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -235,4 +238,11 @@ public class HorseService {
         return horseRepository.save(horse);
     }
 
+    public List<HorseFitnessTrendItemResponse> getFitnessTrend(Long horseId, LocalDate from, LocalDate to) {
+        return trainingPlanService.getFitnessTrend(horseId, from, to);
+    }
+
+    public List<HorseAlertResponse> getHorseAlerts(Long horseId) {
+        return trainingPlanService.getHorseAlerts(horseId);
+    }
 }

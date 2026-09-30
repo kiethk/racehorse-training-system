@@ -26,16 +26,19 @@ public class AdmissionManagerReviewService {
     private final StableStallRepository stableStallRepository;
     private final HorseRepository horseRepository;
     private final PreventiveCareScheduleRepository preventiveCareScheduleRepository;
+    private final AdmissionGroomReviewService admissionGroomReviewService;
 
     public AdmissionManagerReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
             StableStallRepository stableStallRepository,
             HorseRepository horseRepository,
-            PreventiveCareScheduleRepository preventiveCareScheduleRepository) {
+            PreventiveCareScheduleRepository preventiveCareScheduleRepository,
+            AdmissionGroomReviewService admissionGroomReviewService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.stableStallRepository = stableStallRepository;
         this.horseRepository = horseRepository;
         this.preventiveCareScheduleRepository = preventiveCareScheduleRepository;
+        this.admissionGroomReviewService = admissionGroomReviewService;
     }
 
     @Transactional
@@ -134,7 +137,9 @@ public class AdmissionManagerReviewService {
             stableStallRepository.save(quarantineStall);
         }
 
-        return admissionApplicationRepository.save(admission);
+        admission = admissionApplicationRepository.save(admission);
+        processNextWaitingAdmission();
+        return admission;
     }
 
     private AdmissionApplication reject(
@@ -181,6 +186,15 @@ public class AdmissionManagerReviewService {
         admission.setManagerReviewedAt(LocalDateTime.now());
         admission.setStatus(AdmissionStatus.REJECTED);
 
-        return admissionApplicationRepository.save(admission);
+        admission = admissionApplicationRepository.save(admission);
+        processNextWaitingAdmission();
+        return admission;
+    }
+
+    private void processNextWaitingAdmission() {
+        admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL)
+                .ifPresent(waitingAdmission -> {
+                    admissionGroomReviewService.processWaitingForStall(waitingAdmission.getId());
+                });
     }
 }

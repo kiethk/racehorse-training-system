@@ -2,6 +2,7 @@ package com.rtms.backend.service;
 
 import com.rtms.backend.dto.*;
 import com.rtms.backend.entity.*;
+import com.rtms.backend.enums.LotStatus;
 import com.rtms.backend.enums.TrainingDay;
 import com.rtms.backend.enums.TrainingPlanStatus;
 import com.rtms.backend.enums.WorkoutStatus;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 
@@ -60,6 +62,9 @@ class HorseTrainingPlanServiceTest {
     @Mock
     private AreaRepository areaRepository;
 
+    @Mock
+    private GroomIncidentReportRepository incidentReportRepository;
+
     private HorseTrainingPlanService planService;
 
     private final AuthenticatedUser trainerUser = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
@@ -77,7 +82,8 @@ class HorseTrainingPlanServiceTest {
                 lotService,
                 lotRepository,
                 stableStallRepository,
-                areaRepository
+                areaRepository,
+                incidentReportRepository
         );
     }
 
@@ -629,6 +635,84 @@ class HorseTrainingPlanServiceTest {
         verify(planRepository).save(plan);
     }
 
+    @Test
+    @DisplayName("Buổi tập hoàn thành và tất cả buổi trong cùng lot đã xong -> Lot tự động chuyển sang COMPLETED")
+    void testCompleteWorkout_AllWorkoutsInLotCompleted_AutoCompletesLot() {
+        Long workoutId = 301L;
+        CompleteWorkoutRequest req = new CompleteWorkoutRequest();
+        req.setPerformanceRating(9);
+
+        TrainingWorkout workout = new TrainingWorkout();
+        workout.setId(workoutId);
+        workout.setPlanId(50L);
+        workout.setLotId(601L);
+        workout.setStatus(WorkoutStatus.SCHEDULED);
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(50L);
+        plan.setTrainerId(9L);
+        plan.setStatus(TrainingPlanStatus.ACTIVE);
+
+        TrainingLot lot = new TrainingLot();
+        lot.setId(601L);
+        lot.setSubjectId(77L);
+        lot.setStatus(LotStatus.SCHEDULED);
+
+        when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
+        when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
+        when(workoutRepository.saveAndFlush(any(TrainingWorkout.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workoutRepository.countByPlanIdAndStatusNotIn(eq(50L), anyList())).thenReturn(2L); // plan còn buổi khác
+        when(lotRepository.findById(601L)).thenReturn(Optional.of(lot));
+        when(workoutRepository.countByLotIdAndStatusNotIn(eq(601L), anyList())).thenReturn(0L); // tất cả buổi trong lot này đã xong
+
+        // Act
+        planService.completeWorkout(workoutId, req, trainerUser);
+
+        // Assert
+        assertEquals(LotStatus.COMPLETED, lot.getStatus(),
+                "Lot phải tự động chuyển thành COMPLETED khi tất cả buổi tập trong lot đã hoàn thành/huỷ");
+        verify(lotRepository).save(lot);
+    }
+
+    @Test
+    @DisplayName("Buổi tập hoàn thành nhưng lot vẫn còn buổi tập khác chưa xong -> Lot giữ nguyên SCHEDULED")
+    void testCompleteWorkout_OtherWorkoutsInLotStillRemaining_LotRemainsScheduled() {
+        Long workoutId = 302L;
+        CompleteWorkoutRequest req = new CompleteWorkoutRequest();
+        req.setPerformanceRating(7);
+
+        TrainingWorkout workout = new TrainingWorkout();
+        workout.setId(workoutId);
+        workout.setPlanId(50L);
+        workout.setLotId(602L);
+        workout.setStatus(WorkoutStatus.SCHEDULED);
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(50L);
+        plan.setTrainerId(9L);
+        plan.setStatus(TrainingPlanStatus.ACTIVE);
+
+        TrainingLot lot = new TrainingLot();
+        lot.setId(602L);
+        lot.setSubjectId(77L);
+        lot.setStatus(LotStatus.SCHEDULED);
+
+        when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
+        when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
+        when(workoutRepository.saveAndFlush(any(TrainingWorkout.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workoutRepository.countByPlanIdAndStatusNotIn(eq(50L), anyList())).thenReturn(2L);
+        when(lotRepository.findById(602L)).thenReturn(Optional.of(lot));
+        when(workoutRepository.countByLotIdAndStatusNotIn(eq(602L), anyList())).thenReturn(1L); // còn 1 buổi chưa xong
+
+        // Act
+        planService.completeWorkout(workoutId, req, trainerUser);
+
+        // Assert
+        assertEquals(LotStatus.SCHEDULED, lot.getStatus(),
+                "Lot vẫn phải giữ SCHEDULED vì còn buổi tập của ngựa khác chưa hoàn thành");
+        verify(lotRepository, never()).save(lot);
+    }
+
     // =================================================================
     // reassignFutureWorkoutsToGroom — ĐỒNG BỘ GROOM KHI ĐỔI CHUỒNG
     // =================================================================
@@ -950,5 +1034,188 @@ class HorseTrainingPlanServiceTest {
 
         assertEquals(1, moved);
         assertEquals(4L, w1.getAssignedToId());
+    }
+
+    // =================================================================
+    // ĐỢT 7 TESTS: TIẾN ĐỘ, BIỂU ĐỒ THỂ LỰC & CẢNH BÁO
+    // =================================================================
+
+    @Test
+    @DisplayName("Đợt 7.1: Lấy chuỗi dữ liệu thể lực (fitness-trend) theo thời gian tăng dần")
+    void testGetFitnessTrend_Success() {
+        Long horseId = 1L;
+        LocalDate d1 = LocalDate.of(2026, 9, 1);
+        LocalDate d2 = LocalDate.of(2026, 9, 3);
+
+        TrainingWorkout w1 = new TrainingWorkout();
+        w1.setId(101L);
+        w1.setHorseId(horseId);
+        w1.setLotId(10L);
+        w1.setStatus(WorkoutStatus.COMPLETED);
+        w1.setActualDistanceMeters(java.math.BigDecimal.valueOf(1000));
+        w1.setAverageSpeedKmh(java.math.BigDecimal.valueOf(40.0));
+        w1.setAverageHeartRate(135);
+        w1.setPerformanceRating(7);
+
+        TrainingLot l1 = new TrainingLot();
+        l1.setId(10L);
+        l1.setSubjectId(50L);
+        l1.setLotDate(d1);
+
+        TrainingWorkout w2 = new TrainingWorkout();
+        w2.setId(102L);
+        w2.setHorseId(horseId);
+        w2.setLotId(11L);
+        w2.setStatus(WorkoutStatus.COMPLETED);
+        w2.setActualDistanceMeters(java.math.BigDecimal.valueOf(1200));
+        w2.setAverageSpeedKmh(java.math.BigDecimal.valueOf(45.0));
+        w2.setAverageHeartRate(145);
+        w2.setPerformanceRating(9);
+
+        TrainingLot l2 = new TrainingLot();
+        l2.setId(11L);
+        l2.setSubjectId(50L);
+        l2.setLotDate(d2);
+
+        Subject subject = new Subject();
+        subject.setId(50L);
+        subject.setName("Phi nước đại");
+        when(subjectRepository.findById(50L)).thenReturn(Optional.of(subject));
+
+        // Bộ lọc ngày giờ nằm trong SQL, nên service luôn truyền đủ 3 tham số
+        // (bỏ trống from/to thì dùng mốc bao trùm 1900–2999).
+        when(workoutRepository.findCompletedWorkoutsWithLotAsc(
+                eq(horseId), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.<Object[]>of(new Object[]{w1, l1}, new Object[]{w2, l2}));
+
+        List<HorseFitnessTrendItemResponse> result = planService.getFitnessTrend(horseId, null, null);
+
+        assertEquals(2, result.size());
+        assertEquals(d1, result.get(0).getDate());
+        assertEquals(d2, result.get(1).getDate());
+        assertEquals("Phi nước đại", result.get(0).getSubjectName());
+        assertEquals(7, result.get(0).getPerformanceRating());
+        assertEquals(9, result.get(1).getPerformanceRating());
+    }
+
+    @Test
+    @DisplayName("Đợt 7.2: Kích hoạt cảnh báo khi nhịp tim max > 220, hồi phục > 100, tụt phong độ, sự cố lặp")
+    void testGetHorseAlerts_MultipleRulesTriggered() {
+        Long horseId = 2L;
+        LocalDate today = LocalDate.now();
+
+        // 3 buổi tập gần nhất: maxHeartRate = 225 (>220), recovery = 110 (>100), phong độ giảm dần 8 -> 6 -> 4
+        TrainingWorkout w1 = new TrainingWorkout(); // Mới nhất
+        w1.setId(201L);
+        w1.setMaxHeartRate(225);
+        w1.setRecoveryHeartRate(110);
+        w1.setPerformanceRating(4);
+        w1.setActualDistanceMeters(java.math.BigDecimal.valueOf(3000));
+        TrainingLot l1 = new TrainingLot();
+        l1.setLotDate(today.minusDays(1));
+
+        TrainingWorkout w2 = new TrainingWorkout(); // Buổi kế trước
+        w2.setId(202L);
+        w2.setMaxHeartRate(200);
+        w2.setRecoveryHeartRate(90);
+        w2.setPerformanceRating(6);
+        w2.setActualDistanceMeters(java.math.BigDecimal.valueOf(1000));
+        TrainingLot l2 = new TrainingLot();
+        l2.setLotDate(today.minusDays(3));
+
+        TrainingWorkout w3 = new TrainingWorkout(); // Buổi trước nữa
+        w3.setId(203L);
+        w3.setMaxHeartRate(195);
+        w3.setRecoveryHeartRate(85);
+        w3.setPerformanceRating(8);
+        w3.setActualDistanceMeters(java.math.BigDecimal.valueOf(1000));
+        TrainingLot l3 = new TrainingLot();
+        l3.setLotDate(today.minusDays(5));
+
+        when(workoutRepository.findCompletedWorkoutsWithLotDesc(eq(horseId)))
+                .thenReturn(List.<Object[]>of(new Object[]{w1, l1}, new Object[]{w2, l2}, new Object[]{w3, l3}));
+
+        // Sự cố: 2 sự cố trong 14 ngày
+        when(incidentReportRepository.countByHorseIdAndReportedAtAfter(eq(horseId), any(LocalDateTime.class)))
+                .thenReturn(2L);
+
+        List<HorseAlertResponse> alerts = planService.getHorseAlerts(horseId);
+
+        assertNotNull(alerts);
+        assertTrue(alerts.stream().anyMatch(a -> "MAX_HEART_RATE_EXCEEDED".equals(a.getRuleCode())),
+                "Phải có cảnh báo nhịp tim tối đa");
+        assertTrue(alerts.stream().anyMatch(a -> "POOR_RECOVERY_HEART_RATE".equals(a.getRuleCode())),
+                "Phải có cảnh báo hồi phục tim kém");
+        assertTrue(alerts.stream().anyMatch(a -> "CONSECUTIVE_PERFORMANCE_DROP".equals(a.getRuleCode())),
+                "Phải có cảnh báo phong độ tụt liên tiếp");
+        assertTrue(alerts.stream().anyMatch(a -> "REPEATED_INCIDENTS".equals(a.getRuleCode())),
+                "Phải có cảnh báo sự cố lặp lại từ Groom");
+    }
+
+    @Test
+    @DisplayName("Đợt 7.3: Bảng tiến độ Dashboard toàn khu cho Trainer phụ trách")
+    void testGetTrainerDashboard_Success() {
+        Long trainerId = 9L;
+        AuthenticatedUser trainer = new AuthenticatedUser(trainerId, "trainer@example.com", "HEAD_TRAINER");
+
+        Area area = new Area();
+        area.setId(10L);
+        area.setTrainerId(trainerId);
+        when(areaRepository.findAll()).thenReturn(List.of(area));
+
+        StableStall stall = new StableStall();
+        stall.setId(100L);
+        stall.setAreaId(10L);
+        stall.setStallCode("A-01");
+        when(stableStallRepository.findAll()).thenReturn(List.of(stall));
+
+        Horse horse = new Horse();
+        horse.setId(50L);
+        horse.setName("Thần Gió");
+        horse.setBreed("Thoroughbred");
+        horse.setCurrentStallId(100L);
+        when(horseRepository.findAll()).thenReturn(List.of(horse));
+
+        Course course = new Course();
+        course.setId(5L);
+        course.setName("Khoá bứt tốc");
+        course.setTotalSessions(10);
+        when(courseRepository.findAll()).thenReturn(List.of(course));
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(700L);
+        plan.setTrainerId(trainerId);
+        plan.setHorseId(50L);
+        plan.setCourseId(5L);
+        plan.setStatus(TrainingPlanStatus.ACTIVE);
+        when(planRepository.findAll()).thenReturn(List.of(plan));
+
+        TrainingWorkout w = new TrainingWorkout();
+        w.setId(1L);
+        w.setStatus(WorkoutStatus.COMPLETED);
+        w.setPerformanceRating(8);
+
+        // Số buổi hoàn thành giờ lấy từ MỘT truy vấn gom cho mọi kế hoạch,
+        // thay vì gọi findByPlanIdOrderByIdAsc trong vòng lặp qua từng con ngựa.
+        when(workoutRepository.countByPlanIdsGroupedByStatus(anySet()))
+                .thenReturn(List.<Object[]>of(new Object[]{700L, WorkoutStatus.COMPLETED, 1L}));
+
+        TrainingLot lot = new TrainingLot();
+        lot.setLotDate(LocalDate.now());
+        when(workoutRepository.findCompletedWorkoutsWithLotDesc(eq(50L)))
+                .thenReturn(List.<Object[]>of(new Object[]{w, lot}));
+
+        List<TrainerDashboardHorseResponse> dashboard = planService.getTrainerDashboard(trainer);
+
+        assertNotNull(dashboard);
+        assertEquals(1, dashboard.size());
+        TrainerDashboardHorseResponse item = dashboard.get(0);
+        assertEquals("Thần Gió", item.getHorseName());
+        assertEquals("A-01", item.getStallCode());
+        assertEquals("Khoá bứt tốc", item.getCourseName());
+        assertEquals(1, item.getCompletedSessions());
+        assertEquals(10, item.getTotalSessions());
+        assertEquals(10.0, item.getProgressPercent());
+        assertEquals(8, item.getLatestPerformanceRating());
     }
 }

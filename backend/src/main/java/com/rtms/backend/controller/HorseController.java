@@ -11,6 +11,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.web.bind.annotation.*;
 
+import com.rtms.backend.dto.HorseAlertResponse;
+import com.rtms.backend.dto.HorseFitnessTrendItemResponse;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -63,6 +67,21 @@ public class HorseController {
             @PathVariable Long id,
             @RequestParam(required = false) Long stallId) {
         return ApiResponse.success(horseService.assignStall(id, stallId));
+    }
+
+    @PreAuthorize("hasAuthority('HORSE_VIEW')")
+    @GetMapping("/{id}/fitness-trend")
+    public ApiResponse<List<HorseFitnessTrendItemResponse>> getFitnessTrend(
+            @PathVariable Long id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ApiResponse.success(horseService.getFitnessTrend(id, from, to));
+    }
+
+    @PreAuthorize("hasAuthority('HORSE_VIEW')")
+    @GetMapping("/{id}/alerts")
+    public ApiResponse<List<HorseAlertResponse>> getAlerts(@PathVariable Long id) {
+        return ApiResponse.success(horseService.getHorseAlerts(id));
     }
 
 }
