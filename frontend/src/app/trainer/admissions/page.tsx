@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { TrainerQueueList } from '@/features/admissions/components/TrainerQueueList';
+import { TrainerAdmissionsListView } from '@/features/admissions/components/TrainerAdmissionsListView';
 
 export const metadata: Metadata = {
   title: 'Tiếp nhận chiến mã | Huấn luyện viên',
@@ -13,7 +13,7 @@ export default function TrainerAdmissionsPage() {
     <RoleGuard allowedRoles={['HEAD_TRAINER']}>
       <AppShell>
         <PageContainer>
-          <TrainerQueueList />
+          <TrainerAdmissionsListView />
         </PageContainer>
       </AppShell>
     </RoleGuard>
