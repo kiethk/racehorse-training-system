@@ -70,6 +70,22 @@ export async function apiGet<T>(path: string): Promise<T> {
   return res.json();
 }
 
+/** Binary files use cookie authentication and the same refresh flow as JSON. */
+export async function apiGetBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  let apiPath = path;
+  let external = false;
+  if (/^https?:\/\//i.test(path)) {
+    const url = new URL(path);
+    external = url.origin !== new URL(API_URL || window.location.origin).origin;
+    apiPath = `${url.pathname}${url.search}`;
+  }
+  const res = external
+    ? await fetch(path, { credentials: 'omit', signal })
+    : await doFetch(apiPath, { credentials: 'include', signal });
+  if (!res.ok) throw await responseError(res);
+  return res.blob();
+}
+
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const res = await doFetch(path, {
     method: "POST",
