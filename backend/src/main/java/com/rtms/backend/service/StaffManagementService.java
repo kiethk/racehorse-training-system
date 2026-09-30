@@ -1,7 +1,9 @@
 package com.rtms.backend.service;
 
 import com.rtms.backend.dto.StaffCreationRequest;
+import com.rtms.backend.dto.StaffDetailResponse;
 import com.rtms.backend.dto.StaffSummaryResponse;
+import com.rtms.backend.dto.StaffUpdateRequest;
 import com.rtms.backend.entity.*;
 import com.rtms.backend.repository.*;
 import org.springframework.http.HttpStatus;
@@ -47,6 +49,110 @@ public class StaffManagementService {
                 .filter(u -> u.getRole() != null && STAFF_ROLES.contains(u.getRole().getName()))
                 .map(this::mapToSummary)
                 .collect(Collectors.toList());
+    }
+
+    public StaffDetailResponse getStaffDetail(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (user.getRole() == null || !STAFF_ROLES.contains(user.getRole().getName())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a staff account");
+        }
+
+        StaffDetailResponse response = new StaffDetailResponse();
+        response.setId(user.getId());
+        response.setFullName(user.getFullName());
+        response.setEmail(user.getEmail());
+        response.setPhone(user.getPhone());
+        response.setAddress(user.getAddress());
+        response.setRole(user.getRole().getName());
+        response.setActive(user.isActive());
+        response.setCreatedAt(user.getCreatedAt());
+
+        switch (user.getRole().getName()) {
+            case "GROOM":
+                groomProfileRepository.findById(user.getId()).ifPresent(p -> {
+                    StaffDetailResponse.GroomProfileDto dto = new StaffDetailResponse.GroomProfileDto();
+                    dto.setTrainerId(p.getTrainerId());
+                    response.setProfile(dto);
+                });
+                break;
+            case "VETERINARIAN":
+                vetProfileRepository.findById(user.getId()).ifPresent(p -> {
+                    StaffDetailResponse.VeterinarianProfileDto dto = new StaffDetailResponse.VeterinarianProfileDto();
+                    dto.setLicenseNumber(p.getLicenseNumber());
+                    dto.setLicenseIssuedDate(p.getLicenseIssuedDate());
+                    dto.setSpecialization(p.getSpecialization());
+                    response.setProfile(dto);
+                });
+                break;
+            case "HEAD_TRAINER":
+                trainerProfileRepository.findById(user.getId()).ifPresent(p -> {
+                    StaffDetailResponse.TrainerProfileDto dto = new StaffDetailResponse.TrainerProfileDto();
+                    dto.setCertificationNumber(p.getCertificationNumber());
+                    dto.setCertificationIssuedDate(p.getCertificationIssuedDate());
+                    response.setProfile(dto);
+                });
+                break;
+        }
+
+        return response;
+    }
+
+    @Transactional
+    public StaffDetailResponse updateStaff(Long userId, StaffUpdateRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (user.getRole() == null || !STAFF_ROLES.contains(user.getRole().getName())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a staff account");
+        }
+
+        if (request.getFullName() != null && !request.getFullName().isBlank()) {
+            user.setFullName(request.getFullName().trim());
+        }
+        user.setPhone(request.getPhone());
+        user.setAddress(request.getAddress());
+        userRepository.save(user);
+
+        switch (user.getRole().getName()) {
+            case "GROOM":
+                GroomProfile groomProfile = groomProfileRepository.findById(user.getId())
+                        .orElseGet(() -> { GroomProfile p = new GroomProfile(); p.setUserId(user.getId()); return p; });
+                if (request.getTrainerId() != null) {
+                    User trainer = userRepository.findById(request.getTrainerId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trainer not found"));
+                    if (!"HEAD_TRAINER".equals(trainer.getRole() != null ? trainer.getRole().getName() : "") || !trainer.isActive()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or inactive HEAD_TRAINER");
+                    }
+                    groomProfile.setTrainerId(trainer.getId());
+                } else if (request.isTrainerIdProvided()) {
+                    groomProfile.setTrainerId(null);
+                }
+                groomProfileRepository.save(groomProfile);
+                break;
+            case "VETERINARIAN":
+                VeterinarianProfile vetProfile = vetProfileRepository.findById(user.getId())
+                        .orElseGet(() -> { VeterinarianProfile p = new VeterinarianProfile(); p.setUserId(user.getId()); return p; });
+                if (request.getLicenseNumber() != null && !request.getLicenseNumber().isBlank()) {
+                    vetProfile.setLicenseNumber(request.getLicenseNumber().trim());
+                }
+                vetProfile.setLicenseIssuedDate(request.getLicenseIssuedDate());
+                vetProfile.setSpecialization(request.getSpecialization());
+                vetProfileRepository.save(vetProfile);
+                break;
+            case "HEAD_TRAINER":
+                TrainerProfile trainerProfile = trainerProfileRepository.findById(user.getId())
+                        .orElseGet(() -> { TrainerProfile p = new TrainerProfile(); p.setUserId(user.getId()); return p; });
+                if (request.getCertificationNumber() != null && !request.getCertificationNumber().isBlank()) {
+                    trainerProfile.setCertificationNumber(request.getCertificationNumber().trim());
+                }
+                trainerProfile.setCertificationIssuedDate(request.getCertificationIssuedDate());
+                trainerProfileRepository.save(trainerProfile);
+                break;
+        }
+
+        return getStaffDetail(userId);
     }
 
     @Transactional

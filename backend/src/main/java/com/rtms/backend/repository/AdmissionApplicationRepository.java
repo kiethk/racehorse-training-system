@@ -26,6 +26,8 @@ public interface AdmissionApplicationRepository
 
     List<AdmissionApplication> findByStatus(AdmissionStatus status);
 
+    Optional<AdmissionApplication> findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus status);
+
     @Query("""
             SELECT a FROM AdmissionApplication a
             JOIN CandidateHorseProfile c ON c.admissionId = a.id

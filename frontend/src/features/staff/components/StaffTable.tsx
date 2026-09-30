@@ -8,9 +8,10 @@ interface StaffTableProps {
   staff: StaffSummary[];
   onToggleStatus: (userId: number, currentStatus: boolean) => Promise<void>;
   loadingActionId: number | null;
+  onRowClick?: (userId: number) => void;
 }
 
-export function StaffTable({ staff, onToggleStatus, loadingActionId }: StaffTableProps) {
+export function StaffTable({ staff, onToggleStatus, loadingActionId, onRowClick }: StaffTableProps) {
   const [confirmToggle, setConfirmToggle] = useState<StaffSummary | null>(null);
 
   if (staff.length === 0) {
@@ -47,7 +48,11 @@ export function StaffTable({ staff, onToggleStatus, loadingActionId }: StaffTabl
           </thead>
           <tbody className="divide-y divide-[var(--color-border)]">
             {staff.map((s) => (
-              <tr key={s.userId} className="transition-colors hover:bg-[var(--color-surface-muted)]/50">
+              <tr 
+                key={s.userId} 
+                className="transition-colors hover:bg-[var(--color-surface-muted)]/50 cursor-pointer"
+                onClick={() => onRowClick?.(s.userId)}
+              >
                 <td className="px-4 py-3">
                   <div className="font-medium text-[var(--color-text-primary)]">{s.fullName}</div>
                   <div className="text-[12px] text-[var(--color-text-muted)]">{s.email}</div>
@@ -70,7 +75,10 @@ export function StaffTable({ staff, onToggleStatus, loadingActionId }: StaffTabl
                     size="sm"
                     variant={s.active ? 'destructive' : 'primary'}
                     loading={loadingActionId === s.userId}
-                    onClick={() => handleToggle(s)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggle(s);
+                    }}
                   >
                     {s.active ? 'Deactivate' : 'Activate'}
                   </Button>

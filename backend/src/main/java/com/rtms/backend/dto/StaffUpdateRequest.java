@@ -2,43 +2,33 @@ package com.rtms.backend.dto;
 
 import java.time.LocalDate;
 
-public class StaffCreationRequest {
+public class StaffUpdateRequest {
+
     private String fullName;
-    private String email;
-    private String password;
     private String phone;
     private String address;
-    private String role; // Allowed: GROOM, VETERINARIAN, HEAD_TRAINER
 
-    // Veterinarian specific
+    // Veterinarian
     private String licenseNumber;
     private LocalDate licenseIssuedDate;
     private String specialization;
 
-    // Head Trainer specific
+    // Head Trainer
     private String certificationNumber;
     private LocalDate certificationIssuedDate;
 
-    // Groom specific
+    // Groom
     private Long trainerId;
+    private boolean trainerIdProvided;
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
-
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
 
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
 
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
-
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
 
     public String getLicenseNumber() { return licenseNumber; }
     public void setLicenseNumber(String licenseNumber) { this.licenseNumber = licenseNumber; }
@@ -55,7 +45,9 @@ public class StaffCreationRequest {
     public LocalDate getCertificationIssuedDate() { return certificationIssuedDate; }
     public void setCertificationIssuedDate(LocalDate certificationIssuedDate) { this.certificationIssuedDate = certificationIssuedDate; }
 
-
     public Long getTrainerId() { return trainerId; }
     public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
+
+    public boolean isTrainerIdProvided() { return trainerIdProvided; }
+    public void setTrainerIdProvided(boolean trainerIdProvided) { this.trainerIdProvided = trainerIdProvided; }
 }

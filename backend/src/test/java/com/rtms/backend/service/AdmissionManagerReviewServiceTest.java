@@ -43,6 +43,9 @@ class AdmissionManagerReviewServiceTest {
     @Mock
     private PreventiveCareScheduleRepository preventiveCareScheduleRepository;
 
+    @Mock
+    private AdmissionGroomReviewService admissionGroomReviewService;
+
     private AdmissionManagerReviewService service;
 
     // ─── Shared helpers ───────────────────────────────────────────────────────
@@ -93,7 +96,8 @@ class AdmissionManagerReviewServiceTest {
                 admissionApplicationRepository,
                 stableStallRepository,
                 horseRepository,
-                preventiveCareScheduleRepository);
+                preventiveCareScheduleRepository,
+                admissionGroomReviewService);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -456,5 +460,82 @@ class AdmissionManagerReviewServiceTest {
         assertEquals(AdmissionStatus.APPROVED, result.getStatus());
         // findById for Q stall must never be called
         verify(stableStallRepository, never()).findById(any());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WAITING_FOR_STALL processing
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("Approve: Releases Q stall and processes oldest waiting admission")
+    void managerApprove_releasesQStall_andProcessesOldestWaitingAdmission() {
+        AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
+        Horse horse = buildHorse(HorseStatus.CANDIDATE);
+        StableStall regularStall = buildStall(20L, StallStatus.AVAILABLE);
+        StableStall quarantineStall = buildStall(99L, StallStatus.OCCUPIED);
+        
+        AdmissionApplication waitingAdmission = new AdmissionApplication();
+        waitingAdmission.setId(100L);
+        waitingAdmission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
+
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.of(regularStall));
+        when(stableStallRepository.findById(99L)).thenReturn(Optional.of(quarantineStall));
+        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL))
+                .thenReturn(Optional.of(waitingAdmission));
+
+        service.review(1L, 5L, approveRequest(null));
+
+        verify(stableStallRepository).save(quarantineStall);
+        assertEquals(StallStatus.AVAILABLE, quarantineStall.getStatus());
+        verify(admissionGroomReviewService).processWaitingForStall(100L);
+    }
+
+    @Test
+    @DisplayName("Reject: Releases Q stall and processes oldest waiting admission")
+    void managerReject_releasesQStall_andProcessesWaitingAdmission() {
+        AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
+        Horse horse = buildHorse(HorseStatus.CANDIDATE);
+        StableStall quarantineStall = buildStall(99L, StallStatus.OCCUPIED);
+        
+        AdmissionApplication waitingAdmission = new AdmissionApplication();
+        waitingAdmission.setId(200L);
+        waitingAdmission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
+
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.findById(99L)).thenReturn(Optional.of(quarantineStall));
+        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL))
+                .thenReturn(Optional.of(waitingAdmission));
+
+        service.review(1L, 5L, rejectRequest("Not a good fit"));
+
+        verify(stableStallRepository).save(quarantineStall);
+        assertEquals(StallStatus.AVAILABLE, quarantineStall.getStatus());
+        verify(admissionGroomReviewService).processWaitingForStall(200L);
+    }
+
+    @Test
+    @DisplayName("Review: Does not call Groom processing if no waiting admission")
+    void managerReview_whenNoWaitingAdmission_doesNotCallGroomProcessing() {
+        AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
+        Horse horse = buildHorse(HorseStatus.CANDIDATE);
+        StableStall regularStall = buildStall(20L, StallStatus.AVAILABLE);
+        StableStall quarantineStall = buildStall(99L, StallStatus.OCCUPIED);
+
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.of(regularStall));
+        when(stableStallRepository.findById(99L)).thenReturn(Optional.of(quarantineStall));
+        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL))
+                .thenReturn(Optional.empty());
+
+        service.review(1L, 5L, approveRequest(null));
+
+        verify(admissionGroomReviewService, never()).processWaitingForStall(any());
     }
 }
