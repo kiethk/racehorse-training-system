@@ -24,6 +24,13 @@ export type AdmissionDocumentType =
   | 'VACCINATION_RECORD' | 'DEWORMING_RECORD' | 'HEALTH_CERTIFICATE'
   | 'PREVIOUS_MEDICAL_RECORD' | 'PREVIOUS_INJURY_RECORD';
 
+export interface AdmissionDocumentUpload {
+  file: File;
+  documentType: AdmissionDocumentType;
+  recordDate?: string;
+  note?: string;
+}
+
 export interface AdmissionDocument {
   id: number;
   documentType: AdmissionDocumentType;

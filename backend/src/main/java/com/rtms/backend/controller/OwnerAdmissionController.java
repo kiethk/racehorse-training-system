@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -23,13 +24,27 @@ public class OwnerAdmissionController {
         this.service = service;
     }
 
-    @PostMapping
-    @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_CREATE') and principal.role == 'HORSE_OWNER'")
-    public ResponseEntity<ApiResponse<OwnerAdmissionDetailResponse>> create(
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(
+            "hasAuthority('ADMISSION_APPLICATION_CREATE')"
+            + " and hasAuthority('ADMISSION_DOCUMENT_CREATE')"
+            + " and principal.role == 'HORSE_OWNER'"
+    )
+    public ResponseEntity<ApiResponse<OwnerAdmissionDetailResponse>> submit(
             @AuthenticationPrincipal AuthenticatedUser owner,
-            @Valid @RequestBody CreateOwnerAdmissionRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(service.create(owner.getUserId(), request)));
+            @Valid @RequestPart("candidate")
+            CreateOwnerAdmissionRequest request,
+            @RequestPart("documents")
+            List<AdmissionDocumentMetadataRequest> metadata,
+            @RequestPart("files")
+            List<MultipartFile> files) {
+        OwnerAdmissionDetailResponse result = service.submit(
+                owner.getUserId(),
+                request,
+                metadata,
+                files);
+     return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success(result));
     }
 
     @GetMapping

@@ -16,11 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Private local file storage for development/single-instance deployment.
- * Configure RTMS_ADMISSION_UPLOAD_DIR as a persistent private volume.
- * Replace this component with an R2/S3 implementation for multi-instance deployment.
- */
+
 @Component
 public class AdmissionFileStorage {
     private static final long MAX_BYTES = 10L * 1024 * 1024;
@@ -35,26 +31,38 @@ public class AdmissionFileStorage {
         this.uploadRoot = Path.of(directory).toAbsolutePath().normalize();
     }
 
-    public String store(MultipartFile file) {
+    public void validate(MultipartFile file) {
         if (file == null || file.isEmpty() || file.getSize() > MAX_BYTES) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Document must be between 1 byte and 10 MB");
         }
-        String mediaType = file.getContentType() == null
-                ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        String extension = EXTENSIONS.get(mediaType);
-        if (extension == null) {
+
+        String mediaType = file.getContentType() == null ? "" :  file.getContentType().toLowerCase(Locale.ROOT);
+
+        if (!EXTENSIONS.containsKey(mediaType)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PDF, JPEG, PNG and WebP are accepted");
         }
+
+    }
+
+    public String store(MultipartFile file) {
+        validate(file);
+        String mediaType = file.getContentType().toLowerCase(Locale.ROOT);
+        String extension = EXTENSIONS.get(mediaType);
         String storageKey = UUID.randomUUID() + extension;
+        String key = "local:" + storageKey;
         try {
             Files.createDirectories(uploadRoot);
             Path destination = uploadRoot.resolve(storageKey);
             try (var stream = file.getInputStream()) {
                 Files.copy(stream, destination);
             }
-            return "local:" + storageKey;
+            return key;
         } catch (IOException ex) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to store admission document");
+            deleteIfLocal(key);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to store admission document", ex);
+        } catch (RuntimeException ex) {
+            deleteIfLocal(key);
+            throw ex;
         }
     }
 
