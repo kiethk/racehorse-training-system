@@ -1,19 +1,33 @@
 package com.rtms.backend.service;
 
+import com.rtms.backend.config.ApiException;
+import com.rtms.backend.dto.AuditLogResponse;
 import com.rtms.backend.entity.AuditLog;
 import com.rtms.backend.entity.User;
 import com.rtms.backend.repository.AuditLogRepository;
 import com.rtms.backend.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.Set;
 
 @Service
 public class AuditLogService {
 
     private static final Logger logger = LoggerFactory.getLogger(AuditLogService.class);
+
+    private static final Set<String> VALID_WRITE_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
@@ -43,4 +57,41 @@ public class AuditLogService {
             logger.error("Failed to persist audit log for {} {}: {}", httpMethod, requestPath, e.getMessage(), e);
         }
     }
+
+    @Transactional(readOnly = true)
+    public Page<AuditLogResponse> getAuditLogs(
+            Long userId,
+            String httpMethod,
+            Integer statusCode,
+            LocalDateTime from,
+            LocalDateTime to,
+            String search,
+            Pageable pageable
+    ) {
+        // Validate httpMethod filter
+        String normalizedMethod = null;
+        if (httpMethod != null && !httpMethod.isBlank()) {
+            normalizedMethod = httpMethod.trim().toUpperCase();
+            if (!VALID_WRITE_METHODS.contains(normalizedMethod)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                        "Invalid httpMethod filter. Accepted values: POST, PUT, PATCH, DELETE");
+            }
+        }
+
+        // Bound page size
+        int boundedSize = Math.max(1, Math.min(pageable.getPageSize(), MAX_PAGE_SIZE));
+        Pageable boundedPageable = PageRequest.of(
+                Math.max(0, pageable.getPageNumber()),
+                boundedSize,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        String searchTerm = (search != null && !search.isBlank()) ? search.trim() : null;
+
+        Page<AuditLog> page = auditLogRepository.findWithFilters(
+                userId, normalizedMethod, statusCode, from, to, searchTerm, boundedPageable);
+
+        return page.map(AuditLogResponse::from);
+    }
 }
+
