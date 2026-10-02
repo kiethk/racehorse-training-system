@@ -21,9 +21,9 @@ export const incidentApi = {
     (await apiPost<ApiResponse<IncidentReport>>('/api/groom-incident-reports', body)).data,
 
   /**
-   * Đính ảnh — gọi SAU khi create đã trả về id.
-   * apiUpload đã xử lý đúng: không đặt Content-Type thủ công (để trình duyệt
-   * tự sinh boundary), có credentials, và ĐỌC message lỗi từ body.
+   * Attach an image after create returns the report id.
+   * apiUpload handles the multipart boundary, credentials, and error message
+   * parsing from the response body.
    */
   uploadImage: async (reportId: number, file: File): Promise<IncidentReport> => {
     const body = new FormData();
@@ -36,9 +36,8 @@ export const incidentApi = {
   },
 
   /**
-   * Địa chỉ để hiển thị ảnh.
-   * imageUrl bắt đầu bằng "local:" -> ảnh nằm trong hệ thống, gọi endpoint.
-   * Ngược lại -> địa chỉ ngoài, dùng thẳng.
+   * Resolve the image URL for display.
+   * A "local:" imageUrl points to the system endpoint; external URLs are used as-is.
    */
   imageSrc: (report: IncidentReport): string | null => {
     if (!report.imageUrl) return null;
