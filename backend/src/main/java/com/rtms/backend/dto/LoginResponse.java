@@ -24,9 +24,18 @@ public class LoginResponse {
         this.profile = profile;
     }
 
+    private String accessToken;
+    private String refreshToken;
+
     public Long getUserId() { return userId; }
     public String getFullName() { return fullName; }
     public String getEmail() { return email; }
     public String getRole() { return role; }
     public Object getProfile() { return profile; }
+
+    public String getAccessToken() { return accessToken; }
+    public void setAccessToken(String accessToken) { this.accessToken = accessToken; }
+
+    public String getRefreshToken() { return refreshToken; }
+    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
 }

@@ -36,6 +36,20 @@ export function setServerClockOffset(serverTimeMs: number) {
   serverClockOffsetMs = serverTimeMs - Date.now();
 }
 
+export function setTokens(accessToken: string, refreshToken: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('rtms_access_token', accessToken);
+    localStorage.setItem('rtms_refresh_token', refreshToken);
+  }
+}
+
+export function clearTokens() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('rtms_access_token');
+    localStorage.removeItem('rtms_refresh_token');
+  }
+}
+
 async function doFetch(path: string, options: RequestInit): Promise<Response> {
   const isAuthEndpoint = [
     '/api/auth/login',
@@ -44,7 +58,19 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
     '/api/auth/logout'
   ].includes(path);
 
-  let res = await fetch(`${API_URL}${path}`, options);
+  const finalOptions = { ...options };
+  const headers = new Headers(options.headers || {});
+  
+  if (typeof window !== 'undefined') {
+    const accessToken = localStorage.getItem('rtms_access_token');
+    if (accessToken && !isAuthEndpoint) {
+      headers.set('Authorization', `Bearer ${accessToken}`);
+    }
+  }
+  
+  finalOptions.headers = headers;
+
+  let res = await fetch(`${API_URL}${path}`, finalOptions);
 
   const dateHeader = res.headers.get('date');
   if (dateHeader) {
@@ -58,12 +84,26 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
     if (!refreshPromise) {
       refreshPromise = (async () => {
         try {
+          const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('rtms_refresh_token') : null;
+          if (!refreshToken) return false;
+
           const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
             method: 'POST',
-            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
           });
-          return refreshRes.ok;
+
+          if (refreshRes.ok) {
+            const data = await refreshRes.json();
+            if (data?.data?.accessToken) {
+              setTokens(data.data.accessToken, refreshToken);
+              return true;
+            }
+          }
+          clearTokens();
+          return false;
         } catch {
+          clearTokens();
           return false;
         } finally {
           refreshPromise = null;
@@ -74,7 +114,14 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
     const refreshed = await refreshPromise;
     if (refreshed) {
       // Retry original request exactly once
-      res = await fetch(`${API_URL}${path}`, options);
+      if (typeof window !== 'undefined') {
+        const newAccessToken = localStorage.getItem('rtms_access_token');
+        if (newAccessToken) {
+          headers.set('Authorization', `Bearer ${newAccessToken}`);
+          finalOptions.headers = headers;
+        }
+      }
+      res = await fetch(`${API_URL}${path}`, finalOptions);
     }
   }
 
