@@ -86,10 +86,33 @@ public class AuditLogService {
                 Sort.by(Sort.Direction.DESC, "createdAt")
         );
 
-        String searchTerm = (search != null && !search.isBlank()) ? search.trim() : null;
+        String searchTerm = (search != null && !search.isBlank()) ? search.trim().toLowerCase() : null;
+        String finalMethod = normalizedMethod;
 
-        Page<AuditLog> page = auditLogRepository.findWithFilters(
-                userId, normalizedMethod, statusCode, from, to, searchTerm, boundedPageable);
+        Page<AuditLog> page = auditLogRepository.findAll((root, query, cb) -> {
+            java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+            
+            if (userId != null) {
+                predicates.add(cb.equal(root.get("user").get("id"), userId));
+            }
+            if (finalMethod != null) {
+                predicates.add(cb.equal(root.get("httpMethod"), finalMethod));
+            }
+            if (statusCode != null) {
+                predicates.add(cb.equal(root.get("statusCode"), statusCode));
+            }
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), to));
+            }
+            if (searchTerm != null) {
+                predicates.add(cb.like(cb.lower(root.get("requestPath")), "%" + searchTerm + "%"));
+            }
+            
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        }, boundedPageable);
 
         return page.map(AuditLogResponse::from);
     }
