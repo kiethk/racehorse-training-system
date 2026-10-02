@@ -5,9 +5,8 @@ import com.rtms.backend.dto.CompletePreventiveCareScheduleRequest;
 import com.rtms.backend.dto.CreatePreventiveCareScheduleRequest;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.HealthRecord;
-import com.rtms.backend.entity.PreventiveCareSchedule;
+import com.rtms.backend.entity.CareSchedule;
 import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.repository.PreventiveCareScheduleRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.PreventiveCareService;
 
@@ -30,7 +29,7 @@ public class PreventiveCareController {
 
     @PreAuthorize("hasAuthority('PREVENTIVE_CARE_CREATE')")
     @PostMapping
-    public ApiResponse<PreventiveCareSchedule> createSchedule(
+    public ApiResponse<CareSchedule> createSchedule(
             @RequestBody CreatePreventiveCareScheduleRequest request,
             @org.springframework.security.core.annotation.AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(preventiveCareService.createSchedule(request, currentUser));
@@ -38,7 +37,7 @@ public class PreventiveCareController {
 
     @PreAuthorize("hasAuthority('PREVENTIVE_CARE_VIEW')")
     @GetMapping
-    public ApiResponse<List<PreventiveCareSchedule>> getUpcomingByHorse(@RequestParam Long horseId)
+    public ApiResponse<List<CareSchedule>> getUpcomingByHorse(@RequestParam Long horseId)
             throws AccessDeniedException {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();

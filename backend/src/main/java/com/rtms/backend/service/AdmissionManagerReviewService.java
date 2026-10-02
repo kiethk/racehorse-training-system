@@ -3,18 +3,22 @@ package com.rtms.backend.service;
 import com.rtms.backend.dto.ManagerReviewRequest;
 import com.rtms.backend.entity.AdmissionApplication;
 import com.rtms.backend.entity.Horse;
-import com.rtms.backend.entity.PreventiveCareSchedule;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.enums.ReviewDecision;
 import com.rtms.backend.enums.StallStatus;
+import com.rtms.backend.enums.TrainingStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.repository.PreventiveCareScheduleRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.rtms.backend.entity.CareSchedule;
+import com.rtms.backend.enums.CareScheduleStatus;
+import com.rtms.backend.repository.CareScheduleRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,17 +29,14 @@ public class AdmissionManagerReviewService {
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final StableStallRepository stableStallRepository;
     private final HorseRepository horseRepository;
-    private final PreventiveCareScheduleRepository preventiveCareScheduleRepository;
+    private final CareScheduleRepository careScheduleRepository;
 
-    public AdmissionManagerReviewService(
-            AdmissionApplicationRepository admissionApplicationRepository,
-            StableStallRepository stableStallRepository,
-            HorseRepository horseRepository,
-            PreventiveCareScheduleRepository preventiveCareScheduleRepository) {
-        this.admissionApplicationRepository = admissionApplicationRepository;
-        this.stableStallRepository = stableStallRepository;
-        this.horseRepository = horseRepository;
-        this.preventiveCareScheduleRepository = preventiveCareScheduleRepository;
+    public AdmissionManagerReviewService(AdmissionApplicationRepository admissions,
+            StableStallRepository stalls, HorseRepository horses, CareScheduleRepository schedules) {
+        this.admissionApplicationRepository = admissions;
+        this.stableStallRepository = stalls;
+        this.horseRepository = horses;
+        this.careScheduleRepository = schedules;
     }
 
     @Transactional
@@ -57,7 +58,7 @@ public class AdmissionManagerReviewService {
             throw new IllegalStateException("Admission is missing horseId");
         }
 
-        Horse horse = horseRepository.findById(admission.getHorseId())
+        Horse horse = horseRepository.findByIdForUpdate(admission.getHorseId())
                 .orElseThrow(() -> new IllegalStateException("Horse not found"));
 
         if (horse.getCurrentStatus() != HorseStatus.CANDIDATE) {
@@ -103,11 +104,16 @@ public class AdmissionManagerReviewService {
         // 2. Update existing Horse
         horse.setCurrentStatus(HorseStatus.ELIGIBLE);
         horse.setCurrentStallId(regularStall.getId());
-        horse.setTrainingLocked(false);
-        horse.setTrainingLockReason(null);
-        horse.setTrainingLockReviewDate(null);
-        horse.setTrainingLockVetId(null);
-        horse.setTrainingLockUpdatedAt(LocalDateTime.now());
+
+        // Protect Vet medical locks: only clear training lock if it was purely administrative
+        if ("Admission pending trainer and manager review".equals(horse.getTrainingLockReason())
+                && horse.getTrainingLockVetId() == null) {
+            horse.setTrainingLocked(false);
+            horse.setTrainingLockReason(null);
+            horse.setTrainingLockReviewDate(null);
+            horse.setTrainingLockVetId(null);
+            horse.setTrainingLockUpdatedAt(LocalDateTime.now());
+        }
         horseRepository.save(horse);
 
         // 3. Mark regular stall occupied
@@ -166,14 +172,21 @@ public class AdmissionManagerReviewService {
         horse.setCurrentStallId(null);
         horseRepository.save(horse);
 
-        // Cancel all PENDING and OVERDUE preventive care schedules for this horse
-        List<PreventiveCareSchedule> schedulesToCancel =
-                preventiveCareScheduleRepository.findByHorseIdAndStatusIn(
-                        horse.getId(), List.of("PENDING", "OVERDUE"));
-        for (PreventiveCareSchedule schedule : schedulesToCancel) {
-            schedule.setStatus("CANCELLED");
+        // Cancel active CareSchedule records for this horse
+        if (careScheduleRepository != null) {
+            List<CareSchedule> careSchedulesToCancel =
+                    careScheduleRepository.findByHorseIdAndStatusIn(
+                            horse.getId(),
+                            List.of(CareScheduleStatus.REQUESTED,
+                                    CareScheduleStatus.AWAITING_VET_CONFIRMATION,
+                                    CareScheduleStatus.SCHEDULED,
+                                    CareScheduleStatus.IN_PROGRESS));
+            for (CareSchedule cs : careSchedulesToCancel) {
+                cs.setStatus(CareScheduleStatus.CANCELLED);
+                cs.setCancelReason("Admission rejected by manager");
+            }
+            careScheduleRepository.saveAll(careSchedulesToCancel);
         }
-        preventiveCareScheduleRepository.saveAll(schedulesToCancel);
 
         admission.setManagerId(managerId);
         admission.setManagerDecision(ReviewDecision.REJECTED);

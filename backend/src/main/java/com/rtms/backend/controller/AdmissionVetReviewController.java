@@ -2,14 +2,14 @@ package com.rtms.backend.controller;
 
 import com.rtms.backend.dto.AdmissionDocumentResponse;
 import com.rtms.backend.dto.ApiResponse;
+import com.rtms.backend.dto.CareScheduleResponse;
 import com.rtms.backend.dto.VetReviewRequest;
 import com.rtms.backend.dto.VetReviewResponse;
-import com.rtms.backend.dto.VetExamResponse;
 import com.rtms.backend.repository.AdmissionDocumentRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.AdmissionReviewService;
+import com.rtms.backend.service.CareScheduleService;
 import com.rtms.backend.service.OwnerAdmissionService;
-import com.rtms.backend.service.VetExamService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,22 +22,22 @@ public class AdmissionVetReviewController {
     private final AdmissionDocumentRepository documentRepository;
     private final AdmissionReviewService reviewService;
     private final OwnerAdmissionService ownerAdmissionService;
-    private final VetExamService vetExamService;
+    private final CareScheduleService careScheduleService;
 
     public AdmissionVetReviewController(AdmissionDocumentRepository documentRepository,
             AdmissionReviewService reviewService, OwnerAdmissionService ownerAdmissionService,
-            VetExamService vetExamService) {
+            CareScheduleService careScheduleService) {
         this.documentRepository = documentRepository;
         this.reviewService = reviewService;
         this.ownerAdmissionService = ownerAdmissionService;
-        this.vetExamService = vetExamService;
+        this.careScheduleService = careScheduleService;
     }
 
     @PostMapping("/{id}/initial-exam")
-    @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_GROOM_REVIEW')")
-    public ApiResponse<VetExamResponse> createInitialExam(@PathVariable Long id,
+    @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_GROOM_REVIEW') or principal.role == 'GROOM' or principal.role == 'CLUB_MANAGER'")
+    public ApiResponse<CareScheduleResponse> createInitialExam(@PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(vetExamService.createInitialExam(id, currentUser.getUserId()));
+        return ApiResponse.success(careScheduleService.createInitialSchedule(id, null));
     }
 
     @PostMapping("/{id}/vet-review")

@@ -1,11 +1,10 @@
 package com.rtms.backend.service;
 
-import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.dto.CreateGroomDailyTaskRequest;
 import com.rtms.backend.dto.TodayTaskItemResponse;
 import com.rtms.backend.entity.GroomDailyTask;
 import com.rtms.backend.entity.Horse;
-import com.rtms.backend.entity.PreventiveCareSchedule;
+import com.rtms.backend.entity.CareSchedule;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.entity.Subject;
 import com.rtms.backend.entity.TrainingLot;
@@ -15,7 +14,7 @@ import com.rtms.backend.enums.SopSlot;
 import com.rtms.backend.enums.TaskSource;
 import com.rtms.backend.repository.GroomDailyTaskRepository;
 import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.repository.PreventiveCareScheduleRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import com.rtms.backend.repository.SubjectRepository;
 import com.rtms.backend.repository.TrainingWorkoutRepository;
@@ -43,7 +42,7 @@ public class GroomDailyTaskService {
     private final UserRepository userRepository;
     private final StableStallRepository stableStallRepository;
     private final TrainingWorkoutRepository workoutRepository;
-    private final PreventiveCareScheduleRepository preventiveCareScheduleRepository;
+    private final CareScheduleRepository careScheduleRepository;
     private final SubjectRepository subjectRepository;
 
     public GroomDailyTaskService(GroomDailyTaskRepository taskRepository,
@@ -51,14 +50,14 @@ public class GroomDailyTaskService {
                                  UserRepository userRepository,
                                  StableStallRepository stableStallRepository,
                                  TrainingWorkoutRepository workoutRepository,
-                                 PreventiveCareScheduleRepository preventiveCareScheduleRepository,
+                                 CareScheduleRepository careScheduleRepository,
                                  SubjectRepository subjectRepository) {
         this.taskRepository = taskRepository;
         this.horseRepository = horseRepository;
         this.userRepository = userRepository;
         this.stableStallRepository = stableStallRepository;
         this.workoutRepository = workoutRepository;
-        this.preventiveCareScheduleRepository = preventiveCareScheduleRepository;
+        this.careScheduleRepository = careScheduleRepository;
         this.subjectRepository = subjectRepository;
     }
 
@@ -171,7 +170,7 @@ public class GroomDailyTaskService {
      *
      *   Nguồn 1: groom_daily_tasks        (SOP thường nhật)
      *   Nguồn 2: training_workouts JOIN training_lots  (buổi tập được gán)
-     *   Nguồn 3: preventive_care_schedules (lịch thú y của ngựa trong chuồng mình)
+     *   Nguồn 3: care_schedule (lịch thú y của ngựa trong chuồng mình)
      *
      * Lợi ích: Groom nhìn một màn hình là nắm trọn ngày — lúc nào cho ăn, lúc
      * nào phải có mặt ở sân, lúc nào Vet tới tiêm.
@@ -218,9 +217,12 @@ public class GroomDailyTaskService {
         List<Horse> myHorses = stallIds.isEmpty() ? List.of()
                 : horseRepository.findByCurrentStallIdIn(stallIds);
 
-        List<PreventiveCareSchedule> schedules = myHorses.isEmpty() ? List.of()
-                : preventiveCareScheduleRepository.findByHorseIdInAndScheduledDate(
-                        myHorses.stream().map(Horse::getId).toList(), targetDate);
+        List<CareSchedule> schedules = myHorses.isEmpty() ? List.of()
+                : careScheduleRepository.findByHorseIdInAndScheduledAtBetweenAndStatusIn(
+                        myHorses.stream().map(Horse::getId).toList(), dayStart, dayEnd,
+                        List.of(com.rtms.backend.enums.CareScheduleStatus.SCHEDULED,
+                                com.rtms.backend.enums.CareScheduleStatus.IN_PROGRESS,
+                                com.rtms.backend.enums.CareScheduleStatus.COMPLETED));
 
         // =============================================================
         // B2 — GOM ID RỒI NẠP MỘT LẦN
@@ -290,20 +292,17 @@ public class GroomDailyTaskService {
                     false));                      // Trainer mới là người đóng buổi tập
         }
 
-        for (PreventiveCareSchedule s : schedules) {
+        for (CareSchedule s : schedules) {
             items.add(new TodayTaskItemResponse(
                     TaskSource.PREVENTIVE_CARE,
                     s.getId(),
-                    // Lịch thú y chỉ có scheduled_date, KHÔNG có giờ.
-                    // Dùng mốc đầu khung thú y để chèn đúng vị trí trên
-                    // dòng thời gian. Đây là lý do tồn tại của hằng số này.
-                    FarmSchedulePolicy.VET_WINDOW_START,
-                    FarmSchedulePolicy.VET_WINDOW_END,
+                    s.getScheduledAt().toLocalTime(),
+                    s.getScheduledAt().plusMinutes(s.getDurationMinutes()).toLocalTime(),
                     s.getHorseId(),
                     nameOf(horseNameById, s.getHorseId()),
                     "Thú y · " + s.getCareType(),
                     s.getDescription(),
-                    s.getStatus(),
+                    s.getStatus().name(),
                     false));              // Vet mới là người đóng
         }
 

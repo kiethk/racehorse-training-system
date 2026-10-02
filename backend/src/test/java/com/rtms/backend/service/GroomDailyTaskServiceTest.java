@@ -8,7 +8,7 @@ import com.rtms.backend.enums.GroomTaskType;
 import com.rtms.backend.enums.SopSlot;
 import com.rtms.backend.repository.GroomDailyTaskRepository;
 import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.repository.PreventiveCareScheduleRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import com.rtms.backend.repository.SubjectRepository;
 import com.rtms.backend.repository.TrainingWorkoutRepository;
@@ -49,7 +49,7 @@ class GroomDailyTaskServiceTest {
     private TrainingWorkoutRepository workoutRepository;
 
     @Mock
-    private PreventiveCareScheduleRepository preventiveCareScheduleRepository;
+    private CareScheduleRepository careScheduleRepository;
 
     @Mock
     private SubjectRepository subjectRepository;
@@ -64,7 +64,7 @@ class GroomDailyTaskServiceTest {
                 userRepository,
                 stableStallRepository,
                 workoutRepository,
-                preventiveCareScheduleRepository,
+                careScheduleRepository,
                 subjectRepository
         );
     }
@@ -243,14 +243,15 @@ class GroomDailyTaskServiceTest {
         horse1.setCurrentStallId(10L);
         when(horseRepository.findByCurrentStallIdIn(List.of(10L))).thenReturn(List.of(horse1));
 
-        com.rtms.backend.entity.PreventiveCareSchedule schedule = new com.rtms.backend.entity.PreventiveCareSchedule();
+        com.rtms.backend.entity.CareSchedule schedule = new com.rtms.backend.entity.CareSchedule();
         schedule.setId(301L);
         schedule.setHorseId(1L);
-        schedule.setCareType("Tiêm phòng cúm");
+        schedule.setCareType(com.rtms.backend.enums.CareType.ROUTINE);
+        schedule.setScheduledAt(targetDate.atTime(FarmSchedulePolicy.VET_WINDOW_START));
         schedule.setDescription("Tiêm định kỳ 6 tháng");
-        schedule.setStatus("PENDING");
+        schedule.setStatus(com.rtms.backend.enums.CareScheduleStatus.SCHEDULED);
 
-        when(preventiveCareScheduleRepository.findByHorseIdInAndScheduledDate(List.of(1L), targetDate))
+        when(careScheduleRepository.findByHorseIdInAndScheduledAtBetweenAndStatusIn(eq(List.of(1L)), any(), any(), any()))
                 .thenReturn(List.of(schedule));
 
         com.rtms.backend.entity.Subject subject = new com.rtms.backend.entity.Subject();

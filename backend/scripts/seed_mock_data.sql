@@ -372,25 +372,25 @@ WHERE h.registration_number IN (
 -- 5. Supporting health, trainer, groom, and audit records
 -- ---------------------------------------------------------------------
 
-DELETE FROM preventive_care_schedules pcs
+DELETE FROM care_schedule pcs
 USING horses h
 WHERE pcs.horse_id = h.id
   AND h.registration_number LIKE 'RTMSMOCK00000%'
-  AND pcs.care_type = 'INITIAL_EXAM'
+  AND pcs.care_type = 'INITIAL'
   AND pcs.id NOT IN (
       SELECT MIN(keep_pcs.id)
-      FROM preventive_care_schedules keep_pcs
+      FROM care_schedule keep_pcs
       JOIN horses keep_h ON keep_h.id = keep_pcs.horse_id
       WHERE keep_h.registration_number LIKE 'RTMSMOCK00000%'
-        AND keep_pcs.care_type = 'INITIAL_EXAM'
+        AND keep_pcs.care_type = 'INITIAL'
       GROUP BY keep_pcs.horse_id, keep_pcs.care_type
   );
 
-INSERT INTO preventive_care_schedules (
+INSERT INTO care_schedule (
     horse_id,
     veterinarian_id,
     care_type,
-    scheduled_date,
+    scheduled_at,
     description,
     status,
     created_at,
@@ -398,12 +398,12 @@ INSERT INTO preventive_care_schedules (
 )
 SELECT h.id,
        NULL,
-       'INITIAL_EXAM',
+       'INITIAL',
        NULL,
        'Initial admission physical examination in quarantine area',
        CASE h.registration_number
            WHEN 'RTMSMOCK0000006' THEN 'CANCELLED'
-           ELSE 'PENDING'
+           ELSE 'REQUESTED'
        END,
        NOW(),
        NOW()
@@ -417,9 +417,9 @@ WHERE h.registration_number IN (
 )
 AND NOT EXISTS (
     SELECT 1
-    FROM preventive_care_schedules pcs
+    FROM care_schedule pcs
     WHERE pcs.horse_id = h.id
-      AND pcs.care_type = 'INITIAL_EXAM'
+      AND pcs.care_type = 'INITIAL'
 );
 
 INSERT INTO health_records (

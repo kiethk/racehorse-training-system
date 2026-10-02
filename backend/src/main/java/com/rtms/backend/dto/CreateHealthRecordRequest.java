@@ -17,7 +17,7 @@ public class CreateHealthRecordRequest {
     private String findings;
     private String diagnosis;
     private String recordType = "ILLNESS";
-    private Long preventiveCareScheduleId;
+    private Long careScheduleId;
     private String productOrService;
 
     private String notes;
@@ -96,12 +96,12 @@ public class CreateHealthRecordRequest {
         this.recordType = recordType;
     }
 
-    public Long getPreventiveCareScheduleId() {
-        return preventiveCareScheduleId;
+    public Long getCareScheduleId() {
+        return careScheduleId;
     }
 
-    public void setPreventiveCareScheduleId(Long preventiveCareScheduleId) {
-        this.preventiveCareScheduleId = preventiveCareScheduleId;
+    public void setCareScheduleId(Long careScheduleId) {
+        this.careScheduleId = careScheduleId;
     }
 
     public String getProductOrService() {

@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ApiError } from '@/services/api';
+import { ApiError, getServerTime } from '@/services/api';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
-import { MetricCard } from '@/components/ui/MetricCard';
-import { Panel, SectionTitle } from '@/components/ui/Panel';
+import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
 import { DetailSkeleton, EmptyState, ListSkeleton } from '@/components/ui/states';
@@ -17,30 +17,36 @@ import type {
   AdmissionDocument,
   AdmissionStatus,
   AdmissionSummaryResponse,
+  CareSchedule,
+  CareScheduleStatus,
+  CareType,
   HorseHealthMetricResponse,
-  VetExamResponse,
-  VetExamStatus,
-  VetExamType,
+  PendingVetOfferResponse,
   VetReviewResponse,
 } from '../types';
 import { VetReviewForm } from './VetReviewForm';
+import { VET_OFFERS_CHANGED_EVENT } from './VetOfferNotifier';
 
-type QueueRow = AdmissionSummaryResponse & { exam: VetExamResponse | null };
+type QueueRow = AdmissionSummaryResponse & {
+  careSchedule: CareSchedule | null;
+};
 
-const examStatusOptions: Array<{ value: VetExamStatus | 'ALL'; label: string }> = [
+type QueuePillFilter = 'ALL' | 'AWAITING' | 'IN_PROGRESS' | 'RECHECK';
+
+const examStatusOptions: Array<{ value: CareScheduleStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'All Exam States' },
   { value: 'REQUESTED', label: 'Requested' },
+  { value: 'AWAITING_VET_CONFIRMATION', label: 'Awaiting Confirmation' },
   { value: 'SCHEDULED', label: 'Scheduled' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'COMPLETED', label: 'Completed' },
 ];
 
-const examTypeOptions: Array<{ value: VetExamType | 'ALL'; label: string }> = [
+const examTypeOptions: Array<{ value: CareType | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'All Exam Types' },
   { value: 'INITIAL', label: 'Initial Exam' },
-  { value: 'FOLLOW_UP', label: 'Follow-Up Recheck' },
-  { value: 'URGENT', label: 'Urgent Exam' },
   { value: 'ROUTINE', label: 'Routine Exam' },
+  { value: 'URGENT', label: 'Urgent Exam' },
 ];
 
 function errorText(error: unknown) {
@@ -77,22 +83,22 @@ function calculateAge(dateOfBirth: string | null | undefined): string {
     const months = Math.max(0, (now.getFullYear() - dob.getFullYear()) * 12 + now.getMonth() - dob.getMonth());
     return `${months} mo`;
   }
-  return `${years} yo (${years} ${years === 1 ? 'yr' : 'yrs'})`;
+  return `${years} yo`;
 }
 
-function examTone(status: VetExamStatus | undefined) {
+function examTone(status: CareScheduleStatus | undefined) {
   if (status === 'COMPLETED') return 'success' as const;
   if (status === 'IN_PROGRESS') return 'primary' as const;
   if (status === 'SCHEDULED') return 'info' as const;
-  if (status === 'REQUESTED') return 'warning' as const;
+  if (status === 'REQUESTED' || status === 'AWAITING_VET_CONFIRMATION') return 'warning' as const;
   return 'neutral' as const;
 }
 
-function examIcon(status: VetExamStatus | undefined) {
+function examIcon(status: CareScheduleStatus | undefined) {
   if (status === 'COMPLETED') return 'check' as const;
   if (status === 'IN_PROGRESS') return 'activity' as const;
   if (status === 'SCHEDULED') return 'calendar' as const;
-  if (status === 'REQUESTED') return 'clock' as const;
+  if (status === 'AWAITING_VET_CONFIRMATION' || status === 'REQUESTED') return 'clock' as const;
   return 'circle' as const;
 }
 
@@ -103,46 +109,26 @@ function admissionTone(status: AdmissionStatus) {
   return 'info' as const;
 }
 
-function getPriorityBadge(priority: number | undefined, examType: VetExamType | undefined) {
-  if (examType === 'URGENT' || (priority && priority >= 400)) {
+function getPriorityBadge(careType: CareType | undefined) {
+  if (careType === 'URGENT') {
     return { label: 'P1 · Urgent', tone: 'danger' as const, icon: 'alert-triangle' as const };
   }
-  if (examType === 'INITIAL' || (priority && priority >= 300)) {
+  if (careType === 'INITIAL') {
     return { label: 'P2 · Initial', tone: 'info' as const, icon: 'stethoscope' as const };
   }
-  if (examType === 'FOLLOW_UP' || (priority && priority >= 200)) {
-    return { label: 'P3 · Recheck', tone: 'warning' as const, icon: 'calendar' as const };
-  }
-  if (priority && priority >= 100) {
-    return { label: 'P4 · Routine', tone: 'neutral' as const, icon: 'clock' as const };
-  }
-  return { label: 'P— · Standard', tone: 'neutral' as const, icon: 'clock' as const };
+  return { label: 'P4 · Routine', tone: 'neutral' as const, icon: 'clock' as const };
 }
 
-function InfoItem({
-  label,
-  value,
-  subvalue,
-}: {
-  label: string;
-  value: string | number | null | undefined;
-  subvalue?: string | null;
-}) {
-  return (
-    <div>
-      <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-        {label}
-      </dt>
-      <dd className="mt-1 text-[13px] font-medium text-[var(--color-text-primary)]">
-        {value ?? <span className="text-[var(--color-text-muted)] italic">Not available</span>}
-        {subvalue && (
-          <span className="block text-[11px] font-normal text-[var(--color-text-secondary)]">
-            {subvalue}
-          </span>
-        )}
-      </dd>
-    </div>
-  );
+function formatCountdown(expiresAt: string): string {
+  if (!expiresAt) return 'Expired';
+  const targetTime = new Date(expiresAt).getTime();
+  if (Number.isNaN(targetTime)) return 'Expired';
+  const diffMs = targetTime - getServerTime();
+  if (diffMs <= 0) return 'Expired';
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
 }
 
 function MedicalNoteBlock({
@@ -168,20 +154,32 @@ function MedicalNoteBlock({
 export function VetAdmissionQueue() {
   const { user } = useAuth();
   const [admissions, setAdmissions] = useState<AdmissionSummaryResponse[]>([]);
-  const [exams, setExams] = useState<VetExamResponse[]>([]);
+  const [careSchedules, setCareSchedules] = useState<CareSchedule[]>([]);
+  const [pendingOffers, setPendingOffers] = useState<PendingVetOfferResponse[]>([]);
+  const [actioningOfferId, setActioningOfferId] = useState<number | null>(null);
   const [stallCodes, setStallCodes] = useState<Record<number, string>>({});
+
+  // Drawer & Selection state
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isDrawerDirty, setIsDrawerDirty] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+
+  // Detail data for opened admission
   const [detail, setDetail] = useState<AdmissionDetailResponse | null>(null);
   const [documents, setDocuments] = useState<AdmissionDocument[]>([]);
   const [metrics, setMetrics] = useState<HorseHealthMetricResponse[]>([]);
   const [activeTab, setActiveTab] = useState<string>('exam');
 
-  // Filters
+  // Filters state
   const [searchQuery, setSearchQuery] = useState('');
+  const [queuePillFilter, setQueuePillFilter] = useState<QueuePillFilter>('ALL');
   const [admissionFilter, setAdmissionFilter] = useState<'ALL' | 'VET_REVIEW' | 'PENDING_RECHECK'>('ALL');
-  const [examStatusFilter, setExamStatusFilter] = useState<VetExamStatus | 'ALL'>('ALL');
-  const [examTypeFilter, setExamTypeFilter] = useState<VetExamType | 'ALL'>('ALL');
+  const [examStatusFilter, setExamStatusFilter] = useState<CareScheduleStatus | 'ALL'>('ALL');
+  const [examTypeFilter, setExamTypeFilter] = useState<CareType | 'ALL'>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'URGENT' | 'NORMAL'>('ALL');
+  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+  const filterPopoverRef = useRef<HTMLDivElement>(null);
 
   // Request & operation state
   const [loading, setLoading] = useState(true);
@@ -190,28 +188,74 @@ export function VetAdmissionQueue() {
   const [error, setError] = useState('');
   const [detailError, setDetailError] = useState('');
   const [success, setSuccess] = useState('');
+  const [scheduleWarning, setScheduleWarning] = useState('');
   const [reload, setReload] = useState(0);
 
-  // Initial load of queues
+  // Live countdown timer tick only when pending offers exist
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (pendingOffers.length === 0) return;
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [pendingOffers.length]);
+
+  // Listen to offer change events from other tabs / notification components
+  useEffect(() => {
+    const handleOffersChanged = () => {
+      setLoading(true);
+      setReload((current) => current + 1);
+    };
+    window.addEventListener(VET_OFFERS_CHANGED_EVENT, handleOffersChanged);
+    return () => {
+      window.removeEventListener(VET_OFFERS_CHANGED_EVENT, handleOffersChanged);
+    };
+  }, []);
+
+  // Close filter popover on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterPopoverRef.current && !filterPopoverRef.current.contains(e.target as Node)) {
+        setIsFilterPopoverOpen(false);
+      }
+    };
+    if (isFilterPopoverOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isFilterPopoverOpen]);
+
+  // Load Admissions & Care Schedules
   useEffect(() => {
     let active = true;
     Promise.all([
       admissionsApi.getAdmissions('VET_REVIEW'),
       admissionsApi.getAdmissions('PENDING_RECHECK'),
-      admissionsApi.getVetExams({ size: 50 }),
+      admissionsApi.getPendingOffers().catch(() => []),
     ])
-      .then(([initial, rechecks, examPage]) => {
+      .then(async ([initial, rechecks, offers]) => {
         if (!active) return;
         const nextAdmissions = [...initial, ...rechecks].filter(
           (row, index, all) => all.findIndex((candidate) => candidate.admissionId === row.admissionId) === index,
         );
-        setAdmissions(nextAdmissions);
-        setExams(examPage.content);
-        setSelectedId((current) =>
-          nextAdmissions.some((row) => row.admissionId === current)
-            ? current
-            : nextAdmissions[0]?.admissionId ?? null,
+        const scheduleGroups = await Promise.all(
+          nextAdmissions.map(async (admission) => {
+            const firstPage = await admissionsApi.getCareSchedules({ admissionId: admission.admissionId, size: 100 });
+            const remainingPages = await Promise.all(
+              Array.from({ length: Math.max(0, firstPage.totalPages - 1) }, (_, index) =>
+                admissionsApi.getCareSchedules({ admissionId: admission.admissionId, page: index + 1, size: 100 }),
+              ),
+            );
+            return [firstPage, ...remainingPages].flatMap((page) => page.content);
+          }),
         );
+        if (!active) return;
+        setAdmissions(nextAdmissions);
+        setCareSchedules(scheduleGroups.flat());
+        setPendingOffers(offers || []);
       })
       .catch((cause) => {
         if (active) setError(errorText(cause));
@@ -224,27 +268,46 @@ export function VetAdmissionQueue() {
     };
   }, [reload]);
 
-  // Merge admissions with exams and sort by business priority
+  // Merge admissions with careSchedules and sort by business priority
   const rows = useMemo<QueueRow[]>(() => {
     return admissions
       .map((admission) => {
-        const related = exams
-          .filter((exam) => exam.admissionId === admission.admissionId)
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        const activeExam = related.find((exam) => !['COMPLETED', 'CANCELLED'].includes(exam.status));
-        return { ...admission, exam: activeExam ?? related[0] ?? null };
+        const relatedSchedules = careSchedules
+          .filter((cs) => cs.admissionId === admission.admissionId)
+          .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        const activeSchedule =
+          relatedSchedules.find((cs) => !['COMPLETED', 'CANCELLED'].includes(cs.status)) ??
+          relatedSchedules[0] ??
+          null;
+
+        return {
+          ...admission,
+          careSchedule: activeSchedule,
+        };
       })
       .sort((a, b) => {
-        const priorityDiff = (b.exam?.priority ?? 0) - (a.exam?.priority ?? 0);
+        const priorityA =
+          a.careSchedule?.careType === 'URGENT' ? 400 : a.careSchedule?.careType === 'INITIAL' ? 300 : a.careSchedule ? 100 : 0;
+        const priorityB =
+          b.careSchedule?.careType === 'URGENT' ? 400 : b.careSchedule?.careType === 'INITIAL' ? 300 : b.careSchedule ? 100 : 0;
+        const priorityDiff = priorityB - priorityA;
         return priorityDiff || new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime();
       });
-  }, [admissions, exams]);
+  }, [admissions, careSchedules]);
 
-  // Apply search query and filters
+  // Counts for Compact Filter Pills
+  const totalCount = rows.length;
+  const requestedCount = rows.filter(
+    (r) => r.careSchedule?.status === 'REQUESTED' || r.careSchedule?.status === 'AWAITING_VET_CONFIRMATION',
+  ).length;
+  const inProgressCount = rows.filter((r) => r.careSchedule?.status === 'IN_PROGRESS').length;
+  const rechecksCount = rows.filter((r) => r.status === 'PENDING_RECHECK').length;
+
+  // Filter rows based on search, pill filters, and popover filters
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return rows.filter((row) => {
-      // Search filter: candidate name, admissionId, breed
+      // 1. Search Query
       if (query) {
         const matchesName = row.candidateName.toLowerCase().includes(query);
         const matchesId = String(row.admissionId).includes(query);
@@ -252,51 +315,60 @@ export function VetAdmissionQueue() {
         if (!matchesName && !matchesId && !matchesBreed) return false;
       }
 
-      // Admission stage filter
+      // 2. Compact Filter Pills
+      if (queuePillFilter === 'AWAITING') {
+        const isAwaiting =
+          row.careSchedule?.status === 'REQUESTED' || row.careSchedule?.status === 'AWAITING_VET_CONFIRMATION';
+        if (!isAwaiting) return false;
+      } else if (queuePillFilter === 'IN_PROGRESS') {
+        if (row.careSchedule?.status !== 'IN_PROGRESS') return false;
+      } else if (queuePillFilter === 'RECHECK') {
+        if (row.status !== 'PENDING_RECHECK') return false;
+      }
+
+      // 3. Popover Filters
       if (admissionFilter !== 'ALL' && row.status !== admissionFilter) return false;
+      if (examStatusFilter !== 'ALL' && row.careSchedule?.status !== examStatusFilter) return false;
+      if (examTypeFilter !== 'ALL' && row.careSchedule?.careType !== examTypeFilter) return false;
 
-      // Exam status filter
-      if (examStatusFilter !== 'ALL' && row.exam?.status !== examStatusFilter) return false;
-
-      // Exam type filter
-      if (examTypeFilter !== 'ALL' && row.exam?.examType !== examTypeFilter) return false;
-
-      // Priority filter
       if (priorityFilter === 'URGENT') {
-        const isUrgent = row.exam?.examType === 'URGENT' || (row.exam?.priority ?? 0) >= 400;
-        if (!isUrgent) return false;
+        if (row.careSchedule?.careType !== 'URGENT') return false;
       } else if (priorityFilter === 'NORMAL') {
-        const isUrgent = row.exam?.examType === 'URGENT' || (row.exam?.priority ?? 0) >= 400;
-        if (isUrgent) return false;
+        if (row.careSchedule?.careType === 'URGENT') return false;
       }
 
       return true;
     });
-  }, [rows, searchQuery, admissionFilter, examStatusFilter, examTypeFilter, priorityFilter]);
+  }, [rows, searchQuery, queuePillFilter, admissionFilter, examStatusFilter, examTypeFilter, priorityFilter]);
 
-  // Derive selected admission ID directly from filteredRows without triggering cascading renders
-  const selectedAdmissionId = useMemo(() => {
-    if (selectedId !== null && filteredRows.some((row) => row.admissionId === selectedId)) {
-      return selectedId;
-    }
-    return filteredRows[0]?.admissionId ?? null;
-  }, [filteredRows, selectedId]);
+  // Count active popover filters
+  const activePopoverFilterCount = useMemo(() => {
+    let count = 0;
+    if (admissionFilter !== 'ALL') count++;
+    if (examStatusFilter !== 'ALL') count++;
+    if (examTypeFilter !== 'ALL') count++;
+    if (priorityFilter !== 'ALL') count++;
+    return count;
+  }, [admissionFilter, examStatusFilter, examTypeFilter, priorityFilter]);
 
-  // Fetch admission details, documents, and historical health metrics
+  // Fetch admission details when selected
   useEffect(() => {
-    if (selectedAdmissionId === null) return;
+    if (selectedId === null) return;
     let active = true;
-    /* eslint-disable react-hooks/set-state-in-effect -- reset the visible request state when the selected remote resource changes */
-    setLoadingDetail(true);
-    setDetailError('');
-    setDetail(null);
-    setDocuments([]);
-    setMetrics([]);
-    /* eslint-enable react-hooks/set-state-in-effect */
+
+    Promise.resolve().then(() => {
+      if (active) {
+        setLoadingDetail(true);
+        setDetailError('');
+        setDetail(null);
+        setDocuments([]);
+        setMetrics([]);
+      }
+    });
 
     Promise.all([
-      admissionsApi.getAdmissionDetail(selectedAdmissionId),
-      admissionsApi.getDocuments(selectedAdmissionId),
+      admissionsApi.getAdmissionDetail(selectedId),
+      admissionsApi.getDocuments(selectedId),
     ])
       .then(async ([detailData, docs]) => {
         if (!active) return;
@@ -326,43 +398,168 @@ export function VetAdmissionQueue() {
     return () => {
       active = false;
     };
-  }, [selectedAdmissionId, reload]);
+  }, [selectedId, reload]);
 
-  const selectedRow = rows.find((row) => row.admissionId === selectedAdmissionId) ?? null;
-  const selectedExam = selectedRow?.exam ?? null;
-  const selectedExamHistory = exams
-    .filter((exam) => exam.admissionId === selectedAdmissionId)
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const selectedRow = rows.find((row) => row.admissionId === selectedId) ?? null;
 
-  const assignedElsewhere = Boolean(
-    selectedExam?.assignedVetId && user?.userId && selectedExam.assignedVetId !== user.userId,
+  const detailScheduleFallback: CareSchedule | null = detail?.initialExamSchedule
+    ? {
+        id: detail.initialExamSchedule.scheduleId,
+        horseId: detail.horseId ?? 0,
+        admissionId: detail.admissionId,
+        careType: (detail.initialExamSchedule.careType as CareType) || 'INITIAL',
+        status: (detail.initialExamSchedule.status as CareScheduleStatus) || 'REQUESTED',
+        veterinarianId: detail.initialExamSchedule.veterinarianId,
+        assignedVetId: detail.initialExamSchedule.veterinarianId,
+        scheduledAt: detail.initialExamSchedule.scheduledAt,
+        scheduledDate: detail.initialExamSchedule.scheduledDate,
+      }
+    : null;
+
+  const currentActiveSchedule = selectedRow?.careSchedule ?? detailScheduleFallback;
+
+  const assignedVetId = currentActiveSchedule?.veterinarianId ?? currentActiveSchedule?.assignedVetId ?? null;
+  const assignedElsewhere = Boolean(assignedVetId && user?.userId && assignedVetId !== user.userId);
+  const isAssignedToCurrentVet = Boolean(assignedVetId && user?.userId && assignedVetId === user.userId);
+
+  const canStartExam = Boolean(
+    currentActiveSchedule &&
+      (currentActiveSchedule.status === 'SCHEDULED' ||
+        (currentActiveSchedule.status === 'REQUESTED' && currentActiveSchedule.careType === 'URGENT')) &&
+      !assignedElsewhere,
   );
   const canCompleteExam = Boolean(
-    selectedExam && ['SCHEDULED', 'IN_PROGRESS'].includes(selectedExam.status) && !assignedElsewhere,
+    currentActiveSchedule &&
+      (['SCHEDULED', 'IN_PROGRESS'].includes(currentActiveSchedule.status) ||
+        (currentActiveSchedule.status === 'REQUESTED' && currentActiveSchedule.careType === 'URGENT')) &&
+      !assignedElsewhere,
   );
   const latestMetrics = metrics[0] ?? null;
 
-  function handleSelectAdmission(id: number) {
-    if (id !== selectedId) {
-      setSelectedId(id);
-      setActiveTab('exam');
+  const selectedHistory = useMemo(() => {
+    const list: Array<{
+      id: number;
+      label: string;
+      status: CareScheduleStatus;
+      description: string;
+      scheduledAt: string | null;
+      assignedVetId: number | null;
+      createdAt?: string;
+    }> = [];
+
+    careSchedules
+      .filter((cs) => cs.admissionId === selectedId || (detail?.horseId && cs.horseId === detail.horseId))
+      .forEach((cs) => {
+        list.push({
+          id: cs.id,
+          label: `${formatLabel(cs.careType)} Care Schedule #${cs.id}`,
+          status: cs.status,
+          description: cs.description || `${formatLabel(cs.careType)} care schedule`,
+          scheduledAt: cs.scheduledAt || cs.scheduledDate || null,
+          assignedVetId: cs.veterinarianId ?? cs.assignedVetId ?? null,
+          createdAt: cs.createdAt,
+        });
+      });
+
+    return list.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+  }, [careSchedules, selectedId, detail]);
+
+  const handleOpenAdmission = (id: number) => {
+    setSelectedId(id);
+    setActiveTab('exam');
+    setScheduleWarning('');
+    setIsDrawerDirty(false);
+    setDrawerOpen(true);
+  };
+
+  const handleDirtyChange = useCallback((dirty: boolean) => {
+    setIsDrawerDirty(dirty);
+  }, []);
+
+  const handleRequestCloseDrawer = useCallback(() => {
+    if (isDrawerDirty) {
+      setShowCloseConfirm(true);
+    } else {
+      setDrawerOpen(false);
     }
+  }, [isDrawerDirty]);
+
+  // Handle Esc key for drawer
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showCloseConfirm) return;
+        handleRequestCloseDrawer();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [drawerOpen, showCloseConfirm, handleRequestCloseDrawer]);
+
+  function reloadQueue() {
+    setLoading(true);
+    setReload((curr) => curr + 1);
   }
 
   function handleRefresh() {
     setSuccess('');
     setError('');
-    setLoading(true);
-    setReload((curr) => curr + 1);
+    setScheduleWarning('');
+    reloadQueue();
+  }
+
+  async function handleAcceptOffer(offer: PendingVetOfferResponse) {
+    try {
+      setActioningOfferId(offer.id);
+      setError('');
+      await admissionsApi.acceptOffer(offer.id);
+      setPendingOffers((current) => current.filter((item) => item.id !== offer.id));
+      setSuccess(`Accepted care offer for ${offer.horseName}! Examination has been scheduled.`);
+      window.dispatchEvent(new Event(VET_OFFERS_CHANGED_EVENT));
+      reloadQueue();
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        setError(`Offer for ${offer.horseName} is no longer available (claimed or expired).`);
+      } else {
+        setError(errorText(cause));
+      }
+      setPendingOffers((current) => current.filter((item) => item.id !== offer.id));
+      reloadQueue();
+    } finally {
+      setActioningOfferId(null);
+    }
+  }
+
+  async function handleDeclineOffer(offer: PendingVetOfferResponse) {
+    try {
+      setActioningOfferId(offer.id);
+      setError('');
+      await admissionsApi.declineOffer(offer.id);
+      setPendingOffers((current) => current.filter((item) => item.id !== offer.id));
+      setSuccess(`Declined care offer for ${offer.horseName}.`);
+      window.dispatchEvent(new Event(VET_OFFERS_CHANGED_EVENT));
+      reloadQueue();
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        setError(`State conflict while declining offer for ${offer.horseName}.`);
+      } else {
+        setError(errorText(cause));
+      }
+      setPendingOffers((current) => current.filter((item) => item.id !== offer.id));
+      reloadQueue();
+    } finally {
+      setActioningOfferId(null);
+    }
   }
 
   async function handleStartExam() {
-    if (!selectedExam || startingExam) return;
+    if (!currentActiveSchedule || startingExam || !canStartExam) return;
     try {
       setStartingExam(true);
       setError('');
-      await admissionsApi.startVetExam(selectedExam.id);
-      setSuccess(`Examination #${selectedExam.id} started. You can now record clinical findings.`);
+      await admissionsApi.startCareSchedule(currentActiveSchedule.id);
+      setSuccess(`Examination #${currentActiveSchedule.id} started. You can now record clinical findings.`);
       setReload((curr) => curr + 1);
     } catch (cause) {
       setError(errorText(cause));
@@ -371,66 +568,126 @@ export function VetAdmissionQueue() {
     }
   }
 
-  function handleReviewSuccess(result: VetReviewResponse) {
+  function handleReviewSuccess(result: VetReviewResponse, warning?: string) {
     const outcomeMessage =
       result.decision === 'APPROVED'
-        ? 'Veterinary review approved! The admission moved to Trainer review; the horse remains a quarantined CANDIDATE.'
+        ? 'Review approved! The admission moved to Trainer review; horse remains in quarantine.'
         : result.decision === 'RECHECK_REQUIRED'
           ? 'Recheck scheduled! Horse remains in quarantine with training locked until follow-up.'
-          : 'Admission rejected! Quarantine stall released and training lock retained.';
+          : 'Admission rejected! Quarantine stall released.';
     setSuccess(`Admission #${result.admissionId} (${selectedRow?.candidateName ?? 'Horse'}): ${outcomeMessage}`);
-    setReload((curr) => curr + 1);
+    setScheduleWarning(warning || '');
+    setIsDrawerDirty(false);
+    setDrawerOpen(false);
+    reloadQueue();
   }
 
-  // Top metric stats calculation
-  const totalCount = rows.length;
-  const requestedCount = rows.filter((r) => r.exam?.status === 'REQUESTED').length;
-  const inProgressCount = rows.filter((r) => r.exam?.status === 'IN_PROGRESS').length;
-  const rechecksCount = rows.filter((r) => r.status === 'PENDING_RECHECK').length;
-
-  // Tab configuration for detail workspace
   const workspaceTabs: TabItem[] = [
     { id: 'exam', label: 'Clinical Examination', icon: 'stethoscope' },
     {
       id: 'history',
       label: 'Medical Records',
       icon: 'clipboard',
-      count: detail?.healthRecords?.length ?? 0,
+      count: (detail?.healthRecords?.length ?? 0) > 0 ? detail?.healthRecords?.length : undefined,
     },
     {
       id: 'vitals',
       label: 'Vitals History',
       icon: 'heart-pulse',
-      count: metrics.length,
+      count: metrics.length > 0 ? metrics.length : undefined,
     },
     {
       id: 'documents',
       label: 'Intake & Pedigree',
       icon: 'file-text',
-      count: documents.length,
+      count: documents.length > 0 ? documents.length : undefined,
     },
   ];
 
   return (
     <div className="space-y-4">
-      {/* Workspace Header */}
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      {/* Page Header with Compact Interactive Filter Pills (R1) */}
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
               <Icon name="stethoscope" size={20} />
             </span>
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
+            <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
               Veterinary Admissions
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--color-primary)]">
-              Clinical Workspace
-            </span>
           </div>
-          <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
-            Manage initial quarantine intake exams, evaluate biosecurity vitals, and issue clearance decisions.
-          </p>
+
+          {/* Compact Interactive Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 pl-1 sm:border-l sm:border-[var(--color-border)] sm:pl-3">
+            <button
+              type="button"
+              onClick={() => setQueuePillFilter('ALL')}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                queuePillFilter === 'ALL'
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]'
+              }`}
+            >
+              <span>Active</span>
+              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
+                {totalCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setQueuePillFilter((curr) => (curr === 'AWAITING' ? 'ALL' : 'AWAITING'))}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                queuePillFilter === 'AWAITING'
+                  ? 'bg-[var(--color-warning)] text-white'
+                  : requestedCount > 0
+                    ? 'bg-[var(--color-warning-soft)] text-[var(--color-warning)] hover:opacity-80'
+                    : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] hover:bg-[var(--color-border)]'
+              }`}
+            >
+              <span>Awaiting</span>
+              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
+                {requestedCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setQueuePillFilter((curr) => (curr === 'IN_PROGRESS' ? 'ALL' : 'IN_PROGRESS'))}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                queuePillFilter === 'IN_PROGRESS'
+                  ? 'bg-[var(--color-info)] text-white'
+                  : inProgressCount > 0
+                    ? 'bg-[var(--color-info-soft)] text-[var(--color-info)] hover:opacity-80'
+                    : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] hover:bg-[var(--color-border)]'
+              }`}
+            >
+              <span>In Exam</span>
+              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
+                {inProgressCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setQueuePillFilter((curr) => (curr === 'RECHECK' ? 'ALL' : 'RECHECK'))}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                queuePillFilter === 'RECHECK'
+                  ? 'bg-[var(--color-danger)] text-white'
+                  : rechecksCount > 0
+                    ? 'bg-[var(--color-danger-soft)] text-[var(--color-danger)] hover:opacity-80'
+                    : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] hover:bg-[var(--color-border)]'
+              }`}
+            >
+              <span>Recheck</span>
+              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
+                {rechecksCount}
+              </span>
+            </button>
+          </div>
         </div>
+
         <div className="flex items-center gap-2">
           <Button
             onClick={handleRefresh}
@@ -439,7 +696,7 @@ export function VetAdmissionQueue() {
             variant="secondary"
             size="sm"
           >
-            Refresh Queue
+            Refresh
           </Button>
         </div>
       </header>
@@ -485,425 +742,513 @@ export function VetAdmissionQueue() {
         </div>
       )}
 
-      {/* Metric Cards Row */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <MetricCard
-          label="ACTIVE INTAKE"
-          value={totalCount}
-          unit="horses in queue"
-          icon="horse"
-          tone="neutral"
-        />
-        <MetricCard
-          label="AWAITING SCHEDULE"
-          value={requestedCount}
-          unit="exams requested"
-          icon="clock"
-          tone="warning"
-        />
-        <MetricCard
-          label="IN EXAMINATION"
-          value={inProgressCount}
-          unit="active physicals"
-          icon="stethoscope"
-          tone="info"
-        />
-        <MetricCard
-          label="PENDING RECHECK"
-          value={rechecksCount}
-          unit="quarantine re-tests"
-          icon="calendar"
-          tone="danger"
-        />
-      </div>
+      {scheduleWarning && (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 text-[13px] text-[var(--color-warning)]"
+        >
+          <div className="flex items-start gap-2">
+            <Icon name="alert-triangle" size={16} className="mt-0.5 shrink-0" />
+            <span>{scheduleWarning}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setScheduleWarning('')}
+            className="text-[var(--color-warning)] hover:opacity-70"
+            aria-label="Dismiss warning"
+          >
+            <Icon name="x" size={14} />
+          </button>
+        </div>
+      )}
 
-      {/* Main Two-Column Master-Detail Layout */}
-      {loading ? (
-        <Panel>
-          <ListSkeleton rows={6} />
-        </Panel>
-      ) : rows.length === 0 ? (
-        <Panel padded>
-          <EmptyState
-            icon="check"
-            title="Veterinary Admission Queue is Clear"
-            description="There are currently no horses awaiting initial quarantine examination or follow-up recheck."
-          />
-        </Panel>
-      ) : (
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          {/* Left Column: Vet Queue (30% width on desktop) */}
-          <div className="w-full shrink-0 lg:w-[32%] xl:w-[28%]">
-            <Panel className="flex max-h-[820px] flex-col overflow-hidden">
-              {/* Queue Header & Result Count */}
-              <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3 shrink-0">
-                <div className="flex items-center gap-2">
-                  <SectionTitle>Examination Queue</SectionTitle>
-                  <span className="font-metric rounded-full bg-[var(--color-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
-                    {filteredRows.length} of {rows.length}
-                  </span>
+      {/* Pending Offers Section at Top of List (R1) */}
+      {pendingOffers.length > 0 && (
+        <div className="rounded-[var(--radius-lg)] border-2 border-[var(--color-warning)] bg-[var(--color-warning-soft)]/20 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-warning)]/30 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-warning-soft)] text-[var(--color-warning)]">
+                <Icon name="bell" size={14} />
+              </span>
+              <h2 className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                Pending Care &amp; Examination Offers ({pendingOffers.length})
+              </h2>
+            </div>
+            <span className="text-[11px] text-[var(--color-text-secondary)]">
+              Respond before the countdown expires to secure the examination assignment
+            </span>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {pendingOffers.map((offer) => {
+              const countdown = formatCountdown(offer.expiresAt);
+              const isExpired = countdown === 'Expired';
+              const isActioning = actioningOfferId === offer.id;
+
+              return (
+                <div
+                  key={offer.id}
+                  className="flex flex-col justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 shadow-xs"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                          {offer.horseName}
+                        </h3>
+                        <p className="text-[11px] text-[var(--color-text-secondary)]">
+                          {offer.admissionId ? `Admission #${offer.admissionId}` : `Horse #${offer.horseId}`}
+                          {offer.breed ? ` · ${offer.breed}` : ''}
+                        </p>
+                      </div>
+                      <Pill tone={offer.careType === 'URGENT' ? 'danger' : 'info'} size="sm">
+                        {offer.careType}
+                      </Pill>
+                    </div>
+
+                    <div className="mt-2 space-y-1 text-[11px] text-[var(--color-text-secondary)]">
+                      <div className="flex items-center gap-1.5">
+                        <Icon name="calendar" size={12} className="text-[var(--color-text-muted)]" />
+                        <span>Proposed: {formatDate(offer.proposedScheduledAt, true)}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Icon
+                          name="clock"
+                          size={12}
+                          className={isExpired ? 'text-[var(--color-danger)]' : 'text-[var(--color-warning)]'}
+                        />
+                        <span
+                          className={`font-metric font-semibold ${
+                            isExpired ? 'text-[var(--color-danger)]' : 'text-[var(--color-warning)]'
+                          }`}
+                        >
+                          Expires in: {countdown}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-end gap-2 border-t border-[var(--color-border)] pt-2.5">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={isActioning || isExpired}
+                      loading={isActioning}
+                      onClick={() => handleDeclineOffer(offer)}
+                    >
+                      Decline
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      disabled={isActioning || isExpired}
+                      loading={isActioning}
+                      icon="check"
+                      onClick={() => handleAcceptOffer(offer)}
+                    >
+                      Accept Offer
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-              {/* Search Bar */}
-              <div className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 shrink-0">
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-2.5 top-2.5 text-[var(--color-text-muted)]">
-                    <Icon name="search" size={14} />
+      {/* Main Full-Width Schedule List Panel (R1) */}
+      <Panel className="overflow-hidden">
+        {/* Toolbar: Search input & Popover Filters Button */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
+          {/* Visible Search Input */}
+          <div className="relative flex-1 min-w-[240px] max-w-md">
+            <span className="pointer-events-none absolute left-2.5 top-2.5 text-[var(--color-text-muted)]">
+              <Icon name="search" size={14} />
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search candidate name, admission #, or breed..."
+              className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 pl-8 pr-7 text-[12px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)]"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                aria-label="Clear search"
+              >
+                <Icon name="x" size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Consolidated Popover Filters Button */}
+          <div className="relative" ref={filterPopoverRef}>
+            <button
+              type="button"
+              onClick={() => setIsFilterPopoverOpen((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                activePopoverFilterCount > 0 || isFilterPopoverOpen
+                  ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-semibold'
+                  : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
+              }`}
+            >
+              <Icon name="filter" size={14} />
+              <span>Filters</span>
+              {activePopoverFilterCount > 0 && (
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] font-bold text-white">
+                  {activePopoverFilterCount}
+                </span>
+              )}
+            </button>
+
+            {/* Filter Popover Dropdown */}
+            {isFilterPopoverOpen && (
+              <div className="absolute right-0 top-full mt-1.5 z-30 w-72 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 shadow-lg shadow-black/10 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2 mb-2.5">
+                  <span className="text-[12px] font-bold text-[var(--color-text-primary)]">
+                    Filter Admission Queue
                   </span>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search candidate name or ID…"
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 pl-8 pr-7 text-[12px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)]"
-                  />
-                  {searchQuery && (
+                  {activePopoverFilterCount > 0 && (
                     <button
                       type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-                      aria-label="Clear search"
+                      onClick={() => {
+                        setAdmissionFilter('ALL');
+                        setExamStatusFilter('ALL');
+                        setExamTypeFilter('ALL');
+                        setPriorityFilter('ALL');
+                      }}
+                      className="text-[11px] font-semibold text-[var(--color-primary)] hover:underline"
                     >
-                      <Icon name="x" size={14} />
+                      Reset All
                     </button>
                   )}
                 </div>
 
-                {/* Filter Controls Row */}
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <select
-                    value={admissionFilter}
-                    onChange={(e) =>
-                      setAdmissionFilter(e.target.value as typeof admissionFilter)
-                    }
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
-                    aria-label="Admission Stage"
-                  >
-                    <option value="ALL">All Stages</option>
-                    <option value="VET_REVIEW">Initial Review</option>
-                    <option value="PENDING_RECHECK">Pending Recheck</option>
-                  </select>
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
+                      Admission Stage
+                    </label>
+                    <select
+                      value={admissionFilter}
+                      onChange={(e) => setAdmissionFilter(e.target.value as typeof admissionFilter)}
+                      className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
+                    >
+                      <option value="ALL">All Stages</option>
+                      <option value="VET_REVIEW">Initial Review</option>
+                      <option value="PENDING_RECHECK">Pending Recheck</option>
+                    </select>
+                  </div>
 
-                  <select
-                    value={examStatusFilter}
-                    onChange={(e) =>
-                      setExamStatusFilter(e.target.value as VetExamStatus | 'ALL')
-                    }
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
-                    aria-label="Exam Status"
-                  >
-                    {examStatusOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
+                      Exam Status
+                    </label>
+                    <select
+                      value={examStatusFilter}
+                      onChange={(e) => setExamStatusFilter(e.target.value as CareScheduleStatus | 'ALL')}
+                      className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
+                    >
+                      {examStatusOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                  <select
-                    value={examTypeFilter}
-                    onChange={(e) =>
-                      setExamTypeFilter(e.target.value as VetExamType | 'ALL')
-                    }
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
-                    aria-label="Exam Type"
-                  >
-                    {examTypeOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
+                      Exam Type
+                    </label>
+                    <select
+                      value={examTypeFilter}
+                      onChange={(e) => setExamTypeFilter(e.target.value as CareType | 'ALL')}
+                      className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
+                    >
+                      {examTypeOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                  <select
-                    value={priorityFilter}
-                    onChange={(e) =>
-                      setPriorityFilter(e.target.value as typeof priorityFilter)
-                    }
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
-                    aria-label="Priority Filter"
-                  >
-                    <option value="ALL">All Priorities</option>
-                    <option value="URGENT">Urgent (P1)</option>
-                    <option value="NORMAL">Standard (P2-P4)</option>
-                  </select>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
+                      Priority Level
+                    </label>
+                    <select
+                      value={priorityFilter}
+                      onChange={(e) => setPriorityFilter(e.target.value as typeof priorityFilter)}
+                      className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
+                    >
+                      <option value="ALL">All Priorities</option>
+                      <option value="URGENT">Urgent (P1)</option>
+                      <option value="NORMAL">Standard (P2-P4)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
 
-              {/* Scrollable Queue List */}
-              <div className="overflow-y-auto scroll-slim flex-1">
-                {filteredRows.length > 0 ? (
-                  <ul className="divide-y divide-[var(--color-border)]">
-                    {filteredRows.map((row) => {
-                      const isSelected = selectedAdmissionId === row.admissionId;
-                      const priority = getPriorityBadge(row.exam?.priority, row.exam?.examType);
-                      const stallCode =
-                        stallCodes[row.admissionId] ||
-                        (row.quarantineStallId ? `Q-Stall #${row.quarantineStallId}` : 'Quarantine');
-                      const isAssignedToUser =
-                        row.exam?.assignedVetId && user?.userId && row.exam.assignedVetId === user.userId;
+        {/* Full-Width Admission Schedule List Content */}
+        {loading ? (
+          <ListSkeleton rows={6} />
+        ) : filteredRows.length === 0 ? (
+          <div className="p-8">
+            <EmptyState
+              icon="search"
+              title="No matching admissions found"
+              description="No candidates match your current search query or active filter settings."
+              action={
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setQueuePillFilter('ALL');
+                    setAdmissionFilter('ALL');
+                    setExamStatusFilter('ALL');
+                    setExamTypeFilter('ALL');
+                    setPriorityFilter('ALL');
+                  }}
+                >
+                  Reset All Filters
+                </Button>
+              }
+            />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <ul className="divide-y divide-[var(--color-border)]">
+              {filteredRows.map((row) => {
+                const priority = getPriorityBadge(row.careSchedule?.careType);
+                const stallCode =
+                  stallCodes[row.admissionId] ||
+                  (row.quarantineStallId ? `Q-Stall #${row.quarantineStallId}` : 'Quarantine');
+                const rowVetId = row.careSchedule?.veterinarianId ?? row.careSchedule?.assignedVetId ?? null;
+                const isAssignedToUser = Boolean(rowVetId && user?.userId && rowVetId === user.userId);
+                const isExamInProgress = row.careSchedule?.status === 'IN_PROGRESS';
+                const isScheduled = row.careSchedule?.status === 'SCHEDULED';
+                const isCompleted = row.careSchedule?.status === 'COMPLETED';
 
-                      return (
-                        <li key={row.admissionId}>
-                          <button
-                            type="button"
-                            onClick={() => handleSelectAdmission(row.admissionId)}
-                            aria-current={isSelected ? 'true' : undefined}
-                            className={`flex w-full text-left gap-3 px-3.5 py-3 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-focus)] ${
-                              isSelected
-                                ? 'border-l-4 border-l-[var(--color-primary)] bg-[var(--color-primary-subtle)]'
-                                : 'border-l-4 border-l-transparent hover:bg-[var(--color-surface-subtle)]'
-                            }`}
+                return (
+                  <li
+                    key={row.admissionId}
+                    className="flex flex-wrap items-center justify-between gap-4 p-4 transition-colors hover:bg-[var(--color-surface-subtle)]"
+                  >
+                    {/* Left: Horse Avatar & Metadata */}
+                    <div className="flex items-center gap-3.5 min-w-[260px] flex-1">
+                      <HorseAvatar
+                        name={row.candidateName}
+                        image={row.imageUrl}
+                        size={46}
+                        rounded="md"
+                      />
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[14px] font-bold text-[var(--color-text-primary)] truncate">
+                            {row.candidateName}
+                          </span>
+                          <Pill tone={priority.tone} size="sm" icon={priority.icon}>
+                            {priority.label}
+                          </Pill>
+                          <Pill tone={admissionTone(row.status)} size="sm">
+                            {row.status === 'PENDING_RECHECK' ? 'Recheck' : 'Initial Review'}
+                          </Pill>
+                        </div>
+
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                          <span className="font-metric font-semibold text-[var(--color-text-primary)]">
+                            #{row.admissionId}
+                          </span>
+                          <span>·</span>
+                          <span className="truncate">{row.breed}</span>
+                          <span>·</span>
+                          <span>{calculateAge(row.dateOfBirth)}</span>
+                          <span>·</span>
+                          <span className="inline-flex items-center gap-1 rounded bg-[var(--color-isolated-soft)] px-1.5 py-0.2 text-[10px] font-semibold text-[var(--color-isolated)]">
+                            <Icon name="shield" size={10} />
+                            {stallCode}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Middle: Schedule Status & Time */}
+                    <div className="flex flex-wrap items-center gap-4 text-[12px]">
+                      <div>
+                        {row.careSchedule ? (
+                          <Pill
+                            tone={examTone(row.careSchedule.status)}
+                            size="sm"
+                            icon={examIcon(row.careSchedule.status)}
                           >
-                            <HorseAvatar
-                              name={row.candidateName}
-                              image={row.imageUrl}
-                              size={42}
-                              rounded="md"
-                            />
+                            {formatLabel(row.careSchedule.status)}
+                          </Pill>
+                        ) : (
+                          <Pill tone="neutral" size="sm">
+                            No Schedule
+                          </Pill>
+                        )}
+                      </div>
 
-                            <div className="min-w-0 flex-1">
-                              {/* Row 1: Name and Priority */}
-                              <div className="flex items-center justify-between gap-1.5">
-                                <span className="truncate text-[13px] font-bold text-[var(--color-text-primary)]">
-                                  {row.candidateName}
-                                </span>
-                                <Pill tone={priority.tone} size="sm" icon={priority.icon}>
-                                  {priority.label}
-                                </Pill>
-                              </div>
+                      <div className="min-w-[130px] text-[11px]">
+                        {row.careSchedule?.scheduledAt ? (
+                          <div className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
+                            <Icon name="calendar" size={12} className="text-[var(--color-text-muted)]" />
+                            <span className="font-metric">{formatDate(row.careSchedule.scheduledAt, true)}</span>
+                          </div>
+                        ) : row.careSchedule?.scheduledDate ? (
+                          <span className="text-[var(--color-text-muted)] font-metric">
+                            Target: {formatDate(row.careSchedule.scheduledDate)}
+                          </span>
+                        ) : (
+                          <span className="text-[var(--color-text-muted)] italic">Awaiting slot</span>
+                        )}
+                      </div>
 
-                              {/* Row 2: Admission Code, Breed & Quarantine Stall */}
-                              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--color-text-secondary)]">
-                                <span className="font-metric font-medium text-[var(--color-text-primary)]">
-                                  #{row.admissionId}
-                                </span>
-                                <span>·</span>
-                                <span className="truncate">{row.breed}</span>
-                                <span>·</span>
-                                <span className="inline-flex items-center gap-1 rounded bg-[var(--color-isolated-soft)] px-1.5 py-0.2 text-[10px] font-semibold text-[var(--color-isolated)]">
-                                  <Icon name="shield" size={10} />
-                                  {stallCode}
-                                </span>
-                              </div>
+                      <div className="min-w-[110px] text-[11px]">
+                        {isAssignedToUser ? (
+                          <strong className="text-[var(--color-primary)] font-semibold">
+                            Assigned to you
+                          </strong>
+                        ) : rowVetId ? (
+                          <span className="text-[var(--color-text-secondary)]">Vet #{rowVetId}</span>
+                        ) : (
+                          <span className="text-[var(--color-text-muted)]">Unassigned</span>
+                        )}
+                      </div>
+                    </div>
 
-                              {/* Row 3: Status Pills */}
-                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                <Pill tone={admissionTone(row.status)} size="sm">
-                                  {row.status === 'PENDING_RECHECK' ? 'Recheck Stage' : 'Initial Intake'}
-                                </Pill>
-
-                                {row.exam ? (
-                                  <Pill tone={examTone(row.exam.status)} size="sm" icon={examIcon(row.exam.status)}>
-                                    {formatLabel(row.exam.status)}
-                                  </Pill>
-                                ) : (
-                                  <Pill tone="neutral" size="sm">
-                                    No exam linked
-                                  </Pill>
-                                )}
-
-                                {/* Training Locked Indicator */}
-                                <span className="inline-flex items-center gap-1 rounded bg-[var(--color-danger-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-danger)]">
-                                  <Icon name="lock" size={10} />
-                                  Locked
-                                </span>
-                              </div>
-
-                              {/* Row 4: Assigned Vet & Scheduled Info */}
-                              <div className="mt-1.5 flex items-center justify-between text-[10px] text-[var(--color-text-muted)]">
-                                <span className="truncate">
-                                  {isAssignedToUser ? (
-                                    <strong className="text-[var(--color-primary)]">
-                                      Assigned to you
-                                    </strong>
-                                  ) : row.exam?.assignedVetId ? (
-                                    `Vet #${row.exam.assignedVetId}`
-                                  ) : (
-                                    'Vet unassigned'
-                                  )}
-                                </span>
-                                {row.exam?.scheduledAt ? (
-                                  <span className="flex items-center gap-1 font-metric">
-                                    <Icon name="calendar" size={10} />
-                                    {formatDate(row.exam.scheduledAt, true)}
-                                  </span>
-                                ) : row.exam?.requestedForDate ? (
-                                  <span className="font-metric">
-                                    Target: {formatDate(row.exam.requestedForDate)}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <div className="p-6">
-                    <EmptyState
-                      icon="search"
-                      title="No matching admissions"
-                      description="Try clearing your search term or broadening the status and priority filters."
-                      action={
+                    {/* Right: Drawer Trigger Action Button */}
+                    <div className="shrink-0">
+                      {isExamInProgress ? (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          icon="activity"
+                          onClick={() => handleOpenAdmission(row.admissionId)}
+                        >
+                          Tiếp tục
+                        </Button>
+                      ) : isScheduled ? (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          icon="stethoscope"
+                          onClick={() => handleOpenAdmission(row.admissionId)}
+                        >
+                          Khám
+                        </Button>
+                      ) : isCompleted ? (
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => {
-                            setSearchQuery('');
-                            setAdmissionFilter('ALL');
-                            setExamStatusFilter('ALL');
-                            setExamTypeFilter('ALL');
-                            setPriorityFilter('ALL');
-                          }}
+                          icon="check"
+                          onClick={() => handleOpenAdmission(row.admissionId)}
                         >
-                          Reset Filters
+                          Xem kết quả
                         </Button>
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-            </Panel>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          icon="chevron-right"
+                          onClick={() => handleOpenAdmission(row.admissionId)}
+                        >
+                          Chi tiết
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
+        )}
+      </Panel>
 
-          {/* Right Column: Clinical Workspace (70% width on desktop) */}
-          <div className="min-w-0 flex-1">
-            {loadingDetail || (!detail && !detailError) ? (
-              <Panel>
-                <DetailSkeleton />
-              </Panel>
-            ) : detailError ? (
-              <Panel padded>
-                <EmptyState
-                  icon="alert-triangle"
-                  title="Could not load clinical details"
-                  description={detailError}
-                  action={<Button onClick={handleRefresh}>Retry</Button>}
-                />
-              </Panel>
-            ) : detail && selectedRow ? (
-              <div className="space-y-4">
-                {/* Horse Clinical Summary Header */}
-                <Panel className="overflow-hidden">
-                  <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--color-border)] p-5">
-                    <div className="flex items-start gap-4">
-                      <HorseAvatar
-                        name={detail.candidate?.name ?? selectedRow.candidateName}
-                        image={selectedRow.imageUrl}
-                        size={68}
-                        rounded="md"
-                      />
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-[22px] font-bold tracking-tight text-[var(--color-text-primary)]">
-                            {detail.candidate?.name ?? selectedRow.candidateName}
-                          </h2>
-                          <Pill tone={admissionTone(detail.status)}>
-                            {formatLabel(detail.status)}
-                          </Pill>
-                          {selectedExam && (
-                            <Pill tone={examTone(selectedExam.status)} icon={examIcon(selectedExam.status)}>
-                              {formatLabel(selectedExam.status)}
-                            </Pill>
-                          )}
-                          {selectedExam && (
-                            <Pill
-                              tone={getPriorityBadge(selectedExam.priority, selectedExam.examType).tone}
-                              icon={getPriorityBadge(selectedExam.priority, selectedExam.examType).icon}
-                            >
-                              {getPriorityBadge(selectedExam.priority, selectedExam.examType).label}
-                            </Pill>
-                          )}
-                        </div>
+      {/* 1100px Clinical Drawer (R2) */}
+      {drawerOpen && selectedId && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop with blur */}
+          <div
+            className="fixed inset-0 bg-black/45 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+            onClick={handleRequestCloseDrawer}
+            aria-hidden="true"
+          />
 
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-[var(--color-text-secondary)]">
-                          <span className="font-metric font-semibold text-[var(--color-text-primary)]">
-                            Admission #{detail.admissionId}
-                          </span>
-                          <span>·</span>
-                          <span>
-                            Horse: {detail.horseId ? `#${detail.horseId}` : 'Intake profile'}
-                          </span>
-                          <span>·</span>
-                          <span>{detail.candidate?.breed ?? 'Breed unspecified'}</span>
-                          <span>·</span>
-                          <span>{calculateAge(detail.candidate?.dateOfBirth)}</span>
-                          {detail.candidate?.registrationNumber && (
-                            <>
-                              <span>·</span>
-                              <span>Reg: {detail.candidate.registrationNumber}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
+          {/* Drawer Container (1100px on desktop, full-screen sheet on <768px) */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="drawer-horse-name"
+            className="relative z-50 flex h-full w-full max-w-full flex-col bg-[var(--color-surface)] shadow-2xl transition-transform animate-in slide-in-from-right duration-300 md:max-w-[1100px]"
+          >
+            {/* Consolidated Header (No duplicate headers, no violet border box) */}
+            <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 sm:px-5 sm:py-3.5 shrink-0">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <HorseAvatar
+                    name={detail?.candidate?.name ?? selectedRow?.candidateName ?? 'Candidate'}
+                    image={selectedRow?.imageUrl}
+                    size={42}
+                    rounded="md"
+                  />
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2
+                        id="drawer-horse-name"
+                        className="text-[17px] font-bold tracking-tight text-[var(--color-text-primary)]"
+                      >
+                        {detail?.candidate?.name ?? selectedRow?.candidateName ?? 'Candidate'}
+                      </h2>
+                      {selectedRow && (
+                        <Pill
+                          tone={getPriorityBadge(selectedRow.careSchedule?.careType).tone}
+                          size="sm"
+                        >
+                          {getPriorityBadge(selectedRow.careSchedule?.careType).label}
+                        </Pill>
+                      )}
+                      {currentActiveSchedule && (
+                        <Pill tone={examTone(currentActiveSchedule.status)} size="sm">
+                          {formatLabel(currentActiveSchedule.status)}
+                        </Pill>
+                      )}
+                      <span className="inline-flex items-center gap-1 rounded bg-[var(--color-isolated-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--color-isolated)]">
+                        <Icon name="shield" size={10} />
+                        {detail?.quarantineStallCode || 'Quarantine Stall'}
+                      </span>
                     </div>
 
-                    {/* Prominent Training Lock & Quarantine Banner */}
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-isolated-soft)] px-3 py-1 text-[12px] font-bold text-[var(--color-isolated)]">
-                          <Icon name="shield" size={14} />
-                          {detail.quarantineStallCode ? `Quarantine Stall: ${detail.quarantineStallCode}` : 'Quarantine Facility'}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-danger-soft)] px-3 py-1 text-[12px] font-bold text-[var(--color-danger)]">
-                          <Icon name="lock" size={14} />
-                          Training Strictly Locked
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[var(--color-text-muted)] text-right max-w-xs">
-                        Training suspension active until a veterinarian renders a final clinical approval.
-                      </p>
+                    {/* Consolidated Metadata Line */}
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                      <span className="font-metric font-semibold text-[var(--color-text-primary)]">
+                        Admission #{detail?.admissionId ?? selectedId}
+                      </span>
+                      {detail?.horseId && <span>· Horse #{detail.horseId}</span>}
+                      {detail?.ownerId && <span>· Owner #{detail.ownerId}</span>}
+                      <span>· {detail?.candidate?.breed ?? selectedRow?.breed ?? 'Equine'}</span>
+                      <span>· {calculateAge(detail?.candidate?.dateOfBirth ?? selectedRow?.dateOfBirth)}</span>
+                      {currentActiveSchedule?.scheduledAt && (
+                        <span>· Scheduled: {formatDate(currentActiveSchedule.scheduledAt, true)}</span>
+                      )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Summary Details Grid */}
-                  <dl className="grid grid-cols-2 gap-4 bg-[var(--color-surface-subtle)] px-5 py-4 sm:grid-cols-3 xl:grid-cols-6">
-                    <InfoItem label="Owner" value={`#${detail.ownerId}`} />
-                    <InfoItem
-                      label="Date of Birth"
-                      value={formatDate(detail.candidate?.dateOfBirth)}
-                    />
-                    <InfoItem
-                      label="Quarantine Stall"
-                      value={detail.quarantineStallCode || (detail.quarantineStallId ? `#${detail.quarantineStallId}` : null)}
-                    />
-                    <InfoItem
-                      label="Exam Type"
-                      value={selectedExam ? formatLabel(selectedExam.examType) : null}
-                    />
-                    <InfoItem
-                      label="Assigned Vet"
-                      value={
-                        selectedExam?.assignedVetId
-                          ? selectedExam.assignedVetId === user?.userId
-                            ? 'Dr. (You)'
-                            : `#${selectedExam.assignedVetId}`
-                          : 'Unassigned'
-                      }
-                    />
-                    <InfoItem
-                      label="Exam Scheduled"
-                      value={formatDate(selectedExam?.scheduledAt, true)}
-                    />
-                  </dl>
-                </Panel>
-
-                {/* Quick Action & Status Advisory Bar */}
-                {selectedExam?.status === 'SCHEDULED' && !assignedElsewhere && (
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-4">
-                    <div className="flex items-center gap-3">
-                      <Icon name="clock" size={20} className="text-[var(--color-info)]" />
-                      <div>
-                        <h3 className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                          Examination Scheduled
-                        </h3>
-                        <p className="text-[12px] text-[var(--color-text-secondary)]">
-                          Scheduled for {formatDate(selectedExam.scheduledAt, true)}. You can begin the physical examination now or record the results directly.
-                        </p>
-                      </div>
-                    </div>
+                {/* Header Actions */}
+                <div className="flex items-center gap-2">
+                  {canStartExam && (
                     <Button
                       size="sm"
                       variant="primary"
@@ -911,457 +1256,454 @@ export function VetAdmissionQueue() {
                       onClick={handleStartExam}
                       icon="activity"
                     >
-                      Start Examination Now
+                      Bắt đầu khám
                     </Button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleRequestCloseDrawer}
+                    className="flex h-11 w-11 min-h-[44px] min-w-[44px] sm:h-8 sm:w-8 sm:min-h-0 sm:min-w-0 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+                    aria-label="Close drawer"
+                  >
+                    <Icon name="x" size={18} />
+                  </button>
+                </div>
+              </div>
 
-                {selectedExam?.status === 'REQUESTED' && (
-                  <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-4">
-                    <Icon name="clock" size={20} className="mt-0.5 shrink-0 text-[var(--color-warning)]" />
+              {/* Drawer Tabs */}
+              <div className="mt-3">
+                <Tabs
+                  tabs={workspaceTabs}
+                  active={activeTab}
+                  onChange={setActiveTab}
+                />
+              </div>
+            </div>
+
+            {/* Drawer Body (Scrollable with sticky decision panel support) */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 scroll-slim">
+              {loadingDetail || (!detail && !detailError) ? (
+                <DetailSkeleton />
+              ) : detailError ? (
+                <EmptyState
+                  icon="alert-triangle"
+                  title="Could not load examination record"
+                  description={detailError}
+                  action={<Button onClick={handleRefresh}>Retry</Button>}
+                />
+              ) : detail && selectedRow ? (
+                <div>
+                  {/* Tab 1: Clinical Examination & VetReviewForm */}
+                  {activeTab === 'exam' && (
                     <div>
-                      <h3 className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                        Awaiting Exam Scheduling
-                      </h3>
-                      <p className="mt-0.5 text-[12px] text-[var(--color-text-secondary)]">
-                        This exam request is queued for automatic scheduling. Once scheduled and assigned, the clinical entry form unlocks.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {assignedElsewhere && (
-                  <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface-muted)] p-4">
-                    <Icon name="user" size={20} className="mt-0.5 shrink-0 text-[var(--color-text-secondary)]" />
-                    <div>
-                      <h3 className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                        Assigned to Veterinarian #{selectedExam?.assignedVetId}
-                      </h3>
-                      <p className="mt-0.5 text-[12px] text-[var(--color-text-secondary)]">
-                        You have read-only access to this candidate&apos;s clinical records and history. Only the assigned veterinarian can submit the final review.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Workspace Underlined Tabs */}
-                <Panel className="overflow-hidden">
-                  <div className="px-4 pt-2">
-                    <Tabs
-                      tabs={workspaceTabs}
-                      active={activeTab}
-                      onChange={setActiveTab}
-                    />
-                  </div>
-
-                  <div className="p-5">
-                    {/* Tab 1: Clinical Examination & Review Form */}
-                    {activeTab === 'exam' && (
-                      <div className="space-y-5">
-                        {canCompleteExam ? (
-                          <VetReviewForm
-                            key={`${detail.admissionId}-${selectedExam?.id}`}
-                            admissionId={detail.admissionId}
-                            candidateName={detail.candidate?.name ?? selectedRow.candidateName}
-                            quarantineStallCode={detail.quarantineStallCode}
-                            onSuccess={handleReviewSuccess}
-                          />
-                        ) : selectedExam?.status === 'COMPLETED' ? (
-                          <div className="rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-5 text-center">
-                            <Icon name="check" size={28} className="mx-auto text-[var(--color-success)]" />
-                            <h3 className="mt-2 text-[15px] font-bold text-[var(--color-success)]">
-                              Examination Completed
-                            </h3>
-                            <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
-                              The veterinary review for this stage has already been submitted and finalized.
-                            </p>
-                            {detail.vetDecision && (
-                              <div className="mt-3">
-                                <Pill
-                                  tone={
-                                    detail.vetDecision === 'APPROVED'
-                                      ? 'success'
-                                      : detail.vetDecision === 'RECHECK_REQUIRED'
-                                        ? 'warning'
-                                        : 'danger'
-                                  }
-                                >
-                                  Decision: {detail.vetDecision.replace(/_/g, ' ')}
-                                </Pill>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="p-6 text-center text-[var(--color-text-muted)]">
-                            <Icon name="stethoscope" size={32} className="mx-auto mb-2 opacity-40" />
-                            <p className="text-[14px] font-semibold text-[var(--color-text-secondary)]">
-                              Clinical form locked
-                            </p>
-                            <p className="text-[12px] mt-1">
-                              {selectedExam?.status === 'REQUESTED'
-                                ? 'The exam request must be scheduled before review documentation begins.'
-                                : assignedElsewhere
-                                  ? 'This case is assigned to another veterinarian.'
-                                  : 'No active examination found for this admission.'}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Tab 2: Medical Records History */}
-                    {activeTab === 'history' && (
-                      <div className="space-y-6">
-                        {/* Completed Health Records */}
-                        <div>
-                          <SectionTitle>Completed Health Records</SectionTitle>
-                          {detail.healthRecords && detail.healthRecords.length > 0 ? (
-                            <ul className="mt-3 space-y-3">
-                              {detail.healthRecords.map((record) => (
-                                <li
-                                  key={record.id}
-                                  className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-xs"
-                                >
-                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2.5">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                                        {formatLabel(record.recordType)} Exam
-                                      </span>
-                                      <span className="font-metric text-[11px] text-[var(--color-text-muted)]">
-                                        Record #{record.id}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      {record.vetDecision && (
-                                        <Pill
-                                          tone={
-                                            record.vetDecision === 'APPROVED'
-                                              ? 'success'
-                                              : record.vetDecision === 'RECHECK_REQUIRED'
-                                                ? 'warning'
-                                                : 'danger'
-                                          }
-                                          size="sm"
-                                        >
-                                          {formatLabel(record.vetDecision)}
-                                        </Pill>
-                                      )}
-                                      <span className="font-metric text-[11px] text-[var(--color-text-secondary)]">
-                                        {formatDate(record.examinedAt, true)}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                                    <MedicalNoteBlock label="Symptoms" value={record.symptoms} />
-                                    <MedicalNoteBlock label="Findings" value={record.findings} />
-                                    <MedicalNoteBlock label="Diagnosis" value={record.diagnosis} />
-                                    <MedicalNoteBlock label="Treatment Plan" value={record.treatment} />
-                                    <MedicalNoteBlock label="Notes & Context" value={record.notes} />
-                                    <MedicalNoteBlock label="Rejection Reason" value={record.rejectionReason} />
-                                  </div>
-
-                                  {record.followUpDate && (
-                                    <div className="mt-3 flex items-center gap-2 rounded bg-[var(--color-warning-soft)] p-2 text-[12px] font-semibold text-[var(--color-warning)]">
-                                      <Icon name="calendar" size={14} />
-                                      <span>Mandatory Follow-Up Scheduled: {formatDate(record.followUpDate)}</span>
-                                    </div>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="mt-2 text-[13px] text-[var(--color-text-muted)] italic">
-                              No health records have been filed for this horse yet.
-                            </p>
+                      {canCompleteExam ? (
+                        <VetReviewForm
+                          key={`${detail.admissionId}-${currentActiveSchedule?.id}`}
+                          admissionId={detail.admissionId}
+                          horseId={detail.horseId}
+                          candidateName={detail.candidate?.name ?? selectedRow.candidateName}
+                          quarantineStallCode={detail.quarantineStallCode}
+                          careScheduleId={currentActiveSchedule?.id}
+                          careType={currentActiveSchedule?.careType}
+                          scheduleStatus={currentActiveSchedule?.status}
+                          onStartExam={handleStartExam}
+                          onSuccess={handleReviewSuccess}
+                          onDirtyChange={handleDirtyChange}
+                        />
+                      ) : currentActiveSchedule?.status === 'COMPLETED' ? (
+                        <div className="rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-5 text-center">
+                          <Icon name="check" size={28} className="mx-auto text-[var(--color-success)]" />
+                          <h3 className="mt-2 text-[15px] font-bold text-[var(--color-success)]">
+                            Examination Completed
+                          </h3>
+                          <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
+                            The veterinary review for this intake stage has already been submitted and finalized.
+                          </p>
+                          {detail.vetDecision && (
+                            <div className="mt-3">
+                              <Pill
+                                tone={
+                                  detail.vetDecision === 'APPROVED'
+                                    ? 'success'
+                                    : detail.vetDecision === 'RECHECK_REQUIRED'
+                                      ? 'warning'
+                                      : 'danger'
+                                }
+                              >
+                                Decision: {detail.vetDecision.replace(/_/g, ' ')}
+                              </Pill>
+                            </div>
                           )}
                         </div>
+                      ) : (
+                        <div className="p-8 text-center text-[var(--color-text-muted)]">
+                          <Icon name="stethoscope" size={32} className="mx-auto mb-2 opacity-40" />
+                          <p className="text-[14px] font-semibold text-[var(--color-text-secondary)]">
+                            Clinical review locked
+                          </p>
+                          <p className="text-[12px] mt-1">
+                            {currentActiveSchedule?.status === 'REQUESTED' ||
+                            currentActiveSchedule?.status === 'AWAITING_VET_CONFIRMATION'
+                              ? 'The care schedule must be scheduled and accepted before review documentation begins.'
+                              : assignedElsewhere
+                                ? 'This case is assigned to another veterinarian.'
+                                : 'No active examination found for this admission.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                        {/* Examination Schedule Timeline */}
-                        <div className="border-t border-[var(--color-border)] pt-5">
-                          <SectionTitle>Examination Schedule &amp; Log</SectionTitle>
-                          {selectedExamHistory.length > 0 ? (
-                            <ol className="mt-3 space-y-3">
-                              {selectedExamHistory.map((exam, idx) => (
-                                <li
-                                  key={exam.id}
-                                  className="flex items-start gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"
-                                >
-                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary-soft)] text-[11px] font-bold text-[var(--color-primary)]">
-                                    {idx + 1}
-                                  </span>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                                        {formatLabel(exam.examType)} Examination #{exam.id}
-                                      </span>
-                                      <Pill tone={examTone(exam.status)} size="sm">
-                                        {formatLabel(exam.status)}
+                  {/* Tab 2: Medical Records History */}
+                  {activeTab === 'history' && (
+                    <div className="space-y-5">
+                      <div>
+                        <h3 className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                          Completed Health Records
+                        </h3>
+                        {detail.healthRecords && detail.healthRecords.length > 0 ? (
+                          <ul className="mt-3 space-y-3">
+                            {detail.healthRecords.map((record) => (
+                              <li
+                                key={record.id}
+                                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-xs"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                                      {formatLabel(record.recordType)} Exam
+                                    </span>
+                                    <span className="font-metric text-[11px] text-[var(--color-text-muted)]">
+                                      Record #{record.id}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {record.vetDecision && (
+                                      <Pill
+                                        tone={
+                                          record.vetDecision === 'APPROVED'
+                                            ? 'success'
+                                            : record.vetDecision === 'RECHECK_REQUIRED'
+                                              ? 'warning'
+                                              : 'danger'
+                                        }
+                                        size="sm"
+                                      >
+                                        {formatLabel(record.vetDecision)}
                                       </Pill>
-                                    </div>
-                                    <p className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
-                                      {exam.reason || 'Veterinary intake examination'} · Duration: {exam.durationMinutes} min
-                                    </p>
-                                    <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-muted)]">
-                                      <span>
-                                        Scheduled:{' '}
-                                        {exam.scheduledAt
-                                          ? formatDate(exam.scheduledAt, true)
-                                          : exam.requestedForDate
-                                            ? `Target date: ${formatDate(exam.requestedForDate)}`
-                                            : 'Awaiting scheduling'}
-                                      </span>
-                                      <span>·</span>
-                                      <span>
-                                        Assigned Vet: {exam.assignedVetId ? `#${exam.assignedVetId}` : 'Unassigned'}
-                                      </span>
-                                    </div>
+                                    )}
+                                    <span className="font-metric text-[11px] text-[var(--color-text-secondary)]">
+                                      {formatDate(record.examinedAt, true)}
+                                    </span>
                                   </div>
-                                </li>
-                              ))}
-                            </ol>
-                          ) : (
-                            <p className="mt-2 text-[13px] text-[var(--color-text-muted)] italic">
-                              No examination schedule items recorded.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                                </div>
 
-                    {/* Tab 3: Vitals & Health Metrics History */}
-                    {activeTab === 'vitals' && (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <SectionTitle>Recorded Vitals &amp; Health Metrics</SectionTitle>
-                          <span className="text-[11px] text-[var(--color-text-muted)]">
-                            {metrics.length} telemetry readings on record
-                          </span>
-                        </div>
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                  <MedicalNoteBlock label="Symptoms" value={record.symptoms} />
+                                  <MedicalNoteBlock label="Findings" value={record.findings} />
+                                  <MedicalNoteBlock label="Diagnosis" value={record.diagnosis} />
+                                  <MedicalNoteBlock label="Treatment Plan" value={record.treatment} />
+                                  <MedicalNoteBlock label="Notes & Context" value={record.notes} />
+                                  <MedicalNoteBlock label="Rejection Reason" value={record.rejectionReason} />
+                                </div>
 
-                        {metrics.length > 0 ? (
-                          <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-border)]">
-                            <table className="w-full text-left text-[12px]">
-                              <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[11px] font-semibold uppercase text-[var(--color-text-secondary)]">
-                                <tr>
-                                  <th className="px-3 py-2.5">Date &amp; Time</th>
-                                  <th className="px-3 py-2.5">Temperature</th>
-                                  <th className="px-3 py-2.5">Heart Rate</th>
-                                  <th className="px-3 py-2.5">Resp Rate</th>
-                                  <th className="px-3 py-2.5">Weight</th>
-                                  <th className="px-3 py-2.5">BCS</th>
-                                  <th className="px-3 py-2.5">Hydration</th>
-                                  <th className="px-3 py-2.5">Notes</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-[var(--color-border)] font-metric">
-                                {metrics.map((m) => (
-                                  <tr key={m.id} className="hover:bg-[var(--color-surface-subtle)]">
-                                    <td className="px-3 py-2 text-[var(--color-text-primary)]">
-                                      {formatDate(m.recordedAt, true)}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      {m.temperature != null ? `${m.temperature} °C` : '—'}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      {m.heartRate != null ? `${m.heartRate} bpm` : '—'}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      {m.respiratoryRate != null ? `${m.respiratoryRate} rpm` : '—'}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      {m.weight != null ? `${m.weight} kg` : '—'}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      {m.bodyConditionScore != null ? `${m.bodyConditionScore} / 9` : '—'}
-                                    </td>
-                                    <td className="px-3 py-2 font-sans">
-                                      {m.hydrationStatus || '—'}
-                                    </td>
-                                    <td className="px-3 py-2 font-sans text-[var(--color-text-secondary)] max-w-xs truncate">
-                                      {m.notes || '—'}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                                {record.trainingDecision && (
+                                  <div className="mt-2.5 flex items-center gap-2">
+                                    <span
+                                      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                        record.trainingDecision === 'ALLOWED'
+                                          ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]'
+                                          : record.trainingDecision === 'RESTRICTED'
+                                            ? 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]'
+                                            : 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
+                                      }`}
+                                    >
+                                      Training Decision: {record.trainingDecision}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {record.restrictionDetails && (
+                                  <div className="mt-2 rounded bg-[var(--color-warning-soft)] p-2 text-[12px] text-[var(--color-warning)]">
+                                    <strong>Restriction Protocol:</strong> {record.restrictionDetails}
+                                  </div>
+                                )}
+
+                                {record.followUpDate && (
+                                  <div className="mt-3 flex items-center gap-2 rounded bg-[var(--color-warning-soft)] p-2 text-[12px] font-semibold text-[var(--color-warning)]">
+                                    <Icon name="calendar" size={14} />
+                                    <span>Mandatory Follow-Up Scheduled: {formatDate(record.followUpDate)}</span>
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         ) : (
-                          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] p-6 text-center text-[var(--color-text-muted)]">
-                            <Icon name="heart-pulse" size={28} className="mx-auto mb-2 opacity-50" />
-                            <p className="text-[13px] font-medium text-[var(--color-text-secondary)]">
-                              No recorded vitals yet
-                            </p>
-                            <p className="text-[11px] mt-0.5">
-                              Telemetry metrics recorded during the clinical examination will be stored and tracked here.
-                            </p>
-                          </div>
+                          <p className="mt-2 text-[12px] text-[var(--color-text-muted)] italic">
+                            No health records filed for this candidate yet.
+                          </p>
                         )}
+                      </div>
 
-                        {latestMetrics && (
-                          <div className="mt-4 rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] p-4 border border-[var(--color-border)]">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
-                              Latest Baseline Summary (Recorded {formatDate(latestMetrics.recordedAt, true)})
-                            </span>
-                            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 font-metric text-[13px]">
-                              <div>
-                                <span className="text-[10px] text-[var(--color-text-muted)] block font-sans">TEMP</span>
-                                <strong>{latestMetrics.temperature ?? '—'} °C</strong>
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-[var(--color-text-muted)] block font-sans">PULSE</span>
-                                <strong>{latestMetrics.heartRate ?? '—'} bpm</strong>
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-[var(--color-text-muted)] block font-sans">RESP</span>
-                                <strong>{latestMetrics.respiratoryRate ?? '—'} rpm</strong>
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-[var(--color-text-muted)] block font-sans">WEIGHT</span>
-                                <strong>{latestMetrics.weight ?? '—'} kg</strong>
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-[var(--color-text-muted)] block font-sans">BCS</span>
-                                <strong>{latestMetrics.bodyConditionScore ?? '—'} / 9</strong>
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-[var(--color-text-muted)] block font-sans">HYDRATION</span>
-                                <strong className="font-sans text-[12px]">{latestMetrics.hydrationStatus ?? 'Normal'}</strong>
-                              </div>
+                      <div className="border-t border-[var(--color-border)] pt-4">
+                        <h3 className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                          Examination Schedule Log
+                        </h3>
+                        {selectedHistory.length > 0 ? (
+                          <ol className="mt-3 space-y-2.5">
+                            {selectedHistory.map((item, idx) => (
+                              <li
+                                key={`${item.id}-${idx}`}
+                                className="flex items-start gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-[12px]"
+                              >
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary-soft)] text-[10px] font-bold text-[var(--color-primary)]">
+                                  {idx + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="font-bold text-[var(--color-text-primary)]">
+                                      {item.label}
+                                    </span>
+                                    <Pill tone={examTone(item.status)} size="sm">
+                                      {formatLabel(item.status)}
+                                    </Pill>
+                                  </div>
+                                  <p className="mt-0.5 text-[11px] text-[var(--color-text-secondary)]">
+                                    {item.description}
+                                  </p>
+                                  <div className="mt-1 flex flex-wrap items-center gap-3 text-[10px] text-[var(--color-text-muted)]">
+                                    <span>Scheduled: {item.scheduledAt ? formatDate(item.scheduledAt, true) : 'Pending'}</span>
+                                    <span>·</span>
+                                    <span>Assigned Vet: {item.assignedVetId ? `#${item.assignedVetId}` : 'Unassigned'}</span>
+                                  </div>
+                                </div>
+                              </li>
+                            ))}
+                          </ol>
+                        ) : (
+                          <p className="mt-2 text-[12px] text-[var(--color-text-muted)] italic">
+                            No care schedule logs recorded.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tab 3: Vitals & Health Metrics History */}
+                  {activeTab === 'vitals' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                          Recorded Vitals &amp; Telemetry
+                        </h3>
+                        <span className="text-[11px] text-[var(--color-text-muted)]">
+                          {metrics.length} readings on record
+                        </span>
+                      </div>
+
+                      {metrics.length > 0 ? (
+                        <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                          <table className="w-full text-left text-[12px]">
+                            <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[10px] font-semibold uppercase text-[var(--color-text-secondary)]">
+                              <tr>
+                                <th className="px-3 py-2">Recorded At</th>
+                                <th className="px-3 py-2">Temp</th>
+                                <th className="px-3 py-2">Heart Rate</th>
+                                <th className="px-3 py-2">Resp Rate</th>
+                                <th className="px-3 py-2">Weight</th>
+                                <th className="px-3 py-2">BCS</th>
+                                <th className="px-3 py-2">Hydration</th>
+                                <th className="px-3 py-2">Notes</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[var(--color-border)] font-metric">
+                              {metrics.map((m) => (
+                                <tr key={m.id} className="hover:bg-[var(--color-surface-subtle)]">
+                                  <td className="px-3 py-2 text-[var(--color-text-primary)]">
+                                    {formatDate(m.recordedAt, true)}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {m.temperature != null ? `${m.temperature} °C` : '—'}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {m.heartRate != null ? `${m.heartRate} bpm` : '—'}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {m.respiratoryRate != null ? `${m.respiratoryRate} rpm` : '—'}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {m.weight != null ? `${m.weight} kg` : '—'}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {m.bodyConditionScore != null ? `${m.bodyConditionScore} / 9` : '—'}
+                                  </td>
+                                  <td className="px-3 py-2 font-sans">
+                                    {m.hydrationStatus || '—'}
+                                  </td>
+                                  <td className="px-3 py-2 font-sans text-[var(--color-text-secondary)] max-w-xs truncate">
+                                    {m.notes || '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] p-6 text-center text-[var(--color-text-muted)]">
+                          <Icon name="heart-pulse" size={24} className="mx-auto mb-1.5 opacity-50" />
+                          <p className="text-[12px] font-medium text-[var(--color-text-secondary)]">
+                            No telemetry metrics recorded yet
+                          </p>
+                        </div>
+                      )}
+
+                      {latestMetrics && (
+                        <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] p-3 border border-[var(--color-border)]">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
+                            Latest Telemetry Baseline ({formatDate(latestMetrics.recordedAt, true)})
+                          </span>
+                          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6 font-metric text-[12px]">
+                            <div>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">TEMP</span>
+                              <strong>{latestMetrics.temperature ?? '—'} °C</strong>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">PULSE</span>
+                              <strong>{latestMetrics.heartRate ?? '—'} bpm</strong>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">RESP</span>
+                              <strong>{latestMetrics.respiratoryRate ?? '—'} rpm</strong>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">WEIGHT</span>
+                              <strong>{latestMetrics.weight ?? '—'} kg</strong>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">BCS</span>
+                              <strong>{latestMetrics.bodyConditionScore ?? '—'} / 9</strong>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">HYDRATION</span>
+                              <strong className="font-sans text-[11px]">{latestMetrics.hydrationStatus ?? 'Normal'}</strong>
                             </div>
                           </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Tab 4: Intake Documents & Pedigree */}
+                  {activeTab === 'documents' && (
+                    <div className="grid gap-5 xl:grid-cols-2">
+                      <div>
+                        <h3 className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                          Attached Admission Documents
+                        </h3>
+                        {documents.length > 0 ? (
+                          <ul className="mt-3 space-y-2">
+                            {documents.map((doc) => (
+                              <li
+                                key={doc.id}
+                                className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-[12px]"
+                              >
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
+                                  <Icon name="file-text" size={14} />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <a
+                                    href={doc.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-semibold text-[var(--color-primary)] hover:underline truncate block"
+                                  >
+                                    {formatLabel(doc.documentType)}
+                                  </a>
+                                  <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--color-text-muted)] font-metric">
+                                    {doc.recordDate && <span>Dated: {formatDate(doc.recordDate)}</span>}
+                                    <span>Uploaded: {formatDate(doc.uploadedAt)}</span>
+                                  </div>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-2 text-[12px] text-[var(--color-text-muted)] italic">
+                            No documents attached.
+                          </p>
                         )}
                       </div>
-                    )}
 
-                    {/* Tab 4: Intake Documents & Pedigree */}
-                    {activeTab === 'documents' && (
-                      <div className="grid gap-6 xl:grid-cols-2">
-                        {/* Documents List */}
-                        <div>
-                          <SectionTitle>Admission Documents</SectionTitle>
-                          {documents.length > 0 ? (
-                            <ul className="mt-3 space-y-2">
-                              {documents.map((doc) => (
-                                <li
-                                  key={doc.id}
-                                  className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 hover:bg-[var(--color-surface-subtle)] transition-colors"
-                                >
-                                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
-                                    <Icon name="file-text" size={16} />
-                                  </span>
-                                  <div className="min-w-0 flex-1">
-                                    <a
-                                      href={doc.fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-[13px] font-semibold text-[var(--color-primary)] hover:underline truncate block"
-                                    >
-                                      {formatLabel(doc.documentType)}
-                                    </a>
-                                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[var(--color-text-muted)] font-metric">
-                                      {doc.recordDate && <span>Dated: {formatDate(doc.recordDate)}</span>}
-                                      <span>Uploaded: {formatDate(doc.uploadedAt)}</span>
-                                    </div>
-                                    {doc.note && (
-                                      <p className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
-                                        {doc.note}
-                                      </p>
-                                    )}
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="mt-2 text-[13px] text-[var(--color-text-muted)] italic">
-                              No documents attached to this admission application.
+                      <div className="space-y-4">
+                        <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] p-3.5 border border-[var(--color-border)]">
+                          <h4 className="text-[12px] font-bold text-[var(--color-text-primary)]">
+                            Pedigree &amp; Registry Information
+                          </h4>
+                          <dl className="mt-2 space-y-1.5 text-[11px]">
+                            <div className="flex justify-between border-b border-[var(--color-border)] pb-1">
+                              <span className="text-[var(--color-text-muted)]">Registry:</span>
+                              <span className="font-semibold">{detail.candidate?.registryName || 'Not recorded'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-[var(--color-border)] pb-1">
+                              <span className="text-[var(--color-text-muted)]">Registration No:</span>
+                              <span className="font-semibold font-metric">{detail.candidate?.registrationNumber || 'Not recorded'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-[var(--color-border)] pb-1">
+                              <span className="text-[var(--color-text-muted)]">Sire:</span>
+                              <span className="font-semibold">{detail.candidate?.sireName || 'Not recorded'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[var(--color-text-muted)]">Dam:</span>
+                              <span className="font-semibold">{detail.candidate?.damName || 'Not recorded'}</span>
+                            </div>
+                          </dl>
+                        </div>
+
+                        <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] p-3.5 border border-[var(--color-border)]">
+                          <h4 className="text-[12px] font-bold text-[var(--color-text-primary)]">
+                            Groom Physical Screening
+                          </h4>
+                          <dl className="mt-2 space-y-1 text-[11px]">
+                            <div className="flex justify-between">
+                              <span className="text-[var(--color-text-muted)]">Outcome:</span>
+                              <span className="font-semibold">{detail.groomDecision ? formatLabel(detail.groomDecision) : 'Pending'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[var(--color-text-muted)]">Reviewed At:</span>
+                              <span className="font-metric">{formatDate(detail.groomReviewedAt, true)}</span>
+                            </div>
+                          </dl>
+                          {detail.groomFeedback && (
+                            <p className="mt-2 rounded bg-[var(--color-surface)] p-2 text-[11px] text-[var(--color-text-secondary)] border border-[var(--color-border)]">
+                              {detail.groomFeedback}
                             </p>
                           )}
                         </div>
-
-                        {/* Pedigree & Groom Review Info */}
-                        <div className="space-y-4">
-                          <Panel padded className="bg-[var(--color-surface-subtle)]">
-                            <SectionTitle>Pedigree &amp; Registry</SectionTitle>
-                            <dl className="mt-3 space-y-2.5 text-[12px]">
-                              <div className="flex justify-between border-b border-[var(--color-border)] pb-1.5">
-                                <span className="text-[var(--color-text-muted)]">Registry Name:</span>
-                                <span className="font-semibold text-[var(--color-text-primary)]">
-                                  {detail.candidate?.registryName || 'Not recorded'}
-                                </span>
-                              </div>
-                              <div className="flex justify-between border-b border-[var(--color-border)] pb-1.5">
-                                <span className="text-[var(--color-text-muted)]">Registration No:</span>
-                                <span className="font-semibold text-[var(--color-text-primary)] font-metric">
-                                  {detail.candidate?.registrationNumber || 'Not recorded'}
-                                </span>
-                              </div>
-                              <div className="flex justify-between border-b border-[var(--color-border)] pb-1.5">
-                                <span className="text-[var(--color-text-muted)]">Sire:</span>
-                                <span className="font-semibold text-[var(--color-text-primary)]">
-                                  {detail.candidate?.sireName || 'Not recorded'}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-[var(--color-text-muted)]">Dam:</span>
-                                <span className="font-semibold text-[var(--color-text-primary)]">
-                                  {detail.candidate?.damName || 'Not recorded'}
-                                </span>
-                              </div>
-                            </dl>
-                            {detail.candidate?.pedigreeNotes && (
-                              <p className="mt-3 border-t border-[var(--color-border)] pt-2 text-[11px] italic text-[var(--color-text-secondary)]">
-                                &quot;{detail.candidate.pedigreeNotes}&quot;
-                              </p>
-                            )}
-                          </Panel>
-
-                          {/* Groom Review Result */}
-                          <Panel padded className="bg-[var(--color-surface-subtle)]">
-                            <SectionTitle>Initial Groom Physical Screening</SectionTitle>
-                            <dl className="mt-3 space-y-2 text-[12px]">
-                              <div className="flex justify-between">
-                                <span className="text-[var(--color-text-muted)]">Groom Outcome:</span>
-                                <span className="font-semibold text-[var(--color-text-primary)]">
-                                  {detail.groomDecision ? formatLabel(detail.groomDecision) : 'Pending'}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-[var(--color-text-muted)]">Reviewed At:</span>
-                                <span className="font-metric text-[var(--color-text-primary)]">
-                                  {formatDate(detail.groomReviewedAt, true)}
-                                </span>
-                              </div>
-                            </dl>
-                            {detail.groomFeedback && (
-                              <div className="mt-3 rounded-[var(--radius-sm)] bg-[var(--color-surface)] p-2.5 text-[12px] border border-[var(--color-border)]">
-                                <span className="font-semibold text-[var(--color-text-primary)]">
-                                  Groom Inspection Note:
-                                </span>
-                                <p className="mt-1 text-[var(--color-text-secondary)]">
-                                  {detail.groomFeedback}
-                                </p>
-                              </div>
-                            )}
-                          </Panel>
-                        </div>
                       </div>
-                    )}
-                  </div>
-                </Panel>
-              </div>
-            ) : (
-              <Panel>
-                <EmptyState
-                  icon="clipboard"
-                  title="Select an Admission"
-                  description="Choose a candidate from the left examination queue to review clinical vitals and record a medical decision."
-                />
-              </Panel>
-            )}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       )}
+
+      {/* Discard Changes Confirmation Dialog for Drawer (R2) */}
+      <ConfirmDialog
+        open={showCloseConfirm}
+        title="Discard Unsaved Clinical Changes?"
+        description="You have unsaved changes in this examination form. Closing the drawer now will lose any unrecorded clinical documentation."
+        confirmLabel="Discard & Close"
+        cancelLabel="Keep Editing"
+        tone="danger"
+        onConfirm={() => {
+          setIsDrawerDirty(false);
+          setShowCloseConfirm(false);
+          setDrawerOpen(false);
+        }}
+        onCancel={() => setShowCloseConfirm(false)}
+      />
     </div>
   );
 }

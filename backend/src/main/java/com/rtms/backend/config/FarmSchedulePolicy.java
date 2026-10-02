@@ -45,11 +45,9 @@ public final class FarmSchedulePolicy {
     // ---------------------------------------------------------------
     // KHUNG GIỜ THÚ Y ĐỊNH KỲ
     //
-    // CHỈ dùng để sắp xếp hiển thị trong màn hình Today Tasks của Groom,
-    // KHÔNG dùng để kiểm tra xung đột. Lý do: preventive_care_schedules chỉ
-    // có scheduled_date (không có giờ), nên cần một mốc để chèn nó đúng vị
-    // trí trên dòng thời gian. Việc tách hẳn khung sáng/chiều khiến xung đột
-    // Vet <-> Lot không thể xảy ra, nên không cần code kiểm tra.
+    // Khung tham khảo cho lịch thú y định kỳ. Today Tasks hiển thị giờ
+    // scheduled_at thực tế của care_schedule; kiểm tra xung đột do
+    // CareScheduleService thực hiện trên các lịch đã xác nhận.
     // ---------------------------------------------------------------
     public static final LocalTime VET_WINDOW_START = LocalTime.of(13, 30);
     public static final LocalTime VET_WINDOW_END   = LocalTime.of(15, 30);

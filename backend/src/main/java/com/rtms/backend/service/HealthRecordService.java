@@ -34,7 +34,7 @@ public class HealthRecordService {
         record.setFollowUpDate(request.getFollowUpDate());
         record.setSourceTrainingWorkoutId(request.getSourceTrainingWorkoutId());
         record.setRecordType(request.getRecordType() != null ? request.getRecordType() : "ILLNESS");
-        record.setPreventiveCareScheduleId(request.getPreventiveCareScheduleId());
+        record.setCareScheduleId(request.getCareScheduleId());
         record.setProductOrService(request.getProductOrService());
 
         return healthRecordRepository.save(record);

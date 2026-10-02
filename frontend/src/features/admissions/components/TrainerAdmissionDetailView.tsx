@@ -167,6 +167,9 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
                   <span>{hr.recordType || 'Khám nhập học'}</span>
                   <span className="text-[10px] text-[var(--color-text-muted)]">{date(hr.examinedAt)}</span>
                 </div>
+                {hr.trainingDecision && <div className="font-semibold">Quyết định huấn luyện: {hr.trainingDecision}</div>}
+                {hr.restrictionDetails && <div>Hạn chế y tế: {hr.restrictionDetails}</div>}
+                {hr.followUpDate && <div>Ngày tái khám: {date(hr.followUpDate)}</div>}
                 {hr.diagnosis && <div>Chẩn đoán: {hr.diagnosis}</div>}
                 {hr.symptoms && <div className="text-[var(--color-text-secondary)]">Triệu chứng: {hr.symptoms}</div>}
                 {hr.treatment && <div className="text-[var(--color-text-secondary)]">Điều trị: {hr.treatment}</div>}
