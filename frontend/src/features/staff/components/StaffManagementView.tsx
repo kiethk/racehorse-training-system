@@ -7,6 +7,7 @@ import { getStaffList, createStaff, updateStaffStatus } from '../services/staffS
 import type { StaffSummary, StaffCreationRequest } from '../types';
 import { StaffTable } from './StaffTable';
 import { AddStaffDialog } from './AddStaffDialog';
+import { StaffDetailModal } from './StaffDetailModal';
 
 const inputClassName =
   'h-9 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-focus)] focus:ring-1 focus:ring-[var(--color-focus)]';
@@ -26,9 +27,9 @@ export function StaffManagementView() {
   const [addLoading, setAddLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
     fetchStaff();
   }, []);
 
@@ -81,6 +82,8 @@ export function StaffManagementView() {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  const headTrainers = staff.filter(s => s.role === 'HEAD_TRAINER' && s.active);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -107,6 +110,31 @@ export function StaffManagementView() {
         <div className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-[var(--color-danger-soft)] px-3 py-2.5 text-[12px] text-[var(--color-danger)]">
           <Icon name="alert-triangle" size={14} className="mt-0.5 shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* Statistic Cards */}
+      {!loading && staff.length > 0 && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {[
+            { label: 'Total Staff', count: staff.length, role: 'ALL' },
+            { label: 'Grooms', count: staff.filter(s => s.role === 'GROOM').length, role: 'GROOM' },
+            { label: 'Trainers', count: staff.filter(s => s.role === 'HEAD_TRAINER').length, role: 'HEAD_TRAINER' },
+            { label: 'Veterinarians', count: staff.filter(s => s.role === 'VETERINARIAN').length, role: 'VETERINARIAN' },
+          ].map((card) => (
+            <button
+              key={card.role}
+              onClick={() => setRoleFilter(card.role)}
+              className={`flex flex-col rounded-[var(--radius-lg)] border p-4 text-left shadow-sm transition-colors ${
+                roleFilter === card.role
+                  ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
+                  : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-surface-muted)]'
+              }`}
+            >
+              <span className="text-[12px] font-medium text-[var(--color-text-secondary)]">{card.label}</span>
+              <span className="mt-1 text-[24px] font-semibold text-[var(--color-text-primary)]">{card.count}</span>
+            </button>
+          ))}
         </div>
       )}
 
@@ -157,6 +185,7 @@ export function StaffManagementView() {
           staff={filteredStaff} 
           onToggleStatus={handleToggleStatus} 
           loadingActionId={actionLoadingId} 
+          onRowClick={(id) => setSelectedUserId(id)}
         />
       )}
 
@@ -165,6 +194,18 @@ export function StaffManagementView() {
         onClose={() => setAddDialogOpen(false)} 
         onSubmit={handleCreateStaff}
         loading={addLoading}
+        headTrainers={headTrainers}
+      />
+
+      <StaffDetailModal 
+        userId={selectedUserId} 
+        onClose={() => setSelectedUserId(null)}
+        headTrainers={headTrainers}
+        onUpdated={() => {
+          void fetchStaff();
+          setSuccessMsg('Staff updated successfully.');
+          setTimeout(() => setSuccessMsg(''), 5000);
+        }}
       />
     </div>
   );

@@ -22,5 +22,8 @@ backend/.env.cloud
 Thumbs.db
 
 ui-reference/
-
-.agents
+tutorials/
+docs/
+.codex/
+uploads/
+.agents/

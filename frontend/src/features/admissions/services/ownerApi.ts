@@ -1,6 +1,6 @@
-import { apiGet, apiPost } from '@/services/api';
+import { apiGet, apiUpload } from '@/services/api';
 import type { AdmissionSummaryResponse, AdmissionStatus } from '../types';
-import type { CreateOwnerAdmissionRequest } from '../types/owner';
+import type { CreateOwnerAdmissionRequest, AdmissionDocumentUpload } from '../types/owner';
 
 export type CandidateForm = {
   name: string; breed: string; dateOfBirth: string | null;
@@ -13,6 +13,7 @@ export type CandidateForm = {
 export type AdmissionDocument = {
   id: number; documentType: string; fileUrl: string; recordDate: string | null;
   note: string | null; uploadedAt: string; medical: boolean;
+  originalFileName: string | null;
 };
 
 export type OwnerAdmissionDetail = {
@@ -29,8 +30,20 @@ export const ownerAdmissionApi = {
   list: async () => (await apiGet<ApiResponse<AdmissionSummaryResponse[]>>('/api/owner/admissions')).data,
   detail: async (id: number) =>
     (await apiGet<ApiResponse<OwnerAdmissionDetail>>(`/api/owner/admissions/${id}`)).data,
-  create: async (data: CandidateForm | CreateOwnerAdmissionRequest) =>
-    (await apiPost<ApiResponse<OwnerAdmissionDetail>>('/api/owner/admissions', data)).data,
+  submit: async (candidate: CreateOwnerAdmissionRequest, uploads: AdmissionDocumentUpload[]) => {
+    const body = new FormData();
+    body.append('candidate', new Blob([JSON.stringify(candidate)], { type: 'application/json' }));
+    body.append('documents', new Blob([JSON.stringify(uploads.map(upload => ({
+      documentType: upload.documentType,
+      recordDate: upload.recordDate || null,
+      note: upload.note?.trim() || null,
+    })))], { type: 'application/json' }));
+    // Metadata at index i describes the file at index i.
+    uploads.forEach(upload => body.append('files', upload.file));
+    const result = await apiUpload<ApiResponse<OwnerAdmissionDetail>>('/api/owner/admissions', body);
+    if (!result?.success) throw new Error(result?.message || 'Unable to submit admission.');
+    return result.data;
+  },
   upload: async (id: number, file: File, documentType: string, recordDate?: string, note?: string) => {
     const body = new FormData();
     body.append('file', file);

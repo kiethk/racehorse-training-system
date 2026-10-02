@@ -11,12 +11,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.ArrayList;
+
 
 @Service
 public class OwnerAdmissionService {
@@ -24,6 +30,15 @@ public class OwnerAdmissionService {
             AdmissionDocumentType.VACCINATION_RECORD, AdmissionDocumentType.DEWORMING_RECORD,
             AdmissionDocumentType.HEALTH_CERTIFICATE, AdmissionDocumentType.PREVIOUS_MEDICAL_RECORD,
             AdmissionDocumentType.PREVIOUS_INJURY_RECORD);
+
+    private static final Set<AdmissionDocumentType> REQUIRED_DOCUMENT_TYPES = EnumSet.of(
+            AdmissionDocumentType.HORSE_PHOTO,
+            AdmissionDocumentType.REGISTRATION_DOCUMENT,
+            AdmissionDocumentType.PEDIGREE_CERTIFICATE,
+            AdmissionDocumentType.VACCINATION_RECORD
+    );
+
+    private static final Logger log =  LoggerFactory.getLogger(OwnerAdmissionService.class);
 
     private final AdmissionApplicationRepository admissions;
     private final CandidateHorseProfileRepository candidates;
@@ -62,6 +77,60 @@ public class OwnerAdmissionService {
         candidates.save(snapshot);
 
         return toDetail(application, snapshot, List.of());
+    }
+
+    @Transactional
+    public  OwnerAdmissionDetailResponse submit(
+            Long ownerId,
+            CreateOwnerAdmissionRequest request,
+            List<AdmissionDocumentMetadataRequest> metadata,
+            List<MultipartFile> files) {
+        validateDocumentMetadata(metadata, files);
+        validateFiles(metadata, files);
+
+        List<String> storedKeys = registerFileCleanup();
+
+        AdmissionApplication application = new AdmissionApplication();
+        application.setOwnerId(ownerId);
+        application.setStatus(AdmissionStatus.GROOM_REVIEW);
+        application = admissions.save(application);
+
+        CandidateHorseProfile snapshot = new CandidateHorseProfile();
+        snapshot.setAdmissionId(application.getId());
+        snapshot.setName(request.name().trim());
+        snapshot.setBreed(trimNullable(request.breed()));
+        snapshot.setDateOfBirth(request.dateOfBirth());
+        snapshot.setRegistrationNumber(ueln(request.registrationNumber()));
+        snapshot.setRegistryName(trimNullable(request.registryName()));
+        snapshot.setSireName(trimNullable(request.sireName()));
+        snapshot.setSireRegistrationNumber(ueln(request.sireRegistrationNumber()));
+        snapshot.setDamName(trimNullable(request.damName()));
+        snapshot.setDamRegistrationNumber(ueln(request.damRegistrationNumber()));
+        snapshot.setPedigreeNotes(trimNullable(request.pedigreeNotes()));
+        candidates.save(snapshot);
+
+        List<AdmissionDocument> savedDocuments = new ArrayList<>();
+
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            AdmissionDocumentMetadataRequest item = metadata.get(i);
+
+            String key = fileStorage.store(file);
+            storedKeys.add(key);
+
+            AdmissionDocument document = new AdmissionDocument();
+            document.setAdmissionId(application.getId());
+            document.setDocumentType(item.documentType());
+            document.setFileUrl(key);
+            document.setOriginalFileName(
+                    safeOriginalFileName(file.getOriginalFilename())
+            );
+            document.setRecordDate(item.recordDate());
+            document.setNote(trimNullable(item.note()));
+
+            savedDocuments.add(documents.save(document));
+        }
+        return toDetail(application, snapshot, savedDocuments);
     }
 
     @Transactional(readOnly = true)
@@ -197,6 +266,97 @@ public class OwnerAdmissionService {
         return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
     }
 
+    private void validateDocumentMetadata(
+            List<AdmissionDocumentMetadataRequest> metadata,
+            List<MultipartFile> files) {
+        if (metadata == null || files == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Document metadata and files are required"
+            );
+        }
+
+        if (metadata.size() != files.size()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Document metadata count must match file count"
+            );
+        }
+
+        if (metadata.size() < 4 || metadata.size() > 8) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Submit between 4 and 8 documents"
+            );
+        }
+
+        Set<AdmissionDocumentType> selectedTypes =
+                EnumSet.noneOf(AdmissionDocumentType.class);
+
+        for (AdmissionDocumentMetadataRequest item : metadata) {
+            if (item == null || item.documentType() == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Document type is required"
+                );
+            }
+
+            if (!selectedTypes.add(item.documentType())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Duplicate document type" + item.documentType()
+                );
+            }
+
+            if (item.note() != null && item.note().length() > 2000) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Document note must not exceed 2000 characters"
+                );
+            }
+        }
+
+            if (!selectedTypes.containsAll(REQUIRED_DOCUMENT_TYPES)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Horse photo, registration document, pedigree certificate "
+                                + "and vaccination record are required"
+                );
+            }
+    }
+
+
+    private List<String> registerFileCleanup() {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+        || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException(
+                    "File cleanup requires an active transaction"
+            );
+        }
+
+        List<String> storedKeys = new ArrayList<>();
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status == STATUS_ROLLED_BACK) {
+                            for (String key : storedKeys) {
+                                fileStorage.deleteIfLocal(key);
+                            }
+                        } else if (status == STATUS_UNKNOWN) {
+                            log.error(
+                                "Admission transaction outcome unknown; "
+                                + "check stored files: {}",
+                                storedKeys
+                            );
+                        }
+                    }
+                }
+                );
+        return storedKeys;
+    }
+
     private static String safeOriginalFileName(String filename) {
         if (filename == null || filename.isBlank()) return null;
         String normalized = filename.replace('\\', '/');
@@ -204,5 +364,25 @@ public class OwnerAdmissionService {
                 .replaceAll("[\\p{Cntrl}]", "").trim();
         if (basename.isEmpty()) return null;
         return basename.length() <= 255 ? basename : basename.substring(basename.length() - 255);
+    }
+
+    private void validateFiles(
+            List<AdmissionDocumentMetadataRequest> metadata,
+            List<MultipartFile> files) {
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            AdmissionDocumentType type = metadata.get(i).documentType();
+
+            fileStorage.validate(file);
+
+            String mediaType = file.getContentType().toLowerCase(Locale.ROOT);
+
+            if (type == AdmissionDocumentType.HORSE_PHOTO && !mediaType.startsWith("image/")) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Horse photo must be JPEG, PNG, or WebP"
+                );
+            }
+        }
     }
 }

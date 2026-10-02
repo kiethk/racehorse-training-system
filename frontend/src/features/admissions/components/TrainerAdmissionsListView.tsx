@@ -13,7 +13,7 @@ import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
 import type { AdmissionSummaryResponse } from '../types';
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
 
-type Tab = 'PENDING' | 'REVIEWED' | 'ALL';
+type Tab = 'PENDING' | 'REVIEWED';
 
 interface TrainerQueueFilters {
   tab: Tab;
@@ -30,7 +30,7 @@ export function TrainerAdmissionsListView() {
 
   const urlFilters: TrainerQueueFilters = useMemo(() => {
     const rawTab = searchParams.get('tab') as Tab | null;
-    const safeTab: Tab = rawTab === 'REVIEWED' || rawTab === 'ALL' ? rawTab : 'PENDING';
+    const safeTab: Tab = rawTab === 'REVIEWED' ? 'REVIEWED' : 'PENDING';
     return {
       tab: safeTab,
       candidateName: searchParams.get('candidateName') || '',
@@ -53,8 +53,8 @@ export function TrainerAdmissionsListView() {
         const data = await trainerAdmissionsApi.getAll();
         if (active) setAdmissions(data);
       } catch (err) {
-        console.error('Không tải được danh sách tiếp nhận:', err);
-        if (active) setError('Không tải được danh sách hồ sơ. Vui lòng thử lại.');
+        console.error('Failed to load admissions:', err);
+        if (active) setError('Failed to load admission applications. Please try again.');
       } finally {
         if (active) setLoading(false);
       }
@@ -70,7 +70,7 @@ export function TrainerAdmissionsListView() {
     setDraft(urlFilters);
   }, [urlFilters]);
 
-  // Đếm theo từng phân loại
+  // Counts by review status
   const pendingCount = useMemo(
     () => admissions.filter((a) => a.status === 'TRAINER_REVIEW').length,
     [admissions],
@@ -84,17 +84,17 @@ export function TrainerAdmissionsListView() {
     [admissions, user?.userId],
   );
 
-  // Lọc dữ liệu hiển thị
+  // Filter admissions list
   const filteredAdmissions = useMemo(() => {
     return admissions.filter((a) => {
-      // Lọc theo Tab
+      // Filter by review type
       if (urlFilters.tab === 'PENDING') {
         if (a.status !== 'TRAINER_REVIEW') return false;
       } else if (urlFilters.tab === 'REVIEWED') {
         if (!a.trainerReviewedAt || a.trainerId !== user?.userId) return false;
       }
 
-      // Lọc theo Tên ngựa
+      // Filter by horse name
       if (
         urlFilters.candidateName &&
         !a.candidateName.toLowerCase().includes(urlFilters.candidateName.toLowerCase())
@@ -102,7 +102,7 @@ export function TrainerAdmissionsListView() {
         return false;
       }
 
-      // Lọc theo Ngày nộp
+      // Filter by submission date
       if (urlFilters.submittedFrom || urlFilters.submittedTo) {
         const submittedTime = new Date(a.submittedAt).getTime();
         if (urlFilters.submittedFrom) {
@@ -168,72 +168,36 @@ export function TrainerAdmissionsListView() {
       {/* Header */}
       <div>
         <h1 className="text-[20px] font-bold tracking-tight text-[var(--color-text-primary)]">
-          Tiếp nhận chiến mã
+          Horse Admissions
         </h1>
         <p className="text-[13px] text-[var(--color-text-secondary)]">
-          Thẩm định tiềm năng thi đấu và mức độ sẵn sàng của ngựa ứng viên trong khu cách ly.
+          Assess racing potential and readiness of candidate horses in the quarantine facility.
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-[var(--color-border)] pb-2">
-        <button
-          type="button"
-          onClick={() => handleTabChange('PENDING')}
-          className={`flex items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-medium transition ${
-            draft.tab === 'PENDING'
-              ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)]'
-              : 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]'
-          }`}
-        >
-          <span>Chờ bạn đánh giá</span>
-          <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[11px] font-bold">
-            {pendingCount}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange('REVIEWED')}
-          className={`flex items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-medium transition ${
-            draft.tab === 'REVIEWED'
-              ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)]'
-              : 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]'
-          }`}
-        >
-          <span>Bạn đã đánh giá</span>
-          <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[11px] font-bold">
-            {reviewedCount}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange('ALL')}
-          className={`flex items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-medium transition ${
-            draft.tab === 'ALL'
-              ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)]'
-              : 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]'
-          }`}
-        >
-          <span>Tất cả hồ sơ</span>
-          <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[11px] font-bold">
-            {admissions.length}
-          </span>
-        </button>
-      </div>
-
-      {/* Filter Toolbar */}
+      {/* Filter Toolbar (Merged review type filter) */}
       <form
         onSubmit={applyFilters}
-        className="grid grid-cols-1 gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:grid-cols-2 lg:grid-cols-4 xl:items-end"
+        className="grid grid-cols-1 gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:items-end"
       >
         <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Tên ngựa ứng viên
+          Application Type
+          <select
+            value={draft.tab}
+            onChange={(e) => handleTabChange(e.target.value as Tab)}
+            className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+          >
+            <option value="PENDING">Pending Evaluation ({pendingCount})</option>
+            <option value="REVIEWED">Evaluated by You ({reviewedCount})</option>
+          </select>
+        </label>
+
+        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
+          Candidate Horse Name
           <div className="relative mt-1">
             <input
               type="text"
-              placeholder="Nhập tên ngựa..."
+              placeholder="Search horse name..."
               value={draft.candidateName}
               onChange={(e) => setDraft({ ...draft, candidateName: e.target.value })}
               className="h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] pl-8 pr-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
@@ -247,7 +211,7 @@ export function TrainerAdmissionsListView() {
         </label>
 
         <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Từ ngày nộp
+          Submitted From
           <input
             type="date"
             value={draft.submittedFrom}
@@ -257,7 +221,7 @@ export function TrainerAdmissionsListView() {
         </label>
 
         <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Đến ngày nộp
+          Submitted To
           <input
             type="date"
             min={draft.submittedFrom || undefined}
@@ -269,10 +233,10 @@ export function TrainerAdmissionsListView() {
 
         <div className="flex items-center gap-2">
           <Button type="submit" variant="primary" size="sm">
-            Áp dụng
+            Apply
           </Button>
           <Button type="button" variant="secondary" size="sm" onClick={clearFilters}>
-            Đặt lại
+            Reset
           </Button>
         </div>
       </form>
@@ -290,23 +254,23 @@ export function TrainerAdmissionsListView() {
       <Panel className="overflow-hidden">
         {filteredAdmissions.length === 0 ? (
           <EmptyState
-            title="Không tìm thấy hồ sơ phù hợp"
-            description="Thử thay đổi bộ lọc tìm kiếm hoặc chuyển tab để xem các hồ sơ khác."
-            action={<Button size="sm" onClick={clearFilters}>Xóa bộ lọc</Button>}
+            title="No admission records found"
+            description="Try adjusting your search filters or switch the application type."
+            action={<Button size="sm" onClick={clearFilters}>Reset Filters</Button>}
           />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="border-b border-[var(--color-border)] text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
                 <tr>
-                  <th className="px-6 py-3.5">Chiến mã</th>
-                  <th className="px-6 py-3.5">Trạng thái</th>
-                  <th className="px-6 py-3.5">Chuồng cách ly</th>
-                  <th className="px-6 py-3.5">Ngày nộp</th>
+                  <th className="px-6 py-3.5">Candidate Horse</th>
+                  <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5">Quarantine Stall</th>
+                  <th className="px-6 py-3.5">Submitted Date</th>
                   {draft.tab === 'REVIEWED' && (
-                    <th className="px-6 py-3.5">Ngày bạn đánh giá</th>
+                    <th className="px-6 py-3.5">Evaluated Date</th>
                   )}
-                  <th className="px-6 py-3.5 text-right">Hành động</th>
+                  <th className="px-6 py-3.5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)]">
@@ -326,7 +290,7 @@ export function TrainerAdmissionsListView() {
                         <div>
                           <span className="font-semibold block">{item.candidateName}</span>
                           <span className="text-[11px] text-[var(--color-text-muted)]">
-                            {item.breed || 'Chưa rõ giống'}
+                            {item.breed || 'Unknown breed'}
                           </span>
                         </div>
                       </div>
@@ -337,19 +301,27 @@ export function TrainerAdmissionsListView() {
                     <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
                       {item.quarantineStallCode ? (
                         <span className="inline-flex items-center gap-1 font-medium text-[var(--color-text-primary)]">
-                          Chuồng {item.quarantineStallCode}
+                          Stall {item.quarantineStallCode}
                         </span>
                       ) : (
-                        <span className="text-[var(--color-text-muted)] italic">Chưa xếp</span>
+                        <span className="text-[var(--color-text-muted)] italic">Unassigned</span>
                       )}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
-                      {new Date(item.submittedAt).toLocaleDateString('vi-VN')}
+                      {new Date(item.submittedAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
                     </td>
                     {draft.tab === 'REVIEWED' && (
                       <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
                         {item.trainerReviewedAt
-                          ? new Date(item.trainerReviewedAt).toLocaleDateString('vi-VN')
+                          ? new Date(item.trainerReviewedAt).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })
                           : '—'}
                       </td>
                     )}
@@ -362,7 +334,7 @@ export function TrainerAdmissionsListView() {
                             : 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]'
                         }`}
                       >
-                        {item.status === 'TRAINER_REVIEW' ? 'Đánh giá' : 'Xem'}
+                        {item.status === 'TRAINER_REVIEW' ? 'Evaluate' : 'View'}
                       </Link>
                     </td>
                   </tr>

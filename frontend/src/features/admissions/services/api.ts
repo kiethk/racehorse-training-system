@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/services/api';
+import { apiGet, apiGetBlob, apiPost } from '@/services/api';
 import {
   AdmissionSummaryResponse,
   AdmissionDetailResponse,
@@ -25,6 +25,7 @@ interface ApiResponse<T> {
 }
 
 export const admissionsApi = {
+  getDocumentFile: (fileUrl: string, signal?: AbortSignal): Promise<Blob> => apiGetBlob(fileUrl, signal),
   getGroomQueue: async (filters: GroomQueueFilters): Promise<GroomQueueResponse> => {
     const params = new URLSearchParams();
     if (filters.candidateName.trim()) params.set('candidateName', filters.candidateName.trim());

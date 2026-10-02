@@ -2,23 +2,20 @@ package com.rtms.backend.service;
 
 import com.rtms.backend.dto.ManagerReviewRequest;
 import com.rtms.backend.entity.AdmissionApplication;
+import com.rtms.backend.entity.CareSchedule;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.enums.ReviewDecision;
 import com.rtms.backend.enums.StallStatus;
-import com.rtms.backend.enums.TrainingStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.rtms.backend.entity.CareSchedule;
-import com.rtms.backend.enums.CareScheduleStatus;
-import com.rtms.backend.repository.CareScheduleRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,13 +27,19 @@ public class AdmissionManagerReviewService {
     private final StableStallRepository stableStallRepository;
     private final HorseRepository horseRepository;
     private final CareScheduleRepository careScheduleRepository;
+    private final AdmissionGroomReviewService admissionGroomReviewService;
 
-    public AdmissionManagerReviewService(AdmissionApplicationRepository admissions,
-            StableStallRepository stalls, HorseRepository horses, CareScheduleRepository schedules) {
-        this.admissionApplicationRepository = admissions;
-        this.stableStallRepository = stalls;
-        this.horseRepository = horses;
-        this.careScheduleRepository = schedules;
+    public AdmissionManagerReviewService(
+            AdmissionApplicationRepository admissionApplicationRepository,
+            StableStallRepository stableStallRepository,
+            HorseRepository horseRepository,
+            CareScheduleRepository careScheduleRepository,
+            AdmissionGroomReviewService admissionGroomReviewService) {
+        this.admissionApplicationRepository = admissionApplicationRepository;
+        this.stableStallRepository = stableStallRepository;
+        this.horseRepository = horseRepository;
+        this.careScheduleRepository = careScheduleRepository;
+        this.admissionGroomReviewService = admissionGroomReviewService;
     }
 
     @Transactional
@@ -140,7 +143,9 @@ public class AdmissionManagerReviewService {
             stableStallRepository.save(quarantineStall);
         }
 
-        return admissionApplicationRepository.save(admission);
+        admission = admissionApplicationRepository.save(admission);
+        processNextWaitingAdmission();
+        return admission;
     }
 
     private AdmissionApplication reject(
@@ -194,6 +199,15 @@ public class AdmissionManagerReviewService {
         admission.setManagerReviewedAt(LocalDateTime.now());
         admission.setStatus(AdmissionStatus.REJECTED);
 
-        return admissionApplicationRepository.save(admission);
+        admission = admissionApplicationRepository.save(admission);
+        processNextWaitingAdmission();
+        return admission;
+    }
+
+    private void processNextWaitingAdmission() {
+        admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL)
+                .ifPresent(waitingAdmission -> {
+                    admissionGroomReviewService.processWaitingForStall(waitingAdmission.getId());
+                });
     }
 }

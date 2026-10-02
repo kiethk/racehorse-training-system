@@ -39,7 +39,7 @@ class CareScheduleMergeMigrationTest {
                     INSERT INTO users VALUES (7);
                     INSERT INTO admission_applications VALUES (1);
                     """);
-                s.execute(migration("V57__refactor_vet_care_schedule_mvp.sql"));
+                s.execute(migration("V58__refactor_vet_care_schedule_mvp.sql"));
                 s.execute("""
                     INSERT INTO care_schedules (id, horse_id, admission_id, care_type) VALUES (100, 1, 1, 'INITIAL');
                     INSERT INTO vet_offers (care_schedule_id, veterinarian_id) VALUES (100, 7);
@@ -55,8 +55,8 @@ class CareScheduleMergeMigrationTest {
                            (2, 1, NULL, 'FOLLOW_UP', 'COMPLETED', 7, '2026-09-02 14:00', 'recheck', 2, NULL, 7),
                            (3, 1, NULL, 'URGENT', 'REQUESTED', NULL, NULL, 'urgent', NULL, '2026-10-02', 7);
                     """);
-                s.execute(migration("V59__merge_legacy_schedules_into_care_schedule.sql"));
-                s.execute(migration("V60__preserve_requested_care_time.sql"));
+                s.execute(migration("V60__merge_legacy_schedules_into_care_schedule.sql"));
+                s.execute(migration("V61__preserve_requested_care_time.sql"));
                 assertEquals(0, count(s, "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '" + schema
                         + "' AND table_name IN ('vet_exams', 'preventive_care_schedules', 'care_schedules')"));
                 assertEquals(5, count(s, "SELECT COUNT(*) FROM care_schedule"));

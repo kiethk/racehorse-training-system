@@ -12,17 +12,36 @@ function PipelineStep({ label, isDone, isActive, note }: { label: string; isDone
   return <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-2 text-[var(--color-text-muted)]"><span className="mr-1.5 opacity-40">-</span>{label}</div>;
 }
 
-export function AdmissionPipeline({ detail }: { detail: AdmissionDetailResponse }) {
+type PipelineDetail = Pick<AdmissionDetailResponse, 'status'> & Partial<Pick<AdmissionDetailResponse,
+  'groomReviewedAt' | 'quarantineStallCode' | 'vetReviewedAt' | 'trainerReviewedAt' | 'managerReviewedAt'>>;
+
+export function AdmissionPipeline({ detail }: { detail: PipelineDetail }) {
   const isPendingRecheck = detail.status === 'PENDING_RECHECK';
+  const isRejected = detail.status === 'REJECTED';
+  const isApproved = detail.status === 'APPROVED';
+  // Owner responses omit timestamps. Infer only transitions proven by the current status.
+  const stages = ['GROOM_REVIEW', 'WAITING_FOR_STALL', 'VET_REVIEW', 'TRAINER_REVIEW', 'MANAGER_REVIEW', 'APPROVED'];
+  const stage = stages.indexOf(isPendingRecheck ? 'VET_REVIEW' : detail.status);
+  const done = (value: string | null | undefined, threshold: number) => value === undefined ? stage >= threshold : Boolean(value);
   return (
     <Panel padded className="bg-[var(--color-surface)]">
       <SectionTitle>Review pipeline</SectionTitle>
+      {isRejected && (
+        <p role="status" className="mt-3 rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-3 py-2 text-sm font-medium text-[var(--color-danger)]">
+          This application has been rejected.
+        </p>
+      )}
+      {isApproved && (
+        <p role="status" className="mt-3 rounded-[var(--radius-sm)] border border-[var(--color-success)] bg-[var(--color-success-soft)] px-3 py-2 text-sm font-medium text-[var(--color-success)]">
+          This application has been approved.
+        </p>
+      )}
       <div className="mt-4 flex flex-wrap gap-2 text-[12px]">
-        <PipelineStep label="Groom Review" isDone={!!detail.groomReviewedAt} isActive={detail.status === 'GROOM_REVIEW'} />
-        <PipelineStep label="Waiting for Stall" isDone={!!detail.quarantineStallCode} isActive={detail.status === 'WAITING_FOR_STALL'} />
-        <PipelineStep label="Vet Review" isDone={!!detail.vetReviewedAt && !isPendingRecheck} isActive={detail.status === 'VET_REVIEW' || isPendingRecheck} note={isPendingRecheck ? 'Pending Recheck' : undefined} />
-        <PipelineStep label="Trainer Review" isDone={!!detail.trainerReviewedAt} isActive={detail.status === 'TRAINER_REVIEW'} />
-        <PipelineStep label="Manager Review" isDone={!!detail.managerReviewedAt} isActive={detail.status === 'MANAGER_REVIEW'} />
+        <PipelineStep label="Groom Review" isDone={done(detail.groomReviewedAt, 1)} isActive={detail.status === 'GROOM_REVIEW'} />
+        <PipelineStep label="Waiting for Stall" isDone={done(detail.quarantineStallCode, 2)} isActive={detail.status === 'WAITING_FOR_STALL'} />
+        <PipelineStep label="Vet Review" isDone={done(detail.vetReviewedAt, 3) && !isPendingRecheck} isActive={detail.status === 'VET_REVIEW' || isPendingRecheck} note={isPendingRecheck ? 'Pending Recheck' : undefined} />
+        <PipelineStep label="Trainer Review" isDone={done(detail.trainerReviewedAt, 4)} isActive={detail.status === 'TRAINER_REVIEW'} />
+        <PipelineStep label="Manager Review" isDone={done(detail.managerReviewedAt, 5)} isActive={detail.status === 'MANAGER_REVIEW'} />
       </div>
     </Panel>
   );

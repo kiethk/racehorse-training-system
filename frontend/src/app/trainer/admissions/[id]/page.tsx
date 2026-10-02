@@ -1,7 +1,12 @@
+import { Metadata } from 'next';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { TrainerAdmissionDetailView } from '@/features/admissions/components/TrainerAdmissionDetailView';
+
+export const metadata: Metadata = {
+  title: 'Horse Admission Detail | Head Trainer',
+};
 
 type RouteParams = Promise<{ id: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -37,7 +42,7 @@ export default async function TrainerAdmissionDetailPage({
             <TrainerAdmissionDetailView admissionId={admissionId} returnTo={returnTo} />
           ) : (
             <p role="alert" className="text-sm text-[var(--color-danger)]">
-              Mã hồ sơ không hợp lệ.
+              Invalid admission ID.
             </p>
           )}
         </PageContainer>
