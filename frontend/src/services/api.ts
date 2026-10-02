@@ -123,7 +123,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   return res.json();
 }
 
-/** Binary files use cookie authentication and the same refresh flow as JSON. */
+/** Binary files use Bearer authentication and the same refresh flow as JSON. */
 export async function apiGetBlob(path: string, signal?: AbortSignal): Promise<Blob> {
   let apiPath = path;
   let external = false;
@@ -165,7 +165,7 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
-/** Multipart upload uses the same cookie-backed API client as JSON requests. */
+/** Multipart upload uses the same Bearer API client as JSON requests. */
 export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
   const res = await doFetch(path, {
     method: "POST",

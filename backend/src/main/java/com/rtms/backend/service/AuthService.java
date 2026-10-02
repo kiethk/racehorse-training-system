@@ -95,8 +95,10 @@ public class AuthService {
         return new LoginResult(accessToken, rawRefreshToken, loginResponse);
     }
 
+    public record RefreshResult(String accessToken, String refreshToken) {}
+
     @Transactional
-    public String refresh(String rawRefreshToken) {
+    public RefreshResult refresh(String rawRefreshToken) {
         String hash = hashToken(rawRefreshToken);
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "Invalid refresh token"));
@@ -114,7 +116,19 @@ public class AuthService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_INACTIVE", "User is inactive");
         }
 
-        return jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
+        refreshToken.setRevokedAt(LocalDateTime.now());
+        refreshTokenRepository.save(refreshToken);
+
+        String newRawRefreshToken = generateOpaqueToken();
+        RefreshToken newRefreshToken = new RefreshToken();
+        newRefreshToken.setUser(user);
+        newRefreshToken.setTokenHash(hashToken(newRawRefreshToken));
+        newRefreshToken.setExpiresAt(LocalDateTime.now().plusNanos(refreshExpirationMs * 1000000));
+        refreshTokenRepository.save(newRefreshToken);
+
+        String newAccessToken = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
+
+        return new RefreshResult(newAccessToken, newRawRefreshToken);
     }
 
     @Transactional

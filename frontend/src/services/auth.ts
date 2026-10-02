@@ -16,10 +16,12 @@ export async function getCurrentUser(): Promise<ApiResponse<AuthUser>> {
 }
 
 export async function logout(): Promise<ApiResponse<string>> {
-  const res = await apiPost<ApiResponse<string>>('/api/auth/logout', {});
-  const { setAccessToken } = await import('./api');
-  setAccessToken(null);
-  return res;
+  try {
+    return await apiPost<ApiResponse<string>>('/api/auth/logout', {});
+  } finally {
+    const { setAccessToken } = await import('./api');
+    setAccessToken(null);
+  }
 }
 
 /**

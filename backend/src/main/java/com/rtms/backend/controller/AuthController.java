@@ -8,6 +8,7 @@ import com.rtms.backend.dto.OwnerRegistrationResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.AuthService;
 import com.rtms.backend.service.AuthService.LoginResult;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,7 @@ public class AuthController {
         this.authService = authService;
     }
 
+    @Operation(security = {})
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request, HttpServletResponse response) {
         LoginResult result = authService.login(request);
@@ -40,19 +42,24 @@ public class AuthController {
 
     public record TokenRefreshResponse(String accessToken) {}
 
+    @Operation(security = {})
     @PostMapping("/refresh")
     public ApiResponse<TokenRefreshResponse> refresh(
-            @CookieValue(name = "rtms_refresh_token", required = false) String refreshToken) {
+            @CookieValue(name = "rtms_refresh_token", required = false) String refreshToken,
+            HttpServletResponse response) {
         
         if (refreshToken == null || refreshToken.isBlank()) {
-            return ApiResponse.error("Refresh token missing", "UNAUTHORIZED");
+            throw new com.rtms.backend.config.ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Refresh token missing");
         }
 
-        String newAccessToken = authService.refresh(refreshToken);
+        AuthService.RefreshResult result = authService.refresh(refreshToken);
+        
+        setRefreshCookie(response, result.refreshToken(), refreshExpirationMs / 1000);
 
-        return ApiResponse.success(new TokenRefreshResponse(newAccessToken));
+        return ApiResponse.success(new TokenRefreshResponse(result.accessToken()));
     }
 
+    @Operation(security = {})
     @PostMapping("/logout")
     public ApiResponse<String> logout(
             @CookieValue(name = "rtms_refresh_token", required = false) String refreshToken,
@@ -62,7 +69,7 @@ public class AuthController {
             authService.logout(refreshToken);
         }
 
-        setRefreshCookie(response, "", 0); // Expire the cookie
+        setRefreshCookie(response, "deleted", 0); // Expire the cookie
 
         return ApiResponse.success("Logged out successfully");
     }
@@ -75,6 +82,7 @@ public class AuthController {
         return ApiResponse.success(authService.getMe(currentUser.getUserId()));
     }
 
+    @Operation(security = {})
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<OwnerRegistrationResponse>> register(
             @RequestBody OwnerRegistrationRequest request) {
