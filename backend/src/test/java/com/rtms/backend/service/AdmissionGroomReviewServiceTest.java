@@ -5,17 +5,20 @@ import com.rtms.backend.entity.AdmissionApplication;
 import com.rtms.backend.entity.CandidateHorseProfile;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.HorsePedigree;
-import com.rtms.backend.entity.PreventiveCareSchedule;
+import com.rtms.backend.entity.CareSchedule;
+import com.rtms.backend.enums.CareScheduleStatus;
+import com.rtms.backend.enums.CareType;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.enums.HorseStatus;
+import com.rtms.backend.enums.TrainingStatus;
 import com.rtms.backend.enums.ReviewDecision;
 import com.rtms.backend.enums.StallStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.CandidateHorseProfileRepository;
 import com.rtms.backend.repository.HorsePedigreeRepository;
 import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.repository.PreventiveCareScheduleRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -54,7 +57,10 @@ class AdmissionGroomReviewServiceTest {
     private HorsePedigreeRepository horsePedigreeRepository;
 
     @Mock
-    private PreventiveCareScheduleRepository preventiveCareScheduleRepository;
+    private CareScheduleRepository careScheduleRepository;
+
+    @Mock
+    private CareScheduleService careScheduleService;
 
     private AdmissionGroomReviewService service;
 
@@ -66,7 +72,8 @@ class AdmissionGroomReviewServiceTest {
                 stableStallRepository,
                 horseRepository,
                 horsePedigreeRepository,
-                preventiveCareScheduleRepository);
+                careScheduleRepository,
+                careScheduleService);
     }
 
     @Test
@@ -85,7 +92,7 @@ class AdmissionGroomReviewServiceTest {
         assertNotNull(result.getGroomReviewedAt());
         assertNull(result.getHorseId());
         verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
-                preventiveCareScheduleRepository, stableStallRepository);
+                careScheduleRepository, stableStallRepository);
     }
 
     @Test
@@ -105,7 +112,7 @@ class AdmissionGroomReviewServiceTest {
         assertNull(result.getHorseId());
         verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
         verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
-                preventiveCareScheduleRepository);
+                careScheduleRepository);
     }
 
     @Test
@@ -124,7 +131,7 @@ class AdmissionGroomReviewServiceTest {
         assertEquals(AdmissionStatus.WAITING_FOR_STALL, result.getStatus());
         assertEquals(ReviewDecision.APPROVED, result.getGroomDecision());
         verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
-                preventiveCareScheduleRepository);
+                careScheduleRepository);
     }
 
     @Test
@@ -141,7 +148,7 @@ class AdmissionGroomReviewServiceTest {
         }
         verify(admissionApplicationRepository, never()).save(any());
         verifyNoInteractions(stableStallRepository, candidateHorseProfileRepository, horseRepository,
-                horsePedigreeRepository, preventiveCareScheduleRepository);
+                horsePedigreeRepository, careScheduleRepository);
     }
 
     @Test
@@ -175,8 +182,8 @@ class AdmissionGroomReviewServiceTest {
             return horse;
         });
         when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.empty());
-        when(preventiveCareScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
-                eq(20L), eq("INITIAL_EXAM"), any())).thenReturn(false);
+        when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
+                eq(20L), eq(CareType.INITIAL), any())).thenReturn(false);
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "Ready"));
@@ -192,6 +199,8 @@ class AdmissionGroomReviewServiceTest {
         assertEquals("QABALAH MERCURY", savedHorse.getName());
         assertEquals("Arabian", savedHorse.getBreed());
         assertEquals(HorseStatus.CANDIDATE, savedHorse.getCurrentStatus());
+        assertTrue(savedHorse.isTrainingLocked());
+        assertEquals(TrainingStatus.BLOCKED, savedHorse.getTrainingStatus());
         assertEquals(99L, savedHorse.getCurrentStallId());
         assertEquals(5L, savedHorse.getOwnerId());
         assertEquals("FR1234567890123", savedHorse.getRegistrationNumber());
@@ -200,14 +209,15 @@ class AdmissionGroomReviewServiceTest {
         verify(horsePedigreeRepository).save(pedigreeCaptor.capture());
         assertEquals("FR1234567890001", pedigreeCaptor.getValue().getSireRegistrationNumber());
 
-        ArgumentCaptor<PreventiveCareSchedule> scheduleCaptor =
-                ArgumentCaptor.forClass(PreventiveCareSchedule.class);
-        verify(preventiveCareScheduleRepository).save(scheduleCaptor.capture());
-        PreventiveCareSchedule schedule = scheduleCaptor.getValue();
+        ArgumentCaptor<CareSchedule> scheduleCaptor =
+                ArgumentCaptor.forClass(CareSchedule.class);
+        verify(careScheduleRepository).save(scheduleCaptor.capture());
+        CareSchedule schedule = scheduleCaptor.getValue();
         assertEquals(20L, schedule.getHorseId());
-        assertEquals("INITIAL_EXAM", schedule.getCareType());
-        assertEquals("PENDING", schedule.getStatus());
-        assertNull(schedule.getScheduledDate());
+        assertEquals(CareType.INITIAL, schedule.getCareType());
+        assertEquals(CareScheduleStatus.REQUESTED, schedule.getStatus());
+        assertNull(schedule.getScheduledAt());
+        verify(careScheduleService).dispatchOffersForSchedule(schedule);
     }
 
     @Test
@@ -231,8 +241,8 @@ class AdmissionGroomReviewServiceTest {
             return horse;
         });
         when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.empty());
-        when(preventiveCareScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
-                eq(20L), eq("INITIAL_EXAM"), any())).thenReturn(false);
+        when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
+                eq(20L), eq(CareType.INITIAL), any())).thenReturn(false);
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.processWaitingForStall(1L);
@@ -261,8 +271,8 @@ class AdmissionGroomReviewServiceTest {
         when(horseRepository.findByRegistrationNumber("FR1234567890123")).thenReturn(List.of(existingHorse));
         when(horseRepository.save(existingHorse)).thenReturn(existingHorse);
         when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.of(new HorsePedigree()));
-        when(preventiveCareScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
-                eq(20L), eq("INITIAL_EXAM"), any())).thenReturn(true);
+        when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
+                eq(20L), eq(CareType.INITIAL), any())).thenReturn(true);
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "Verified"));
@@ -270,8 +280,9 @@ class AdmissionGroomReviewServiceTest {
         assertEquals(AdmissionStatus.VET_REVIEW, result.getStatus());
         assertEquals(20L, result.getHorseId());
         assertEquals(HorseStatus.CANDIDATE, existingHorse.getCurrentStatus());
+        assertTrue(existingHorse.isTrainingLocked());
         assertEquals(99L, existingHorse.getCurrentStallId());
-        verify(preventiveCareScheduleRepository, never()).save(any());
+        verify(careScheduleRepository, never()).save(any());
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.rtms.backend.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.rtms.backend.enums.TrainingDecision;
 import com.rtms.backend.enums.VetDecision;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
@@ -10,10 +11,18 @@ import java.util.List;
 
 public class VetReviewRequest {
 
-    @NotNull(message = "Decision is required")
     private VetDecision decision;
+    private Long careScheduleId;
+
+    public Long getCareScheduleId() { return careScheduleId; }
+    public void setCareScheduleId(Long careScheduleId) { this.careScheduleId = careScheduleId; }
+
+    private TrainingDecision trainingDecision;
+    private String restrictionDetails;
 
     private String feedback;
+
+    private Boolean rejectAdmission;
 
     @NotNull(message = "Physical exam confirmation is required")
     private Boolean physicalExamConfirmed;
@@ -26,6 +35,12 @@ public class VetReviewRequest {
     private String notes;
     private LocalDate followUpDate;
     private List<@NotNull @Valid HorseHealthMetricRequest> metrics;
+
+    public TrainingDecision getTrainingDecision() { return trainingDecision; }
+    public void setTrainingDecision(TrainingDecision trainingDecision) { this.trainingDecision = trainingDecision; }
+
+    public String getRestrictionDetails() { return restrictionDetails; }
+    public void setRestrictionDetails(String restrictionDetails) { this.restrictionDetails = restrictionDetails; }
 
     public String getSymptoms() { return symptoms; }
     public void setSymptoms(String symptoms) { this.symptoms = symptoms; }
@@ -68,12 +83,30 @@ public class VetReviewRequest {
         this.physicalExamConfirmed = physicalExamConfirmed;
     }
 
+    public Boolean getRejectAdmission() {
+        return rejectAdmission;
+    }
+
+    public void setRejectAdmission(Boolean rejectAdmission) {
+        this.rejectAdmission = rejectAdmission;
+    }
+
     @JsonIgnore
-    @AssertTrue(message = "Rejection reason is required when decision is REJECTED")
+    @AssertTrue(message = "Decision or Training Decision is required")
+    public boolean isDecisionSpecified() {
+        return decision != null || trainingDecision != null;
+    }
+
+    @JsonIgnore
+    @AssertTrue(message = "Rejection reason or restriction details are required when decision is REJECTED, BLOCKED, or RESTRICTED")
     public boolean isFeedbackValid() {
-        return decision != VetDecision.REJECTED
-                || (rejectionReason != null && !rejectionReason.isBlank())
-                || (feedback != null && !feedback.isBlank());
+        if (decision == VetDecision.REJECTED || trainingDecision == TrainingDecision.BLOCKED
+                || trainingDecision == TrainingDecision.RESTRICTED) {
+            return (rejectionReason != null && !rejectionReason.isBlank())
+                    || (feedback != null && !feedback.isBlank())
+                    || (restrictionDetails != null && !restrictionDetails.isBlank());
+        }
+        return true;
     }
 
     @JsonIgnore
@@ -83,9 +116,8 @@ public class VetReviewRequest {
     }
 
     @JsonIgnore
-    @AssertTrue(message = "A future follow-up date is required when decision is RECHECK_REQUIRED")
+    @AssertTrue(message = "Follow-up date if provided must be in the future")
     public boolean isFollowUpValid() {
-        return decision != VetDecision.RECHECK_REQUIRED
-                || (followUpDate != null && followUpDate.isAfter(LocalDate.now()));
+        return followUpDate == null || followUpDate.isAfter(LocalDate.now());
     }
 }

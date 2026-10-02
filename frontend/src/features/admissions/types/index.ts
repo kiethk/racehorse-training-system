@@ -44,6 +44,8 @@ export interface HealthRecord {
   diagnosis: string | null;
   treatment: string | null;
   vetDecision: VetDecision | null;
+  trainingDecision?: TrainingDecision | null;
+  restrictionDetails?: string | null;
   rejectionReason: string | null;
   recordType: string;
   productOrService: string | null;
@@ -129,6 +131,104 @@ export type VetDecision = 'APPROVED' | 'RECHECK_REQUIRED' | 'REJECTED';
 export type VetExamType = 'URGENT' | 'INITIAL' | 'FOLLOW_UP' | 'ROUTINE';
 export type VetExamStatus = 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
+// Care Schedule and Offer Types
+export type CareScheduleStatus =
+  | 'REQUESTED'
+  | 'AWAITING_VET_CONFIRMATION'
+  | 'SCHEDULED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type CareType = 'INITIAL' | 'ROUTINE' | 'URGENT';
+
+export type VetOfferStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED' | 'RELEASED';
+
+export interface VetOffer {
+  id: number;
+  scheduleId: number;
+  careScheduleId?: number;
+  veterinarianId: number;
+  status: VetOfferStatus;
+  round: number;
+  offeredAt: string;
+  expiresAt: string;
+  proposedScheduledAt: string;
+}
+
+export interface PendingVetOfferResponse {
+  id: number;
+  scheduleId?: number;
+  careScheduleId: number;
+  admissionId?: number | null;
+  horseId: number;
+  horseName: string;
+  breed?: string;
+  careType: CareType;
+  durationMinutes: number;
+  description?: string | null;
+  round: number;
+  status: VetOfferStatus;
+  offeredAt: string;
+  expiresAt: string;
+  proposedScheduledAt: string;
+}
+
+export interface CareSchedule {
+  id: number;
+  horseId: number;
+  veterinarianId?: number | null;
+  admissionId?: number | null;
+  candidateName?: string;
+  careType: CareType;
+  status: CareScheduleStatus;
+  assignedVetId?: number | null;
+  scheduledDate?: string | null;
+  scheduledAt?: string | null;
+  notes?: string | null;
+  description?: string | null;
+  createdAt?: string;
+  offers?: VetOffer[];
+}
+
+export interface CareScheduleFilters {
+  status?: CareScheduleStatus;
+  careType?: CareType;
+  horseId?: number;
+  admissionId?: number;
+  vetId?: number;
+  veterinarianId?: number;
+  page?: number;
+  size?: number;
+}
+
+export interface CreateNextScheduleRequest {
+  horseId?: number | null;
+  admissionId?: number | null;
+  careType: CareType;
+  scheduledDate: string;
+  description?: string;
+  notes?: string;
+}
+
+export interface CompleteCareScheduleRequest {
+  findings: string;
+  diagnosis?: string;
+  treatment?: string;
+  trainingDecision: TrainingDecision;
+  restrictionDetails?: string;
+  rejectAdmission?: boolean;
+  rejectionReason?: string;
+  notes?: string;
+  metrics?: HorseHealthMetricRequest[];
+  scheduleFollowUp?: boolean;
+  followUpDate?: string;
+  followUpDescription?: string;
+}
+
+export type TrainingDecision = 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
+export type TrainingStatus = 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
+
 export interface VetExamResponse {
   id: number;
   horseId: number;
@@ -173,11 +273,15 @@ export interface HorseHealthMetricResponse extends HorseHealthMetricRequest {
 }
 
 export interface VetReviewRequest {
-  decision: VetDecision;
+  careScheduleId?: number;
+  decision?: VetDecision;
+  trainingDecision?: TrainingDecision;
+  restrictionDetails?: string;
+  rejectAdmission?: boolean;
   feedback?: string;
   physicalExamConfirmed: boolean;
   symptoms?: string;
-  findings?: string;
+  findings: string;
   diagnosis?: string;
   treatment?: string;
   rejectionReason?: string;
@@ -191,6 +295,9 @@ export interface VetReviewResponse {
   status: AdmissionStatus;
   veterinarianId: number;
   decision: VetDecision;
+  trainingDecision?: TrainingDecision;
+  trainingStatus?: TrainingStatus;
+  restrictionDetails?: string | null;
   feedback: string | null;
   reviewedAt: string;
   horseId: number;
@@ -199,7 +306,8 @@ export interface VetReviewResponse {
   quarantineStallCode: string;
   initialExamStatus: string;
   healthRecordId: number | null;
-  vetExamId: number;
+  vetExamId?: number;
+  careScheduleId?: number;
 }
 
 export interface GroomQueueFilters {
