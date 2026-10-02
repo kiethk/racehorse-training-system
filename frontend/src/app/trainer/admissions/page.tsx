@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { TrainerAdmissionsListView } from '@/features/admissions/components/TrainerAdmissionsListView';
 
 export const metadata: Metadata = {
-  title: 'Tiếp nhận chiến mã | Huấn luyện viên',
+  title: 'Horse Admissions | Head Trainer',
 };
 
 export default function TrainerAdmissionsPage() {

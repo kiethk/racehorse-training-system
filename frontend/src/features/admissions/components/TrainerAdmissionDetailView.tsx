@@ -16,11 +16,15 @@ import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumen
 import { TrainerReviewActionPanel } from './TrainerReviewActionPanel';
 
 function date(value: string | null) {
-  return value ? new Date(value).toLocaleDateString('vi-VN') : 'Chưa ghi nhận';
+  return value
+    ? new Date(value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    : 'Not recorded';
 }
 
 function datetime(value: string | null) {
-  return value ? new Date(value).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : 'Chưa ghi nhận';
+  return value
+    ? new Date(value).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })
+    : 'Not recorded';
 }
 
 interface TrainerAdmissionDetailViewProps {
@@ -40,7 +44,7 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
       const data = await trainerAdmissionsApi.getView(admissionId);
       setView(data);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Không thể tải hồ sơ tiếp nhận.');
+      setError(cause instanceof Error ? cause.message : 'Failed to load admission application.');
     } finally {
       setLoading(false);
     }
@@ -63,9 +67,9 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
     return (
       <EmptyState
         icon="alert-triangle"
-        title="Không thể tải hồ sơ"
+        title="Cannot load admission details"
         description={error}
-        action={<Button size="sm" onClick={() => void load()}>Thử lại</Button>}
+        action={<Button size="sm" onClick={() => void load()}>Try Again</Button>}
       />
     );
   }
@@ -76,11 +80,11 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
   if (!detail || !candidate) {
     return (
       <EmptyState
-        title="Không tìm thấy hồ sơ"
-        description="Hồ sơ tiếp nhận không tồn tại hoặc đã bị xóa."
+        title="Admission application not found"
+        description="The admission application does not exist or has been removed."
         action={
           <Link className="text-sm font-medium text-[var(--color-primary)]" href={returnTo}>
-            Quay lại danh sách hồ sơ
+            Back to admissions list
           </Link>
         }
       />
@@ -92,21 +96,21 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
   const healthMetrics = view.healthMetrics;
   const horsePhoto = detail.documents.find((doc) => doc.documentType === 'HORSE_PHOTO');
 
-  // 1. Gia phả & Chuồng nuôi
+  // 1. Pedigree & Quarantine Housing
   const candidateSection = (
-    <AdmissionInfoSection title="Gia phả & Chuồng nuôi">
-      <InfoRow label="Sổ đăng bạ" value={candidate.registryName} />
-      <InfoRow label="Số UELN" value={candidate.registrationNumber} />
-      <InfoRow label="Cha (Sire)" value={candidate.sireName} />
-      <InfoRow label="Mẹ (Dam)" value={candidate.damName} />
+    <AdmissionInfoSection title="Pedigree & Housing">
+      <InfoRow label="Registry Name" value={candidate.registryName} />
+      <InfoRow label="UELN Number" value={candidate.registrationNumber} />
+      <InfoRow label="Sire" value={candidate.sireName} />
+      <InfoRow label="Dam" value={candidate.damName} />
       <div className="pt-2 border-t border-[var(--color-border)] space-y-3">
         <InfoRow
-          label="Chuồng cách ly"
-          value={detail.quarantineStallCode ? `Chuồng ${detail.quarantineStallCode}` : 'Chưa xếp chuồng'}
+          label="Quarantine Stall"
+          value={detail.quarantineStallCode ? `Stall ${detail.quarantineStallCode}` : 'Unassigned'}
         />
         <InfoRow
-          label="Hồ sơ chiến mã"
-          value={horse ? `#${horse.id} · ${horse.currentStatus}` : 'Chưa lập hồ sơ'}
+          label="Horse Profile"
+          value={horse ? `#${horse.id} · ${horse.currentStatus}` : 'Not created yet'}
         />
         {candidate.pedigreeNotes && (
           <div className="mt-2 text-[var(--color-text-secondary)] italic">
@@ -117,119 +121,119 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
     </AdmissionInfoSection>
   );
 
-  // 2. Dữ liệu y tế & Khám bệnh thú y
+  // 2. Veterinary Examination & Vitals
   const healthSection = (
-    <AdmissionInfoSection title="Dữ liệu Khám Thú y & Sinh hiệu">
+    <AdmissionInfoSection title="Veterinary Examination & Vitals">
       <InfoRow
-        label="Kết luận của Thú y"
+        label="Veterinary Decision"
         value={
           detail.vetDecision
             ? detail.vetDecision === 'APPROVED'
-              ? 'ĐẠT (Đủ điều kiện)'
+              ? 'PASSED (Eligible)'
               : detail.vetDecision === 'RECHECK_REQUIRED'
-              ? 'CẦN KHÁM LẠI'
-              : 'TỪ CHỐI'
-            : 'Chưa có kết luận'
+              ? 'RECHECK REQUIRED'
+              : 'REJECTED'
+            : 'Pending Decision'
         }
       />
       {detail.vetFeedback && (
         <div className="pt-2 border-t border-[var(--color-border)]">
-          <span className="text-[var(--color-text-muted)] block mb-1 font-medium">Nhận xét của Bác sĩ:</span>
+          <span className="text-[var(--color-text-muted)] block mb-1 font-medium">Veterinarian&apos;s Remarks:</span>
           <p className="text-[var(--color-text-primary)]">{detail.vetFeedback}</p>
         </div>
       )}
 
-      {/* Chỉ số sinh hiệu gần nhất */}
+      {/* Latest Vitals */}
       {healthMetrics && healthMetrics.length > 0 && (
         <div className="pt-2 border-t border-[var(--color-border)] space-y-1.5">
           <span className="text-[var(--color-text-muted)] block font-medium">
-            Chỉ số sinh hiệu gần nhất ({new Date(healthMetrics[0].recordedAt).toLocaleDateString('vi-VN')}):
+            Latest Vital Signs ({new Date(healthMetrics[0].recordedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}):
           </span>
           <div className="grid grid-cols-2 gap-2 text-[11px] bg-[var(--color-surface-muted)] p-2 rounded">
-            <div>Thân nhiệt: <strong>{healthMetrics[0].temperature != null ? `${healthMetrics[0].temperature} °C` : '—'}</strong></div>
-            <div>Nhịp tim: <strong>{healthMetrics[0].heartRate != null ? `${healthMetrics[0].heartRate} bpm` : '—'}</strong></div>
-            <div>Nhịp thở: <strong>{healthMetrics[0].respiratoryRate != null ? `${healthMetrics[0].respiratoryRate} bpm` : '—'}</strong></div>
-            <div>Cân nặng: <strong>{healthMetrics[0].weight != null ? `${healthMetrics[0].weight} kg` : '—'}</strong></div>
-            <div>Bù nước: <strong>{healthMetrics[0].hydrationStatus || '—'}</strong></div>
-            <div>Điểm BCS: <strong>{healthMetrics[0].bodyConditionScore != null ? `${healthMetrics[0].bodyConditionScore}/9` : '—'}</strong></div>
+            <div>Temperature: <strong>{healthMetrics[0].temperature != null ? `${healthMetrics[0].temperature} °C` : '—'}</strong></div>
+            <div>Heart Rate: <strong>{healthMetrics[0].heartRate != null ? `${healthMetrics[0].heartRate} bpm` : '—'}</strong></div>
+            <div>Respiratory Rate: <strong>{healthMetrics[0].respiratoryRate != null ? `${healthMetrics[0].respiratoryRate} bpm` : '—'}</strong></div>
+            <div>Weight: <strong>{healthMetrics[0].weight != null ? `${healthMetrics[0].weight} kg` : '—'}</strong></div>
+            <div>Hydration: <strong>{healthMetrics[0].hydrationStatus || '—'}</strong></div>
+            <div>BCS Score: <strong>{healthMetrics[0].bodyConditionScore != null ? `${healthMetrics[0].bodyConditionScore}/9` : '—'}</strong></div>
           </div>
         </div>
       )}
 
-      {/* Danh sách khám bệnh lâm sàng */}
+      {/* Clinical Exam Records */}
       <div className="pt-2 border-t border-[var(--color-border)]">
-        <span className="text-[var(--color-text-muted)] block mb-2 font-medium">Lịch sử khám lâm sàng</span>
+        <span className="text-[var(--color-text-muted)] block mb-2 font-medium">Clinical Examination History</span>
         {healthRecords && healthRecords.length > 0 ? (
           <ul className="space-y-2">
             {healthRecords.map((hr) => (
               <li key={hr.id} className="bg-[var(--color-surface-muted)] p-2 rounded text-[11px] space-y-1">
                 <div className="flex justify-between font-medium">
-                  <span>{hr.recordType || 'Khám nhập học'}</span>
+                  <span>{hr.recordType || 'Admission Exam'}</span>
                   <span className="text-[10px] text-[var(--color-text-muted)]">{date(hr.examinedAt)}</span>
                 </div>
-                {hr.diagnosis && <div>Chẩn đoán: {hr.diagnosis}</div>}
-                {hr.symptoms && <div className="text-[var(--color-text-secondary)]">Triệu chứng: {hr.symptoms}</div>}
-                {hr.treatment && <div className="text-[var(--color-text-secondary)]">Điều trị: {hr.treatment}</div>}
-                {hr.notes && <div className="text-[var(--color-text-secondary)] italic">Ghi chú: {hr.notes}</div>}
+                {hr.diagnosis && <div>Diagnosis: {hr.diagnosis}</div>}
+                {hr.symptoms && <div className="text-[var(--color-text-secondary)]">Symptoms: {hr.symptoms}</div>}
+                {hr.treatment && <div className="text-[var(--color-text-secondary)]">Treatment: {hr.treatment}</div>}
+                {hr.notes && <div className="text-[var(--color-text-secondary)] italic">Notes: {hr.notes}</div>}
               </li>
             ))}
           </ul>
         ) : (
-          <span className="text-[var(--color-text-muted)] italic">Chưa có bản ghi khám bệnh chi tiết.</span>
+          <span className="text-[var(--color-text-muted)] italic">No clinical examination records found.</span>
         )}
       </div>
     </AdmissionInfoSection>
   );
 
-  // 3. Lịch sử xét duyệt qua các khâu
+  // 3. Review History Across Pipeline
   const reviewHistorySection = (
-    <AdmissionInfoSection title="Lịch sử xét duyệt">
+    <AdmissionInfoSection title="Review History">
       <div className="space-y-4">
         {detail.groomReviewedAt ? (
           <div className="space-y-1">
             <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Chăm sóc viên (Groom)
+              Groom
             </h4>
-            <InfoRow label="Quyết định" value={detail.groomDecision} />
-            <InfoRow label="Thời gian" value={datetime(detail.groomReviewedAt)} />
-            <InfoRow label="Nhận xét" value={detail.groomFeedback} />
+            <InfoRow label="Decision" value={detail.groomDecision} />
+            <InfoRow label="Date & Time" value={datetime(detail.groomReviewedAt)} />
+            <InfoRow label="Feedback" value={detail.groomFeedback} />
           </div>
         ) : null}
 
         {detail.vetReviewedAt ? (
           <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
             <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Bác sĩ thú y (Veterinarian)
+              Veterinarian
             </h4>
-            <InfoRow label="Quyết định" value={detail.vetDecision} />
-            <InfoRow label="Thời gian" value={datetime(detail.vetReviewedAt)} />
-            <InfoRow label="Nhận xét" value={detail.vetFeedback} />
+            <InfoRow label="Decision" value={detail.vetDecision} />
+            <InfoRow label="Date & Time" value={datetime(detail.vetReviewedAt)} />
+            <InfoRow label="Feedback" value={detail.vetFeedback} />
           </div>
         ) : null}
 
         {detail.trainerReviewedAt ? (
           <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
             <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Huấn luyện viên (Head Trainer)
+              Head Trainer
             </h4>
-            <InfoRow label="Thời gian" value={datetime(detail.trainerReviewedAt)} />
-            <InfoRow label="Nhận xét" value={detail.trainerFeedback} />
+            <InfoRow label="Date & Time" value={datetime(detail.trainerReviewedAt)} />
+            <InfoRow label="Feedback" value={detail.trainerFeedback} />
           </div>
         ) : null}
 
         {detail.managerReviewedAt ? (
           <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
             <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Quản lý (Manager)
+              Club Manager
             </h4>
-            <InfoRow label="Quyết định" value={detail.managerDecision} />
-            <InfoRow label="Thời gian" value={datetime(detail.managerReviewedAt)} />
-            <InfoRow label="Nhận xét" value={detail.managerFeedback} />
+            <InfoRow label="Decision" value={detail.managerDecision} />
+            <InfoRow label="Date & Time" value={datetime(detail.managerReviewedAt)} />
+            <InfoRow label="Feedback" value={detail.managerFeedback} />
           </div>
         ) : null}
 
         {!detail.groomReviewedAt && !detail.vetReviewedAt && !detail.trainerReviewedAt && (
-          <span className="text-[var(--color-text-muted)] italic">Chưa có thông tin duyệt trước đó.</span>
+          <span className="text-[var(--color-text-muted)] italic">No previous review records.</span>
         )}
       </div>
     </AdmissionInfoSection>

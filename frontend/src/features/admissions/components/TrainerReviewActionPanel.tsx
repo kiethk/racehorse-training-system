@@ -14,9 +14,9 @@ const READINESS_OPTIONS: {
   value: RacingReadinessStatus;
   label: string;
 }[] = [
-  { value: 'READY', label: 'Sẵn sàng thi đấu' },
-  { value: 'NEEDS_MORE_TRAINING', label: 'Cần huấn luyện thêm' },
-  { value: 'UNSUITABLE', label: 'Không phù hợp' },
+  { value: 'READY', label: 'Ready for Racing' },
+  { value: 'NEEDS_MORE_TRAINING', label: 'Needs More Training' },
+  { value: 'UNSUITABLE', label: 'Unsuitable' },
 ];
 
 const MIN_REMARKS = 20;
@@ -94,7 +94,7 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
     const remarks = form.remarks?.trim() ?? '';
     if (remarks.length < MIN_REMARKS) {
       setFormError(
-        `Nhận xét chuyên môn phải có ít nhất ${MIN_REMARKS} ký tự (hiện ${remarks.length}).`,
+        `Professional remarks must be at least ${MIN_REMARKS} characters (currently ${remarks.length}).`,
       );
       return;
     }
@@ -108,35 +108,35 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
       setSubmittedNotice(true);
       onSuccess();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gửi đánh giá thất bại.';
+      const msg = err instanceof Error ? err.message : 'Failed to submit evaluation.';
       setFormError(msg);
     } finally {
       setSubmitting(false);
     }
   }
 
-  // Đã đánh giá rồi -> Hiển thị kết quả đánh giá (chỉ đọc)
+  // Already evaluated -> Display evaluation results (Read-only)
   if (readOnly && existingAssessment) {
     return (
       <Panel padded className="bg-[var(--color-surface)]">
-        <SectionTitle>Đánh giá của Huấn luyện viên (Đã nộp)</SectionTitle>
+        <SectionTitle>Head Trainer Evaluation (Submitted)</SectionTitle>
         <div className="mt-3 space-y-2 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-4 text-[12px]">
-          <Row label="Mức độ sẵn sàng" value={existingAssessment.readinessStatus} />
-          <Row label="Điểm dáng vóc" value={fmtScore(existingAssessment.conformationScore)} />
-          <Row label="Điểm tính nết" value={fmtScore(existingAssessment.temperamentScore)} />
-          <Row label="Điểm bước đi" value={fmtScore(existingAssessment.gaitQualityScore)} />
+          <Row label="Readiness Status" value={existingAssessment.readinessStatus} />
+          <Row label="Conformation Score" value={fmtScore(existingAssessment.conformationScore)} />
+          <Row label="Temperament Score" value={fmtScore(existingAssessment.temperamentScore)} />
+          <Row label="Gait Quality Score" value={fmtScore(existingAssessment.gaitQualityScore)} />
           <Row
-            label="Ước tính thời gian thi đấu"
+            label="Estimated Time to Race"
             value={
               existingAssessment.estimatedMonthsToRace != null
-                ? `${existingAssessment.estimatedMonthsToRace} tháng`
+                ? `${existingAssessment.estimatedMonthsToRace} months`
                 : '—'
             }
           />
-          <Row label="Ngày đánh giá" value={existingAssessment.assessmentDate} />
+          <Row label="Assessment Date" value={existingAssessment.assessmentDate} />
           {existingAssessment.remarks && (
             <div className="mt-3 border-t border-[var(--color-border)] pt-2">
-              <span className="block text-[var(--color-text-muted)] mb-1">Nhận xét chuyên môn:</span>
+              <span className="block text-[var(--color-text-muted)] mb-1">Professional Remarks:</span>
               <p className="whitespace-pre-wrap text-[var(--color-text-primary)]">
                 {existingAssessment.remarks}
               </p>
@@ -147,25 +147,25 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
     );
   }
 
-  // Chưa đến lượt hoặc không ở trạng thái TRAINER_REVIEW
+  // Not currently in TRAINER_REVIEW status
   if (!canReview) {
     return (
       <Panel padded className="bg-[var(--color-surface)]">
-        <SectionTitle>Đánh giá của Huấn luyện viên</SectionTitle>
+        <SectionTitle>Head Trainer Evaluation</SectionTitle>
         <p className="mt-2 text-[12px] text-[var(--color-text-muted)] italic">
-          Hồ sơ hiện không ở trạng thái chờ Huấn luyện viên đánh giá (Trạng thái hiện tại: {admission.status}).
+          This application is not currently pending Head Trainer evaluation (Current status: {admission.status}).
         </p>
       </Panel>
     );
   }
 
-  // Đang ở TRAINER_REVIEW nhưng thiếu hồ sơ ngựa (Groom chưa tạo)
+  // Pending TRAINER_REVIEW but horse record is missing
   if (horseMissing) {
     return (
       <Panel padded className="bg-[var(--color-surface)]">
-        <SectionTitle>Đánh giá của Huấn luyện viên</SectionTitle>
+        <SectionTitle>Head Trainer Evaluation</SectionTitle>
         <div className="mt-2 rounded-[var(--radius-md)] bg-[var(--color-warning-soft)] p-3 text-[12px] text-[var(--color-warning)]">
-          Chưa thể đánh giá: Hồ sơ chiến mã chưa được lập bởi Chăm sóc viên (Groom).
+          Cannot evaluate yet: The candidate horse profile has not been created by the Groom.
         </div>
       </Panel>
     );
@@ -173,18 +173,18 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
 
   return (
     <Panel padded className="bg-[var(--color-surface)]">
-      <SectionTitle>Thẩm định Tiềm năng Thi đấu (Racing Readiness)</SectionTitle>
+      <SectionTitle>Racing Readiness Assessment</SectionTitle>
 
       {submittedNotice && (
         <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-success-soft)] p-3 text-[12px] text-[var(--color-success)]">
-          Đánh giá của bạn đã được gửi thành công và chuyển tiếp sang Quản lý duyệt.
+          Your evaluation has been submitted successfully and forwarded to the Club Manager.
         </div>
       )}
 
       <div className="mt-4 space-y-4">
-        {/* --- Mức sẵn sàng --- */}
+        {/* --- Readiness Status --- */}
         <div>
-          <FieldLabel>Mức độ sẵn sàng thi đấu</FieldLabel>
+          <FieldLabel>Racing Readiness Status</FieldLabel>
           <div className="mt-1.5 flex flex-wrap gap-4">
             {READINESS_OPTIONS.map((opt) => (
               <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
@@ -203,56 +203,56 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
           </div>
         </div>
 
-        {/* --- Ba điểm quan sát --- */}
+        {/* --- Observation Scores --- */}
         <div className="grid gap-4 sm:grid-cols-3">
           <ScoreInput
-            label="Dáng vóc"
+            label="Conformation"
             value={form.conformationScore}
             onChange={setNum('conformationScore')}
           />
           <ScoreInput
-            label="Tính nết"
+            label="Temperament"
             value={form.temperamentScore}
             onChange={setNum('temperamentScore')}
           />
           <ScoreInput
-            label="Bước đi"
+            label="Gait Quality"
             value={form.gaitQualityScore}
             onChange={setNum('gaitQualityScore')}
           />
         </div>
 
-        {/* --- Ước tính thời gian --- */}
+        {/* --- Estimated Months --- */}
         <div>
-          <FieldLabel>Ước tính số tháng nữa đủ điều kiện đăng ký giải</FieldLabel>
+          <FieldLabel>Estimated Months Until Eligible for Race Registration</FieldLabel>
           <input
             type="number"
             min={0}
             max={60}
-            placeholder="Số tháng"
+            placeholder="Number of months"
             className="mt-1 w-40 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px]"
             value={form.estimatedMonthsToRace ?? ''}
             onChange={(e) => setNum('estimatedMonthsToRace')(e.target.value)}
           />
         </div>
 
-        {/* --- Nhận xét --- */}
+        {/* --- Remarks --- */}
         <div>
-          <FieldLabel>Nhận xét chuyên môn (tối thiểu 20 ký tự)</FieldLabel>
+          <FieldLabel>Professional Remarks (minimum 20 characters)</FieldLabel>
           <textarea
             rows={4}
-            placeholder="Dáng vóc cân đối, cơ bắp phát triển tốt. Tính nết điềm tĩnh khi tiếp xúc. Bước đi đều, sải chân dài..."
+            placeholder="Balanced conformation with well-developed musculature. Calm temperament upon contact. Even strides and good reach..."
             className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px]"
             value={form.remarks ?? ''}
             onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
           />
           <div className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-            {form.remarks?.trim().length ?? 0}/{MIN_REMARKS} ký tự tối thiểu
+            {form.remarks?.trim().length ?? 0}/{MIN_REMARKS} characters minimum
           </div>
         </div>
 
         <p className="text-[11px] text-[var(--color-text-muted)] italic">
-          * Điểm thể lực sẽ được đo lường và đánh giá định kỳ sau khi chiến mã kết thúc cách ly và nhập chuồng chính thức.
+          * Fitness metrics will be measured and assessed periodically once the horse completes quarantine and enters regular training.
         </p>
 
         {formError && (
@@ -267,10 +267,10 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
             disabled={submitting}
             onClick={handleSubmit}
           >
-            {submitting ? 'Đang nộp...' : 'Nộp đánh giá'}
+            {submitting ? 'Submitting...' : 'Submit Evaluation'}
           </Button>
           <span className="text-[11px] text-[var(--color-text-muted)]">
-            Sau khi nộp, hồ sơ sẽ được chuyển tới Quản lý câu lạc bộ.
+            Once submitted, the evaluation will be forwarded to the Club Manager.
           </span>
         </div>
       </div>
