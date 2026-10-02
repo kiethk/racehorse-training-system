@@ -3,10 +3,10 @@ import type { ApiResponse } from '@/types/horse';
 import type { AuthUser, LoginRequest, OwnerRegistrationRequest, OwnerRegistrationResponse } from '@/types/auth';
 
 export async function login(request: LoginRequest): Promise<ApiResponse<AuthUser>> {
-  const res = await apiPost<ApiResponse<AuthUser & { accessToken?: string, refreshToken?: string }>>('/api/auth/login', request);
-  if (res.success && res.data.accessToken && res.data.refreshToken) {
-    const { setTokens } = await import('./api');
-    setTokens(res.data.accessToken, res.data.refreshToken);
+  const res = await apiPost<ApiResponse<AuthUser & { accessToken?: string }>>('/api/auth/login', request);
+  if (res.success && res.data.accessToken) {
+    const { setAccessToken } = await import('./api');
+    setAccessToken(res.data.accessToken);
   }
   return res;
 }
@@ -16,10 +16,9 @@ export async function getCurrentUser(): Promise<ApiResponse<AuthUser>> {
 }
 
 export async function logout(): Promise<ApiResponse<string>> {
-  const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('rtms_refresh_token') : null;
-  const res = await apiPost<ApiResponse<string>>('/api/auth/logout', { refreshToken });
-  const { clearTokens } = await import('./api');
-  clearTokens();
+  const res = await apiPost<ApiResponse<string>>('/api/auth/logout', {});
+  const { setAccessToken } = await import('./api');
+  setAccessToken(null);
   return res;
 }
 

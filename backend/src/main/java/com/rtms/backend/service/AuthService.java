@@ -91,7 +91,6 @@ public class AuthService {
         LoginResponse loginResponse = new LoginResponse(user.getId(), user.getFullName(),
                 user.getEmail(), user.getRole().getName());
         loginResponse.setAccessToken(accessToken);
-        loginResponse.setRefreshToken(rawRefreshToken);
 
         return new LoginResult(accessToken, rawRefreshToken, loginResponse);
     }

@@ -37,13 +37,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // On mount: restore session from cookie via /api/auth/me
+  // On mount: restore session from cookie by fetching a new access token
   useEffect(() => {
     let cancelled = false;
     async function init() {
       try {
-        const res = await authService.getCurrentUser();
-        if (!cancelled) setUser(res.success ? res.data : null);
+        const { setAccessToken } = await import('@/services/api');
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+        
+        // 1. Attempt to refresh the access token using HttpOnly cookie
+        const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          if (data?.data?.accessToken) {
+            setAccessToken(data.data.accessToken);
+            // 2. Fetch user profile
+            const meRes = await authService.getCurrentUser();
+            if (!cancelled) setUser(meRes.success ? meRes.data : null);
+          } else {
+            if (!cancelled) setUser(null);
+          }
+        } else {
+          setAccessToken(null);
+          if (!cancelled) setUser(null);
+        }
       } catch {
         if (!cancelled) setUser(null);
       } finally {

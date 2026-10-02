@@ -69,7 +69,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of("http://localhost:3000"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true); // BẮT BUỘC để trình duyệt gửi cookie kèm request
+        config.setAllowCredentials(true); // Required for HttpOnly refresh-token cookie, normal protected APIs use Bearer token
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
