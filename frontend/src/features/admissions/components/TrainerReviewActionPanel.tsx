@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { FieldLabel, Panel, SectionTitle } from '@/components/ui/Panel';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
+import { simpleStatusLabel } from '../shared/components/AdmissionStatusBadge';
 import type {
   RacingReadinessStatus,
   TrainerAdmissionView,
@@ -153,7 +154,7 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
       <Panel padded className="bg-[var(--color-surface)]">
         <SectionTitle>Head Trainer Evaluation</SectionTitle>
         <p className="mt-2 text-[12px] text-[var(--color-text-muted)] italic">
-          This application is not currently pending Head Trainer evaluation (Current status: {admission.status}).
+          This application is not currently pending Head Trainer evaluation (Current status: {simpleStatusLabel(admission.status)}).
         </p>
       </Panel>
     );

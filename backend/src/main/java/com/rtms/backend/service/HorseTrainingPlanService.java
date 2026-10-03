@@ -485,10 +485,14 @@ public class HorseTrainingPlanService {
         // ---- Groom: suy từ chuồng, cho phép ghi đè ----
         Long groomId = (overrideGroomId != null) ? overrideGroomId : stall.getGroomId();
         if (groomId == null) {
+            // Không chỉ Trainer đi gán nữa: từ V63, phân công Groom cho chuồng
+            // là việc của Quản lý câu lạc bộ. Hướng người dùng tới một hành
+            // động họ không có quyền làm thì tệ hơn là không hướng gì.
             throw new IllegalStateException(String.format(
-                    "Chuồng '%s' của chiến mã '%s' chưa được gán Groom. "
-                  + "Hãy gán Groom (PUT /api/stalls/%d/assign-groom) trước!",
-                    stall.getStallCode(), horse.getName(), stall.getId()));
+                    "Chuồng '%s' của chiến mã '%s' chưa được phân công Groom. "
+                  + "Liên hệ Quản lý câu lạc bộ để phân công, hoặc chọn Groom "
+                  + "trực tiếp cho buổi tập khi lập kế hoạch!",
+                    stall.getStallCode(), horse.getName()));
         }
         return groomId;
     }
