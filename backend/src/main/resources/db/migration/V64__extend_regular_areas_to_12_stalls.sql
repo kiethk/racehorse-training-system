@@ -1,5 +1,5 @@
 -- =====================================================================
--- V62: EXTEND REGULAR AREAS FROM 10 TO 12 STALLS
+-- V64: EXTEND REGULAR AREAS FROM 10 TO 12 STALLS
 -- =====================================================================
 -- Each REGULAR area must contain exactly 12 stalls.
 -- V28 seeded stalls 1–10. This migration adds stalls 11 and 12

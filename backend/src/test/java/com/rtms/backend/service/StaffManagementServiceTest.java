@@ -3,6 +3,7 @@ package com.rtms.backend.service;
 import com.rtms.backend.dto.StaffCreationRequest;
 import com.rtms.backend.dto.StaffCreationResponse;
 import com.rtms.backend.dto.StaffSummaryResponse;
+import com.rtms.backend.dto.StaffUpdateRequest;
 import com.rtms.backend.entity.*;
 import com.rtms.backend.enums.AreaType;
 import com.rtms.backend.repository.*;
@@ -217,6 +218,8 @@ class StaffManagementServiceTest {
         when(groomProfileRepository.countByTrainerId(5L)).thenReturn(5L);
         when(groomProfileRepository.countByTrainerId(6L)).thenReturn(2L);
 
+        // Locked re-read for area 2 (Trainer B wins), block 1-3
+        when(stableStallRepository.findBlockForUpdate(2L, 1, 3)).thenReturn(blockB);
         when(stableStallRepository.save(any(StableStall.class))).thenAnswer(inv -> inv.getArgument(0));
 
         StaffCreationRequest req = new StaffCreationRequest();
@@ -265,6 +268,8 @@ class StaffManagementServiceTest {
         when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(2L, 4, 6)).thenReturn(blockB2);
         when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(eq(2L), argThat(start -> start != 1 && start != 4), anyInt())).thenReturn(List.of());
 
+        // Locked re-read for area 2 (Trainer B wins), block 1-3
+        when(stableStallRepository.findBlockForUpdate(2L, 1, 3)).thenReturn(blockB1);
         when(stableStallRepository.save(any(StableStall.class))).thenAnswer(inv -> inv.getArgument(0));
 
         StaffCreationRequest req = new StaffCreationRequest();
@@ -329,6 +334,8 @@ class StaffManagementServiceTest {
         when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(2L, 1, 3)).thenReturn(blockB);
         when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(anyLong(), argThat(start -> start != 1), anyInt())).thenReturn(List.of());
 
+        // Locked re-read for area 2 (Trainer B = 5L wins — smallest ID), block 1-3
+        when(stableStallRepository.findBlockForUpdate(2L, 1, 3)).thenReturn(blockB);
         when(stableStallRepository.save(any(StableStall.class))).thenAnswer(inv -> inv.getArgument(0));
 
         StaffCreationRequest req = new StaffCreationRequest();
@@ -418,5 +425,163 @@ class StaffManagementServiceTest {
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> staffService.updateStaffStatus(1L, false));
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+    }
+
+    // ── Groom trainer reassignment ──────────────────────────────────────
+
+    /** Groom owns stalls belonging to old Trainer’s area → reassignment to a different Trainer is rejected. */
+    @Test
+    void testUpdateGroomTrainer_WithStalls_RejectsIfAreaMismatch() {
+        Role groomRole = new Role(); groomRole.setName("GROOM");
+        User groom = new User(); groom.setId(20L); groom.setRole(groomRole); groom.setActive(true);
+        groom.setFullName("Groom G"); groom.setEmail("g@rtms.com");
+
+        User newTrainer = savedUser(6L, "HEAD_TRAINER"); // different trainer
+
+        when(userRepository.findById(20L)).thenReturn(Optional.of(groom));
+        when(userRepository.findById(6L)).thenReturn(Optional.of(newTrainer));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        GroomProfile groomProfile = new GroomProfile();
+        groomProfile.setUserId(20L);
+        groomProfile.setTrainerId(5L); // currently assigned to trainer 5
+        when(groomProfileRepository.findById(20L)).thenReturn(Optional.of(groomProfile));
+
+        // Groom owns stalls 1-3 in area 1; area 1 belongs to trainer 5, NOT trainer 6
+        StableStall s1 = stall(101, 1, 1, 20L);
+        StableStall s2 = stall(102, 1, 2, 20L);
+        StableStall s3 = stall(103, 1, 3, 20L);
+        when(stableStallRepository.findByGroomId(20L)).thenReturn(List.of(s1, s2, s3));
+
+        Area area1 = area(1L, "A"); area1.setTrainerId(5L); // owned by trainer 5
+        when(areaRepository.findById(1L)).thenReturn(Optional.of(area1));
+
+        StaffUpdateRequest req = new StaffUpdateRequest();
+        req.setTrainerId(6L); // trying to move to trainer 6
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> staffService.updateStaff(20L, req));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Unassign the stalls first"));
+        verify(groomProfileRepository, never()).save(any(GroomProfile.class));
+    }
+
+    /** Groom owns NO stalls → trainer reassignment is allowed freely. */
+    @Test
+    void testUpdateGroomTrainer_NoStalls_Allowed() {
+        Role groomRole = new Role(); groomRole.setName("GROOM");
+        User groom = new User(); groom.setId(20L); groom.setRole(groomRole); groom.setActive(true);
+        groom.setFullName("Groom G"); groom.setEmail("g@rtms.com");
+
+        User newTrainer = savedUser(6L, "HEAD_TRAINER");
+
+        when(userRepository.findById(20L)).thenReturn(Optional.of(groom));
+        when(userRepository.findById(6L)).thenReturn(Optional.of(newTrainer));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        GroomProfile groomProfile = new GroomProfile();
+        groomProfile.setUserId(20L);
+        groomProfile.setTrainerId(5L);
+        when(groomProfileRepository.findById(20L)).thenReturn(Optional.of(groomProfile));
+
+        // No stalls owned
+        when(stableStallRepository.findByGroomId(20L)).thenReturn(List.of());
+
+        // getStaffDetail called at end of updateStaff
+        when(groomProfileRepository.findById(20L)).thenReturn(Optional.of(groomProfile));
+
+        StaffUpdateRequest req = new StaffUpdateRequest();
+        req.setTrainerId(6L);
+
+        // Should not throw
+        assertDoesNotThrow(() -> staffService.updateStaff(20L, req));
+        verify(groomProfileRepository, atLeastOnce()).save(any(GroomProfile.class));
+    }
+
+    // ── Concurrency guard tests ───────────────────────────────────────
+
+    /**
+     * After the candidate block is chosen, findBlockForUpdate returns a stall already owned
+     * by another Groom (concurrent assignment). Service must throw CONFLICT without persisting.
+     */
+    @Test
+    void testCreateGroom_LockedBlock_ConcurrentlyTaken_ThrowsConflict() {
+        mockBasicCreation("GROOM");
+        mockUserSaveWithId(20L);
+
+        User trainer = savedUser(5L, "HEAD_TRAINER");
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainer));
+
+        Area a = area(1L, "A"); a.setTrainerId(5L);
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of(a));
+        when(groomProfileRepository.countByTrainerId(5L)).thenReturn(0L);
+
+        // Non-locking scan sees the block as free
+        List<StableStall> freeBlock = List.of(
+                stall(101, 1, 1, null),
+                stall(102, 1, 2, null),
+                stall(103, 1, 3, null));
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(1L, 1, 3))
+                .thenReturn(freeBlock);
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(anyLong(), argThat(s -> s != 1), anyInt()))
+                .thenReturn(List.of());
+
+        // Locked re-read shows stall 101 already assigned to another groom (concurrent winner)
+        List<StableStall> takenBlock = List.of(
+                stall(101, 1, 1, 99L),   // taken!
+                stall(102, 1, 2, null),
+                stall(103, 1, 3, null));
+        when(stableStallRepository.findBlockForUpdate(1L, 1, 3)).thenReturn(takenBlock);
+
+        StaffCreationRequest req = new StaffCreationRequest();
+        req.setFullName("G"); req.setEmail("g@rtms.com"); req.setPassword("pass");
+        req.setRole("GROOM");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> staffService.createStaff(req));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        verify(stableStallRepository, never()).save(any(StableStall.class));
+    }
+
+    /** Normal auto-assignment assigns exactly 3 adjacent stalls (block 1-3). */
+    @Test
+    void testCreateGroom_NormalAssignment_ExactlyThreeAdjacentStalls() {
+        mockBasicCreation("GROOM");
+        mockUserSaveWithId(20L);
+
+        User trainer = savedUser(5L, "HEAD_TRAINER");
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainer));
+
+        Area a = area(1L, "A"); a.setTrainerId(5L);
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of(a));
+        when(groomProfileRepository.countByTrainerId(5L)).thenReturn(0L);
+
+        List<StableStall> freeBlock = List.of(
+                stall(101, 1, 1, null),
+                stall(102, 1, 2, null),
+                stall(103, 1, 3, null));
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(1L, 1, 3))
+                .thenReturn(freeBlock);
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(anyLong(), argThat(s -> s != 1), anyInt()))
+                .thenReturn(List.of());
+
+        // Locked re-read returns the same free block
+        when(stableStallRepository.findBlockForUpdate(1L, 1, 3)).thenReturn(freeBlock);
+        when(stableStallRepository.save(any(StableStall.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        StaffCreationRequest req = new StaffCreationRequest();
+        req.setFullName("G"); req.setEmail("g@rtms.com"); req.setPassword("pass");
+        req.setRole("GROOM");
+
+        StaffCreationResponse res = staffService.createStaff(req);
+
+        assertEquals("ASSIGNED", res.getAssignmentStatus());
+        assertEquals(3, res.getAssignedStallIds().size());
+        // Verify stall numbers are consecutive 1, 2, 3
+        List<Long> ids = res.getAssignedStallIds();
+        assertEquals(3, ids.size());
+        assertEquals(1L, res.getAssignedAreaId());
+        // All 3 stalls saved
+        verify(stableStallRepository, times(3)).save(any(StableStall.class));
     }
 }

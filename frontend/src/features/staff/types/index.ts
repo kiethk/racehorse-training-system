@@ -22,7 +22,6 @@ export interface StaffCreationRequest {
   specialization?: string;
   certificationNumber?: string;
   certificationIssuedDate?: string;
-  trainerId?: number;
 }
 
 /** Result of POST /api/staff — carries auto-assignment info from backend. */

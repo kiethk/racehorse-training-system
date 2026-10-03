@@ -147,6 +147,23 @@ public class StaffManagementService {
                     if (!"HEAD_TRAINER".equals(trainer.getRole() != null ? trainer.getRole().getName() : "") || !trainer.isActive()) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or inactive HEAD_TRAINER");
                     }
+
+                    // Invariant: Groom.trainer_id == Stall.Area.trainer_id
+                    // If this Groom already owns stalls, every stall's area must belong to the new Trainer.
+                    // Reject the reassignment with a clear error if any stall is outside the new Trainer's areas.
+                    List<StableStall> ownedStalls = stableStallRepository.findByGroomId(user.getId());
+                    if (!ownedStalls.isEmpty()) {
+                        boolean mismatch = ownedStalls.stream().anyMatch(s -> {
+                            Area stallArea = areaRepository.findById(s.getAreaId()).orElse(null);
+                            return stallArea == null || !trainer.getId().equals(stallArea.getTrainerId());
+                        });
+                        if (mismatch) {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                    "Cannot reassign Trainer: Groom owns stalls that belong to the current Trainer's areas. " +
+                                    "Unassign the stalls first, then change the Trainer.");
+                        }
+                    }
+
                     groomProfile.setTrainerId(trainer.getId());
                 } else if (request.isTrainerIdProvided()) {
                     groomProfile.setTrainerId(null);
@@ -183,7 +200,9 @@ public class StaffManagementService {
      * Creates a staff member and performs automatic assignments:
      * <ul>
      *   <li>HEAD_TRAINER: assigns up to 2 unassigned REGULAR areas (deterministic, code ASC)</li>
-     *   <li>GROOM: requires trainerId, auto-assigns first free 3-stall block in Trainer's areas</li>
+     *   <li>GROOM: automatically selects the best available Trainer (fewest grooms → most free blocks
+     *       → lowest ID) and locks + assigns the first free 3-stall block in that Trainer's REGULAR
+     *       areas. If no Trainer has a free block the Groom is still created with status UNASSIGNED.</li>
      * </ul>
      * The whole operation is transactional.
      */
@@ -360,17 +379,36 @@ public class StaffManagementService {
             return response;
         }
 
+        // ── Concurrency guard: reload & lock the chosen block inside this transaction ──
+        int blockStart = bestBlockToAssign.get(0).getStallNumber();
+        int blockEnd   = blockStart + GROOM_BLOCK_SIZE - 1;
+        List<StableStall> lockedBlock = stableStallRepository.findBlockForUpdate(
+                bestAreaToAssign.getId(), blockStart, blockEnd);
+
+        // Validate the locked snapshot: must still be a complete, unoccupied block
+        if (lockedBlock.size() != GROOM_BLOCK_SIZE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Stall block was modified concurrently — please retry");
+        }
+        for (int i = 0; i < GROOM_BLOCK_SIZE; i++) {
+            StableStall s = lockedBlock.get(i);
+            if (s.getGroomId() != null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Stall " + s.getStallCode() + " was taken concurrently — please retry");
+            }
+            if (s.getStallNumber() != blockStart + i) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Stall block is no longer consecutive — please retry");
+            }
+        }
+
         groom.setTrainerId(bestTrainer.getId());
         groomProfileRepository.save(groom);
 
         List<Long> stallIds = new ArrayList<>();
         List<String> stallCodes = new ArrayList<>();
 
-        for (StableStall stall : bestBlockToAssign) {
-            // Re-check just to be absolutely safe
-            if (stall.getGroomId() != null) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Stall was modified concurrently");
-            }
+        for (StableStall stall : lockedBlock) {
             stall.setGroomId(user.getId());
             stableStallRepository.save(stall);
             stallIds.add(stall.getId());
