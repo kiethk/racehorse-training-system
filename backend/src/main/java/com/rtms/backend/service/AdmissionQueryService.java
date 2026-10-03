@@ -13,14 +13,13 @@ import com.rtms.backend.entity.CandidateHorseProfile;
 import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.VetExamType;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.AdmissionDocumentRepository;
 import com.rtms.backend.repository.CandidateHorseProfileRepository;
 import com.rtms.backend.repository.HealthRecordRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import com.rtms.backend.repository.UserRepository;
-import com.rtms.backend.repository.VetExamRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -41,7 +40,7 @@ public class AdmissionQueryService {
     private final HealthRecordRepository healthRecordRepository;
     private final AdmissionFileStorage fileStorage;
     private final UserRepository userRepository;
-    private final VetExamRepository vetExamRepository;
+    private final CareScheduleRepository careScheduleRepository;
 
     @Autowired
     public AdmissionQueryService(
@@ -52,7 +51,7 @@ public class AdmissionQueryService {
             HealthRecordRepository healthRecordRepository,
             AdmissionFileStorage fileStorage,
             UserRepository userRepository,
-            VetExamRepository vetExamRepository) {
+            CareScheduleRepository careScheduleRepository) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.admissionDocumentRepository = admissionDocumentRepository;
@@ -60,7 +59,22 @@ public class AdmissionQueryService {
         this.healthRecordRepository = healthRecordRepository;
         this.fileStorage = fileStorage;
         this.userRepository = userRepository;
-        this.vetExamRepository = vetExamRepository;
+        this.careScheduleRepository = careScheduleRepository;
+    }
+
+    @Deprecated
+    public AdmissionQueryService(
+            AdmissionApplicationRepository admissionApplicationRepository,
+            CandidateHorseProfileRepository candidateHorseProfileRepository,
+            AdmissionDocumentRepository admissionDocumentRepository,
+            StableStallRepository stableStallRepository,
+            HealthRecordRepository healthRecordRepository,
+            AdmissionFileStorage fileStorage,
+            UserRepository userRepository,
+            Object vetExamRepository,
+            CareScheduleRepository careScheduleRepository) {
+        this(admissionApplicationRepository, candidateHorseProfileRepository, admissionDocumentRepository,
+                stableStallRepository, healthRecordRepository, fileStorage, userRepository, careScheduleRepository);
     }
 
     public AdmissionQueryService(
@@ -189,8 +203,8 @@ public class AdmissionQueryService {
 
         // Health records for the horse created during Vet quarantine review
         if (admission.getHorseId() != null) {
-            if (vetExamRepository != null) {
-                vetExamRepository.findFirstByAdmissionIdAndExamTypeOrderByCreatedAtDesc(admission.getId(), VetExamType.INITIAL)
+            if (careScheduleRepository != null) {
+                careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admission.getId(), com.rtms.backend.enums.CareType.INITIAL)
                         .map(InitialExamScheduleResponse::from).ifPresent(response::setInitialExamSchedule);
             }
             List<HealthRecord> healthRecords = healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(

@@ -91,6 +91,9 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
                   <span className="font-semibold">{hr.recordType}</span>
                   <span className="text-[10px] text-[var(--color-text-muted)]">{date(hr.examinedAt)}</span>
                 </div>
+                {hr.trainingDecision && <div className="text-[11px] font-semibold">Training: {hr.trainingDecision}</div>}
+                {hr.restrictionDetails && <div className="text-[11px]">Restrictions: {hr.restrictionDetails}</div>}
+                {hr.followUpDate && <div className="text-[11px]">Follow-up: {date(hr.followUpDate)}</div>}
                 {hr.diagnosis && <div className="text-[11px]">Diag: {hr.diagnosis}</div>}
                 {hr.notes && <div className="text-[11px] text-[var(--color-text-secondary)] mt-1">{hr.notes}</div>}
               </li>

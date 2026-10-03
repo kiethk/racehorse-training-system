@@ -5,6 +5,6 @@ public enum TaskSource {
     SOP,
     /** Từ training_workouts JOIN training_lots — buổi tập Trainer gán cho Groom. */
     WORKOUT,
-    /** Từ preventive_care_schedules — lịch thú y định kỳ của ngựa trong chuồng mình. */
+    /** Từ care_schedule — lịch thú y định kỳ của ngựa trong chuồng mình. */
     PREVENTIVE_CARE
 }

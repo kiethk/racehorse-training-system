@@ -3,15 +3,17 @@ package com.rtms.backend.service;
 import com.rtms.backend.dto.ManagerReviewRequest;
 import com.rtms.backend.entity.AdmissionApplication;
 import com.rtms.backend.entity.Horse;
-import com.rtms.backend.entity.PreventiveCareSchedule;
 import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.entity.CareSchedule;
 import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.enums.ReviewDecision;
 import com.rtms.backend.enums.StallStatus;
+import com.rtms.backend.enums.TrainingStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.repository.PreventiveCareScheduleRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +43,7 @@ class AdmissionManagerReviewServiceTest {
     private HorseRepository horseRepository;
 
     @Mock
-    private PreventiveCareScheduleRepository preventiveCareScheduleRepository;
+    private CareScheduleRepository careScheduleRepository;
 
     @Mock
     private AdmissionGroomReviewService admissionGroomReviewService;
@@ -96,7 +98,7 @@ class AdmissionManagerReviewServiceTest {
                 admissionApplicationRepository,
                 stableStallRepository,
                 horseRepository,
-                preventiveCareScheduleRepository,
+                careScheduleRepository,
                 admissionGroomReviewService);
     }
 
@@ -113,7 +115,7 @@ class AdmissionManagerReviewServiceTest {
         StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.of(regularStall));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -151,7 +153,7 @@ class AdmissionManagerReviewServiceTest {
         StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.of(regularStall));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -177,9 +179,9 @@ class AdmissionManagerReviewServiceTest {
         StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(preventiveCareScheduleRepository.findByHorseIdAndStatusIn(10L, List.of("PENDING", "OVERDUE")))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
                 .thenReturn(List.of());
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -200,43 +202,43 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("REJECT: lịch PENDING và OVERDUE bị CANCELLED, lịch COMPLETED không bị ảnh hưởng")
-    void reject_cancelsPendingAndOverdueSchedules_notCompleted() {
+    @DisplayName("REJECT: lịch REQUESTED và SCHEDULED bị CANCELLED, lịch COMPLETED không bị ảnh hưởng")
+    void reject_cancelsActiveSchedules_notCompleted() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
 
-        PreventiveCareSchedule pending = new PreventiveCareSchedule();
+        CareSchedule pending = new CareSchedule();
         pending.setId(1L);
         pending.setHorseId(10L);
-        pending.setStatus("PENDING");
+        pending.setStatus(CareScheduleStatus.REQUESTED);
 
-        PreventiveCareSchedule overdue = new PreventiveCareSchedule();
+        CareSchedule overdue = new CareSchedule();
         overdue.setId(2L);
         overdue.setHorseId(10L);
-        overdue.setStatus("OVERDUE");
+        overdue.setStatus(CareScheduleStatus.SCHEDULED);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(preventiveCareScheduleRepository.findByHorseIdAndStatusIn(10L, List.of("PENDING", "OVERDUE")))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
                 .thenReturn(List.of(pending, overdue));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         service.review(1L, 5L, rejectRequest("Rejected"));
 
-        assertEquals("CANCELLED", pending.getStatus());
-        assertEquals("CANCELLED", overdue.getStatus());
+        assertEquals(CareScheduleStatus.CANCELLED, pending.getStatus());
+        assertEquals(CareScheduleStatus.CANCELLED, overdue.getStatus());
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<PreventiveCareSchedule>> captor = ArgumentCaptor.forClass(List.class);
-        verify(preventiveCareScheduleRepository).saveAll(captor.capture());
-        List<PreventiveCareSchedule> saved = captor.getValue();
+        ArgumentCaptor<List<CareSchedule>> captor = ArgumentCaptor.forClass(List.class);
+        verify(careScheduleRepository).saveAll(captor.capture());
+        List<CareSchedule> saved = captor.getValue();
         assertEquals(2, saved.size());
-        assertTrue(saved.stream().allMatch(s -> "CANCELLED".equals(s.getStatus())));
+        assertTrue(saved.stream().allMatch(s -> s.getStatus() == CareScheduleStatus.CANCELLED));
 
         // COMPLETED schedules are never queried in this call — no interference
-        verify(preventiveCareScheduleRepository, never()).findByHorseIdOrderByScheduledDateAsc(any());
+        verify(careScheduleRepository, never()).findByHorseIdOrderByScheduledAtAsc(any());
     }
 
     @Test
@@ -247,15 +249,52 @@ class AdmissionManagerReviewServiceTest {
         StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(preventiveCareScheduleRepository.findByHorseIdAndStatusIn(10L, List.of("PENDING", "OVERDUE")))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
                 .thenReturn(List.of());
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         service.review(1L, 5L, rejectRequest("Rejected"));
 
-        verify(preventiveCareScheduleRepository).saveAll(List.of());
+        verify(careScheduleRepository).saveAll(List.of());
+    }
+
+    @Test
+    @DisplayName("REJECT: huỷ các CareSchedule đang active (REQUESTED, AWAITING_VET_CONFIRMATION, SCHEDULED, IN_PROGRESS)")
+    void reject_cancelsActiveCareSchedules() {
+        AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
+        Horse horse = buildHorse(HorseStatus.CANDIDATE);
+        StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
+
+        CareSchedule requested = new CareSchedule();
+        requested.setId(100L);
+        requested.setHorseId(10L);
+        requested.setStatus(CareScheduleStatus.REQUESTED);
+
+        CareSchedule inProgress = new CareSchedule();
+        inProgress.setId(101L);
+        inProgress.setHorseId(10L);
+        inProgress.setStatus(CareScheduleStatus.IN_PROGRESS);
+
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
+        when(careScheduleRepository.findByHorseIdAndStatusIn(eq(10L), any()))
+                .thenReturn(List.of(requested, inProgress));
+        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        service.review(1L, 5L, rejectRequest("Rejected"));
+
+        assertEquals(CareScheduleStatus.CANCELLED, requested.getStatus());
+        assertEquals("Admission rejected by manager", requested.getCancelReason());
+        assertEquals(CareScheduleStatus.CANCELLED, inProgress.getStatus());
+        assertEquals("Admission rejected by manager", inProgress.getCancelReason());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CareSchedule>> captor = ArgumentCaptor.forClass(List.class);
+        verify(careScheduleRepository).saveAll(captor.capture());
+        assertEquals(2, captor.getValue().size());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -269,7 +308,7 @@ class AdmissionManagerReviewServiceTest {
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
 
         ManagerReviewRequest req = rejectRequest(null);
 
@@ -288,7 +327,7 @@ class AdmissionManagerReviewServiceTest {
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.review(1L, 5L, rejectRequest("   ")));
@@ -354,7 +393,7 @@ class AdmissionManagerReviewServiceTest {
     void review_horseNotFound_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.empty());
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.empty());
 
         assertThrows(IllegalStateException.class,
                 () -> service.review(1L, 5L, approveRequest(20L)));
@@ -369,7 +408,7 @@ class AdmissionManagerReviewServiceTest {
         Horse horse = buildHorse(HorseStatus.ELIGIBLE); // Already past CANDIDATE
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
 
         assertThrows(IllegalStateException.class,
                 () -> service.review(1L, 5L, approveRequest(20L)));
@@ -388,7 +427,7 @@ class AdmissionManagerReviewServiceTest {
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.empty());
 
         assertThrows(IllegalStateException.class,
@@ -405,7 +444,7 @@ class AdmissionManagerReviewServiceTest {
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.empty());
 
         assertThrows(IllegalStateException.class,
@@ -426,7 +465,7 @@ class AdmissionManagerReviewServiceTest {
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
 
         ManagerReviewRequest req = new ManagerReviewRequest();
         // decision left null
@@ -451,7 +490,7 @@ class AdmissionManagerReviewServiceTest {
         StableStall regularStall = buildStall(20L, StallStatus.AVAILABLE);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.of(regularStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -460,6 +499,39 @@ class AdmissionManagerReviewServiceTest {
         assertEquals(AdmissionStatus.APPROVED, result.getStatus());
         // findById for Q stall must never be called
         verify(stableStallRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("APPROVE bảo toàn khóa huấn luyện y khoa do bác sĩ thú y chỉ định")
+    void approve_withVetMedicalLock_preservesTrainingLock() {
+        AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
+        Horse horse = buildHorse(HorseStatus.CANDIDATE);
+        horse.setTrainingLocked(true);
+        horse.setTrainingStatus(TrainingStatus.BLOCKED);
+        horse.setTrainingLockVetId(3L);
+        horse.setTrainingLockReason("Left forelimb tendon strain - rest prescribed by vet");
+
+        StableStall regularStall = buildStall(20L, StallStatus.AVAILABLE);
+        StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
+
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.of(regularStall));
+        when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
+        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        AdmissionApplication result = service.review(1L, 5L, approveRequest(20L));
+
+        assertEquals(AdmissionStatus.APPROVED, result.getStatus());
+        assertEquals(HorseStatus.ELIGIBLE, horse.getCurrentStatus());
+        assertEquals(20L, horse.getCurrentStallId());
+
+        // Lock must be preserved!
+        assertTrue(horse.isTrainingLocked());
+        assertEquals(TrainingStatus.BLOCKED, horse.getTrainingStatus());
+        assertEquals(3L, horse.getTrainingLockVetId());
+        assertEquals("Left forelimb tendon strain - rest prescribed by vet", horse.getTrainingLockReason());
+        verify(horseRepository).save(horse);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -473,13 +545,13 @@ class AdmissionManagerReviewServiceTest {
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         StableStall regularStall = buildStall(20L, StallStatus.AVAILABLE);
         StableStall quarantineStall = buildStall(99L, StallStatus.OCCUPIED);
-        
+
         AdmissionApplication waitingAdmission = new AdmissionApplication();
         waitingAdmission.setId(100L);
         waitingAdmission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.of(regularStall));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(quarantineStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -499,13 +571,13 @@ class AdmissionManagerReviewServiceTest {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         StableStall quarantineStall = buildStall(99L, StallStatus.OCCUPIED);
-        
+
         AdmissionApplication waitingAdmission = new AdmissionApplication();
         waitingAdmission.setId(200L);
         waitingAdmission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(quarantineStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL))
@@ -527,7 +599,7 @@ class AdmissionManagerReviewServiceTest {
         StableStall quarantineStall = buildStall(99L, StallStatus.OCCUPIED);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.of(regularStall));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(quarantineStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
