@@ -25,6 +25,30 @@ export interface StaffCreationRequest {
   trainerId?: number;
 }
 
+/** Result of POST /api/staff — carries auto-assignment info from backend. */
+export interface StaffCreationResponse {
+  userId: number;
+  fullName: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  role: string;
+  active: boolean;
+  createdAt: string;
+  profileSummary?: string;
+  // HEAD_TRAINER assignment
+  assignedAreaIds?: number[];
+  assignedAreaCodes?: string[];
+  // GROOM assignment
+  trainerId?: number;
+  trainerName?: string;
+  assignedAreaId?: number;
+  assignedAreaCode?: string;
+  assignedStallIds?: number[];
+  assignedStallCodes?: string[];
+  noStallBlockAvailable?: boolean;
+}
+
 export interface StaffDetailResponse {
   id: number;
   fullName: string;

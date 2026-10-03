@@ -117,4 +117,21 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             ORDER BY a.code ASC, ss.stall_number ASC
             """, nativeQuery = true)
     List<StableStall> findAllAvailableRegularStallsOrdered();
+
+    /**
+     * Find all stalls in a given area with stall_number within [fromNumber, toNumber], ordered ascending.
+     * Used for groom block assignment to inspect a specific 3-stall block.
+     */
+    List<StableStall> findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(
+            Long areaId, Integer stallNumberFrom, Integer stallNumberTo);
+
+    /** Find all stalls belonging to any of the given area IDs, ordered area code + stall_number ascending. */
+    @Query(value = """
+            SELECT ss.*
+            FROM stable_stalls ss
+            JOIN areas a ON a.id = ss.area_id
+            WHERE ss.area_id IN :areaIds
+            ORDER BY a.code ASC, ss.stall_number ASC
+            """, nativeQuery = true)
+    List<StableStall> findByAreaIdInOrdered(@Param("areaIds") List<Long> areaIds);
 }

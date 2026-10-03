@@ -165,6 +165,19 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const res = await doFetch(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw await responseError(res);
+  }
+  return res.json();
+}
+
 /** Multipart upload uses the same Bearer API client as JSON requests. */
 export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
   const res = await doFetch(path, {
