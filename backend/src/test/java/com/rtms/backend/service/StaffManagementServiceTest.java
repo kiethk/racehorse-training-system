@@ -498,6 +498,68 @@ class StaffManagementServiceTest {
         verify(groomProfileRepository, atLeastOnce()).save(any(GroomProfile.class));
     }
 
+    /** Groom owns stalls + clear Trainer (trainerId = null) → rejected. */
+    @Test
+    void testUpdateGroomTrainer_WithStalls_RejectsClearTrainer() {
+        Role groomRole = new Role(); groomRole.setName("GROOM");
+        User groom = new User(); groom.setId(20L); groom.setRole(groomRole); groom.setActive(true);
+        groom.setFullName("Groom G"); groom.setEmail("g@rtms.com");
+
+        when(userRepository.findById(20L)).thenReturn(Optional.of(groom));
+
+        GroomProfile groomProfile = new GroomProfile();
+        groomProfile.setUserId(20L);
+        groomProfile.setTrainerId(5L); // currently assigned to trainer 5
+        when(groomProfileRepository.findById(20L)).thenReturn(Optional.of(groomProfile));
+
+        // Groom owns stalls
+        StableStall s1 = stall(101, 1, 1, 20L);
+        when(stableStallRepository.findByGroomId(20L)).thenReturn(List.of(s1));
+
+        StaffUpdateRequest req = new StaffUpdateRequest();
+        req.setTrainerIdProvided(true); // implies they explicitly passed trainerId: null
+        req.setTrainerId(null);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> staffService.updateStaff(20L, req));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Cannot remove Trainer"));
+        verify(groomProfileRepository, never()).save(any(GroomProfile.class));
+    }
+
+    /** Groom owns NO stalls + clear Trainer (trainerId = null) → allowed. */
+    @Test
+    void testUpdateGroomTrainer_NoStalls_AllowsClearTrainer() {
+        Role groomRole = new Role(); groomRole.setName("GROOM");
+        User groom = new User(); groom.setId(20L); groom.setRole(groomRole); groom.setActive(true);
+        groom.setFullName("Groom G"); groom.setEmail("g@rtms.com");
+
+        when(userRepository.findById(20L)).thenReturn(Optional.of(groom));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        GroomProfile groomProfile = new GroomProfile();
+        groomProfile.setUserId(20L);
+        groomProfile.setTrainerId(5L); // currently assigned to trainer 5
+        when(groomProfileRepository.findById(20L)).thenReturn(Optional.of(groomProfile));
+
+        // Groom owns no stalls
+        when(stableStallRepository.findByGroomId(20L)).thenReturn(List.of());
+        
+        when(groomProfileRepository.findById(20L)).thenReturn(Optional.of(groomProfile));
+
+        StaffUpdateRequest req = new StaffUpdateRequest();
+        req.setTrainerIdProvided(true); // implies they explicitly passed trainerId: null
+        req.setTrainerId(null);
+
+        assertDoesNotThrow(() -> staffService.updateStaff(20L, req));
+        
+        // Assert trainer is cleared
+        assertNull(groomProfile.getTrainerId());
+        verify(groomProfileRepository, atLeastOnce()).save(any(GroomProfile.class));
+    }
+
+
+
     // ── Concurrency guard tests ───────────────────────────────────────
 
     /**

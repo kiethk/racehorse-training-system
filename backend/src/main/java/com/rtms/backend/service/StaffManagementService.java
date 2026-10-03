@@ -166,6 +166,11 @@ public class StaffManagementService {
 
                     groomProfile.setTrainerId(trainer.getId());
                 } else if (request.isTrainerIdProvided()) {
+                    List<StableStall> ownedStalls = stableStallRepository.findByGroomId(user.getId());
+                    if (!ownedStalls.isEmpty()) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Cannot remove Trainer while Groom is assigned to stalls. Unassign the stalls first.");
+                    }
                     groomProfile.setTrainerId(null);
                 }
                 groomProfileRepository.save(groomProfile);
