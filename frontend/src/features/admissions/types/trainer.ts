@@ -1,4 +1,22 @@
-import type { AdmissionDetailResponse, HealthRecord, HorseHealthMetricResponse } from './index';
+import type {
+  AdmissionDetailResponse,
+  AdmissionSummaryResponse,
+  HealthRecord,
+  HorseHealthMetricResponse,
+} from './index';
+
+/**
+ * Khớp dto/TrainerAdmissionQueueResponse.java.
+ *
+ * Backend đã lọc theo Trainer đang đăng nhập, nên màn hình KHÔNG lọc lại theo
+ * trainerId hay status nữa — chỉ cần chọn đúng mảng theo tab.
+ */
+export interface TrainerAdmissionQueue {
+  /** Đơn ở bước TRAINER_REVIEW được phân cho tôi (hoặc chưa phân cho ai). */
+  pending: AdmissionSummaryResponse[];
+  /** Đơn tôi đã đánh giá — mọi trạng thái về sau, kể cả bị Quản lý từ chối. */
+  reviewed: AdmissionSummaryResponse[];
+}
 
 /**
  * Khớp enums/RacingReadinessStatus.java.

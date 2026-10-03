@@ -10,7 +10,6 @@ import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { stableApi } from '../services/stableService';
 import type { Area, Horse, StableStall, UserSummary } from '../types';
 import { AssignHorseDialog } from './AssignHorseDialog';
-import { AssignGroomDialog } from './AssignGroomDialog';
 
 export function StableMap() {
   const { user } = useAuth();
@@ -23,12 +22,19 @@ export function StableMap() {
    * backend đã loại hết ngựa chưa có chuồng, lọc lại ở client sẽ luôn rỗng.
    */
   const [unassignedHorses, setUnassignedHorses] = useState<Horse[]>([]);
+  /**
+   * Chỉ dùng để hiện TÊN Groom trên từng ô chuồng.
+   *
+   * Trainer không còn phân công Groom (V63 — việc đó thuộc Quản lý câu lạc
+   * bộ), nhưng vẫn phải biết ai chăm con nào để điều phối lot: khi hai ngựa
+   * cùng một Groom bị xếp vào cùng một lot thì vướng BR-09, và cách chữa là
+   * dời ngựa sang chuồng của Groom khác hoặc chọn Groom riêng cho buổi tập.
+   */
   const [grooms, setGrooms] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [assignHorseStall, setAssignHorseStall] = useState<StableStall | null>(null);
-  const [assignGroomStall, setAssignGroomStall] = useState<StableStall | null>(null);
   /** Chuồng đang chờ xác nhận gỡ ngựa. */
   const [unassignStall, setUnassignStall] = useState<StableStall | null>(null);
   const [unassigning, setUnassigning] = useState(false);
@@ -76,14 +82,6 @@ export function StableMap() {
     [grooms],
   );
 
-  const stallCountByGroom = useMemo(() => {
-    const m = new Map<number, number>();
-    stalls.forEach((s) => {
-      if (s.groomId) m.set(s.groomId, (m.get(s.groomId) ?? 0) + 1);
-    });
-    return m;
-  }, [stalls]);
-
   // Chỉ hiện khu REGULAR do chính Trainer này phụ trách (nếu có trainerId), hoặc tất cả khu REGULAR
   const myAreas = useMemo(() => {
     const filtered = areas.filter(
@@ -117,10 +115,10 @@ export function StableMap() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[18px] font-semibold tracking-tight text-[var(--color-text-primary)]">
-            Sơ đồ chuồng trại &amp; Phân công Groom
+            Sơ đồ chuồng trại
           </h1>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Theo dõi vị trí các chiến mã và phân công Groom chăm sóc.
+            Xếp chiến mã vào chuồng và xem Groom phụ trách từng chuồng.
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => loadAll()}>
@@ -237,13 +235,6 @@ export function StableMap() {
                               Gỡ ngựa
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => setAssignGroomStall(stall)}
-                            className="flex-1 rounded px-2 py-1 text-[11px] font-medium text-center bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)] transition"
-                          >
-                            {stall.groomId ? 'Đổi Groom' : 'Gán Groom'}
-                          </button>
                         </div>
                       </div>
                     );
@@ -261,15 +252,6 @@ export function StableMap() {
         stall={assignHorseStall}
         horses={unassignedHorses}
         onClose={() => setAssignHorseStall(null)}
-        onAssigned={loadAll}
-      />
-
-      <AssignGroomDialog
-        open={assignGroomStall !== null}
-        stall={assignGroomStall}
-        grooms={grooms}
-        stallCountByGroom={stallCountByGroom}
-        onClose={() => setAssignGroomStall(null)}
         onAssigned={loadAll}
       />
 

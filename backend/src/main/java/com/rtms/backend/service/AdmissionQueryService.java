@@ -7,6 +7,7 @@ import com.rtms.backend.dto.AdmissionDocumentResponse;
 import com.rtms.backend.dto.AdmissionSummaryResponse;
 import com.rtms.backend.dto.GroomAdmissionQueueResponse;
 import com.rtms.backend.dto.InitialExamScheduleResponse;
+import com.rtms.backend.dto.TrainerAdmissionQueueResponse;
 import com.rtms.backend.entity.AdmissionApplication;
 import com.rtms.backend.entity.AdmissionDocument;
 import com.rtms.backend.entity.CandidateHorseProfile;
@@ -101,6 +102,31 @@ public class AdmissionQueryService {
         return admissions.stream()
                 .map(this::toSummaryResponse)
                 .toList();
+    }
+
+    /**
+     * Hàng chờ riêng của một Huấn luyện viên.
+     *
+     * KHÔNG dùng getAdmissions(status) cho màn hình Trainer: endpoint đó
+     * (GET /api/admissions) dùng chung cho cả 5 vai trò — Chủ ngựa, Groom,
+     * Thú y, Trainer, Quản lý — vì cùng một quyền ADMISSION_APPLICATION_VIEW.
+     * Nhét điều kiện trainer_id vào đó sẽ làm danh sách của Quản lý và Thú y
+     * rỗng trắng, mà không gây lỗi biên dịch nào để báo trước.
+     */
+    public TrainerAdmissionQueueResponse getTrainerQueue(Long trainerId) {
+        List<AdmissionSummaryResponse> pending = admissionApplicationRepository
+                .findTrainerPendingQueue(trainerId, AdmissionStatus.TRAINER_REVIEW)
+                .stream()
+                .map(this::toSummaryResponse)
+                .toList();
+
+        List<AdmissionSummaryResponse> reviewed = admissionApplicationRepository
+                .findByTrainerIdAndTrainerReviewedAtIsNotNullOrderByTrainerReviewedAtDesc(trainerId)
+                .stream()
+                .map(this::toSummaryResponse)
+                .toList();
+
+        return new TrainerAdmissionQueueResponse(pending, reviewed);
     }
 
     public GroomAdmissionQueueResponse getGroomQueue(String candidateName, AdmissionStatus status,

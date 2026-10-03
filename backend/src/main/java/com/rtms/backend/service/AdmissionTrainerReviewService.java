@@ -6,6 +6,7 @@ import com.rtms.backend.entity.RacingReadinessAssessment;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.RacingReadinessAssessmentRepository;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +59,23 @@ public class AdmissionTrainerReviewService {
                     admission.getStatus()));
         }
 
+        // ---- Đúng người được phân công ----
+        //
+        // Guard này PHẢI nằm ở đây, không chỉ ở câu truy vấn hàng chờ. Ẩn đơn
+        // khỏi danh sách chỉ là tiện lợi cho giao diện; ai cũng gọi thẳng
+        // POST /api/admissions/45/trainer-review được.
+        //
+        // Trước đây dòng cuối hàm này ghi setTrainerId(trainerId) vô điều
+        // kiện. Khi bước Thú y bắt đầu gán sẵn, dòng đó biến thành GHI ĐÈ âm
+        // thầm: Trainer B nộp đánh giá cho đơn của Trainer A thì trainer_id bị
+        // sửa thành B, kèm theo racing_readiness_assessments.trainer_id = B —
+        // không còn dấu vết nào cho thấy thuật toán đã chọn A.
+        if (admission.getTrainerId() != null
+                && !admission.getTrainerId().equals(trainerId)) {
+            throw new AccessDeniedException(
+                    "Hồ sơ này đã được phân công cho Huấn luyện viên khác đánh giá!");
+        }
+
         // ---- Bước Groom phải tạo Horse trước ----
         if (admission.getHorseId() == null) {
             throw new IllegalStateException(
@@ -101,7 +119,18 @@ public class AdmissionTrainerReviewService {
         assessmentRepository.save(assessment);
 
         // ---- Ghi dấu bước Trainer lên đơn ----
-        admission.setTrainerId(trainerId);
+        //
+        // Chỉ gán khi còn trống. Đơn đã có người phụ trách thì giữ nguyên —
+        // guard ở đầu hàm đã bảo đảm người đó chính là người đang gọi, nên
+        // gán lại cũng không đổi gì, mà bỏ gán thì không bao giờ ghi đè nhầm.
+        //
+        // TODO(sau khi Thú y gán trainer_id tự động): đổi nhánh null thành
+        // lỗi "Đơn chưa được phân công Huấn luyện viên". Chưa làm ngay vì mọi
+        // đơn hiện có trong cơ sở dữ liệu đều mang trainer_id = NULL, siết
+        // bây giờ là không đánh giá được đơn nào nữa.
+        if (admission.getTrainerId() == null) {
+            admission.setTrainerId(trainerId);
+        }
         admission.setTrainerFeedback(request.getRemarks());
         admission.setTrainerReviewedAt(LocalDateTime.now());
         admission.setStatus(AdmissionStatus.MANAGER_REVIEW);

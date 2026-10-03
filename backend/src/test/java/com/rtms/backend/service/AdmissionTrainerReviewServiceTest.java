@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -79,6 +80,59 @@ class AdmissionTrainerReviewServiceTest {
         assertEquals(4, savedAssessment.getEstimatedMonthsToRace());
         assertNull(savedAssessment.getFitnessScore());
         assertNull(savedAssessment.getValidUntil());
+    }
+
+    @Test
+    @DisplayName("Chặn Trainer đánh giá đơn đã phân công cho Trainer khác (403)")
+    void testCompleteAssessment_AssignedToAnotherTrainer_ThrowsAccessDenied() {
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(10L);
+        admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
+        admission.setHorseId(7L);
+        admission.setTrainerId(5L);              // đơn của Trainer #5
+
+        when(admissionRepository.findById(10L)).thenReturn(Optional.of(admission));
+
+        TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
+        req.setReadinessStatus(RacingReadinessStatus.READY);
+
+        // Trainer #9 cố nộp -> phải bị chặn, dù danh sách đã ẩn đơn này đi
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> trainerReviewService.completeAssessment(10L, req, 9L));
+
+        assertTrue(ex.getMessage().contains("Huấn luyện viên khác"));
+        verify(assessmentRepository, never()).save(any());
+        verify(admissionRepository, never()).save(any());
+        assertEquals(5L, admission.getTrainerId());   // KHÔNG bị ghi đè
+    }
+
+    @Test
+    @DisplayName("Giữ nguyên trainerId khi đơn đã được phân công sẵn cho chính mình")
+    void testCompleteAssessment_PreAssignedToSelf_KeepsTrainerId() {
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(10L);
+        admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
+        admission.setHorseId(7L);
+        admission.setTrainerId(5L);
+
+        when(admissionRepository.findById(10L)).thenReturn(Optional.of(admission));
+        when(assessmentRepository.save(any(RacingReadinessAssessment.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(admissionRepository.save(any(AdmissionApplication.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
+        req.setReadinessStatus(RacingReadinessStatus.READY);
+
+        AdmissionApplication result = trainerReviewService.completeAssessment(10L, req, 5L);
+
+        assertEquals(5L, result.getTrainerId());
+        assertEquals(AdmissionStatus.MANAGER_REVIEW, result.getStatus());
+
+        ArgumentCaptor<RacingReadinessAssessment> captor =
+                ArgumentCaptor.forClass(RacingReadinessAssessment.class);
+        verify(assessmentRepository).save(captor.capture());
+        assertEquals(5L, captor.getValue().getTrainerId());
     }
 
     @Test

@@ -1,6 +1,9 @@
-import { apiGet } from '@/services/api';
-import type { AdmissionSummaryResponse } from '../types';
-import type { TrainerAdmissionView, TrainerReviewRequest } from '../types/trainer';
+import { apiGet, apiPost } from '@/services/api';
+import type {
+  TrainerAdmissionQueue,
+  TrainerAdmissionView,
+  TrainerReviewRequest,
+} from '../types/trainer';
 
 /** Khớp dto/ApiResponse.java — { success, data, message }. */
 interface ApiResponse<T> {
@@ -12,44 +15,30 @@ interface ApiResponse<T> {
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 /**
- * TODO(nhóm): xoá hàm này khi services/api.ts được sửa để giữ lại message lỗi.
+ * Hàm postWithMessage cục bộ ĐÃ XOÁ — ngoại lệ so với FRONTEND_GUIDE.md §8
+ * không còn lý do tồn tại: responseError() trong services/api.ts giờ đã đọc
+ * payload.message, nên apiPost giữ nguyên văn lỗi nghiệp vụ, ví dụ
+ * "Hồ sơ này đã được phân công cho Huấn luyện viên khác đánh giá!".
  *
- * NGOẠI LỆ CÓ CHỦ ĐÍCH so với FRONTEND_GUIDE.md §8.
- *
- * apiPost dùng chung VỨT BỎ body lỗi — nó chỉ ném new Error("API error: 400").
- * Màn hình này bắt buộc hiện nguyên văn lỗi nghiệp vụ, ví dụ:
- *   "Đơn đang ở bước MANAGER_REVIEW, không phải TRAINER_REVIEW — không thể đánh giá!"
- * Dùng apiPost thì vi phạm §12 (hiện lỗi) và §19 (không được nuốt lỗi).
- *
- * apiUpload trong CHÍNH services/api.ts đã xử lý đúng — xem đề xuất ở PHẦN D.
- * Hàm này đặt trong tầng service, KHÔNG đặt trong component.
+ * Và hàm cũ còn một khiếm khuyết nữa: nó tự gọi fetch() nên không đi qua
+ * doFetch(), tức là bỏ qua cơ chế tự làm mới token khi gặp 401. Trainer ngồi
+ * nhập ba điểm số rồi bấm nộp đúng lúc JWT vừa hết hạn sẽ mất trắng phần đã
+ * nhập, thay vì được refresh rồi gửi lại.
  */
-async function postWithMessage<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',      // bắt buộc — cookie jwt_token là HttpOnly
-    body: JSON.stringify(body),
-  });
-  const payload = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(payload?.message || `API error: ${res.status}`);
-  }
-  return payload as T;
-}
-
 export const trainerAdmissionsApi = {
   /**
-   * TẤT CẢ hồ sơ tiếp nhận — màn hình tự chia thành "chờ đánh giá" và
-   * "đã đánh giá".
+   * Hàng chờ của CHÍNH Trainer đang đăng nhập — hai nhóm trong một lời gọi.
    *
-   * Vì sao không lọc sẵn theo status ở đây: sau khi Trainer đánh giá xong,
-   * hồ sơ chuyển sang bước Quản lý nên không còn trạng thái nào nghĩa là
-   * "Trainer đã duyệt". Lấy hết rồi chia ở client là cách rẻ nhất để vẫn
-   * xem lại được hồ sơ cũ, mà chỉ tốn một lời gọi.
+   * Thay cho getAll() cũ (GET /api/admissions không truyền status). Cái cũ
+   * rơi vào nhánh findAll() của backend, trả về TOÀN BỘ hồ sơ của mọi trạng
+   * thái và mọi Trainer, rồi màn hình tự lọc ở client. Hai vấn đề: dữ liệu
+   * của Trainer khác vẫn nằm trong phản hồi (chỉ bị ẩn khỏi bảng), và lượng
+   * truyền tăng tuyến tính theo số đơn toàn hệ thống.
    */
-  getAll: async (): Promise<AdmissionSummaryResponse[]> => {
-    const res = await apiGet<ApiResponse<AdmissionSummaryResponse[]>>('/api/admissions');
+  getQueue: async (): Promise<TrainerAdmissionQueue> => {
+    const res = await apiGet<ApiResponse<TrainerAdmissionQueue>>(
+      '/api/admissions/trainer/queue',
+    );
     return res.data;
   },
 
@@ -63,10 +52,7 @@ export const trainerAdmissionsApi = {
 
   /** Nộp đánh giá -> backend TỰ chuyển đơn sang MANAGER_REVIEW. */
   submitReview: async (id: number, body: TrainerReviewRequest): Promise<void> => {
-    await postWithMessage<ApiResponse<unknown>>(
-      `/api/admissions/${id}/trainer-review`,
-      body,
-    );
+    await apiPost<ApiResponse<unknown>>(`/api/admissions/${id}/trainer-review`, body);
   },
 
   /** Link tải giấy tờ — mở bằng thẻ <a>, cookie jwt_token tự gửi kèm. */
