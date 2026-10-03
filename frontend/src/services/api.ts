@@ -36,6 +36,47 @@ export function setServerClockOffset(serverTimeMs: number) {
   serverClockOffsetMs = serverTimeMs - Date.now();
 }
 
+let accessToken: string | null = null;
+
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
+export function setAccessToken(token: string | null) {
+  accessToken = token;
+}
+
+export async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (refreshRes.ok) {
+        const data = await refreshRes.json();
+        if (data?.data?.accessToken) {
+          setAccessToken(data.data.accessToken);
+          return true;
+        }
+      }
+      setAccessToken(null);
+      return false;
+    } catch {
+      setAccessToken(null);
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 async function doFetch(path: string, options: RequestInit): Promise<Response> {
   const isAuthEndpoint = [
     '/api/auth/login',
@@ -44,7 +85,16 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
     '/api/auth/logout'
   ].includes(path);
 
-  let res = await fetch(`${API_URL}${path}`, options);
+  const finalOptions = { ...options };
+  const headers = new Headers(options.headers || {});
+  
+  if (accessToken && !isAuthEndpoint) {
+    headers.set('Authorization', `Bearer ${accessToken}`);
+  }
+  
+  finalOptions.headers = headers;
+
+  let res = await fetch(`${API_URL}${path}`, finalOptions);
 
   const dateHeader = res.headers.get('date');
   if (dateHeader) {
@@ -55,26 +105,12 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
   }
 
   if (res.status === 401 && !isAuthEndpoint) {
-    if (!refreshPromise) {
-      refreshPromise = (async () => {
-        try {
-          const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
-            method: 'POST',
-            credentials: 'include',
-          });
-          return refreshRes.ok;
-        } catch {
-          return false;
-        } finally {
-          refreshPromise = null;
-        }
-      })();
-    }
-
-    const refreshed = await refreshPromise;
-    if (refreshed) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed && accessToken) {
       // Retry original request exactly once
-      res = await fetch(`${API_URL}${path}`, options);
+      headers.set('Authorization', `Bearer ${accessToken}`);
+      finalOptions.headers = headers;
+      res = await fetch(`${API_URL}${path}`, finalOptions);
     }
   }
 
@@ -91,7 +127,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   return res.json();
 }
 
-/** Binary files use cookie authentication and the same refresh flow as JSON. */
+/** Binary files use Bearer authentication and the same refresh flow as JSON. */
 export async function apiGetBlob(path: string, signal?: AbortSignal): Promise<Blob> {
   let apiPath = path;
   let external = false;
@@ -133,7 +169,20 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
-/** Multipart upload uses the same cookie-backed API client as JSON requests. */
+export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const res = await doFetch(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw await responseError(res);
+  }
+  return res.json();
+}
+
+/** Multipart upload uses the same Bearer API client as JSON requests. */
 export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
   const res = await doFetch(path, {
     method: "POST",

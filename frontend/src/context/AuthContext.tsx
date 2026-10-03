@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import * as authService from '@/services/auth';
+import { refreshAccessToken } from '@/services/api';
 import type { AuthUser } from '@/types/auth';
 
 interface AuthContextValue {
@@ -37,13 +38,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // On mount: restore session from cookie via /api/auth/me
+  // On mount: restore session from cookie by fetching a new access token
   useEffect(() => {
     let cancelled = false;
     async function init() {
       try {
-        const res = await authService.getCurrentUser();
-        if (!cancelled) setUser(res.success ? res.data : null);
+        // 1. Attempt to refresh the access token using the shared single-flight mechanism
+        const refreshed = await refreshAccessToken();
+
+        if (refreshed) {
+          // 2. Fetch user profile
+          const meRes = await authService.getCurrentUser();
+          if (!cancelled) setUser(meRes.success ? meRes.data : null);
+        } else {
+          if (!cancelled) setUser(null);
+        }
       } catch {
         if (!cancelled) setUser(null);
       } finally {
