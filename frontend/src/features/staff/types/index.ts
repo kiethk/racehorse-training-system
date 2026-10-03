@@ -47,6 +47,7 @@ export interface StaffCreationResponse {
   assignedStallIds?: number[];
   assignedStallCodes?: string[];
   noStallBlockAvailable?: boolean;
+  assignmentStatus?: string;
 }
 
 export interface StaffDetailResponse {

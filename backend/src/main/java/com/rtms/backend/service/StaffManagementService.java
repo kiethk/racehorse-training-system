@@ -276,68 +276,116 @@ public class StaffManagementService {
 
     private StaffCreationResponse createGroom(User user, StaffCreationRequest request,
                                               StaffCreationResponse response) {
-        if (request.getTrainerId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "trainerId is required for GROOM creation");
-        }
+        
+        List<User> activeTrainers = userRepository.findActiveHeadTrainers();
+        
+        User bestTrainer = null;
+        int bestTrainerFreeBlocks = -1;
+        long bestTrainerGroomCount = Long.MAX_VALUE;
+        
+        Area bestAreaToAssign = null;
+        List<StableStall> bestBlockToAssign = null;
 
-        User trainer = userRepository.findById(request.getTrainerId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trainer not found"));
-        if (trainer.getRole() == null || !"HEAD_TRAINER".equals(trainer.getRole().getName()) || !trainer.isActive()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected user is not an active HEAD_TRAINER");
-        }
+        for (User trainer : activeTrainers) {
+            List<Area> trainerAreas = new ArrayList<>(
+                    areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, trainer.getId()));
+            
+            if (trainerAreas.isEmpty()) continue;
+            
+            trainerAreas.sort((a, b) -> a.getCode().compareTo(b.getCode())); // deterministic: area code ASC
 
-        GroomProfile groom = new GroomProfile();
-        groom.setUserId(user.getId());
-        groom.setTrainerId(trainer.getId());
-        groomProfileRepository.save(groom);
+            int freeBlocks = 0;
+            Area firstFreeArea = null;
+            List<StableStall> firstFreeBlock = null;
 
-        response.setTrainerId(trainer.getId());
-        response.setTrainerName(trainer.getFullName());
+            for (Area area : trainerAreas) {
+                for (int blockStart : BLOCK_STARTS) {
+                    int blockEnd = blockStart + GROOM_BLOCK_SIZE - 1; // e.g. 1→3, 4→6
+                    List<StableStall> block = stableStallRepository
+                            .findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(area.getId(), blockStart, blockEnd);
 
-        // Auto-assign first free 3-stall block in Trainer's REGULAR areas (code ASC, then block order).
-        // If no block exists, Groom is still created with zero stall assignments.
-        List<Area> trainerAreas = new ArrayList<>(
-                areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, trainer.getId()));
-        trainerAreas.sort((a, b) -> a.getCode().compareTo(b.getCode())); // deterministic: area code ASC
-
-        List<Long>   stallIds   = new ArrayList<>();
-        List<String> stallCodes = new ArrayList<>();
-        Long foundAreaId   = null;
-        String foundAreaCode = null;
-
-        outer:
-        for (Area area : trainerAreas) {
-            for (int blockStart : BLOCK_STARTS) {
-                int blockEnd = blockStart + GROOM_BLOCK_SIZE - 1; // e.g. 1→3, 4→6
-                List<StableStall> block = stableStallRepository
-                        .findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(area.getId(), blockStart, blockEnd);
-
-                if (block.size() == GROOM_BLOCK_SIZE && block.stream().allMatch(s -> s.getGroomId() == null)) {
-                    // Found a fully free block — assign the groom to all 3 stalls
-                    for (StableStall stall : block) {
-                        stall.setGroomId(user.getId());
-                        stableStallRepository.save(stall);
-                        stallIds.add(stall.getId());
-                        stallCodes.add(stall.getStallCode());
+                    if (block.size() == GROOM_BLOCK_SIZE && block.stream().allMatch(s -> s.getGroomId() == null)) {
+                        freeBlocks++;
+                        if (firstFreeBlock == null) {
+                            firstFreeBlock = block;
+                            firstFreeArea = area;
+                        }
                     }
-                    foundAreaId   = area.getId();
-                    foundAreaCode = area.getCode();
-                    break outer;
+                }
+            }
+
+            if (freeBlocks > 0) {
+                long groomCount = groomProfileRepository.countByTrainerId(trainer.getId());
+                
+                boolean isBetter = false;
+                if (groomCount < bestTrainerGroomCount) {
+                    isBetter = true;
+                } else if (groomCount == bestTrainerGroomCount) {
+                    if (freeBlocks > bestTrainerFreeBlocks) {
+                        isBetter = true;
+                    } else if (freeBlocks == bestTrainerFreeBlocks) {
+                        if (bestTrainer == null || trainer.getId() < bestTrainer.getId()) {
+                            isBetter = true;
+                        }
+                    }
+                }
+
+                if (isBetter) {
+                    bestTrainer = trainer;
+                    bestTrainerGroomCount = groomCount;
+                    bestTrainerFreeBlocks = freeBlocks;
+                    bestAreaToAssign = firstFreeArea;
+                    bestBlockToAssign = firstFreeBlock;
                 }
             }
         }
 
-        if (stallIds.isEmpty()) {
+        GroomProfile groom = new GroomProfile();
+        groom.setUserId(user.getId());
+
+        if (bestTrainer == null) {
+            groom.setTrainerId(null);
+            groomProfileRepository.save(groom);
+            
+            response.setTrainerId(null);
+            response.setTrainerName(null);
+            response.setAssignedAreaId(null);
+            response.setAssignedAreaCode(null);
+            response.setAssignedStallIds(new ArrayList<>());
+            response.setAssignedStallCodes(new ArrayList<>());
+            response.setAssignmentStatus("UNASSIGNED");
             response.setNoStallBlockAvailable(true);
-            response.setProfileSummary("Trainer: " + trainer.getFullName() + " | No stall block available");
-        } else {
-            response.setAssignedAreaId(foundAreaId);
-            response.setAssignedAreaCode(foundAreaCode);
-            response.setAssignedStallIds(stallIds);
-            response.setAssignedStallCodes(stallCodes);
-            response.setNoStallBlockAvailable(false);
-            response.setProfileSummary("Trainer: " + trainer.getFullName() + " | Stalls: " + String.join(", ", stallCodes));
+            response.setProfileSummary("Groom created successfully, but no Trainer with an available stall block is currently available.");
+            
+            return response;
         }
+
+        groom.setTrainerId(bestTrainer.getId());
+        groomProfileRepository.save(groom);
+
+        List<Long> stallIds = new ArrayList<>();
+        List<String> stallCodes = new ArrayList<>();
+
+        for (StableStall stall : bestBlockToAssign) {
+            // Re-check just to be absolutely safe
+            if (stall.getGroomId() != null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Stall was modified concurrently");
+            }
+            stall.setGroomId(user.getId());
+            stableStallRepository.save(stall);
+            stallIds.add(stall.getId());
+            stallCodes.add(stall.getStallCode());
+        }
+
+        response.setTrainerId(bestTrainer.getId());
+        response.setTrainerName(bestTrainer.getFullName());
+        response.setAssignedAreaId(bestAreaToAssign.getId());
+        response.setAssignedAreaCode(bestAreaToAssign.getCode());
+        response.setAssignedStallIds(stallIds);
+        response.setAssignedStallCodes(stallCodes);
+        response.setAssignmentStatus("ASSIGNED");
+        response.setNoStallBlockAvailable(false);
+        response.setProfileSummary("Trainer: " + bestTrainer.getFullName() + " | Area: " + bestAreaToAssign.getCode() + " | Stalls: " + String.join(", ", stallCodes));
 
         return response;
     }

@@ -37,11 +37,16 @@ public class StaffCreationResponse {
      * null  = not applicable (not a Groom creation, or block was found).
      */
     private Boolean noStallBlockAvailable;
+    
+    private String assignmentStatus;
 
     // ── Accessors ────────────────────────────────────────────────────────────
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
+    
+    public String getAssignmentStatus() { return assignmentStatus; }
+    public void setAssignmentStatus(String assignmentStatus) { this.assignmentStatus = assignmentStatus; }
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }

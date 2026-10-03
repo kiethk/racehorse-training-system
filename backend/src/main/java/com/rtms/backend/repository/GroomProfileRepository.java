@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface GroomProfileRepository extends JpaRepository<GroomProfile, Long> {
     List<GroomProfile> findByTrainerId(Long trainerId);
+    long countByTrainerId(Long trainerId);
 }

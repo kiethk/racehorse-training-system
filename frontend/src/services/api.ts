@@ -46,6 +46,37 @@ export function setAccessToken(token: string | null) {
   accessToken = token;
 }
 
+export async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (refreshRes.ok) {
+        const data = await refreshRes.json();
+        if (data?.data?.accessToken) {
+          setAccessToken(data.data.accessToken);
+          return true;
+        }
+      }
+      setAccessToken(null);
+      return false;
+    } catch {
+      setAccessToken(null);
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 async function doFetch(path: string, options: RequestInit): Promise<Response> {
   const isAuthEndpoint = [
     '/api/auth/login',
@@ -74,34 +105,7 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
   }
 
   if (res.status === 401 && !isAuthEndpoint) {
-    if (!refreshPromise) {
-      refreshPromise = (async () => {
-        try {
-          const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-          });
-
-          if (refreshRes.ok) {
-            const data = await refreshRes.json();
-            if (data?.data?.accessToken) {
-              setAccessToken(data.data.accessToken);
-              return true;
-            }
-          }
-          setAccessToken(null);
-          return false;
-        } catch {
-          setAccessToken(null);
-          return false;
-        } finally {
-          refreshPromise = null;
-        }
-      })();
-    }
-
-    const refreshed = await refreshPromise;
+    const refreshed = await refreshAccessToken();
     if (refreshed && accessToken) {
       // Retry original request exactly once
       headers.set('Authorization', `Bearer ${accessToken}`);

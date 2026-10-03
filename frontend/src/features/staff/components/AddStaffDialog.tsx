@@ -33,7 +33,7 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
   const [certificationIssuedDate, setCertificationIssuedDate] = useState('');
 
   // Groom specific
-  const [trainerId, setTrainerId] = useState('');
+  // Removed manual trainerId
 
   const [error, setError] = useState('');
   const [creationResult, setCreationResult] = useState<StaffCreationResponse | null>(null);
@@ -60,7 +60,6 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
       setSpecialization('');
       setCertificationNumber('');
       setCertificationIssuedDate('');
-      setTrainerId('');
       setError('');
       setCreationResult(null);
     }
@@ -119,30 +118,32 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
             {/* GROOM: show trainer + stall block */}
             {creationResult.role === 'GROOM' && (
               <div className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 text-[13px] space-y-3">
-                <div>
-                  <p className="font-medium text-[var(--color-text-primary)] mb-1">Trainer</p>
-                  <p className="text-[var(--color-text-secondary)]">{creationResult.trainerName}</p>
-                </div>
-                <div>
-                  <p className="font-medium text-[var(--color-text-primary)] mb-1">Assigned Stall Block</p>
-                  {creationResult.noStallBlockAvailable ? (
-                    <div className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-amber-50 border border-amber-200 px-3 py-2 text-[12px] text-amber-700">
-                      <Icon name="alert-triangle" size={13} className="mt-0.5 shrink-0" />
-                      <span>No stall block is currently available in this trainer&apos;s areas. Stalls can be assigned later.</span>
+                {creationResult.assignmentStatus === 'UNASSIGNED' ? (
+                  <div className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-amber-50 border border-amber-200 px-3 py-2 text-[12px] text-amber-700">
+                    <Icon name="alert-triangle" size={13} className="mt-0.5 shrink-0" />
+                    <span>Groom created successfully, but no Trainer with an available stall block is currently available.</span>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <p className="font-medium text-[var(--color-text-primary)] mb-1">Trainer</p>
+                      <p className="text-[var(--color-text-secondary)]">{creationResult.trainerName}</p>
                     </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <p className="text-[var(--color-text-muted)] text-[12px]">Area <strong>{creationResult.assignedAreaCode}</strong></p>
-                      <div className="flex gap-2 flex-wrap">
-                        {(creationResult.assignedStallCodes ?? []).map((code) => (
-                          <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-mono font-semibold text-[12px]">
-                            {code}
-                          </span>
-                        ))}
+                    <div>
+                      <p className="font-medium text-[var(--color-text-primary)] mb-1">Assigned Stall Block</p>
+                      <div className="space-y-1">
+                        <p className="text-[var(--color-text-muted)] text-[12px]">Area <strong>{creationResult.assignedAreaCode}</strong></p>
+                        <div className="flex gap-2 flex-wrap">
+                          {(creationResult.assignedStallCodes ?? []).map((code) => (
+                            <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-mono font-semibold text-[12px]">
+                              {code}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -177,11 +178,6 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
       return;
     }
 
-    if (role === 'GROOM' && !trainerId) {
-      setError('You must select a Head Trainer for the Groom.');
-      return;
-    }
-
     const request: StaffCreationRequest = {
       fullName: fullName.trim(),
       email: email.trim(),
@@ -198,8 +194,6 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
     } else if (role === 'HEAD_TRAINER') {
       request.certificationNumber = certificationNumber.trim();
       request.certificationIssuedDate = certificationIssuedDate || undefined;
-    } else if (role === 'GROOM') {
-      request.trainerId = parseInt(trainerId, 10);
     }
 
     try {
@@ -388,31 +382,9 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
 
               {role === 'GROOM' && (
                 <>
-                  <label className="block">
-                    <span className="text-[12px] font-medium text-[var(--color-text-primary)]">
-                      Head Trainer <span className="text-[var(--color-danger)]">*</span>
-                    </span>
-                    <select
-                      value={trainerId}
-                      onChange={(e) => setTrainerId(e.target.value)}
-                      className={inputClassName}
-                      disabled={loading}
-                      required
-                    >
-                      <option value="">— Select Trainer —</option>
-                      {headTrainers.map(t => (
-                        <option key={t.userId} value={String(t.userId)}>
-                          {t.fullName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {headTrainers.length === 0 && (
-                    <p className="text-[12px] text-[var(--color-text-muted)]">No active Head Trainers found. Create one first.</p>
-                  )}
                   <div className="rounded-[var(--radius-sm)] bg-blue-50 border border-blue-200 px-3 py-2 text-[12px] text-blue-700">
-                    <p className="font-medium mb-0.5">Auto Stall Block Assignment</p>
-                    <p>The system will automatically assign the first available 3-stall block in the selected trainer&apos;s areas.</p>
+                    <p className="font-medium mb-0.5">Auto Assignment</p>
+                    <p>Trainer and stall block will be assigned automatically based on current workload and available capacity.</p>
                   </div>
                 </>
               )}

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import * as authService from '@/services/auth';
+import { refreshAccessToken } from '@/services/api';
 import type { AuthUser } from '@/types/auth';
 
 interface AuthContextValue {
@@ -42,28 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     async function init() {
       try {
-        const { setAccessToken } = await import('@/services/api');
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
-        
-        // 1. Attempt to refresh the access token using HttpOnly cookie
-        const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-        });
+        // 1. Attempt to refresh the access token using the shared single-flight mechanism
+        const refreshed = await refreshAccessToken();
 
-        if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          if (data?.data?.accessToken) {
-            setAccessToken(data.data.accessToken);
-            // 2. Fetch user profile
-            const meRes = await authService.getCurrentUser();
-            if (!cancelled) setUser(meRes.success ? meRes.data : null);
-          } else {
-            if (!cancelled) setUser(null);
-          }
+        if (refreshed) {
+          // 2. Fetch user profile
+          const meRes = await authService.getCurrentUser();
+          if (!cancelled) setUser(meRes.success ? meRes.data : null);
         } else {
-          setAccessToken(null);
           if (!cancelled) setUser(null);
         }
       } catch {

@@ -190,166 +190,157 @@ class StaffManagementServiceTest {
     // ── Groom creation ────────────────────────────────────────────────────────
 
     @Test
-    void testCreateGroom_RequiresValidActiveTrainer() {
+    void testCreateGroom_AutoAssignment_BalancedLoad() {
         mockBasicCreation("GROOM");
         mockUserSaveWithId(20L);
 
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+        User trainerA = savedUser(5L, "HEAD_TRAINER");
+        User trainerB = savedUser(6L, "HEAD_TRAINER");
+        
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainerA, trainerB));
+        
+        Area areaA = area(1L, "A"); areaA.setTrainerId(5L);
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of(areaA));
+        
+        Area areaB = area(2L, "B"); areaB.setTrainerId(6L);
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 6L)).thenReturn(List.of(areaB));
 
-        StaffCreationRequest req = new StaffCreationRequest();
-        req.setFullName("G"); req.setEmail("g@rtms.com"); req.setPassword("pass");
-        req.setRole("GROOM"); req.setTrainerId(99L);
+        // Both have 1 free block (1-3)
+        List<StableStall> blockA = List.of(stall(101, 1, 1, null), stall(102, 1, 2, null), stall(103, 1, 3, null));
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(1L, 1, 3)).thenReturn(blockA);
+        List<StableStall> blockB = List.of(stall(201, 2, 1, null), stall(202, 2, 2, null), stall(203, 2, 3, null));
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(2L, 1, 3)).thenReturn(blockB);
+        
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(anyLong(), argThat(start -> start != 1), anyInt())).thenReturn(List.of());
 
-        assertThrows(ResponseStatusException.class, () -> staffService.createStaff(req));
-    }
+        // Trainer A has 5 grooms, Trainer B has 2
+        when(groomProfileRepository.countByTrainerId(5L)).thenReturn(5L);
+        when(groomProfileRepository.countByTrainerId(6L)).thenReturn(2L);
 
-    @Test
-    void testCreateGroom_RequiresTrainerId() {
-        mockBasicCreation("GROOM");
-        mockUserSaveWithId(20L);
-
-        StaffCreationRequest req = new StaffCreationRequest();
-        req.setFullName("G"); req.setEmail("g@rtms.com"); req.setPassword("pass");
-        req.setRole("GROOM"); // no trainerId
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> staffService.createStaff(req));
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
-    }
-
-    @Test
-    void testCreateGroom_GetsFirstCompleteBlock() {
-        mockBasicCreation("GROOM");
-        mockUserSaveWithId(20L);
-        User trainer = savedUser(5L, "HEAD_TRAINER");
-        when(userRepository.findById(5L)).thenReturn(Optional.of(trainer));
-
-        Area a = area(1L, "A"); a.setTrainerId(5L);
-        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of(a));
-
-        // block 1-3: stalls unassigned
-        List<StableStall> block1 = List.of(
-                stall(101, 1, 1, null),
-                stall(102, 1, 2, null),
-                stall(103, 1, 3, null));
-        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(1L, 1, 3))
-                .thenReturn(block1);
         when(stableStallRepository.save(any(StableStall.class))).thenAnswer(inv -> inv.getArgument(0));
 
         StaffCreationRequest req = new StaffCreationRequest();
         req.setFullName("G"); req.setEmail("g@rtms.com"); req.setPassword("pass");
-        req.setRole("GROOM"); req.setTrainerId(5L);
+        req.setRole("GROOM");
 
         StaffCreationResponse res = staffService.createStaff(req);
 
+        // Should pick Trainer B because 2 < 5
+        assertEquals(6L, res.getTrainerId());
+        assertEquals("ASSIGNED", res.getAssignmentStatus());
         assertFalse(res.getNoStallBlockAvailable());
         assertEquals(3, res.getAssignedStallIds().size());
-        assertEquals(1L, res.getAssignedAreaId());
+        assertEquals(2L, res.getAssignedAreaId());
     }
 
     @Test
-    void testCreateGroom_AssignedStallsAreAdjacent() {
-        // Ensures the block is 1-3, not scattered 1, 4, 9
+    void testCreateGroom_AutoAssignment_TieOnGroomCount() {
         mockBasicCreation("GROOM");
         mockUserSaveWithId(20L);
-        User trainer = savedUser(5L, "HEAD_TRAINER");
-        when(userRepository.findById(5L)).thenReturn(Optional.of(trainer));
 
-        Area a = area(1L, "A"); a.setTrainerId(5L);
-        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of(a));
+        User trainerA = savedUser(5L, "HEAD_TRAINER");
+        User trainerB = savedUser(6L, "HEAD_TRAINER");
+        
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainerA, trainerB));
+        
+        Area areaA = area(1L, "A"); areaA.setTrainerId(5L);
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of(areaA));
+        
+        Area areaB = area(2L, "B"); areaB.setTrainerId(6L);
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 6L)).thenReturn(List.of(areaB));
 
-        List<StableStall> block1 = List.of(
-                stall(101, 1, 1, null),
-                stall(102, 1, 2, null),
-                stall(103, 1, 3, null));
-        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(1L, 1, 3))
-                .thenReturn(block1);
+        // Both have same groom count
+        when(groomProfileRepository.countByTrainerId(5L)).thenReturn(3L);
+        when(groomProfileRepository.countByTrainerId(6L)).thenReturn(3L);
+
+        // Trainer A has 1 free block (1-3)
+        List<StableStall> blockA1 = List.of(stall(101, 1, 1, null), stall(102, 1, 2, null), stall(103, 1, 3, null));
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(1L, 1, 3)).thenReturn(blockA1);
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(eq(1L), argThat(start -> start != 1), anyInt())).thenReturn(List.of());
+
+        // Trainer B has 2 free blocks (1-3 and 4-6)
+        List<StableStall> blockB1 = List.of(stall(201, 2, 1, null), stall(202, 2, 2, null), stall(203, 2, 3, null));
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(2L, 1, 3)).thenReturn(blockB1);
+        List<StableStall> blockB2 = List.of(stall(204, 2, 4, null), stall(205, 2, 5, null), stall(206, 2, 6, null));
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(2L, 4, 6)).thenReturn(blockB2);
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(eq(2L), argThat(start -> start != 1 && start != 4), anyInt())).thenReturn(List.of());
+
         when(stableStallRepository.save(any(StableStall.class))).thenAnswer(inv -> inv.getArgument(0));
 
         StaffCreationRequest req = new StaffCreationRequest();
         req.setFullName("G"); req.setEmail("g@rtms.com"); req.setPassword("pass");
-        req.setRole("GROOM"); req.setTrainerId(5L);
+        req.setRole("GROOM");
 
         StaffCreationResponse res = staffService.createStaff(req);
 
-        // Stall numbers must be consecutive (the block used is 1-3)
-        List<Long> assigned = res.getAssignedStallIds();
-        assertEquals(3, assigned.size());
+        // Should pick Trainer B because more free blocks (2 > 1)
+        assertEquals(6L, res.getTrainerId());
+        assertEquals("ASSIGNED", res.getAssignmentStatus());
     }
 
     @Test
-    void testCreateGroom_MaxThreeStalls() {
-        // Groom always gets exactly one block (3 stalls), never more
+    void testCreateGroom_AutoAssignment_NoCapacity() {
         mockBasicCreation("GROOM");
         mockUserSaveWithId(20L);
-        User trainer = savedUser(5L, "HEAD_TRAINER");
-        when(userRepository.findById(5L)).thenReturn(Optional.of(trainer));
 
-        Area a = area(1L, "A"); a.setTrainerId(5L);
-        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of(a));
+        User trainerA = savedUser(5L, "HEAD_TRAINER");
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainerA));
+        
+        Area areaA = area(1L, "A"); areaA.setTrainerId(5L);
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of(areaA));
 
-        List<StableStall> block1 = List.of(
-                stall(101, 1, 1, null),
-                stall(102, 1, 2, null),
-                stall(103, 1, 3, null));
-        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(1L, 1, 3))
-                .thenReturn(block1);
+        // No free blocks
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(anyLong(), anyInt(), anyInt())).thenReturn(List.of());
+
+        StaffCreationRequest req = new StaffCreationRequest();
+        req.setFullName("G"); req.setEmail("g@rtms.com"); req.setPassword("pass");
+        req.setRole("GROOM");
+
+        StaffCreationResponse res = staffService.createStaff(req);
+
+        // Groom still created
+        assertNull(res.getTrainerId());
+        assertEquals("UNASSIGNED", res.getAssignmentStatus());
+        assertTrue(res.getNoStallBlockAvailable());
+        assertTrue(res.getAssignedStallIds().isEmpty());
+    }
+
+    @Test
+    void testCreateGroom_AutoAssignment_FullTieSmallestId() {
+        mockBasicCreation("GROOM");
+        mockUserSaveWithId(20L);
+
+        User trainerA = savedUser(6L, "HEAD_TRAINER"); // Larger ID first in list to prove order doesn't dictate solely
+        User trainerB = savedUser(5L, "HEAD_TRAINER"); // Smaller ID
+        
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainerA, trainerB));
+        
+        Area areaA = area(1L, "A"); areaA.setTrainerId(6L);
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 6L)).thenReturn(List.of(areaA));
+        Area areaB = area(2L, "B"); areaB.setTrainerId(5L);
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of(areaB));
+
+        when(groomProfileRepository.countByTrainerId(anyLong())).thenReturn(2L); // Tied on groom count
+
+        // Tied on free blocks (both have 1)
+        List<StableStall> blockA = List.of(stall(101, 1, 1, null), stall(102, 1, 2, null), stall(103, 1, 3, null));
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(1L, 1, 3)).thenReturn(blockA);
+        List<StableStall> blockB = List.of(stall(201, 2, 1, null), stall(202, 2, 2, null), stall(203, 2, 3, null));
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(2L, 1, 3)).thenReturn(blockB);
+        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(anyLong(), argThat(start -> start != 1), anyInt())).thenReturn(List.of());
+
         when(stableStallRepository.save(any(StableStall.class))).thenAnswer(inv -> inv.getArgument(0));
 
         StaffCreationRequest req = new StaffCreationRequest();
         req.setFullName("G"); req.setEmail("g@rtms.com"); req.setPassword("pass");
-        req.setRole("GROOM"); req.setTrainerId(5L);
+        req.setRole("GROOM");
 
         StaffCreationResponse res = staffService.createStaff(req);
 
-        assertEquals(StaffManagementService.GROOM_BLOCK_SIZE, res.getAssignedStallIds().size());
+        // Pick smaller ID (trainerB = 5L)
+        assertEquals(5L, res.getTrainerId());
     }
 
-    @Test
-    void testCreateGroom_CannotReceiveStallsOutsideTrainerAreas() {
-        // If trainer has no REGULAR areas, no stall block assignment happens
-        mockBasicCreation("GROOM");
-        mockUserSaveWithId(20L);
-        User trainer = savedUser(5L, "HEAD_TRAINER");
-        when(userRepository.findById(5L)).thenReturn(Optional.of(trainer));
-
-        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of());
-
-        StaffCreationRequest req = new StaffCreationRequest();
-        req.setFullName("G"); req.setEmail("g@rtms.com"); req.setPassword("pass");
-        req.setRole("GROOM"); req.setTrainerId(5L);
-
-        StaffCreationResponse res = staffService.createStaff(req);
-
-        assertTrue(res.getNoStallBlockAvailable());
-        assertNull(res.getAssignedStallIds());
-        verify(stableStallRepository, never()).save(any(StableStall.class));
-    }
-
-    @Test
-    void testCreateGroom_NoFreeBlock_StillCreated() {
-        // All blocks occupied → groom created with no stall assignment
-        mockBasicCreation("GROOM");
-        mockUserSaveWithId(20L);
-        User trainer = savedUser(5L, "HEAD_TRAINER");
-        when(userRepository.findById(5L)).thenReturn(Optional.of(trainer));
-
-        Area a = area(1L, "A"); a.setTrainerId(5L);
-        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 5L)).thenReturn(List.of(a));
-
-        // All 4 blocks have at least one stall assigned → return empty lists (or partial)
-        when(stableStallRepository.findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(anyLong(), anyInt(), anyInt()))
-                .thenReturn(List.of()); // empty means "no stalls found for block" (treated as occupied/missing)
-
-        StaffCreationRequest req = new StaffCreationRequest();
-        req.setFullName("G"); req.setEmail("g@rtms.com"); req.setPassword("pass");
-        req.setRole("GROOM"); req.setTrainerId(5L);
-
-        StaffCreationResponse res = staffService.createStaff(req);
-
-        assertEquals("GROOM", res.getRole());
-        assertTrue(res.getNoStallBlockAvailable());
-        verify(groomProfileRepository, times(1)).save(any(GroomProfile.class));
-    }
 
     // ── Existing tests (kept) ─────────────────────────────────────────────────
 
