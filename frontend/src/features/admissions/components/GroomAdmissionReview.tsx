@@ -18,7 +18,7 @@ function date(value: string | null) {
 const documentNames: Record<string, string> = {
   HORSE_PHOTO: 'Horse photo',
   REGISTRATION_DOCUMENT: 'Registration document',
-  PEDIGREE_CERTIFICATE: 'Pedigree certificate',
+  PEDIGREE_CERTIFICATE: 'Horse birth certificate',
   VACCINATION_RECORD: 'Vaccination record',
   DEWORMING_RECORD: 'Deworming record',
   HEALTH_CERTIFICATE: 'Health certificate',
@@ -45,6 +45,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setDetail(null);
     try {
       setDetail(await admissionsApi.getAdmissionDetail(admissionId));
     } catch (cause) {
@@ -55,15 +56,9 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
   }, [admissionId]);
 
   useEffect(() => {
-    let active = true;
-    admissionsApi.getAdmissionDetail(admissionId)
-      .then((data) => { if (active) setDetail(data); })
-      .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load this application.');
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [admissionId]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   const review = async (decision: 'APPROVED' | 'REJECTED') => {
     if (!feedback.trim()) {
@@ -201,13 +196,13 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
             {detail.documents.length ? (
               <ul className="mt-4 space-y-2 text-[12px]">
                 {detail.documents.map((document) => (
-                  <li key={document.id} className="flex items-start gap-2 rounded border border-[var(--color-border)] p-2 transition-colors hover:bg-[var(--color-surface-muted)]">
-                    <Icon name={document.documentType === 'HORSE_PHOTO' ? 'image' : 'file-text'} className="mt-0.5 shrink-0" />
+                  <li key={document.id} className="flex items-center gap-3 rounded border border-[var(--color-border)] p-2 transition-colors hover:bg-[var(--color-surface-muted)]">
+                    <DocumentTypeMark documentType={document.documentType} />
                     <div className="min-w-0 flex-1">
                       <a href={admissionsApi.assetUrl(document.fileUrl)} target="_blank" rel="noreferrer" className="block truncate font-medium text-[var(--color-primary)] hover:underline">{document.originalFileName || documentNames[document.documentType] || document.documentType}</a>
                       <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">{documentNames[document.documentType] || document.documentType} · Recorded {date(document.recordDate)} · Uploaded {date(document.uploadedAt)}</p>
                     </div>
-                    <Icon name="external-link" size={14} className="mt-0.5 shrink-0 text-[var(--color-text-muted)]" />
+                    <a href={admissionsApi.assetUrl(document.fileUrl)} target="_blank" rel="noreferrer" className="shrink-0 rounded-[var(--radius-sm)] px-2 py-1 text-[11px] font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]">View</a>
                   </li>
                 ))}
               </ul>
@@ -280,6 +275,15 @@ function HeaderValue({ label, value }: { label: string; value: string }) {
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   return <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-[var(--color-text-muted)]">{label}</span><span className="text-right font-medium text-[var(--color-text-primary)]">{value || <span className="font-normal italic text-[var(--color-text-muted)]">N/A</span>}</span></div>;
+}
+
+function DocumentTypeMark({ documentType }: { documentType: string }) {
+  const isPhoto = documentType === 'HORSE_PHOTO';
+  return (
+    <span className="flex h-9 w-10 shrink-0 items-center justify-center rounded-[var(--radius-xs)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[9px] font-semibold tracking-wide text-[var(--color-text-muted)]">
+      {isPhoto ? 'PHOTO' : 'FILE'}
+    </span>
+  );
 }
 
 function PipelineStep({ label, isDone, isActive }: { label: string; isDone: boolean; isActive: boolean }) {

@@ -13,10 +13,10 @@ import type { Horse, StableStall } from '@/features/stable/types';
 import type { IncidentReport, IncidentSeverity } from '../types';
 
 const SEVERITY_OPTIONS: { value: IncidentSeverity; label: string; hint: string; tone: string }[] = [
-  { value: 'LOW', label: 'Nhẹ', hint: 'Theo dõi thêm, chưa cần can thiệp khẩn', tone: 'text-gray-600' },
-  { value: 'MEDIUM', label: 'Trung bình', hint: 'Cần Thú y kiểm tra trong ngày', tone: 'text-blue-600' },
-  { value: 'HIGH', label: 'Nặng', hint: 'Cần Thú y khám ngay càng sớm càng tốt', tone: 'text-amber-600' },
-  { value: 'CRITICAL', label: 'Nguy kịch', hint: 'Khẩn cấp đe dọa sức khỏe — gọi điện song song', tone: 'text-red-600 font-semibold' },
+  { value: 'LOW', label: 'Minor', hint: 'Monitor the horse; no urgent intervention is required.', tone: 'text-gray-600' },
+  { value: 'MEDIUM', label: 'Moderate', hint: 'Veterinary review is needed today.', tone: 'text-blue-600' },
+  { value: 'HIGH', label: 'Major', hint: 'Request veterinary attention as soon as possible.', tone: 'text-amber-600' },
+  { value: 'CRITICAL', label: 'Critical', hint: 'A health emergency requiring an immediate call.', tone: 'text-red-600 font-semibold' },
 ];
 
 export function IncidentForm() {
@@ -48,7 +48,7 @@ export function IncidentForm() {
 
         setStalls(stallList);
 
-        // Lọc ngựa thuộc chuồng của chính Groom hiện tại (BR-Groom)
+        // Keep only horses assigned to stalls managed by the current groom.
         const myStallIds = stallList
           .filter((s) => s.groomId === user?.userId)
           .map((s) => s.id);
@@ -62,8 +62,8 @@ export function IncidentForm() {
           setHorseId(myHorses[0].id);
         }
       } catch (err) {
-        console.error('Lỗi khi nạp dữ liệu ngựa và chuồng:', err);
-        setError('Không tải được danh sách chiến mã. Vui lòng tải lại trang.');
+        console.error('Unable to load horse and stall data:', err);
+        setError('Unable to load the horse list. Please reload the page.');
       } finally {
         setLoadingInitial(false);
       }
@@ -78,7 +78,7 @@ export function IncidentForm() {
     const f = e.target.files?.[0] ?? null;
     if (f) {
       if (f.size > 10 * 1024 * 1024) {
-        setError('Ảnh không được vượt quá 10 MB.');
+        setError('The image must not exceed 10 MB.');
         return;
       }
       setFile(f);
@@ -101,15 +101,15 @@ export function IncidentForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!horseId) {
-      setError('Vui lòng chọn chiến mã gặp sự cố.');
+      setError('Please select the horse involved in the incident.');
       return;
     }
     if (!title.trim()) {
-      setError('Vui lòng nhập tiêu đề sự cố.');
+      setError('Please enter an incident title.');
       return;
     }
     if (!description.trim()) {
-      setError('Vui lòng nhập mô tả chi tiết sự cố.');
+      setError('Please enter a detailed incident description.');
       return;
     }
 
@@ -118,7 +118,7 @@ export function IncidentForm() {
     let created: IncidentReport | null = null;
 
     try {
-      // Bước 1 — tạo báo cáo, lấy id
+      // Step 1: create the report and receive its id.
       created = await incidentApi.create({
         horseId: Number(horseId),
         title: title.trim(),
@@ -126,18 +126,18 @@ export function IncidentForm() {
         severity,
       });
 
-      // Bước 2 — có chọn ảnh thì đính vào
+      // Step 2: attach the image when one was selected.
       if (file) {
         await incidentApi.uploadImage(created.id, file);
       }
 
       router.push('/groom/incidents');
     } catch (err) {
-      console.error('Lỗi khi gửi báo cáo sự cố:', err);
+      console.error('Unable to submit incident report:', err);
       setError(
         created
-          ? `Báo cáo #${created.id} đã gửi nhưng tải ảnh thất bại. Mở lại báo cáo để thử tải ảnh.`
-          : (err instanceof Error ? err.message : 'Gửi báo cáo sự cố thất bại.')
+          ? `Report #${created.id} was submitted, but the image upload failed. Open the report to try again.`
+          : (err instanceof Error ? err.message : 'Failed to submit the incident report.')
       );
     } finally {
       setSubmitting(false);
@@ -146,14 +146,14 @@ export function IncidentForm() {
 
   const stallMap = new Map<number, string>();
   for (const s of stalls) {
-    stallMap.set(s.id, s.stallCode || `Chuồng #${s.stallNumber}`);
+    stallMap.set(s.id, s.stallCode || `Stall #${s.stallNumber}`);
   }
 
   if (loadingInitial) {
     return (
       <Panel padded>
         <div className="flex items-center justify-center py-12 text-sm text-[var(--color-text-secondary)]">
-          Đang tải thông tin chuồng và chiến mã...
+          Loading stall and horse information...
         </div>
       </Panel>
     );
@@ -164,17 +164,17 @@ export function IncidentForm() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-            Báo cáo sự cố đột xuất
+            Incident Report
           </h1>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Gửi báo cáo dấu hiệu bất thường hoặc chấn thương của chiến mã tới Bác sĩ Thú y.
+            Report unusual symptoms or injuries to the veterinary team.
           </p>
         </div>
         <Link
           href="/groom/incidents"
           className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
         >
-          <Icon name="arrow-left" size={14} /> Quay lại danh sách
+          <Icon name="arrow-left" size={14} /> Back to reports
         </Link>
       </div>
 
@@ -187,10 +187,10 @@ export function IncidentForm() {
       {horses.length === 0 ? (
         <Panel padded>
           <div className="py-8 text-center text-sm text-[var(--color-text-secondary)]">
-            Hiện bạn chưa được phân công phụ trách chuồng hoặc chiến mã nào trong hệ thống.
+            You are not currently assigned to any stalls or horses.
             <div className="mt-4">
               <Link href="/groom/incidents">
-                <Button variant="secondary">Quay lại</Button>
+                <Button variant="secondary">Back</Button>
               </Link>
             </div>
           </div>
@@ -198,10 +198,10 @@ export function IncidentForm() {
       ) : (
         <Panel padded>
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Chọn ngựa */}
+            {/* Horse selection */}
             <div>
               <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                Chiến mã gặp sự cố <span className="text-red-500">*</span>
+                Horse involved in the incident <span className="text-red-500">*</span>
               </label>
               <select
                 value={horseId}
@@ -211,8 +211,8 @@ export function IncidentForm() {
               >
                 {horses.map((h) => {
                   const stallLabel = h.currentStallId
-                    ? stallMap.get(h.currentStallId) || `Chuồng #${h.currentStallId}`
-                    : 'Chưa có chuồng';
+                    ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
+                    : 'No stall assigned';
                   return (
                     <option key={h.id} value={h.id}>
                       {h.name} (#{h.id}) — {stallLabel}
@@ -221,14 +221,14 @@ export function IncidentForm() {
                 })}
               </select>
               <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                Chỉ hiển thị các chiến mã trong các chuồng do bạn phụ trách.
+                Only horses in your assigned stalls are shown.
               </p>
             </div>
 
-            {/* Mức độ nghiêm trọng */}
+            {/* Severity */}
             <div>
               <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                Mức độ nghiêm trọng <span className="text-red-500">*</span>
+                Severity <span className="text-red-500">*</span>
               </label>
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {SEVERITY_OPTIONS.map((opt) => (
@@ -258,47 +258,47 @@ export function IncidentForm() {
 
               {severity === 'CRITICAL' && (
                 <div className="mt-2.5 rounded-[var(--radius-md)] border border-red-300 bg-red-50 p-2.5 text-xs text-red-800">
-                  <div className="font-semibold">⚠️ Cảnh báo khẩn cấp:</div>
-                  Hệ thống không gửi thông báo tức thời. Với sự cố <strong>Nguy kịch</strong>, bạn cần{' '}
-                  <strong>gọi điện thoại trực tiếp</strong> cho Thú y hoặc Quản lý ngay sau khi gửi báo cáo này!
+                  <div className="font-semibold">Emergency warning:</div>
+                  The system does not send instant notifications. For a <strong>Critical</strong> incident,{' '}
+                  <strong>call the veterinary team directly</strong> or notify a manager immediately after submitting this report.
                 </div>
               )}
             </div>
 
-            {/* Tiêu đề */}
+            {/* Title */}
             <div>
               <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                Tiêu đề sự cố <span className="text-red-500">*</span>
+                Incident title <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ví dụ: Sưng khớp gối trước phải, bỏ ăn sáng..."
+                placeholder="Example: Swollen right front knee, missed breakfast..."
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 required
               />
             </div>
 
-            {/* Mô tả chi tiết */}
+            {/* Detailed description */}
             <div>
               <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                Mô tả chi tiết <span className="text-red-500">*</span>
+                Detailed description <span className="text-red-500">*</span>
               </label>
               <textarea
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Mô tả cụ thể triệu chứng, thời điểm phát hiện, hành vi của chiến mã, vị trí đau/vết thương..."
+                placeholder="Describe the symptoms, time discovered, horse behavior, and pain or injury location..."
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 required
               />
             </div>
 
-            {/* Tải ảnh đính kèm */}
+            {/* Optional image attachment */}
             <div>
               <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                Hình ảnh hiện trường / chấn thương (tuỳ chọn)
+                Scene or injury image (optional)
               </label>
               <div className="mt-1.5 flex flex-col gap-2">
                 <input
@@ -308,7 +308,7 @@ export function IncidentForm() {
                   className="text-xs text-[var(--color-text-secondary)] file:mr-3 file:rounded-[var(--radius-sm)] file:border-0 file:bg-[var(--color-bg-secondary)] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--color-text-primary)] hover:file:bg-[var(--color-border)]"
                 />
                 <p className="text-[11px] text-[var(--color-text-muted)]">
-                  Chỉ nhận định dạng JPEG, PNG, WebP. Tối đa 10 MB.
+                  JPEG, PNG, and WebP only. Maximum size: 10 MB.
                 </p>
 
                 {previewUrl && (
@@ -316,14 +316,14 @@ export function IncidentForm() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={previewUrl}
-                      alt="Xem trước ảnh"
+                      alt="Image preview"
                       className="max-h-48 rounded-[var(--radius-md)] border border-[var(--color-border)] object-cover"
                     />
                     <button
                       type="button"
                       onClick={handleRemoveFile}
                       className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
-                      title="Xoá ảnh"
+                      title="Remove image"
                     >
                       <Icon name="x" size={14} />
                     </button>
@@ -332,15 +332,15 @@ export function IncidentForm() {
               </div>
             </div>
 
-            {/* Nút hành động */}
+            {/* Form actions */}
             <div className="flex items-center justify-end gap-3 pt-3">
               <Link href="/groom/incidents">
                 <Button type="button" variant="secondary" disabled={submitting}>
-                  Hủy
+                  Cancel
                 </Button>
               </Link>
               <Button type="submit" variant="primary" disabled={submitting}>
-                {submitting ? 'Đang gửi báo cáo...' : 'Gửi báo cáo sự cố'}
+                {submitting ? 'Submitting report...' : 'Submit incident report'}
               </Button>
             </div>
           </form>
