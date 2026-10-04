@@ -16,9 +16,9 @@ export interface TodayTaskItem {
 
 export type IncidentSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 /**
- * Khớp CHÍNH XÁC enums/IncidentStatus.java và ràng buộc chk_incident_status
- * trong migration V45. Sai một tên là backend trả 400 lúc lọc theo trạng thái —
- * TypeScript không bắt được vì nó chỉ kiểm nội bộ frontend.
+ * Must match enums/IncidentStatus.java and the chk_incident_status constraint
+ * in migration V45. A mismatch causes a 400 response when filtering by status;
+ * TypeScript cannot catch it because this validation happens in the backend.
  */
 export type IncidentStatus = 'REPORTED' | 'IN_REVIEW' | 'RESOLVED' | 'DISMISSED';
 

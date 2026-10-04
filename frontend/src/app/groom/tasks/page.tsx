@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { TodayChecklist } from '@/features/groom/components/TodayChecklist';
 
 export const metadata: Metadata = {
-  title: 'Công việc hôm nay | Groom',
+  title: "Today's Tasks | Groom",
 };
 
 export default function GroomTasksPage() {
