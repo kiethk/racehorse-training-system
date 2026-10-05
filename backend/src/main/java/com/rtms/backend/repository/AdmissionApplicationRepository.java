@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,10 @@ public interface AdmissionApplicationRepository
     List<AdmissionApplication> findByOwnerIdOrderBySubmittedAtDesc(Long ownerId);
 
     List<AdmissionApplication> findByStatus(AdmissionStatus status);
+
+    List<AdmissionApplication> findByTrainerId(Long trainerId);
+
+    List<AdmissionApplication> findByGroomId(Long groomId);
 
     Optional<AdmissionApplication> findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus status);
 
@@ -54,4 +59,19 @@ public interface AdmissionApplicationRepository
             WHERE a.id = :id
             """)
     Optional<AdmissionApplication> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("""
+            SELECT a.trainerId, COUNT(a.id)
+            FROM AdmissionApplication a
+            WHERE a.trainerId IN :trainerIds
+              AND a.status NOT IN :terminalStatuses
+            GROUP BY a.trainerId
+            """)
+    List<Object[]> countActiveAdmissionsByTrainerIds(
+            @Param("trainerIds") Collection<Long> trainerIds,
+            @Param("terminalStatuses") Collection<AdmissionStatus> terminalStatuses);
+
+    List<AdmissionApplication> findByStatusInAndTrainerIdIsNull(
+            Collection<AdmissionStatus> statuses,
+            Pageable pageable);
 }

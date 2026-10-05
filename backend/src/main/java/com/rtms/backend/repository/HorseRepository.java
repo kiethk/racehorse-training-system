@@ -40,4 +40,14 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
      * tìm con ngựa cần đồng bộ Groom khi chuồng đổi người phụ trách.
      */
     Optional<Horse> findByCurrentStallId(Long stallId);
+
+    @Query("""
+            SELECT a.trainerId, COUNT(h.id)
+            FROM Horse h
+            JOIN StableStall ss ON h.currentStallId = ss.id
+            JOIN Area a ON ss.areaId = a.id
+            WHERE a.trainerId IN :trainerIds
+            GROUP BY a.trainerId
+            """)
+    List<Object[]> countHorsesByTrainerIds(@Param("trainerIds") java.util.Collection<Long> trainerIds);
 }

@@ -36,7 +36,10 @@ class GroomIncidentReportServiceTest {
 
     @BeforeEach
     void setUp() {
-        incidentReportService = new GroomIncidentReportService(incidentReportRepository, horseRepository, fileStorage);
+        incidentReportService = new GroomIncidentReportService(
+                incidentReportRepository, horseRepository, fileStorage,
+                mock(com.rtms.backend.repository.CareScheduleRepository.class),
+                mock(CareScheduleService.class));
     }
 
     @Test
@@ -206,4 +209,4 @@ class GroomIncidentReportServiceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> incidentReportService.attachImage(10L, file, groom));
     }
-}
+}

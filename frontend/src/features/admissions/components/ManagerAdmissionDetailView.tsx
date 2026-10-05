@@ -55,6 +55,8 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
 
   const candidate = detail.candidate;
   const horsePhoto = detail.documents.find((doc) => doc.documentType === 'HORSE_PHOTO');
+  const currentTrainingDecision =
+    detail.vetTrainingDecision ?? detail.healthRecords?.find((record) => record.trainingDecision)?.trainingDecision ?? null;
   
   const candidateSection = (
     <AdmissionInfoSection title="Pedigree & Registration">
@@ -74,7 +76,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
 
   const healthSection = (
     <AdmissionInfoSection title="Health Screening">
-      <InfoRow label="Vet Decision" value={detail.vetDecision} />
+      <InfoRow label="Vet Training Decision" value={currentTrainingDecision} />
       {detail.vetFeedback && (
         <div>
           <span className="text-[var(--color-text-muted)] block mb-1">Feedback:</span>
@@ -121,7 +123,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         {detail.vetReviewedAt ? (
           <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
             <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Veterinarian Review</h4>
-            <InfoRow label="Decision" value={detail.vetDecision} />
+            <InfoRow label="Training Decision" value={currentTrainingDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.vetReviewedAt)} />
             <InfoRow label="Feedback" value={detail.vetFeedback} />
           </div>

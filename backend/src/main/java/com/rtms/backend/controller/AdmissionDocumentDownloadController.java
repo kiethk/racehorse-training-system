@@ -4,6 +4,7 @@ import com.rtms.backend.entity.AdmissionDocument;
 import com.rtms.backend.enums.AdmissionDocumentType;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.AdmissionFileStorage;
+import com.rtms.backend.service.AdmissionQueryService;
 import com.rtms.backend.service.OwnerAdmissionService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -23,16 +24,22 @@ import java.nio.charset.StandardCharsets;
 public class AdmissionDocumentDownloadController {
     private final OwnerAdmissionService service;
     private final AdmissionFileStorage storage;
+    private final AdmissionQueryService admissionQueryService;
 
-    public AdmissionDocumentDownloadController(OwnerAdmissionService service, AdmissionFileStorage storage) {
+    public AdmissionDocumentDownloadController(OwnerAdmissionService service, AdmissionFileStorage storage,
+                                                AdmissionQueryService admissionQueryService) {
         this.service = service;
         this.storage = storage;
+        this.admissionQueryService = admissionQueryService;
     }
 
     @GetMapping("/{id}/documents/{documentId}/file")
     @PreAuthorize("hasAuthority('ADMISSION_DOCUMENT_VIEW')")
     public ResponseEntity<Resource> download(@PathVariable Long id, @PathVariable Long documentId,
             @AuthenticationPrincipal AuthenticatedUser viewer) {
+        if ("VETERINARIAN".equals(viewer.getRole())) {
+            admissionQueryService.assertVetAssignedOrManager(id, viewer);
+        }
         AdmissionDocument document = service.getDocumentForViewer(id, documentId, viewer);
         if (document.getFileUrl() != null && !document.getFileUrl().startsWith("local:")) {
             return ResponseEntity.status(HttpStatus.FOUND)

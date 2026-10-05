@@ -160,65 +160,19 @@ class AdmissionReviewServiceTest {
     }
 
     @Test
-    void rejectedMapsLegacyFeedbackToBlockedTrainingDecision() {
-        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
-        // IN_PROGRESS found directly
-        when(admissions.findById(1L)).thenReturn(Optional.of(admission));
-        when(careSchedules.findFirstByAdmissionIdAndStatusOrderByCreatedAtDesc(1L, CareScheduleStatus.IN_PROGRESS))
-                .thenReturn(Optional.of(schedule));
-        when(horses.findById(10L)).thenReturn(Optional.of(horse));
-        when(stalls.findById(99L)).thenReturn(Optional.of(quarantine));
-
-        when(careScheduleService.completeCareSchedule(eq(20L), any(), eq(5L))).thenAnswer(invocation -> {
-            CompleteCareScheduleRequest completion = invocation.getArgument(1);
-            admission.setStatus(AdmissionStatus.REJECTED);
-            admission.setVetDecision(VetDecision.REJECTED);
-            admission.setVetFeedback(completion.getRestrictionDetails());
-            admission.setVetReviewedAt(LocalDateTime.now());
-            horse.setCurrentStatus(HorseStatus.REJECTED);
-            horse.setCurrentStallId(null);
-            schedule.setStatus(CareScheduleStatus.COMPLETED);
-            return CareScheduleResponse.from(schedule);
-        });
-        when(healthRecordRepository.findByCareScheduleId(20L)).thenReturn(Optional.empty());
-
+    void rejectedLegacyDecisionIsForbidden() {
         VetReviewRequest request = request(VetDecision.REJECTED);
         request.setFeedback("Not safe for training");
 
-        var response = service.reviewByVet(1L, request, 5L);
+        ApiException error = assertThrows(ApiException.class, () -> service.reviewByVet(1L, request, 5L));
 
-        assertEquals(AdmissionStatus.REJECTED, response.status());
-        assertEquals("Not safe for training", response.feedback());
-        ArgumentCaptor<CompleteCareScheduleRequest> completion = ArgumentCaptor.forClass(CompleteCareScheduleRequest.class);
-        verify(careScheduleService).completeCareSchedule(eq(20L), completion.capture(), eq(5L));
-        assertEquals(TrainingDecision.BLOCKED, completion.getValue().getTrainingDecision());
-        assertEquals("Not safe for training", completion.getValue().getRestrictionDetails());
-        assertTrue(completion.getValue().isRejectAdmission());
-        assertEquals("Not safe for training", completion.getValue().getRejectionReason());
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
+        assertEquals("VET_CANNOT_REJECT_ADMISSION", error.getErrorCode());
+        verifyNoInteractions(careScheduleService);
     }
 
     @Test
-    void explicitRejectAdmissionWithBlockedDecisionMapsToCompletionRequest() {
-        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
-        when(admissions.findById(1L)).thenReturn(Optional.of(admission));
-        when(careSchedules.findFirstByAdmissionIdAndStatusOrderByCreatedAtDesc(1L, CareScheduleStatus.IN_PROGRESS))
-                .thenReturn(Optional.of(schedule));
-        when(horses.findById(10L)).thenReturn(Optional.of(horse));
-        when(stalls.findById(99L)).thenReturn(Optional.of(quarantine));
-
-        when(careScheduleService.completeCareSchedule(eq(20L), any(), eq(5L))).thenAnswer(invocation -> {
-            CompleteCareScheduleRequest comp = invocation.getArgument(1);
-            admission.setStatus(AdmissionStatus.REJECTED);
-            admission.setVetDecision(VetDecision.REJECTED);
-            admission.setVetFeedback(comp.getRejectionReason());
-            admission.setVetReviewedAt(LocalDateTime.now());
-            horse.setCurrentStatus(HorseStatus.REJECTED);
-            horse.setCurrentStallId(null);
-            schedule.setStatus(CareScheduleStatus.COMPLETED);
-            return CareScheduleResponse.from(schedule);
-        });
-        when(healthRecordRepository.findByCareScheduleId(20L)).thenReturn(Optional.empty());
-
+    void explicitRejectAdmissionIsForbiddenEvenWithBlockedDecision() {
         VetReviewRequest request = new VetReviewRequest();
         request.setPhysicalExamConfirmed(true);
         request.setFindings("Severe communicable infection detected");
@@ -227,15 +181,11 @@ class AdmissionReviewServiceTest {
         request.setRejectAdmission(true);
         request.setRejectionReason("Communicable disease outbreak prevention");
 
-        var response = service.reviewByVet(1L, request, 5L);
+        ApiException error = assertThrows(ApiException.class, () -> service.reviewByVet(1L, request, 5L));
 
-        assertEquals(AdmissionStatus.REJECTED, response.status());
-        assertEquals(VetDecision.REJECTED, response.decision());
-        ArgumentCaptor<CompleteCareScheduleRequest> completion = ArgumentCaptor.forClass(CompleteCareScheduleRequest.class);
-        verify(careScheduleService).completeCareSchedule(eq(20L), completion.capture(), eq(5L));
-        assertTrue(completion.getValue().isRejectAdmission());
-        assertEquals("Communicable disease outbreak prevention", completion.getValue().getRejectionReason());
-        assertEquals(TrainingDecision.BLOCKED, completion.getValue().getTrainingDecision());
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
+        assertEquals("VET_CANNOT_REJECT_ADMISSION", error.getErrorCode());
+        verifyNoInteractions(careScheduleService);
     }
 
     @Test
@@ -296,13 +246,8 @@ class AdmissionReviewServiceTest {
     }
 
     @Test
-    void requestedExaminationCannotBypassOfferAcceptance() {
+    void requestedExaminationCannotBypassAutomaticAssignment() {
         assertPendingReviewRejected(CareScheduleStatus.REQUESTED);
-    }
-
-    @Test
-    void awaitingConfirmationCannotBypassOfferAcceptance() {
-        assertPendingReviewRejected(CareScheduleStatus.AWAITING_VET_CONFIRMATION);
     }
 
     private void assertPendingReviewRejected(CareScheduleStatus status) {

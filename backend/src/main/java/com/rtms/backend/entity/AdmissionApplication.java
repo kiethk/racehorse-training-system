@@ -45,6 +45,9 @@ public class AdmissionApplication {
     @Column(name = "vet_decision", length = 20)
     private VetDecision vetDecision;
 
+    @Column(name = "vet_training_decision", length = 30)
+    private String vetTrainingDecision;
+
     @Column(name = "vet_feedback", columnDefinition = "TEXT")
     private String vetFeedback;
 
@@ -184,6 +187,14 @@ public class AdmissionApplication {
 
     public void setVetDecision(VetDecision vetDecision) {
         this.vetDecision = vetDecision;
+    }
+
+    public String getVetTrainingDecision() {
+        return vetTrainingDecision;
+    }
+
+    public void setVetTrainingDecision(String vetTrainingDecision) {
+        this.vetTrainingDecision = vetTrainingDecision;
     }
 
     public String getVetFeedback() {

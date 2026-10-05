@@ -181,7 +181,9 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
+                .thenReturn(List.of());
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.SCHEDULED)))
                 .thenReturn(List.of());
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -202,7 +204,7 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("REJECT: lịch REQUESTED và SCHEDULED bị CANCELLED, lịch COMPLETED không bị ảnh hưởng")
+    @DisplayName("REJECT: chỉ lịch SCHEDULED bị CANCELLED")
     void reject_cancelsActiveSchedules_notCompleted() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -221,20 +223,22 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
-                .thenReturn(List.of(pending, overdue));
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
+                .thenReturn(List.of());
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.SCHEDULED)))
+                .thenReturn(List.of(overdue));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         service.review(1L, 5L, rejectRequest("Rejected"));
 
-        assertEquals(CareScheduleStatus.CANCELLED, pending.getStatus());
+        assertEquals(CareScheduleStatus.REQUESTED, pending.getStatus());
         assertEquals(CareScheduleStatus.CANCELLED, overdue.getStatus());
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CareSchedule>> captor = ArgumentCaptor.forClass(List.class);
         verify(careScheduleRepository).saveAll(captor.capture());
         List<CareSchedule> saved = captor.getValue();
-        assertEquals(2, saved.size());
+        assertEquals(1, saved.size());
         assertTrue(saved.stream().allMatch(s -> s.getStatus() == CareScheduleStatus.CANCELLED));
 
         // COMPLETED schedules are never queried in this call — no interference
@@ -251,7 +255,9 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
+                .thenReturn(List.of());
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.SCHEDULED)))
                 .thenReturn(List.of());
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -261,8 +267,8 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("REJECT: huỷ các CareSchedule đang active (REQUESTED, AWAITING_VET_CONFIRMATION, SCHEDULED, IN_PROGRESS)")
-    void reject_cancelsActiveCareSchedules() {
+    @DisplayName("REJECT: không chuyển REQUESTED hoặc IN_PROGRESS sang CANCELLED")
+    void reject_doesNotCancelInvalidTransitions() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
@@ -280,21 +286,18 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(eq(10L), any()))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
                 .thenReturn(List.of(requested, inProgress));
-        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        service.review(1L, 5L, rejectRequest("Rejected"));
+        assertThrows(IllegalStateException.class,
+                () -> service.review(1L, 5L, rejectRequest("Rejected")));
 
-        assertEquals(CareScheduleStatus.CANCELLED, requested.getStatus());
-        assertEquals("Admission rejected by manager", requested.getCancelReason());
-        assertEquals(CareScheduleStatus.CANCELLED, inProgress.getStatus());
-        assertEquals("Admission rejected by manager", inProgress.getCancelReason());
+        assertEquals(CareScheduleStatus.REQUESTED, requested.getStatus());
+        assertNull(requested.getCancelReason());
+        assertEquals(CareScheduleStatus.IN_PROGRESS, inProgress.getStatus());
+        assertNull(inProgress.getCancelReason());
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<CareSchedule>> captor = ArgumentCaptor.forClass(List.class);
-        verify(careScheduleRepository).saveAll(captor.capture());
-        assertEquals(2, captor.getValue().size());
+        verify(careScheduleRepository, never()).saveAll(any());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

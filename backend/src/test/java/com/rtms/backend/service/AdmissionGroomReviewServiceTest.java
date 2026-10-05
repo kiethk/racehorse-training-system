@@ -62,6 +62,12 @@ class AdmissionGroomReviewServiceTest {
     @Mock
     private CareScheduleService careScheduleService;
 
+    @Mock
+    private HeadTrainerWorkloadService headTrainerWorkloadService;
+
+    @Mock
+    private NotificationService notificationService;
+
     private AdmissionGroomReviewService service;
 
     @BeforeEach
@@ -73,7 +79,9 @@ class AdmissionGroomReviewServiceTest {
                 horseRepository,
                 horsePedigreeRepository,
                 careScheduleRepository,
-                careScheduleService);
+                careScheduleService,
+                headTrainerWorkloadService,
+                notificationService);
     }
 
     @Test
@@ -92,7 +100,7 @@ class AdmissionGroomReviewServiceTest {
         assertNotNull(result.getGroomReviewedAt());
         assertNull(result.getHorseId());
         verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
-                careScheduleRepository, stableStallRepository);
+                careScheduleRepository, stableStallRepository, headTrainerWorkloadService, notificationService);
     }
 
     @Test
@@ -112,7 +120,7 @@ class AdmissionGroomReviewServiceTest {
         assertNull(result.getHorseId());
         verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
         verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
-                careScheduleRepository);
+                careScheduleRepository, headTrainerWorkloadService, notificationService);
     }
 
     @Test
@@ -131,7 +139,7 @@ class AdmissionGroomReviewServiceTest {
         assertEquals(AdmissionStatus.WAITING_FOR_STALL, result.getStatus());
         assertEquals(ReviewDecision.APPROVED, result.getGroomDecision());
         verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
-                careScheduleRepository);
+                careScheduleRepository, headTrainerWorkloadService, notificationService);
     }
 
     @Test
@@ -148,7 +156,7 @@ class AdmissionGroomReviewServiceTest {
         }
         verify(admissionApplicationRepository, never()).save(any());
         verifyNoInteractions(stableStallRepository, candidateHorseProfileRepository, horseRepository,
-                horsePedigreeRepository, careScheduleRepository);
+                horsePedigreeRepository, careScheduleRepository, headTrainerWorkloadService, notificationService);
     }
 
     @Test
@@ -165,8 +173,8 @@ class AdmissionGroomReviewServiceTest {
     }
 
     @Test
-    @DisplayName("Groom approve đủ capacity: tạo Horse CANDIDATE, chiếm Q stall và tạo INITIAL_EXAM")
-    void review_approveWithCapacity_createsCandidateHorse() {
+    @DisplayName("Groom approve đủ capacity: tạo Horse CANDIDATE, chiếm Q stall, tạo INITIAL CareSchedule, gán Vet, gán Trainer và gửi notifications")
+    void review_approveWithCapacity_createsCandidateHorseAndAssignsVetAndTrainer() {
         AdmissionApplication admission = admission();
         CandidateHorseProfile candidate = candidate();
         StableStall qStall = stall(99L);
@@ -182,17 +190,40 @@ class AdmissionGroomReviewServiceTest {
             return horse;
         });
         when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.empty());
-        when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
-                eq(20L), eq(CareType.INITIAL), any())).thenReturn(false);
+
+        // Initial CareSchedule creation
+        CareSchedule createdSchedule = new CareSchedule();
+        createdSchedule.setId(100L);
+        createdSchedule.setHorseId(20L);
+        createdSchedule.setAdmissionId(1L);
+        createdSchedule.setCareType(CareType.INITIAL);
+        createdSchedule.setStatus(CareScheduleStatus.SCHEDULED);
+        createdSchedule.setVeterinarianId(15L); // Vet 15 assigned
+
+        when(careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(createdSchedule));
+        when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(eq(20L), eq(CareType.INITIAL), any()))
+                .thenReturn(false);
+        when(careScheduleRepository.save(any(CareSchedule.class))).thenReturn(createdSchedule);
+
+        // Least loaded Head Trainer selection
+        when(headTrainerWorkloadService.selectLeastLoadedHeadTrainerId()).thenReturn(Optional.of(8L));
+
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "Ready"));
 
+        // 1. Trạng thái Admission
         assertEquals(AdmissionStatus.VET_REVIEW, result.getStatus());
         assertEquals(20L, result.getHorseId());
         assertEquals(99L, result.getQuarantineStallId());
         assertEquals(StallStatus.OCCUPIED, qStall.getStatus());
 
+        // 2. Gán Trainer vào AdmissionApplication.trainerId
+        assertEquals(8L, result.getTrainerId());
+
+        // 3. Horse CANDIDATE
         ArgumentCaptor<Horse> horseCaptor = ArgumentCaptor.forClass(Horse.class);
         verify(horseRepository).save(horseCaptor.capture());
         Horse savedHorse = horseCaptor.getValue();
@@ -205,23 +236,68 @@ class AdmissionGroomReviewServiceTest {
         assertEquals(5L, savedHorse.getOwnerId());
         assertEquals("FR1234567890123", savedHorse.getRegistrationNumber());
 
-        ArgumentCaptor<HorsePedigree> pedigreeCaptor = ArgumentCaptor.forClass(HorsePedigree.class);
-        verify(horsePedigreeRepository).save(pedigreeCaptor.capture());
-        assertEquals("FR1234567890001", pedigreeCaptor.getValue().getSireRegistrationNumber());
+        // 4. CareSchedule INITIAL & gán Vet
+        verify(careScheduleService).assignRequestedSchedules();
 
-        ArgumentCaptor<CareSchedule> scheduleCaptor =
-                ArgumentCaptor.forClass(CareSchedule.class);
-        verify(careScheduleRepository).save(scheduleCaptor.capture());
-        CareSchedule schedule = scheduleCaptor.getValue();
-        assertEquals(20L, schedule.getHorseId());
-        assertEquals(CareType.INITIAL, schedule.getCareType());
-        assertEquals(CareScheduleStatus.REQUESTED, schedule.getStatus());
-        assertNull(schedule.getScheduledAt());
-        verify(careScheduleService).dispatchOffersForSchedule(schedule);
+        // 5. Notifications cho cả Vet và Trainer
+        verify(notificationService).sendAssignmentNotification(
+                eq(15L), eq(1L), eq(20L), eq(NotificationTypes.ADMISSION_VET_ASSIGNED), anyString(), anyString());
+        verify(notificationService).sendAssignmentNotification(
+                eq(8L), eq(1L), eq(20L), eq(NotificationTypes.ADMISSION_TRAINER_ASSIGNED), anyString(), anyString());
     }
 
     @Test
-    @DisplayName("WAITING_FOR_STALL retry: không review lại Groom, chỉ allocate khi capacity đủ")
+    @DisplayName("Retry Groom confirm không tạo trùng CareSchedule, không đổi Trainer đã gán, không duplicate notification")
+    void review_retry_idempotent_preservesAssignments() {
+        AdmissionApplication admission = admission();
+        admission.setTrainerId(8L); // Trainer đã gán từ trước
+        CandidateHorseProfile candidate = candidate();
+        StableStall qStall = stall(99L);
+
+        CareSchedule existingSchedule = new CareSchedule();
+        existingSchedule.setId(100L);
+        existingSchedule.setHorseId(20L);
+        existingSchedule.setAdmissionId(1L);
+        existingSchedule.setCareType(CareType.INITIAL);
+        existingSchedule.setStatus(CareScheduleStatus.SCHEDULED);
+        existingSchedule.setVeterinarianId(15L);
+
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        mockCapacityAvailable();
+        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(candidate));
+        when(stableStallRepository.findFirstAvailableQuarantineStallForUpdate()).thenReturn(Optional.of(qStall));
+        when(horseRepository.findByRegistrationNumber("FR1234567890123")).thenReturn(List.of());
+        when(horseRepository.save(any(Horse.class))).thenAnswer(inv -> {
+            Horse horse = inv.getArgument(0);
+            horse.setId(20L);
+            return horse;
+        });
+        when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.empty());
+
+        // Existing schedule found -> not recreated
+        when(careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
+                .thenReturn(Optional.of(existingSchedule));
+
+        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "Retry approve"));
+
+        // TrainerId cũ 8L được giữ nguyên, không gọi lại service chọn trainer
+        assertEquals(8L, result.getTrainerId());
+        verifyNoInteractions(headTrainerWorkloadService);
+
+        // Không tạo mới schedule
+        verify(careScheduleRepository, never()).save(any(CareSchedule.class));
+
+        // Notifications được gọi qua dedup service
+        verify(notificationService).sendAssignmentNotification(
+                eq(15L), eq(1L), eq(20L), eq(NotificationTypes.ADMISSION_VET_ASSIGNED), anyString(), anyString());
+        verify(notificationService).sendAssignmentNotification(
+                eq(8L), eq(1L), eq(20L), eq(NotificationTypes.ADMISSION_TRAINER_ASSIGNED), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("WAITING_FOR_STALL retry: gán Trainer và Vet khi capacity đủ")
     void processWaitingForStall_success() {
         AdmissionApplication admission = admission();
         admission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
@@ -243,6 +319,7 @@ class AdmissionGroomReviewServiceTest {
         when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.empty());
         when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
                 eq(20L), eq(CareType.INITIAL), any())).thenReturn(false);
+        when(headTrainerWorkloadService.selectLeastLoadedHeadTrainerId()).thenReturn(Optional.of(12L));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.processWaitingForStall(1L);
@@ -251,6 +328,7 @@ class AdmissionGroomReviewServiceTest {
         assertEquals(7L, result.getGroomId());
         assertEquals(ReviewDecision.APPROVED, result.getGroomDecision());
         assertEquals(20L, result.getHorseId());
+        assertEquals(12L, result.getTrainerId());
     }
 
     @Test
@@ -271,18 +349,21 @@ class AdmissionGroomReviewServiceTest {
         when(horseRepository.findByRegistrationNumber("FR1234567890123")).thenReturn(List.of(existingHorse));
         when(horseRepository.save(existingHorse)).thenReturn(existingHorse);
         when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.of(new HorsePedigree()));
+        when(careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
+                .thenReturn(Optional.empty());
         when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
                 eq(20L), eq(CareType.INITIAL), any())).thenReturn(true);
+        when(headTrainerWorkloadService.selectLeastLoadedHeadTrainerId()).thenReturn(Optional.of(3L));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "Verified"));
 
         assertEquals(AdmissionStatus.VET_REVIEW, result.getStatus());
         assertEquals(20L, result.getHorseId());
+        assertEquals(3L, result.getTrainerId());
         assertEquals(HorseStatus.CANDIDATE, existingHorse.getCurrentStatus());
         assertTrue(existingHorse.isTrainingLocked());
         assertEquals(99L, existingHorse.getCurrentStallId());
-        verify(careScheduleRepository, never()).save(any());
     }
 
     @Test

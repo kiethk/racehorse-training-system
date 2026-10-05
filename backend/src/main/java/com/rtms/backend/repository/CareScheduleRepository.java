@@ -3,6 +3,7 @@ package com.rtms.backend.repository;
 import com.rtms.backend.entity.CareSchedule;
 import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.enums.CareType;
+import com.rtms.backend.enums.AdmissionStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -40,9 +41,42 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
 
     Optional<CareSchedule> findFirstByHorseIdAndCareTypeAndStatusInOrderByCreatedAtDesc(Long horseId, CareType careType, Collection<CareScheduleStatus> statuses);
 
+    Optional<CareSchedule> findByRequestedByIdAndIdempotencyKey(Long requestedById, String idempotencyKey);
+
+    Optional<CareSchedule> findBySourceScheduleId(Long sourceScheduleId);
+
+    Optional<CareSchedule> findFirstByVeterinarianIdAndHorseIdAndStatusOrderByCompletedAtDesc(
+            Long veterinarianId, Long horseId, CareScheduleStatus status);
+
     boolean existsByHorseIdAndCareTypeAndStatusInAndIdNot(Long horseId, CareType careType, Collection<CareScheduleStatus> statuses, Long id);
 
     List<CareSchedule> findByStatus(CareScheduleStatus status);
+
+    @Query(value = """
+            SELECT cs.* FROM care_schedule cs
+            LEFT JOIN groom_incident_reports gir ON gir.id = cs.source_incident_id
+            WHERE cs.status = 'REQUESTED'
+            ORDER BY CASE cs.care_type WHEN 'URGENT' THEN 0 WHEN 'INITIAL' THEN 1 ELSE 2 END,
+                     CASE WHEN cs.care_type = 'URGENT' THEN
+                       CASE gir.severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END
+                     ELSE 0 END,
+                     cs.created_at ASC, cs.id ASC
+            LIMIT :batchSize
+            FOR UPDATE OF cs SKIP LOCKED
+            """, nativeQuery = true)
+    List<CareSchedule> lockNextRequestedBatch(@Param("batchSize") int batchSize);
+
+    @Query("SELECT cs FROM CareSchedule cs WHERE cs.veterinarianId IS NOT NULL "
+            + "AND cs.status IN :statuses AND cs.scheduledAt >= :dayStart AND cs.scheduledAt < :dayEnd")
+    List<CareSchedule> findAssignedInDay(@Param("dayStart") LocalDateTime dayStart,
+            @Param("dayEnd") LocalDateTime dayEnd,
+            @Param("statuses") Collection<CareScheduleStatus> statuses);
+
+    boolean existsByVeterinarianIdAndHorseIdAndStatusIn(Long veterinarianId, Long horseId,
+            Collection<CareScheduleStatus> statuses);
+
+    List<CareSchedule> findByVeterinarianIdAndCareTypeAndStatus(
+            Long veterinarianId, CareType careType, CareScheduleStatus status);
 
     List<CareSchedule> findByVeterinarianIdAndStatus(Long veterinarianId, CareScheduleStatus status);
 
@@ -72,6 +106,16 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             @Param("careType") CareType careType, @Param("horseId") Long horseId,
             @Param("vetId") Long vetId, @Param("admissionId") Long admissionId, Pageable pageable);
 
+    @Query("SELECT cs FROM CareSchedule cs, AdmissionApplication a WHERE cs.admissionId = a.id "
+            + "AND (:status IS NULL OR cs.status = :status) AND (:careType IS NULL OR cs.careType = :careType) "
+            + "AND (:horseId IS NULL OR cs.horseId = :horseId) AND (:vetId IS NULL OR cs.veterinarianId = :vetId) "
+            + "AND (:admissionId IS NULL OR cs.admissionId = :admissionId) "
+            + "AND ((:role = 'HEAD_TRAINER' AND a.trainerId = :userId) OR (:role = 'GROOM' AND a.groomId = :userId))")
+    Page<CareSchedule> findFilteredForAdmissionAssignee(@Param("status") CareScheduleStatus status,
+            @Param("careType") CareType careType, @Param("horseId") Long horseId,
+            @Param("vetId") Long vetId, @Param("admissionId") Long admissionId,
+            @Param("userId") Long userId, @Param("role") String role, Pageable pageable);
+
     Page<CareSchedule> findByHorseId(Long horseId, Pageable pageable);
 
     Page<CareSchedule> findByVeterinarianId(Long veterinarianId, Pageable pageable);
@@ -81,4 +125,75 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     Page<CareSchedule> findByCareType(CareType careType, Pageable pageable);
 
     Page<CareSchedule> findByStatusAndCareType(CareScheduleStatus status, CareType careType, Pageable pageable);
+
+    boolean existsByAdmissionIdAndVeterinarianId(Long admissionId, Long veterinarianId);
+
+    List<CareSchedule> findByAdmissionIdIn(Collection<Long> admissionIds);
+
+    List<CareSchedule> findByAdmissionId(Long admissionId);
+
+    @Query("""
+        SELECT cs FROM CareSchedule cs
+        WHERE cs.admissionId IS NOT NULL
+          AND cs.veterinarianId = :vetId
+          AND cs.status != 'CANCELLED'
+        ORDER BY
+          CASE cs.careType WHEN 'URGENT' THEN 0 WHEN 'INITIAL' THEN 1 ELSE 2 END,
+          cs.scheduledAt ASC, cs.id DESC
+    """)
+    List<CareSchedule> findVetAdmissionSchedules(@Param("vetId") Long vetId);
+
+    @Query(value = """
+        SELECT cs FROM CareSchedule cs, AdmissionApplication a, CandidateHorseProfile c
+        WHERE cs.admissionId = a.id AND c.admissionId = a.id
+          AND cs.veterinarianId = :vetId AND cs.status NOT IN ('COMPLETED','CANCELLED')
+          AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
+               OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+               OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
+          AND (:admissionStatus IS NULL OR a.status = :admissionStatus)
+          AND (:scheduleStatus IS NULL OR cs.status = :scheduleStatus)
+          AND (:careType IS NULL OR cs.careType = :careType)
+          AND (:pill = ''
+               OR (:pill = 'AWAITING' AND cs.status IN ('REQUESTED','SCHEDULED'))
+               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS')
+               OR (:pill = 'RECHECK' AND a.status = 'PENDING_RECHECK'))
+          AND (:priority = ''
+               OR (:priority = 'URGENT' AND cs.careType = 'URGENT')
+               OR (:priority = 'NORMAL' AND cs.careType <> 'URGENT'))
+        ORDER BY CASE cs.careType WHEN 'URGENT' THEN 0 WHEN 'INITIAL' THEN 1 ELSE 2 END,
+                 COALESCE(cs.scheduledAt, cs.createdAt) ASC, cs.id ASC
+        """,
+        countQuery = """
+        SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a, CandidateHorseProfile c
+        WHERE cs.admissionId = a.id AND c.admissionId = a.id
+          AND cs.veterinarianId = :vetId AND cs.status NOT IN ('COMPLETED','CANCELLED')
+          AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
+               OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+               OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
+          AND (:admissionStatus IS NULL OR a.status = :admissionStatus)
+          AND (:scheduleStatus IS NULL OR cs.status = :scheduleStatus)
+          AND (:careType IS NULL OR cs.careType = :careType)
+          AND (:pill = ''
+               OR (:pill = 'AWAITING' AND cs.status IN ('REQUESTED','SCHEDULED'))
+               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS')
+               OR (:pill = 'RECHECK' AND a.status = 'PENDING_RECHECK'))
+          AND (:priority = ''
+               OR (:priority = 'URGENT' AND cs.careType = 'URGENT')
+               OR (:priority = 'NORMAL' AND cs.careType <> 'URGENT'))
+        """)
+    Page<CareSchedule> findVetQueuePage(
+            @Param("vetId") Long vetId, @Param("searching") boolean searching,
+            @Param("search") String search, @Param("pill") String pill,
+            @Param("admissionStatus") AdmissionStatus admissionStatus,
+            @Param("scheduleStatus") CareScheduleStatus scheduleStatus,
+            @Param("careType") CareType careType, @Param("priority") String priority,
+            Pageable pageable);
+
+    long countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(Long vetId, Collection<CareScheduleStatus> statuses);
+
+    @Query("SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a "
+            + "WHERE cs.admissionId = a.id AND cs.veterinarianId = :vetId "
+            + "AND cs.status IN ('REQUESTED','SCHEDULED','IN_PROGRESS') "
+            + "AND a.status = 'PENDING_RECHECK'")
+    long countVetRecheckItems(@Param("vetId") Long vetId);
 }

@@ -53,8 +53,15 @@ public class AdmissionTrainerReviewController {
      */
     @GetMapping("/{id}/trainer-view")
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VIEW')")
-    public ApiResponse<TrainerAdmissionViewResponse> getTrainerView(@PathVariable Long id) {
+    public ApiResponse<TrainerAdmissionViewResponse> getTrainerView(@PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
         AdmissionDetailResponse detail = queryService.getAdmissionDetail(id);
+        if ("HEAD_TRAINER".equals(currentUser.getRole())
+                && !java.util.Objects.equals(detail.getTrainerId(), currentUser.getUserId())) {
+            throw new com.rtms.backend.config.ApiException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "FORBIDDEN",
+                    "Only the assigned trainer can view this admission");
+        }
 
         Horse horse = detail.getHorseId() == null
                 ? null

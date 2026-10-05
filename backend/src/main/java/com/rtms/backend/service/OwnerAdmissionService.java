@@ -203,6 +203,8 @@ public class OwnerAdmissionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
         if ("HORSE_OWNER".equals(viewer.getRole())) {
             assertOwner(viewer.getUserId(), application);
+        } else if (!"VETERINARIAN".equals(viewer.getRole())) {
+            assertViewerCanRead(admissionId, viewer);
         }
         AdmissionDocument document = documents.findById(documentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
@@ -214,11 +216,16 @@ public class OwnerAdmissionService {
 
     @Transactional(readOnly = true)
     public void assertViewerCanRead(Long admissionId, AuthenticatedUser viewer) {
-        if ("HORSE_OWNER".equals(viewer.getRole())) {
-            ownedAdmission(viewer.getUserId(), admissionId);
-        } else if (!admissions.existsById(admissionId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found");
-        }
+        AdmissionApplication admission = admissions.findById(admissionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
+        boolean allowed = switch (viewer.getRole()) {
+            case "CLUB_MANAGER" -> true;
+            case "HORSE_OWNER" -> java.util.Objects.equals(admission.getOwnerId(), viewer.getUserId());
+            case "HEAD_TRAINER" -> java.util.Objects.equals(admission.getTrainerId(), viewer.getUserId());
+            case "GROOM" -> java.util.Objects.equals(admission.getGroomId(), viewer.getUserId());
+            default -> false;
+        };
+        if (!allowed) throw new org.springframework.security.access.AccessDeniedException("Admission is not assigned to you");
     }
 
     public AdmissionDocumentResponse toDocumentResponse(AdmissionDocument document) {

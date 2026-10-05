@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -79,6 +80,52 @@ class AdmissionTrainerReviewServiceTest {
         assertEquals(4, savedAssessment.getEstimatedMonthsToRace());
         assertNull(savedAssessment.getFitnessScore());
         assertNull(savedAssessment.getValidUntil());
+    }
+
+    @Test
+    @DisplayName("Trainer được phân công đánh giá thành công: giữ nguyên trainerId đã gán")
+    void testCompleteAssessment_preservesPreassignedTrainerId() {
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(10L);
+        admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
+        admission.setHorseId(7L);
+        admission.setTrainerId(5L); // Preassigned Trainer ID
+
+        when(admissionRepository.findById(10L)).thenReturn(Optional.of(admission));
+        when(assessmentRepository.save(any(RacingReadinessAssessment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(admissionRepository.save(any(AdmissionApplication.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
+        req.setReadinessStatus(RacingReadinessStatus.READY);
+        req.setRemarks("Hồ sơ đạt yêu cầu thi đấu.");
+
+        AdmissionApplication result = trainerReviewService.completeAssessment(10L, req, 5L);
+
+        assertEquals(AdmissionStatus.MANAGER_REVIEW, result.getStatus());
+        assertEquals(5L, result.getTrainerId(), "TrainerId đã gán từ trước phải được giữ nguyên");
+    }
+
+    @Test
+    @DisplayName("Trainer khác cố tình đánh giá đơn đã gán: nhận 403 Forbidden")
+    void testCompleteAssessment_differentTrainer_throwsForbidden() {
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(10L);
+        admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
+        admission.setHorseId(7L);
+        admission.setTrainerId(5L); // Preassigned to Trainer 5
+
+        when(admissionRepository.findById(10L)).thenReturn(Optional.of(admission));
+
+        TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
+        req.setReadinessStatus(RacingReadinessStatus.READY);
+        req.setRemarks("Hồ sơ đạt.");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> trainerReviewService.completeAssessment(10L, req, 99L)); // Trainer 99 calls
+
+        assertEquals(403, ex.getStatusCode().value());
+        assertTrue(ex.getReason().contains("Chỉ Trainer được phân công"));
+        verifyNoInteractions(assessmentRepository);
     }
 
     @Test

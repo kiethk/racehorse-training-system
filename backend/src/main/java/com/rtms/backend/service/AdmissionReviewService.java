@@ -39,6 +39,15 @@ public class AdmissionReviewService {
 
     @Transactional
     public VetReviewResponse reviewByVet(Long admissionId, VetReviewRequest request, Long actorId) {
+        if (Boolean.TRUE.equals(request.getRejectAdmission()) || request.getDecision() == VetDecision.REJECTED) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "VET_CANNOT_REJECT_ADMISSION",
+                    "Veterinarians cannot reject admissions; only medical training decisions (ALLOWED, RESTRICTED, BLOCKED) are permitted.");
+        }
+        if (request.getFollowUpDate() != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "LEGACY_FIELD_NOT_SUPPORTED",
+                    "followUpDate is deprecated and not supported; schedule follow-up examinations via nextSchedule instead.");
+        }
+
         AdmissionApplication before = admissions.findById(admissionId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Admission not found"));
         if (before.getStatus() != AdmissionStatus.VET_REVIEW && before.getStatus() != AdmissionStatus.PENDING_RECHECK) {
@@ -65,7 +74,7 @@ public class AdmissionReviewService {
             careScheduleService.startCareSchedule(schedule.getId(), actorId);
         } else if (schedule.getStatus() != CareScheduleStatus.IN_PROGRESS) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE",
-                    "Accept the examination offer and start it before submitting a review");
+                    "Start the examination before submitting a review");
         }
 
         return completeCareScheduleReview(admissionId, schedule, request, actorId);
@@ -101,15 +110,8 @@ public class AdmissionReviewService {
         compReq.setNotes(request.getNotes() != null ? request.getNotes() : request.getFeedback());
         compReq.setFollowUpDate(request.getFollowUpDate());
         compReq.setMetrics(request.getMetrics());
-
-        if (Boolean.TRUE.equals(request.getRejectAdmission())
-                || (request.getDecision() == VetDecision.REJECTED && !Boolean.FALSE.equals(request.getRejectAdmission()))) {
-            compReq.setRejectAdmission(true);
-            compReq.setRejectionReason(request.getRejectionReason() != null ? request.getRejectionReason()
-                    : (request.getFeedback() != null ? request.getFeedback() : "Admission rejected by veterinarian"));
-        } else {
-            compReq.setRejectAdmission(false);
-        }
+        compReq.setNextSchedule(request.getNextSchedule());
+        compReq.setRejectAdmission(false);
 
         if (request.getTrainingDecision() != null) {
             compReq.setTrainingDecision(request.getTrainingDecision());

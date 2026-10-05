@@ -36,6 +36,10 @@ export function setServerClockOffset(serverTimeMs: number) {
   serverClockOffsetMs = serverTimeMs - Date.now();
 }
 
+export function createAuthenticatedEventSource(path: string): EventSource {
+  return new EventSource(`${API_URL}${path}`, { withCredentials: true });
+}
+
 async function doFetch(path: string, options: RequestInit): Promise<Response> {
   const isAuthEndpoint = [
     '/api/auth/login',
@@ -146,4 +150,17 @@ export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
     throw new ApiError(res.status, msg, payload?.errorCode);
   }
   return payload as T;
+}
+
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  const res = await doFetch(path, {
+    method: "PATCH",
+    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    credentials: "include",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    throw await responseError(res);
+  }
+  return res.json();
 }

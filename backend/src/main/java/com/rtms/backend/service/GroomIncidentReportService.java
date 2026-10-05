@@ -7,6 +7,12 @@ import com.rtms.backend.enums.IncidentSeverity;
 import com.rtms.backend.enums.IncidentStatus;
 import com.rtms.backend.repository.GroomIncidentReportRepository;
 import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
+import com.rtms.backend.entity.CareSchedule;
+import com.rtms.backend.entity.Horse;
+import com.rtms.backend.enums.CareScheduleStatus;
+import com.rtms.backend.enums.CareType;
+import com.rtms.backend.enums.TrainingStatus;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -25,13 +31,19 @@ public class GroomIncidentReportService {
     private final GroomIncidentReportRepository incidentReportRepository;
     private final HorseRepository horseRepository;
     private final AdmissionFileStorage fileStorage;
+    private final CareScheduleRepository careScheduleRepository;
+    private final CareScheduleService careScheduleService;
 
     public GroomIncidentReportService(GroomIncidentReportRepository incidentReportRepository,
                                       HorseRepository horseRepository,
-                                      AdmissionFileStorage fileStorage) {
+                                      AdmissionFileStorage fileStorage,
+                                      CareScheduleRepository careScheduleRepository,
+                                      CareScheduleService careScheduleService) {
         this.incidentReportRepository = incidentReportRepository;
         this.horseRepository = horseRepository;
         this.fileStorage = fileStorage;
+        this.careScheduleRepository = careScheduleRepository;
+        this.careScheduleService = careScheduleService;
     }
 
     @Transactional
@@ -39,7 +51,7 @@ public class GroomIncidentReportService {
         if (request.getHorseId() == null) {
             throw new RuntimeException("Horse ID is required");
         }
-        horseRepository.findById(request.getHorseId())
+        Horse horse = horseRepository.findByIdForUpdate(request.getHorseId())
                 .orElseThrow(() -> new RuntimeException("Horse not found with id: " + request.getHorseId()));
 
         if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
@@ -61,7 +73,27 @@ public class GroomIncidentReportService {
                 severity
         );
 
-        return incidentReportRepository.save(report);
+        GroomIncidentReport saved = incidentReportRepository.save(report);
+
+        List<CareScheduleStatus> activeStatuses = List.of(
+                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+        CareSchedule active = careScheduleRepository
+                .findFirstByHorseIdAndCareTypeAndStatusInOrderByCreatedAtDesc(
+                        horse.getId(), CareType.URGENT, activeStatuses)
+                .orElse(null);
+        if (active == null) {
+            careScheduleService.createSchedule(horse.getId(), CareType.URGENT, null, null, saved.getId());
+            active = careScheduleRepository
+                    .findFirstByHorseIdAndCareTypeAndStatusInOrderByCreatedAtDesc(
+                            horse.getId(), CareType.URGENT, activeStatuses)
+                    .orElseThrow(() -> new IllegalStateException("Urgent schedule was not created"));
+        } else {
+            horse.setTrainingStatus(TrainingStatus.BLOCKED);
+            horse.setTrainingLockReason("Urgent veterinary care pending");
+            horseRepository.save(horse);
+        }
+        saved.setCareScheduleId(active.getId());
+        return incidentReportRepository.save(saved);
     }
 
     public List<GroomIncidentReport> getReports(Long horseId,

@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
-import { VetOfferNotifier } from '@/features/admissions/components/VetOfferNotifier';
+import { Suspense } from 'react';
+import { UrgentAssignmentNotifier } from '@/features/admissions/components/UrgentAssignmentNotifier';
 
 export default function VeterinarianLayout({ children }: { children: ReactNode }) {
   return (
     <>
-      <VetOfferNotifier />
+      <Suspense fallback={null}>
+        <UrgentAssignmentNotifier />
+      </Suspense>
       {children}
     </>
   );

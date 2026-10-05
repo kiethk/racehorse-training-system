@@ -6,8 +6,10 @@ import com.rtms.backend.entity.RacingReadinessAssessment;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.RacingReadinessAssessmentRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -47,7 +49,7 @@ public class AdmissionTrainerReviewService {
                                                     Long trainerId) {
 
         AdmissionApplication admission = admissionRepository.findById(admissionId)
-                .orElseThrow(() -> new RuntimeException(
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy đơn nhập học #" + admissionId));
 
         // ---- Một lần duy nhất ----
@@ -63,6 +65,12 @@ public class AdmissionTrainerReviewService {
             throw new IllegalStateException(
                     "Đơn chưa gắn hồ sơ chiến mã. Bước Groom phải tạo Horse (CANDIDATE) "
                   + "và xếp chuồng cách ly trước khi Trainer đánh giá!");
+        }
+
+        // ---- Kiểm tra phân công Trainer: Trainer khác không được review chéo ----
+        if (admission.getTrainerId() != null && !admission.getTrainerId().equals(trainerId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Chỉ Trainer được phân công mới có quyền đánh giá đơn này!");
         }
 
         if (request.getReadinessStatus() == null) {
@@ -101,7 +109,10 @@ public class AdmissionTrainerReviewService {
         assessmentRepository.save(assessment);
 
         // ---- Ghi dấu bước Trainer lên đơn ----
-        admission.setTrainerId(trainerId);
+        // Trainer review KHÔNG được thay đổi trainerId đã gán
+        if (admission.getTrainerId() == null) {
+            admission.setTrainerId(trainerId);
+        }
         admission.setTrainerFeedback(request.getRemarks());
         admission.setTrainerReviewedAt(LocalDateTime.now());
         admission.setStatus(AdmissionStatus.MANAGER_REVIEW);
