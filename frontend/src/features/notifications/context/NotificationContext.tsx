@@ -32,15 +32,30 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
   const { user } = useAuth();
   const router = useRouter();
 
+  const userId = user?.userId ?? null;
+  const storageKey = `rtms_dismissed_notifications_${userId ?? 'anon'}`;
+
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [activeModalNotification, setActiveModalNotification] = useState<NotificationItem | null>(null);
-  const [temporarilyDismissedIds, setTemporarilyDismissedIds] = useState<Set<number>>(new Set());
+  const [temporarilyDismissedIds, setTemporarilyDismissedIds] = useState<Set<number>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const raw = sessionStorage.getItem(`rtms_dismissed_notifications_${userId ?? 'anon'}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return new Set<number>(parsed.map(Number));
+        }
+      }
+    } catch {
+      // Ignore sessionStorage read errors
+    }
+    return new Set<number>();
+  });
   const [modalActionError, setModalActionError] = useState<string | null>(null);
   const [modalActionPending, setModalActionPending] = useState(false);
   const requestGeneration = useRef(0);
-
-  const userId = user?.userId ?? null;
 
   const refreshNotifications = useCallback(async () => {
     if (!userId) return;
@@ -173,11 +188,22 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
 
   const handleDismissTemporary = useCallback(() => {
     if (activeModalNotification) {
-      setTemporarilyDismissedIds((prev) => new Set(prev).add(activeModalNotification.id));
+      const dismissedId = activeModalNotification.id;
+      setTemporarilyDismissedIds((prev) => {
+        const next = new Set(prev).add(dismissedId);
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem(storageKey, JSON.stringify(Array.from(next)));
+          }
+        } catch {
+          // Ignore sessionStorage write errors
+        }
+        return next;
+      });
     }
     setActiveModalNotification(null);
     setModalActionError(null);
-  }, [activeModalNotification]);
+  }, [activeModalNotification, storageKey]);
 
   const contextValue = useMemo(
     () => ({

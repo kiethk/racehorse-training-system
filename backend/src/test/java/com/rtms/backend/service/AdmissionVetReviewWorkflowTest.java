@@ -58,6 +58,8 @@ class AdmissionVetReviewWorkflowTest {
     @Mock
     private NotificationService notificationService;
     @Mock
+    private HeadTrainerWorkloadService headTrainerWorkloadService;
+    @Mock
     private CandidateHorseProfileRepository candidateProfileRepository;
     @Mock
     private AdmissionDocumentRepository admissionDocumentRepository;
@@ -83,7 +85,8 @@ class AdmissionVetReviewWorkflowTest {
                 auditLogRepository,
                 eventPublisher,
                 entityManager,
-                notificationService
+                notificationService,
+                headTrainerWorkloadService
         );
 
         admissionQueryService = new AdmissionQueryService(
@@ -173,7 +176,7 @@ class AdmissionVetReviewWorkflowTest {
         Horse horse = new Horse();
         horse.setId(horseId);
         horse.setCurrentStatus(HorseStatus.CANDIDATE);
-        horse.setTrainingStatus(TrainingStatus.BLOCKED);
+        horse.setTrainingStatus(TrainingDecision.BLOCKED);
 
         AdmissionApplication admission = new AdmissionApplication();
         admission.setId(admissionId);

@@ -3,7 +3,9 @@ package com.rtms.backend.service;
 import com.rtms.backend.entity.TrainerProfile;
 import com.rtms.backend.entity.User;
 import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.TrainerProfileRepository;
 import com.rtms.backend.repository.UserRepository;
@@ -20,7 +22,7 @@ import java.util.stream.Collectors;
  * 1. Chỉ xét User đang active.
  * 2. Role phải là HEAD_TRAINER.
  * 3. Phải có TrainerProfile hợp lệ (certificationNumber không rỗng).
- * 4. Workload = (Số Horse trong các Area do Trainer phụ trách) + (Số Admission đã gán trainerId chưa terminal).
+ * 4. Workload = (Số Horse trong các Area do Trainer phụ trách) + (Số Admission đã gán trainerId chưa terminal) + (Số CareSchedule active đã gán trainerId).
  * 5. Trạng thái terminal: APPROVED hoặc REJECTED.
  * 6. Tie-break: chọn trainerId nhỏ hơn.
  * 7. Nếu không có Trainer hợp lệ: trả về Optional.empty().
@@ -33,20 +35,28 @@ public class HeadTrainerWorkloadService {
             AdmissionStatus.REJECTED
     );
 
+    public static final Set<CareScheduleStatus> ACTIVE_CARE_SCHEDULE_STATUSES = Set.of(
+            CareScheduleStatus.SCHEDULED,
+            CareScheduleStatus.IN_PROGRESS
+    );
+
     private final UserRepository userRepository;
     private final TrainerProfileRepository trainerProfileRepository;
     private final HorseRepository horseRepository;
     private final AdmissionApplicationRepository admissionApplicationRepository;
+    private final CareScheduleRepository careScheduleRepository;
 
     public HeadTrainerWorkloadService(
             UserRepository userRepository,
             TrainerProfileRepository trainerProfileRepository,
             HorseRepository horseRepository,
-            AdmissionApplicationRepository admissionApplicationRepository) {
+            AdmissionApplicationRepository admissionApplicationRepository,
+            CareScheduleRepository careScheduleRepository) {
         this.userRepository = userRepository;
         this.trainerProfileRepository = trainerProfileRepository;
         this.horseRepository = horseRepository;
         this.admissionApplicationRepository = admissionApplicationRepository;
+        this.careScheduleRepository = careScheduleRepository;
     }
 
     /**
@@ -125,8 +135,8 @@ public class HeadTrainerWorkloadService {
 
     /**
      * Tính toán bảng workload cho danh sách trainerIds:
-     * workload = horseCount + activeAdmissionCount.
-     * Sử dụng 2 câu query tổng hợp tránh N+1.
+     * workload = horseCount + activeAdmissionCount + activeCareScheduleCount.
+     * Sử dụng 3 câu query tổng hợp tránh N+1.
      */
     @Transactional(readOnly = true)
     public Map<Long, Long> calculateWorkloads(Collection<Long> trainerIds) {
@@ -137,12 +147,15 @@ public class HeadTrainerWorkloadService {
         Map<Long, Long> horseCounts = parseCountResults(horseRepository.countHorsesByTrainerIds(trainerIds));
         Map<Long, Long> admissionCounts = parseCountResults(
                 admissionApplicationRepository.countActiveAdmissionsByTrainerIds(trainerIds, TERMINAL_ADMISSION_STATUSES));
+        Map<Long, Long> careScheduleCounts = parseCountResults(
+                careScheduleRepository.countActiveCareSchedulesByTrainerIds(trainerIds, ACTIVE_CARE_SCHEDULE_STATUSES));
 
         Map<Long, Long> workloads = new HashMap<>();
         for (Long trainerId : trainerIds) {
             long horses = horseCounts.getOrDefault(trainerId, 0L);
             long admissions = admissionCounts.getOrDefault(trainerId, 0L);
-            workloads.put(trainerId, horses + admissions);
+            long careSchedules = careScheduleCounts.getOrDefault(trainerId, 0L);
+            workloads.put(trainerId, horses + admissions + careSchedules);
         }
         return workloads;
     }
@@ -169,6 +182,19 @@ public class HeadTrainerWorkloadService {
         }
         Map<Long, Long> counts = parseCountResults(
                 admissionApplicationRepository.countActiveAdmissionsByTrainerIds(List.of(trainerId), TERMINAL_ADMISSION_STATUSES));
+        return counts.getOrDefault(trainerId, 0L);
+    }
+
+    /**
+     * Lấy riêng số lượng care schedule active (SCHEDULED, IN_PROGRESS) đã gán cho Trainer.
+     */
+    @Transactional(readOnly = true)
+    public long getCareScheduleWorkload(Long trainerId) {
+        if (trainerId == null) {
+            return 0L;
+        }
+        Map<Long, Long> counts = parseCountResults(
+                careScheduleRepository.countActiveCareSchedulesByTrainerIds(List.of(trainerId), ACTIVE_CARE_SCHEDULE_STATUSES));
         return counts.getOrDefault(trainerId, 0L);
     }
 

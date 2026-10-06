@@ -19,6 +19,14 @@ public class CareSchedule {
     @Column(name = "veterinarian_id")
     private Long veterinarianId;
 
+    /**
+     * Head Trainer responsible for this care schedule. Assigned directly alongside
+     * {@code veterinarianId} by the scheduler (Vet Flow MVP §3.3) — only the ID is
+     * stored; no separate TrainingSession is created. Null until a Trainer is available.
+     */
+    @Column(name = "trainer_id")
+    private Long trainerId;
+
     @Column(name = "admission_id")
     private Long admissionId;
 
@@ -92,6 +100,9 @@ public class CareSchedule {
 
     public Long getVeterinarianId() { return veterinarianId; }
     public void setVeterinarianId(Long veterinarianId) { this.veterinarianId = veterinarianId; }
+
+    public Long getTrainerId() { return trainerId; }
+    public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
 
     public Long getAdmissionId() { return admissionId; }
     public void setAdmissionId(Long admissionId) { this.admissionId = admissionId; }

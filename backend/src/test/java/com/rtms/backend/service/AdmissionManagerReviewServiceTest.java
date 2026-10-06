@@ -10,7 +10,7 @@ import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.enums.ReviewDecision;
 import com.rtms.backend.enums.StallStatus;
-import com.rtms.backend.enums.TrainingStatus;
+import com.rtms.backend.enums.TrainingDecision;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.repository.HorseRepository;
@@ -510,7 +510,7 @@ class AdmissionManagerReviewServiceTest {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         horse.setTrainingLocked(true);
-        horse.setTrainingStatus(TrainingStatus.BLOCKED);
+        horse.setTrainingStatus(TrainingDecision.BLOCKED);
         horse.setTrainingLockVetId(3L);
         horse.setTrainingLockReason("Left forelimb tendon strain - rest prescribed by vet");
 
@@ -531,7 +531,7 @@ class AdmissionManagerReviewServiceTest {
 
         // Lock must be preserved!
         assertTrue(horse.isTrainingLocked());
-        assertEquals(TrainingStatus.BLOCKED, horse.getTrainingStatus());
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingStatus());
         assertEquals(3L, horse.getTrainingLockVetId());
         assertEquals("Left forelimb tendon strain - rest prescribed by vet", horse.getTrainingLockReason());
         verify(horseRepository).save(horse);

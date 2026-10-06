@@ -2,7 +2,6 @@ export type AdmissionStatus =
   | 'GROOM_REVIEW'
   | 'WAITING_FOR_STALL'
   | 'VET_REVIEW'
-  | 'PENDING_RECHECK'
   | 'TRAINER_REVIEW'
   | 'MANAGER_REVIEW'
   | 'APPROVED'
@@ -45,7 +44,7 @@ export interface HealthRecord {
   findings: string | null;
   diagnosis: string | null;
   treatment: string | null;
-  vetDecision: VetDecision | null;
+  vetDecision: string | null;
   trainingDecision?: TrainingDecision | null;
   restrictionDetails?: string | null;
   rejectionReason: string | null;
@@ -112,7 +111,14 @@ export interface AdmissionDetailResponse {
 
   availableRegularStalls: StableStall[];
   healthRecords: HealthRecord[];
-  initialExamSchedule: InitialExamScheduleResponse | null;
+  initialExamSchedule: {
+    scheduleId: number;
+    careType: string;
+    status: string;
+    veterinarianId: number | null;
+    scheduledDate: string | null;
+    scheduledAt: string | null;
+  } | null;
   capacity: {
     availableQuarantineStalls: number;
     availableRegularStalls: number;
@@ -121,19 +127,6 @@ export interface AdmissionDetailResponse {
     blockingReason: 'NO_QUARANTINE_STALL' | 'REGULAR_RESERVE_INSUFFICIENT' | null;
   };
 }
-
-export interface InitialExamScheduleResponse {
-  scheduleId: number;
-  careType: string;
-  status: string;
-  veterinarianId: number | null;
-  scheduledDate: string | null;
-  scheduledAt: string | null;
-}
-
-export type VetDecision = 'APPROVED' | 'RECHECK_REQUIRED' | 'REJECTED';
-export type VetExamType = 'URGENT' | 'INITIAL' | 'FOLLOW_UP' | 'ROUTINE';
-export type VetExamStatus = 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
 // Care Schedule Types
 export type CareScheduleStatus =
@@ -144,6 +137,14 @@ export type CareScheduleStatus =
   | 'CANCELLED';
 
 export type CareType = 'INITIAL' | 'ROUTINE' | 'URGENT';
+
+export interface HorseSummary {
+  id: number;
+  name: string;
+  breed: string | null;
+  registrationNumber: string | null;
+  trainingStatus: TrainingDecision;
+}
 
 export interface UrgentAssignmentAlert {
   eventId: number;
@@ -161,7 +162,7 @@ export interface UrgentAssignmentAlert {
   title: string;
   description: string;
   imageUrl: string | null;
-  trainingStatus: TrainingStatus;
+  trainingStatus: TrainingDecision;
   status: CareScheduleStatus;
   scheduledAt: string | null;
   assignedAt: string;
@@ -171,6 +172,7 @@ export interface CareSchedule {
   id: number;
   horseId: number;
   veterinarianId?: number | null;
+  trainerId?: number | null;
   admissionId?: number | null;
   candidateName?: string;
   careType: CareType;
@@ -185,14 +187,9 @@ export interface CareSchedule {
 
 export interface CareScheduleDetail {
   schedule: CareSchedule;
-  horse: {
-    id: number;
-    name: string;
-    breed: string | null;
-    registrationNumber: string | null;
-    trainingStatus: TrainingStatus;
-  } | null;
+  horse: HorseSummary | null;
   veterinarian: { id: number; fullName: string; email: string } | null;
+  trainer: { id: number; fullName: string; email: string } | null;
   healthRecord: {
     id: number;
     findings: string;
@@ -210,6 +207,7 @@ export interface CareScheduleFilters {
   admissionId?: number;
   vetId?: number;
   veterinarianId?: number;
+  trainerId?: number | null;
   page?: number;
   size?: number;
 }
@@ -259,12 +257,13 @@ export interface VetQueueSummary {
   total: number;
   awaiting: number;
   inProgress: number;
-  recheck: number;
 }
+
+export type VetQueueSummaryResponse = VetQueueSummary;
 
 export interface VetQueueFilters {
   search?: string;
-  pill?: 'ALL' | 'AWAITING' | 'IN_PROGRESS' | 'RECHECK';
+  pill?: 'ALL' | 'AWAITING' | 'IN_PROGRESS';
   admissionStatus?: AdmissionStatus | 'ALL';
   scheduleStatus?: CareScheduleStatus | 'ALL';
   careType?: CareType | 'ALL';
@@ -274,25 +273,6 @@ export interface VetQueueFilters {
 }
 
 export type TrainingDecision = 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
-export type TrainingStatus = 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
-
-export interface VetExamResponse {
-  id: number;
-  horseId: number;
-  admissionId: number | null;
-  examType: VetExamType;
-  status: VetExamStatus;
-  priority: number;
-  reason: string | null;
-  createdByUserId: number | null;
-  assignedVetId: number | null;
-  preferredVetId: number | null;
-  requestedForDate: string | null;
-  scheduledAt: string | null;
-  durationMinutes: number;
-  healthRecordId: number | null;
-  createdAt: string;
-}
 
 export interface PageResponse<T> {
   content: T[];
@@ -321,7 +301,7 @@ export interface HorseHealthMetricResponse extends HorseHealthMetricRequest {
 
 export interface VetReviewRequest {
   careScheduleId?: number;
-  decision?: VetDecision;
+  decision?: string;
   trainingDecision?: TrainingDecision;
   restrictionDetails?: string;
   rejectAdmission?: boolean;
@@ -342,9 +322,9 @@ export interface VetReviewResponse {
   admissionId: number;
   status: AdmissionStatus;
   veterinarianId: number;
-  decision: VetDecision;
+  decision: string;
   trainingDecision?: TrainingDecision;
-  trainingStatus?: TrainingStatus;
+  trainingStatus?: TrainingDecision;
   restrictionDetails?: string | null;
   feedback: string | null;
   reviewedAt: string;

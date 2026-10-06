@@ -419,7 +419,7 @@ public class AdmissionQueryService {
 
     public VetQueueSummaryResponse getVetQueueSummary(Long vetId) {
         if (careScheduleRepository == null) {
-            return new VetQueueSummaryResponse(0, 0, 0, 0);
+            return new VetQueueSummaryResponse(0, 0, 0);
         }
         long total = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
                 vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED,
@@ -428,7 +428,6 @@ public class AdmissionQueryService {
                 vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));
         long inProgress = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
                 vetId, List.of(CareScheduleStatus.IN_PROGRESS));
-        long recheck = careScheduleRepository.countVetRecheckItems(vetId);
-        return new VetQueueSummaryResponse(total, awaiting, inProgress, recheck);
+        return new VetQueueSummaryResponse(total, awaiting, inProgress);
     }
 }

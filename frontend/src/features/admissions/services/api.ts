@@ -7,7 +7,6 @@ import {
   CareScheduleDetail,
   CareScheduleFilters,
   CompleteCareScheduleRequest,
-  CreateNextScheduleRequest,
   GroomQueueFilters,
   GroomQueueResponse,
   GroomReviewRequest,
@@ -138,14 +137,6 @@ export const admissionsApi = {
 
   completeCareSchedule: async (id: number, data: CompleteCareScheduleRequest): Promise<CareSchedule> => {
     const response = await apiPost<ApiResponse<CareSchedule> | CareSchedule>(`/api/care-schedules/${id}/complete`, data);
-    if (response && 'data' in response && response.data) return response.data;
-    return response as CareSchedule;
-  },
-
-  createNextSchedule: async (
-    data: CreateNextScheduleRequest & { sourceScheduleId: number }
-  ): Promise<CareSchedule> => {
-    const response = await apiPost<ApiResponse<CareSchedule> | CareSchedule>('/api/care-schedules/create-next', data);
     if (response && 'data' in response && response.data) return response.data;
     return response as CareSchedule;
   },

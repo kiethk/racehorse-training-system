@@ -103,7 +103,7 @@ public class CareScheduleController {
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasRole('CLUB_MANAGER') or (hasAuthority('VET_EXAM_MANAGE') and principal.role == 'CLUB_MANAGER')")
+    @PreAuthorize("hasRole('CLUB_MANAGER')")
     public ApiResponse<CareScheduleResponse> cancel(
             @PathVariable Long id,
             @Valid @RequestBody CancelCareScheduleRequest request,

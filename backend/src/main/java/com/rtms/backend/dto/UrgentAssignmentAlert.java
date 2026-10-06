@@ -2,7 +2,7 @@ package com.rtms.backend.dto;
 
 import com.rtms.backend.enums.IncidentSeverity;
 import com.rtms.backend.enums.CareScheduleStatus;
-import com.rtms.backend.enums.TrainingStatus;
+import com.rtms.backend.enums.TrainingDecision;
 
 import java.time.LocalDateTime;
 
@@ -22,7 +22,7 @@ public record UrgentAssignmentAlert(
         String title,
         String description,
         String imageUrl,
-        TrainingStatus trainingStatus,
+        TrainingDecision trainingStatus,
         CareScheduleStatus status,
         LocalDateTime scheduledAt,
         LocalDateTime assignedAt

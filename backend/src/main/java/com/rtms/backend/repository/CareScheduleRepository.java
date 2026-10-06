@@ -50,7 +50,6 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
 
     boolean existsByHorseIdAndCareTypeAndStatusInAndIdNot(Long horseId, CareType careType, Collection<CareScheduleStatus> statuses, Long id);
 
-    List<CareSchedule> findByStatus(CareScheduleStatus status);
 
     @Query(value = """
             SELECT cs.* FROM care_schedule cs
@@ -78,8 +77,6 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     List<CareSchedule> findByVeterinarianIdAndCareTypeAndStatus(
             Long veterinarianId, CareType careType, CareScheduleStatus status);
 
-    List<CareSchedule> findByVeterinarianIdAndStatus(Long veterinarianId, CareScheduleStatus status);
-
     boolean existsByVeterinarianIdAndStatus(Long veterinarianId, CareScheduleStatus status);
 
     boolean existsByHorseIdAndStatus(Long horseId, CareScheduleStatus status);
@@ -87,15 +84,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.horseId = :horseId AND cs.status = :status AND cs.scheduledAt IS NOT NULL")
     List<CareSchedule> findScheduledForHorse(@Param("horseId") Long horseId, @Param("status") CareScheduleStatus status);
 
-    @Query("SELECT cs FROM CareSchedule cs WHERE cs.veterinarianId = :vetId AND cs.status = 'SCHEDULED' AND cs.scheduledAt IS NOT NULL")
-    List<CareSchedule> findConflictingSchedulesForVet(@Param("vetId") Long vetId);
-
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.veterinarianId = :vetId AND cs.status = :status AND cs.scheduledAt IS NOT NULL")
     List<CareSchedule> findScheduledForVet(@Param("vetId") Long vetId, @Param("status") CareScheduleStatus status);
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT cs FROM CareSchedule cs WHERE cs.veterinarianId = :vetId AND cs.status = :status AND cs.scheduledAt IS NOT NULL")
-    List<CareSchedule> findScheduledForVetForUpdate(@Param("vetId") Long vetId, @Param("status") CareScheduleStatus status);
 
     @Query("SELECT cs FROM CareSchedule cs WHERE (:status IS NULL OR cs.status = :status) "
             + "AND (:careType IS NULL OR cs.careType = :careType) "
@@ -115,22 +105,10 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             @Param("careType") CareType careType, @Param("horseId") Long horseId,
             @Param("vetId") Long vetId, @Param("admissionId") Long admissionId,
             @Param("userId") Long userId, @Param("role") String role, Pageable pageable);
-
-    Page<CareSchedule> findByHorseId(Long horseId, Pageable pageable);
-
-    Page<CareSchedule> findByVeterinarianId(Long veterinarianId, Pageable pageable);
-
-    Page<CareSchedule> findByStatus(CareScheduleStatus status, Pageable pageable);
-
-    Page<CareSchedule> findByCareType(CareType careType, Pageable pageable);
-
-    Page<CareSchedule> findByStatusAndCareType(CareScheduleStatus status, CareType careType, Pageable pageable);
-
     boolean existsByAdmissionIdAndVeterinarianId(Long admissionId, Long veterinarianId);
 
-    List<CareSchedule> findByAdmissionIdIn(Collection<Long> admissionIds);
-
-    List<CareSchedule> findByAdmissionId(Long admissionId);
+    @Query("SELECT cs.trainerId, COUNT(cs.id) FROM CareSchedule cs WHERE cs.trainerId IN :trainerIds AND cs.status IN :statuses GROUP BY cs.trainerId")
+    List<Object[]> countActiveCareSchedulesByTrainerIds(@Param("trainerIds") Collection<Long> trainerIds, @Param("statuses") Collection<CareScheduleStatus> statuses);
 
     @Query("""
         SELECT cs FROM CareSchedule cs
@@ -155,8 +133,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
           AND (:careType IS NULL OR cs.careType = :careType)
           AND (:pill = ''
                OR (:pill = 'AWAITING' AND cs.status IN ('REQUESTED','SCHEDULED'))
-               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS')
-               OR (:pill = 'RECHECK' AND a.status = 'PENDING_RECHECK'))
+               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS'))
           AND (:priority = ''
                OR (:priority = 'URGENT' AND cs.careType = 'URGENT')
                OR (:priority = 'NORMAL' AND cs.careType <> 'URGENT'))
@@ -175,8 +152,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
           AND (:careType IS NULL OR cs.careType = :careType)
           AND (:pill = ''
                OR (:pill = 'AWAITING' AND cs.status IN ('REQUESTED','SCHEDULED'))
-               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS')
-               OR (:pill = 'RECHECK' AND a.status = 'PENDING_RECHECK'))
+               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS'))
           AND (:priority = ''
                OR (:priority = 'URGENT' AND cs.careType = 'URGENT')
                OR (:priority = 'NORMAL' AND cs.careType <> 'URGENT'))
@@ -190,10 +166,4 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             Pageable pageable);
 
     long countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(Long vetId, Collection<CareScheduleStatus> statuses);
-
-    @Query("SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a "
-            + "WHERE cs.admissionId = a.id AND cs.veterinarianId = :vetId "
-            + "AND cs.status IN ('REQUESTED','SCHEDULED','IN_PROGRESS') "
-            + "AND a.status = 'PENDING_RECHECK'")
-    long countVetRecheckItems(@Param("vetId") Long vetId);
 }

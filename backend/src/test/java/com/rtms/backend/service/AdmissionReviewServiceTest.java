@@ -121,45 +121,6 @@ class AdmissionReviewServiceTest {
     }
 
     @Test
-    void recheckUsesInProgressScheduleAndDoesNotRestartExam() {
-        // Simulate: admission is PENDING_RECHECK with a ROUTINE CareSchedule IN_PROGRESS
-        admission.setStatus(AdmissionStatus.PENDING_RECHECK);
-        CareSchedule routineSchedule = new CareSchedule();
-        routineSchedule.setId(21L);
-        routineSchedule.setAdmissionId(1L);
-        routineSchedule.setHorseId(10L);
-        routineSchedule.setCareType(CareType.ROUTINE);
-        routineSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
-        routineSchedule.setVeterinarianId(5L);
-
-        when(admissions.findById(1L)).thenReturn(Optional.of(admission));
-        // findFirstByAdmissionIdAndStatusOrderByCreatedAtDesc returns the IN_PROGRESS routine schedule
-        when(careSchedules.findFirstByAdmissionIdAndStatusOrderByCreatedAtDesc(1L, CareScheduleStatus.IN_PROGRESS))
-                .thenReturn(Optional.of(routineSchedule));
-        when(horses.findById(10L)).thenReturn(Optional.of(horse));
-        when(stalls.findById(99L)).thenReturn(Optional.of(quarantine));
-        when(healthRecordRepository.findByCareScheduleId(21L)).thenReturn(Optional.empty());
-
-        when(careScheduleService.completeCareSchedule(eq(21L), any(), eq(5L))).thenAnswer(invocation -> {
-            admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
-            admission.setVetDecision(VetDecision.APPROVED);
-            admission.setVetReviewedAt(LocalDateTime.now());
-            routineSchedule.setStatus(CareScheduleStatus.COMPLETED);
-            return CareScheduleResponse.from(routineSchedule);
-        });
-
-        VetReviewRequest request = request(VetDecision.APPROVED);
-        var response = service.reviewByVet(1L, request, 5L);
-
-        assertEquals(AdmissionStatus.TRAINER_REVIEW, response.status());
-        assertEquals(VetDecision.APPROVED, response.decision());
-        verify(careScheduleService, never()).startCareSchedule(anyLong(), anyLong());
-        ArgumentCaptor<CompleteCareScheduleRequest> completion = ArgumentCaptor.forClass(CompleteCareScheduleRequest.class);
-        verify(careScheduleService).completeCareSchedule(eq(21L), completion.capture(), eq(5L));
-        assertEquals(TrainingDecision.ALLOWED, completion.getValue().getTrainingDecision());
-    }
-
-    @Test
     void rejectedLegacyDecisionIsForbidden() {
         VetReviewRequest request = request(VetDecision.REJECTED);
         request.setFeedback("Not safe for training");

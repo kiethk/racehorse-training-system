@@ -1,4 +1,4 @@
-import { apiGet } from '@/services/api';
+import { apiGet, apiPost } from '@/services/api';
 import type { AdmissionSummaryResponse } from '../types';
 import type { TrainerAdmissionView, TrainerReviewRequest } from '../types/trainer';
 
@@ -10,33 +10,6 @@ interface ApiResponse<T> {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
-/**
- * TODO(nhóm): xoá hàm này khi services/api.ts được sửa để giữ lại message lỗi.
- *
- * NGOẠI LỆ CÓ CHỦ ĐÍCH so với FRONTEND_GUIDE.md §8.
- *
- * apiPost dùng chung VỨT BỎ body lỗi — nó chỉ ném new Error("API error: 400").
- * Màn hình này bắt buộc hiện nguyên văn lỗi nghiệp vụ, ví dụ:
- *   "Đơn đang ở bước MANAGER_REVIEW, không phải TRAINER_REVIEW — không thể đánh giá!"
- * Dùng apiPost thì vi phạm §12 (hiện lỗi) và §19 (không được nuốt lỗi).
- *
- * apiUpload trong CHÍNH services/api.ts đã xử lý đúng — xem đề xuất ở PHẦN D.
- * Hàm này đặt trong tầng service, KHÔNG đặt trong component.
- */
-async function postWithMessage<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',      // bắt buộc — cookie jwt_token là HttpOnly
-    body: JSON.stringify(body),
-  });
-  const payload = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(payload?.message || `API error: ${res.status}`);
-  }
-  return payload as T;
-}
 
 export const trainerAdmissionsApi = {
   /**
@@ -63,7 +36,7 @@ export const trainerAdmissionsApi = {
 
   /** Nộp đánh giá -> backend TỰ chuyển đơn sang MANAGER_REVIEW. */
   submitReview: async (id: number, body: TrainerReviewRequest): Promise<void> => {
-    await postWithMessage<ApiResponse<unknown>>(
+    await apiPost<ApiResponse<unknown>>(
       `/api/admissions/${id}/trainer-review`,
       body,
     );

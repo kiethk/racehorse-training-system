@@ -5,7 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.rtms.backend.enums.HorseStatus;
-import com.rtms.backend.enums.TrainingStatus;
+import com.rtms.backend.enums.TrainingDecision;
 
 @Entity
 @Table(name = "horses")
@@ -29,7 +29,7 @@ public class Horse {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "training_status", nullable = false)
-    private TrainingStatus trainingStatus = TrainingStatus.ALLOWED;
+    private TrainingDecision trainingStatus = TrainingDecision.ALLOWED;
 
     @Column(name = "stable_location")
     private String stableLocation;
@@ -72,7 +72,7 @@ public class Horse {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
         if (trainingStatus == null) {
-            trainingStatus = trainingLocked ? TrainingStatus.BLOCKED : TrainingStatus.ALLOWED;
+            trainingStatus = trainingLocked ? TrainingDecision.BLOCKED : TrainingDecision.ALLOWED;
         }
     }
 
@@ -97,11 +97,14 @@ public class Horse {
     public HorseStatus getCurrentStatus() { return currentStatus; }
     public void setCurrentStatus(HorseStatus currentStatus) { this.currentStatus = currentStatus; }
 
-    public TrainingStatus getTrainingStatus() { return trainingStatus; }
-    public void setTrainingStatus(TrainingStatus trainingStatus) {
-        this.trainingStatus = trainingStatus != null ? trainingStatus : TrainingStatus.ALLOWED;
-        this.trainingLocked = (this.trainingStatus != TrainingStatus.ALLOWED);
+    public TrainingDecision getTrainingStatus() { return trainingStatus; }
+    public void setTrainingStatus(TrainingDecision trainingStatus) {
+        this.trainingStatus = trainingStatus != null ? trainingStatus : TrainingDecision.ALLOWED;
+        this.trainingLocked = (this.trainingStatus != TrainingDecision.ALLOWED);
     }
+
+    public TrainingDecision getTrainingDecision() { return getTrainingStatus(); }
+    public void setTrainingDecision(TrainingDecision trainingDecision) { setTrainingStatus(trainingDecision); }
 
     public String getStableLocation() { return stableLocation; }
     public void setStableLocation(String stableLocation) { this.stableLocation = stableLocation; }
@@ -122,9 +125,7 @@ public class Horse {
     public void setTrainingLocked(boolean trainingLocked) {
         this.trainingLocked = trainingLocked;
         if (!trainingLocked) {
-            this.trainingStatus = TrainingStatus.ALLOWED;
-        } else if (this.trainingStatus == TrainingStatus.ALLOWED || this.trainingStatus == null) {
-            this.trainingStatus = TrainingStatus.BLOCKED;
+            this.trainingStatus = TrainingDecision.ALLOWED;
         }
     }
 

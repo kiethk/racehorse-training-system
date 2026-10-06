@@ -25,8 +25,7 @@ function currentReviewStage(status: OwnerAdmissionDetail['status']): number | nu
   switch (status) {
     case 'GROOM_REVIEW': return 0;
     case 'WAITING_FOR_STALL': return 1;
-    case 'VET_REVIEW':
-    case 'PENDING_RECHECK': return 2;
+    case 'VET_REVIEW': return 2;
     case 'TRAINER_REVIEW': return 3;
     case 'MANAGER_REVIEW': return 4;
     default: return null;

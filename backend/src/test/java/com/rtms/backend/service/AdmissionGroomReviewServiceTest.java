@@ -11,7 +11,7 @@ import com.rtms.backend.enums.CareType;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.enums.HorseStatus;
-import com.rtms.backend.enums.TrainingStatus;
+import com.rtms.backend.enums.TrainingDecision;
 import com.rtms.backend.enums.ReviewDecision;
 import com.rtms.backend.enums.StallStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
@@ -82,6 +82,7 @@ class AdmissionGroomReviewServiceTest {
                 careScheduleService,
                 headTrainerWorkloadService,
                 notificationService);
+        lenient().when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
     }
 
     @Test
@@ -203,8 +204,6 @@ class AdmissionGroomReviewServiceTest {
         when(careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(createdSchedule));
-        when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(eq(20L), eq(CareType.INITIAL), any()))
-                .thenReturn(false);
         when(careScheduleRepository.save(any(CareSchedule.class))).thenReturn(createdSchedule);
 
         // Least loaded Head Trainer selection
@@ -231,7 +230,7 @@ class AdmissionGroomReviewServiceTest {
         assertEquals("Arabian", savedHorse.getBreed());
         assertEquals(HorseStatus.CANDIDATE, savedHorse.getCurrentStatus());
         assertTrue(savedHorse.isTrainingLocked());
-        assertEquals(TrainingStatus.BLOCKED, savedHorse.getTrainingStatus());
+        assertEquals(TrainingDecision.BLOCKED, savedHorse.getTrainingStatus());
         assertEquals(99L, savedHorse.getCurrentStallId());
         assertEquals(5L, savedHorse.getOwnerId());
         assertEquals("FR1234567890123", savedHorse.getRegistrationNumber());
@@ -316,9 +315,6 @@ class AdmissionGroomReviewServiceTest {
             horse.setId(20L);
             return horse;
         });
-        when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.empty());
-        when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
-                eq(20L), eq(CareType.INITIAL), any())).thenReturn(false);
         when(headTrainerWorkloadService.selectLeastLoadedHeadTrainerId()).thenReturn(Optional.of(12L));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -351,8 +347,6 @@ class AdmissionGroomReviewServiceTest {
         when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.of(new HorsePedigree()));
         when(careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
                 .thenReturn(Optional.empty());
-        when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
-                eq(20L), eq(CareType.INITIAL), any())).thenReturn(true);
         when(headTrainerWorkloadService.selectLeastLoadedHeadTrainerId()).thenReturn(Optional.of(3L));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 

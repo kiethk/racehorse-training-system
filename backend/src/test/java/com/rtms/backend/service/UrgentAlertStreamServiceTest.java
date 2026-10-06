@@ -3,7 +3,7 @@ package com.rtms.backend.service;
 import com.rtms.backend.dto.UrgentAssignmentAlert;
 import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.enums.IncidentSeverity;
-import com.rtms.backend.enums.TrainingStatus;
+import com.rtms.backend.enums.TrainingDecision;
 import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -50,7 +50,7 @@ class UrgentAlertStreamServiceTest {
         UrgentAssignmentAlert alert = new UrgentAssignmentAlert(
                 500L, 500L, 700L, 2L, 99L, "Rocket", "North barn", "A-01",
                 8L, "Groom A", now, IncidentSeverity.CRITICAL, "Acute lameness",
-                "Cannot bear weight", null, TrainingStatus.BLOCKED,
+                "Cannot bear weight", null, TrainingDecision.BLOCKED,
                 CareScheduleStatus.SCHEDULED, now, now);
 
         service.afterAssignmentCommitted(new UrgentAssignmentCommittedEvent(alert));

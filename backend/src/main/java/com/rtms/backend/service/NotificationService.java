@@ -90,6 +90,34 @@ public class NotificationService {
 
     /**
      * Tiện ích gửi thông báo gán việc (Vet hoặc Trainer) với mã event code cụ thể.
+     * Phiên bản này nhận referenceType/referenceId một cách rõ ràng, dùng để thông báo
+     * cho một care_schedule không liên kết admission (ROUTINE, URGENT).
+     */
+    @Transactional
+    public Optional<Notification> sendAssignmentNotification(
+            Long recipientId,
+            String referenceType,
+            Long referenceId,
+            Long horseId,
+            String notificationType,
+            String title,
+            String message) {
+
+        if (recipientId == null) {
+            return Optional.empty();
+        }
+
+        String eventType = notificationType != null && !notificationType.isBlank()
+                ? notificationType
+                : "ASSIGNMENT";
+        String dedupKey = Notification.buildDeduplicationKey(recipientId, referenceType, referenceId, eventType);
+
+        return createNotification(recipientId, title, message, eventType, referenceType, referenceId, dedupKey);
+    }
+
+    /**
+     * Phiên bản cũ: giữ nguyên hành vi admission-scoped. Manager, Groom và Trainer
+     * flows phụ thuộc vào nó — không được thay đổi.
      */
     @Transactional
     public Optional<Notification> sendAssignmentNotification(

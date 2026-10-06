@@ -27,7 +27,7 @@ import type {
 } from '../types';
 import { VetReviewForm } from './VetReviewForm';
 
-type QueuePillFilter = 'ALL' | 'AWAITING' | 'IN_PROGRESS' | 'RECHECK';
+type QueuePillFilter = 'ALL' | 'AWAITING' | 'IN_PROGRESS';
 
 const examStatusOptions: Array<{ value: CareScheduleStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'All Exam States' },
@@ -98,7 +98,6 @@ function examIcon(status: CareScheduleStatus | undefined) {
 }
 
 function admissionTone(status: AdmissionStatus) {
-  if (status === 'PENDING_RECHECK') return 'warning' as const;
   if (status === 'APPROVED') return 'success' as const;
   if (status === 'REJECTED') return 'danger' as const;
   return 'info' as const;
@@ -148,7 +147,6 @@ export function VetAdmissionQueue() {
     total: 0,
     awaiting: 0,
     inProgress: 0,
-    recheck: 0,
   });
 
   // Full-page examination workspace & selection state
@@ -170,7 +168,7 @@ export function VetAdmissionQueue() {
   // Filters state
   const [searchQuery, setSearchQuery] = useState('');
   const [queuePillFilter, setQueuePillFilter] = useState<QueuePillFilter>('ALL');
-  const [admissionFilter, setAdmissionFilter] = useState<'ALL' | 'VET_REVIEW' | 'PENDING_RECHECK'>('ALL');
+  const [admissionFilter, setAdmissionFilter] = useState<'ALL' | 'VET_REVIEW'>('ALL');
   const [examStatusFilter, setExamStatusFilter] = useState<CareScheduleStatus | 'ALL'>('ALL');
   const [examTypeFilter, setExamTypeFilter] = useState<CareType | 'ALL'>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'URGENT' | 'NORMAL'>('ALL');
@@ -384,6 +382,7 @@ export function VetAdmissionQueue() {
         status: (detail.initialExamSchedule.status as CareScheduleStatus) || 'REQUESTED',
         veterinarianId: detail.initialExamSchedule.veterinarianId,
         assignedVetId: detail.initialExamSchedule.veterinarianId,
+        trainerId: detail?.trainerId ?? null,
         scheduledAt: detail.initialExamSchedule.scheduledAt,
         scheduledDate: detail.initialExamSchedule.scheduledDate,
       }
@@ -625,26 +624,6 @@ export function VetAdmissionQueue() {
                 {summary.inProgress}
               </span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setQueuePillFilter((curr) => (curr === 'RECHECK' ? 'ALL' : 'RECHECK'));
-                setPage(0);
-              }}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                queuePillFilter === 'RECHECK'
-                  ? 'bg-[var(--color-danger)] text-white'
-                  : summary.recheck > 0
-                    ? 'bg-[var(--color-danger-soft)] text-[var(--color-danger)] hover:opacity-80'
-                    : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] hover:bg-[var(--color-border)]'
-              }`}
-            >
-              <span>Recheck</span>
-              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
-                {summary.recheck}
-              </span>
-            </button>
           </div>
         </div>
 
@@ -814,7 +793,6 @@ export function VetAdmissionQueue() {
                     >
                       <option value="ALL">All Stages</option>
                       <option value="VET_REVIEW">Initial Review</option>
-                      <option value="PENDING_RECHECK">Pending Recheck</option>
                     </select>
                   </div>
 
@@ -947,7 +925,7 @@ export function VetAdmissionQueue() {
                             {priority.label}
                           </Pill>
                           <Pill tone={admissionTone(row.admissionStatus)} size="sm">
-                            {row.admissionStatus === 'PENDING_RECHECK' ? 'Recheck' : 'Initial Review'}
+                            Initial Review
                           </Pill>
                         </div>
 

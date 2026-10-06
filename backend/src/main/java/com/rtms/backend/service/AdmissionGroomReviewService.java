@@ -88,7 +88,7 @@ public class AdmissionGroomReviewService {
     @Transactional
     public void assignPendingTrainers() {
         List<AdmissionApplication> pending = admissionApplicationRepository.findByStatusInAndTrainerIdIsNull(
-                List.of(AdmissionStatus.VET_REVIEW, AdmissionStatus.PENDING_RECHECK, AdmissionStatus.TRAINER_REVIEW, AdmissionStatus.MANAGER_REVIEW),
+                List.of(AdmissionStatus.VET_REVIEW, AdmissionStatus.TRAINER_REVIEW, AdmissionStatus.MANAGER_REVIEW),
                 org.springframework.data.domain.PageRequest.of(0, 25)
         );
 
@@ -233,7 +233,7 @@ public class AdmissionGroomReviewService {
         horse.setRegistrationNumber(candidate.getRegistrationNumber());
         horse.setCurrentStatus(HorseStatus.CANDIDATE);
         horse.setCurrentStallId(quarantineStall.getId());
-        horse.setTrainingStatus(TrainingStatus.BLOCKED);
+        horse.setTrainingStatus(TrainingDecision.BLOCKED);
         horse.setTrainingLocked(true);
         horse.setTrainingLockReason("Initial admission examination is pending");
         horse.setTrainingLockVetId(null);
@@ -255,23 +255,21 @@ public class AdmissionGroomReviewService {
     private CareSchedule ensureInitialCareSchedule(Long admissionId, Long horseId) {
         CareSchedule schedule = careScheduleRepository
                 .findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admissionId, CareType.INITIAL)
-                .filter(cs -> List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS).contains(cs.getStatus()))
                 .orElse(null);
 
         if (schedule == null) {
-            boolean alreadyOpen = careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
-                    horseId, CareType.INITIAL,
-                    List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
-            if (!alreadyOpen) {
-                schedule = new CareSchedule();
-                schedule.setHorseId(horseId);
-                schedule.setAdmissionId(admissionId);
-                schedule.setCareType(CareType.INITIAL);
-                schedule.setStatus(CareScheduleStatus.REQUESTED);
-                schedule.setDurationMinutes(30);
-                schedule.setDescription("Initial admission physical examination in quarantine area");
-                schedule = careScheduleRepository.save(schedule);
-            }
+            // Spec item 11: every admission reaching VET_REVIEW owns its own INITIAL
+            // care_schedule row. The horse-level check previously skipped creation
+            // when a different admission already had an open INITIAL, leaving this
+            // admission without a schedule of its own.
+            schedule = new CareSchedule();
+            schedule.setHorseId(horseId);
+            schedule.setAdmissionId(admissionId);
+            schedule.setCareType(CareType.INITIAL);
+            schedule.setStatus(CareScheduleStatus.REQUESTED);
+            schedule.setDurationMinutes(30);
+            schedule.setDescription("Initial admission physical examination in quarantine area");
+            schedule = careScheduleRepository.save(schedule);
         }
 
         careScheduleService.assignRequestedSchedules();

@@ -4,7 +4,9 @@ import com.rtms.backend.entity.Role;
 import com.rtms.backend.entity.TrainerProfile;
 import com.rtms.backend.entity.User;
 import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.TrainerProfileRepository;
 import com.rtms.backend.repository.UserRepository;
@@ -36,6 +38,9 @@ class HeadTrainerWorkloadServiceTest {
     @Mock
     private AdmissionApplicationRepository admissionApplicationRepository;
 
+    @Mock
+    private CareScheduleRepository careScheduleRepository;
+
     private HeadTrainerWorkloadService service;
 
     @BeforeEach
@@ -44,8 +49,11 @@ class HeadTrainerWorkloadServiceTest {
                 userRepository,
                 trainerProfileRepository,
                 horseRepository,
-                admissionApplicationRepository
+                admissionApplicationRepository,
+                careScheduleRepository
         );
+        lenient().when(careScheduleRepository.countActiveCareSchedulesByTrainerIds(anyCollection(), anyCollection()))
+                .thenReturn(Collections.emptyList());
     }
 
     private List<Object[]> rows(Object[]... items) {
@@ -277,6 +285,44 @@ class HeadTrainerWorkloadServiceTest {
         assertEquals(1L, selectedId.get());
         assertEquals(0L, service.getHorseWorkload(1L));
         assertEquals(0L, service.getAdmissionWorkload(1L));
+        assertEquals(0L, service.getCareScheduleWorkload(1L));
+    }
+
+    @Test
+    @DisplayName("9. CareSchedule active (SCHEDULED, IN_PROGRESS) được tính vào Trainer workload")
+    void calculateWorkloads_includesActiveCareSchedules() {
+        when(horseRepository.countHorsesByTrainerIds(anyCollection())).thenReturn(rows(
+                new Object[]{1L, 2L}
+        ));
+        when(admissionApplicationRepository.countActiveAdmissionsByTrainerIds(anyCollection(), anyCollection())).thenReturn(rows(
+                new Object[]{1L, 1L}
+        ));
+        when(careScheduleRepository.countActiveCareSchedulesByTrainerIds(
+                eq(List.of(1L)),
+                eq(HeadTrainerWorkloadService.ACTIVE_CARE_SCHEDULE_STATUSES)
+        )).thenReturn(rows(
+                new Object[]{1L, 4L}
+        ));
+
+        Map<Long, Long> workloads = service.calculateWorkloads(List.of(1L));
+
+        assertEquals(1, workloads.size());
+        // 2 horses + 1 active admission + 4 active care schedules = 7
+        assertEquals(7L, workloads.get(1L));
+    }
+
+    @Test
+    @DisplayName("10. getCareScheduleWorkload trả về đúng số lượng")
+    void getCareScheduleWorkload_returnsCount() {
+        when(careScheduleRepository.countActiveCareSchedulesByTrainerIds(
+                eq(List.of(1L)),
+                eq(HeadTrainerWorkloadService.ACTIVE_CARE_SCHEDULE_STATUSES)
+        )).thenReturn(rows(
+                new Object[]{1L, 3L}
+        ));
+
+        assertEquals(3L, service.getCareScheduleWorkload(1L));
+        assertEquals(0L, service.getCareScheduleWorkload(null));
     }
 
     private User createHeadTrainer(Long id, String name, boolean active) {

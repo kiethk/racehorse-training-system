@@ -12,7 +12,7 @@ import com.rtms.backend.entity.CareSchedule;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.enums.CareType;
-import com.rtms.backend.enums.TrainingStatus;
+import com.rtms.backend.enums.TrainingDecision;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -88,7 +88,7 @@ public class GroomIncidentReportService {
                             horse.getId(), CareType.URGENT, activeStatuses)
                     .orElseThrow(() -> new IllegalStateException("Urgent schedule was not created"));
         } else {
-            horse.setTrainingStatus(TrainingStatus.BLOCKED);
+            horse.setTrainingStatus(TrainingDecision.BLOCKED);
             horse.setTrainingLockReason("Urgent veterinary care pending");
             horseRepository.save(horse);
         }

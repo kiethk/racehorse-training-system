@@ -50,7 +50,7 @@ public class AdmissionReviewService {
 
         AdmissionApplication before = admissions.findById(admissionId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Admission not found"));
-        if (before.getStatus() != AdmissionStatus.VET_REVIEW && before.getStatus() != AdmissionStatus.PENDING_RECHECK) {
+        if (before.getStatus() != AdmissionStatus.VET_REVIEW) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE", "Admission is not awaiting a vet examination");
         }
 

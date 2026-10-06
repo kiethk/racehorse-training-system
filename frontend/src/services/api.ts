@@ -22,19 +22,6 @@ async function responseError(res: Response): Promise<ApiError> {
 }
 
 let refreshPromise: Promise<boolean> | null = null;
-let serverClockOffsetMs = 0;
-
-export function getServerTime(): number {
-  return Date.now() + serverClockOffsetMs;
-}
-
-export function getServerClockOffset(): number {
-  return serverClockOffsetMs;
-}
-
-export function setServerClockOffset(serverTimeMs: number) {
-  serverClockOffsetMs = serverTimeMs - Date.now();
-}
 
 export function createAuthenticatedEventSource(path: string): EventSource {
   return new EventSource(`${API_URL}${path}`, { withCredentials: true });
@@ -49,14 +36,6 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
   ].includes(path);
 
   let res = await fetch(`${API_URL}${path}`, options);
-
-  const dateHeader = res.headers.get('date');
-  if (dateHeader) {
-    const serverMs = Date.parse(dateHeader);
-    if (!Number.isNaN(serverMs)) {
-      serverClockOffsetMs = serverMs - Date.now();
-    }
-  }
 
   if (res.status === 401 && !isAuthEndpoint) {
     if (!refreshPromise) {
