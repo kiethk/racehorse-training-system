@@ -3,14 +3,13 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
-import type { AdmissionSummaryResponse } from '../types';
+import type { TrainerAdmissionQueue } from '../types/trainer';
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
 
 type Tab = 'PENDING' | 'REVIEWED';
@@ -23,7 +22,6 @@ interface TrainerQueueFilters {
 }
 
 export function TrainerAdmissionsListView() {
-  const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -39,7 +37,7 @@ export function TrainerAdmissionsListView() {
     };
   }, [searchParams]);
 
-  const [admissions, setAdmissions] = useState<AdmissionSummaryResponse[]>([]);
+  const [queue, setQueue] = useState<TrainerAdmissionQueue>({ pending: [], reviewed: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<TrainerQueueFilters>(urlFilters);
@@ -50,11 +48,16 @@ export function TrainerAdmissionsListView() {
       try {
         setLoading(true);
         setError(null);
-        const data = await trainerAdmissionsApi.getAll();
-        if (active) setAdmissions(data);
+        const data = await trainerAdmissionsApi.getQueue();
+        if (active) setQueue(data);
       } catch (err) {
         console.error('Failed to load admissions:', err);
-        if (active) setError('Failed to load admission applications. Please try again.');
+        if (active)
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Failed to load admission applications. Please try again.',
+          );
       } finally {
         if (active) setLoading(false);
       }
@@ -70,30 +73,16 @@ export function TrainerAdmissionsListView() {
     setDraft(urlFilters);
   }, [urlFilters]);
 
-  // Counts by review status
-  const pendingCount = useMemo(
-    () => admissions.filter((a) => a.status === 'TRAINER_REVIEW').length,
-    [admissions],
-  );
+  // Backend đã lọc theo Trainer đang đăng nhập và tách sẵn hai nhóm, nên
+  // số đếm chỉ là độ dài mảng — không lọc lại theo status/trainerId ở client.
+  const pendingCount = queue.pending.length;
+  const reviewedCount = queue.reviewed.length;
 
-  const reviewedCount = useMemo(
-    () =>
-      admissions.filter(
-        (a) => a.trainerReviewedAt !== null && a.trainerId === user?.userId,
-      ).length,
-    [admissions, user?.userId],
-  );
-
-  // Filter admissions list
+  // Chỉ còn lọc theo tên và ngày nộp — hai thứ người dùng gõ tại màn hình này.
   const filteredAdmissions = useMemo(() => {
-    return admissions.filter((a) => {
-      // Filter by review type
-      if (urlFilters.tab === 'PENDING') {
-        if (a.status !== 'TRAINER_REVIEW') return false;
-      } else if (urlFilters.tab === 'REVIEWED') {
-        if (!a.trainerReviewedAt || a.trainerId !== user?.userId) return false;
-      }
+    const source = urlFilters.tab === 'REVIEWED' ? queue.reviewed : queue.pending;
 
+    return source.filter((a) => {
       // Filter by horse name
       if (
         urlFilters.candidateName &&
@@ -117,7 +106,7 @@ export function TrainerAdmissionsListView() {
 
       return true;
     });
-  }, [admissions, urlFilters, user?.userId]);
+  }, [queue, urlFilters]);
 
   const updateUrl = (filters: TrainerQueueFilters) => {
     const params = new URLSearchParams();
@@ -296,7 +285,7 @@ export function TrainerAdmissionsListView() {
                       </div>
                     </td>
                     <td className="px-6 py-3.5">
-                      <AdmissionStatusBadge status={item.status} />
+                      <AdmissionStatusBadge status={item.status} simplified />
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
                       {item.quarantineStallCode ? (

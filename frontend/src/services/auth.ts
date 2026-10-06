@@ -1,9 +1,13 @@
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, setAccessToken } from './api';
 import type { ApiResponse } from '@/types/horse';
 import type { AuthUser, LoginRequest, OwnerRegistrationRequest, OwnerRegistrationResponse } from '@/types/auth';
 
 export async function login(request: LoginRequest): Promise<ApiResponse<AuthUser>> {
-  return apiPost<ApiResponse<AuthUser>>('/api/auth/login', request);
+  const res = await apiPost<ApiResponse<AuthUser & { accessToken?: string }>>('/api/auth/login', request);
+  if (res.success && res.data.accessToken) {
+    setAccessToken(res.data.accessToken);
+  }
+  return res;
 }
 
 export async function getCurrentUser(): Promise<ApiResponse<AuthUser>> {
@@ -11,7 +15,11 @@ export async function getCurrentUser(): Promise<ApiResponse<AuthUser>> {
 }
 
 export async function logout(): Promise<ApiResponse<string>> {
-  return apiPost<ApiResponse<string>>('/api/auth/logout', {});
+  try {
+    return await apiPost<ApiResponse<string>>('/api/auth/logout', {});
+  } finally {
+    setAccessToken(null);
+  }
 }
 
 /**

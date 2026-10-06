@@ -22,4 +22,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.isActive = true AND u.role.name = 'VETERINARIAN' ORDER BY u.id")
     List<User> findActiveVeterinariansForUpdate();
+
+    @Query("SELECT u FROM User u WHERE u.isActive = true AND u.role.name = 'HEAD_TRAINER' ORDER BY u.id")
+    List<User> findActiveHeadTrainers();
 }

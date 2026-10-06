@@ -1,12 +1,13 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import type { StaffCreationRequest, StaffSummary } from '../types';
+import type { StaffCreationRequest, StaffCreationResponse, StaffSummary } from '../types';
 
 interface AddStaffDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (request: StaffCreationRequest) => Promise<void>;
+  /** Called with the creation request; resolves with the backend response. */
+  onSubmit: (request: StaffCreationRequest) => Promise<StaffCreationResponse | null>;
   loading: boolean;
   headTrainers: StaffSummary[];
 }
@@ -32,9 +33,10 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
   const [certificationIssuedDate, setCertificationIssuedDate] = useState('');
 
   // Groom specific
-  const [trainerId, setTrainerId] = useState('');
+  // Removed manual trainerId
 
   const [error, setError] = useState('');
+  const [creationResult, setCreationResult] = useState<StaffCreationResponse | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -58,12 +60,103 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
       setSpecialization('');
       setCertificationNumber('');
       setCertificationIssuedDate('');
-      setTrainerId('');
       setError('');
+      setCreationResult(null);
     }
   }, [open]);
 
   if (!open) return null;
+
+  // If we have a result to show, render the assignment summary screen
+  if (creationResult) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="relative flex w-full max-w-lg flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl"
+        >
+          <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
+            <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">Staff Created</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)]"
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-4">
+            {/* Success banner */}
+            <div className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-[var(--color-success-soft,#f0fdf4)] px-3 py-2.5 text-[12px] text-[var(--color-success,#16a34a)]">
+              <Icon name="check" size={14} className="mt-0.5 shrink-0" />
+              <span>
+                <strong>{creationResult.fullName}</strong> ({creationResult.role.replace('_', ' ')}) created successfully.
+              </span>
+            </div>
+
+            {/* HEAD_TRAINER: show assigned areas */}
+            {creationResult.role === 'HEAD_TRAINER' && (
+              <div className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 text-[13px]">
+                <p className="font-medium text-[var(--color-text-primary)] mb-2">Auto-assigned Areas</p>
+                {creationResult.assignedAreaCodes && creationResult.assignedAreaCodes.length > 0 ? (
+                  <div className="flex gap-2 flex-wrap">
+                    {creationResult.assignedAreaCodes.map((code) => (
+                      <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-mono font-semibold text-[12px]">
+                        Area {code}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[var(--color-text-muted)]">No areas were available for assignment at this time. You can assign areas later.</p>
+                )}
+              </div>
+            )}
+
+            {/* GROOM: show trainer + stall block */}
+            {creationResult.role === 'GROOM' && (
+              <div className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 text-[13px] space-y-3">
+                {creationResult.assignmentStatus === 'UNASSIGNED' ? (
+                  <div className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-amber-50 border border-amber-200 px-3 py-2 text-[12px] text-amber-700">
+                    <Icon name="alert-triangle" size={13} className="mt-0.5 shrink-0" />
+                    <span>Groom created successfully, but no Trainer with an available stall block is currently available.</span>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <p className="font-medium text-[var(--color-text-primary)] mb-1">Trainer</p>
+                      <p className="text-[var(--color-text-secondary)]">{creationResult.trainerName}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-[var(--color-text-primary)] mb-1">Assigned Stall Block</p>
+                      <div className="space-y-1">
+                        <p className="text-[var(--color-text-muted)] text-[12px]">Area <strong>{creationResult.assignedAreaCode}</strong></p>
+                        <div className="flex gap-2 flex-wrap">
+                          {(creationResult.assignedStallCodes ?? []).map((code) => (
+                            <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-mono font-semibold text-[12px]">
+                              {code}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-[var(--color-border)] px-6 py-4">
+            <Button type="button" variant="primary" onClick={onClose}>
+              Done
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -101,12 +194,11 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
     } else if (role === 'HEAD_TRAINER') {
       request.certificationNumber = certificationNumber.trim();
       request.certificationIssuedDate = certificationIssuedDate || undefined;
-    } else if (role === 'GROOM') {
-      request.trainerId = trainerId ? parseInt(trainerId, 10) : undefined;
     }
 
     try {
-      await onSubmit(request);
+      const result = await onSubmit(request);
+      if (result) setCreationResult(result);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create staff');
     }
@@ -281,27 +373,19 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
                       disabled={loading}
                     />
                   </label>
+                  <div className="rounded-[var(--radius-sm)] bg-blue-50 border border-blue-200 px-3 py-2 text-[12px] text-blue-700">
+                    <p className="font-medium mb-0.5">Auto Area Assignment</p>
+                    <p>The system will automatically assign up to 2 available REGULAR areas to this trainer upon creation.</p>
+                  </div>
                 </>
               )}
 
               {role === 'GROOM' && (
                 <>
-                  <label className="block">
-                    <span className="text-[12px] font-medium text-[var(--color-text-primary)]">Assigned Head Trainer (Optional)</span>
-                    <select
-                      value={trainerId}
-                      onChange={(e) => setTrainerId(e.target.value)}
-                      className={inputClassName}
-                      disabled={loading}
-                    >
-                      <option value="">Unassigned</option>
-                      {headTrainers.map(t => (
-                        <option key={t.userId} value={String(t.userId)}>
-                          {t.fullName} — #{t.userId}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="rounded-[var(--radius-sm)] bg-blue-50 border border-blue-200 px-3 py-2 text-[12px] text-blue-700">
+                    <p className="font-medium mb-0.5">Auto Assignment</p>
+                    <p>Trainer and stall block will be assigned automatically based on current workload and available capacity.</p>
+                  </div>
                 </>
               )}
             </div>

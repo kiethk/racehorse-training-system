@@ -1,28 +1,21 @@
-import { apiGet } from '@/services/api';
+import { apiGet, apiPut } from '@/services/api';
 import type { Area, Horse, StableStall, UserSummary, HorseStatus } from '../types';
 
 interface ApiResponse<T> { success: boolean; data: T; message?: string; }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 /**
- * TODO(nhóm): xoá khi services/api.ts giữ lại message lỗi — xem PLAN_05 phần D.
+ * Hàm putWithMessage cục bộ ĐÃ XOÁ — services/api.ts giờ đã có apiPut, và
+ * responseError() ở đó đọc payload.message nên lỗi nghiệp vụ (BR-07 "Chuồng
+ * X đang có chiến mã Y") vẫn hiện nguyên văn.
  *
- * Màn hình này cần hiện nguyên văn lỗi BR-06 ("Groom X đã phụ trách 3/3 chuồng")
- * và BR-07. apiPut chưa tồn tại, apiPost thì vứt body lỗi.
+ * Quan trọng hơn chuyện gọn gàng: hàm cũ tự gọi fetch() nên KHÔNG đi qua
+ * doFetch(), tức là bỏ qua luôn cơ chế tự làm mới token khi gặp 401. JWT hết
+ * hạn giữa lúc đang xem sơ đồ chuồng thì thao tác xếp ngựa thất bại thẳng,
+ * trong khi mọi lời gọi qua apiGet/apiPut đều tự refresh rồi thử lại một lần.
+ *
+ * Body {} là chỗ giữ chỗ: hai endpoint dưới đây nhận @RequestParam, không có
+ * @RequestBody, nên Spring bỏ qua phần thân.
  */
-async function putWithMessage<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'PUT',
-    credentials: 'include',
-  });
-  const payload = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(payload?.message || `API error: ${res.status}`);
-  }
-  return payload as T;
-}
-
 export const stableApi = {
   getAreas: async (): Promise<Area[]> =>
     (await apiGet<ApiResponse<Area[]>>('/api/areas')).data,
@@ -58,22 +51,20 @@ export const stableApi = {
 
   /** LƯU Ý: backend nhận @RequestParam, KHÔNG phải body. */
   assignHorseToStall: async (horseId: number, stallId: number): Promise<void> => {
-    await putWithMessage(`/api/horses/${horseId}/assign-stall?stallId=${stallId}`);
+    await apiPut(`/api/horses/${horseId}/assign-stall?stallId=${stallId}`, {});
   },
 
   /**
    * Gỡ chiến mã khỏi chuồng — bỏ trống stallId.
-   * Nhất quán với assignGroomToStall(stallId, null).
    *
    * Các buổi tập chưa diễn ra sẽ thành "chưa phân công Groom".
    */
   unassignHorseFromStall: async (horseId: number): Promise<void> => {
-    await putWithMessage(`/api/horses/${horseId}/assign-stall`);
+    await apiPut(`/api/horses/${horseId}/assign-stall`, {});
   },
 
-  /** Bỏ trống groomId = gỡ Groom khỏi chuồng. */
-  assignGroomToStall: async (stallId: number, groomId: number | null): Promise<void> => {
-    const qs = groomId == null ? '' : `?groomId=${groomId}`;
-    await putWithMessage(`/api/stalls/${stallId}/assign-groom${qs}`);
-  },
+  // ĐÃ XOÁ: assignGroomToStall — phân công Groom cho chuồng chuyển sang Quản
+  // lý câu lạc bộ (V63). PUT /api/stalls/{id}/assign-groom vẫn tồn tại nhưng
+  // đòi quyền STALL_GROOM_ASSIGN mà Huấn luyện viên không có, nên gọi từ đây
+  // chỉ nhận 403. Trainer vẫn đổi chuồng cho ngựa bằng assignHorseToStall.
 };

@@ -1,17 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import {useEffect, useState} from 'react';
 import Link from 'next/link';
 
 
-
-import { Panel } from '@/components/ui/Panel';
-import { Button } from '@/components/ui/Button';
-import { HorseAvatar } from '@/components/ui/HorseAvatar';
-import { admissionsApi } from '@/features/admissions/services/api';
-import { ownerAdmissionApi } from '@/features/admissions/services/ownerApi';
-import type { AdmissionSummaryResponse } from '../types';
-import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
+import {Panel} from '@/components/ui/Panel';
+import {Button} from '@/components/ui/Button';
+import {HorseAvatar} from '@/components/ui/HorseAvatar';
+import {admissionsApi} from '@/features/admissions/services/api';
+import {ownerAdmissionApi} from '@/features/admissions/services/ownerApi';
+import type {AdmissionSummaryResponse} from '../types';
+import {AdmissionTable} from '../shared/components/AdmissionTable';
 
 function AdmissionHorseAvatar({ name, imageUrl }: { name: string; imageUrl?: string | null }) {
   const [loadedImage, setLoadedImage] = useState<{ source: string; url: string } | null>(null);
@@ -35,7 +34,7 @@ function AdmissionHorseAvatar({ name, imageUrl }: { name: string; imageUrl?: str
     };
   }, [imageUrl]);
 
-  return <HorseAvatar name={name} image={image} size={48} rounded="md" />;
+  return <HorseAvatar name={name} image={image} size={32} rounded="md" />;
 }
 
 export function OwnerAdmissionsListView() {
@@ -54,18 +53,18 @@ export function OwnerAdmissionsListView() {
       </header>
       {loading ? <p>Loading admissions…</p> : error ? <p role="alert">{error}</p> :
         rows.length === 0 ? <Panel padded>No admission history yet.</Panel> :
-        <Panel><ul className="divide-y divide-[var(--color-border)]">
-          {rows.map(a => <li key={a.admissionId} className="p-4 flex items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <AdmissionHorseAvatar name={a.candidateName} imageUrl={a.imageUrl} />
-              <div className="min-w-0"><p className="font-semibold">{a.candidateName}</p>
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                Application #{a.admissionId} · {a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : 'Just submitted'}
-              </p><AdmissionStatusBadge status={a.status} size="sm" /></div>
-            </div>
-            <Link className="shrink-0 whitespace-nowrap underline text-[var(--color-primary)]" href={`/owner/admissions/${a.admissionId}`}>View details</Link>
-          </li>)}
-        </ul></Panel>}
+            <Panel className="overflow-hidden">
+              <AdmissionTable
+                  admissions={rows}
+                  detailHref={id => `/owner/admissions/${id}`}
+                  renderAvatar={admission => (
+                      <AdmissionHorseAvatar
+                          name={admission.candidateName}
+                          imageUrl={admission.imageUrl}
+                      />
+                  )}
+              />
+            </Panel>}
     </div>
   );
 }

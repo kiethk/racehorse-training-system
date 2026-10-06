@@ -1,14 +1,14 @@
 package com.rtms.backend.controller;
+
+import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.LoginRequest;
 import com.rtms.backend.dto.LoginResponse;
 import com.rtms.backend.dto.OwnerRegistrationRequest;
 import com.rtms.backend.dto.OwnerRegistrationResponse;
+import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.AuthService;
 import com.rtms.backend.service.AuthService.LoginResult;
-import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.dto.ApiResponse;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -23,9 +23,6 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @Value("${jwt.access-expiration}")
-    private long accessExpirationMs;
-
     @Value("${jwt.refresh-expiration}")
     private long refreshExpirationMs;
 
@@ -33,61 +30,46 @@ public class AuthController {
         this.authService = authService;
     }
 
+    @Operation(security = {})
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request, HttpServletResponse response) {
         LoginResult result = authService.login(request);
-
-        setCookies(response, result.token(), result.refreshToken());
-
+        
+        setRefreshCookie(response, result.refreshToken(), refreshExpirationMs / 1000);
+        
         return ApiResponse.success(result.loginResponse());
     }
 
+    public record TokenRefreshResponse(String accessToken) {}
+
+    @Operation(security = {})
     @PostMapping("/refresh")
-    public ApiResponse<String> refresh(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = extractCookie(request, "rtms_refresh_token");
+    public ApiResponse<TokenRefreshResponse> refresh(
+            @CookieValue(name = "rtms_refresh_token", required = false) String refreshToken,
+            HttpServletResponse response) {
+        
         if (refreshToken == null || refreshToken.isBlank()) {
-            return ApiResponse.error("Refresh token missing", "UNAUTHORIZED");
+            throw new com.rtms.backend.config.ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Refresh token missing");
         }
 
-        String newAccessToken = authService.refresh(refreshToken);
+        AuthService.RefreshResult result = authService.refresh(refreshToken);
+        
+        setRefreshCookie(response, result.refreshToken(), refreshExpirationMs / 1000);
 
-        ResponseCookie accessCookie = ResponseCookie.from("rtms_access_token", newAccessToken)
-                .httpOnly(true)
-                .secure(false) // false because localhost (http, no https)
-                .path("/")
-                .maxAge(accessExpirationMs / 1000)
-                .sameSite("Lax")
-                .build();
-
-        response.addHeader("Set-Cookie", accessCookie.toString());
-
-        return ApiResponse.success("Token refreshed");
+        return ApiResponse.success(new TokenRefreshResponse(result.accessToken()));
     }
 
+    @Operation(security = {})
     @PostMapping("/logout")
-    public ApiResponse<String> logout(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = extractCookie(request, "rtms_refresh_token");
+    public ApiResponse<String> logout(
+            @CookieValue(name = "rtms_refresh_token", required = false) String refreshToken,
+            HttpServletResponse response) {
         
-        authService.logout(refreshToken);
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            authService.logout(refreshToken);
+        }
 
-        ResponseCookie accessCookie = ResponseCookie.from("rtms_access_token", "")
-                .httpOnly(true)
-                .secure(false)
-                .path("/")
-                .maxAge(0)
-                .sameSite("Lax")
-                .build();
-
-        ResponseCookie refreshCookie = ResponseCookie.from("rtms_refresh_token", "")
-                .httpOnly(true)
-                .secure(false)
-                .path("/")
-                .maxAge(0)
-                .sameSite("Lax")
-                .build();
-
-        response.addHeader("Set-Cookie", accessCookie.toString());
-        response.addHeader("Set-Cookie", refreshCookie.toString());
+        setRefreshCookie(response, "deleted", 0); // Expire the cookie
 
         return ApiResponse.success("Logged out successfully");
     }
@@ -100,6 +82,7 @@ public class AuthController {
         return ApiResponse.success(authService.getMe(currentUser.getUserId()));
     }
 
+    @Operation(security = {})
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<OwnerRegistrationResponse>> register(
             @RequestBody OwnerRegistrationRequest request) {
@@ -108,35 +91,16 @@ public class AuthController {
                 .body(ApiResponse.success(response));
     }
 
-    private void setCookies(HttpServletResponse response, String accessToken, String refreshToken) {
-        ResponseCookie accessCookie = ResponseCookie.from("rtms_access_token", accessToken)
-                .httpOnly(true)
-                .secure(false) 
-                .path("/")
-                .maxAge(accessExpirationMs / 1000)
-                .sameSite("Lax")
-                .build();
-
+    private void setRefreshCookie(HttpServletResponse response, String refreshToken, long maxAgeSeconds) {
         ResponseCookie refreshCookie = ResponseCookie.from("rtms_refresh_token", refreshToken)
                 .httpOnly(true)
-                .secure(false)
-                .path("/")
-                .maxAge(refreshExpirationMs / 1000)
+                .secure(false) // false because localhost
+                .path("/api/auth")
+                .maxAge(maxAgeSeconds)
                 .sameSite("Lax")
                 .build();
 
-        response.addHeader("Set-Cookie", accessCookie.toString());
         response.addHeader("Set-Cookie", refreshCookie.toString());
     }
-
-    private String extractCookie(HttpServletRequest request, String name) {
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if (name.equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
-        }
-        return null;
-    }
 }
+
