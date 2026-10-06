@@ -1,5 +1,4 @@
 package com.rtms.backend.controller;
-
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.entity.Area;
 import com.rtms.backend.entity.StableStall;

@@ -142,6 +142,14 @@ export const admissionsApi = {
     const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/groom-review`, request);
     return response.data;
   },
+  confirmHorseArrival: async (id: number, request: {
+    confirmed: boolean;
+    feedback?: string;
+  }): Promise<AdmissionDetailResponse> => {
+    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(
+      '/api/admissions/' + id + '/arrival-confirmation', request);
+    return response.data;
+  },
   retryQuarantineAllocation: async (id: number): Promise<AdmissionDetailResponse> => {
     const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/quarantine-allocation`, {});
     return response.data;

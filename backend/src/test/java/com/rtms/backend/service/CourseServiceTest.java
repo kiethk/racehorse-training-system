@@ -1,5 +1,5 @@
 package com.rtms.backend.service;
-
+import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.dto.CourseDetailResponse;
 import com.rtms.backend.dto.CourseSubjectItemRequest;
 import com.rtms.backend.dto.CourseSubjectResponse;
@@ -11,7 +11,6 @@ import com.rtms.backend.enums.CourseStatus;
 import com.rtms.backend.repository.CourseRepository;
 import com.rtms.backend.repository.CourseSubjectRepository;
 import com.rtms.backend.repository.SubjectRepository;
-import com.rtms.backend.security.AuthenticatedUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

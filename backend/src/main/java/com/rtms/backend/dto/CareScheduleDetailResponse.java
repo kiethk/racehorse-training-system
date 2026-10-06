@@ -1,5 +1,5 @@
 package com.rtms.backend.dto;
-
+import com.rtms.backend.dto.VetOfferResponse;
 import com.rtms.backend.entity.CareSchedule;
 import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.entity.Horse;

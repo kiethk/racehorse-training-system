@@ -1,6 +1,4 @@
 package com.rtms.backend.service;
-
-import com.rtms.backend.config.ApiException;
 import com.rtms.backend.dto.AdmissionCapacitySummary;
 import com.rtms.backend.dto.AdmissionDetailResponse;
 import com.rtms.backend.dto.AdmissionDocumentResponse;
@@ -10,16 +8,20 @@ import com.rtms.backend.dto.InitialExamScheduleResponse;
 import com.rtms.backend.entity.AdmissionApplication;
 import com.rtms.backend.entity.AdmissionDocument;
 import com.rtms.backend.entity.CandidateHorseProfile;
-import com.rtms.backend.entity.HealthRecord;
-import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.enums.AdmissionDocumentType;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.AdmissionDocumentRepository;
 import com.rtms.backend.repository.CandidateHorseProfileRepository;
-import com.rtms.backend.repository.HealthRecordRepository;
-import com.rtms.backend.repository.StableStallRepository;
-import com.rtms.backend.repository.UserRepository;
+import com.rtms.backend.entity.HealthRecord;
+import com.rtms.backend.enums.CareType;
 import com.rtms.backend.repository.CareScheduleRepository;
+import com.rtms.backend.repository.HealthRecordRepository;
+import com.rtms.backend.entity.User;
+import com.rtms.backend.repository.UserRepository;
+import com.rtms.backend.config.ApiException;
+import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.repository.StableStallRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -180,6 +182,9 @@ public class AdmissionQueryService {
         response.setManagerReviewedAt(admission.getManagerReviewedAt());
 
         response.setHorseId(admission.getHorseId());
+        response.setArrivalStatus(admission.getArrivalStatus());
+        response.setArrivalConfirmedAt(admission.getArrivalConfirmedAt());
+        response.setArrivalConfirmedBy(admission.getArrivalConfirmedBy());
         response.setSubmittedAt(admission.getSubmittedAt());
 
         response.setQuarantineStallCode(admission.getQuarantineStallId() == null

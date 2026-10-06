@@ -1,6 +1,6 @@
 package com.rtms.backend.repository;
-
 import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.repository.AdmissionApplicationRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

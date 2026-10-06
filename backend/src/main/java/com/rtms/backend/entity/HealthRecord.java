@@ -1,10 +1,10 @@
 package com.rtms.backend.entity;
+import com.rtms.backend.enums.VetDecision;
+import com.rtms.backend.enums.TrainingDecision;
 
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import com.rtms.backend.enums.TrainingDecision;
-import com.rtms.backend.enums.VetDecision;
 
 @Entity
 @Table(name = "health_records")

@@ -1,11 +1,14 @@
 package com.rtms.backend.service;
-
 import com.rtms.backend.dto.TrainerAdmissionReviewRequest;
 import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.entity.RacingReadinessAssessment;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.entity.Horse;
+import com.rtms.backend.entity.RacingReadinessAssessment;
 import com.rtms.backend.repository.RacingReadinessAssessmentRepository;
+import com.rtms.backend.entity.Course;
+import com.rtms.backend.entity.HorseTrainingPlan;
+import com.rtms.backend.entity.TrainingWorkout;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

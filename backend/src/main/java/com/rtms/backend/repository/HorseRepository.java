@@ -8,7 +8,6 @@
  *  - Thêm custom query bằng method name (findByName, findByStatus...) hoặc @Query nếu phức tạp hơn
  */
 package com.rtms.backend.repository;
-
 import com.rtms.backend.entity.Horse;
 
 import java.util.List;

@@ -1,7 +1,8 @@
 package com.rtms.backend.service;
-
 import com.rtms.backend.dto.CreateSubjectRequest;
 import com.rtms.backend.entity.Subject;
+import com.rtms.backend.enums.IntensityLevel;
+import com.rtms.backend.enums.SurfaceType;
 import com.rtms.backend.enums.WorkoutType;
 import com.rtms.backend.repository.SubjectCategoryRepository;
 import com.rtms.backend.repository.SubjectRepository;

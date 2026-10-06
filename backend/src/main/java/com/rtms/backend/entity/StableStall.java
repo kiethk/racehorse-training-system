@@ -1,5 +1,4 @@
 package com.rtms.backend.entity;
-
 import com.rtms.backend.enums.StallStatus;
 import jakarta.persistence.*;
 

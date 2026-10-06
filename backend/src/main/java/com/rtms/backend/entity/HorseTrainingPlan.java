@@ -1,5 +1,4 @@
 package com.rtms.backend.entity;
-
 import com.rtms.backend.config.TrainingDaySetConverter;
 import com.rtms.backend.enums.TrainingDay;
 import com.rtms.backend.enums.TrainingPlanStatus;

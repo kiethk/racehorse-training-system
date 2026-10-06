@@ -1,5 +1,4 @@
 package com.rtms.backend.dto;
-
 import com.rtms.backend.enums.TrainingDay;
 
 import java.time.LocalDate;

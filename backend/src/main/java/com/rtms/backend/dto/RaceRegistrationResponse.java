@@ -1,5 +1,4 @@
 package com.rtms.backend.dto;
-
 import com.rtms.backend.entity.RaceRegistration;
 
 import java.math.BigDecimal;

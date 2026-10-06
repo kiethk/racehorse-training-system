@@ -1,16 +1,15 @@
 package com.rtms.backend.controller;
-
-import com.rtms.backend.config.ApiException;
-import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.HorseHealthMetricRequest;
 import com.rtms.backend.dto.HorseHealthMetricResponse;
 import com.rtms.backend.entity.HealthRecord;
-import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.HorseHealthMetric;
 import com.rtms.backend.repository.HealthRecordRepository;
 import com.rtms.backend.repository.HorseHealthMetricRepository;
+import com.rtms.backend.entity.Horse;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.config.ApiException;
+import com.rtms.backend.dto.ApiResponse;
 import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.List;

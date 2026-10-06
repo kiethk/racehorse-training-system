@@ -1,10 +1,20 @@
 package com.rtms.backend.service;
-
-import com.rtms.backend.config.ApiException;
-import com.rtms.backend.dto.*;
-import com.rtms.backend.entity.*;
-import com.rtms.backend.enums.*;
-import com.rtms.backend.repository.*;
+import com.rtms.backend.entity.VetOffer;
+import com.rtms.backend.enums.VetOfferStatus;
+import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.VetOfferRepository;
+import com.rtms.backend.entity.CareSchedule;
+import com.rtms.backend.enums.CareScheduleStatus;
+import com.rtms.backend.enums.CareType;
+import com.rtms.backend.repository.CareScheduleRepository;
+import com.rtms.backend.repository.HealthRecordRepository;
+import com.rtms.backend.repository.HorseHealthMetricRepository;
+import com.rtms.backend.entity.Horse;
+import com.rtms.backend.enums.HorseStatus;
+import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.entity.User;
+import com.rtms.backend.repository.UserRepository;
+import com.rtms.backend.repository.StableStallRepository;
 import jakarta.persistence.LockModeType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

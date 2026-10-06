@@ -1,11 +1,11 @@
 package com.rtms.backend.service;
-
 import com.rtms.backend.dto.TrainerAdmissionReviewRequest;
 import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.entity.RacingReadinessAssessment;
 import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.RacingReadinessStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.entity.Horse;
+import com.rtms.backend.entity.RacingReadinessAssessment;
+import com.rtms.backend.enums.RacingReadinessStatus;
 import com.rtms.backend.repository.RacingReadinessAssessmentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

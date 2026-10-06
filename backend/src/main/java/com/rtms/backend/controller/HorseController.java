@@ -1,18 +1,16 @@
 package com.rtms.backend.controller;
-
-import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreateHorseRequest;
+import com.rtms.backend.dto.HorseAlertResponse;
+import com.rtms.backend.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.dto.UpdateHorseStatusRequest;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.service.HorseService;
+import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.dto.ApiResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
-import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.web.bind.annotation.*;
-
-import com.rtms.backend.dto.HorseAlertResponse;
-import com.rtms.backend.dto.HorseFitnessTrendItemResponse;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
 import java.util.List;

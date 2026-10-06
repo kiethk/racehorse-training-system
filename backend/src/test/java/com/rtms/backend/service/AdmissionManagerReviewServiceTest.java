@@ -1,20 +1,19 @@
 package com.rtms.backend.service;
-
 import com.rtms.backend.dto.ManagerReviewRequest;
 import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.entity.Horse;
-import com.rtms.backend.entity.StableStall;
-import com.rtms.backend.entity.CareSchedule;
 import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.CareScheduleStatus;
-import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.enums.ReviewDecision;
-import com.rtms.backend.enums.StallStatus;
-import com.rtms.backend.enums.TrainingStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.entity.CareSchedule;
+import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.repository.CareScheduleRepository;
+import com.rtms.backend.entity.Horse;
+import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.enums.StallStatus;
 import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.enums.TrainingStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -181,7 +180,7 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.OVERDUE)))
                 .thenReturn(List.of());
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -221,7 +220,7 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.OVERDUE)))
                 .thenReturn(List.of(pending, overdue));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -251,7 +250,7 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.OVERDUE)))
                 .thenReturn(List.of());
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 

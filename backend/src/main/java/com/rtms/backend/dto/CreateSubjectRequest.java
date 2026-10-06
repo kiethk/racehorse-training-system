@@ -1,7 +1,7 @@
 package com.rtms.backend.dto;
-
 import com.rtms.backend.enums.IntensityLevel;
 import com.rtms.backend.enums.SurfaceType;
+import com.rtms.backend.enums.WorkoutType;
 
 import java.math.BigDecimal;
 

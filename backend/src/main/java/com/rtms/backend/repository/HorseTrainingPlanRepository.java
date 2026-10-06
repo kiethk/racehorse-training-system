@@ -1,5 +1,4 @@
 package com.rtms.backend.repository;
-
 import com.rtms.backend.entity.HorseTrainingPlan;
 import com.rtms.backend.enums.TrainingPlanStatus;
 import org.springframework.data.jpa.repository.JpaRepository;

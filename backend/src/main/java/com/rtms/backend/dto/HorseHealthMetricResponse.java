@@ -1,5 +1,4 @@
 package com.rtms.backend.dto;
-
 import com.rtms.backend.entity.HorseHealthMetric;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

@@ -1,5 +1,4 @@
 package com.rtms.backend.scheduler;
-
 import com.rtms.backend.service.CareScheduleService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

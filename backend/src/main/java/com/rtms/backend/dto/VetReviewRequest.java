@@ -1,8 +1,9 @@
 package com.rtms.backend.dto;
+import com.rtms.backend.enums.VetDecision;
+import com.rtms.backend.dto.HorseHealthMetricRequest;
+import com.rtms.backend.enums.TrainingDecision;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.rtms.backend.enums.TrainingDecision;
-import com.rtms.backend.enums.VetDecision;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.Valid;

@@ -1,6 +1,4 @@
 package com.rtms.backend.service;
-
-import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.config.TrainingDaySetConverter;
 import com.rtms.backend.entity.TrainingLot;
 import com.rtms.backend.enums.TrainingDay;

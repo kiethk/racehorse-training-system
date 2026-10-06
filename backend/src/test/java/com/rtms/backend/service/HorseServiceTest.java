@@ -1,10 +1,15 @@
 package com.rtms.backend.service;
-
+import com.rtms.backend.dto.UpdateHorseStatusRequest;
 import com.rtms.backend.entity.Horse;
+import com.rtms.backend.enums.HorseStatus;
+import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.entity.Area;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.StallStatus;
-import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.repository.AreaRepository;
 import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.service.HorseTrainingPlanService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -381,4 +386,4 @@ class HorseServiceTest {
         verify(horseRepository, never()).save(any());
         assertEquals(18L, horse.getCurrentStallId());
     }
-}
+}

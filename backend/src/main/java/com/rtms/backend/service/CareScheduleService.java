@@ -1,11 +1,37 @@
 package com.rtms.backend.service;
-
+import com.rtms.backend.dto.VetOfferResponse;
+import com.rtms.backend.entity.AdmissionApplication;
+import com.rtms.backend.entity.VetOffer;
+import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.enums.VetDecision;
+import com.rtms.backend.enums.VetOfferStatus;
+import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.VetOfferRepository;
+import com.rtms.backend.dto.CancelCareScheduleRequest;
+import com.rtms.backend.dto.CareScheduleDetailResponse;
+import com.rtms.backend.dto.CareScheduleResponse;
+import com.rtms.backend.dto.CompleteCareScheduleRequest;
+import com.rtms.backend.dto.CreateNextScheduleRequest;
+import com.rtms.backend.dto.HorseHealthMetricRequest;
+import com.rtms.backend.entity.CareSchedule;
+import com.rtms.backend.entity.HealthRecord;
+import com.rtms.backend.entity.HorseHealthMetric;
+import com.rtms.backend.enums.CareScheduleStatus;
+import com.rtms.backend.enums.CareType;
+import com.rtms.backend.repository.CareScheduleRepository;
+import com.rtms.backend.repository.HealthRecordRepository;
+import com.rtms.backend.repository.HorseHealthMetricRepository;
+import com.rtms.backend.entity.Horse;
+import com.rtms.backend.enums.HorseStatus;
+import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.entity.User;
+import com.rtms.backend.repository.UserRepository;
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.enums.StallStatus;
+import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.enums.TrainingDecision;
+import com.rtms.backend.enums.TrainingStatus;
 import jakarta.persistence.EntityManager;
-import com.rtms.backend.dto.*;
-import com.rtms.backend.entity.*;
-import com.rtms.backend.enums.*;
-import com.rtms.backend.repository.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -53,6 +79,16 @@ public class CareScheduleService {
 
     @Transactional
     public CareScheduleResponse createInitialSchedule(Long admissionId, Long horseId) {
+        return createInitialScheduleInternal(admissionId, horseId, false);
+    }
+
+    @Transactional
+    public CareScheduleResponse createInitialScheduleForGroom(Long admissionId, Long horseId) {
+        return createInitialScheduleInternal(admissionId, horseId, true);
+    }
+
+    private CareScheduleResponse createInitialScheduleInternal(Long admissionId, Long horseId,
+            boolean assignLeastLoadedVetImmediately) {
         if (admissionId == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "admissionId is required");
         }
@@ -74,7 +110,8 @@ public class CareScheduleService {
         boolean activeExists = careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
                 horseId, CareType.INITIAL,
                 List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION,
-                        CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+                        CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS,
+                        CareScheduleStatus.OVERDUE));
         if (activeExists) {
             CareSchedule existing = careScheduleRepository
                     .findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admissionId, CareType.INITIAL)
@@ -99,8 +136,89 @@ public class CareScheduleService {
             horseRepository.save(horse);
         }
 
-        dispatchOffersForSchedule(saved);
+        if (assignLeastLoadedVetImmediately) {
+            Long assignedVetId = assignLeastLoadedVetImmediately(saved);
+            if (assignedVetId != null) {
+                adm.setVeterinarianId(assignedVetId);
+                admissionRepository.save(adm);
+            }
+            careScheduleRepository.save(saved);
+        } else {
+            dispatchOffersForSchedule(saved);
+        }
         return CareScheduleResponse.from(saved);
+    }
+
+    private Long assignLeastLoadedVetImmediately(CareSchedule schedule) {
+        List<User> activeVets = userRepository.findActiveVeterinariansForUpdate();
+        if (activeVets == null || activeVets.isEmpty()) {
+            return null;
+        }
+
+        List<User> orderedVets = activeVets.stream()
+                .sorted(Comparator
+                        .comparingLong((User vet) -> careScheduleRepository
+                                .countActiveHorsesForVeterinarian(vet.getId()))
+                        .thenComparing(User::getId))
+                .toList();
+
+        LocalDateTime earliest = LocalDateTime.now().plusHours(2)
+                .withSecond(0).withNano(0);
+        for (User vet : orderedVets) {
+            LocalDateTime slot = findNextAvailableSlot(schedule, vet.getId(), earliest);
+            if (slot == null) {
+                continue;
+            }
+            schedule.setVeterinarianId(vet.getId());
+            schedule.setScheduledAt(slot);
+            schedule.setStatus(CareScheduleStatus.SCHEDULED);
+            return vet.getId();
+        }
+        return null;
+    }
+
+    private LocalDateTime findNextAvailableSlot(CareSchedule schedule, Long vetId,
+            LocalDateTime earliest) {
+        if (careScheduleRepository.existsByVeterinarianIdAndStatus(
+                vetId, CareScheduleStatus.IN_PROGRESS)
+                || careScheduleRepository.existsByHorseIdAndStatus(
+                        schedule.getHorseId(), CareScheduleStatus.IN_PROGRESS)) {
+            return null;
+        }
+
+        List<CareSchedule> vetSchedules = careScheduleRepository
+                .findScheduledForVet(vetId, CareScheduleStatus.SCHEDULED);
+        List<CareSchedule> horseSchedules = careScheduleRepository
+                .findScheduledForHorse(schedule.getHorseId(), CareScheduleStatus.SCHEDULED);
+        int duration = schedule.getDurationMinutes() > 0
+                ? schedule.getDurationMinutes() : DEFAULT_DURATION_MINUTES;
+
+        LocalDateTime candidate = earliest;
+        LocalDateTime limit = earliest.plusDays(30);
+        while (candidate.isBefore(limit)) {
+            LocalDateTime candidateStart = candidate;
+            LocalDateTime end = candidateStart.plusMinutes(duration);
+            boolean vetBusy = vetSchedules.stream().anyMatch(existing ->
+                    !Objects.equals(existing.getId(), schedule.getId())
+                            && overlaps(candidateStart, end, existing));
+            boolean horseBusy = horseSchedules.stream().anyMatch(existing ->
+                    !Objects.equals(existing.getId(), schedule.getId())
+                            && overlaps(candidateStart, end, existing));
+            if (!vetBusy && !horseBusy) {
+                return candidate;
+            }
+            candidate = candidate.plusMinutes(DEFAULT_DURATION_MINUTES);
+        }
+        return null;
+    }
+
+    private boolean overlaps(LocalDateTime start, LocalDateTime end, CareSchedule other) {
+        if (other.getScheduledAt() == null) {
+            return false;
+        }
+        LocalDateTime otherEnd = other.getScheduledAt().plusMinutes(
+                other.getDurationMinutes() > 0 ? other.getDurationMinutes() : DEFAULT_DURATION_MINUTES);
+        return start.isBefore(otherEnd) && end.isAfter(other.getScheduledAt());
     }
 
     @Transactional
@@ -592,7 +710,8 @@ public class CareScheduleService {
                 CareScheduleStatus.REQUESTED,
                 CareScheduleStatus.AWAITING_VET_CONFIRMATION,
                 CareScheduleStatus.SCHEDULED,
-                CareScheduleStatus.IN_PROGRESS
+                CareScheduleStatus.IN_PROGRESS,
+                CareScheduleStatus.OVERDUE
         );
         Optional<CareSchedule> existing = careScheduleRepository
                 .findFirstByHorseIdAndCareTypeAndStatusInOrderByCreatedAtDesc(horse.getId(), careType, activeStatuses);
@@ -722,6 +841,10 @@ public class CareScheduleService {
 
         List<User> candidates = eligibleVets.stream()
                 .filter(v -> !offeredVetIdsInRound.contains(v.getId()))
+                .sorted(Comparator
+                        .comparingLong((User vet) -> careScheduleRepository
+                                .countActiveHorsesForVeterinarian(vet.getId()))
+                        .thenComparing(User::getId))
                 .toList();
 
         int finalRound = targetRound;

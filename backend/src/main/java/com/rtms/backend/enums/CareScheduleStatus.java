@@ -5,6 +5,7 @@ public enum CareScheduleStatus {
     AWAITING_VET_CONFIRMATION,
     SCHEDULED,
     IN_PROGRESS,
+    OVERDUE,
     COMPLETED,
     CANCELLED
 }

@@ -1,11 +1,16 @@
 package com.rtms.backend.service;
-
-import com.rtms.backend.config.ApiException;
-import com.rtms.backend.dto.*;
-import com.rtms.backend.entity.*;
+import com.rtms.backend.dto.CareScheduleResponse;
+import com.rtms.backend.dto.CompletePreventiveCareScheduleRequest;
+import com.rtms.backend.dto.CreateNextScheduleRequest;
+import com.rtms.backend.dto.CreatePreventiveCareScheduleRequest;
+import com.rtms.backend.entity.CareSchedule;
+import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.enums.CareType;
-import com.rtms.backend.repository.*;
+import com.rtms.backend.repository.CareScheduleRepository;
+import com.rtms.backend.entity.Horse;
+import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.config.ApiException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;

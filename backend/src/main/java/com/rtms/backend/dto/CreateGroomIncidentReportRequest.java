@@ -1,5 +1,4 @@
 package com.rtms.backend.dto;
-
 import com.rtms.backend.enums.IncidentSeverity;
 
 public class CreateGroomIncidentReportRequest {

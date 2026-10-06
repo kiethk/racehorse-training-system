@@ -1,10 +1,38 @@
 package com.rtms.backend.service;
-
+import com.rtms.backend.dto.VetOfferResponse;
+import com.rtms.backend.entity.AdmissionApplication;
+import com.rtms.backend.entity.VetOffer;
+import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.enums.VetDecision;
+import com.rtms.backend.enums.VetOfferStatus;
+import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.VetOfferRepository;
+import com.rtms.backend.dto.CancelCareScheduleRequest;
+import com.rtms.backend.dto.CareScheduleDetailResponse;
+import com.rtms.backend.dto.CareScheduleResponse;
+import com.rtms.backend.dto.CompleteCareScheduleRequest;
+import com.rtms.backend.dto.CreateNextScheduleRequest;
+import com.rtms.backend.dto.HorseHealthMetricRequest;
+import com.rtms.backend.entity.CareSchedule;
+import com.rtms.backend.entity.HealthRecord;
+import com.rtms.backend.entity.HorseHealthMetric;
+import com.rtms.backend.enums.CareScheduleStatus;
+import com.rtms.backend.enums.CareType;
+import com.rtms.backend.repository.CareScheduleRepository;
+import com.rtms.backend.repository.HealthRecordRepository;
+import com.rtms.backend.repository.HorseHealthMetricRepository;
+import com.rtms.backend.entity.Horse;
+import com.rtms.backend.enums.HorseStatus;
+import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.entity.Role;
+import com.rtms.backend.entity.User;
+import com.rtms.backend.repository.UserRepository;
 import com.rtms.backend.config.ApiException;
-import com.rtms.backend.dto.*;
-import com.rtms.backend.entity.*;
-import com.rtms.backend.enums.*;
-import com.rtms.backend.repository.*;
+import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.enums.StallStatus;
+import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.enums.TrainingDecision;
+import com.rtms.backend.enums.TrainingStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -130,6 +158,47 @@ class CareScheduleServiceTest {
 
         assertEquals(100L, response.id());
         verify(careScheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("A03: Groom initial schedule selects the Vet with the lowest active horse load")
+    void createInitialScheduleForGroom_selectsLeastLoadedVetIncludingOverdueLoad() {
+        User vetFive = new User();
+        vetFive.setId(5L);
+        User vetSix = new User();
+        vetSix.setId(6L);
+        User vetSeven = new User();
+        vetSeven.setId(7L);
+
+        when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(eq(10L), eq(CareType.INITIAL), any()))
+                .thenReturn(false);
+        when(userRepository.findActiveVeterinariansForUpdate()).thenReturn(List.of(vetFive, vetSix, vetSeven));
+        when(careScheduleRepository.countActiveHorsesForVeterinarian(5L)).thenReturn(3L);
+        when(careScheduleRepository.countActiveHorsesForVeterinarian(6L)).thenReturn(1L);
+        when(careScheduleRepository.countActiveHorsesForVeterinarian(7L)).thenReturn(1L);
+        when(careScheduleRepository.findScheduledForVet(anyLong(), eq(CareScheduleStatus.SCHEDULED)))
+                .thenReturn(Collections.emptyList());
+        when(careScheduleRepository.findScheduledForHorse(10L, CareScheduleStatus.SCHEDULED))
+                .thenReturn(Collections.emptyList());
+        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(invocation -> {
+            CareSchedule saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(100L);
+            }
+            return saved;
+        });
+        when(admissionRepository.save(any(AdmissionApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CareScheduleResponse response = service.createInitialScheduleForGroom(1L, 10L);
+
+        assertEquals(6L, response.veterinarianId(), "Tied load should be resolved by the lower Vet id");
+        assertEquals(CareScheduleStatus.SCHEDULED, response.status());
+        assertNotNull(response.scheduledAt());
+        assertEquals(6L, admission.getVeterinarianId());
+        verify(careScheduleRepository, atLeastOnce()).countActiveHorsesForVeterinarian(5L);
+        verify(careScheduleRepository, atLeastOnce()).countActiveHorsesForVeterinarian(6L);
+        verify(careScheduleRepository, atLeastOnce()).countActiveHorsesForVeterinarian(7L);
+        verify(admissionRepository).save(admission);
     }
 
     @Test

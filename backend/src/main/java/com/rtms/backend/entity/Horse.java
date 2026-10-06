@@ -1,11 +1,10 @@
 package com.rtms.backend.entity;
+import com.rtms.backend.enums.HorseStatus;
+import com.rtms.backend.enums.TrainingStatus;
 
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-
-import com.rtms.backend.enums.HorseStatus;
-import com.rtms.backend.enums.TrainingStatus;
 
 @Entity
 @Table(name = "horses")

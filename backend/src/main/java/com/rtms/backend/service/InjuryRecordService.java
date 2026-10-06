@@ -1,16 +1,15 @@
 package com.rtms.backend.service;
-
 import com.rtms.backend.dto.CreateInjuryRecordRequest;
-import com.rtms.backend.dto.TrainingLockStatusResponse;
-import com.rtms.backend.entity.Horse;
+import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.entity.HorseBodyRegion;
 import com.rtms.backend.entity.InjuryRecord;
-import com.rtms.backend.entity.HealthRecord;
-import com.rtms.backend.enums.HorseStatus;
-import com.rtms.backend.repository.HorseBodyRegionRepository;
-import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.repository.InjuryRecordRepository;
 import com.rtms.backend.repository.HealthRecordRepository;
+import com.rtms.backend.repository.HorseBodyRegionRepository;
+import com.rtms.backend.repository.InjuryRecordRepository;
+import com.rtms.backend.entity.Horse;
+import com.rtms.backend.enums.HorseStatus;
+import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.dto.TrainingLockStatusResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;

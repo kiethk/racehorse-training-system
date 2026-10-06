@@ -1,5 +1,4 @@
 package com.rtms.backend.entity;
-
 import com.rtms.backend.enums.WorkoutStatus;
 import jakarta.persistence.*;
 import java.math.BigDecimal;

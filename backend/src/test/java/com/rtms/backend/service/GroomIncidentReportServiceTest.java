@@ -1,5 +1,5 @@
 package com.rtms.backend.service;
-
+import com.rtms.backend.service.AdmissionFileStorage;
 import com.rtms.backend.dto.HandleIncidentRequest;
 import com.rtms.backend.entity.GroomIncidentReport;
 import com.rtms.backend.enums.IncidentStatus;
@@ -206,4 +206,4 @@ class GroomIncidentReportServiceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> incidentReportService.attachImage(10L, file, groom));
     }
-}
+}

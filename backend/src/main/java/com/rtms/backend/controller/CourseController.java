@@ -1,12 +1,11 @@
 package com.rtms.backend.controller;
-
+import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CourseDetailResponse;
 import com.rtms.backend.dto.CourseSubjectItemRequest;
 import com.rtms.backend.dto.CourseSubjectResponse;
 import com.rtms.backend.dto.CreateCourseRequest;
 import com.rtms.backend.entity.Course;
-import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.CourseService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;

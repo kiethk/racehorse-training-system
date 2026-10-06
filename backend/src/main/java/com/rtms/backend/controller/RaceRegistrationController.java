@@ -1,11 +1,10 @@
 package com.rtms.backend.controller;
-
-import com.rtms.backend.dto.ApiResponse;
+import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.dto.CreateRaceRegistrationRequest;
 import com.rtms.backend.dto.RaceRegistrationResponse;
 import com.rtms.backend.dto.ReviewRaceRegistrationRequest;
-import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.RaceRegistrationService;
+import com.rtms.backend.dto.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

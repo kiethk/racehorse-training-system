@@ -1,11 +1,18 @@
 package com.rtms.backend.service;
-
 import com.rtms.backend.dto.StaffCreationRequest;
 import com.rtms.backend.dto.StaffDetailResponse;
 import com.rtms.backend.dto.StaffSummaryResponse;
 import com.rtms.backend.dto.StaffUpdateRequest;
-import com.rtms.backend.entity.*;
-import com.rtms.backend.repository.*;
+import com.rtms.backend.entity.GroomProfile;
+import com.rtms.backend.entity.Role;
+import com.rtms.backend.entity.TrainerProfile;
+import com.rtms.backend.entity.User;
+import com.rtms.backend.entity.VeterinarianProfile;
+import com.rtms.backend.repository.GroomProfileRepository;
+import com.rtms.backend.repository.RoleRepository;
+import com.rtms.backend.repository.TrainerProfileRepository;
+import com.rtms.backend.repository.UserRepository;
+import com.rtms.backend.repository.VeterinarianProfileRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

@@ -1,5 +1,4 @@
 package com.rtms.backend.repository;
-
 import com.rtms.backend.entity.Area;
 import com.rtms.backend.enums.AreaType;
 import org.springframework.data.jpa.repository.JpaRepository;

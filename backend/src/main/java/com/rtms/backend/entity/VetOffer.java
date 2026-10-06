@@ -1,5 +1,4 @@
 package com.rtms.backend.entity;
-
 import com.rtms.backend.enums.VetOfferStatus;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

@@ -1,5 +1,4 @@
 package com.rtms.backend.repository;
-
 import com.rtms.backend.entity.CareSchedule;
 import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.enums.CareType;
@@ -47,6 +46,18 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     List<CareSchedule> findByVeterinarianIdAndStatus(Long veterinarianId, CareScheduleStatus status);
 
     boolean existsByVeterinarianIdAndStatus(Long veterinarianId, CareScheduleStatus status);
+
+    @Query("""
+            SELECT COUNT(DISTINCT cs.horseId)
+            FROM CareSchedule cs
+            WHERE cs.veterinarianId = :vetId
+              AND cs.status IN (
+                  com.rtms.backend.enums.CareScheduleStatus.SCHEDULED,
+                  com.rtms.backend.enums.CareScheduleStatus.IN_PROGRESS,
+                  com.rtms.backend.enums.CareScheduleStatus.OVERDUE
+              )
+            """)
+    long countActiveHorsesForVeterinarian(@Param("vetId") Long vetId);
 
     boolean existsByHorseIdAndStatus(Long horseId, CareScheduleStatus status);
 

@@ -1,14 +1,13 @@
 package com.rtms.backend.controller;
-
-import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreateHorseTrainingPlanRequest;
+import com.rtms.backend.dto.TrainerDashboardHorseResponse;
+import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.HorseTrainingPlanDetailResponse;
 import com.rtms.backend.dto.JoinableCohortResponse;
 import com.rtms.backend.dto.PlanSummaryResponse;
-import com.rtms.backend.dto.TrainerDashboardHorseResponse;
 import com.rtms.backend.dto.UpdatePlanStatusRequest;
 import com.rtms.backend.entity.HorseTrainingPlan;
-import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.HorseTrainingPlanService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

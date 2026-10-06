@@ -1,9 +1,8 @@
 package com.rtms.backend.dto;
-
 import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.enums.VetDecision;
 import com.rtms.backend.enums.CareScheduleStatus;
+import com.rtms.backend.enums.HorseStatus;
 import java.time.LocalDateTime;
 
 public record VetReviewResponse(Long admissionId, AdmissionStatus status, Long veterinarianId,

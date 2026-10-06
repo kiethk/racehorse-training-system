@@ -1,7 +1,8 @@
 package com.rtms.backend.repository;
-
+import com.rtms.backend.entity.TrainingLot;
 import com.rtms.backend.entity.TrainingWorkout;
 import com.rtms.backend.enums.WorkoutStatus;
+import com.rtms.backend.service.TrainingLotService;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

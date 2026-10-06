@@ -1,10 +1,9 @@
 package com.rtms.backend.controller;
-
-import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.UserSummaryResponse;
 import com.rtms.backend.entity.Role;
 import com.rtms.backend.entity.User;
 import com.rtms.backend.repository.UserRepository;
+import com.rtms.backend.dto.ApiResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

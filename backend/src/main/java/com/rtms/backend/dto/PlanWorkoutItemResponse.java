@@ -1,7 +1,7 @@
 package com.rtms.backend.dto;
-
 import com.rtms.backend.entity.TrainingLot;
 import com.rtms.backend.entity.TrainingWorkout;
+import com.rtms.backend.service.HorseTrainingPlanService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

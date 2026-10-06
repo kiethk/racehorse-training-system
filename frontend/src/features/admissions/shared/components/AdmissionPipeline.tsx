@@ -13,14 +13,14 @@ function PipelineStep({ label, isDone, isActive, note }: { label: string; isDone
 }
 
 type PipelineDetail = Pick<AdmissionDetailResponse, 'status'> & Partial<Pick<AdmissionDetailResponse,
-  'groomReviewedAt' | 'quarantineStallCode' | 'vetReviewedAt' | 'trainerReviewedAt' | 'managerReviewedAt'>>;
+  'groomReviewedAt' | 'quarantineStallCode' | 'arrivalStatus' | 'vetReviewedAt' | 'trainerReviewedAt' | 'managerReviewedAt'>>;
 
 export function AdmissionPipeline({ detail }: { detail: PipelineDetail }) {
   const isPendingRecheck = detail.status === 'PENDING_RECHECK';
   const isRejected = detail.status === 'REJECTED';
   const isApproved = detail.status === 'APPROVED';
   // Owner responses omit timestamps. Infer only transitions proven by the current status.
-  const stages = ['GROOM_REVIEW', 'WAITING_FOR_STALL', 'VET_REVIEW', 'TRAINER_REVIEW', 'MANAGER_REVIEW', 'APPROVED'];
+  const stages = ['GROOM_REVIEW', 'WAITING_FOR_STALL', 'WAITING_FOR_ARRIVAL', 'VET_REVIEW', 'TRAINER_REVIEW', 'MANAGER_REVIEW', 'APPROVED'];
   const stage = stages.indexOf(isPendingRecheck ? 'VET_REVIEW' : detail.status);
   const done = (value: string | null | undefined, threshold: number) => value === undefined ? stage >= threshold : Boolean(value);
   return (
@@ -39,9 +39,10 @@ export function AdmissionPipeline({ detail }: { detail: PipelineDetail }) {
       <div className="mt-4 flex flex-wrap gap-2 text-[12px]">
         <PipelineStep label="Groom Review" isDone={done(detail.groomReviewedAt, 1)} isActive={detail.status === 'GROOM_REVIEW'} />
         <PipelineStep label="Waiting for Stall" isDone={done(detail.quarantineStallCode, 2)} isActive={detail.status === 'WAITING_FOR_STALL'} />
-        <PipelineStep label="Vet Review" isDone={done(detail.vetReviewedAt, 3) && !isPendingRecheck} isActive={detail.status === 'VET_REVIEW' || isPendingRecheck} note={isPendingRecheck ? 'Pending Recheck' : undefined} />
-        <PipelineStep label="Trainer Review" isDone={done(detail.trainerReviewedAt, 4)} isActive={detail.status === 'TRAINER_REVIEW'} />
-        <PipelineStep label="Manager Review" isDone={done(detail.managerReviewedAt, 5)} isActive={detail.status === 'MANAGER_REVIEW'} />
+        <PipelineStep label="Horse Arrival" isDone={detail.arrivalStatus === 'CONFIRMED' || done(undefined, 3)} isActive={detail.status === 'WAITING_FOR_ARRIVAL'} />
+        <PipelineStep label="Vet Review" isDone={done(detail.vetReviewedAt, 4) && !isPendingRecheck} isActive={detail.status === 'VET_REVIEW' || isPendingRecheck} note={isPendingRecheck ? 'Pending Recheck' : undefined} />
+        <PipelineStep label="Trainer Review" isDone={done(detail.trainerReviewedAt, 5)} isActive={detail.status === 'TRAINER_REVIEW'} />
+        <PipelineStep label="Manager Review" isDone={done(detail.managerReviewedAt, 6)} isActive={detail.status === 'MANAGER_REVIEW'} />
       </div>
     </Panel>
   );

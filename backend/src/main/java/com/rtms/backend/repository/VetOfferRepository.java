@@ -1,5 +1,4 @@
 package com.rtms.backend.repository;
-
 import com.rtms.backend.entity.VetOffer;
 import com.rtms.backend.enums.VetOfferStatus;
 import jakarta.persistence.LockModeType;
