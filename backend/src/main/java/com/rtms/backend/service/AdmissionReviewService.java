@@ -41,7 +41,7 @@ public class AdmissionReviewService {
     public VetReviewResponse reviewByVet(Long admissionId, VetReviewRequest request, Long actorId) {
         if (Boolean.TRUE.equals(request.getRejectAdmission()) || request.getDecision() == VetDecision.REJECTED) {
             throw new ApiException(HttpStatus.FORBIDDEN, "VET_CANNOT_REJECT_ADMISSION",
-                    "Veterinarians cannot reject admissions; only medical training decisions (ALLOWED, RESTRICTED, BLOCKED) are permitted.");
+                    "Veterinarians cannot reject admissions; only medical training decisions (ALLOWED, BLOCKED) are permitted.");
         }
         if (request.getFollowUpDate() != null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "LEGACY_FIELD_NOT_SUPPORTED",
@@ -142,7 +142,7 @@ public class AdmissionReviewService {
         } else if (request.getDecision() == VetDecision.APPROVED) {
             compReq.setTrainingDecision(TrainingDecision.ALLOWED);
         } else if (request.getDecision() == VetDecision.RECHECK_REQUIRED) {
-            compReq.setTrainingDecision(TrainingDecision.RESTRICTED);
+            compReq.setTrainingDecision(TrainingDecision.BLOCKED);
             compReq.setRestrictionDetails(request.getFeedback() != null ? request.getFeedback() : "Recheck required");
         } else {
             compReq.setTrainingDecision(TrainingDecision.BLOCKED);

@@ -206,8 +206,8 @@ class AdmissionReviewServiceTest {
         HealthRecord hr = new HealthRecord();
         hr.setId(31L);
         hr.setCareScheduleId(20L);
-        hr.setTrainingDecision(TrainingDecision.RESTRICTED);
-        hr.setRestrictionDetails("Light work only");
+        hr.setTrainingDecision(TrainingDecision.BLOCKED);
+        hr.setRestrictionDetails("No exercise");
         when(healthRecordRepository.findByCareScheduleId(20L)).thenReturn(Optional.of(hr));
 
         when(careScheduleService.completeCareSchedule(eq(20L), any(), eq(5L))).thenAnswer(invocation -> {
@@ -217,22 +217,22 @@ class AdmissionReviewServiceTest {
             admission.setVetFeedback(comp.getFindings());
             admission.setVetReviewedAt(LocalDateTime.now());
             schedule.setStatus(CareScheduleStatus.COMPLETED);
-            horse.setTrainingStatus(TrainingDecision.RESTRICTED);
+            horse.setTrainingStatus(TrainingDecision.BLOCKED);
             return CareScheduleResponse.from(schedule);
         });
 
         VetReviewRequest request = new VetReviewRequest();
         request.setPhysicalExamConfirmed(true);
         request.setFindings("Mild lameness");
-        request.setTrainingDecision(TrainingDecision.RESTRICTED);
-        request.setRestrictionDetails("Light work only");
+        request.setTrainingDecision(TrainingDecision.BLOCKED);
+        request.setRestrictionDetails("No exercise");
 
         var response = service.reviewByVet(1L, request, 5L);
 
         assertEquals(AdmissionStatus.TRAINER_REVIEW, response.status());
         assertNull(response.decision());
-        assertEquals(TrainingDecision.RESTRICTED, response.trainingDecision());
-        assertEquals("Light work only", response.restrictionDetails());
+        assertEquals(TrainingDecision.BLOCKED, response.trainingDecision());
+        assertEquals("No exercise", response.restrictionDetails());
         assertEquals(31L, response.healthRecordId());
         assertEquals(20L, response.careScheduleId());
         assertEquals(20L, response.vetExamId());
@@ -301,18 +301,6 @@ class AdmissionReviewServiceTest {
             // If provided in the future, it is valid
             recheck.setFollowUpDate(LocalDate.now().plusDays(1));
             assertTrue(validator.validate(recheck).isEmpty());
-
-            // TrainingDecision.RESTRICTED requires rejectionReason, feedback, or restrictionDetails
-            VetReviewRequest restricted = new VetReviewRequest();
-            restricted.setPhysicalExamConfirmed(true);
-            restricted.setFindings("Mild lameness observed");
-            restricted.setTrainingDecision(TrainingDecision.RESTRICTED);
-            assertFalse(validator.validate(restricted).isEmpty(),
-                    "RESTRICTED trainingDecision without restriction details or feedback must fail validation");
-
-            restricted.setRestrictionDetails("Light training only, avoid jumping");
-            assertTrue(validator.validate(restricted).isEmpty(),
-                    "RESTRICTED trainingDecision with restrictionDetails must pass validation");
 
             // TrainingDecision.BLOCKED requires rejectionReason, feedback, or restrictionDetails
             VetReviewRequest blocked = new VetReviewRequest();

@@ -1239,13 +1239,7 @@ export function VetAdmissionQueue() {
                         {displayedTrainingDecision && (
                           <div className="mt-3">
                             <Pill
-                              tone={
-                                displayedTrainingDecision === 'ALLOWED'
-                                  ? 'success'
-                                  : displayedTrainingDecision === 'RESTRICTED'
-                                    ? 'warning'
-                                    : 'danger'
-                              }
+                              tone={displayedTrainingDecision === 'ALLOWED' ? 'success' : 'danger'}
                             >
                               Training Decision: {formatLabel(displayedTrainingDecision)}
                             </Pill>
@@ -1314,9 +1308,7 @@ export function VetAdmissionQueue() {
                                       className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
                                         record.trainingDecision === 'ALLOWED'
                                           ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]'
-                                          : record.trainingDecision === 'RESTRICTED'
-                                            ? 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]'
-                                            : 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
+                                          : 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
                                       }`}
                                     >
                                       Training Decision: {record.trainingDecision}

@@ -71,9 +71,9 @@ public class CompleteCareScheduleRequest {
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 
     @JsonIgnore
-    @AssertTrue(message = "Restriction details are required when training decision is RESTRICTED or BLOCKED")
+    @AssertTrue(message = "Restriction details are required when training decision is BLOCKED")
     public boolean isRestrictionValid() {
-        if (trainingDecision == TrainingDecision.RESTRICTED || trainingDecision == TrainingDecision.BLOCKED) {
+        if (trainingDecision == TrainingDecision.BLOCKED) {
             return restrictionDetails != null && !restrictionDetails.isBlank();
         }
         return true;

@@ -145,8 +145,8 @@ class UrgentCareCompletionTest {
     }
 
     @Test
-    @DisplayName("completeCareSchedule RESTRICTED keeps horse training lock")
-    void testCompleteUrgentSchedule_restricted_keepsLock() {
+    @DisplayName("completeCareSchedule BLOCKED keeps horse training lock")
+    void testCompleteUrgentSchedule_blocked_keepsLock() {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
 
         when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
@@ -162,14 +162,14 @@ class UrgentCareCompletionTest {
         CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
         req.setFindings("Lameness in right foot");
         req.setDiagnosis("Tendon strain");
-        req.setTrainingDecision(TrainingDecision.RESTRICTED);
-        req.setRestrictionDetails("Walk only for 5 days");
+        req.setTrainingDecision(TrainingDecision.BLOCKED);
+        req.setRestrictionDetails("No exercise for 5 days");
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(), req, vet.getId());
 
         assertTrue(horse.isTrainingLocked());
-        assertEquals(TrainingDecision.RESTRICTED, horse.getTrainingStatus());
-        assertEquals("Walk only for 5 days", horse.getTrainingLockReason());
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingStatus());
+        assertEquals("No exercise for 5 days", horse.getTrainingLockReason());
     }
 
     @Test

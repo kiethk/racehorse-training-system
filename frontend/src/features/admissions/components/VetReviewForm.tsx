@@ -119,18 +119,9 @@ const trainingDecisions: TrainingDecisionOption[] = [
     activeBg: 'bg-[var(--color-success-soft)]',
   },
   {
-    value: 'RESTRICTED',
-    title: 'Training Restricted',
-    subtitle: 'Limited or modified conditioning only',
-    icon: 'alert-triangle',
-    tone: 'warning',
-    activeBorder: 'border-[var(--color-warning)] ring-1 ring-[var(--color-warning)]',
-    activeBg: 'bg-[var(--color-warning-soft)]',
-  },
-  {
     value: 'BLOCKED',
     title: 'Training Blocked',
-    subtitle: 'Zero training permitted; stall rest',
+    subtitle: 'Zero training permitted; stall rest until rechecked',
     icon: 'lock',
     tone: 'danger',
     activeBorder: 'border-[var(--color-danger)] ring-1 ring-[var(--color-danger)]',
@@ -602,9 +593,9 @@ export function VetReviewForm({
     ) {
       errors.systemFindings = 'Select at least one abnormal or not-examined body system.';
     }
-    if (trainingDecision === 'RESTRICTED' || trainingDecision === 'BLOCKED') {
+    if (trainingDecision === 'BLOCKED') {
       if (!restrictionDetails.trim()) {
-        errors.restrictionDetails = 'Restriction details are mandatory when training is restricted or blocked.';
+        errors.restrictionDetails = 'Block reason and medical instructions are mandatory when training is blocked.';
       }
     }
     if (scheduleFollowUp) {
@@ -1381,17 +1372,17 @@ export function VetReviewForm({
               </div>
             </div>
 
-            {/* Expanding Restriction Details ONLY when RESTRICTED or BLOCKED */}
-            {(trainingDecision === 'RESTRICTED' || trainingDecision === 'BLOCKED') && (
-              <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 space-y-1.5 animate-in fade-in duration-200">
+            {/* Expanding Restriction Details ONLY when BLOCKED */}
+            {trainingDecision === 'BLOCKED' && (
+              <div className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 space-y-1.5 animate-in fade-in duration-200">
                 <label
                   htmlFor="field-restriction-details"
-                  className="block text-[11px] font-bold text-[var(--color-warning)]"
+                  className="block text-[11px] font-bold text-[var(--color-danger)]"
                 >
-                  Mandatory Restriction Protocol <span className="text-[var(--color-danger)]">*</span>
+                  Mandatory Training Lock Reason <span className="text-[var(--color-danger)]">*</span>
                 </label>
                 <p className="text-[10px] text-[var(--color-text-secondary)]">
-                  Specify allowable gait limits or strict stall rest conditions.
+                  Specify clinical reason for locking training and strict stall rest instructions until rechecked.
                 </p>
                 {isUrgent ? (
                   <textarea

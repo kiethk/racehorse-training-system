@@ -36,7 +36,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [findings, setFindings] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [treatment, setTreatment] = useState('');
-  const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>('RESTRICTED');
+  const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>('BLOCKED');
   const [restrictionDetails, setRestrictionDetails] = useState('');
   const [notes, setNotes] = useState('');
   const [temperature, setTemperature] = useState('');
@@ -92,9 +92,9 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     if (!diagnosis.trim()) {
       errors.diagnosis = 'Chẩn đoán lâm sàng (diagnosis) là bắt buộc.';
     }
-    if (trainingDecision === 'RESTRICTED' || trainingDecision === 'BLOCKED') {
+    if (trainingDecision === 'BLOCKED') {
       if (!restrictionDetails.trim()) {
-        errors.restrictionDetails = 'Chi tiết hạn chế là bắt buộc khi quyết định RESTRICTED hoặc BLOCKED.';
+        errors.restrictionDetails = 'Lý do khóa tập luyện là bắt buộc khi quyết định BLOCKED.';
       }
     }
 
@@ -439,11 +439,10 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
                   3. Quyết định huấn luyện (Training Decision) <span className="text-[var(--color-danger)]">*</span>
                 </label>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   {[
                     { value: 'ALLOWED' as const, label: 'ALLOWED', desc: 'Cho phép tập luyện bình thường' },
-                    { value: 'RESTRICTED' as const, label: 'RESTRICTED', desc: 'Hạn chế vận động có điều kiện' },
-                    { value: 'BLOCKED' as const, label: 'BLOCKED', desc: 'Cấm tập hoàn toàn, nghỉ tại chuồng' },
+                    { value: 'BLOCKED' as const, label: 'BLOCKED', desc: 'Khóa kế hoạch huấn luyện, nghỉ tại chuồng' },
                   ].map((option) => (
                     <label
                       key={option.value}
@@ -474,10 +473,10 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   ))}
                 </div>
 
-                {(trainingDecision === 'RESTRICTED' || trainingDecision === 'BLOCKED') && (
+                {trainingDecision === 'BLOCKED' && (
                   <div className="mt-3">
                     <label htmlFor="restriction-details" className="block text-xs font-semibold text-[var(--color-danger)]">
-                      Chi tiết hạn chế vận động <span className="text-[var(--color-danger)]">*</span>
+                      Lý do khóa kế hoạch huấn luyện <span className="text-[var(--color-danger)]">*</span>
                     </label>
                     <textarea
                       id="restriction-details"

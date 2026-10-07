@@ -219,7 +219,7 @@ public class CareScheduleService {
     public CareScheduleResponse completeCareSchedule(Long scheduleId, CompleteCareScheduleRequest request, Long vetId) {
         if (Boolean.TRUE.equals(request.getRejectAdmission())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "VET_CANNOT_REJECT_ADMISSION",
-                    "Veterinarians cannot reject admissions; only medical training decisions (ALLOWED, RESTRICTED, BLOCKED) are permitted.");
+                    "Veterinarians cannot reject admissions; only medical training decisions (ALLOWED, BLOCKED) are permitted.");
         }
         if (request.getFollowUpDate() != null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "LEGACY_FIELD_NOT_SUPPORTED",
@@ -234,9 +234,9 @@ public class CareScheduleService {
         if (request.getTrainingDecision() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Training decision is required");
         }
-        if ((request.getTrainingDecision() == TrainingDecision.RESTRICTED || request.getTrainingDecision() == TrainingDecision.BLOCKED)
+        if (request.getTrainingDecision() == TrainingDecision.BLOCKED
                 && (request.getRestrictionDetails() == null || request.getRestrictionDetails().isBlank())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Restriction details required for RESTRICTED or BLOCKED decision");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Restriction details required for BLOCKED decision");
         }
 
         CareSchedule schedule = lockClinicalSchedule(scheduleId);
@@ -598,7 +598,6 @@ public class CareScheduleService {
 
     private static int trainingSeverity(TrainingDecision status) {
         if (status == TrainingDecision.BLOCKED) return 2;
-        if (status == TrainingDecision.RESTRICTED) return 1;
         return 0;
     }
 

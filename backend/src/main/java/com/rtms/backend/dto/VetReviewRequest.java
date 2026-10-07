@@ -102,10 +102,9 @@ public class VetReviewRequest {
     }
 
     @JsonIgnore
-    @AssertTrue(message = "Rejection reason or restriction details are required when decision is REJECTED, BLOCKED, or RESTRICTED")
+    @AssertTrue(message = "Rejection reason or restriction details are required when decision is REJECTED or BLOCKED")
     public boolean isFeedbackValid() {
-        if (decision == VetDecision.REJECTED || trainingDecision == TrainingDecision.BLOCKED
-                || trainingDecision == TrainingDecision.RESTRICTED) {
+        if (decision == VetDecision.REJECTED || trainingDecision == TrainingDecision.BLOCKED) {
             return (rejectionReason != null && !rejectionReason.isBlank())
                     || (feedback != null && !feedback.isBlank())
                     || (restrictionDetails != null && !restrictionDetails.isBlank());

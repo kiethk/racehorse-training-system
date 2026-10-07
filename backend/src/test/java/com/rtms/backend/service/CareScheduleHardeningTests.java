@@ -212,16 +212,12 @@ class CareScheduleHardeningTests {
     }
 
     @Test
-    @DisplayName("User Requirement: Horse sử dụng TrainingDecision (ALLOWED, RESTRICTED, BLOCKED) trực tiếp")
+    @DisplayName("User Requirement: Horse sử dụng TrainingDecision (ALLOWED, BLOCKED) trực tiếp")
     void trainingDecisionConsolidation_horseUsesTrainingDecision() throws Exception {
         Horse horse = new Horse();
         horse.setTrainingStatus(TrainingDecision.ALLOWED);
         assertEquals(TrainingDecision.ALLOWED, horse.getTrainingStatus());
         assertFalse(horse.isTrainingLocked());
-
-        horse.setTrainingStatus(TrainingDecision.RESTRICTED);
-        assertEquals(TrainingDecision.RESTRICTED, horse.getTrainingStatus());
-        assertTrue(horse.isTrainingLocked());
 
         horse.setTrainingStatus(TrainingDecision.BLOCKED);
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingStatus());

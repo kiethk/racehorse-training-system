@@ -269,7 +269,7 @@ export interface VetQueueFilters {
   size?: number;
 }
 
-export type TrainingDecision = 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
+export type TrainingDecision = 'ALLOWED' | 'BLOCKED';
 
 export interface PageResponse<T> {
   content: T[];

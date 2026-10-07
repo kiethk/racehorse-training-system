@@ -67,22 +67,19 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
     assert.equal(initialSymptoms, 'Left foreleg swelling and acute lameness');
   });
 
-  it('3. Urgent completion validation: symptoms, findings, diagnosis required; restrictionDetails required for RESTRICTED/BLOCKED', () => {
+  it('3. Urgent completion validation: symptoms, findings, diagnosis required; restrictionDetails required for BLOCKED', () => {
     function validateUrgentForm(data: {
       symptoms: string;
       findings: string;
       diagnosis: string;
-      trainingDecision: 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
+      trainingDecision: 'ALLOWED' | 'BLOCKED';
       restrictionDetails: string;
     }): Record<string, string> {
       const errors: Record<string, string> = {};
       if (!data.symptoms.trim()) errors.symptoms = 'Triệu chứng là bắt buộc';
       if (!data.findings.trim()) errors.findings = 'Kết quả khám là bắt buộc';
       if (!data.diagnosis.trim()) errors.diagnosis = 'Chẩn đoán là bắt buộc';
-      if (
-        (data.trainingDecision === 'RESTRICTED' || data.trainingDecision === 'BLOCKED') &&
-        !data.restrictionDetails.trim()
-      ) {
+      if (data.trainingDecision === 'BLOCKED' && !data.restrictionDetails.trim()) {
         errors.restrictionDetails = 'Chi tiết hạn chế là bắt buộc';
       }
       return errors;
@@ -125,13 +122,13 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
       findings: 'Mild swelling on left hock, no heat',
       diagnosis: 'Minor strain',
       treatment: 'Cold hose and poultice',
-      trainingDecision: 'RESTRICTED',
+      trainingDecision: 'BLOCKED',
       restrictionDetails: 'Hand walk 15 mins daily only',
       notes: 'Recheck in 3 days',
       metrics: [{ temperature: 38.1, heartRate: 38 }],
     };
 
-    assert.equal(payload.trainingDecision, 'RESTRICTED');
+    assert.equal(payload.trainingDecision, 'BLOCKED');
     assert.equal(payload.restrictionDetails, 'Hand walk 15 mins daily only');
     assert.ok(payload.metrics && payload.metrics[0].temperature === 38.1);
   });
@@ -165,7 +162,7 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
       status: 'TRAINER_REVIEW',
       veterinarianId: 10,
       decision: null, // Legacy field is nullable
-      trainingDecision: 'RESTRICTED',
+      trainingDecision: 'BLOCKED',
       restrictionDetails: 'Light trotting only',
       feedback: 'Examination completed smoothly',
       reviewedAt: '2026-10-07T10:00:00',
@@ -181,7 +178,7 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
 
     assert.equal(response.status, 'TRAINER_REVIEW');
     assert.equal(response.decision, null);
-    assert.equal(response.trainingDecision, 'RESTRICTED');
+    assert.equal(response.trainingDecision, 'BLOCKED');
     assert.equal(response.careScheduleId, 300);
   });
 });
