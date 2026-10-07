@@ -52,9 +52,6 @@ export default function DesignTestPage() {
         <div className="flex flex-wrap gap-4">
           <StatusBadge status="CANDIDATE" />
           <StatusBadge status="ELIGIBLE" />
-          <StatusBadge status="MONITORING" />
-          <StatusBadge status="INJURED" />
-          <StatusBadge status="QUARANTINED" />
           <StatusBadge status="REJECTED" />
         </div>
       </section>

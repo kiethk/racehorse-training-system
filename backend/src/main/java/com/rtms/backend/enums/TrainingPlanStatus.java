@@ -4,6 +4,5 @@ public enum TrainingPlanStatus {
     UPCOMING,
     ACTIVE,
     COMPLETED,
-    CANCELLED,
-    PAUSED
+    CANCELLED
 }

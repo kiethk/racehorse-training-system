@@ -19,7 +19,6 @@ public class PlanWorkoutItemResponse {
     private LocalTime endTime;
     private Long subjectId;
     private String subjectName;
-    private String workoutType;
     private Long horseId;
     private Long assignedGroomId;
     private String status;
@@ -63,8 +62,6 @@ public class PlanWorkoutItemResponse {
         this.trainerFeedback = w.getTrainerFeedback();
     }
 
-    public void setWorkoutType(String workoutType) { this.workoutType = workoutType; }
-
     public Integer getLotOccupancy() { return lotOccupancy; }
     public void setLotOccupancy(Integer lotOccupancy) { this.lotOccupancy = lotOccupancy; }
 
@@ -75,7 +72,6 @@ public class PlanWorkoutItemResponse {
     public LocalTime getEndTime() { return endTime; }
     public Long getSubjectId() { return subjectId; }
     public String getSubjectName() { return subjectName; }
-    public String getWorkoutType() { return workoutType; }
     public Long getHorseId() { return horseId; }
     public Long getAssignedGroomId() { return assignedGroomId; }
     public String getStatus() { return status; }

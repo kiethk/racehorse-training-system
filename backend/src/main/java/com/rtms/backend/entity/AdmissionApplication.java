@@ -2,7 +2,7 @@ package com.rtms.backend.entity;
 
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.enums.ReviewDecision;
-import com.rtms.backend.enums.VetDecision;
+import com.rtms.backend.enums.TrainingDecision;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -41,12 +41,13 @@ public class AdmissionApplication {
     @Column(name = "veterinarian_id")
     private Long veterinarianId;
 
+    /**
+     * Kết luận của Thú y ở lần khám nhập học. Thú y không duyệt/từ chối đơn —
+     * chỉ quyết định ngựa được tập hay tạm nghỉ; đơn luôn đi tiếp sang Trainer.
+     */
     @Enumerated(EnumType.STRING)
-    @Column(name = "vet_decision", length = 20)
-    private VetDecision vetDecision;
-
     @Column(name = "vet_training_decision", length = 30)
-    private String vetTrainingDecision;
+    private TrainingDecision vetTrainingDecision;
 
     @Column(name = "vet_feedback", columnDefinition = "TEXT")
     private String vetFeedback;
@@ -181,19 +182,11 @@ public class AdmissionApplication {
         this.veterinarianId = veterinarianId;
     }
 
-    public VetDecision getVetDecision() {
-        return vetDecision;
-    }
-
-    public void setVetDecision(VetDecision vetDecision) {
-        this.vetDecision = vetDecision;
-    }
-
-    public String getVetTrainingDecision() {
+    public TrainingDecision getVetTrainingDecision() {
         return vetTrainingDecision;
     }
 
-    public void setVetTrainingDecision(String vetTrainingDecision) {
+    public void setVetTrainingDecision(TrainingDecision vetTrainingDecision) {
         this.vetTrainingDecision = vetTrainingDecision;
     }
 

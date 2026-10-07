@@ -3,9 +3,10 @@ package com.rtms.backend.service;
 import com.rtms.backend.entity.Role;
 import com.rtms.backend.entity.TrainerProfile;
 import com.rtms.backend.entity.User;
+import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.TrainerProfileRepository;
-import com.rtms.backend.repository.TrainerScheduleRepository;
 import com.rtms.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,7 +34,7 @@ class HeadTrainerWorkloadServiceTest {
     private HorseRepository horseRepository;
 
     @Mock
-    private TrainerScheduleRepository trainerScheduleRepository;
+    private AdmissionApplicationRepository admissionRepository;
 
     private HeadTrainerWorkloadService service;
 
@@ -44,7 +44,7 @@ class HeadTrainerWorkloadServiceTest {
                 userRepository,
                 trainerProfileRepository,
                 horseRepository,
-                trainerScheduleRepository
+                admissionRepository
         );
     }
 
@@ -53,7 +53,7 @@ class HeadTrainerWorkloadServiceTest {
     }
 
     @Test
-    @DisplayName("1. Chọn Trainer có workload ngựa riêng biệt thấp nhất (distinct union giữa Area horses và TrainerSchedule horses)")
+    @DisplayName("1. Chọn Trainer có ít ngựa khác nhau nhất (ngựa trong khu ∪ ngựa của đơn TRAINER_REVIEW đã giao)")
     void selectLeastLoadedHeadTrainer_selectsLowestDistinctHorseWorkload() {
         User trainer1 = createHeadTrainer(1L, "Trainer 1", true);
         User trainer2 = createHeadTrainer(2L, "Trainer 2", true);
@@ -61,12 +61,10 @@ class HeadTrainerWorkloadServiceTest {
 
         when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainer1, trainer2, trainer3));
         mockValidProfiles(trainer1, trainer2, trainer3);
-        when(trainerScheduleRepository.findByTrainerIdAndStatusIn(anyLong(), anyCollection()))
-                .thenReturn(Collections.emptyList());
 
-        // Trainer 1: manages horse 10, 11, 12, 13 (4 horses), active schedule for horse 14 -> distinct union = 5
-        // Trainer 2: manages horse 10, active schedule for horse 10 -> distinct union = 1 (lowest!)
-        // Trainer 3: manages horse 20, 21, active schedule for horse 22 -> distinct union = 3
+        // Trainer 1: khu có ngựa 10..13 (4), đơn chờ duyệt ngựa 14 -> 5
+        // Trainer 2: khu có ngựa 10, đơn chờ duyệt cũng là ngựa 10 -> 1 (thấp nhất)
+        // Trainer 3: khu có ngựa 20, 21, đơn chờ duyệt ngựa 22 -> 3
         when(horseRepository.findManagedHorsePairs(anyCollection())).thenReturn(rows(
                 new Object[]{1L, 10L},
                 new Object[]{1L, 11L},
@@ -76,21 +74,47 @@ class HeadTrainerWorkloadServiceTest {
                 new Object[]{3L, 20L},
                 new Object[]{3L, 21L}
         ));
-        when(trainerScheduleRepository.findActiveTrainerHorsePairs(anyCollection(), anyCollection())).thenReturn(rows(
-                new Object[]{1L, 14L},
-                new Object[]{2L, 10L}, // Same horse as managed horse -> distinct count must be 1, not 2
-                new Object[]{3L, 22L}
-        ));
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), eq(AdmissionStatus.TRAINER_REVIEW)))
+                .thenReturn(rows(
+                        new Object[]{1L, 14L},
+                        new Object[]{2L, 10L}, // trùng ngựa trong khu -> chỉ đếm 1 lần
+                        new Object[]{3L, 22L}
+                ));
 
         Optional<User> selected = service.selectLeastLoadedHeadTrainer();
 
         assertTrue(selected.isPresent());
         assertEquals(2L, selected.get().getId());
-        assertEquals("Trainer 2", selected.get().getFullName());
     }
 
     @Test
-    @DisplayName("2. Hai Trainer bằng workload thì chọn trainerId nhỏ hơn (tie-break)")
+    @DisplayName("2. Đơn đang chờ duyệt cũng tính vào tải: Trainer khu trống nhưng đã nhận 2 đơn thì không được ưu tiên")
+    void selectLeastLoadedHeadTrainer_countsPendingAdmissions() {
+        User trainer1 = createHeadTrainer(1L, "Trainer 1", true);
+        User trainer2 = createHeadTrainer(2L, "Trainer 2", true);
+
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainer1, trainer2));
+        mockValidProfiles(trainer1, trainer2);
+
+        // Trainer 1: khu trống, nhưng đang giữ 2 đơn chờ duyệt -> 2
+        // Trainer 2: khu có 1 ngựa -> 1
+        when(horseRepository.findManagedHorsePairs(anyCollection())).thenReturn(rows(
+                new Object[]{2L, 50L}
+        ));
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), eq(AdmissionStatus.TRAINER_REVIEW)))
+                .thenReturn(rows(
+                        new Object[]{1L, 60L},
+                        new Object[]{1L, 61L}
+                ));
+
+        Optional<User> selected = service.selectLeastLoadedHeadTrainer();
+
+        assertTrue(selected.isPresent());
+        assertEquals(2L, selected.get().getId());
+    }
+
+    @Test
+    @DisplayName("3. Hai Trainer bằng tải thì chọn trainerId nhỏ hơn (tie-break)")
     void selectLeastLoadedHeadTrainer_tieBreakSmallerTrainerId() {
         User trainerA = createHeadTrainer(10L, "Trainer A", true);
         User trainerB = createHeadTrainer(5L, "Trainer B", true);
@@ -98,16 +122,13 @@ class HeadTrainerWorkloadServiceTest {
 
         when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainerA, trainerB, trainerC));
         mockValidProfiles(trainerA, trainerB, trainerC);
-        when(trainerScheduleRepository.findByTrainerIdAndStatusIn(anyLong(), anyCollection()))
-                .thenReturn(Collections.emptyList());
 
-        // All have same workload = 1
         when(horseRepository.findManagedHorsePairs(anyCollection())).thenReturn(rows(
                 new Object[]{10L, 100L},
                 new Object[]{5L, 101L},
                 new Object[]{20L, 102L}
         ));
-        when(trainerScheduleRepository.findActiveTrainerHorsePairs(anyCollection(), anyCollection()))
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), eq(AdmissionStatus.TRAINER_REVIEW)))
                 .thenReturn(Collections.emptyList());
 
         Optional<User> selected = service.selectLeastLoadedHeadTrainer();
@@ -117,60 +138,31 @@ class HeadTrainerWorkloadServiceTest {
     }
 
     @Test
-    @DisplayName("3. Lọc bỏ Trainer có lịch đánh giá trùng giờ (overlapping schedule)")
-    void selectLeastLoadedHeadTrainer_filtersOutOverlappingTrainers() {
-        User trainer1 = createHeadTrainer(1L, "Trainer 1", true);
-        User trainer2 = createHeadTrainer(2L, "Trainer 2", true);
+    @DisplayName("4. Khóa TrainerProfile của ứng viên theo thứ tự id trước khi tính tải")
+    void selectLeastLoadedHeadTrainer_locksProfilesInIdOrder() {
+        User trainerA = createHeadTrainer(9L, "Trainer A", true);
+        User trainerB = createHeadTrainer(3L, "Trainer B", true);
 
-        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainer1, trainer2));
-        mockValidProfiles(trainer1, trainer2);
-
-        // Trainer 1 is overlapping in the proposed slot!
-        com.rtms.backend.entity.TrainerSchedule overlapping = new com.rtms.backend.entity.TrainerSchedule();
-        overlapping.setScheduledAt(LocalDateTime.now().minusMinutes(5));
-        overlapping.setDurationMinutes(30);
-        when(trainerScheduleRepository.findByTrainerIdAndStatusIn(eq(1L), anyCollection()))
-                .thenReturn(List.of(overlapping));
-        when(trainerScheduleRepository.findByTrainerIdAndStatusIn(eq(2L), anyCollection()))
-                .thenReturn(Collections.emptyList());
-
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainerA, trainerB));
+        mockValidProfiles(trainerA, trainerB);
         when(horseRepository.findManagedHorsePairs(anyCollection())).thenReturn(Collections.emptyList());
-        when(trainerScheduleRepository.findActiveTrainerHorsePairs(anyCollection(), anyCollection()))
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), any()))
                 .thenReturn(Collections.emptyList());
 
-        Optional<User> selected = service.selectLeastLoadedHeadTrainer();
+        service.selectLeastLoadedHeadTrainer();
 
-        assertTrue(selected.isPresent());
-        assertEquals(2L, selected.get().getId(), "Trainer 1 bị trùng lịch nên Trainer 2 được chọn");
+        verify(trainerProfileRepository).findByUserIdsForUpdate(List.of(3L, 9L));
     }
 
     @Test
-    @DisplayName("4. Tất cả Trainer bị trùng lịch -> trả về Optional.empty()")
-    void selectLeastLoadedHeadTrainer_allOverlapping_returnsEmpty() {
-        User trainer1 = createHeadTrainer(1L, "Trainer 1", true);
-
-        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainer1));
-        mockValidProfiles(trainer1);
-
-        com.rtms.backend.entity.TrainerSchedule overlapping = new com.rtms.backend.entity.TrainerSchedule();
-        overlapping.setScheduledAt(LocalDateTime.now().minusMinutes(5));
-        overlapping.setDurationMinutes(30);
-        when(trainerScheduleRepository.findByTrainerIdAndStatusIn(eq(1L), anyCollection()))
-                .thenReturn(List.of(overlapping));
-
-        Optional<User> selected = service.selectLeastLoadedHeadTrainer();
-
-        assertTrue(selected.isEmpty());
-    }
-
-    @Test
-    @DisplayName("5. Không có Head Trainer active -> trả về Optional.empty()")
+    @DisplayName("5. Không có Head Trainer active -> Optional.empty() (đơn để trống trainerId, chờ gán lại)")
     void selectLeastLoadedHeadTrainer_noActiveTrainers_returnsEmpty() {
         when(userRepository.findActiveHeadTrainers()).thenReturn(Collections.emptyList());
 
         Optional<User> selected = service.selectLeastLoadedHeadTrainer();
 
         assertTrue(selected.isEmpty());
+        verifyNoInteractions(admissionRepository);
     }
 
     @Test
@@ -180,11 +172,9 @@ class HeadTrainerWorkloadServiceTest {
         User trainerWithoutProfile = createHeadTrainer(2L, "Trainer Missing Profile", true);
 
         when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainerWithProfile, trainerWithoutProfile));
-        mockValidProfiles(trainerWithProfile); // Only 1L has profile
-        when(trainerScheduleRepository.findByTrainerIdAndStatusIn(anyLong(), anyCollection()))
-                .thenReturn(Collections.emptyList());
+        mockValidProfiles(trainerWithProfile);
         when(horseRepository.findManagedHorsePairs(anyCollection())).thenReturn(Collections.emptyList());
-        when(trainerScheduleRepository.findActiveTrainerHorsePairs(anyCollection(), anyCollection()))
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), any()))
                 .thenReturn(Collections.emptyList());
 
         Optional<User> selected = service.selectLeastLoadedHeadTrainer();
@@ -194,27 +184,29 @@ class HeadTrainerWorkloadServiceTest {
     }
 
     @Test
-    @DisplayName("7. getDistinctHorseWorkload tính đúng hợp tập ngựa riêng biệt")
-    void getDistinctHorseWorkload_returnsDistinctUnionCount() {
+    @DisplayName("7. calculateDistinctHorseWorkloads tính đúng hợp tập ngựa riêng biệt")
+    void calculateDistinctHorseWorkloads_returnsDistinctUnionCount() {
         when(horseRepository.findManagedHorsePairs(List.of(1L))).thenReturn(rows(
                 new Object[]{1L, 10L},
                 new Object[]{1L, 20L}
         ));
-        when(trainerScheduleRepository.findActiveTrainerHorsePairs(eq(List.of(1L)), anyCollection())).thenReturn(rows(
-                new Object[]{1L, 20L},
-                new Object[]{1L, 30L}
-        ));
+        when(admissionRepository.findAssignedHorsePairs(List.of(1L), AdmissionStatus.TRAINER_REVIEW))
+                .thenReturn(rows(
+                        new Object[]{1L, 20L},
+                        new Object[]{1L, 30L}
+                ));
 
-        long workload = service.getDistinctHorseWorkload(1L);
+        Map<Long, Long> workloads = service.calculateDistinctHorseWorkloads(List.of(1L));
 
-        // Union: {10, 20, 30} -> size 3
-        assertEquals(3L, workload);
+        // Hợp: {10, 20, 30} -> 3
+        assertEquals(3L, workloads.get(1L));
     }
 
     @Test
-    @DisplayName("8. getDistinctHorseWorkload với null trainerId trả về 0")
-    void getDistinctHorseWorkload_nullTrainer_returnsZero() {
-        assertEquals(0L, service.getDistinctHorseWorkload(null));
+    @DisplayName("8. calculateDistinctHorseWorkloads với danh sách rỗng trả về map rỗng")
+    void calculateDistinctHorseWorkloads_empty_returnsEmptyMap() {
+        assertTrue(service.calculateDistinctHorseWorkloads(List.of()).isEmpty());
+        verifyNoInteractions(horseRepository, admissionRepository);
     }
 
     private User createHeadTrainer(Long id, String name, boolean active) {

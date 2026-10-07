@@ -62,7 +62,6 @@ public class AdmissionQueryService {
     private final AdmissionFileStorage fileStorage;
     private final UserRepository userRepository;
     private final CareScheduleRepository careScheduleRepository;
-    private final com.rtms.backend.repository.TrainerScheduleRepository trainerScheduleRepository;
 
     @Autowired
     public AdmissionQueryService(
@@ -73,8 +72,7 @@ public class AdmissionQueryService {
             HealthRecordRepository healthRecordRepository,
             AdmissionFileStorage fileStorage,
             UserRepository userRepository,
-            CareScheduleRepository careScheduleRepository,
-            com.rtms.backend.repository.TrainerScheduleRepository trainerScheduleRepository) {
+            CareScheduleRepository careScheduleRepository) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.admissionDocumentRepository = admissionDocumentRepository;
@@ -83,20 +81,6 @@ public class AdmissionQueryService {
         this.fileStorage = fileStorage;
         this.userRepository = userRepository;
         this.careScheduleRepository = careScheduleRepository;
-        this.trainerScheduleRepository = trainerScheduleRepository;
-    }
-
-    public AdmissionQueryService(
-            AdmissionApplicationRepository admissionApplicationRepository,
-            CandidateHorseProfileRepository candidateHorseProfileRepository,
-            AdmissionDocumentRepository admissionDocumentRepository,
-            StableStallRepository stableStallRepository,
-            HealthRecordRepository healthRecordRepository,
-            AdmissionFileStorage fileStorage,
-            UserRepository userRepository,
-            CareScheduleRepository careScheduleRepository) {
-        this(admissionApplicationRepository, candidateHorseProfileRepository, admissionDocumentRepository,
-                stableStallRepository, healthRecordRepository, fileStorage, userRepository, careScheduleRepository, null);
     }
 
     public AdmissionQueryService(
@@ -136,7 +120,7 @@ public class AdmissionQueryService {
      */
     public TrainerAdmissionQueueResponse getTrainerQueue(Long trainerId) {
         List<AdmissionSummaryResponse> pending = admissionApplicationRepository
-                .findTrainerPendingQueue(trainerId, AdmissionStatus.TRAINER_REVIEW)
+                .findByTrainerIdAndStatusOrderBySubmittedAtAscIdAsc(trainerId, AdmissionStatus.TRAINER_REVIEW)
                 .stream()
                 .map(this::toSummaryResponse)
                 .toList();
@@ -213,17 +197,11 @@ public class AdmissionQueryService {
         response.setGroomReviewedAt(admission.getGroomReviewedAt());
 
         response.setVeterinarianId(admission.getVeterinarianId());
-        response.setVetDecision(admission.getVetDecision());
         response.setVetTrainingDecision(admission.getVetTrainingDecision());
         response.setVetFeedback(admission.getVetFeedback());
         response.setVetReviewedAt(admission.getVetReviewedAt());
 
-        Long trainerId = null;
-        if (trainerScheduleRepository != null) {
-            trainerId = trainerScheduleRepository.findByAdmissionId(admission.getId())
-                    .map(com.rtms.backend.entity.TrainerSchedule::getTrainerId)
-                    .orElse(null);
-        }
+        Long trainerId = admission.getTrainerId();
         response.setTrainerId(trainerId);
         response.setTrainerName(trainerId == null ? null
                 : userRepository.findById(trainerId)
@@ -296,13 +274,6 @@ public class AdmissionQueryService {
                 .map(fileStorage::downloadUrl)
                 .orElse(null);
 
-        Long trainerId = null;
-        if (trainerScheduleRepository != null) {
-            trainerId = trainerScheduleRepository.findByAdmissionId(admission.getId())
-                    .map(com.rtms.backend.entity.TrainerSchedule::getTrainerId)
-                    .orElse(null);
-        }
-
         return new AdmissionSummaryResponse(
                 admission.getId(),
                 admission.getStatus(),
@@ -313,7 +284,7 @@ public class AdmissionQueryService {
                 admission.getQuarantineStallId(),
                 stallCode,
                 imageUrl,
-                trainerId,
+                admission.getTrainerId(),
                 admission.getTrainerReviewedAt());
     }
 
@@ -365,12 +336,7 @@ public class AdmissionQueryService {
     }
 
     public List<AdmissionSummaryResponse> getAdmissionsForTrainer(Long trainerId, AdmissionStatus status) {
-        if (trainerScheduleRepository == null) return List.of();
-        List<com.rtms.backend.entity.TrainerSchedule> schedules = trainerScheduleRepository.findByTrainerId(trainerId);
-        List<Long> admissionIds = schedules.stream()
-                .map(com.rtms.backend.entity.TrainerSchedule::getAdmissionId)
-                .toList();
-        return admissionApplicationRepository.findAllById(admissionIds).stream()
+        return admissionApplicationRepository.findByTrainerId(trainerId).stream()
                 .filter(a -> status == null || a.getStatus() == status)
                 .sorted(Comparator.comparing(AdmissionApplication::getSubmittedAt).reversed()
                         .thenComparing(AdmissionApplication::getId).reversed())
@@ -428,12 +394,9 @@ public class AdmissionQueryService {
         Map<Long, CandidateHorseProfile> candidates = candidateHorseProfileRepository.findByAdmissionIdIn(admissionIds).stream()
                 .collect(Collectors.toMap(CandidateHorseProfile::getAdmissionId, c -> c));
         Map<Long, Long> admissionTrainerMap = new HashMap<>();
-        if (trainerScheduleRepository != null) {
-            for (Long aId : admissionIds) {
-                trainerScheduleRepository.findByAdmissionId(aId)
-                        .ifPresent(ts -> admissionTrainerMap.put(aId, ts.getTrainerId()));
-            }
-        }
+        admissions.values().stream()
+                .filter(a -> a.getTrainerId() != null)
+                .forEach(a -> admissionTrainerMap.put(a.getId(), a.getTrainerId()));
         Set<Long> userIds = admissions.values().stream()
                 .map(AdmissionApplication::getOwnerId)
                 .filter(Objects::nonNull).collect(Collectors.toSet());

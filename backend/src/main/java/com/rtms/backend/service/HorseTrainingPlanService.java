@@ -27,7 +27,7 @@ public class HorseTrainingPlanService {
     private final CourseSubjectRepository courseSubjectRepository;
     private final SubjectRepository subjectRepository;
     private final HorseRepository horseRepository;
-    private final InjuryRecordService injuryRecordService;
+    private final TrainingDecisionService trainingDecisionService;
 
     // ===== THÊM MỚI (V43) =====
     private final TrainingLotService lotService;
@@ -53,7 +53,7 @@ public class HorseTrainingPlanService {
                                     CourseSubjectRepository courseSubjectRepository,
                                     SubjectRepository subjectRepository,
                                     HorseRepository horseRepository,
-                                    InjuryRecordService injuryRecordService,
+                                    TrainingDecisionService trainingDecisionService,
                                     TrainingLotService lotService,
                                     TrainingLotRepository lotRepository,
                                     StableStallRepository stableStallRepository,
@@ -65,7 +65,7 @@ public class HorseTrainingPlanService {
         this.courseSubjectRepository = courseSubjectRepository;
         this.subjectRepository = subjectRepository;
         this.horseRepository = horseRepository;
-        this.injuryRecordService = injuryRecordService;
+        this.trainingDecisionService = trainingDecisionService;
         this.lotService = lotService;
         this.lotRepository = lotRepository;
         this.stableStallRepository = stableStallRepository;
@@ -181,9 +181,6 @@ public class HorseTrainingPlanService {
             Subject subject = subjectRepository.findById(lot.getSubjectId()).orElse(null);
             PlanWorkoutItemResponse item = new PlanWorkoutItemResponse(
                     w, lot, subject != null ? subject.getName() : "#" + lot.getSubjectId());
-            if (subject != null) {
-                item.setWorkoutType(subject.getWorkoutType().name());
-            }
             items.add(item);
             lotIds.add(lot.getId());
         }
@@ -276,15 +273,9 @@ public class HorseTrainingPlanService {
                     .orElseThrow(() -> new RuntimeException(
                             "Không tìm thấy chiến mã #" + e.getHorseId()));
 
-            // ---- BR-05: KHOÁ HUẤN LUYỆN ----
-            TrainingLockStatusResponse lock =
-                    injuryRecordService.getTrainingLockStatus(horse.getId());
-            if (lock.isLocked()) {
-                throw new IllegalStateException(String.format(
-                        "Chiến mã '%s' đang bị KHOÁ HUẤN LUYỆN (trạng thái: %s). "
-                      + "Không thể tạo kế hoạch mới!",
-                        horse.getName(), lock.getCurrentStatus()));
-            }
+            // ---- BR-05: ngựa phải được nhận vào và không bị Thú y chặn tập ----
+            // Lỗi nêu rõ lý do và ngày khám lại, không chỉ "đang bị khóa".
+            trainingDecisionService.assertCanTrain(horse);
 
             Long groomId = resolveGroom(horse, e.getGroomId(), trainerId);
             enrolled.add(new EnrolledHorse(horse, groomId));
@@ -381,7 +372,6 @@ public class HorseTrainingPlanService {
 
                     PlanWorkoutItemResponse item =
                             new PlanWorkoutItemResponse(saved, lot, subject.getName());
-                    item.setWorkoutType(subject.getWorkoutType().name());
                     workoutsByHorse.get(en.horse().getId()).add(item);
                 }
                 sessionIndex++;
@@ -429,15 +419,6 @@ public class HorseTrainingPlanService {
         due.forEach(p -> p.setStatus(TrainingPlanStatus.ACTIVE));
         planRepository.saveAll(due);
         return due.size();
-    }
-
-    @Transactional
-    public HorseTrainingPlan updatePlanStatus(Long id, UpdatePlanStatusRequest request) {
-        HorseTrainingPlan plan = planRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Training plan not found with id: " + id));
-
-        plan.setStatus(request.getStatus());
-        return planRepository.save(plan);
     }
 
     // =================================================================
@@ -610,12 +591,8 @@ public class HorseTrainingPlanService {
 
         Subject subject = subjectRepository.findById(lot.getSubjectId()).orElse(null);
 
-        PlanWorkoutItemResponse item = new PlanWorkoutItemResponse(
+        return new PlanWorkoutItemResponse(
                 saved, lot, subject != null ? subject.getName() : "#" + lot.getSubjectId());
-        if (subject != null) {
-            item.setWorkoutType(subject.getWorkoutType().name());
-        }
-        return item;
     }
 
     // =================================================================
@@ -747,14 +724,14 @@ public class HorseTrainingPlanService {
     /**
      * HUỶ TOÀN BỘ HUẤN LUYỆN TƯƠNG LAI CỦA MỘT CHIẾN MÃ.
      *
-     * Gọi khi Bác sĩ thú y chuyển ngựa sang trạng thái khoá huấn luyện
-     * (INJURED / QUARANTINED / MONITORING / REJECTED / CANDIDATE).
+     * Chỉ gọi qua TrainingDecisionService.block — mỗi khi ngựa bị chặn tập
+     * (Thú y kết luận BLOCKED, có ca khẩn cấp, hoặc Groom báo sự cố).
      *
      * Theo thiết kế đã chốt:
      *   1. Huỷ mọi buổi tập SCHEDULED từ hôm nay trở đi  -> TỰ ĐỘNG
      *   2. Lot nào rỗng sau khi huỷ thì huỷ luôn lot     -> trả lại khe giờ
-     *   3. Plan chuyển CANCELLED (không phải PAUSED), vì sau chấn thương
-     *      thường thay bằng khoá hồi phục chứ không tập tiếp khoá cũ.
+     *   3. Plan chuyển CANCELLED (không tạm dừng): kế hoạch dở dang sau thời
+     *      gian nghỉ hiếm khi còn đúng; hết hạn nghỉ Trainer lập kế hoạch mới.
      *
      * @return số buổi tập đã huỷ
      */

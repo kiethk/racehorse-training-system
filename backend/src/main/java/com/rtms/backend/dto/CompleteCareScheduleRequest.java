@@ -22,15 +22,14 @@ public class CompleteCareScheduleRequest {
     @NotNull(message = "Training decision is required")
     private TrainingDecision trainingDecision;
 
+    /** Lý do chặn tập — bắt buộc khi BLOCKED, Trainer đọc thấy khi lập kế hoạch. */
     private String restrictionDetails;
-
-    private Boolean rejectAdmission = false;
-    private String rejectionReason;
 
     private String symptoms;
     private String notes;
-    private java.time.LocalDate followUpDate;
     private List<@NotNull @Valid HorseHealthMetricRequest> metrics;
+
+    /** Lịch khám lại — bắt buộc khi BLOCKED: "tạm nghỉ đến" chính là ngày của lịch này. */
     private CreateNextScheduleRequest nextSchedule;
 
     public String getFindings() { return findings; }
@@ -54,37 +53,24 @@ public class CompleteCareScheduleRequest {
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
 
-    public java.time.LocalDate getFollowUpDate() { return followUpDate; }
-    public void setFollowUpDate(java.time.LocalDate followUpDate) { this.followUpDate = followUpDate; }
-
     public CreateNextScheduleRequest getNextSchedule() { return nextSchedule; }
     public void setNextSchedule(CreateNextScheduleRequest nextSchedule) { this.nextSchedule = nextSchedule; }
 
     public List<HorseHealthMetricRequest> getMetrics() { return metrics; }
     public void setMetrics(List<HorseHealthMetricRequest> metrics) { this.metrics = metrics; }
 
-    public Boolean getRejectAdmission() { return rejectAdmission; }
-    public void setRejectAdmission(Boolean rejectAdmission) { this.rejectAdmission = rejectAdmission; }
-    public boolean isRejectAdmission() { return Boolean.TRUE.equals(rejectAdmission); }
-
-    public String getRejectionReason() { return rejectionReason; }
-    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
-
     @JsonIgnore
-    @AssertTrue(message = "Restriction details are required when training decision is RESTRICTED or BLOCKED")
+    @AssertTrue(message = "Restriction details are required when training is BLOCKED")
     public boolean isRestrictionValid() {
-        if (trainingDecision == TrainingDecision.RESTRICTED || trainingDecision == TrainingDecision.BLOCKED) {
+        if (trainingDecision == TrainingDecision.BLOCKED) {
             return restrictionDetails != null && !restrictionDetails.isBlank();
         }
         return true;
     }
 
     @JsonIgnore
-    @AssertTrue(message = "Rejection reason is required when rejectAdmission is true")
-    public boolean isRejectionReasonValid() {
-        if (Boolean.TRUE.equals(rejectAdmission)) {
-            return rejectionReason != null && !rejectionReason.isBlank();
-        }
-        return true;
+    @AssertTrue(message = "A follow-up examination (nextSchedule) is required when training is BLOCKED")
+    public boolean isFollowUpValid() {
+        return trainingDecision != TrainingDecision.BLOCKED || nextSchedule != null;
     }
 }

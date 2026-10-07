@@ -74,8 +74,8 @@ export function UrgentAssignmentModal({ alert, onOpenCase }: Props) {
               <dd className="mt-1 font-semibold text-[var(--color-text-primary)]">{formatDateTime(alert.reportedAt)}</dd>
             </div>
             <div className="sm:col-span-2">
-              <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Training status</dt>
-              <dd className="mt-1 font-bold text-[var(--color-danger)]">{alert.trainingStatus} — Không được training</dd>
+              <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Quyết định tập luyện</dt>
+              <dd className="mt-1 font-bold text-[var(--color-danger)]">{alert.trainingDecision} — Tạm dừng tập cho tới khi khám xong</dd>
             </div>
           </dl>
 

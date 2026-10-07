@@ -103,7 +103,7 @@ interface TrainingDecisionOption {
   title: string;
   subtitle: string;
   icon: IconName;
-  tone: 'success' | 'warning' | 'danger';
+  tone: 'success' | 'danger';
   activeBorder: string;
   activeBg: string;
 }
@@ -119,18 +119,9 @@ const trainingDecisions: TrainingDecisionOption[] = [
     activeBg: 'bg-[var(--color-success-soft)]',
   },
   {
-    value: 'RESTRICTED',
-    title: 'Training Restricted',
-    subtitle: 'Limited or modified conditioning only',
-    icon: 'alert-triangle',
-    tone: 'warning',
-    activeBorder: 'border-[var(--color-warning)] ring-1 ring-[var(--color-warning)]',
-    activeBg: 'bg-[var(--color-warning-soft)]',
-  },
-  {
     value: 'BLOCKED',
     title: 'Training Blocked',
-    subtitle: 'Zero training permitted; stall rest',
+    subtitle: 'No training until the follow-up exam; future workouts are cancelled',
     icon: 'lock',
     tone: 'danger',
     activeBorder: 'border-[var(--color-danger)] ring-1 ring-[var(--color-danger)]',
@@ -413,6 +404,9 @@ export function VetReviewForm({
   const inFlight = useRef(false);
 
   const isGated = scheduleStatus != null && scheduleStatus !== 'IN_PROGRESS';
+  // Chặn tập luôn phải có lịch khám lại: "tạm nghỉ đến" chính là ngày khám đó.
+  const followUpRequired = trainingDecision === 'BLOCKED';
+  const followUpActive = scheduleFollowUp || followUpRequired;
   const isFormDisabled = submitting || startingExam || isGated;
   const isUrgent = careType === 'URGENT';
 
@@ -456,7 +450,10 @@ export function VetReviewForm({
     if (availableDraft.symptoms !== undefined) setSymptoms(availableDraft.symptoms);
     if (availableDraft.findings !== undefined) setFindings(availableDraft.findings);
     if (availableDraft.diagnosis !== undefined) setDiagnosis(availableDraft.diagnosis);
-    if (availableDraft.trainingDecision) setTrainingDecision(availableDraft.trainingDecision);
+    // Bản nháp cũ có thể còn RESTRICTED -> nay gộp vào BLOCKED.
+    if (availableDraft.trainingDecision) {
+      setTrainingDecision(availableDraft.trainingDecision === 'ALLOWED' ? 'ALLOWED' : 'BLOCKED');
+    }
     if (availableDraft.restrictionDetails !== undefined) setRestrictionDetails(availableDraft.restrictionDetails);
     if (availableDraft.scheduleFollowUp !== undefined) setScheduleFollowUp(availableDraft.scheduleFollowUp);
     if (availableDraft.followUpDate !== undefined) setFollowUpDate(availableDraft.followUpDate);
@@ -602,12 +599,10 @@ export function VetReviewForm({
     ) {
       errors.systemFindings = 'Select at least one abnormal or not-examined body system.';
     }
-    if (trainingDecision === 'RESTRICTED' || trainingDecision === 'BLOCKED') {
-      if (!restrictionDetails.trim()) {
-        errors.restrictionDetails = 'Restriction details are mandatory when training is restricted or blocked.';
-      }
+    if (trainingDecision === 'BLOCKED' && !restrictionDetails.trim()) {
+      errors.restrictionDetails = 'Restriction details are mandatory when training is blocked.';
     }
-    if (scheduleFollowUp) {
+    if (followUpActive) {
       if (!followUpDate) {
         errors.followUpDate = 'Follow-up date is required when scheduling follow-up care.';
       } else if (followUpDate < tomorrowBusinessDate()) {
@@ -677,7 +672,7 @@ export function VetReviewForm({
         ]),
     ) as HorseHealthMetricRequest;
 
-    const nextScheduleRequest = scheduleFollowUp && followUpDate ? {
+    const nextScheduleRequest = followUpActive && followUpDate ? {
       horseId: horseId ?? undefined,
       admissionId,
       careType: 'ROUTINE' as const,
@@ -692,10 +687,8 @@ export function VetReviewForm({
       if (careType === 'INITIAL') {
         const request: VetReviewRequest = {
           careScheduleId: careScheduleId ?? undefined,
-          decision: 'APPROVED',
           trainingDecision,
           restrictionDetails: restrictionDetails.trim() || undefined,
-          rejectAdmission: false,
           physicalExamConfirmed: true,
           findings: effectiveFindings,
           diagnosis: effectiveDiagnosis,
@@ -1356,6 +1349,9 @@ export function VetReviewForm({
                         checked={isSelected}
                         onChange={() => {
                           setTrainingDecision(opt.value);
+                          if (opt.value === 'BLOCKED' && !followUpDate) {
+                            setFollowUpDate(businessDateFromToday(7));
+                          }
                           if (fieldErrors.restrictionDetails) {
                             setFieldErrors((errs) => ({ ...errs, restrictionDetails: '' }));
                           }
@@ -1381,8 +1377,8 @@ export function VetReviewForm({
               </div>
             </div>
 
-            {/* Expanding Restriction Details ONLY when RESTRICTED or BLOCKED */}
-            {(trainingDecision === 'RESTRICTED' || trainingDecision === 'BLOCKED') && (
+            {/* Expanding Restriction Details ONLY when BLOCKED */}
+            {trainingDecision === 'BLOCKED' && (
               <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 space-y-1.5 animate-in fade-in duration-200">
                 <label
                   htmlFor="field-restriction-details"
@@ -1391,7 +1387,7 @@ export function VetReviewForm({
                   Mandatory Restriction Protocol <span className="text-[var(--color-danger)]">*</span>
                 </label>
                 <p className="text-[10px] text-[var(--color-text-secondary)]">
-                  Specify allowable gait limits or strict stall rest conditions.
+                  Shown to the Head Trainer when planning. The horse rests until the follow-up exam below.
                 </p>
                 {isUrgent ? (
                   <textarea
@@ -1435,10 +1431,12 @@ export function VetReviewForm({
               <label className="flex cursor-pointer items-center justify-between">
                 <span className="text-[12px] font-semibold text-[var(--color-text-primary)]">
                   Schedule Follow-up Exam
+                  {followUpRequired && <span className="text-[var(--color-danger)]"> *</span>}
                 </span>
                 <input
                   type="checkbox"
-                  checked={scheduleFollowUp}
+                  checked={followUpActive}
+                  disabled={followUpRequired}
                   onChange={(e) => {
                     const checked = e.target.checked;
                     setScheduleFollowUp(checked);
@@ -1449,8 +1447,13 @@ export function VetReviewForm({
                   className="h-4 w-4 rounded accent-[var(--color-primary)]"
                 />
               </label>
+              {followUpRequired && (
+                <p className="text-[10px] text-[var(--color-text-secondary)]">
+                  Required when training is blocked: the horse stays off training until this exam.
+                </p>
+              )}
 
-              {scheduleFollowUp && (
+              {followUpActive && (
                 <div className="space-y-2 border-t border-[var(--color-border)] pt-2 animate-in fade-in duration-200">
                   <div>
                     <label
@@ -1611,7 +1614,7 @@ export function VetReviewForm({
               You are certifying medical examination for <strong>{candidateName}</strong> with training decision{' '}
               <strong className="uppercase text-[var(--color-primary)]">{trainingDecision}</strong>.
             </p>
-            {scheduleFollowUp && (
+            {followUpActive && (
               <div className="rounded-[var(--radius-sm)] bg-[var(--color-warning-soft)] p-2 text-[12px] text-[var(--color-warning)] font-medium">
                 📅 Follow-up scheduled for <strong>{followUpDate}</strong>: {followUpDescription}.
               </div>

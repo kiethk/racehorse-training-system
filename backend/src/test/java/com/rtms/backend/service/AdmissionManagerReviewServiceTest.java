@@ -66,8 +66,6 @@ class AdmissionManagerReviewServiceTest {
         h.setId(10L);
         h.setCurrentStatus(status);
         h.setCurrentStallId(99L);
-        h.setTrainingLocked(true);
-        h.setTrainingLockReason("Admission pending trainer and manager review");
         return h;
     }
 
@@ -129,8 +127,9 @@ class AdmissionManagerReviewServiceTest {
 
         assertEquals(HorseStatus.ELIGIBLE, horse.getCurrentStatus());
         assertEquals(20L, horse.getCurrentStallId());
-        assertFalse(horse.isTrainingLocked());
-        assertNull(horse.getTrainingLockReason());
+        // Duyệt xong: ELIGIBLE + ALLOWED -> Trainer lập kế hoạch được ngay.
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
+        assertTrue(horse.canTrain());
         verify(horseRepository).save(horse);
 
         assertEquals(StallStatus.OCCUPIED, regularStall.getStatus());
@@ -505,14 +504,12 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("APPROVE bảo toàn khóa huấn luyện y khoa do bác sĩ thú y chỉ định")
-    void approve_withVetMedicalLock_preservesTrainingLock() {
+    @DisplayName("APPROVE giữ nguyên quyết định chặn tập (BLOCKED) của Thú y")
+    void approve_withVetBlockedDecision_preservesBlock() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
-        horse.setTrainingLocked(true);
-        horse.setTrainingStatus(TrainingDecision.BLOCKED);
-        horse.setTrainingLockVetId(3L);
-        horse.setTrainingLockReason("Left forelimb tendon strain - rest prescribed by vet");
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        horse.setTrainingDecisionReason("Left forelimb tendon strain - rest prescribed by vet");
 
         StableStall regularStall = buildStall(20L, StallStatus.AVAILABLE);
         StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
@@ -529,11 +526,10 @@ class AdmissionManagerReviewServiceTest {
         assertEquals(HorseStatus.ELIGIBLE, horse.getCurrentStatus());
         assertEquals(20L, horse.getCurrentStallId());
 
-        // Lock must be preserved!
-        assertTrue(horse.isTrainingLocked());
-        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingStatus());
-        assertEquals(3L, horse.getTrainingLockVetId());
-        assertEquals("Left forelimb tendon strain - rest prescribed by vet", horse.getTrainingLockReason());
+        // Quyết định chặn tập của Thú y phải giữ nguyên sau khi duyệt.
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
+        assertEquals("Left forelimb tendon strain - rest prescribed by vet", horse.getTrainingDecisionReason());
+        assertFalse(horse.canTrain());
         verify(horseRepository).save(horse);
     }
 

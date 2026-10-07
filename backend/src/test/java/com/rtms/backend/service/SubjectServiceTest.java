@@ -2,7 +2,6 @@ package com.rtms.backend.service;
 
 import com.rtms.backend.dto.CreateSubjectRequest;
 import com.rtms.backend.entity.Subject;
-import com.rtms.backend.enums.WorkoutType;
 import com.rtms.backend.repository.SubjectCategoryRepository;
 import com.rtms.backend.repository.SubjectRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -107,7 +106,6 @@ class SubjectServiceTest {
         req.setTargetDistanceMeters(java.math.BigDecimal.valueOf(1600));
         req.setIntensityLevel(com.rtms.backend.enums.IntensityLevel.MEDIUM);
         req.setDurationMinutes(45);
-        req.setWorkoutType(WorkoutType.REGULAR);
 
         when(categoryRepository.existsById(2L)).thenReturn(true);
         when(subjectRepository.save(any(Subject.class))).thenAnswer(inv -> {
@@ -122,7 +120,6 @@ class SubjectServiceTest {
         assertEquals(88L, created.getId());
         assertEquals("Luyện nhịp tim 45 phút", created.getName());
         assertEquals(45, created.getDurationMinutes());
-        assertEquals(WorkoutType.REGULAR, created.getWorkoutType());
         verify(subjectRepository).save(any(Subject.class));
     }
 

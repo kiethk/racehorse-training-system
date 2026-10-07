@@ -179,12 +179,10 @@ public class AdmissionGroomReviewService {
         horse.setRegistrationNumber(candidate.getRegistrationNumber());
         horse.setCurrentStatus(HorseStatus.CANDIDATE);
         horse.setCurrentStallId(quarantineStall.getId());
-        horse.setTrainingStatus(TrainingDecision.BLOCKED);
-        horse.setTrainingLocked(true);
-        horse.setTrainingLockReason("Initial admission examination is pending");
-        horse.setTrainingLockVetId(null);
-        horse.setTrainingLockReviewDate(null);
-        horse.setTrainingLockUpdatedAt(LocalDateTime.now());
+        // Không khóa tập ở đây: CANDIDATE vốn không tập được (Horse.canTrain()).
+        // Ngựa từng bị từ chối nộp lại thì xóa kết luận cũ — lần khám nhập học mới sẽ quyết định.
+        horse.setTrainingDecision(TrainingDecision.ALLOWED);
+        horse.setTrainingDecisionReason(null);
     }
 
     private void updatePedigree(Long horseId, CandidateHorseProfile candidate) {

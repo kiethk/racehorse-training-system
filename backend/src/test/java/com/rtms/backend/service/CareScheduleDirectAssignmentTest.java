@@ -25,7 +25,7 @@ class CareScheduleDirectAssignmentTest {
     private VeterinarianProfileRepository profiles;
     private GroomIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private TrainerScheduleAssignmentService trainerScheduleAssignmentService;
+    private HorseTrainingPlanService trainingPlanService;
     private CareScheduleService service;
 
     @BeforeEach
@@ -36,7 +36,7 @@ class CareScheduleDirectAssignmentTest {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(GroomIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        trainerScheduleAssignmentService = mock(TrainerScheduleAssignmentService.class);
+        trainingPlanService = mock(HorseTrainingPlanService.class);
         service = new CareScheduleService(
                 schedules,
                 horses,
@@ -51,7 +51,7 @@ class CareScheduleDirectAssignmentTest {
                 events,
                 mock(EntityManager.class),
                 mock(NotificationService.class),
-                trainerScheduleAssignmentService);
+                new TrainingDecisionService(horses, schedules, trainingPlanService));
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(schedules.findScheduledForHorse(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
         when(schedules.findScheduledForVet(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
@@ -140,7 +140,7 @@ class CareScheduleDirectAssignmentTest {
         Horse horse = new Horse();
         horse.setId(99L);
         horse.setName("Rocket");
-        horse.setTrainingStatus(TrainingDecision.BLOCKED);
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
         when(horses.findByIdForUpdate(99L)).thenReturn(Optional.of(horse));
 
         CareSchedule requested = new CareSchedule();
@@ -182,7 +182,7 @@ class CareScheduleDirectAssignmentTest {
         Horse horse = new Horse();
         horse.setId(99L);
         horse.setName("Rocket");
-        horse.setTrainingStatus(TrainingDecision.ALLOWED);
+        horse.setTrainingDecision(TrainingDecision.ALLOWED);
         when(horses.findByIdForUpdate(99L)).thenReturn(Optional.of(horse));
         when(users.findActiveVeterinarians()).thenReturn(List.of());
         when(schedules.save(any(CareSchedule.class))).thenAnswer(invocation -> {
@@ -193,8 +193,9 @@ class CareScheduleDirectAssignmentTest {
 
         service.createSchedule(99L, CareType.URGENT, "Acute lameness", null, 700L);
 
-        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingStatus());
-        assertTrue(horse.isTrainingLocked());
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
+        // Chặn tập luôn kéo theo hủy buổi tập tương lai.
+        verify(trainingPlanService).cancelFutureTrainingForHorse(eq(99L), anyString());
         verify(horses).save(horse);
         verify(schedules, atLeastOnce()).save(argThat(schedule ->
                 schedule.getCareType() == CareType.URGENT
@@ -228,7 +229,7 @@ class CareScheduleDirectAssignmentTest {
         Horse horse = new Horse();
         horse.setId(horseId);
         horse.setName("Horse " + horseId);
-        horse.setTrainingStatus(TrainingDecision.BLOCKED);
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
         when(horses.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
         CareSchedule schedule = new CareSchedule();
         schedule.setId(500L);
