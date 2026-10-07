@@ -32,11 +32,20 @@ class GroomIncidentReportServiceTest {
     @Mock
     private AdmissionFileStorage fileStorage;
 
+    @Mock
+    private com.rtms.backend.repository.CareScheduleRepository careScheduleRepository;
+
+    @Mock
+    private CareScheduleService careScheduleService;
+
     private GroomIncidentReportService incidentReportService;
 
     @BeforeEach
     void setUp() {
-        incidentReportService = new GroomIncidentReportService(incidentReportRepository, horseRepository, fileStorage);
+        incidentReportService = new GroomIncidentReportService(
+                incidentReportRepository, horseRepository, fileStorage,
+                careScheduleRepository,
+                careScheduleService);
     }
 
     @Test
@@ -206,4 +215,53 @@ class GroomIncidentReportServiceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> incidentReportService.attachImage(10L, file, groom));
     }
-}
+
+    @Test
+    @DisplayName("createReport: Khi report có description thực tế, schedule nhận đúng description")
+    void testCreateReport_WithActualDescription_PassesDescriptionToSchedule() {
+        com.rtms.backend.entity.Horse horse = new com.rtms.backend.entity.Horse();
+        horse.setId(10L);
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
+
+        when(incidentReportRepository.save(any(GroomIncidentReport.class))).thenAnswer(inv -> {
+            GroomIncidentReport r = inv.getArgument(0);
+            if (r.getId() == null) r.setId(100L);
+            return r;
+        });
+
+        when(careScheduleRepository.findFirstByHorseIdAndCareTypeAndStatusInOrderByCreatedAtDesc(eq(10L), eq(com.rtms.backend.enums.CareType.URGENT), any()))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(new com.rtms.backend.entity.CareSchedule()));
+
+        com.rtms.backend.dto.CreateGroomIncidentReportRequest req = new com.rtms.backend.dto.CreateGroomIncidentReportRequest();
+        req.setHorseId(10L);
+        req.setTitle("Sprained ankle");
+        req.setDescription("Horse slipped on wet ground during walking");
+
+        AuthenticatedUser groom = new AuthenticatedUser(5L, "groom@example.com", "GROOM");
+
+        GroomIncidentReport saved = incidentReportService.createReport(req, groom);
+        assertNotNull(saved);
+
+        org.mockito.ArgumentCaptor<String> descCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(careScheduleService).createSchedule(eq(10L), eq(com.rtms.backend.enums.CareType.URGENT), descCaptor.capture(), isNull(), eq(100L));
+        assertEquals("Horse slipped on wet ground during walking", descCaptor.getValue());
+    }
+
+    @Test
+    @DisplayName("createReport: Khi description null hoặc blank, từ chối với RuntimeException")
+    void testCreateReport_WithNullOrBlankDescription_ThrowsValidationException() {
+        com.rtms.backend.entity.Horse horse = new com.rtms.backend.entity.Horse();
+        horse.setId(10L);
+        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
+
+        com.rtms.backend.dto.CreateGroomIncidentReportRequest req = new com.rtms.backend.dto.CreateGroomIncidentReportRequest();
+        req.setHorseId(10L);
+        req.setTitle("Sudden colic symptoms");
+        req.setDescription("   "); // Blank description
+
+        AuthenticatedUser groom = new AuthenticatedUser(5L, "groom@example.com", "GROOM");
+
+        assertThrows(RuntimeException.class, () -> incidentReportService.createReport(req, groom));
+    }
+}

@@ -179,13 +179,16 @@ public class AdmissionManagerReviewService {
 
         // Cancel active CareSchedule records for this horse
         if (careScheduleRepository != null) {
+            List<CareSchedule> nonCancellableSchedules =
+                    careScheduleRepository.findByHorseIdAndStatusIn(
+                            horse.getId(), List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS));
+            if (!nonCancellableSchedules.isEmpty()) {
+                throw new IllegalStateException(
+                        "Admission cannot be rejected while veterinary care is REQUESTED or IN_PROGRESS");
+            }
             List<CareSchedule> careSchedulesToCancel =
                     careScheduleRepository.findByHorseIdAndStatusIn(
-                            horse.getId(),
-                            List.of(CareScheduleStatus.REQUESTED,
-                                    CareScheduleStatus.AWAITING_VET_CONFIRMATION,
-                                    CareScheduleStatus.SCHEDULED,
-                                    CareScheduleStatus.IN_PROGRESS));
+                            horse.getId(), List.of(CareScheduleStatus.SCHEDULED));
             for (CareSchedule cs : careSchedulesToCancel) {
                 cs.setStatus(CareScheduleStatus.CANCELLED);
                 cs.setCancelReason("Admission rejected by manager");

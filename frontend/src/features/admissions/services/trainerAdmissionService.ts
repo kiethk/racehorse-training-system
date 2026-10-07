@@ -3,6 +3,9 @@ import type {
   TrainerAdmissionQueue,
   TrainerAdmissionView,
   TrainerReviewRequest,
+  TrainerScheduleDetailResponse,
+  TrainerScheduleResponse,
+  TrainerScheduleStatus,
 } from '../types/trainer';
 
 /** Khớp dto/ApiResponse.java — { success, data, message }. */
@@ -14,26 +17,53 @@ interface ApiResponse<T> {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-/**
- * Hàm postWithMessage cục bộ ĐÃ XOÁ — ngoại lệ so với FRONTEND_GUIDE.md §8
- * không còn lý do tồn tại: responseError() trong services/api.ts giờ đã đọc
- * payload.message, nên apiPost giữ nguyên văn lỗi nghiệp vụ, ví dụ
- * "Hồ sơ này đã được phân công cho Huấn luyện viên khác đánh giá!".
- *
- * Và hàm cũ còn một khiếm khuyết nữa: nó tự gọi fetch() nên không đi qua
- * doFetch(), tức là bỏ qua cơ chế tự làm mới token khi gặp 401. Trainer ngồi
- * nhập ba điểm số rồi bấm nộp đúng lúc JWT vừa hết hạn sẽ mất trắng phần đã
- * nhập, thay vì được refresh rồi gửi lại.
- */
 export const trainerAdmissionsApi = {
   /**
+   * Lấy danh sách lịch đánh giá của Trainer (/api/trainer-schedules)
+   */
+  getSchedules: async (status?: TrainerScheduleStatus): Promise<TrainerScheduleResponse[]> => {
+    const query = status ? `?status=${status}` : '';
+    const res = await apiGet<ApiResponse<TrainerScheduleResponse[]>>(`/api/trainer-schedules${query}`);
+    return res.data;
+  },
+
+  /**
+   * Chi tiết lịch đánh giá gồm đơn nhập viện, hồ sơ ngựa, kết quả khám của Vet (/api/trainer-schedules/:id)
+   */
+  getScheduleDetail: async (scheduleId: number): Promise<TrainerScheduleDetailResponse> => {
+    const res = await apiGet<ApiResponse<TrainerScheduleDetailResponse>>(
+      `/api/trainer-schedules/${scheduleId}`,
+    );
+    return res.data;
+  },
+
+  /**
+   * Bắt đầu đánh giá (SCHEDULED -> IN_PROGRESS)
+   */
+  startSchedule: async (scheduleId: number): Promise<TrainerScheduleResponse> => {
+    const res = await apiPost<ApiResponse<TrainerScheduleResponse>>(
+      `/api/trainer-schedules/${scheduleId}/start`,
+      {},
+    );
+    return res.data;
+  },
+
+  /**
+   * Hoàn thành đánh giá (IN_PROGRESS -> COMPLETED)
+   */
+  completeSchedule: async (
+    scheduleId: number,
+    body: TrainerReviewRequest,
+  ): Promise<TrainerScheduleResponse> => {
+    const res = await apiPost<ApiResponse<TrainerScheduleResponse>>(
+      `/api/trainer-schedules/${scheduleId}/complete`,
+      body,
+    );
+    return res.data;
+  },
+
+  /**
    * Hàng chờ của CHÍNH Trainer đang đăng nhập — hai nhóm trong một lời gọi.
-   *
-   * Thay cho getAll() cũ (GET /api/admissions không truyền status). Cái cũ
-   * rơi vào nhánh findAll() của backend, trả về TOÀN BỘ hồ sơ của mọi trạng
-   * thái và mọi Trainer, rồi màn hình tự lọc ở client. Hai vấn đề: dữ liệu
-   * của Trainer khác vẫn nằm trong phản hồi (chỉ bị ẩn khỏi bảng), và lượng
-   * truyền tăng tuyến tính theo số đơn toàn hệ thống.
    */
   getQueue: async (): Promise<TrainerAdmissionQueue> => {
     const res = await apiGet<ApiResponse<TrainerAdmissionQueue>>(
@@ -52,7 +82,10 @@ export const trainerAdmissionsApi = {
 
   /** Nộp đánh giá -> backend TỰ chuyển đơn sang MANAGER_REVIEW. */
   submitReview: async (id: number, body: TrainerReviewRequest): Promise<void> => {
-    await apiPost<ApiResponse<unknown>>(`/api/admissions/${id}/trainer-review`, body);
+    await apiPost<ApiResponse<unknown>>(
+      `/api/admissions/${id}/trainer-review`,
+      body,
+    );
   },
 
   /** Link tải giấy tờ — mở bằng thẻ <a>, cookie jwt_token tự gửi kèm. */

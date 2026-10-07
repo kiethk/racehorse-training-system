@@ -66,8 +66,8 @@ interface TrainerReviewActionPanelProps {
 }
 
 export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActionPanelProps) {
-  const { admission, horse, existingAssessment } = view;
-  const readOnly = existingAssessment !== null;
+  const { admission, horse, existingAssessment, trainerSchedule } = view;
+  const readOnly = existingAssessment !== null || trainerSchedule?.status === 'COMPLETED';
   const horseMissing = horse === null;
   const canReview = admission.status === 'TRAINER_REVIEW' && !readOnly;
 
@@ -81,6 +81,7 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [submittedNotice, setSubmittedNotice] = useState(false);
 
@@ -88,6 +89,21 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
     (key: keyof TrainerReviewRequest) =>
     (raw: string) =>
       setForm((f) => ({ ...f, [key]: raw === '' ? null : Number(raw) }));
+
+  async function handleStart() {
+    if (!trainerSchedule) return;
+    try {
+      setStarting(true);
+      setFormError(null);
+      await trainerAdmissionsApi.startSchedule(trainerSchedule.id);
+      onSuccess();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to start evaluation.';
+      setFormError(msg);
+    } finally {
+      setStarting(false);
+    }
+  }
 
   async function handleSubmit() {
     setFormError(null);
@@ -102,10 +118,17 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
 
     try {
       setSubmitting(true);
-      await trainerAdmissionsApi.submitReview(admission.admissionId, {
-        ...form,
-        remarks,
-      });
+      if (trainerSchedule) {
+        await trainerAdmissionsApi.completeSchedule(trainerSchedule.id, {
+          ...form,
+          remarks,
+        });
+      } else {
+        await trainerAdmissionsApi.submitReview(admission.admissionId, {
+          ...form,
+          remarks,
+        });
+      }
       setSubmittedNotice(true);
       onSuccess();
     } catch (err: unknown) {
@@ -167,6 +190,50 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
         <SectionTitle>Head Trainer Evaluation</SectionTitle>
         <div className="mt-2 rounded-[var(--radius-md)] bg-[var(--color-warning-soft)] p-3 text-[12px] text-[var(--color-warning)]">
           Cannot evaluate yet: The candidate horse profile has not been created by the Groom.
+        </div>
+      </Panel>
+    );
+  }
+
+  // Schedule exists and is in SCHEDULED status -> Prompt to Start
+  if (trainerSchedule && trainerSchedule.status === 'SCHEDULED') {
+    return (
+      <Panel padded className="bg-[var(--color-surface)]">
+        <SectionTitle>Head Trainer Evaluation Schedule</SectionTitle>
+        <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--color-primary-soft)] bg-[var(--color-primary-subtle)] p-4 text-[13px] text-[var(--color-text-primary)]">
+          <p className="font-semibold text-[var(--color-primary)]">Schedule Assigned</p>
+          <p className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
+            Scheduled for {new Date(trainerSchedule.scheduledAt).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })} ({trainerSchedule.durationMinutes} minutes).
+          </p>
+          <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
+            Click &quot;Start Assessment&quot; when you are ready to evaluate the candidate horse at the quarantine facility.
+          </p>
+          {formError && (
+            <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] p-3 text-[12px] text-[var(--color-danger)]">
+              {formError}
+            </div>
+          )}
+          <div className="mt-4">
+            <Button
+              variant="primary"
+              disabled={starting}
+              onClick={handleStart}
+            >
+              {starting ? 'Starting...' : 'Start Assessment'}
+            </Button>
+          </div>
+        </div>
+      </Panel>
+    );
+  }
+
+  // If in TRAINER_REVIEW but no schedule yet assigned
+  if (!trainerSchedule && !existingAssessment) {
+    return (
+      <Panel padded className="bg-[var(--color-surface)]">
+        <SectionTitle>Head Trainer Evaluation</SectionTitle>
+        <div className="mt-2 rounded-[var(--radius-md)] bg-[var(--color-info-soft)] p-3 text-[12px] text-[var(--color-info)]">
+          Awaiting Trainer Schedule assignment. The system will automatically assign an available Head Trainer.
         </div>
       </Panel>
     );

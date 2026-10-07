@@ -48,6 +48,13 @@ class PreventiveCareServiceTest {
         schedule.setId(1L);
         schedule.setHorseId(2L);
         schedule.setCareType(CareType.ROUTINE);
+        CareSchedule source = new CareSchedule();
+        source.setId(99L);
+        source.setHorseId(2L);
+        source.setVeterinarianId(7L);
+        source.setStatus(CareScheduleStatus.COMPLETED);
+        when(schedules.findFirstByVeterinarianIdAndHorseIdAndStatusOrderByCompletedAtDesc(
+                7L, 2L, CareScheduleStatus.COMPLETED)).thenReturn(Optional.of(source));
         when(care.createNextSchedule(any(), eq(7L))).thenReturn(CareScheduleResponse.from(schedule));
         when(schedules.findById(1L)).thenReturn(Optional.of(schedule));
         CreatePreventiveCareScheduleRequest request = new CreatePreventiveCareScheduleRequest();
@@ -55,6 +62,8 @@ class PreventiveCareServiceTest {
         request.setCareType("VACCINATION");
         assertSame(schedule, new PreventiveCareService(schedules, horses, care).createSchedule(request, vet));
         verify(care).createNextSchedule(argThat(r -> r.getCareType() == CareType.ROUTINE
+                && Long.valueOf(99L).equals(r.getSourceScheduleId())
+                && r.getIdempotencyKey() != null
                 && r.getDescription().startsWith("VACCINATION:")), eq(7L));
         verify(schedules, never()).save(any());
     }

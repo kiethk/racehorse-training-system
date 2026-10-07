@@ -18,7 +18,7 @@ export default async function ManagerAdmissionDetailPage({
   const validId = Number.isSafeInteger(admissionId) && admissionId > 0;
   
   const FILTER_KEYS = ['candidateName', 'status', 'submittedFrom', 'submittedTo'] as const;
-  const VALID_STATUSES = ['ALL', 'GROOM_REVIEW', 'WAITING_FOR_STALL', 'VET_REVIEW', 'PENDING_RECHECK', 'TRAINER_REVIEW', 'MANAGER_REVIEW', 'APPROVED', 'REJECTED'];
+  const VALID_STATUSES = ['ALL', 'GROOM_REVIEW', 'WAITING_FOR_STALL', 'VET_REVIEW', 'TRAINER_REVIEW', 'MANAGER_REVIEW', 'APPROVED', 'REJECTED'];
   
   const query = new URLSearchParams();
   FILTER_KEYS.forEach((key) => {

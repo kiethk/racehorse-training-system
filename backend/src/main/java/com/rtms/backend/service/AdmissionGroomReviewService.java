@@ -22,6 +22,7 @@ public class AdmissionGroomReviewService {
     private final HorsePedigreeRepository horsePedigreeRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final CareScheduleService careScheduleService;
+    private final NotificationService notificationService;
 
     public AdmissionGroomReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
@@ -30,7 +31,8 @@ public class AdmissionGroomReviewService {
             HorseRepository horseRepository,
             HorsePedigreeRepository horsePedigreeRepository,
             CareScheduleRepository careScheduleRepository,
-            CareScheduleService careScheduleService) {
+            CareScheduleService careScheduleService,
+            NotificationService notificationService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.stableStallRepository = stableStallRepository;
@@ -38,6 +40,7 @@ public class AdmissionGroomReviewService {
         this.horsePedigreeRepository = horsePedigreeRepository;
         this.careScheduleRepository = careScheduleRepository;
         this.careScheduleService = careScheduleService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -100,21 +103,44 @@ public class AdmissionGroomReviewService {
                 .findFirstAvailableQuarantineStallForUpdate()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No quarantine stall available"));
 
+        // 1. Tạo hoặc tái sử dụng Horse CANDIDATE
         Horse horse = findReusableHorseOrCreateNew(admission, candidate);
         applyCandidateSnapshot(horse, admission, candidate, quarantineStall);
         horse = horseRepository.save(horse);
 
         updatePedigree(horse.getId(), candidate);
-        ensureInitialCareSchedule(admission.getId(), horse.getId());
 
+        // 2. Tạo hoặc tái sử dụng INITIAL CareSchedule và gán Vet
+        CareSchedule initialSchedule = ensureInitialCareSchedule(admission.getId(), horse.getId());
+
+        // 3. Gán chuồng cách ly
         quarantineStall.setStatus(StallStatus.OCCUPIED);
         stableStallRepository.save(quarantineStall);
 
         admission.setHorseId(horse.getId());
         admission.setQuarantineStallId(quarantineStall.getId());
-        admission.setStatus(AdmissionStatus.VET_REVIEW);
 
-        return admissionApplicationRepository.save(admission);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+        admission = admissionApplicationRepository.save(admission);
+
+        // 4. Tạo notification "new horse assignment" cho Vet (có khóa chống trùng)
+        dispatchAssignmentNotifications(admission, horse, initialSchedule);
+
+        return admission;
+    }
+
+    private void dispatchAssignmentNotifications(AdmissionApplication admission, Horse horse, CareSchedule initialSchedule) {
+        // Notification cho Vet
+        if (initialSchedule != null && initialSchedule.getVeterinarianId() != null) {
+            notificationService.sendAssignmentNotification(
+                    initialSchedule.getVeterinarianId(),
+                    admission.getId(),
+                    horse.getId(),
+                    NotificationTypes.ADMISSION_VET_ASSIGNED,
+                    "New horse assignment",
+                    "You have been assigned to candidate horse " + horse.getName() + " for initial admission examination in quarantine."
+            );
+        }
     }
 
     private boolean hasAdmissionCapacity() {
@@ -153,7 +179,7 @@ public class AdmissionGroomReviewService {
         horse.setRegistrationNumber(candidate.getRegistrationNumber());
         horse.setCurrentStatus(HorseStatus.CANDIDATE);
         horse.setCurrentStallId(quarantineStall.getId());
-        horse.setTrainingStatus(TrainingStatus.BLOCKED);
+        horse.setTrainingStatus(TrainingDecision.BLOCKED);
         horse.setTrainingLocked(true);
         horse.setTrainingLockReason("Initial admission examination is pending");
         horse.setTrainingLockVetId(null);
@@ -172,26 +198,31 @@ public class AdmissionGroomReviewService {
         horsePedigreeRepository.save(pedigree);
     }
 
-    private void ensureInitialCareSchedule(Long admissionId, Long horseId) {
-        boolean alreadyOpen = careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
-                horseId, CareType.INITIAL,
-                List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION,
-                        CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+    private CareSchedule ensureInitialCareSchedule(Long admissionId, Long horseId) {
+        CareSchedule schedule = careScheduleRepository
+                .findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admissionId, CareType.INITIAL)
+                .orElse(null);
 
-        if (alreadyOpen) {
-            return;
+        if (schedule == null) {
+            // Spec item 11: every admission reaching VET_REVIEW owns its own INITIAL
+            // care_schedule row. The horse-level check previously skipped creation
+            // when a different admission already had an open INITIAL, leaving this
+            // admission without a schedule of its own.
+            schedule = new CareSchedule();
+            schedule.setHorseId(horseId);
+            schedule.setAdmissionId(admissionId);
+            schedule.setCareType(CareType.INITIAL);
+            schedule.setStatus(CareScheduleStatus.REQUESTED);
+            schedule.setDurationMinutes(30);
+            schedule.setDescription("Initial admission physical examination in quarantine area");
+            schedule = careScheduleRepository.save(schedule);
         }
 
-        CareSchedule schedule = new CareSchedule();
-        schedule.setHorseId(horseId);
-        schedule.setAdmissionId(admissionId);
-        schedule.setCareType(CareType.INITIAL);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
-        schedule.setDurationMinutes(30);
-        schedule.setDescription("Initial admission physical examination in quarantine area");
+        careScheduleService.assignRequestedSchedules();
 
-        careScheduleRepository.save(schedule);
-        careScheduleService.dispatchOffersForSchedule(schedule);
+        return careScheduleRepository
+                .findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admissionId, CareType.INITIAL)
+                .orElse(schedule);
     }
 
     private void stampGroomReview(AdmissionApplication admission, Long groomId, ReviewDecision decision, String feedback) {
@@ -200,4 +231,5 @@ public class AdmissionGroomReviewService {
         admission.setGroomFeedback(feedback);
         admission.setGroomReviewedAt(LocalDateTime.now());
     }
+
 }

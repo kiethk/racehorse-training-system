@@ -35,6 +35,7 @@ public class VetReviewRequest {
     private String notes;
     private LocalDate followUpDate;
     private List<@NotNull @Valid HorseHealthMetricRequest> metrics;
+    private CreateNextScheduleRequest nextSchedule;
 
     public TrainingDecision getTrainingDecision() { return trainingDecision; }
     public void setTrainingDecision(TrainingDecision trainingDecision) { this.trainingDecision = trainingDecision; }
@@ -56,6 +57,9 @@ public class VetReviewRequest {
     public void setNotes(String notes) { this.notes = notes; }
     public LocalDate getFollowUpDate() { return followUpDate; }
     public void setFollowUpDate(LocalDate followUpDate) { this.followUpDate = followUpDate; }
+    public CreateNextScheduleRequest getNextSchedule() { return nextSchedule; }
+    public void setNextSchedule(CreateNextScheduleRequest nextSchedule) { this.nextSchedule = nextSchedule; }
+
     public List<HorseHealthMetricRequest> getMetrics() { return metrics; }
     public void setMetrics(List<HorseHealthMetricRequest> metrics) { this.metrics = metrics; }
 

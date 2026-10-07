@@ -10,6 +10,7 @@ import com.rtms.backend.repository.HealthRecordRepository;
 import com.rtms.backend.repository.HorseHealthMetricRepository;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.RacingReadinessAssessmentRepository;
+import com.rtms.backend.repository.TrainerScheduleRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.AdmissionQueryService;
 import com.rtms.backend.service.AdmissionTrainerReviewService;
@@ -30,6 +31,7 @@ public class AdmissionTrainerReviewController {
     private final RacingReadinessAssessmentRepository assessmentRepository;
     private final HealthRecordRepository healthRecordRepository;
     private final HorseHealthMetricRepository horseHealthMetricRepository;
+    private final TrainerScheduleRepository trainerScheduleRepository;
 
     public AdmissionTrainerReviewController(
             AdmissionTrainerReviewService trainerReviewService,
@@ -37,13 +39,15 @@ public class AdmissionTrainerReviewController {
             HorseRepository horseRepository,
             RacingReadinessAssessmentRepository assessmentRepository,
             HealthRecordRepository healthRecordRepository,
-            HorseHealthMetricRepository horseHealthMetricRepository) {
+            HorseHealthMetricRepository horseHealthMetricRepository,
+            TrainerScheduleRepository trainerScheduleRepository) {
         this.trainerReviewService = trainerReviewService;
         this.queryService = queryService;
         this.horseRepository = horseRepository;
         this.assessmentRepository = assessmentRepository;
         this.healthRecordRepository = healthRecordRepository;
         this.horseHealthMetricRepository = horseHealthMetricRepository;
+        this.trainerScheduleRepository = trainerScheduleRepository;
     }
 
     /**
@@ -75,6 +79,12 @@ public class AdmissionTrainerReviewController {
             @PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         AdmissionDetailResponse detail = queryService.getAdmissionDetail(id);
+        if ("HEAD_TRAINER".equals(currentUser.getRole())
+                && !java.util.Objects.equals(detail.getTrainerId(), currentUser.getUserId())) {
+            throw new com.rtms.backend.config.ApiException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "FORBIDDEN",
+                    "Only the assigned trainer can view this admission");
+        }
 
         assertAssignedToMe(detail.getTrainerId(), currentUser.getUserId());
 
@@ -90,12 +100,15 @@ public class AdmissionTrainerReviewController {
                 ? List.of()
                 : horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(horse.getId());
 
+        com.rtms.backend.entity.TrainerSchedule schedule = trainerScheduleRepository.findByAdmissionId(id).orElse(null);
+
         return ApiResponse.success(new TrainerAdmissionViewResponse(
                 detail,
                 horse,
                 healthRecords,
                 healthMetrics,
-                assessmentRepository.findByAdmissionId(id).orElse(null)));
+                assessmentRepository.findByAdmissionId(id).orElse(null),
+                schedule == null ? null : TrainerScheduleResponse.from(schedule)));
     }
 
     /** Hoàn thành đánh giá -> đơn chuyển MANAGER_REVIEW. */
