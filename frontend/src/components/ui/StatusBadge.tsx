@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
 
-export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'MONITORING' | 'INJURED' | 'QUARANTINED' | 'REJECTED';
+/** Vòng đời ngựa trong CLB. Sức khỏe không nằm ở đây — xem trainingDecision. */
+export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED';
 
 type Tone = 'success' | 'warning' | 'danger' | 'info' | 'isolated' | 'primary' | 'neutral';
 
@@ -53,9 +54,6 @@ const tones: Record<Tone, ToneStyle> = {
 const horseStatusMap: Record<HorseStatus, { tone: Tone; icon: IconName; label: string }> = {
   CANDIDATE: { tone: 'info', icon: 'clipboard', label: 'Candidate' },
   ELIGIBLE: { tone: 'success', icon: 'check', label: 'Eligible' },
-  MONITORING: { tone: 'warning', icon: 'activity', label: 'Monitoring' },
-  INJURED: { tone: 'danger', icon: 'alert-triangle', label: 'Injured' },
-  QUARANTINED: { tone: 'isolated', icon: 'shield', label: 'Quarantined' },
   REJECTED: { tone: 'neutral', icon: 'x', label: 'Rejected' },
 };
 

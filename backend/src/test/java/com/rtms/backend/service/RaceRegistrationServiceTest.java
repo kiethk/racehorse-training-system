@@ -70,7 +70,6 @@ class RaceRegistrationServiceTest {
         h.setName("Bạch Long Mã");
         h.setRegistrationNumber("VN-2026-001");
         h.setCurrentStatus(HorseStatus.ELIGIBLE);
-        h.setTrainingLocked(false);
         h.setCurrentStallId(stallId);
         return h;
     }
@@ -191,7 +190,7 @@ class RaceRegistrationServiceTest {
         Long areaId = 2L;
 
         Horse horse = createEligibleHorse(horseId, stallId);
-        horse.setTrainingLocked(true); // Bị khoá huấn luyện
+        horse.setTrainingDecision(com.rtms.backend.enums.TrainingDecision.BLOCKED); // Thú y chặn tập
 
         StableStall stall = new StableStall();
         stall.setId(stallId);

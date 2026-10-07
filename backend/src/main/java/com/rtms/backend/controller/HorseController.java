@@ -2,7 +2,6 @@ package com.rtms.backend.controller;
 
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreateHorseRequest;
-import com.rtms.backend.dto.UpdateHorseStatusRequest;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.service.HorseService;
@@ -51,13 +50,6 @@ public class HorseController {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
         return ApiResponse.success(horseService.getHorseById(id, currentUser));
-    }
-
-    @PreAuthorize("hasAuthority('HORSE_STATUS_EDIT')")
-    @PutMapping("/{id}/status")
-    public ApiResponse<Horse> updateHorseStatus(@PathVariable Long id,
-            @RequestBody UpdateHorseStatusRequest request) {
-        return ApiResponse.success(horseService.updateHorseStatus(id, request));
     }
 
     /** Bỏ trống stallId = gỡ ngựa khỏi chuồng, giống assign-groom bỏ trống groomId. */

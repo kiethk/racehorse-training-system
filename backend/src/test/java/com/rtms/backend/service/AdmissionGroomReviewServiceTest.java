@@ -219,8 +219,10 @@ class AdmissionGroomReviewServiceTest {
         assertEquals("QABALAH MERCURY", savedHorse.getName());
         assertEquals("Arabian", savedHorse.getBreed());
         assertEquals(HorseStatus.CANDIDATE, savedHorse.getCurrentStatus());
-        assertTrue(savedHorse.isTrainingLocked());
-        assertEquals(TrainingDecision.BLOCKED, savedHorse.getTrainingStatus());
+        // Ngựa CANDIDATE: không cần cờ khóa, canTrain() đã false vì chưa ELIGIBLE.
+        assertEquals(TrainingDecision.ALLOWED, savedHorse.getTrainingDecision());
+        assertNull(savedHorse.getTrainingDecisionReason());
+        assertFalse(savedHorse.canTrain());
         assertEquals(99L, savedHorse.getCurrentStallId());
         assertEquals(5L, savedHorse.getOwnerId());
         assertEquals("FR1234567890123", savedHorse.getRegistrationNumber());
@@ -333,7 +335,7 @@ class AdmissionGroomReviewServiceTest {
         assertEquals(AdmissionStatus.VET_REVIEW, result.getStatus());
         assertEquals(20L, result.getHorseId());
         assertEquals(HorseStatus.CANDIDATE, existingHorse.getCurrentStatus());
-        assertTrue(existingHorse.isTrainingLocked());
+        assertFalse(existingHorse.canTrain());
         assertEquals(99L, existingHorse.getCurrentStallId());
     }
 

@@ -105,18 +105,10 @@ public class AdmissionManagerReviewService {
         }
 
         // 2. Update existing Horse
+        // Thành ELIGIBLE là đủ để ngựa tập được nếu Thú y đã cho phép. Kết luận
+        // chặn tập của Thú y (nếu có) giữ nguyên, không cần mở khóa gì ở đây.
         horse.setCurrentStatus(HorseStatus.ELIGIBLE);
         horse.setCurrentStallId(regularStall.getId());
-
-        // Protect Vet medical locks: only clear training lock if it was purely administrative
-        if ("Admission pending trainer and manager review".equals(horse.getTrainingLockReason())
-                && horse.getTrainingLockVetId() == null) {
-            horse.setTrainingLocked(false);
-            horse.setTrainingLockReason(null);
-            horse.setTrainingLockReviewDate(null);
-            horse.setTrainingLockVetId(null);
-            horse.setTrainingLockUpdatedAt(LocalDateTime.now());
-        }
         horseRepository.save(horse);
 
         // 3. Mark regular stall occupied

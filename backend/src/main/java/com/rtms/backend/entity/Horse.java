@@ -27,9 +27,17 @@ public class Horse {
     @Column(name = "current_status", nullable = false)
     private HorseStatus currentStatus = HorseStatus.ELIGIBLE;
 
+    /**
+     * Quyết định y tế đang có hiệu lực: được tập hay đang tạm nghỉ.
+     * Cùng kiểu với HealthRecord.trainingDecision — một khái niệm, một tên.
+     */
     @Enumerated(EnumType.STRING)
-    @Column(name = "training_status", nullable = false)
-    private TrainingDecision trainingStatus = TrainingDecision.ALLOWED;
+    @Column(name = "training_decision", nullable = false)
+    private TrainingDecision trainingDecision = TrainingDecision.ALLOWED;
+
+    /** Vì sao bị chặn tập. Chỉ có giá trị khi trainingDecision = BLOCKED. */
+    @Column(name = "training_decision_reason", columnDefinition = "TEXT")
+    private String trainingDecisionReason;
 
     @Column(name = "stable_location")
     private String stableLocation;
@@ -46,21 +54,6 @@ public class Horse {
     @Column(name = "registration_number")
     private String registrationNumber;
 
-    @Column(name = "training_locked", nullable = false)
-    private boolean trainingLocked;
-
-    @Column(name = "training_lock_reason", columnDefinition = "TEXT")
-    private String trainingLockReason;
-
-    @Column(name = "training_lock_review_date")
-    private LocalDate trainingLockReviewDate;
-
-    @Column(name = "training_lock_vet_id")
-    private Long trainingLockVetId;
-
-    @Column(name = "training_lock_updated_at")
-    private LocalDateTime trainingLockUpdatedAt;
-
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -71,8 +64,8 @@ public class Horse {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-        if (trainingStatus == null) {
-            trainingStatus = trainingLocked ? TrainingDecision.BLOCKED : TrainingDecision.ALLOWED;
+        if (trainingDecision == null) {
+            trainingDecision = TrainingDecision.ALLOWED;
         }
     }
 
@@ -97,14 +90,21 @@ public class Horse {
     public HorseStatus getCurrentStatus() { return currentStatus; }
     public void setCurrentStatus(HorseStatus currentStatus) { this.currentStatus = currentStatus; }
 
-    public TrainingDecision getTrainingStatus() { return trainingStatus; }
-    public void setTrainingStatus(TrainingDecision trainingStatus) {
-        this.trainingStatus = trainingStatus != null ? trainingStatus : TrainingDecision.ALLOWED;
-        this.trainingLocked = (this.trainingStatus != TrainingDecision.ALLOWED);
-    }
+    public TrainingDecision getTrainingDecision() { return trainingDecision; }
+    public void setTrainingDecision(TrainingDecision trainingDecision) { this.trainingDecision = trainingDecision; }
 
-    public TrainingDecision getTrainingDecision() { return getTrainingStatus(); }
-    public void setTrainingDecision(TrainingDecision trainingDecision) { setTrainingStatus(trainingDecision); }
+    public String getTrainingDecisionReason() { return trainingDecisionReason; }
+    public void setTrainingDecisionReason(String trainingDecisionReason) { this.trainingDecisionReason = trainingDecisionReason; }
+
+    /**
+     * Quy tắc duy nhất: ngựa đã được nhận vào nuôi VÀ không bị chặn tập.
+     *
+     * Ngựa CANDIDATE không tập được vì chưa được duyệt nhập — điều đó suy ra từ
+     * currentStatus, không lưu thành một cờ khóa riêng.
+     */
+    public boolean canTrain() {
+        return currentStatus == HorseStatus.ELIGIBLE && trainingDecision == TrainingDecision.ALLOWED;
+    }
 
     public String getStableLocation() { return stableLocation; }
     public void setStableLocation(String stableLocation) { this.stableLocation = stableLocation; }
@@ -120,26 +120,6 @@ public class Horse {
 
     public String getRegistrationNumber() { return registrationNumber; }
     public void setRegistrationNumber(String registrationNumber) { this.registrationNumber = registrationNumber; }
-
-    public boolean isTrainingLocked() { return trainingLocked; }
-    public void setTrainingLocked(boolean trainingLocked) {
-        this.trainingLocked = trainingLocked;
-        if (!trainingLocked) {
-            this.trainingStatus = TrainingDecision.ALLOWED;
-        }
-    }
-
-    public String getTrainingLockReason() { return trainingLockReason; }
-    public void setTrainingLockReason(String trainingLockReason) { this.trainingLockReason = trainingLockReason; }
-
-    public LocalDate getTrainingLockReviewDate() { return trainingLockReviewDate; }
-    public void setTrainingLockReviewDate(LocalDate trainingLockReviewDate) { this.trainingLockReviewDate = trainingLockReviewDate; }
-
-    public Long getTrainingLockVetId() { return trainingLockVetId; }
-    public void setTrainingLockVetId(Long trainingLockVetId) { this.trainingLockVetId = trainingLockVetId; }
-
-    public LocalDateTime getTrainingLockUpdatedAt() { return trainingLockUpdatedAt; }
-    public void setTrainingLockUpdatedAt(LocalDateTime trainingLockUpdatedAt) { this.trainingLockUpdatedAt = trainingLockUpdatedAt; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

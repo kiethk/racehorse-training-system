@@ -29,7 +29,7 @@ class CareScheduleHardeningTests {
     private VeterinarianProfileRepository profiles;
     private GroomIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private TrainerScheduleAssignmentService trainerScheduleAssignmentService;
+    private HorseTrainingPlanService trainingPlanService;
     private NotificationService notificationService;
     private AdmissionApplicationRepository admissionRepository;
     private CareScheduleService service;
@@ -42,7 +42,7 @@ class CareScheduleHardeningTests {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(GroomIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        trainerScheduleAssignmentService = mock(TrainerScheduleAssignmentService.class);
+        trainingPlanService = mock(HorseTrainingPlanService.class);
         notificationService = mock(NotificationService.class);
         admissionRepository = mock(AdmissionApplicationRepository.class);
 
@@ -60,7 +60,7 @@ class CareScheduleHardeningTests {
                 events,
                 mock(EntityManager.class),
                 notificationService,
-                trainerScheduleAssignmentService
+                new TrainingDecisionService(horses, schedules, trainingPlanService)
         );
 
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -76,7 +76,7 @@ class CareScheduleHardeningTests {
         Horse h = new Horse();
         h.setId(id);
         h.setName(name);
-        h.setTrainingStatus(TrainingDecision.ALLOWED);
+        h.setTrainingDecision(TrainingDecision.ALLOWED);
         when(horses.findByIdForUpdate(id)).thenReturn(Optional.of(h));
         when(horses.findById(id)).thenReturn(Optional.of(h));
         return h;
@@ -212,25 +212,21 @@ class CareScheduleHardeningTests {
     }
 
     @Test
-    @DisplayName("User Requirement: Horse sử dụng TrainingDecision (ALLOWED, BLOCKED) trực tiếp")
-    void trainingDecisionConsolidation_horseUsesTrainingDecision() throws Exception {
+    @DisplayName("TrainingDecision chỉ còn ALLOWED/BLOCKED; canTrain() = ELIGIBLE và ALLOWED")
+    void trainingDecision_onlyAllowedOrBlocked_andCanTrainNeedsBoth() {
+        assertArrayEquals(new TrainingDecision[]{TrainingDecision.ALLOWED, TrainingDecision.BLOCKED},
+                TrainingDecision.values());
+
         Horse horse = new Horse();
-        horse.setTrainingStatus(TrainingDecision.ALLOWED);
-        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingStatus());
-        assertFalse(horse.isTrainingLocked());
+        horse.setCurrentStatus(HorseStatus.ELIGIBLE);
+        horse.setTrainingDecision(TrainingDecision.ALLOWED);
+        assertTrue(horse.canTrain());
 
-        horse.setTrainingStatus(TrainingDecision.BLOCKED);
-        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingStatus());
-        assertTrue(horse.isTrainingLocked());
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        assertFalse(horse.canTrain(), "Thú y chặn tập thì không tập được");
 
-        // Verify toTrainingStatus method is deleted from TrainingDecision
-        boolean hasToTrainingStatus = false;
-        for (Method m : TrainingDecision.class.getDeclaredMethods()) {
-            if ("toTrainingStatus".equals(m.getName())) {
-                hasToTrainingStatus = true;
-                break;
-            }
-        }
-        assertFalse(hasToTrainingStatus, "TrainingDecision không còn phương thức chuyển đổi toTrainingStatus()");
+        horse.setCurrentStatus(HorseStatus.CANDIDATE);
+        horse.setTrainingDecision(TrainingDecision.ALLOWED);
+        assertFalse(horse.canTrain(), "Ngựa chưa được nhận vào CLB thì không tập được dù ALLOWED");
     }
 }

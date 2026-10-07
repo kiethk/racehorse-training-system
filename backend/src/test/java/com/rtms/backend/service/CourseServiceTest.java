@@ -7,7 +7,6 @@ import com.rtms.backend.dto.CreateCourseRequest;
 import com.rtms.backend.entity.Course;
 import com.rtms.backend.entity.CourseSubject;
 import com.rtms.backend.entity.Subject;
-import com.rtms.backend.enums.CourseStatus;
 import com.rtms.backend.repository.CourseRepository;
 import com.rtms.backend.repository.CourseSubjectRepository;
 import com.rtms.backend.repository.SubjectRepository;
@@ -158,7 +157,6 @@ class CourseServiceTest {
         assertNotNull(res);
         assertEquals(100L, res.getCourse().getId());
         assertEquals("Khóa bứt tốc 1200m", res.getCourse().getName());
-        assertEquals(CourseStatus.ACTIVE, res.getCourse().getStatus());
         assertEquals(2, res.getSubjects().size());
         verify(courseRepository).save(any(Course.class));
         verify(courseSubjectRepository, times(2)).save(any(CourseSubject.class));
