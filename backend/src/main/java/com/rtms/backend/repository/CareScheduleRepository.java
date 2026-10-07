@@ -167,4 +167,19 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             Pageable pageable);
 
     long countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(Long vetId, Collection<CareScheduleStatus> statuses);
+
+    boolean existsByHorseIdAndStatusInAndIdNot(Long horseId, Collection<CareScheduleStatus> statuses, Long id);
+
+    /**
+     * Lần khám sắp tới của ngựa (đã xếp giờ thì lấy giờ xếp, chưa thì lấy giờ
+     * yêu cầu). Ngựa đang tạm nghỉ thì đây chính là mốc "tạm nghỉ đến".
+     * null nếu không còn lần khám nào đang chờ.
+     */
+    @Query("""
+            SELECT MIN(COALESCE(cs.scheduledAt, cs.requestedAt))
+            FROM CareSchedule cs
+            WHERE cs.horseId = :horseId AND cs.status IN :statuses
+            """)
+    LocalDateTime findNextExamTime(@Param("horseId") Long horseId,
+                                   @Param("statuses") Collection<CareScheduleStatus> statuses);
 }

@@ -58,23 +58,40 @@ public interface AdmissionApplicationRepository
             """)
     Optional<AdmissionApplication> findByIdForUpdate(@Param("id") Long id);
 
-    @Query("""
-            SELECT a FROM AdmissionApplication a
-            WHERE a.status = 'TRAINER_REVIEW'
-              AND NOT EXISTS (SELECT 1 FROM TrainerSchedule ts WHERE ts.admissionId = a.id)
-            ORDER BY a.submittedAt ASC, a.id ASC
-            """)
-    List<AdmissionApplication> findPendingTrainerScheduleAdmissions();
+    /**
+     * Đơn đã sang bước Trainer nhưng chưa được gán ai (chưa có Trainer phù hợp
+     * lúc Vet khám xong). Job định kỳ dùng để gán lại; đơn chờ lâu nhất trước.
+     */
+    List<AdmissionApplication> findByStatusAndTrainerIdIsNullOrderBySubmittedAtAscIdAsc(AdmissionStatus status);
 
-    @Query("""
-            SELECT a FROM AdmissionApplication a
-            WHERE a.status = :status
-              AND (a.trainerId = :trainerId OR a.trainerId IS NULL)
-            ORDER BY a.submittedAt ASC, a.id ASC
-            """)
-    List<AdmissionApplication> findTrainerPendingQueue(@Param("trainerId") Long trainerId,
-                                                       @Param("status") AdmissionStatus status);
+    /** Hàng chờ của MỘT Trainer — đơn chờ lâu nhất lên đầu. */
+    List<AdmissionApplication> findByTrainerIdAndStatusOrderBySubmittedAtAscIdAsc(Long trainerId,
+                                                                               AdmissionStatus status);
 
+    /**
+     * Hồ sơ Trainer này ĐÃ đánh giá — không lọc theo status.
+     *
+     * Đánh giá xong là đơn chuyển MANAGER_REVIEW, rồi có thể thành APPROVED
+     * hoặc REJECTED. Không trạng thái nào mang nghĩa "Trainer đã duyệt", nên
+     * dấu vết duy nhất là trainer_reviewed_at.
+     */
     List<AdmissionApplication> findByTrainerIdAndTrainerReviewedAtIsNotNullOrderByTrainerReviewedAtDesc(
             Long trainerId);
+
+    List<AdmissionApplication> findByTrainerId(Long trainerId);
+
+    /**
+     * (trainerId, horseId) của các đơn đang chờ Trainer duyệt — phần "việc đã
+     * giao nhưng chưa xong" trong tải của Trainer. Không tính phần này thì nhiều
+     * đơn hoàn tất cùng lúc sẽ dồn hết về một người.
+     */
+    @Query("""
+            SELECT a.trainerId, a.horseId
+            FROM AdmissionApplication a
+            WHERE a.status = :status
+              AND a.trainerId IN :trainerIds
+              AND a.horseId IS NOT NULL
+            """)
+    List<Object[]> findAssignedHorsePairs(@Param("trainerIds") java.util.Collection<Long> trainerIds,
+                                          @Param("status") AdmissionStatus status);
 }

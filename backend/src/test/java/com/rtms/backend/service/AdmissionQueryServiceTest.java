@@ -83,7 +83,7 @@ class AdmissionQueryServiceTest {
         AdmissionApplication reviewed = admission(2L, AdmissionStatus.MANAGER_REVIEW,
                 LocalDateTime.of(2026, 3, 1, 9, 0));
 
-        when(admissions.findTrainerPendingQueue(7L, AdmissionStatus.TRAINER_REVIEW))
+        when(admissions.findByTrainerIdAndStatusOrderBySubmittedAtAscIdAsc(7L, AdmissionStatus.TRAINER_REVIEW))
                 .thenReturn(List.of(pending));
         when(admissions.findByTrainerIdAndTrainerReviewedAtIsNotNullOrderByTrainerReviewedAtDesc(7L))
                 .thenReturn(List.of(reviewed));

@@ -1,16 +1,17 @@
 package com.rtms.backend.controller;
+
+import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreateHorseRequest;
-import com.rtms.backend.dto.HorseAlertResponse;
-import com.rtms.backend.dto.HorseFitnessTrendItemResponse;
-import com.rtms.backend.dto.UpdateHorseStatusRequest;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.service.HorseService;
-import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.dto.ApiResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.web.bind.annotation.*;
+
+import com.rtms.backend.dto.HorseAlertResponse;
+import com.rtms.backend.dto.HorseFitnessTrendItemResponse;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
 import java.util.List;
@@ -49,13 +50,6 @@ public class HorseController {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
         return ApiResponse.success(horseService.getHorseById(id, currentUser));
-    }
-
-    @PreAuthorize("hasAuthority('HORSE_STATUS_EDIT')")
-    @PutMapping("/{id}/status")
-    public ApiResponse<Horse> updateHorseStatus(@PathVariable Long id,
-            @RequestBody UpdateHorseStatusRequest request) {
-        return ApiResponse.success(horseService.updateHorseStatus(id, request));
     }
 
     /** Bỏ trống stallId = gỡ ngựa khỏi chuồng, giống assign-groom bỏ trống groomId. */

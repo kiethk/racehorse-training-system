@@ -1,11 +1,11 @@
 package com.rtms.backend.dto;
+
 import com.rtms.backend.entity.CandidateHorseProfile;
-import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.ArrivalStatus;
-import com.rtms.backend.enums.ReviewDecision;
-import com.rtms.backend.enums.VetDecision;
 import com.rtms.backend.entity.HealthRecord;
 import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.enums.ReviewDecision;
+import com.rtms.backend.enums.TrainingDecision;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,8 +29,7 @@ public class AdmissionDetailResponse {
     private LocalDateTime groomReviewedAt;
 
     private Long veterinarianId;
-    private VetDecision vetDecision;
-    private String vetTrainingDecision;
+    private TrainingDecision vetTrainingDecision;
     private String vetFeedback;
     private LocalDateTime vetReviewedAt;
 
@@ -45,9 +44,6 @@ public class AdmissionDetailResponse {
     private LocalDateTime managerReviewedAt;
 
     private Long horseId;
-    private ArrivalStatus arrivalStatus;
-    private LocalDateTime arrivalConfirmedAt;
-    private Long arrivalConfirmedBy;
     private LocalDateTime submittedAt;
 
     // Available REGULAR stalls for Manager to select during approval
@@ -164,19 +160,11 @@ public class AdmissionDetailResponse {
         this.veterinarianId = veterinarianId;
     }
 
-    public VetDecision getVetDecision() {
-        return vetDecision;
-    }
-
-    public void setVetDecision(VetDecision vetDecision) {
-        this.vetDecision = vetDecision;
-    }
-
-    public String getVetTrainingDecision() {
+    public TrainingDecision getVetTrainingDecision() {
         return vetTrainingDecision;
     }
 
-    public void setVetTrainingDecision(String vetTrainingDecision) {
+    public void setVetTrainingDecision(TrainingDecision vetTrainingDecision) {
         this.vetTrainingDecision = vetTrainingDecision;
     }
 
@@ -263,18 +251,6 @@ public class AdmissionDetailResponse {
     public void setHorseId(Long horseId) {
         this.horseId = horseId;
     }
-
-    public ArrivalStatus getArrivalStatus() { return arrivalStatus; }
-
-    public void setArrivalStatus(ArrivalStatus arrivalStatus) { this.arrivalStatus = arrivalStatus; }
-
-    public LocalDateTime getArrivalConfirmedAt() { return arrivalConfirmedAt; }
-
-    public void setArrivalConfirmedAt(LocalDateTime arrivalConfirmedAt) { this.arrivalConfirmedAt = arrivalConfirmedAt; }
-
-    public Long getArrivalConfirmedBy() { return arrivalConfirmedBy; }
-
-    public void setArrivalConfirmedBy(Long arrivalConfirmedBy) { this.arrivalConfirmedBy = arrivalConfirmedBy; }
 
     public LocalDateTime getSubmittedAt() {
         return submittedAt;

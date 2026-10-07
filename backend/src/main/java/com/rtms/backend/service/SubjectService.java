@@ -2,7 +2,6 @@ package com.rtms.backend.service;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.dto.CreateSubjectRequest;
 import com.rtms.backend.entity.Subject;
-import com.rtms.backend.enums.WorkoutType;
 import com.rtms.backend.repository.SubjectCategoryRepository;
 import com.rtms.backend.repository.SubjectRepository;
 import org.springframework.stereotype.Service;
@@ -48,8 +47,6 @@ public class SubjectService {
         subject.setIntensityLevel(request.getIntensityLevel());
         subject.setDurationMinutes(
                 request.getDurationMinutes() != null ? request.getDurationMinutes() : 60);
-        subject.setWorkoutType(
-                request.getWorkoutType() != null ? request.getWorkoutType() : WorkoutType.REGULAR);
 
         if (subject.getDurationMinutes() < 15 || subject.getDurationMinutes() > 240) {
             throw new IllegalArgumentException(

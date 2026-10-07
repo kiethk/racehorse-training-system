@@ -3,6 +3,7 @@ package com.rtms.backend.service;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.dto.*;
 import com.rtms.backend.entity.*;
+import com.rtms.backend.event.InitialExamCompletedEvent;
 import com.rtms.backend.enums.*;
 import com.rtms.backend.repository.*;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -58,9 +59,7 @@ class AdmissionVetReviewWorkflowTest {
     @Mock
     private NotificationService notificationService;
     @Mock
-    private TrainerScheduleAssignmentService trainerScheduleAssignmentService;
-    @Mock
-    private TrainerScheduleRepository trainerScheduleRepository;
+    private HorseTrainingPlanService trainingPlanService;
     @Mock
     private CandidateHorseProfileRepository candidateProfileRepository;
     @Mock
@@ -88,7 +87,7 @@ class AdmissionVetReviewWorkflowTest {
                 eventPublisher,
                 entityManager,
                 notificationService,
-                trainerScheduleAssignmentService
+                new TrainingDecisionService(horseRepository, careScheduleRepository, trainingPlanService)
         );
 
         admissionQueryService = new AdmissionQueryService(
@@ -99,8 +98,7 @@ class AdmissionVetReviewWorkflowTest {
                 healthRecordRepository,
                 fileStorage,
                 userRepository,
-                careScheduleRepository,
-                trainerScheduleRepository
+                careScheduleRepository
         );
 
         admissionReviewService = new AdmissionReviewService(
@@ -114,50 +112,71 @@ class AdmissionVetReviewWorkflowTest {
     }
 
     @Test
-    @DisplayName("Vet cannot reject admission: completeCareSchedule returns 403 VET_CANNOT_REJECT_ADMISSION")
-    void completeCareSchedule_rejectAdmission_throws403() {
-        CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
-        req.setRejectAdmission(true);
-        req.setFindings("Severe lameness");
-        req.setDiagnosis("Fracture");
-        req.setTrainingDecision(TrainingDecision.BLOCKED);
-
-        ApiException ex = assertThrows(ApiException.class, () ->
-                careScheduleService.completeCareSchedule(100L, req, 15L));
-
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
-        assertEquals("VET_CANNOT_REJECT_ADMISSION", ex.getErrorCode());
-    }
-
-    @Test
-    @DisplayName("AdmissionReviewService blocks Vet rejection request with 403")
-    void reviewByVet_rejectAdmission_throws403() {
+    @DisplayName("Vet review thiếu kết luận tập luyện -> 400, không đụng tới đơn")
+    void reviewByVet_missingTrainingDecision_throws400() {
         VetReviewRequest req = new VetReviewRequest();
-        req.setRejectAdmission(true);
-        req.setDecision(VetDecision.REJECTED);
+        req.setPhysicalExamConfirmed(true);
         req.setFindings("Severe colic");
 
         ApiException ex = assertThrows(ApiException.class, () ->
                 admissionReviewService.reviewByVet(1L, req, 15L));
 
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
-        assertEquals("VET_CANNOT_REJECT_ADMISSION", ex.getErrorCode());
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        verifyNoInteractions(admissionRepository);
     }
 
     @Test
-    @DisplayName("Legacy followUpDate is rejected with 400 LEGACY_FIELD_NOT_SUPPORTED")
-    void completeCareSchedule_legacyFollowUpDate_throws400() {
+    @DisplayName("Khám nhập học BLOCKED: Vet không từ chối đơn — đơn vẫn sang TRAINER_REVIEW kèm kết luận BLOCKED")
+    void completeInitialExam_blocked_stillMovesToTrainerReview() {
+        Long scheduleId = 100L;
+        Long vetId = 15L;
+        Long horseId = 20L;
+        Long admissionId = 1L;
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setHorseId(horseId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setVeterinarianId(vetId);
+
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setCurrentStatus(HorseStatus.CANDIDATE);
+
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(admissionId);
+        admission.setHorseId(horseId);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+
+        when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
+        when(admissionRepository.findByIdForUpdate(admissionId)).thenReturn(Optional.of(admission));
+        when(admissionRepository.findById(admissionId)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+        when(healthRecordRepository.save(any(HealthRecord.class))).thenAnswer(i -> i.getArgument(0));
+        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+        when(careScheduleRepository.saveAndFlush(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+
         CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
-        req.setFindings("Healthy");
-        req.setDiagnosis("Clear");
-        req.setTrainingDecision(TrainingDecision.ALLOWED);
-        req.setFollowUpDate(LocalDate.now().plusDays(7));
+        req.setFindings("Mild tendon heat");
+        req.setDiagnosis("Tendon strain");
+        req.setTrainingDecision(TrainingDecision.BLOCKED);
+        req.setRestrictionDetails("Box rest 10 days");
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setDescription("Recheck tendon");
+        next.setScheduledDate(LocalDate.now().plusDays(10).toString());
+        req.setNextSchedule(next);
 
-        ApiException ex = assertThrows(ApiException.class, () ->
-                careScheduleService.completeCareSchedule(100L, req, 15L));
+        careScheduleService.completeCareSchedule(scheduleId, req, vetId);
 
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertEquals("LEGACY_FIELD_NOT_SUPPORTED", ex.getErrorCode());
+        assertEquals(AdmissionStatus.TRAINER_REVIEW, admission.getStatus());
+        assertEquals(TrainingDecision.BLOCKED, admission.getVetTrainingDecision());
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
+        assertEquals("Box rest 10 days", horse.getTrainingDecisionReason());
+        verify(eventPublisher).publishEvent(new InitialExamCompletedEvent(admissionId));
     }
 
     @Test
@@ -179,7 +198,6 @@ class AdmissionVetReviewWorkflowTest {
         Horse horse = new Horse();
         horse.setId(horseId);
         horse.setCurrentStatus(HorseStatus.CANDIDATE);
-        horse.setTrainingStatus(TrainingDecision.BLOCKED);
 
         AdmissionApplication admission = new AdmissionApplication();
         admission.setId(admissionId);
@@ -211,9 +229,10 @@ class AdmissionVetReviewWorkflowTest {
         assertNotNull(res);
         assertEquals(CareScheduleStatus.COMPLETED, schedule.getStatus());
         assertEquals(AdmissionStatus.TRAINER_REVIEW, admission.getStatus());
-        assertEquals("ALLOWED", admission.getVetTrainingDecision());
+        assertEquals(TrainingDecision.ALLOWED, admission.getVetTrainingDecision());
         assertEquals(15L, admission.getVeterinarianId(), "Vet assignment must be preserved");
-        verify(trainerScheduleAssignmentService).assignForCompletedInitialCare(admissionId, scheduleId);
+        // Gán Trainer chạy sau commit qua sự kiện, không gọi thẳng trong transaction của Vet.
+        verify(eventPublisher).publishEvent(new InitialExamCompletedEvent(admissionId));
     }
 
     @Test
@@ -240,6 +259,7 @@ class AdmissionVetReviewWorkflowTest {
         adm.setId(1L);
         adm.setOwnerId(5L);
         adm.setHorseId(20L);
+        adm.setTrainerId(8L);
         adm.setStatus(AdmissionStatus.VET_REVIEW);
         adm.setSubmittedAt(LocalDateTime.now().minusDays(1));
         when(admissionRepository.findAllById(any())).thenReturn(List.of(adm));
@@ -259,11 +279,6 @@ class AdmissionVetReviewWorkflowTest {
         trainer.setId(8L);
         trainer.setFullName("Trainer Mike");
         when(userRepository.findAllById(any())).thenReturn(List.of(owner, trainer));
-
-        TrainerSchedule ts = new TrainerSchedule();
-        ts.setAdmissionId(1L);
-        ts.setTrainerId(8L);
-        when(trainerScheduleRepository.findByAdmissionId(1L)).thenReturn(Optional.of(ts));
 
         Page<VetAdmissionQueueItemResponse> queue = admissionQueryService.getVetQueue(
                 vetId, null, null, null, null, null, null, pageRequest);

@@ -1,6 +1,5 @@
 export type SurfaceType = 'TURF' | 'DIRT' | 'SYNTHETIC';
 export type IntensityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
-export type WorkoutType = 'REGULAR' | 'GATE_PRACTICE' | 'BREEZING' | 'SWIMMING' | 'RECOVERY';
 
 export type TrainingDay =
   | 'MONDAY'
@@ -26,7 +25,6 @@ export interface Subject {
   targetDistanceMeters: number;
   intensityLevel: IntensityLevel;
   durationMinutes: number;
-  workoutType: WorkoutType;
 }
 
 export interface CreateSubjectRequest {
@@ -37,7 +35,6 @@ export interface CreateSubjectRequest {
   targetDistanceMeters: number;
   intensityLevel: IntensityLevel;
   durationMinutes: number;
-  workoutType?: WorkoutType;
 }
 
 export interface CourseSubjectItem {
@@ -116,7 +113,6 @@ export interface PlanWorkoutItemResponse {
   endTime: string;
   subjectId: number;
   subjectName: string;
-  workoutType: string;
   horseId: number;
   /** Người dắt RIÊNG con ngựa này — KHÔNG phải "groom của lot". */
   assignedGroomId: number | null;
@@ -185,7 +181,7 @@ export interface TrainingLotResponse {
   subjectId: number;
   subjectName: string;
   durationMinutes: number;
-  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
   maxCapacity: number;
   occupied: number;
   remainingSlots: number;

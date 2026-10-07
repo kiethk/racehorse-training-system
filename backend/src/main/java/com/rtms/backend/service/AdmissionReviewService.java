@@ -1,25 +1,10 @@
 package com.rtms.backend.service;
-import com.rtms.backend.dto.VetReviewRequest;
-import com.rtms.backend.dto.VetReviewResponse;
-import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.VetDecision;
-import com.rtms.backend.repository.AdmissionApplicationRepository;
-import com.rtms.backend.dto.CareScheduleResponse;
-import com.rtms.backend.dto.CompleteCareScheduleRequest;
-import com.rtms.backend.entity.CareSchedule;
-import com.rtms.backend.entity.HealthRecord;
-import com.rtms.backend.enums.CareScheduleStatus;
-import com.rtms.backend.enums.CareType;
-import com.rtms.backend.repository.CareScheduleRepository;
-import com.rtms.backend.repository.HealthRecordRepository;
-import com.rtms.backend.service.CareScheduleService;
-import com.rtms.backend.entity.Horse;
-import com.rtms.backend.repository.HorseRepository;
+
 import com.rtms.backend.config.ApiException;
-import com.rtms.backend.entity.StableStall;
-import com.rtms.backend.repository.StableStallRepository;
-import com.rtms.backend.enums.TrainingDecision;
+import com.rtms.backend.dto.*;
+import com.rtms.backend.entity.*;
+import com.rtms.backend.enums.*;
+import com.rtms.backend.repository.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,13 +39,8 @@ public class AdmissionReviewService {
 
     @Transactional
     public VetReviewResponse reviewByVet(Long admissionId, VetReviewRequest request, Long actorId) {
-        if (Boolean.TRUE.equals(request.getRejectAdmission()) || request.getDecision() == VetDecision.REJECTED) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "VET_CANNOT_REJECT_ADMISSION",
-                    "Veterinarians cannot reject admissions; only medical training decisions (ALLOWED, RESTRICTED, BLOCKED) are permitted.");
-        }
-        if (request.getFollowUpDate() != null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "LEGACY_FIELD_NOT_SUPPORTED",
-                    "followUpDate is deprecated and not supported; schedule follow-up examinations via nextSchedule instead.");
+        if (request.getTrainingDecision() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Training decision is required");
         }
 
         AdmissionApplication before = admissions.findById(admissionId)
@@ -107,8 +87,6 @@ public class AdmissionReviewService {
 
         HealthRecord hr = healthRecordRepository.findByCareScheduleId(schedule.getId()).orElse(null);
 
-        // Map the trainingDecision back to a VetDecision for the response (nullable per modern workflow)
-        VetDecision responseDecision = admission.getVetDecision();
         TrainingDecision trainingDecision = hr != null && hr.getTrainingDecision() != null
                 ? hr.getTrainingDecision()
                 : compReq.getTrainingDecision();
@@ -122,7 +100,6 @@ public class AdmissionReviewService {
                 admission.getId(),
                 admission.getStatus(),
                 actorId,
-                responseDecision,
                 trainingDecision,
                 restrictionDetails,
                 admission.getVetFeedback(),
@@ -145,33 +122,13 @@ public class AdmissionReviewService {
         compReq.setTreatment(request.getTreatment());
         compReq.setSymptoms(request.getSymptoms());
         compReq.setNotes(request.getNotes() != null ? request.getNotes() : request.getFeedback());
-        compReq.setFollowUpDate(request.getFollowUpDate());
         compReq.setMetrics(request.getMetrics());
         compReq.setNextSchedule(request.getNextSchedule());
-        compReq.setRejectAdmission(false);
-
-        if (request.getTrainingDecision() != null) {
-            compReq.setTrainingDecision(request.getTrainingDecision());
-            compReq.setRestrictionDetails(
-                    request.getRestrictionDetails() != null ? request.getRestrictionDetails() : request.getFeedback());
-        } else if (request.getDecision() == VetDecision.APPROVED) {
-            compReq.setTrainingDecision(TrainingDecision.ALLOWED);
-        } else if (request.getDecision() == VetDecision.RECHECK_REQUIRED) {
-            compReq.setTrainingDecision(TrainingDecision.RESTRICTED);
-            compReq.setRestrictionDetails(request.getFeedback() != null ? request.getFeedback() : "Recheck required");
-        } else {
-            compReq.setTrainingDecision(TrainingDecision.BLOCKED);
-            compReq.setRestrictionDetails(
-                    request.getRejectionReason() != null ? request.getRejectionReason() : request.getFeedback());
-        }
-
-        // Ensure restriction details are present for non-ALLOWED decisions
-        if (compReq.getTrainingDecision() != TrainingDecision.ALLOWED
-                && (compReq.getRestrictionDetails() == null || compReq.getRestrictionDetails().isBlank())) {
-            compReq.setRestrictionDetails(request.getRejectionReason() != null ? request.getRejectionReason()
-                    : (request.getFeedback() != null ? request.getFeedback() : "Training restricted by veterinarian"));
-        }
-
+        compReq.setTrainingDecision(request.getTrainingDecision());
+        compReq.setRestrictionDetails(
+                request.getRestrictionDetails() != null && !request.getRestrictionDetails().isBlank()
+                        ? request.getRestrictionDetails()
+                        : request.getFeedback());
         return compReq;
     }
 

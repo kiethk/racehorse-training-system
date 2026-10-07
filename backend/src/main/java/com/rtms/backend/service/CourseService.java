@@ -1,5 +1,5 @@
 package com.rtms.backend.service;
-import com.rtms.backend.security.AuthenticatedUser;
+
 import com.rtms.backend.dto.CourseDetailResponse;
 import com.rtms.backend.dto.CourseSubjectItemRequest;
 import com.rtms.backend.dto.CourseSubjectResponse;
@@ -7,10 +7,10 @@ import com.rtms.backend.dto.CreateCourseRequest;
 import com.rtms.backend.entity.Course;
 import com.rtms.backend.entity.CourseSubject;
 import com.rtms.backend.entity.Subject;
-import com.rtms.backend.enums.CourseStatus;
 import com.rtms.backend.repository.CourseRepository;
 import com.rtms.backend.repository.CourseSubjectRepository;
 import com.rtms.backend.repository.SubjectRepository;
+import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,7 +58,6 @@ public class CourseService {
         course.setTargetGoal(request.getTargetGoal());
         course.setTotalSessions(request.getTotalSessions());
         course.setCreatedById(currentUser.getUserId());
-        course.setStatus(CourseStatus.ACTIVE);
 
         Course savedCourse = courseRepository.save(course);
 

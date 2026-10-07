@@ -1,8 +1,10 @@
 export type StallStatus = 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE';
 export type AreaType = 'REGULAR' | 'QUARANTINE';
-export type HorseStatus =
-  | 'CANDIDATE' | 'ELIGIBLE' | 'MONITORING'
-  | 'INJURED' | 'QUARANTINED' | 'REJECTED';
+/** Vòng đời ngựa trong CLB. Sức khỏe không nằm ở đây — xem trainingDecision. */
+export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED';
+
+/** Thú y cho tập hay tạm chặn. Tập được = ELIGIBLE và ALLOWED. */
+export type TrainingDecision = 'ALLOWED' | 'BLOCKED';
 
 export interface Area {
   id: number;
@@ -29,7 +31,9 @@ export interface Horse {
   currentStatus: HorseStatus;
   currentStallId: number | null;
   ownerId: number | null;
-  trainingLocked?: boolean;
+  trainingDecision?: TrainingDecision;
+  /** Lý do Thú y chặn tập; null khi ALLOWED. */
+  trainingDecisionReason?: string | null;
   registrationNumber?: string | null;
 }
 

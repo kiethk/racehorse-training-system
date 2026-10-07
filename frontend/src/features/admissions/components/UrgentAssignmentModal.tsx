@@ -15,7 +15,7 @@ function formatDateTime(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+    : new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
 export function UrgentAssignmentModal({ alert, onOpenCase }: Props) {
@@ -38,13 +38,13 @@ export function UrgentAssignmentModal({ alert, onOpenCase }: Props) {
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--color-danger)]">
-                Automatic assignment · No confirmation required
+                Phân công tự động · Không cần xác nhận
               </p>
               <h2 id="urgent-assignment-title" className="mt-1 text-[19px] font-bold text-[var(--color-text-primary)]">
-                URGENT CASE ASSIGNED
+                CA KHẨN CẤP ĐÃ ĐƯỢC PHÂN CÔNG
               </h2>
               <p id="urgent-assignment-description" className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
-                The system assigned you directly to this case. The horse is BLOCKED from training.
+                Hệ thống đã phân công bạn trực tiếp cho ca này. Horse đang bị BLOCKED khỏi training.
               </p>
             </div>
             <Pill tone="danger">{alert.severity}</Pill>
@@ -58,24 +58,24 @@ export function UrgentAssignmentModal({ alert, onOpenCase }: Props) {
               <dd className="mt-1 font-bold text-[var(--color-text-primary)]">{alert.horseName} · #{alert.horseId}</dd>
             </div>
             <div>
-              <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Stall / location</dt>
+              <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Chuồng / vị trí</dt>
               <dd className="mt-1 font-semibold text-[var(--color-text-primary)]">
-                {[alert.stallCode, alert.stableLocation].filter(Boolean).join(' · ') || 'Described in report'}
+                {[alert.stallCode, alert.stableLocation].filter(Boolean).join(' · ') || 'Được mô tả trong báo cáo'}
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Reported by</dt>
+              <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Người báo</dt>
               <dd className="mt-1 font-semibold text-[var(--color-text-primary)]">
-                {alert.reportedByName || 'Unknown'} · #{alert.reportedById}
+                {alert.reportedByName || 'Không rõ tên'} · #{alert.reportedById}
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Reported at</dt>
+              <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Thời điểm báo</dt>
               <dd className="mt-1 font-semibold text-[var(--color-text-primary)]">{formatDateTime(alert.reportedAt)}</dd>
             </div>
             <div className="sm:col-span-2">
-              <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Training status</dt>
-              <dd className="mt-1 font-bold text-[var(--color-danger)]">{alert.trainingStatus} — Training blocked</dd>
+              <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Quyết định tập luyện</dt>
+              <dd className="mt-1 font-bold text-[var(--color-danger)]">{alert.trainingDecision} — Tạm dừng tập cho tới khi khám xong</dd>
             </div>
           </dl>
 
@@ -92,17 +92,17 @@ export function UrgentAssignmentModal({ alert, onOpenCase }: Props) {
               target="_blank"
               rel="noreferrer"
               className="block overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)]"
-              aria-label="Open report image at full size"
+              aria-label="Mở ảnh báo cáo kích thước lớn"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={admissionsApi.assetUrl(alert.imageUrl)} alt="Urgent case report" className="max-h-72 w-full object-contain" />
+              <img src={admissionsApi.assetUrl(alert.imageUrl)} alt="Ảnh ca khẩn cấp" className="max-h-72 w-full object-contain" />
             </a>
           )}
         </div>
 
         <footer className="border-t border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-6 py-4">
           <Button variant="destructive" icon="chevron-right" className="w-full" onClick={() => onOpenCase(alert)}>
-            Open urgent case
+            Mở ca khẩn cấp
           </Button>
         </footer>
       </div>

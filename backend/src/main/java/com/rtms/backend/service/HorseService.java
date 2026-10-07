@@ -2,7 +2,6 @@ package com.rtms.backend.service;
 import com.rtms.backend.dto.CreateHorseRequest;
 import com.rtms.backend.dto.HorseAlertResponse;
 import com.rtms.backend.dto.HorseFitnessTrendItemResponse;
-import com.rtms.backend.dto.UpdateHorseStatusRequest;
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.repository.HorseRepository;
@@ -137,31 +136,6 @@ public class HorseService {
             }
         }
         return horse;
-    }
-
-    @Transactional
-    public Horse updateHorseStatus(Long id, UpdateHorseStatusRequest request) {
-        Horse horse = horseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Horse not found with id: " + id));
-
-        // Cập nhật trạng thái mới
-        HorseStatus newStatus = HorseStatus.valueOf(request.getStatus());
-        horse.setCurrentStatus(newStatus);
-        Horse saved = horseRepository.save(horse);
-
-        // A non-eligible administrative status may lock training, but changing
-        // the status back to ELIGIBLE never clears a Vet lock. Only a veterinary
-        // APPROVED decision is allowed to do that.
-        if (newStatus != HorseStatus.ELIGIBLE) {
-            horse.setTrainingLocked(true);
-            horse.setTrainingLockReason("Horse status changed to " + newStatus);
-            horse.setTrainingLockUpdatedAt(java.time.LocalDateTime.now());
-            trainingPlanService.cancelFutureTrainingForHorse(
-                    saved.getId(),
-                    "Chiến mã chuyển sang trạng thái " + newStatus);
-        }
-
-        return saved;
     }
 
     /**

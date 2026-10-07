@@ -34,17 +34,20 @@ public class GroomIncidentReportService {
     private final AdmissionFileStorage fileStorage;
     private final CareScheduleRepository careScheduleRepository;
     private final CareScheduleService careScheduleService;
+    private final TrainingDecisionService trainingDecisionService;
 
     public GroomIncidentReportService(GroomIncidentReportRepository incidentReportRepository,
                                       HorseRepository horseRepository,
                                       AdmissionFileStorage fileStorage,
                                       CareScheduleRepository careScheduleRepository,
-                                      CareScheduleService careScheduleService) {
+                                      CareScheduleService careScheduleService,
+                                      TrainingDecisionService trainingDecisionService) {
         this.incidentReportRepository = incidentReportRepository;
         this.horseRepository = horseRepository;
         this.fileStorage = fileStorage;
         this.careScheduleRepository = careScheduleRepository;
         this.careScheduleService = careScheduleService;
+        this.trainingDecisionService = trainingDecisionService;
     }
 
     @Transactional
@@ -92,9 +95,8 @@ public class GroomIncidentReportService {
                             horse.getId(), CareType.URGENT, activeStatuses)
                     .orElseThrow(() -> new IllegalStateException("Urgent schedule was not created"));
         } else {
-            horse.setTrainingStatus(TrainingDecision.BLOCKED);
-            horse.setTrainingLockReason("Urgent veterinary care pending");
-            horseRepository.save(horse);
+            // Đã có ca khẩn cấp đang mở: báo cáo mới chỉ gắn vào ca đó, ngựa vẫn bị chặn tập.
+            trainingDecisionService.block(horse, "Urgent veterinary care pending");
         }
         saved.setCareScheduleId(active.getId());
         return incidentReportRepository.save(saved);

@@ -3,9 +3,6 @@ import type {
   TrainerAdmissionQueue,
   TrainerAdmissionView,
   TrainerReviewRequest,
-  TrainerScheduleDetailResponse,
-  TrainerScheduleResponse,
-  TrainerScheduleStatus,
 } from '../types/trainer';
 
 /** Khớp dto/ApiResponse.java — { success, data, message }. */
@@ -18,50 +15,6 @@ interface ApiResponse<T> {
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const trainerAdmissionsApi = {
-  /**
-   * Lấy danh sách lịch đánh giá của Trainer (/api/trainer-schedules)
-   */
-  getSchedules: async (status?: TrainerScheduleStatus): Promise<TrainerScheduleResponse[]> => {
-    const query = status ? `?status=${status}` : '';
-    const res = await apiGet<ApiResponse<TrainerScheduleResponse[]>>(`/api/trainer-schedules${query}`);
-    return res.data;
-  },
-
-  /**
-   * Chi tiết lịch đánh giá gồm đơn nhập viện, hồ sơ ngựa, kết quả khám của Vet (/api/trainer-schedules/:id)
-   */
-  getScheduleDetail: async (scheduleId: number): Promise<TrainerScheduleDetailResponse> => {
-    const res = await apiGet<ApiResponse<TrainerScheduleDetailResponse>>(
-      `/api/trainer-schedules/${scheduleId}`,
-    );
-    return res.data;
-  },
-
-  /**
-   * Bắt đầu đánh giá (SCHEDULED -> IN_PROGRESS)
-   */
-  startSchedule: async (scheduleId: number): Promise<TrainerScheduleResponse> => {
-    const res = await apiPost<ApiResponse<TrainerScheduleResponse>>(
-      `/api/trainer-schedules/${scheduleId}/start`,
-      {},
-    );
-    return res.data;
-  },
-
-  /**
-   * Hoàn thành đánh giá (IN_PROGRESS -> COMPLETED)
-   */
-  completeSchedule: async (
-    scheduleId: number,
-    body: TrainerReviewRequest,
-  ): Promise<TrainerScheduleResponse> => {
-    const res = await apiPost<ApiResponse<TrainerScheduleResponse>>(
-      `/api/trainer-schedules/${scheduleId}/complete`,
-      body,
-    );
-    return res.data;
-  },
-
   /**
    * Hàng chờ của CHÍNH Trainer đang đăng nhập — hai nhóm trong một lời gọi.
    */

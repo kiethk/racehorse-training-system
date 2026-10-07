@@ -1,24 +1,9 @@
 package com.rtms.backend.service;
+
 import com.rtms.backend.dto.GroomAdmissionReviewRequest;
-import com.rtms.backend.dto.GroomArrivalConfirmationRequest;
-import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.entity.CandidateHorseProfile;
-import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.ArrivalStatus;
-import com.rtms.backend.enums.ReviewDecision;
-import com.rtms.backend.repository.AdmissionApplicationRepository;
-import com.rtms.backend.repository.CandidateHorseProfileRepository;
-import com.rtms.backend.repository.CareScheduleRepository;
-import com.rtms.backend.service.CareScheduleService;
-import com.rtms.backend.entity.Horse;
-import com.rtms.backend.entity.HorsePedigree;
-import com.rtms.backend.enums.HorseStatus;
-import com.rtms.backend.repository.HorsePedigreeRepository;
-import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.entity.StableStall;
-import com.rtms.backend.enums.StallStatus;
-import com.rtms.backend.repository.StableStallRepository;
-import com.rtms.backend.enums.TrainingDecision;
+import com.rtms.backend.entity.*;
+import com.rtms.backend.enums.*;
+import com.rtms.backend.repository.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +22,7 @@ public class AdmissionGroomReviewService {
     private final HorsePedigreeRepository horsePedigreeRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final CareScheduleService careScheduleService;
+    private final NotificationService notificationService;
 
     public AdmissionGroomReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
@@ -45,7 +31,8 @@ public class AdmissionGroomReviewService {
             HorseRepository horseRepository,
             HorsePedigreeRepository horsePedigreeRepository,
             CareScheduleRepository careScheduleRepository,
-            CareScheduleService careScheduleService) {
+            CareScheduleService careScheduleService,
+            NotificationService notificationService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.stableStallRepository = stableStallRepository;
@@ -53,6 +40,7 @@ public class AdmissionGroomReviewService {
         this.horsePedigreeRepository = horsePedigreeRepository;
         this.careScheduleRepository = careScheduleRepository;
         this.careScheduleService = careScheduleService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -94,61 +82,6 @@ public class AdmissionGroomReviewService {
         return moveForwardIfCapacityAvailable(admission);
     }
 
-    @Transactional
-    public AdmissionApplication confirmArrival(Long admissionId, Long groomId,
-            GroomArrivalConfirmationRequest request) {
-        AdmissionApplication admission = admissionApplicationRepository.findByIdForUpdate(admissionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
-
-        if (admission.getStatus() != AdmissionStatus.WAITING_FOR_ARRIVAL) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Admission is not waiting for horse arrival");
-        }
-
-        String feedback = request == null || request.feedback() == null
-                ? null : request.feedback().trim();
-        if (request == null || !request.confirmed()) {
-            if (feedback == null || feedback.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Feedback is required when rejecting the arriving horse");
-            }
-            releaseReservedQuarantineStall(admission);
-            admission.setQuarantineStallId(null);
-            admission.setStatus(AdmissionStatus.REJECTED);
-            admission.setGroomFeedback(feedback);
-            return admissionApplicationRepository.save(admission);
-        }
-
-        CandidateHorseProfile candidate = candidateHorseProfileRepository
-                .findByAdmissionId(admission.getId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Candidate horse profile not found"));
-
-        StableStall quarantineStall = stableStallRepository
-                .findQuarantineStallByIdForUpdate(admission.getQuarantineStallId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.CONFLICT, "Reserved quarantine stall not found"));
-        if (quarantineStall.getStatus() != StallStatus.OCCUPIED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Reserved quarantine stall is no longer occupied");
-        }
-
-        Horse horse = findReusableHorseOrCreateNew(admission, candidate);
-        applyCandidateSnapshot(horse, admission, candidate, quarantineStall);
-        horse = horseRepository.save(horse);
-        updatePedigree(horse.getId(), candidate);
-
-        admission.setHorseId(horse.getId());
-        admission.setArrivalStatus(ArrivalStatus.CONFIRMED);
-        admission.setArrivalConfirmedAt(LocalDateTime.now());
-        admission.setArrivalConfirmedBy(groomId);
-        admission.setStatus(AdmissionStatus.VET_REVIEW);
-        AdmissionApplication saved = admissionApplicationRepository.save(admission);
-
-        careScheduleService.createInitialSchedule(saved.getId(), horse.getId());
-        return saved;
-    }
-
     private AdmissionApplication reject(AdmissionApplication admission, Long groomId, String feedback) {
         stampGroomReview(admission, groomId, ReviewDecision.REJECTED, feedback);
         admission.setStatus(AdmissionStatus.REJECTED);
@@ -162,30 +95,51 @@ public class AdmissionGroomReviewService {
             return admissionApplicationRepository.save(admission);
         }
 
+        CandidateHorseProfile candidate = candidateHorseProfileRepository
+                .findByAdmissionId(admission.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Candidate horse profile not found"));
+
         StableStall quarantineStall = stableStallRepository
                 .findFirstAvailableQuarantineStallForUpdate()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No quarantine stall available"));
 
+        // 1. Tạo hoặc tái sử dụng Horse CANDIDATE
+        Horse horse = findReusableHorseOrCreateNew(admission, candidate);
+        applyCandidateSnapshot(horse, admission, candidate, quarantineStall);
+        horse = horseRepository.save(horse);
+
+        updatePedigree(horse.getId(), candidate);
+
+        // 2. Tạo hoặc tái sử dụng INITIAL CareSchedule và gán Vet
+        CareSchedule initialSchedule = ensureInitialCareSchedule(admission.getId(), horse.getId());
+
+        // 3. Gán chuồng cách ly
         quarantineStall.setStatus(StallStatus.OCCUPIED);
         stableStallRepository.save(quarantineStall);
 
-        admission.setHorseId(null);
+        admission.setHorseId(horse.getId());
         admission.setQuarantineStallId(quarantineStall.getId());
-        admission.setArrivalStatus(ArrivalStatus.PENDING);
-        admission.setStatus(AdmissionStatus.WAITING_FOR_ARRIVAL);
 
-        return admissionApplicationRepository.save(admission);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+        admission = admissionApplicationRepository.save(admission);
+
+        // 4. Tạo notification "new horse assignment" cho Vet (có khóa chống trùng)
+        dispatchAssignmentNotifications(admission, horse, initialSchedule);
+
+        return admission;
     }
 
-    private void releaseReservedQuarantineStall(AdmissionApplication admission) {
-        if (admission.getQuarantineStallId() == null) {
-            return;
-        }
-        StableStall stall = stableStallRepository.findQuarantineStallByIdForUpdate(
-                admission.getQuarantineStallId()).orElse(null);
-        if (stall != null) {
-            stall.setStatus(StallStatus.AVAILABLE);
-            stableStallRepository.save(stall);
+    private void dispatchAssignmentNotifications(AdmissionApplication admission, Horse horse, CareSchedule initialSchedule) {
+        // Notification cho Vet
+        if (initialSchedule != null && initialSchedule.getVeterinarianId() != null) {
+            notificationService.sendAssignmentNotification(
+                    initialSchedule.getVeterinarianId(),
+                    admission.getId(),
+                    horse.getId(),
+                    NotificationTypes.ADMISSION_VET_ASSIGNED,
+                    "New horse assignment",
+                    "You have been assigned to candidate horse " + horse.getName() + " for initial admission examination in quarantine."
+            );
         }
     }
 
@@ -225,12 +179,10 @@ public class AdmissionGroomReviewService {
         horse.setRegistrationNumber(candidate.getRegistrationNumber());
         horse.setCurrentStatus(HorseStatus.CANDIDATE);
         horse.setCurrentStallId(quarantineStall.getId());
-        horse.setTrainingStatus(TrainingDecision.BLOCKED);
-        horse.setTrainingLocked(true);
-        horse.setTrainingLockReason("Initial admission examination is pending");
-        horse.setTrainingLockVetId(null);
-        horse.setTrainingLockReviewDate(null);
-        horse.setTrainingLockUpdatedAt(LocalDateTime.now());
+        // Không khóa tập ở đây: CANDIDATE vốn không tập được (Horse.canTrain()).
+        // Ngựa từng bị từ chối nộp lại thì xóa kết luận cũ — lần khám nhập học mới sẽ quyết định.
+        horse.setTrainingDecision(TrainingDecision.ALLOWED);
+        horse.setTrainingDecisionReason(null);
     }
 
     private void updatePedigree(Long horseId, CandidateHorseProfile candidate) {
@@ -244,10 +196,38 @@ public class AdmissionGroomReviewService {
         horsePedigreeRepository.save(pedigree);
     }
 
+    private CareSchedule ensureInitialCareSchedule(Long admissionId, Long horseId) {
+        CareSchedule schedule = careScheduleRepository
+                .findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admissionId, CareType.INITIAL)
+                .orElse(null);
+
+        if (schedule == null) {
+            // Spec item 11: every admission reaching VET_REVIEW owns its own INITIAL
+            // care_schedule row. The horse-level check previously skipped creation
+            // when a different admission already had an open INITIAL, leaving this
+            // admission without a schedule of its own.
+            schedule = new CareSchedule();
+            schedule.setHorseId(horseId);
+            schedule.setAdmissionId(admissionId);
+            schedule.setCareType(CareType.INITIAL);
+            schedule.setStatus(CareScheduleStatus.REQUESTED);
+            schedule.setDurationMinutes(30);
+            schedule.setDescription("Initial admission physical examination in quarantine area");
+            schedule = careScheduleRepository.save(schedule);
+        }
+
+        careScheduleService.assignRequestedSchedules();
+
+        return careScheduleRepository
+                .findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admissionId, CareType.INITIAL)
+                .orElse(schedule);
+    }
+
     private void stampGroomReview(AdmissionApplication admission, Long groomId, ReviewDecision decision, String feedback) {
         admission.setGroomId(groomId);
         admission.setGroomDecision(decision);
         admission.setGroomFeedback(feedback);
         admission.setGroomReviewedAt(LocalDateTime.now());
     }
+
 }

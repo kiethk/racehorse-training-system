@@ -1240,13 +1240,7 @@ export function VetAdmissionQueue() {
                         {displayedTrainingDecision && (
                           <div className="mt-3">
                             <Pill
-                              tone={
-                                displayedTrainingDecision === 'ALLOWED'
-                                  ? 'success'
-                                  : displayedTrainingDecision === 'RESTRICTED'
-                                    ? 'warning'
-                                    : 'danger'
-                              }
+                              tone={displayedTrainingDecision === 'ALLOWED' ? 'success' : 'danger'}
                             >
                               Training Decision: {formatLabel(displayedTrainingDecision)}
                             </Pill>
@@ -1306,7 +1300,6 @@ export function VetAdmissionQueue() {
                                   <MedicalNoteBlock label="Diagnosis" value={record.diagnosis} />
                                   <MedicalNoteBlock label="Treatment Plan" value={record.treatment} />
                                   <MedicalNoteBlock label="Notes & Context" value={record.notes} />
-                                  <MedicalNoteBlock label="Rejection Reason" value={record.rejectionReason} />
                                 </div>
 
                                 {record.trainingDecision && (
@@ -1315,9 +1308,7 @@ export function VetAdmissionQueue() {
                                       className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
                                         record.trainingDecision === 'ALLOWED'
                                           ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]'
-                                          : record.trainingDecision === 'RESTRICTED'
-                                            ? 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]'
-                                            : 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
+                                          : 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
                                       }`}
                                     >
                                       Training Decision: {record.trainingDecision}
@@ -1328,13 +1319,6 @@ export function VetAdmissionQueue() {
                                 {record.restrictionDetails && (
                                   <div className="mt-2 rounded bg-[var(--color-warning-soft)] p-2 text-[12px] text-[var(--color-warning)]">
                                     <strong>Restriction Protocol:</strong> {record.restrictionDetails}
-                                  </div>
-                                )}
-
-                                {record.followUpDate && (
-                                  <div className="mt-3 flex items-center gap-2 rounded bg-[var(--color-warning-soft)] p-2 text-[12px] font-semibold text-[var(--color-warning)]">
-                                    <Icon name="calendar" size={14} />
-                                    <span>Mandatory Follow-Up Scheduled: {formatDate(record.followUpDate)}</span>
                                   </div>
                                 )}
                               </li>

@@ -1,8 +1,8 @@
 package com.rtms.backend.entity;
+
 import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.ArrivalStatus;
 import com.rtms.backend.enums.ReviewDecision;
-import com.rtms.backend.enums.VetDecision;
+import com.rtms.backend.enums.TrainingDecision;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -41,12 +41,13 @@ public class AdmissionApplication {
     @Column(name = "veterinarian_id")
     private Long veterinarianId;
 
+    /**
+     * Kết luận của Thú y ở lần khám nhập học. Thú y không duyệt/từ chối đơn —
+     * chỉ quyết định ngựa được tập hay tạm nghỉ; đơn luôn đi tiếp sang Trainer.
+     */
     @Enumerated(EnumType.STRING)
-    @Column(name = "vet_decision", length = 20)
-    private VetDecision vetDecision;
-
     @Column(name = "vet_training_decision", length = 30)
-    private String vetTrainingDecision;
+    private TrainingDecision vetTrainingDecision;
 
     @Column(name = "vet_feedback", columnDefinition = "TEXT")
     private String vetFeedback;
@@ -79,16 +80,6 @@ public class AdmissionApplication {
     @Column(name = "horse_id")
     private Long horseId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "arrival_status", nullable = false, length = 20)
-    private ArrivalStatus arrivalStatus = ArrivalStatus.PENDING;
-
-    @Column(name = "arrival_confirmed_at")
-    private LocalDateTime arrivalConfirmedAt;
-
-    @Column(name = "arrival_confirmed_by")
-    private Long arrivalConfirmedBy;
-
     @Column(name = "submitted_at", nullable = false)
     private LocalDateTime submittedAt;
 
@@ -108,9 +99,6 @@ public class AdmissionApplication {
 
         if (status == null) {
             status = AdmissionStatus.GROOM_REVIEW;
-        }
-        if (arrivalStatus == null) {
-            arrivalStatus = ArrivalStatus.PENDING;
         }
 
         createdAt = now;
@@ -194,19 +182,11 @@ public class AdmissionApplication {
         this.veterinarianId = veterinarianId;
     }
 
-    public VetDecision getVetDecision() {
-        return vetDecision;
-    }
-
-    public void setVetDecision(VetDecision vetDecision) {
-        this.vetDecision = vetDecision;
-    }
-
-    public String getVetTrainingDecision() {
+    public TrainingDecision getVetTrainingDecision() {
         return vetTrainingDecision;
     }
 
-    public void setVetTrainingDecision(String vetTrainingDecision) {
+    public void setVetTrainingDecision(TrainingDecision vetTrainingDecision) {
         this.vetTrainingDecision = vetTrainingDecision;
     }
 
@@ -288,30 +268,6 @@ public class AdmissionApplication {
 
     public void setHorseId(Long horseId) {
         this.horseId = horseId;
-    }
-
-    public ArrivalStatus getArrivalStatus() {
-        return arrivalStatus;
-    }
-
-    public void setArrivalStatus(ArrivalStatus arrivalStatus) {
-        this.arrivalStatus = arrivalStatus;
-    }
-
-    public LocalDateTime getArrivalConfirmedAt() {
-        return arrivalConfirmedAt;
-    }
-
-    public void setArrivalConfirmedAt(LocalDateTime arrivalConfirmedAt) {
-        this.arrivalConfirmedAt = arrivalConfirmedAt;
-    }
-
-    public Long getArrivalConfirmedBy() {
-        return arrivalConfirmedBy;
-    }
-
-    public void setArrivalConfirmedBy(Long arrivalConfirmedBy) {
-        this.arrivalConfirmedBy = arrivalConfirmedBy;
     }
 
     public LocalDateTime getSubmittedAt() {

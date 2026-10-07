@@ -38,6 +38,9 @@ class GroomIncidentReportServiceTest {
     @Mock
     private CareScheduleService careScheduleService;
 
+    @Mock
+    private TrainingDecisionService trainingDecisionService;
+
     private GroomIncidentReportService incidentReportService;
 
     @BeforeEach
@@ -45,7 +48,8 @@ class GroomIncidentReportServiceTest {
         incidentReportService = new GroomIncidentReportService(
                 incidentReportRepository, horseRepository, fileStorage,
                 careScheduleRepository,
-                careScheduleService);
+                careScheduleService,
+                trainingDecisionService);
     }
 
     @Test

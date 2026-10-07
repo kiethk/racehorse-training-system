@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type {
   CompleteCareScheduleRequest,
+  TrainingDecision,
   UrgentAssignmentAlert,
   VetReviewResponse,
 } from '../../types/index.ts';
@@ -24,7 +25,7 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
       title: 'Colic symptoms',
       description: 'Severe abdominal pain observed during morning feeding',
       imageUrl: null,
-      trainingStatus: 'BLOCKED',
+      trainingDecision: 'BLOCKED',
       status: 'SCHEDULED',
       scheduledAt: '2026-10-07T08:15:00',
       assignedAt: '2026-10-07T08:05:00',
@@ -55,7 +56,7 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
       title: 'Lameness after gallop',
       description: 'Left foreleg swelling and acute lameness',
       imageUrl: null,
-      trainingStatus: 'BLOCKED',
+      trainingDecision: 'BLOCKED',
       status: 'IN_PROGRESS',
       scheduledAt: '2026-10-07T09:10:00',
       assignedAt: '2026-10-07T09:05:00',
@@ -67,56 +68,73 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
     assert.equal(initialSymptoms, 'Left foreleg swelling and acute lameness');
   });
 
-  it('3. Urgent completion validation: symptoms, findings, diagnosis required; restrictionDetails required for RESTRICTED/BLOCKED', () => {
+  it('3. Urgent completion validation: BLOCKED requires restriction details AND a follow-up date', () => {
     function validateUrgentForm(data: {
       symptoms: string;
       findings: string;
       diagnosis: string;
-      trainingDecision: 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
+      trainingDecision: TrainingDecision;
       restrictionDetails: string;
+      followUpDate: string;
     }): Record<string, string> {
       const errors: Record<string, string> = {};
       if (!data.symptoms.trim()) errors.symptoms = 'Triệu chứng là bắt buộc';
       if (!data.findings.trim()) errors.findings = 'Kết quả khám là bắt buộc';
       if (!data.diagnosis.trim()) errors.diagnosis = 'Chẩn đoán là bắt buộc';
-      if (
-        (data.trainingDecision === 'RESTRICTED' || data.trainingDecision === 'BLOCKED') &&
-        !data.restrictionDetails.trim()
-      ) {
-        errors.restrictionDetails = 'Chi tiết hạn chế là bắt buộc';
+      if (data.trainingDecision === 'BLOCKED') {
+        if (!data.restrictionDetails.trim()) errors.restrictionDetails = 'Lý do chặn tập là bắt buộc';
+        if (!data.followUpDate) errors.followUpDate = 'Phải chọn ngày khám lại';
       }
       return errors;
     }
 
-    // Missing symptoms
-    const err1 = validateUrgentForm({
-      symptoms: '',
-      findings: 'Exam done',
-      diagnosis: 'Colic',
-      trainingDecision: 'BLOCKED',
-      restrictionDetails: 'Stall rest',
-    });
-    assert.ok(err1.symptoms);
-
-    // Missing restriction details when BLOCKED
-    const err2 = validateUrgentForm({
-      symptoms: 'Fever',
-      findings: 'T 39.5C',
-      diagnosis: 'Infection',
-      trainingDecision: 'BLOCKED',
-      restrictionDetails: '',
-    });
-    assert.ok(err2.restrictionDetails);
-
-    // Valid submission
-    const valid = validateUrgentForm({
+    const base = {
       symptoms: 'Fever and nasal discharge',
       findings: 'T 39.2C, clear mucus',
       diagnosis: 'Upper respiratory infection',
+    };
+
+    // Missing symptoms
+    assert.ok(
+      validateUrgentForm({
+        ...base,
+        symptoms: '',
+        trainingDecision: 'BLOCKED',
+        restrictionDetails: 'Stall rest',
+        followUpDate: '2026-10-14',
+      }).symptoms,
+    );
+
+    // BLOCKED without restriction details or follow-up date
+    const blockedErrors = validateUrgentForm({
+      ...base,
       trainingDecision: 'BLOCKED',
-      restrictionDetails: 'Isolation for 7 days with antibiotics',
+      restrictionDetails: '',
+      followUpDate: '',
     });
-    assert.equal(Object.keys(valid).length, 0);
+    assert.ok(blockedErrors.restrictionDetails);
+    assert.ok(blockedErrors.followUpDate);
+
+    // ALLOWED needs neither
+    assert.equal(
+      Object.keys(
+        validateUrgentForm({ ...base, trainingDecision: 'ALLOWED', restrictionDetails: '', followUpDate: '' }),
+      ).length,
+      0,
+    );
+
+    // Valid BLOCKED submission
+    assert.equal(
+      Object.keys(
+        validateUrgentForm({
+          ...base,
+          trainingDecision: 'BLOCKED',
+          restrictionDetails: 'Isolation for 7 days with antibiotics',
+          followUpDate: '2026-10-14',
+        }),
+      ).length,
+      0,
+    );
   });
 
   it('4. Submit complete builds valid CompleteCareScheduleRequest payload', () => {
@@ -125,14 +143,22 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
       findings: 'Mild swelling on left hock, no heat',
       diagnosis: 'Minor strain',
       treatment: 'Cold hose and poultice',
-      trainingDecision: 'RESTRICTED',
+      trainingDecision: 'BLOCKED',
       restrictionDetails: 'Hand walk 15 mins daily only',
       notes: 'Recheck in 3 days',
       metrics: [{ temperature: 38.1, heartRate: 38 }],
+      nextSchedule: {
+        horseId: 99,
+        careType: 'ROUTINE',
+        scheduledDate: '2026-10-10',
+        description: 'Tái khám sau ca khẩn cấp',
+        idempotencyKey: 'follow-up-1',
+      },
     };
 
-    assert.equal(payload.trainingDecision, 'RESTRICTED');
+    assert.equal(payload.trainingDecision, 'BLOCKED');
     assert.equal(payload.restrictionDetails, 'Hand walk 15 mins daily only');
+    assert.equal(payload.nextSchedule?.careType, 'ROUTINE');
     assert.ok(payload.metrics && payload.metrics[0].temperature === 38.1);
   });
 
@@ -159,13 +185,12 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
     assert.equal(formState.diagnosis, 'Subsolar abscess');
   });
 
-  it('6. VetReviewResponse canonical contract enforces matching types and nullable legacy fields', () => {
+  it('6. VetReviewResponse: BLOCKED still advances the admission to TRAINER_REVIEW', () => {
     const response: VetReviewResponse = {
       admissionId: 1,
       status: 'TRAINER_REVIEW',
       veterinarianId: 10,
-      decision: null, // Legacy field is nullable
-      trainingDecision: 'RESTRICTED',
+      trainingDecision: 'BLOCKED',
       restrictionDetails: 'Light trotting only',
       feedback: 'Examination completed smoothly',
       reviewedAt: '2026-10-07T10:00:00',
@@ -180,8 +205,7 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
     };
 
     assert.equal(response.status, 'TRAINER_REVIEW');
-    assert.equal(response.decision, null);
-    assert.equal(response.trainingDecision, 'RESTRICTED');
+    assert.equal(response.trainingDecision, 'BLOCKED');
     assert.equal(response.careScheduleId, 300);
   });
 });

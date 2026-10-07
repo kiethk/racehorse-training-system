@@ -47,8 +47,8 @@ export function TrainerRaceForm() {
         setHorseError(null);
         // Lấy ngựa trong khu trainer (mine=true), đủ điều kiện (ELIGIBLE)
         const list = await stableApi.getHorses({ mine: true, status: 'ELIGIBLE' });
-        // Lọc thêm ngựa không bị khoá huấn luyện (trainingLocked !== true)
-        const available = list.filter((h) => !h.trainingLocked);
+        // Khớp Horse.canTrain() ở backend: ELIGIBLE và Thú y không chặn tập.
+        const available = list.filter((h) => h.trainingDecision !== 'BLOCKED');
         setHorses(available);
       } catch (err) {
         console.error('Failed to load horses:', err);

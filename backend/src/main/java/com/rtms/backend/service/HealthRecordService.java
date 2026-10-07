@@ -31,7 +31,6 @@ public class HealthRecordService {
         record.setFindings(request.getFindings());
         record.setDiagnosis(request.getDiagnosis());
         record.setNotes(request.getNotes());
-        record.setFollowUpDate(request.getFollowUpDate());
         record.setSourceTrainingWorkoutId(request.getSourceTrainingWorkoutId());
         record.setRecordType(request.getRecordType() != null ? request.getRecordType() : "ILLNESS");
         record.setCareScheduleId(request.getCareScheduleId());

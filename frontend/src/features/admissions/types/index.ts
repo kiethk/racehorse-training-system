@@ -45,14 +45,11 @@ export interface HealthRecord {
   findings: string | null;
   diagnosis: string | null;
   treatment: string | null;
-  vetDecision: string | null;
   trainingDecision?: TrainingDecision | null;
   restrictionDetails?: string | null;
-  rejectionReason: string | null;
   recordType: string;
   productOrService: string | null;
   notes: string | null;
-  followUpDate: string | null;
 }
 
 export interface StableStall {
@@ -92,11 +89,12 @@ export interface AdmissionDetailResponse {
   groomReviewedAt: string | null;
 
   veterinarianId: number | null;
-  vetDecision: string | null;
-  vetTrainingDecision?: string | null;
+  /** Kết luận lần khám nhập học. Thú y không duyệt/từ chối đơn. */
+  vetTrainingDecision: TrainingDecision | null;
   vetFeedback: string | null;
   vetReviewedAt: string | null;
 
+  /** Trainer được hệ thống phân công. null ở TRAINER_REVIEW = chưa có Trainer đủ điều kiện. */
   trainerId: number | null;
   trainerName?: string | null;
   trainerFeedback: string | null;
@@ -147,7 +145,7 @@ export interface HorseSummary {
   name: string;
   breed: string | null;
   registrationNumber: string | null;
-  trainingStatus: TrainingDecision;
+  trainingDecision: TrainingDecision;
 }
 
 export interface UrgentAssignmentAlert {
@@ -166,7 +164,7 @@ export interface UrgentAssignmentAlert {
   title: string;
   description: string;
   imageUrl: string | null;
-  trainingStatus: TrainingDecision;
+  trainingDecision: TrainingDecision;
   status: CareScheduleStatus;
   scheduledAt: string | null;
   assignedAt: string;
@@ -273,7 +271,11 @@ export interface VetQueueFilters {
   size?: number;
 }
 
-export type TrainingDecision = 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
+/**
+ * Ngựa có được tập không. BLOCKED luôn đi kèm lịch khám lại (nextSchedule):
+ * "tạm nghỉ đến" chính là ngày của lịch đó.
+ */
+export type TrainingDecision = 'ALLOWED' | 'BLOCKED';
 
 export interface PageResponse<T> {
   content: T[];
@@ -302,19 +304,15 @@ export interface HorseHealthMetricResponse extends HorseHealthMetricRequest {
 
 export interface VetReviewRequest {
   careScheduleId?: number;
-  decision?: string;
-  trainingDecision?: TrainingDecision;
+  trainingDecision: TrainingDecision;
   restrictionDetails?: string;
-  rejectAdmission?: boolean;
   feedback?: string;
   physicalExamConfirmed: boolean;
   symptoms?: string;
   findings: string;
   diagnosis?: string;
   treatment?: string;
-  rejectionReason?: string;
   notes?: string;
-  followUpDate?: string;
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
 }
@@ -323,8 +321,6 @@ export interface VetReviewResponse {
   admissionId: number;
   status: AdmissionStatus;
   veterinarianId: number;
-  /** @deprecated Use trainingDecision instead */
-  decision: string | null;
   trainingDecision: TrainingDecision;
   restrictionDetails: string | null;
   feedback: string | null;

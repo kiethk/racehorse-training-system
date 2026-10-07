@@ -187,7 +187,7 @@ public class RaceRegistrationService {
         if (!trainerId.equals(area.getTrainerId())) {
             throw new AccessDeniedException("Ngựa không thuộc khu bạn phụ trách");
         }
-        if (horse.getCurrentStatus() != HorseStatus.ELIGIBLE || horse.isTrainingLocked()) {
+        if (!horse.canTrain()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "HORSE_NOT_ELIGIBLE",
                     "Ngựa hiện không thể được đề cử dự đua");
         }
