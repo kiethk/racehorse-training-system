@@ -1,10 +1,8 @@
 package com.rtms.backend.entity;
 
 import jakarta.persistence.*;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import com.rtms.backend.enums.TrainingDecision;
-import com.rtms.backend.enums.VetDecision;
 
 @Entity
 @Table(name = "health_records")
@@ -48,13 +46,6 @@ public class HealthRecord {
     @Column(name = "restriction_details", columnDefinition = "TEXT")
     private String restrictionDetails;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "vet_decision", length = 30)
-    private VetDecision vetDecision;
-
-    @Column(name = "rejection_reason", columnDefinition = "TEXT")
-    private String rejectionReason;
-
     @Column(name = "record_type", nullable = false)
     private String recordType = "ILLNESS";
 
@@ -64,9 +55,6 @@ public class HealthRecord {
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
-
-    @Column(name = "follow_up_date")
-    private LocalDate followUpDate;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -122,11 +110,7 @@ public class HealthRecord {
     public String getRestrictionDetails() { return restrictionDetails; }
     public void setRestrictionDetails(String restrictionDetails) { this.restrictionDetails = restrictionDetails; }
 
-    public VetDecision getVetDecision() { return vetDecision; }
-    public void setVetDecision(VetDecision vetDecision) { this.vetDecision = vetDecision; }
 
-    public String getRejectionReason() { return rejectionReason; }
-    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 
     public String getRecordType() { return recordType; }
     public void setRecordType(String recordType) { this.recordType = recordType; }
@@ -138,8 +122,6 @@ public class HealthRecord {
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
 
-    public LocalDate getFollowUpDate() { return followUpDate; }
-    public void setFollowUpDate(LocalDate followUpDate) { this.followUpDate = followUpDate; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

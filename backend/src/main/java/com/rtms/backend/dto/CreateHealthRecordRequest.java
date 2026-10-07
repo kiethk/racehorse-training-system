@@ -3,7 +3,6 @@ package com.rtms.backend.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class CreateHealthRecordRequest {
@@ -21,7 +20,6 @@ public class CreateHealthRecordRequest {
     private String productOrService;
 
     private String notes;
-    private LocalDate followUpDate;
     private Long sourceTrainingWorkoutId;
 
     public Long getHorseId() {
@@ -70,14 +68,6 @@ public class CreateHealthRecordRequest {
 
     public void setNotes(String notes) {
         this.notes = notes;
-    }
-
-    public LocalDate getFollowUpDate() {
-        return followUpDate;
-    }
-
-    public void setFollowUpDate(LocalDate followUpDate) {
-        this.followUpDate = followUpDate;
     }
 
     public Long getSourceTrainingWorkoutId() {

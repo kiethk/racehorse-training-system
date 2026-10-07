@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import com.rtms.backend.event.InitialExamCompletedEvent;
 import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
 
 @Service
@@ -42,7 +43,7 @@ public class CareScheduleService {
     private final ApplicationEventPublisher eventPublisher;
     private final EntityManager entityManager;
     private final NotificationService notificationService;
-    private final TrainerScheduleAssignmentService trainerScheduleAssignmentService;
+    private final TrainingDecisionService trainingDecisionService;
 
     public CareScheduleService(
             CareScheduleRepository careScheduleRepository,
@@ -58,7 +59,7 @@ public class CareScheduleService {
             ApplicationEventPublisher eventPublisher,
             EntityManager entityManager,
             NotificationService notificationService,
-            TrainerScheduleAssignmentService trainerScheduleAssignmentService) {
+            TrainingDecisionService trainingDecisionService) {
         this.careScheduleRepository = careScheduleRepository;
         this.horseRepository = horseRepository;
         this.healthRecordRepository = healthRecordRepository;
@@ -72,7 +73,7 @@ public class CareScheduleService {
         this.eventPublisher = eventPublisher;
         this.entityManager = entityManager;
         this.notificationService = notificationService;
-        this.trainerScheduleAssignmentService = trainerScheduleAssignmentService;
+        this.trainingDecisionService = trainingDecisionService;
     }
 
     @Transactional
@@ -93,7 +94,8 @@ public class CareScheduleService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "HORSE_NOT_ASSIGNED", "Admission does not have a horse assigned yet");
         }
 
-        Horse initialHorse = horseRepository.findByIdForUpdate(horseId)
+        // Khóa hàng ngựa để hai yêu cầu tạo lịch khám song song không cùng lọt qua bước kiểm tra trùng.
+        horseRepository.findByIdForUpdate(horseId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found"));
         boolean activeExists = careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
                 horseId, CareType.INITIAL,
@@ -112,16 +114,9 @@ public class CareScheduleService {
         schedule.setStatus(CareScheduleStatus.REQUESTED);
         schedule.setDurationMinutes(DEFAULT_DURATION_MINUTES);
         schedule.setDescription("Initial admission physical examination in quarantine area");
+        // Không khóa ngựa ở đây: ngựa CANDIDATE vốn không tập được (Horse.canTrain()),
+        // kết luận y tế do chính lần khám này quyết định.
         CareSchedule saved = careScheduleRepository.save(schedule);
-
-        Horse horse = initialHorse;
-        if (horse != null) {
-            horse.setTrainingStatus(TrainingDecision.BLOCKED);
-            horse.setTrainingLocked(true);
-            horse.setTrainingLockReason("Initial admission examination is pending");
-            horseRepository.save(horse);
-        }
-
         assignRequestedSchedule(saved);
         return CareScheduleResponse.from(saved);
     }
@@ -141,13 +136,12 @@ public class CareScheduleService {
         schedule.setSourceIncidentId(sourceIncidentId);
 
         if (careType == CareType.URGENT) {
-            horse.setTrainingStatus(TrainingDecision.BLOCKED);
-            horse.setTrainingLocked(true);
-            String lockReason = (description != null && !description.isBlank())
+            // Chặn phòng ngừa ngay khi có ca khẩn cấp, kéo theo hủy buổi tập
+            // tương lai: không để ngựa đang có vấn đề vẫn được dắt ra sân sáng mai.
+            String reason = (description != null && !description.isBlank())
                     ? "Urgent veterinary care pending: " + description.trim()
                     : "Urgent veterinary care pending";
-            horse.setTrainingLockReason(lockReason);
-            horseRepository.save(horse);
+            trainingDecisionService.block(horse, reason);
         }
 
         CareSchedule saved = careScheduleRepository.save(schedule);
@@ -217,14 +211,6 @@ public class CareScheduleService {
 
     @Transactional
     public CareScheduleResponse completeCareSchedule(Long scheduleId, CompleteCareScheduleRequest request, Long vetId) {
-        if (Boolean.TRUE.equals(request.getRejectAdmission())) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "VET_CANNOT_REJECT_ADMISSION",
-                    "Veterinarians cannot reject admissions; only medical training decisions (ALLOWED, RESTRICTED, BLOCKED) are permitted.");
-        }
-        if (request.getFollowUpDate() != null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "LEGACY_FIELD_NOT_SUPPORTED",
-                    "followUpDate is deprecated and not supported; schedule follow-up examinations via nextSchedule instead.");
-        }
         if (request.getFindings() == null || request.getFindings().isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Findings are required");
         }
@@ -234,9 +220,17 @@ public class CareScheduleService {
         if (request.getTrainingDecision() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Training decision is required");
         }
-        if ((request.getTrainingDecision() == TrainingDecision.RESTRICTED || request.getTrainingDecision() == TrainingDecision.BLOCKED)
-                && (request.getRestrictionDetails() == null || request.getRestrictionDetails().isBlank())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Restriction details required for RESTRICTED or BLOCKED decision");
+        if (request.getTrainingDecision() == TrainingDecision.BLOCKED) {
+            if (request.getRestrictionDetails() == null || request.getRestrictionDetails().isBlank()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                        "Restriction details are required when training is BLOCKED");
+            }
+            // Chặn tập luôn phải có điểm kết thúc: lần khám lại chính là mốc "tạm nghỉ đến".
+            // Không có lịch thì ngựa bị khóa vô thời hạn cho tới khi ai đó nhớ ra mà tạo.
+            if (request.getNextSchedule() == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "FOLLOW_UP_REQUIRED",
+                        "A follow-up examination (nextSchedule) is required when training is BLOCKED");
+            }
         }
 
         CareSchedule schedule = lockClinicalSchedule(scheduleId);
@@ -268,8 +262,7 @@ public class CareScheduleService {
         Horse horse = horseRepository.findByIdForUpdate(schedule.getHorseId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found"));
 
-        // Atomic update Horse.trainingStatus and trainingLocked
-        TrainingDecision newStatus = request.getTrainingDecision();
+        TrainingDecision decision = request.getTrainingDecision();
         List<CareScheduleStatus> activeStatuses = List.of(
                 CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
         boolean anotherActiveUrgent = schedule.getCareType() == CareType.URGENT
@@ -277,34 +270,18 @@ public class CareScheduleService {
                         horse.getId(), CareType.URGENT, activeStatuses, schedule.getId())
                 : careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
                         horse.getId(), CareType.URGENT, activeStatuses);
+        // Ngựa chỉ có MỘT trạng thái khóa nhưng có thể có nhiều ca khám cùng lúc.
+        // Còn một ca khẩn cấp khác chưa xong thì lần khám này không được mở khóa:
+        // kết quả vẫn lưu vào bệnh án bên dưới, nhưng ngựa giữ nguyên BLOCKED.
         boolean preservedUrgentLock = anotherActiveUrgent
-                && trainingSeverity(horse.getTrainingStatus()) > trainingSeverity(newStatus);
-        if (preservedUrgentLock) {
-            newStatus = horse.getTrainingStatus();
-        }
-        if (preservedUrgentLock) {
-            // The clinical result is still recorded below, but an unrelated examination
-            // cannot replace the active urgent case's lock owner/reason/review metadata.
-        } else if (newStatus == TrainingDecision.ALLOWED) {
-            horse.setTrainingStatus(TrainingDecision.ALLOWED);
-            if (schedule.getCareType() == CareType.URGENT) {
-                horse.setTrainingLocked(false);
-                horse.setTrainingLockReason(null);
-            } else {
-                horse.setTrainingLocked(horse.getCurrentStatus() == HorseStatus.CANDIDATE);
-                horse.setTrainingLockReason(horse.isTrainingLocked() ? "Admission pending trainer and manager review" : null);
-            }
-            horse.setTrainingLockReviewDate(null);
-            horse.setTrainingLockVetId(null);
-        } else {
-            horse.setTrainingLocked(true);
-            horse.setTrainingStatus(newStatus);
-            horse.setTrainingLockReason(request.getRestrictionDetails());
-            horse.setTrainingLockVetId(vetId);
-        }
+                && horse.getTrainingDecision() == TrainingDecision.BLOCKED
+                && decision == TrainingDecision.ALLOWED;
         if (!preservedUrgentLock) {
-            horse.setTrainingLockUpdatedAt(LocalDateTime.now());
-            horseRepository.save(horse);
+            if (decision == TrainingDecision.ALLOWED) {
+                trainingDecisionService.allow(horse);
+            } else {
+                trainingDecisionService.block(horse, request.getRestrictionDetails().trim());
+            }
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -321,13 +298,6 @@ public class CareScheduleService {
         record.setRestrictionDetails(request.getRestrictionDetails() != null ? request.getRestrictionDetails().trim() : null);
         record.setSymptoms(request.getSymptoms() != null ? request.getSymptoms().trim() : null);
         record.setNotes(request.getNotes() != null ? request.getNotes().trim() : null);
-        record.setFollowUpDate(request.getFollowUpDate());
-
-        // Compatibility column remains readable for historical rows. New workflow state is
-        // carried by trainingDecision; completing care never creates RECHECK_REQUIRED.
-        record.setVetDecision(request.getTrainingDecision() == TrainingDecision.ALLOWED
-                ? VetDecision.APPROVED : null);
-        record.setRejectionReason(null);
         HealthRecord savedRecord = healthRecordRepository.save(record);
 
         // Save metrics if present
@@ -360,15 +330,11 @@ public class CareScheduleService {
                     admission.setVetReviewedAt(now);
                     admission.setVetFeedback(request.getNotes() != null && !request.getNotes().isBlank()
                             ? request.getNotes() : request.getFindings());
-                    admission.setVetTrainingDecision(request.getTrainingDecision().name());
-                    admission.setVetDecision(record.getVetDecision());
+                    // Thú y không duyệt/từ chối đơn: đơn luôn đi tiếp sang Trainer, kèm
+                    // kết luận được tập hay tạm nghỉ. Ngựa vẫn là CANDIDATE nên chưa tập được
+                    // cho tới khi Manager duyệt — không cần khóa thêm.
+                    admission.setVetTrainingDecision(request.getTrainingDecision());
                     admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
-                    if (request.getTrainingDecision() == TrainingDecision.ALLOWED && !preservedUrgentLock) {
-                        // Medical clearance does not bypass final admission approval unless another urgent lock takes precedence.
-                        horse.setTrainingLocked(true);
-                        horse.setTrainingLockReason("Admission pending trainer and manager review");
-                        horse.setTrainingLockVetId(null);
-                    }
                     admissionRepository.save(admission);
                 }
             }
@@ -378,8 +344,10 @@ public class CareScheduleService {
         schedule.setCompletedAt(now);
         CareSchedule completedSchedule = careScheduleRepository.save(schedule);
 
+        // Gán Trainer chạy SAU khi transaction này commit (TrainerAssignmentTriggers):
+        // lỗi lúc gán không thể làm rollback kết quả khám của Vet.
         if (schedule.getAdmissionId() != null && schedule.getCareType() == CareType.INITIAL) {
-            trainerScheduleAssignmentService.assignForCompletedInitialCare(schedule.getAdmissionId(), completedSchedule.getId());
+            eventPublisher.publishEvent(new InitialExamCompletedEvent(schedule.getAdmissionId()));
         }
 
         if (schedule.getCareType() == CareType.URGENT && schedule.getSourceIncidentId() != null) {
@@ -419,6 +387,18 @@ public class CareScheduleService {
 
         if (!isManager) {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only club managers can cancel care schedules; veterinarians cannot decline assignments");
+        }
+
+        // Ngựa đang tạm nghỉ chỉ được mở khóa bởi một lần khám. Hủy nốt lần khám
+        // cuối cùng thì ngựa bị khóa vô thời hạn mà không còn ai để mở.
+        Horse horse = horseRepository.findById(schedule.getHorseId()).orElse(null);
+        if (horse != null && horse.getTrainingDecision() == TrainingDecision.BLOCKED
+                && !careScheduleRepository.existsByHorseIdAndStatusInAndIdNot(horse.getId(),
+                        List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS),
+                        schedule.getId())) {
+            throw new ApiException(HttpStatus.CONFLICT, "LAST_FOLLOW_UP",
+                    "This horse is blocked from training and this is its last pending examination. "
+                            + "Schedule a replacement examination before cancelling this one.");
         }
 
         schedule.setStatus(CareScheduleStatus.CANCELLED);
@@ -594,12 +574,6 @@ public class CareScheduleService {
         CareSchedule saved = careScheduleRepository.saveAndFlush(schedule);
         assignRequestedSchedule(saved);
         return CareScheduleResponse.from(saved);
-    }
-
-    private static int trainingSeverity(TrainingDecision status) {
-        if (status == TrainingDecision.BLOCKED) return 2;
-        if (status == TrainingDecision.RESTRICTED) return 1;
-        return 0;
     }
 
     private static String fingerprint(Long horseId, Long admissionId, LocalDateTime requestedAt, String description) {
@@ -814,7 +788,7 @@ public class CareScheduleService {
                 incident != null ? incident.getTitle() : "Urgent Care",
                 incident != null ? incident.getDescription() : schedule.getDescription(),
                 incident != null ? incident.getImageUrl() : null,
-                horse.getTrainingStatus(),
+                horse.getTrainingDecision(),
                 schedule.getStatus(),
                 schedule.getScheduledAt(),
                 assignedAt

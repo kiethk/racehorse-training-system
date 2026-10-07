@@ -6,7 +6,6 @@ import com.rtms.backend.enums.LotStatus;
 import com.rtms.backend.enums.TrainingDay;
 import com.rtms.backend.enums.TrainingPlanStatus;
 import com.rtms.backend.enums.WorkoutStatus;
-import com.rtms.backend.enums.WorkoutType;
 import com.rtms.backend.repository.*;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +47,7 @@ class HorseTrainingPlanServiceTest {
     private HorseRepository horseRepository;
 
     @Mock
-    private InjuryRecordService injuryRecordService;
+    private TrainingDecisionService trainingDecisionService;
 
     @Mock
     private TrainingLotService lotService;
@@ -78,7 +77,7 @@ class HorseTrainingPlanServiceTest {
                 courseSubjectRepository,
                 subjectRepository,
                 horseRepository,
-                injuryRecordService,
+                trainingDecisionService,
                 lotService,
                 lotRepository,
                 stableStallRepository,
@@ -122,7 +121,6 @@ class HorseTrainingPlanServiceTest {
         Subject sub1 = new Subject();
         sub1.setId(50L);
         sub1.setName("Khởi động 30'");
-        sub1.setWorkoutType(WorkoutType.REGULAR);
         when(subjectRepository.findById(50L)).thenReturn(Optional.of(sub1));
 
         // Horse 1
@@ -140,10 +138,6 @@ class HorseTrainingPlanServiceTest {
         when(horseRepository.findById(2L)).thenReturn(Optional.of(h2));
 
         // Locks
-        when(injuryRecordService.getTrainingLockStatus(1L))
-                .thenReturn(new TrainingLockStatusResponse(1L, "ELIGIBLE", false));
-        when(injuryRecordService.getTrainingLockStatus(2L))
-                .thenReturn(new TrainingLockStatusResponse(2L, "ELIGIBLE", false));
 
         // Stalls & Areas
         StableStall s1 = new StableStall();
@@ -275,8 +269,6 @@ class HorseTrainingPlanServiceTest {
         horse.setName("Chiến Mã 5");
         horse.setCurrentStallId(10L);
         when(horseRepository.findById(5L)).thenReturn(Optional.of(horse));
-        when(injuryRecordService.getTrainingLockStatus(5L))
-                .thenReturn(new TrainingLockStatusResponse(5L, "ELIGIBLE", false));
 
         StableStall stall = new StableStall();
         stall.setId(10L);
@@ -325,12 +317,12 @@ class HorseTrainingPlanServiceTest {
         when(horseRepository.findById(7L)).thenReturn(Optional.of(horse));
 
         // Khóa do chấn thương
-        when(injuryRecordService.getTrainingLockStatus(7L))
-                .thenReturn(new TrainingLockStatusResponse(7L, "INJURED", true));
+        doThrow(new IllegalStateException("Ngựa Thương Mã đang bị chặn tập"))
+                .when(trainingDecisionService).assertCanTrain(horse);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> planService.createPlan(req, trainerUser));
-        assertTrue(ex.getMessage().contains("KHOÁ HUẤN LUYỆN"));
+        assertTrue(ex.getMessage().contains("chặn tập"));
     }
 
     @Test
@@ -363,8 +355,6 @@ class HorseTrainingPlanServiceTest {
         horse.setName("Ngựa Tự Do");
         horse.setCurrentStallId(null); // Chưa xếp chuồng
         when(horseRepository.findById(3L)).thenReturn(Optional.of(horse));
-        when(injuryRecordService.getTrainingLockStatus(3L))
-                .thenReturn(new TrainingLockStatusResponse(3L, "ELIGIBLE", false));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> planService.createPlan(req, trainerUser));
@@ -401,8 +391,6 @@ class HorseTrainingPlanServiceTest {
         horse.setName("Ngựa Khu B");
         horse.setCurrentStallId(20L);
         when(horseRepository.findById(3L)).thenReturn(Optional.of(horse));
-        when(injuryRecordService.getTrainingLockStatus(3L))
-                .thenReturn(new TrainingLockStatusResponse(3L, "ELIGIBLE", false));
 
         StableStall stall = new StableStall();
         stall.setId(20L);
@@ -450,8 +438,6 @@ class HorseTrainingPlanServiceTest {
         horse.setName("Chiến Mã 1");
         horse.setCurrentStallId(10L);
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
-        when(injuryRecordService.getTrainingLockStatus(1L))
-                .thenReturn(new TrainingLockStatusResponse(1L, "ELIGIBLE", false));
 
         StableStall stall = new StableStall();
         stall.setId(10L);
@@ -513,7 +499,6 @@ class HorseTrainingPlanServiceTest {
         Subject subject = new Subject();
         subject.setId(77L);
         subject.setName("Bài tập tăng tốc");
-        subject.setWorkoutType(WorkoutType.REGULAR);
         when(subjectRepository.findById(77L)).thenReturn(Optional.of(subject));
 
         // Act
@@ -882,7 +867,6 @@ class HorseTrainingPlanServiceTest {
         Subject subject = new Subject();
         subject.setId(1L);
         subject.setName("Chạy bền");
-        subject.setWorkoutType(WorkoutType.REGULAR);
 
         when(workoutRepository.findById(101L)).thenReturn(Optional.of(workout));
         when(planRepository.findById(27L)).thenReturn(Optional.of(plan));
@@ -993,7 +977,6 @@ class HorseTrainingPlanServiceTest {
         Subject subject = new Subject();
         subject.setId(1L);
         subject.setName("Khởi động & Chạy bền nhịp đều");
-        subject.setWorkoutType(WorkoutType.REGULAR);
 
         when(planRepository.findById(27L)).thenReturn(Optional.of(plan));
         when(workoutRepository.findByPlanIdWithLot(27L)).thenReturn(List.of(

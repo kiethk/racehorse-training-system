@@ -6,7 +6,7 @@ import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { trainingApi } from '../services/trainingService';
-import type { Subject, SubjectCategory, CreateSubjectRequest, SurfaceType, IntensityLevel, WorkoutType } from '../types';
+import type { Subject, SubjectCategory, CreateSubjectRequest, SurfaceType, IntensityLevel } from '../types';
 
 export function SubjectList() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -23,7 +23,6 @@ export function SubjectList() {
   const [targetDistanceMeters, setTargetDistanceMeters] = useState<number>(1000);
   const [intensityLevel, setIntensityLevel] = useState<IntensityLevel>('MEDIUM');
   const [durationMinutes, setDurationMinutes] = useState<number>(60);
-  const [workoutType, setWorkoutType] = useState<WorkoutType>('REGULAR');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -76,7 +75,6 @@ export function SubjectList() {
         targetDistanceMeters: Number(targetDistanceMeters),
         intensityLevel,
         durationMinutes: Number(durationMinutes),
-        workoutType,
       };
       await trainingApi.createSubject(payload);
       setName('');
@@ -224,23 +222,6 @@ export function SubjectList() {
                 <span className="text-[11px] text-[var(--color-text-muted)]">
                   Quyết định độ dài lot. Khung giờ vàng tối đa 240 phút.
                 </span>
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Loại hình bài tập (Workout Type)
-                </label>
-                <select
-                  value={workoutType}
-                  onChange={(e) => setWorkoutType(e.target.value as WorkoutType)}
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                >
-                  <option value="REGULAR">Bài tập thông thường (REGULAR)</option>
-                  <option value="GATE_PRACTICE">Tập xuất phát cổng (GATE_PRACTICE)</option>
-                  <option value="BREEZING">Nước đại tốc độ cao (BREEZING)</option>
-                  <option value="SWIMMING">Bơi lội (SWIMMING)</option>
-                  <option value="RECOVERY">Hồi phục thể lực (RECOVERY)</option>
-                </select>
               </div>
             </div>
 

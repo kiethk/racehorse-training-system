@@ -59,6 +59,8 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
   const horsePhoto = detail.documents.find((doc) => doc.documentType === 'HORSE_PHOTO');
   const currentTrainingDecision =
     detail.vetTrainingDecision ?? detail.healthRecords?.find((record) => record.trainingDecision)?.trainingDecision ?? null;
+  // Đơn đã qua Thú y nhưng hệ thống chưa tìm được Trainer đủ điều kiện để giao.
+  const trainerUnassigned = detail.status === 'TRAINER_REVIEW' && detail.trainerId == null;
   
   const TABS: TabItem[] = [
     { id: 'overview', label: 'Overview' },
@@ -84,9 +86,9 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
       </AdmissionInfoSection>
       
       {/* Short Trainer/Vet Assessment Summary if available */}
-      {(detail.trainerFeedback || detail.vetDecision) && (
+      {(detail.trainerFeedback || currentTrainingDecision) && (
         <AdmissionInfoSection title="Assessment Summary">
-          {detail.vetDecision && <InfoRow label="Vet Decision" value={detail.vetDecision} />}
+          {currentTrainingDecision && <InfoRow label="Vet Training Decision" value={currentTrainingDecision} />}
           {detail.trainerFeedback && <InfoRow label="Trainer Assessment" value={detail.trainerFeedback} />}
         </AdmissionInfoSection>
       )}
@@ -100,7 +102,6 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
   const renderMedical = () => (
     <div className="space-y-6">
       <AdmissionInfoSection title="Health & Veterinary">
-        <InfoRow label="Vet Decision" value={detail.vetDecision} />
         <InfoRow label="Training Decision" value={currentTrainingDecision} />
         {detail.vetFeedback && (
           <div>
@@ -122,7 +123,6 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
                 {hr.trainingDecision && <div className="text-sm mt-1"><span className="text-[var(--color-text-muted)]">Training:</span> {hr.trainingDecision}</div>}
                 {hr.restrictionDetails && <div className="text-sm mt-1"><span className="text-[var(--color-text-muted)]">Restrictions:</span> {hr.restrictionDetails}</div>}
                 {hr.diagnosis && <div className="text-sm mt-1"><span className="text-[var(--color-text-muted)]">Diagnosis:</span> {hr.diagnosis}</div>}
-                {hr.followUpDate && <div className="text-sm mt-1"><span className="text-[var(--color-text-muted)]">Follow-up:</span> {date(hr.followUpDate)}</div>}
                 {hr.notes && <div className="text-sm text-[var(--color-text-secondary)] mt-2 italic">{hr.notes}</div>}
               </li>
             ))}
@@ -149,7 +149,6 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         {detail.vetReviewedAt && (
           <div className="space-y-2 pt-4 border-t border-[var(--color-border)]">
             <h4 className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">Veterinarian Review</h4>
-            <InfoRow label="Decision" value={detail.vetDecision} />
             <InfoRow label="Training Decision" value={currentTrainingDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.vetReviewedAt)} />
             {detail.vetFeedback && <InfoRow label="Feedback" value={detail.vetFeedback} />}
@@ -226,12 +225,30 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
                       <span className="font-medium text-[var(--color-text-primary)] text-right">{detail.quarantineStallCode}</span>
                     </div>
                   )}
-                  {detail.healthRecords && detail.healthRecords.length > 0 && (
+                  {currentTrainingDecision && (
                     <div className="flex justify-between items-center gap-4">
                       <span className="text-[var(--color-text-secondary)] whitespace-nowrap">Training</span>
                       <span className="font-medium text-[var(--color-text-primary)] text-right">
-                        {detail.healthRecords[0].trainingDecision || 'Unknown'}
+                        {currentTrainingDecision}
                       </span>
+                    </div>
+                  )}
+                  {detail.trainerId != null && (
+                    <div className="flex justify-between items-center gap-4">
+                      <span className="text-[var(--color-text-secondary)] whitespace-nowrap">Head Trainer</span>
+                      <span className="font-medium text-[var(--color-text-primary)] text-right">
+                        {detail.trainerName ?? `#${detail.trainerId}`}
+                      </span>
+                    </div>
+                  )}
+                  {trainerUnassigned && (
+                    <div
+                      role="status"
+                      className="rounded-[var(--radius-sm)] bg-[var(--color-warning-soft)] p-2.5 text-[12px] text-[var(--color-warning)]"
+                    >
+                      <span className="font-semibold block">No Head Trainer assigned yet</span>
+                      No eligible Head Trainer is available. The system retries automatically; check that at
+                      least one active Head Trainer has a certification number.
                     </div>
                   )}
                 </div>

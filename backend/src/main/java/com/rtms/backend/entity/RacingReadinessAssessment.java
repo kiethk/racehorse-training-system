@@ -123,11 +123,5 @@ public class RacingReadinessAssessment {
     public Long getAdmissionId() { return admissionId; }
     public void setAdmissionId(Long admissionId) { this.admissionId = admissionId; }
 
-    @Column(name = "trainer_schedule_id", unique = true)
-    private Long trainerScheduleId;
-
-    public Long getTrainerScheduleId() { return trainerScheduleId; }
-    public void setTrainerScheduleId(Long trainerScheduleId) { this.trainerScheduleId = trainerScheduleId; }
-
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

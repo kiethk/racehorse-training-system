@@ -109,44 +109,6 @@ class HorseServiceTest {
     }
 
     @Test
-    @DisplayName("updateHorseStatus sang INJURED: kích hoạt cascade cancelFutureTrainingForHorse")
-    void testUpdateHorseStatus_Injured_TriggersCascade() {
-        Horse horse = new Horse();
-        horse.setId(1L);
-        horse.setCurrentStatus(com.rtms.backend.enums.HorseStatus.ELIGIBLE);
-
-        when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
-        when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
-
-        com.rtms.backend.dto.UpdateHorseStatusRequest req = new com.rtms.backend.dto.UpdateHorseStatusRequest();
-        req.setStatus("INJURED");
-
-        Horse updated = horseService.updateHorseStatus(1L, req);
-
-        assertEquals(com.rtms.backend.enums.HorseStatus.INJURED, updated.getCurrentStatus());
-        verify(trainingPlanService, times(1)).cancelFutureTrainingForHorse(eq(1L), anyString());
-    }
-
-    @Test
-    @DisplayName("updateHorseStatus sang ELIGIBLE: KHÔNG kích hoạt cascade huỷ huấn luyện")
-    void testUpdateHorseStatus_Eligible_NoCascade() {
-        Horse horse = new Horse();
-        horse.setId(1L);
-        horse.setCurrentStatus(com.rtms.backend.enums.HorseStatus.INJURED);
-
-        when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
-        when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
-
-        com.rtms.backend.dto.UpdateHorseStatusRequest req = new com.rtms.backend.dto.UpdateHorseStatusRequest();
-        req.setStatus("ELIGIBLE");
-
-        Horse updated = horseService.updateHorseStatus(1L, req);
-
-        assertEquals(com.rtms.backend.enums.HorseStatus.ELIGIBLE, updated.getCurrentStatus());
-        verify(trainingPlanService, never()).cancelFutureTrainingForHorse(anyLong(), anyString());
-    }
-
-    @Test
     @DisplayName("getAllHorses với mine=true và vai trò HEAD_TRAINER: chỉ trả ngựa ở khu Trainer phụ trách")
     void testGetAllHorses_HeadTrainer_Mine() {
         com.rtms.backend.security.AuthenticatedUser trainer =

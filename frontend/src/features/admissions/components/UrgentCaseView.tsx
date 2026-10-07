@@ -14,6 +14,19 @@ import type {
   UrgentAssignmentAlert,
 } from '../types';
 
+/** Ngày theo giờ Việt Nam, cộng thêm dayOffset ngày, dạng yyyy-MM-dd (khớp backend). */
+function businessDate(dayOffset: number) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+  const [year, month, day] = today.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + dayOffset)).toISOString().slice(0, 10);
+}
+
+function newIdempotencyKey() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `follow-up-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function formatDateTime(value: string | null) {
   if (!value) return 'Chưa xác định';
   const date = new Date(value);
@@ -36,8 +49,12 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [findings, setFindings] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [treatment, setTreatment] = useState('');
-  const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>('RESTRICTED');
+  const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>('BLOCKED');
   const [restrictionDetails, setRestrictionDetails] = useState('');
+  // Chặn tập bắt buộc kèm lịch khám lại — "tạm nghỉ đến" chính là ngày này.
+  const [followUpDate, setFollowUpDate] = useState(() => businessDate(3));
+  const [followUpDescription, setFollowUpDescription] = useState('Tái khám sau ca khẩn cấp');
+  const [followUpKey] = useState(newIdempotencyKey);
   const [notes, setNotes] = useState('');
   const [temperature, setTemperature] = useState('');
   const [heartRate, setHeartRate] = useState('');
@@ -92,9 +109,17 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     if (!diagnosis.trim()) {
       errors.diagnosis = 'Chẩn đoán lâm sàng (diagnosis) là bắt buộc.';
     }
-    if (trainingDecision === 'RESTRICTED' || trainingDecision === 'BLOCKED') {
+    if (trainingDecision === 'BLOCKED') {
       if (!restrictionDetails.trim()) {
-        errors.restrictionDetails = 'Chi tiết hạn chế là bắt buộc khi quyết định RESTRICTED hoặc BLOCKED.';
+        errors.restrictionDetails = 'Lý do chặn tập là bắt buộc khi quyết định BLOCKED.';
+      }
+      if (!followUpDate) {
+        errors.followUpDate = 'Phải chọn ngày khám lại khi chặn tập.';
+      } else if (followUpDate < businessDate(1)) {
+        errors.followUpDate = 'Ngày khám lại phải từ ngày mai trở đi.';
+      }
+      if (!followUpDescription.trim()) {
+        errors.followUpDescription = 'Nội dung khám lại là bắt buộc.';
       }
     }
 
@@ -129,6 +154,16 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       restrictionDetails: restrictionDetails.trim() || undefined,
       notes: notes.trim() || undefined,
       metrics: Object.keys(metrics).length > 0 ? [metrics] : undefined,
+      nextSchedule:
+        trainingDecision === 'BLOCKED'
+          ? {
+              horseId: urgentCase.horseId,
+              careType: 'ROUTINE',
+              scheduledDate: followUpDate,
+              description: followUpDescription.trim(),
+              idempotencyKey: followUpKey,
+            }
+          : undefined,
     };
 
     try {
@@ -210,9 +245,9 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
               <dd className="mt-1 font-semibold">{formatDateTime(urgentCase.assignedAt)}</dd>
             </div>
             <div>
-              <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Training status</dt>
+              <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Quyết định tập luyện</dt>
               <dd className="mt-1 font-bold text-[var(--color-danger)]">
-                {urgentCase.trainingStatus} — Không được training
+                {urgentCase.trainingDecision} — Tạm dừng tập cho tới khi khám xong
               </dd>
             </div>
           </dl>
@@ -439,11 +474,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
                   3. Quyết định huấn luyện (Training Decision) <span className="text-[var(--color-danger)]">*</span>
                 </label>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   {[
                     { value: 'ALLOWED' as const, label: 'ALLOWED', desc: 'Cho phép tập luyện bình thường' },
-                    { value: 'RESTRICTED' as const, label: 'RESTRICTED', desc: 'Hạn chế vận động có điều kiện' },
-                    { value: 'BLOCKED' as const, label: 'BLOCKED', desc: 'Cấm tập hoàn toàn, nghỉ tại chuồng' },
+                    {
+                      value: 'BLOCKED' as const,
+                      label: 'BLOCKED',
+                      desc: 'Tạm nghỉ tới lần khám lại; buổi tập tương lai bị hủy',
+                    },
                   ].map((option) => (
                     <label
                       key={option.value}
@@ -462,7 +500,12 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                           onChange={() => {
                             setTrainingDecision(option.value);
                             if (option.value === 'ALLOWED') {
-                              setFieldErrors((prev) => ({ ...prev, restrictionDetails: '' }));
+                              setFieldErrors((prev) => ({
+                                ...prev,
+                                restrictionDetails: '',
+                                followUpDate: '',
+                                followUpDescription: '',
+                              }));
                             }
                           }}
                           className="accent-[var(--color-primary)]"
@@ -474,27 +517,86 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   ))}
                 </div>
 
-                {(trainingDecision === 'RESTRICTED' || trainingDecision === 'BLOCKED') && (
-                  <div className="mt-3">
-                    <label htmlFor="restriction-details" className="block text-xs font-semibold text-[var(--color-danger)]">
-                      Chi tiết hạn chế vận động <span className="text-[var(--color-danger)]">*</span>
-                    </label>
-                    <textarea
-                      id="restriction-details"
-                      rows={2}
-                      value={restrictionDetails}
-                      onChange={(e) => {
-                        setRestrictionDetails(e.target.value);
-                        if (fieldErrors.restrictionDetails) {
-                          setFieldErrors((prev) => ({ ...prev, restrictionDetails: '' }));
-                        }
-                      }}
-                      placeholder="Mô tả cụ thể chế độ hạn chế (ví dụ: chỉ dắt đi bộ 15 phút, nghỉ chuồng tuyệt đối...)"
-                      className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-surface)] p-2.5 text-xs outline-none focus:ring-1 focus:ring-[var(--color-danger)]"
-                    />
-                    {fieldErrors.restrictionDetails && (
-                      <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.restrictionDetails}</p>
-                    )}
+                {trainingDecision === 'BLOCKED' && (
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <label htmlFor="restriction-details" className="block text-xs font-semibold text-[var(--color-danger)]">
+                        Lý do chặn tập / chế độ nghỉ <span className="text-[var(--color-danger)]">*</span>
+                      </label>
+                      <textarea
+                        id="restriction-details"
+                        rows={2}
+                        value={restrictionDetails}
+                        onChange={(e) => {
+                          setRestrictionDetails(e.target.value);
+                          if (fieldErrors.restrictionDetails) {
+                            setFieldErrors((prev) => ({ ...prev, restrictionDetails: '' }));
+                          }
+                        }}
+                        placeholder="Mô tả cụ thể chế độ hạn chế (ví dụ: chỉ dắt đi bộ 15 phút, nghỉ chuồng tuyệt đối...)"
+                        className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-surface)] p-2.5 text-xs outline-none focus:ring-1 focus:ring-[var(--color-danger)]"
+                      />
+                      {fieldErrors.restrictionDetails && (
+                        <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.restrictionDetails}</p>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="follow-up-date" className="block text-xs font-semibold text-[var(--color-danger)]">
+                          Ngày khám lại <span className="text-[var(--color-danger)]">*</span>
+                        </label>
+                        <input
+                          id="follow-up-date"
+                          type="date"
+                          min={businessDate(1)}
+                          value={followUpDate}
+                          onChange={(e) => {
+                            setFollowUpDate(e.target.value);
+                            if (fieldErrors.followUpDate) setFieldErrors((prev) => ({ ...prev, followUpDate: '' }));
+                          }}
+                          className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none"
+                        />
+                        <div className="mt-1 flex gap-1">
+                          {[3, 7, 14].map((days) => (
+                            <button
+                              key={days}
+                              type="button"
+                              onClick={() => setFollowUpDate(businessDate(days))}
+                              className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]"
+                            >
+                              +{days} ngày
+                            </button>
+                          ))}
+                        </div>
+                        {fieldErrors.followUpDate && (
+                          <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUpDate}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label htmlFor="follow-up-desc" className="block text-xs font-semibold text-[var(--color-danger)]">
+                          Nội dung khám lại <span className="text-[var(--color-danger)]">*</span>
+                        </label>
+                        <input
+                          id="follow-up-desc"
+                          type="text"
+                          value={followUpDescription}
+                          onChange={(e) => {
+                            setFollowUpDescription(e.target.value);
+                            if (fieldErrors.followUpDescription) {
+                              setFieldErrors((prev) => ({ ...prev, followUpDescription: '' }));
+                            }
+                          }}
+                          className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none"
+                        />
+                        {fieldErrors.followUpDescription && (
+                          <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUpDescription}</p>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-[var(--color-text-secondary)]">
+                      Ngựa tạm nghỉ tới lần khám này. Trainer sẽ thấy lý do và ngày khám lại khi lập kế hoạch.
+                    </p>
                   </div>
                 )}
               </div>
@@ -532,8 +634,16 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   </div>
                   {completedData.restrictionDetails && (
                     <div className="sm:col-span-2">
-                      <dt className="font-semibold text-[var(--color-text-muted)]">Chi tiết hạn chế</dt>
+                      <dt className="font-semibold text-[var(--color-text-muted)]">Lý do chặn tập</dt>
                       <dd className="mt-1 text-[var(--color-danger)]">{completedData.restrictionDetails}</dd>
+                    </div>
+                  )}
+                  {completedData.nextSchedule && (
+                    <div className="sm:col-span-2">
+                      <dt className="font-semibold text-[var(--color-text-muted)]">Khám lại</dt>
+                      <dd className="mt-1 text-[var(--color-text-primary)]">
+                        {completedData.nextSchedule.scheduledDate} — {completedData.nextSchedule.description}
+                      </dd>
                     </div>
                   )}
                 </dl>

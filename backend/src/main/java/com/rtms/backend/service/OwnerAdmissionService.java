@@ -44,24 +44,14 @@ public class OwnerAdmissionService {
     private final CandidateHorseProfileRepository candidates;
     private final AdmissionDocumentRepository documents;
     private final AdmissionFileStorage fileStorage;
-    private final com.rtms.backend.repository.TrainerScheduleRepository trainerScheduleRepository;
-
-    @org.springframework.beans.factory.annotation.Autowired
-    public OwnerAdmissionService(AdmissionApplicationRepository admissions,
-            CandidateHorseProfileRepository candidates, AdmissionDocumentRepository documents,
-            AdmissionFileStorage fileStorage,
-            com.rtms.backend.repository.TrainerScheduleRepository trainerScheduleRepository) {
-        this.admissions = admissions;
-        this.candidates = candidates;
-        this.documents = documents;
-        this.fileStorage = fileStorage;
-        this.trainerScheduleRepository = trainerScheduleRepository;
-    }
 
     public OwnerAdmissionService(AdmissionApplicationRepository admissions,
             CandidateHorseProfileRepository candidates, AdmissionDocumentRepository documents,
             AdmissionFileStorage fileStorage) {
-        this(admissions, candidates, documents, fileStorage, null);
+        this.admissions = admissions;
+        this.candidates = candidates;
+        this.documents = documents;
+        this.fileStorage = fileStorage;
     }
 
     /** The transaction creates exactly one new Application and one new immutable snapshot. */
@@ -231,8 +221,7 @@ public class OwnerAdmissionService {
         boolean allowed = switch (viewer.getRole()) {
             case "CLUB_MANAGER" -> true;
             case "HORSE_OWNER" -> java.util.Objects.equals(admission.getOwnerId(), viewer.getUserId());
-            case "HEAD_TRAINER" -> trainerScheduleRepository != null && trainerScheduleRepository.findByAdmissionId(admissionId)
-                    .map(ts -> java.util.Objects.equals(ts.getTrainerId(), viewer.getUserId())).orElse(false);
+            case "HEAD_TRAINER" -> java.util.Objects.equals(admission.getTrainerId(), viewer.getUserId());
             case "GROOM" -> java.util.Objects.equals(admission.getGroomId(), viewer.getUserId());
             default -> false;
         };

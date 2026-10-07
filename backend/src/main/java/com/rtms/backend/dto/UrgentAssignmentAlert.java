@@ -22,7 +22,7 @@ public record UrgentAssignmentAlert(
         String title,
         String description,
         String imageUrl,
-        TrainingDecision trainingStatus,
+        TrainingDecision trainingDecision,
         CareScheduleStatus status,
         LocalDateTime scheduledAt,
         LocalDateTime assignedAt
