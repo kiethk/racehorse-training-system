@@ -1,4 +1,4 @@
--- Requested dates must remain usable by offer allocation after consolidation.
+-- V61: requested dates must remain usable by offer allocation after consolidation.
 ALTER TABLE care_schedule ADD COLUMN requested_at TIMESTAMP;
 UPDATE care_schedule cs SET requested_at = (
     SELECT COALESCE((entry->'row'->>'requested_for_date')::date,
