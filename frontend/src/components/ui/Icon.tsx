@@ -4,6 +4,7 @@ type IconName =
   | 'search'
   | 'plus'
   | 'chevron-down'
+  | 'chevron-up'
   | 'chevron-right'
   | 'chevron-left'
   | 'bell'
@@ -56,6 +57,7 @@ const paths: Record<IconName, ReactElement> = {
   ),
   plus: <path d="M12 5v14M5 12h14" />,
   'chevron-down': <path d="m6 9 6 6 6-6" />,
+  'chevron-up': <path d="m18 15-6-6-6 6" />,
   'chevron-right': <path d="m9 6 6 6-6 6" />,
   'chevron-left': <path d="m15 6-6 6 6 6" />,
   bell: (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
@@ -9,8 +9,29 @@ import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { auditLogApi } from '../services/api';
 import type { AuditLogItem, AuditLogFilters, PageResponse } from '../types';
 
-const HTTP_METHODS = ['ALL', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
-const STATUS_CODES = ['ALL', '200', '201', '204', '400', '401', '403', '404', '409', '500'] as const;
+const STATUS_CODES = [
+  { value: 'ALL', label: 'All Results' },
+  { value: '200', label: 'Success (200)' },
+  { value: '201', label: 'Created (201)' },
+  { value: '204', label: 'No Content (204)' },
+  { value: '400', label: 'Bad Request (400)' },
+  { value: '401', label: 'Unauthorized (401)' },
+  { value: '403', label: 'Forbidden (403)' },
+  { value: '404', label: 'Not Found (404)' },
+  { value: '409', label: 'Conflict (409)' },
+  { value: '500', label: 'Server Error (500)' },
+] as const;
+
+const CATEGORIES = [
+  { value: '', label: 'All Categories' },
+  { value: '/api/admissions', label: 'Admission' },
+  { value: '/api/horses', label: 'Horse' },
+  { value: '/api/staff', label: 'Staff' },
+  { value: '/api/stalls', label: 'Stable' },
+  { value: '/api/health-records', label: 'Health' },
+  { value: '/api/training', label: 'Training' },
+  { value: '/api/auth', label: 'Access Control' },
+] as const;
 
 const initialFilters: AuditLogFilters = {
   search: '',
@@ -34,40 +55,29 @@ function formatRole(role: string | null): string {
   }
 }
 
-function StatusBadge({ code }: { code: number }) {
+function ResultBadge({ code }: { code: number }) {
   let colorClass = 'bg-[var(--color-surface-muted)] text-[var(--color-text-primary)] border border-[var(--color-border)]';
+  let label = 'Unknown';
   
   if (code >= 200 && code < 300) {
     colorClass = 'bg-[var(--color-success-soft)] text-[var(--color-success)] border border-[var(--color-success-border)]';
+    label = 'Success';
   } else if (code >= 400 && code < 500) {
     colorClass = 'bg-[var(--color-warning-soft)] text-[var(--color-warning-strong)] border border-[var(--color-warning-border)]';
+    label = 'Failed';
   } else if (code >= 500) {
     colorClass = 'bg-[var(--color-danger-soft)] text-[var(--color-danger)] border border-[var(--color-danger-border)]';
+    label = 'Failed';
   }
 
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${colorClass}`}>
-      {code}
+      {label}
     </span>
   );
 }
 
-function MethodBadge({ method }: { method: string }) {
-  let colorClass = 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)]';
-  
-  switch (method) {
-    case 'POST': colorClass = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'; break;
-    case 'PUT': colorClass = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'; break;
-    case 'PATCH': colorClass = 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'; break;
-    case 'DELETE': colorClass = 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'; break;
-  }
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${colorClass}`}>
-      {method}
-    </span>
-  );
-}
+import { mapAuditLogEvent } from '../services/audit-event-mapper';
 
 export function ManagerAuditLogView() {
   const router = useRouter();
@@ -89,6 +99,7 @@ export function ManagerAuditLogView() {
   const [data, setData] = useState<PageResponse<AuditLogItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   
   const [draft, setDraft] = useState<AuditLogFilters>(urlFilters);
 
@@ -171,24 +182,24 @@ export function ManagerAuditLogView() {
         </label>
         
         <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Method
+          Activity category
           <select 
-            value={draft.httpMethod} 
-            onChange={(e) => setDraft({ ...draft, httpMethod: e.target.value })} 
+            value={CATEGORIES.find(c => c.value && draft.search.includes(c.value))?.value || ''} 
+            onChange={(e) => setDraft({ ...draft, search: e.target.value })} 
             className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
           >
-            {HTTP_METHODS.map((m) => <option key={m} value={m}>{m === 'ALL' ? 'All Methods' : m}</option>)}
+            {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
         </label>
 
         <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Status
+          Result
           <select 
             value={draft.statusCode} 
             onChange={(e) => setDraft({ ...draft, statusCode: e.target.value })} 
             className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
           >
-            {STATUS_CODES.map((s) => <option key={s} value={s}>{s === 'ALL' ? 'All Statuses' : s}</option>)}
+            {STATUS_CODES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </label>
 
@@ -237,51 +248,84 @@ export function ManagerAuditLogView() {
                     <th className="px-6 py-4">Time</th>
                     <th className="px-6 py-4">Actor</th>
                     <th className="px-6 py-4">Role</th>
-                    <th className="px-6 py-4">Method</th>
-                    <th className="px-6 py-4">Request</th>
-                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Activity</th>
+                    <th className="px-6 py-4">Target</th>
+                    <th className="px-6 py-4">Result</th>
+                    <th className="px-6 py-4"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)] relative">
                   {loading && (
                     <tr>
-                      <td colSpan={6} className="absolute inset-0 bg-[var(--color-surface)]/50 backdrop-blur-[1px] z-10" />
+                      <td colSpan={7} className="absolute inset-0 bg-[var(--color-surface)]/50 backdrop-blur-[1px] z-10" />
                     </tr>
                   )}
-                  {data.content.map((log) => (
-                    <tr key={log.id} className="hover:bg-[var(--color-surface-muted)] transition-colors">
-                      <td className="px-6 py-4 text-[var(--color-text-secondary)] whitespace-nowrap">
-                        {new Date(log.createdAt).toLocaleString('en-GB', { 
-                          day: '2-digit', month: 'short', year: 'numeric',
-                          hour: '2-digit', minute: '2-digit', second: '2-digit'
-                        })}
-                      </td>
-                      <td className="px-6 py-4">
-                        {log.actorName ? (
-                          <div>
-                            <span className="font-semibold block text-[var(--color-text-primary)]">{log.actorName}</span>
-                            {log.actorEmail && <span className="text-[11px] text-[var(--color-text-muted)]">{log.actorEmail}</span>}
-                          </div>
-                        ) : (
-                          <span className="text-[var(--color-text-secondary)] italic">System / Unauthenticated</span>
+                  {data.content.map((log) => {
+                    const mapped = mapAuditLogEvent(log.httpMethod, log.requestPath, log.statusCode);
+                    const isExpanded = expandedId === log.id;
+                    
+                    return (
+                      <React.Fragment key={log.id}>
+                        <tr 
+                          className="hover:bg-[var(--color-surface-muted)] transition-colors cursor-pointer"
+                          onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                        >
+                          <td className="px-6 py-4 text-[var(--color-text-secondary)] whitespace-nowrap">
+                            {new Date(log.createdAt).toLocaleString('en-GB', { 
+                              day: '2-digit', month: 'short', year: 'numeric',
+                              hour: '2-digit', minute: '2-digit', second: '2-digit'
+                            })}
+                          </td>
+                          <td className="px-6 py-4">
+                            {log.actorName ? (
+                              <div>
+                                <span className="font-semibold block text-[var(--color-text-primary)]">{log.actorName}</span>
+                                {log.actorEmail && <span className="text-[11px] text-[var(--color-text-muted)]">{log.actorEmail}</span>}
+                              </div>
+                            ) : (
+                              <span className="text-[var(--color-text-secondary)] italic">System / Unauthenticated</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-[var(--color-text-secondary)]">{formatRole(log.actorRole)}</span>
+                          </td>
+                          <td className="px-6 py-4 font-medium text-[var(--color-text-primary)]">
+                            {mapped.activity}
+                          </td>
+                          <td className="px-6 py-4 text-[var(--color-text-secondary)]">
+                            {mapped.target}
+                          </td>
+                          <td className="px-6 py-4">
+                            <ResultBadge code={log.statusCode} />
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} className="text-[var(--color-text-muted)]" />
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="bg-[var(--color-surface-subtle)] border-b border-[var(--color-border)]">
+                            <td colSpan={7} className="px-6 py-4">
+                              <div className="flex flex-col gap-2 text-sm text-[var(--color-text-secondary)]">
+                                <span className="font-semibold text-xs uppercase tracking-wider text-[var(--color-text-muted)] mb-1">Technical Details</span>
+                                <div className="grid grid-cols-[100px_1fr] gap-2">
+                                  <span className="font-medium">HTTP Method</span>
+                                  <span className="font-mono text-xs bg-[var(--color-surface)] px-1.5 py-0.5 rounded border border-[var(--color-border)] w-fit">{log.httpMethod}</span>
+                                </div>
+                                <div className="grid grid-cols-[100px_1fr] gap-2">
+                                  <span className="font-medium">Request Path</span>
+                                  <span className="font-mono text-xs bg-[var(--color-surface)] px-1.5 py-0.5 rounded border border-[var(--color-border)] break-all">{log.requestPath}</span>
+                                </div>
+                                <div className="grid grid-cols-[100px_1fr] gap-2">
+                                  <span className="font-medium">Status Code</span>
+                                  <span className="font-mono text-xs bg-[var(--color-surface)] px-1.5 py-0.5 rounded border border-[var(--color-border)] w-fit">{log.statusCode}</span>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-[var(--color-text-secondary)]">{formatRole(log.actorRole)}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <MethodBadge method={log.httpMethod} />
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-mono text-xs text-[var(--color-text-primary)] max-w-xs md:max-w-md lg:max-w-lg truncate block" title={log.requestPath}>
-                          {log.requestPath}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge code={log.statusCode} />
-                      </td>
-                    </tr>
-                  ))}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
