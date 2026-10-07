@@ -39,7 +39,7 @@ export function AssignHorseDialog({
       await onAssigned();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Xếp ngựa vào chuồng thất bại.');
+      setError(err instanceof Error ? err.message : 'Unable to assign the horse to the stall.');
     } finally {
       setSubmitting(false);
     }
@@ -58,15 +58,15 @@ export function AssignHorseDialog({
         className="relative w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl"
       >
         <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-          Xếp ngựa vào chuồng {stall.stallCode}
+          Assign horse to stall {stall.stallCode}
         </h2>
         <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
-          Chọn một chiến mã chưa có chuồng để xếp vào ô này.
+          Select an unassigned horse for this stall.
         </p>
 
         {isStallOccupied && (
           <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] p-3 text-[12px] text-[var(--color-danger)]">
-            Chuồng này hiện đang có ngựa ở (OCCUPIED). Vui lòng dọn chuồng hoặc chuyển ngựa cũ trước khi xếp ngựa mới.
+            This stall is occupied. Clear or move the current horse before assigning another horse.
           </div>
         )}
 
@@ -78,11 +78,11 @@ export function AssignHorseDialog({
 
         <div className="mt-4">
           <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-            Chiến mã sẵn sàng ({availableHorses.length})
+            Available horses ({availableHorses.length})
           </label>
           {availableHorses.length === 0 ? (
             <p className="mt-2 text-[12px] text-[var(--color-text-muted)]">
-              Không có chiến mã nào chưa được xếp chuồng.
+              No unassigned horses are available.
             </p>
           ) : (
             <select
@@ -91,10 +91,10 @@ export function AssignHorseDialog({
               disabled={isStallOccupied || submitting}
               className="mt-1.5 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
             >
-              <option value="">-- Chọn chiến mã --</option>
+              <option value="">-- Select a horse --</option>
               {availableHorses.map((h) => (
                 <option key={h.id} value={h.id}>
-                  {h.name} ({h.breed || 'Chưa rõ giống'} · Trạng thái: {h.currentStatus})
+                  {h.name} ({h.breed || 'Unknown breed'} · Status: {h.currentStatus})
                 </option>
               ))}
             </select>
@@ -103,14 +103,14 @@ export function AssignHorseDialog({
 
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            Huỷ
+            Cancel
           </Button>
           <Button
             variant="primary"
             onClick={handleAssign}
             disabled={!selectedHorseId || isStallOccupied || submitting}
           >
-            {submitting ? 'Đang xếp...' : 'Xác nhận xếp chuồng'}
+            {submitting ? 'Assigning...' : 'Assign horse'}
           </Button>
         </div>
       </div>

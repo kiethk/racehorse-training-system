@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { accessControlService } from '../services/accessControlService';
 import { AccessControlMatrixResponse } from '../types';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { Table } from '@/components/ui/Table';
 
 const PERMISSION_GROUPS = [
   { key: 'user-account', label: 'User & Account Management' },
@@ -327,7 +328,7 @@ export function AccessControlView() {
         </div>
 
         <div className="overflow-x-auto rounded-md border border-[var(--color-border)]">
-          <table className="w-full min-w-[800px] border-collapse text-left text-[13px]">
+          <Table className="min-w-[800px] text-[13px]">
             <thead>
               <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
                 <th className="p-3 font-semibold text-[var(--color-text-primary)] min-w-[250px]">
@@ -368,7 +369,7 @@ export function AccessControlView() {
                     {!isGroupCollapsed(group.key) && group.permissions.map(permission => (
                       <tr key={permission.id} className="hover:bg-[var(--color-surface-muted)] transition-colors">
                         <td className="p-3 pl-8">
-                          <div className="font-medium text-[var(--color-text-primary)] font-mono text-[12px]">
+                          <div className="font-medium text-[var(--color-text-primary)] font-metric text-[12px]">
                             {permission.code}
                           </div>
                           <div className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">
@@ -402,7 +403,7 @@ export function AccessControlView() {
                 ))
               )}
             </tbody>
-          </table>
+          </Table>
         </div>
       </Panel>
     </div>

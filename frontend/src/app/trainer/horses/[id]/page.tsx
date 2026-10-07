@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { HorseFitnessTrendView } from '@/features/training/components/HorseFitnessTrendView';
 
 export const metadata: Metadata = {
-  title: 'Thể lực & Tiến độ chiến mã | Huấn luyện viên',
+  title: 'Horse Fitness & Progress | RTMS',
 };
 
 export default async function HorseFitnessDetailPage({

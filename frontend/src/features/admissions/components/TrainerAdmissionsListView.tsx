@@ -11,6 +11,7 @@ import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
 import type { TrainerAdmissionQueue } from '../types/trainer';
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui/Table';
 
 type Tab = 'PENDING' | 'REVIEWED';
 
@@ -248,27 +249,26 @@ export function TrainerAdmissionsListView() {
             action={<Button size="sm" onClick={clearFilters}>Reset Filters</Button>}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="border-b border-[var(--color-border)] text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+          <TableShell className="rounded-none border-0 shadow-none">
+            <Table>
+              <TableHeader className="uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-3.5">Candidate Horse</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">Quarantine Stall</th>
-                  <th className="px-6 py-3.5">Submitted Date</th>
+                  <TableHead>Candidate Horse</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Quarantine Stall</TableHead>
+                  <TableHead>Submitted Date</TableHead>
                   {draft.tab === 'REVIEWED' && (
-                    <th className="px-6 py-3.5">Evaluated Date</th>
+                    <TableHead>Evaluated Date</TableHead>
                   )}
-                  <th className="px-6 py-3.5 text-right">Action</th>
+                  <TableHead align="right">Action</TableHead>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)]">
+              </TableHeader>
+              <TableBody>
                 {filteredAdmissions.map((item) => (
-                  <tr
+                  <TableRow
                     key={item.admissionId}
-                    className="transition-colors hover:bg-[var(--color-surface-muted)]"
                   >
-                    <td className="px-6 py-3.5">
+                    <TableCell>
                       <div className="flex items-center gap-3">
                         <HorseAvatar
                           name={item.candidateName}
@@ -283,11 +283,11 @@ export function TrainerAdmissionsListView() {
                           </span>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-3.5">
+                    </TableCell>
+                    <TableCell>
                       <AdmissionStatusBadge status={item.status} simplified />
-                    </td>
-                    <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
+                    </TableCell>
+                    <TableCell className="text-[12px] text-[var(--color-text-secondary)]">
                       {item.quarantineStallCode ? (
                         <span className="inline-flex items-center gap-1 font-medium text-[var(--color-text-primary)]">
                           Stall {item.quarantineStallCode}
@@ -295,16 +295,16 @@ export function TrainerAdmissionsListView() {
                       ) : (
                         <span className="text-[var(--color-text-muted)] italic">Unassigned</span>
                       )}
-                    </td>
-                    <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
+                    </TableCell>
+                    <TableCell className="text-[12px] text-[var(--color-text-secondary)]">
                       {new Date(item.submittedAt).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
                       })}
-                    </td>
+                    </TableCell>
                     {draft.tab === 'REVIEWED' && (
-                      <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
+                      <TableCell className="text-[12px] text-[var(--color-text-secondary)]">
                         {item.trainerReviewedAt
                           ? new Date(item.trainerReviewedAt).toLocaleDateString('en-US', {
                               year: 'numeric',
@@ -312,9 +312,9 @@ export function TrainerAdmissionsListView() {
                               day: 'numeric',
                             })
                           : '—'}
-                      </td>
+                      </TableCell>
                     )}
-                    <td className="px-6 py-3.5 text-right">
+                    <TableCell align="right">
                       <Link
                         href={`/trainer/admissions/${item.admissionId}${detailQuery}`}
                         className={`inline-flex items-center justify-center rounded-[var(--radius-sm)] px-4 py-1.5 text-xs font-semibold transition-colors ${
@@ -325,12 +325,12 @@ export function TrainerAdmissionsListView() {
                       >
                         {item.status === 'TRAINER_REVIEW' ? 'Evaluate' : 'View'}
                       </Link>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </TableShell>
         )}
       </Panel>
     </div>

@@ -831,7 +831,7 @@ export function VetReviewForm({
             <div className="flex items-center gap-2">
               <Icon name="clipboard" size={14} className="text-[var(--color-primary)] shrink-0" />
               <span>
-                Tìm thấy bản nháp từ <strong>{availableDraft.timestamp}</strong>. Bạn có muốn khôi phục dữ liệu đã lưu không?
+                A draft from <strong>{availableDraft.timestamp}</strong> was found. Restore the saved data?
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -841,7 +841,7 @@ export function VetReviewForm({
                 variant="primary"
                 onClick={handleRestoreDraft}
               >
-                Khôi phục
+                Restore
               </Button>
               <Button
                 type="button"
@@ -849,7 +849,7 @@ export function VetReviewForm({
                 variant="secondary"
                 onClick={handleDiscardAvailableDraft}
               >
-                Xóa nháp
+                Delete draft
               </Button>
             </div>
           </div>
@@ -860,14 +860,14 @@ export function VetReviewForm({
           <div className="mb-4 flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-1.5 text-[11px] text-[var(--color-text-secondary)]">
             <span className="flex items-center gap-1.5 font-medium">
               <Icon name="check" size={12} className="text-[var(--color-success)]" />
-              Đã lưu nháp lúc {draftSavedTime}
+              Draft saved at {draftSavedTime}
             </span>
             <button
               type="button"
               onClick={handleClearDraft}
               className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] font-medium transition-colors"
             >
-              Xóa nháp
+              Delete draft
             </button>
           </div>
         )}
@@ -932,7 +932,7 @@ export function VetReviewForm({
                           onChange={(e) =>
                             setMetrics((curr) => ({ ...curr, [cfg.key]: e.target.value }))
                           }
-                          className={`w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface)] px-2.5 py-1.5 pr-8 font-mono text-[13px] font-semibold text-[var(--color-text-primary)] outline-none transition-all ${borderInfo.borderClass}`}
+                          className={`w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface)] px-2.5 py-1.5 pr-8 font-metric text-[13px] font-semibold text-[var(--color-text-primary)] outline-none transition-all ${borderInfo.borderClass}`}
                         />
                         <span className="pointer-events-none absolute right-2 top-1.5 text-[11px] text-[var(--color-text-muted)]">
                           {cfg.unit}
@@ -1109,7 +1109,7 @@ export function VetReviewForm({
                         }`}
                       >
                         <Icon name="check" size={14} />
-                        Normal (Bình thường)
+                        Normal
                       </button>
                       <button
                         type="button"
@@ -1125,7 +1125,7 @@ export function VetReviewForm({
                         }`}
                       >
                         <Icon name="alert-triangle" size={14} />
-                        Abnormal (Bất thường)
+                        Abnormal
                       </button>
                     </div>
 
@@ -1470,7 +1470,7 @@ export function VetReviewForm({
                           setFieldErrors((errs) => ({ ...errs, followUpDate: '' }));
                         }
                       }}
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] font-mono outline-none"
+                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] font-metric outline-none"
                     />
                     <div className="mt-1 flex gap-1">
                       {[3, 7, 14].map((days) => {

@@ -26,8 +26,8 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
         const res = await racingService.getMine(id);
         setData(res);
       } catch (err) {
-        console.error('Lỗi khi tải chi tiết đơn đề cử:', err);
-        setError(err instanceof Error ? err.message : 'Không tìm thấy đơn đề cử hoặc bạn không có quyền xem.');
+        console.error('Failed to load race nomination:', err);
+        setError(err instanceof Error ? err.message : 'The race nomination was not found or you do not have access.');
       } finally {
         setLoading(false);
       }
@@ -38,11 +38,11 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
   const renderStatusBadge = (status: RaceRegistrationStatus) => {
     switch (status) {
       case 'PENDING':
-        return <Pill tone="warning" size="md">Chờ duyệt</Pill>;
+        return <Pill tone="warning" size="md">Pending review</Pill>;
       case 'APPROVED':
-        return <Pill tone="success" size="md">Đã duyệt</Pill>;
+        return <Pill tone="success" size="md">Approved</Pill>;
       case 'REJECTED':
-        return <Pill tone="danger" size="md">Từ chối</Pill>;
+        return <Pill tone="danger" size="md">Rejected</Pill>;
       default:
         return <Pill tone="neutral" size="md">{status}</Pill>;
     }
@@ -53,7 +53,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
     try {
       const [y, m, d] = dateStr.split('-');
       if (y && m && d) return `${d}/${m}/${y}`;
-      return new Date(dateStr).toLocaleDateString('vi-VN');
+      return new Date(dateStr).toLocaleDateString('en-GB');
     } catch {
       return dateStr;
     }
@@ -63,7 +63,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
     if (!dtStr) return '—';
     try {
       const dt = new Date(dtStr);
-      return `${dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày ${dt.toLocaleDateString('vi-VN')}`;
+      return `${dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} on ${dt.toLocaleDateString('en-GB')}`;
     } catch {
       return dtStr;
     }
@@ -82,12 +82,12 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
       <Panel padded>
         <EmptyState
           icon="alert-triangle"
-          title="Không thể hiển thị đơn đề cử"
-          description={error || 'Đơn đề cử không tồn tại hoặc đã bị gỡ bỏ.'}
+          title="Unable to display nomination"
+          description={error || 'This nomination does not exist or has been removed.'}
           action={
             <Link href="/trainer/racing">
               <Button variant="secondary" size="sm">
-                ← Quay lại danh sách
+                ← Back to list
               </Button>
             </Link>
           }
@@ -105,7 +105,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
             href="/trainer/racing"
             className="inline-flex items-center text-[12px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition mb-1"
           >
-            ← Danh sách đơn đề cử
+            ← Race nominations
           </Link>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[20px] font-bold text-[var(--color-text-primary)]">
@@ -114,13 +114,13 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
             {renderStatusBadge(data.status)}
           </div>
           <p className="mt-0.5 text-[13px] text-[var(--color-text-secondary)]">
-            Hạng mục: <strong className="text-[var(--color-text-primary)]">{data.raceCategory}</strong> • Ngày gửi: {formatDateTime(data.createdAt)}
+            Category: <strong className="text-[var(--color-text-primary)]">{data.raceCategory}</strong> • Submitted: {formatDateTime(data.createdAt)}
           </p>
         </div>
 
         <Link href="/trainer/racing">
           <Button variant="secondary">
-            Quay lại danh sách
+            Back to list
           </Button>
         </Link>
       </div>
@@ -129,7 +129,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
       <div className="rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-3 text-[12px] text-[var(--color-info)] flex items-center gap-2">
         <span>ℹ️</span>
         <span>
-          <strong>Lưu ý:</strong> Thông tin cuộc đua do Trainer tự tìm hiểu và cung cấp; Ban Quản lý sẽ kiểm chứng trước khi phê duyệt.
+              <strong>Note:</strong> Race information is provided by the trainer; management will verify it before approval.
         </span>
       </div>
 
@@ -145,16 +145,16 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
           <div className="font-bold flex items-center gap-2 mb-1">
             <span>{data.status === 'APPROVED' ? '✅' : '❌'}</span>
             <span>
-              Phản hồi từ Ban Quản lý ({data.status === 'APPROVED' ? 'Đồng ý duyệt' : 'Từ chối đề cử'})
+              Manager feedback ({data.status === 'APPROVED' ? 'Approved' : 'Nomination rejected'})
             </span>
           </div>
           {data.reviewedAt && (
             <div className="text-[12px] opacity-80 mb-2">
-              Thời gian duyệt: {formatDateTime(data.reviewedAt)}
+              Reviewed: {formatDateTime(data.reviewedAt)}
             </div>
           )}
           <div className="rounded bg-[var(--color-surface)]/80 p-3 border border-current/20 text-[var(--color-text-primary)]">
-            {data.managerFeedback || 'Không có nhận xét bổ sung.'}
+            {data.managerFeedback || 'No additional feedback.'}
           </div>
         </div>
       )}
@@ -165,21 +165,21 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
         <div className="space-y-6">
           <Panel padded>
             <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
-              <span>🏇</span> Chiến mã đề cử
+              <span aria-hidden="true">Horse</span> Nominated horse
             </h2>
 
             <div className="space-y-3 text-[13px]">
               <div>
-                <span className="text-[var(--color-text-secondary)]">Tên chiến mã:</span>{' '}
+                <span className="text-[var(--color-text-secondary)]">Horse name:</span>{' '}
                 <strong className="text-[var(--color-text-primary)] text-[15px]">
-                  {data.horseName || `Ngựa #${data.horseId}`}
+                  {data.horseName || `Horse #${data.horseId}`}
                 </strong>
               </div>
 
               {data.horseRegistrationNumber && (
                 <div>
-                  <span className="text-[var(--color-text-secondary)]">Mã UELN / Số đăng ký:</span>{' '}
-                  <span className="font-mono font-medium text-[var(--color-text-primary)]">
+                  <span className="text-[var(--color-text-secondary)]">UELN / Registration number:</span>{' '}
+                  <span className="font-metric font-medium text-[var(--color-text-primary)]">
                     {data.horseRegistrationNumber}
                   </span>
                 </div>
@@ -187,7 +187,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
 
               <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
                 <span className="text-[var(--color-text-secondary)] block font-medium mb-1">
-                  Nhận định / Lý do đề cử của Trainer:
+                  Trainer assessment / nomination reason:
                 </span>
                 <p className="whitespace-pre-wrap rounded bg-[var(--color-surface-muted)] p-3 text-[var(--color-text-primary)] border border-[var(--color-border)]">
                   {data.selectionReason}
@@ -199,19 +199,19 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
           {/* Cột 1: Thông tin tham khảo */}
           <Panel padded>
             <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
-              <span>📋</span> Thông số kỹ thuật & Ghi chú
+              <span aria-hidden="true">Details</span> Technical details & Notes
             </h2>
 
             <div className="space-y-3 text-[13px]">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <span className="text-[var(--color-text-secondary)] block">Cự ly:</span>
+                  <span className="text-[var(--color-text-secondary)] block">Distance:</span>
                   <span className="font-medium text-[var(--color-text-primary)]">
                     {data.distanceMeters ? `${data.distanceMeters.toLocaleString()} m` : '—'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[var(--color-text-secondary)] block">Mặt sân:</span>
+                  <span className="text-[var(--color-text-secondary)] block">Surface:</span>
                   <span className="font-medium text-[var(--color-text-primary)]">
                     {data.trackType || '—'}
                   </span>
@@ -221,7 +221,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
               {data.prizeDetails && (
                 <div className="pt-2 border-t border-[var(--color-border)]">
                   <span className="text-[var(--color-text-secondary)] block font-medium mb-1">
-                    Cơ cấu giải thưởng / Tiền thưởng:
+                    Prize structure / Purse:
                   </span>
                   <p className="whitespace-pre-wrap rounded bg-[var(--color-surface-muted)] p-2.5 text-[var(--color-text-primary)] border border-[var(--color-border)]">
                     {data.prizeDetails}
@@ -232,7 +232,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
               {data.trainerNotes && (
                 <div className="pt-2 border-t border-[var(--color-border)]">
                   <span className="text-[var(--color-text-secondary)] block font-medium mb-1">
-                    Ghi chú / Điều kiện tham dự / Hậu cần:
+                    Notes / Entry conditions / Logistics:
                   </span>
                   <p className="whitespace-pre-wrap rounded bg-[var(--color-surface-muted)] p-2.5 text-[var(--color-text-primary)] border border-[var(--color-border)]">
                     {data.trainerNotes}
@@ -247,26 +247,26 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
         <div className="space-y-6">
           <Panel padded>
             <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
-              <span>🏆</span> Chi tiết cuộc đua / sự kiện
+              <span aria-hidden="true">Race</span> Race / Event details
             </h2>
 
             <div className="space-y-3 text-[13px]">
               <div>
-                <span className="text-[var(--color-text-secondary)] block">Tên sự kiện:</span>
+                <span className="text-[var(--color-text-secondary)] block">Event name:</span>
                 <span className="font-semibold text-[var(--color-text-primary)] text-[14px]">
                   {data.raceName}
                 </span>
               </div>
 
               <div>
-                <span className="text-[var(--color-text-secondary)] block">Hạng mục / Chặng:</span>
+                <span className="text-[var(--color-text-secondary)] block">Category / Leg:</span>
                 <span className="font-medium text-[var(--color-text-primary)]">
                   {data.raceCategory}
                 </span>
               </div>
 
               <div>
-                <span className="text-[var(--color-text-secondary)] block">Sân đua & Địa điểm:</span>
+                <span className="text-[var(--color-text-secondary)] block">Racecourse & Location:</span>
                 <span className="font-medium text-[var(--color-text-primary)]">
                   📍 {data.location}
                 </span>
@@ -274,28 +274,28 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
 
               <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[var(--color-border)]">
                 <div>
-                  <span className="text-[var(--color-text-secondary)] block">Ngày tổ chức:</span>
+                  <span className="text-[var(--color-text-secondary)] block">Event date:</span>
                   <span className="font-medium text-[var(--color-text-primary)]">
                     📅 {formatDate(data.eventDate)}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[var(--color-text-secondary)] block">Giờ xuất phát:</span>
+                  <span className="text-[var(--color-text-secondary)] block">Start time:</span>
                   <span className="font-medium text-[var(--color-text-primary)]">
-                    ⏱️ {data.eventTime ? data.eventTime.substring(0, 5) : 'Chưa công bố'}
+                    {data.eventTime ? data.eventTime.substring(0, 5) : 'Not announced'}
                   </span>
                 </div>
               </div>
 
               <div className="pt-2 border-t border-[var(--color-border)]">
-                <span className="text-[var(--color-text-secondary)] block">Đơn vị tổ chức:</span>
+                <span className="text-[var(--color-text-secondary)] block">Organizer:</span>
                 <span className="font-medium text-[var(--color-text-primary)]">
                   {data.organizer || '—'}
                 </span>
               </div>
 
               <div>
-                <span className="text-[var(--color-text-secondary)] block">Hạn nộp hồ sơ thật:</span>
+                  <span className="text-[var(--color-text-secondary)] block">Official submission deadline:</span>
                 <span className="font-medium text-[var(--color-text-primary)]">
                   {data.nominationDeadline ? formatDate(data.nominationDeadline) : '—'}
                 </span>
@@ -304,7 +304,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
               {data.sourceUrl && (
                 <div className="pt-2 border-t border-[var(--color-border)]">
                   <span className="text-[var(--color-text-secondary)] block font-medium mb-1">
-                    Trang thể lệ / Link chính thức:
+                    Rules / Official link:
                   </span>
                   <a
                     href={data.sourceUrl}

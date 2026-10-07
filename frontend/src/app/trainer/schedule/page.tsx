@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { LotTimeline } from '@/features/training/components/LotTimeline';
 
 export const metadata: Metadata = {
-  title: 'Lịch Lot huấn luyện | Huấn luyện viên',
+  title: 'Training Lot Schedule | RTMS',
 };
 
 export default function TrainerSchedulePage() {

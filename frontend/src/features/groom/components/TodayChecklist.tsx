@@ -150,7 +150,7 @@ export function TodayChecklist() {
               >
                 <div className="flex items-start gap-3">
                   {/* Time */}
-                  <div className="font-mono text-[12px] font-bold text-[var(--color-text-primary)] w-16 pt-0.5">
+                  <div className="font-metric text-[12px] font-bold text-[var(--color-text-primary)] w-16 pt-0.5">
                     {task.startTime.substring(0, 5)}
                     {task.endTime && `–${task.endTime.substring(0, 5)}`}
                   </div>

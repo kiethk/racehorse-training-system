@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui/Table';
 import { racingService } from '../services/racingService';
 import type { RaceRegistrationResponse, RaceRegistrationStatus } from '../types';
 
@@ -25,8 +26,8 @@ export function TrainerRaceList() {
       const data = await racingService.listMine();
       setItems(data);
     } catch (err) {
-      console.error('Lỗi khi nạp danh sách đơn đề cử:', err);
-      setError(err instanceof Error ? err.message : 'Không tải được danh sách đơn đề cử.');
+      console.error('Failed to load race nominations:', err);
+      setError(err instanceof Error ? err.message : 'Unable to load race nominations.');
     } finally {
       setLoading(false);
     }
@@ -66,11 +67,11 @@ export function TrainerRaceList() {
   const renderStatusBadge = (status: RaceRegistrationStatus) => {
     switch (status) {
       case 'PENDING':
-        return <Pill tone="warning" size="sm">Chờ duyệt</Pill>;
+        return <Pill tone="warning" size="sm">Pending review</Pill>;
       case 'APPROVED':
-        return <Pill tone="success" size="sm">Đã duyệt</Pill>;
+        return <Pill tone="success" size="sm">Approved</Pill>;
       case 'REJECTED':
-        return <Pill tone="danger" size="sm">Từ chối</Pill>;
+        return <Pill tone="danger" size="sm">Rejected</Pill>;
       default:
         return <Pill tone="neutral" size="sm">{status}</Pill>;
     }
@@ -81,7 +82,7 @@ export function TrainerRaceList() {
     try {
       const [y, m, d] = dateStr.split('-');
       if (y && m && d) return `${d}/${m}/${y}`;
-      return new Date(dateStr).toLocaleDateString('vi-VN');
+      return new Date(dateStr).toLocaleDateString('en-GB');
     } catch {
       return dateStr;
     }
@@ -91,7 +92,7 @@ export function TrainerRaceList() {
     if (!dtStr) return '—';
     try {
       const dt = new Date(dtStr);
-      return `${dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${dt.toLocaleDateString('vi-VN')}`;
+      return `${dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} ${dt.toLocaleDateString('en-GB')}`;
     } catch {
       return dtStr;
     }
@@ -103,15 +104,15 @@ export function TrainerRaceList() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[20px] font-bold text-[var(--color-text-primary)]">
-            Đơn đề cử dự đua
+            Race nominations
           </h1>
           <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
-            Bạn tự tìm hiểu cuộc đua và gửi đề cử nội bộ để quản lý xem xét.
+            Research races and submit internal nominations for manager review.
           </p>
         </div>
         <Link href="/trainer/racing/new">
           <Button variant="primary">
-            + Tạo đơn đề cử
+              + Create nomination
           </Button>
         </Link>
       </div>
@@ -121,10 +122,10 @@ export function TrainerRaceList() {
         <div className="flex border-b border-[var(--color-border)]">
           {(
             [
-              { key: 'ALL', label: 'Tất cả' },
-              { key: 'PENDING', label: 'Chờ duyệt' },
-              { key: 'APPROVED', label: 'Đã duyệt' },
-              { key: 'REJECTED', label: 'Từ chối' },
+              { key: 'ALL', label: 'All' },
+              { key: 'PENDING', label: 'Pending' },
+              { key: 'APPROVED', label: 'Approved' },
+              { key: 'REJECTED', label: 'Rejected' },
             ] as const
           ).map((tab) => (
             <button
@@ -153,7 +154,7 @@ export function TrainerRaceList() {
         <div className="w-full sm:w-64">
           <input
             type="text"
-            placeholder="Tìm theo giải, ngựa, địa điểm..."
+            placeholder="Search race, horse or location..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
@@ -170,11 +171,11 @@ export function TrainerRaceList() {
         <Panel padded>
           <EmptyState
             icon="alert-triangle"
-            title="Lỗi nạp dữ liệu"
+            title="Unable to load data"
             description={error}
             action={
               <Button variant="secondary" size="sm" onClick={loadData}>
-                Thử lại
+                Retry
               </Button>
             }
           />
@@ -183,12 +184,12 @@ export function TrainerRaceList() {
         <Panel padded>
           <EmptyState
             icon="clipboard"
-            title="Bạn chưa gửi đơn đề cử nào"
-            description="Tìm hiểu thông tin giải đấu và gửi đơn đề cử để ban quản lý xem xét kế hoạch thi đấu."
+            title="No race nominations yet"
+            description="Research a race and submit a nomination for manager review."
             action={
               <Link href="/trainer/racing/new">
                 <Button variant="primary" size="sm">
-                  + Tạo đơn đề cử
+                  + Create nomination
                 </Button>
               </Link>
             }
@@ -198,47 +199,47 @@ export function TrainerRaceList() {
         <Panel padded>
           <EmptyState
             icon="search"
-            title="Không tìm thấy đơn phù hợp"
-            description="Thử thay đổi bộ lọc hoặc từ khoá tìm kiếm."
+            title="No matching nominations"
+            description="Try changing the filters or search query."
           />
         </Panel>
       ) : (
         <Panel>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
-              <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[12px] font-semibold text-[var(--color-text-secondary)]">
+          <TableShell className="rounded-none border-0 shadow-none">
+            <Table>
+              <TableHeader>
                 <tr>
-                  <th className="px-4 py-3">Cuộc đua & Hạng mục</th>
-                  <th className="px-4 py-3">Chiến mã</th>
-                  <th className="px-4 py-3">Ngày thi đấu & Địa điểm</th>
-                  <th className="px-4 py-3">Trạng thái</th>
-                  <th className="px-4 py-3">Ngày gửi</th>
-                  <th className="px-4 py-3 text-right">Thao tác</th>
+                  <TableHead>Race & Category</TableHead>
+                  <TableHead>Horse</TableHead>
+                  <TableHead>Race Date & Location</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Submitted</TableHead>
+                  <TableHead align="right">Actions</TableHead>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)]">
+              </TableHeader>
+              <TableBody>
                 {filteredItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-[var(--color-surface-muted)]/50 transition">
-                    <td className="px-4 py-3.5">
+                  <TableRow key={item.id}>
+                    <TableCell>
                       <div className="font-semibold text-[var(--color-text-primary)]">
                         {item.raceName}
                       </div>
                       <div className="text-[12px] text-[var(--color-text-secondary)]">
                         {item.raceCategory}
                       </div>
-                    </td>
-                    <td className="px-4 py-3.5">
+                    </TableCell>
+                    <TableCell>
                       <div className="font-medium text-[var(--color-text-primary)] flex items-center gap-1.5">
                         <span>🏇</span>
-                        <span>{item.horseName || `Ngựa #${item.horseId}`}</span>
+                        <span>{item.horseName || `Horse #${item.horseId}`}</span>
                       </div>
                       {item.horseRegistrationNumber && (
-                        <div className="text-[11px] text-[var(--color-text-muted)] font-mono">
+                        <div className="text-[11px] text-[var(--color-text-muted)] font-metric">
                           {item.horseRegistrationNumber}
                         </div>
                       )}
-                    </td>
-                    <td className="px-4 py-3.5">
+                    </TableCell>
+                    <TableCell>
                       <div className="font-medium text-[var(--color-text-primary)]">
                         📅 {formatDate(item.eventDate)}
                         {item.eventTime && ` • ${item.eventTime.substring(0, 5)}`}
@@ -246,25 +247,25 @@ export function TrainerRaceList() {
                       <div className="text-[12px] text-[var(--color-text-secondary)] truncate max-w-xs" title={item.location}>
                         📍 {item.location}
                       </div>
-                    </td>
-                    <td className="px-4 py-3.5">
+                    </TableCell>
+                    <TableCell>
                       {renderStatusBadge(item.status)}
-                    </td>
-                    <td className="px-4 py-3.5 text-[12px] text-[var(--color-text-muted)]">
+                    </TableCell>
+                    <TableCell className="text-[12px] text-[var(--color-text-muted)]">
                       {formatDateTime(item.createdAt)}
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
+                    </TableCell>
+                    <TableCell align="right">
                       <Link href={`/trainer/racing/${item.id}`}>
                         <Button variant="secondary" size="sm">
-                          Xem đơn
+                          View application
                         </Button>
                       </Link>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </TableShell>
         </Panel>
       )}
     </div>
