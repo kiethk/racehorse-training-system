@@ -9,12 +9,6 @@ import java.util.List;
 
 /**
  * Màn hình Trainer xem hồ sơ candidate.
- *
- * Bọc AdmissionDetailResponse (đã có sẵn: CandidateHorseProfile, kết quả Groom,
- * kết quả Vet, chuồng cách ly, documents) rồi bổ sung Horse + phần y tế.
- *
- * KHÔNG sửa AdmissionDetailResponse vì nó dùng chung với controller của Vet
- * và Manager — đó là code của đồng đội.
  */
 public class TrainerAdmissionViewResponse {
 
@@ -29,14 +23,25 @@ public class TrainerAdmissionViewResponse {
     /** Đã đánh giá rồi thì trả về để FE hiển thị lại; chưa thì null. */
     private RacingReadinessAssessment existingAssessment;
 
+    /** Lịch đánh giá của Head Trainer */
+    private TrainerScheduleResponse trainerSchedule;
+
     public TrainerAdmissionViewResponse(AdmissionDetailResponse admission, Horse horse,
                                         List<?> healthRecords, List<?> healthMetrics,
                                         RacingReadinessAssessment existingAssessment) {
+        this(admission, horse, healthRecords, healthMetrics, existingAssessment, null);
+    }
+
+    public TrainerAdmissionViewResponse(AdmissionDetailResponse admission, Horse horse,
+                                        List<?> healthRecords, List<?> healthMetrics,
+                                        RacingReadinessAssessment existingAssessment,
+                                        TrainerScheduleResponse trainerSchedule) {
         this.admission = admission;
         this.horse = horse;
         this.healthRecords = healthRecords;
         this.healthMetrics = healthMetrics;
         this.existingAssessment = existingAssessment;
+        this.trainerSchedule = trainerSchedule;
     }
 
     public AdmissionDetailResponse getAdmission() { return admission; }
@@ -44,4 +49,5 @@ public class TrainerAdmissionViewResponse {
     public List<?> getHealthRecords() { return healthRecords; }
     public List<?> getHealthMetrics() { return healthMetrics; }
     public RacingReadinessAssessment getExistingAssessment() { return existingAssessment; }
+    public TrainerScheduleResponse getTrainerSchedule() { return trainerSchedule; }
 }

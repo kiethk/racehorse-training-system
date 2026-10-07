@@ -1,17 +1,18 @@
 package com.rtms.backend.service;
+
 import com.rtms.backend.dto.ManagerReviewRequest;
 import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.ReviewDecision;
-import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.entity.CareSchedule;
-import com.rtms.backend.enums.CareScheduleStatus;
-import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.entity.Horse;
-import com.rtms.backend.enums.HorseStatus;
-import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.enums.CareScheduleStatus;
+import com.rtms.backend.enums.HorseStatus;
+import com.rtms.backend.enums.ReviewDecision;
 import com.rtms.backend.enums.StallStatus;
+import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
+import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.StableStallRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -178,14 +179,16 @@ public class AdmissionManagerReviewService {
 
         // Cancel active CareSchedule records for this horse
         if (careScheduleRepository != null) {
+            List<CareSchedule> nonCancellableSchedules =
+                    careScheduleRepository.findByHorseIdAndStatusIn(
+                            horse.getId(), List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS));
+            if (!nonCancellableSchedules.isEmpty()) {
+                throw new IllegalStateException(
+                        "Admission cannot be rejected while veterinary care is REQUESTED or IN_PROGRESS");
+            }
             List<CareSchedule> careSchedulesToCancel =
                     careScheduleRepository.findByHorseIdAndStatusIn(
-                            horse.getId(),
-                            List.of(CareScheduleStatus.REQUESTED,
-                                    CareScheduleStatus.AWAITING_VET_CONFIRMATION,
-                                    CareScheduleStatus.SCHEDULED,
-                                    CareScheduleStatus.IN_PROGRESS,
-                                    CareScheduleStatus.OVERDUE));
+                            horse.getId(), List.of(CareScheduleStatus.SCHEDULED));
             for (CareSchedule cs : careSchedulesToCancel) {
                 cs.setStatus(CareScheduleStatus.CANCELLED);
                 cs.setCancelReason("Admission rejected by manager");

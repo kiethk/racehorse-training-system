@@ -119,7 +119,7 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
-					<argLine>-Duser.timezone=Asia/Ho_Chi_Minh</argLine>
+					<argLine>-Duser.timezone=Asia/Ho_Chi_Minh -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
 				</configuration>
 			</plugin>
 		</plugins>

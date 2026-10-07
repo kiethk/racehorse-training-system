@@ -18,7 +18,7 @@ import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.StallStatus;
 import com.rtms.backend.repository.StableStallRepository;
-import com.rtms.backend.enums.TrainingStatus;
+import com.rtms.backend.enums.TrainingDecision;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -145,7 +145,7 @@ public class AdmissionGroomReviewService {
         admission.setStatus(AdmissionStatus.VET_REVIEW);
         AdmissionApplication saved = admissionApplicationRepository.save(admission);
 
-        careScheduleService.createInitialScheduleForGroom(saved.getId(), horse.getId());
+        careScheduleService.createInitialSchedule(saved.getId(), horse.getId());
         return saved;
     }
 
@@ -225,7 +225,7 @@ public class AdmissionGroomReviewService {
         horse.setRegistrationNumber(candidate.getRegistrationNumber());
         horse.setCurrentStatus(HorseStatus.CANDIDATE);
         horse.setCurrentStallId(quarantineStall.getId());
-        horse.setTrainingStatus(TrainingStatus.BLOCKED);
+        horse.setTrainingStatus(TrainingDecision.BLOCKED);
         horse.setTrainingLocked(true);
         horse.setTrainingLockReason("Initial admission examination is pending");
         horse.setTrainingLockVetId(null);

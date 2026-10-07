@@ -167,7 +167,7 @@ class AdmissionGroomReviewServiceTest {
         assertEquals(20L, result.getHorseId());
         assertEquals(ArrivalStatus.CONFIRMED, result.getArrivalStatus());
         assertEquals(7L, result.getArrivalConfirmedBy());
-        verify(careScheduleService).createInitialScheduleForGroom(1L, 20L);
+        verify(careScheduleService).createInitialSchedule(1L, 20L);
     }
 
     @Test

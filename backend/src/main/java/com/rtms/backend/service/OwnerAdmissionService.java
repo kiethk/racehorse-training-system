@@ -53,14 +53,24 @@ public class OwnerAdmissionService {
     private final CandidateHorseProfileRepository candidates;
     private final AdmissionDocumentRepository documents;
     private final AdmissionFileStorage fileStorage;
+    private final com.rtms.backend.repository.TrainerScheduleRepository trainerScheduleRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public OwnerAdmissionService(AdmissionApplicationRepository admissions,
             CandidateHorseProfileRepository candidates, AdmissionDocumentRepository documents,
-            AdmissionFileStorage fileStorage) {
+            AdmissionFileStorage fileStorage,
+            com.rtms.backend.repository.TrainerScheduleRepository trainerScheduleRepository) {
         this.admissions = admissions;
         this.candidates = candidates;
         this.documents = documents;
         this.fileStorage = fileStorage;
+        this.trainerScheduleRepository = trainerScheduleRepository;
+    }
+
+    public OwnerAdmissionService(AdmissionApplicationRepository admissions,
+            CandidateHorseProfileRepository candidates, AdmissionDocumentRepository documents,
+            AdmissionFileStorage fileStorage) {
+        this(admissions, candidates, documents, fileStorage, null);
     }
 
     /** The transaction creates exactly one new Application and one new immutable snapshot. */
@@ -212,6 +222,8 @@ public class OwnerAdmissionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
         if ("HORSE_OWNER".equals(viewer.getRole())) {
             assertOwner(viewer.getUserId(), application);
+        } else if (!"VETERINARIAN".equals(viewer.getRole())) {
+            assertViewerCanRead(admissionId, viewer);
         }
         AdmissionDocument document = documents.findById(documentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
@@ -223,11 +235,17 @@ public class OwnerAdmissionService {
 
     @Transactional(readOnly = true)
     public void assertViewerCanRead(Long admissionId, AuthenticatedUser viewer) {
-        if ("HORSE_OWNER".equals(viewer.getRole())) {
-            ownedAdmission(viewer.getUserId(), admissionId);
-        } else if (!admissions.existsById(admissionId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found");
-        }
+        AdmissionApplication admission = admissions.findById(admissionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
+        boolean allowed = switch (viewer.getRole()) {
+            case "CLUB_MANAGER" -> true;
+            case "HORSE_OWNER" -> java.util.Objects.equals(admission.getOwnerId(), viewer.getUserId());
+            case "HEAD_TRAINER" -> trainerScheduleRepository != null && trainerScheduleRepository.findByAdmissionId(admissionId)
+                    .map(ts -> java.util.Objects.equals(ts.getTrainerId(), viewer.getUserId())).orElse(false);
+            case "GROOM" -> java.util.Objects.equals(admission.getGroomId(), viewer.getUserId());
+            default -> false;
+        };
+        if (!allowed) throw new org.springframework.security.access.AccessDeniedException("Admission is not assigned to you");
     }
 
     public AdmissionDocumentResponse toDocumentResponse(AdmissionDocument document) {

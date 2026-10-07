@@ -1,29 +1,54 @@
 package com.rtms.backend.controller;
-import com.rtms.backend.dto.CancelCareScheduleRequest;
-import com.rtms.backend.dto.CareScheduleDetailResponse;
-import com.rtms.backend.dto.CareScheduleResponse;
-import com.rtms.backend.dto.CompleteCareScheduleRequest;
-import com.rtms.backend.dto.CreateNextScheduleRequest;
+
+import com.rtms.backend.dto.*;
 import com.rtms.backend.enums.CareScheduleStatus;
 import com.rtms.backend.enums.CareType;
-import com.rtms.backend.service.CareScheduleService;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.dto.ApiResponse;
+import com.rtms.backend.service.CareScheduleService;
+import com.rtms.backend.service.UrgentAlertStreamService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.List;
 
 @RestController
 @RequestMapping({"/api/care-schedules", "/api/vet/schedules"})
 public class CareScheduleController {
 
     private final CareScheduleService careScheduleService;
+    private final UrgentAlertStreamService urgentAlertStreamService;
 
-    public CareScheduleController(CareScheduleService careScheduleService) {
+    public CareScheduleController(CareScheduleService careScheduleService,
+            UrgentAlertStreamService urgentAlertStreamService) {
         this.careScheduleService = careScheduleService;
+        this.urgentAlertStreamService = urgentAlertStreamService;
+    }
+
+    @GetMapping("/urgent-alerts/pending")
+    @PreAuthorize("principal.role == 'VETERINARIAN'")
+    public ApiResponse<List<UrgentAssignmentAlert>> pendingUrgentAlerts(
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(careScheduleService.getPendingUrgentAlerts(currentUser.getUserId()));
+    }
+
+    @GetMapping("/urgent-alerts/{scheduleId}")
+    @PreAuthorize("principal.role == 'VETERINARIAN'")
+    public ApiResponse<UrgentAssignmentAlert> urgentCase(
+            @PathVariable Long scheduleId,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(careScheduleService.getUrgentCase(scheduleId, currentUser.getUserId()));
+    }
+
+    @GetMapping(value = "/urgent-alerts/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize("principal.role == 'VETERINARIAN'")
+    public SseEmitter streamUrgentAlerts(@AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return urgentAlertStreamService.subscribe(currentUser.getUserId());
     }
 
     @GetMapping
@@ -34,13 +59,29 @@ public class CareScheduleController {
             @RequestParam(required = false) Long horseId,
             @RequestParam(required = false) Long veterinarianId,
             @RequestParam(required = false) Long admissionId,
-            Pageable pageable) {
+            Pageable pageable,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        if ("VETERINARIAN".equals(currentUser.getRole())) {
+            veterinarianId = currentUser.getUserId();
+        }
+        if ("GROOM".equals(currentUser.getRole())) {
+            return ApiResponse.success(careScheduleService.listSchedulesForAdmissionAssignee(status, careType,
+                    horseId, veterinarianId, admissionId, currentUser.getUserId(), currentUser.getRole(), pageable));
+        }
         return ApiResponse.success(careScheduleService.listSchedules(status, careType, horseId, veterinarianId, admissionId, pageable));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('VET_EXAM_VIEW')")
-    public ApiResponse<CareScheduleDetailResponse> getById(@PathVariable Long id) {
+    public ApiResponse<CareScheduleDetailResponse> getById(@PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        if ("VETERINARIAN".equals(currentUser.getRole())) {
+            return ApiResponse.success(careScheduleService.getAssignedScheduleDetail(id, currentUser.getUserId()));
+        }
+        if ("GROOM".equals(currentUser.getRole())) {
+            return ApiResponse.success(careScheduleService.getScheduleDetailForAdmissionAssignee(
+                    id, currentUser.getUserId(), currentUser.getRole()));
+        }
         return ApiResponse.success(careScheduleService.getScheduleDetail(id));
     }
 
@@ -62,7 +103,7 @@ public class CareScheduleController {
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAuthority('VET_EXAM_MANAGE') or principal.role == 'VETERINARIAN' or principal.role == 'CLUB_MANAGER'")
+    @PreAuthorize("hasRole('CLUB_MANAGER')")
     public ApiResponse<CareScheduleResponse> cancel(
             @PathVariable Long id,
             @Valid @RequestBody CancelCareScheduleRequest request,

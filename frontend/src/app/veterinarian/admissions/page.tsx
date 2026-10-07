@@ -1,7 +1,9 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageContainer } from '@/components/layout/PageContainer';
+import { ListSkeleton } from '@/components/ui/states';
 import { VetAdmissionQueue } from '@/features/admissions/components/VetAdmissionQueue';
 
 export const metadata: Metadata = {
@@ -14,7 +16,9 @@ export default function VetAdmissionsPage() {
     <RoleGuard allowedRoles={['VETERINARIAN']}>
       <AppShell>
         <PageContainer>
-          <VetAdmissionQueue />
+          <Suspense fallback={<ListSkeleton rows={6} />}>
+            <VetAdmissionQueue />
+          </Suspense>
         </PageContainer>
       </AppShell>
     </RoleGuard>

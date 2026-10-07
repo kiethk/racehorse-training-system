@@ -19,6 +19,9 @@ public class GroomIncidentReport {
     @Column(name = "horse_id", nullable = false)
     private Long horseId;
 
+    @Column(name = "care_schedule_id")
+    private Long careScheduleId;
+
     @Column(nullable = false)
     private String title;
 
@@ -99,6 +102,9 @@ public class GroomIncidentReport {
     public void setHorseId(Long horseId) {
         this.horseId = horseId;
     }
+
+    public Long getCareScheduleId() { return careScheduleId; }
+    public void setCareScheduleId(Long careScheduleId) { this.careScheduleId = careScheduleId; }
 
     public String getTitle() {
         return title;

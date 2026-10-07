@@ -2,11 +2,19 @@ package com.rtms.backend.repository;
 import com.rtms.backend.entity.GroomIncidentReport;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import java.util.List;
 
 @Repository
 public interface GroomIncidentReportRepository extends JpaRepository<GroomIncidentReport, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT report FROM GroomIncidentReport report WHERE report.id = :id")
+    java.util.Optional<GroomIncidentReport> findByIdForUpdate(@Param("id") Long id);
 
     List<GroomIncidentReport> findByGroomId(Long groomId);
 

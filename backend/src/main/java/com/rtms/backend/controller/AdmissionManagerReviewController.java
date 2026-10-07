@@ -40,7 +40,13 @@ public class AdmissionManagerReviewController {
         return ApiResponse.success(
                 "HORSE_OWNER".equals(currentUser.getRole())
                         ? ownerAdmissionService.getMyAdmissions(currentUser.getUserId(), status)
-                        : admissionQueryService.getAdmissions(status)
+                        : "VETERINARIAN".equals(currentUser.getRole())
+                                ? admissionQueryService.getAdmissionsForVet(currentUser.getUserId(), status)
+                                : "HEAD_TRAINER".equals(currentUser.getRole())
+                                        ? admissionQueryService.getAdmissionsForTrainer(currentUser.getUserId(), status)
+                                        : "GROOM".equals(currentUser.getRole())
+                                                ? admissionQueryService.getAdmissionsForGroom(currentUser.getUserId(), status)
+                                                : admissionQueryService.getAdmissions(status)
         );
     }
 
@@ -50,11 +56,15 @@ public class AdmissionManagerReviewController {
             @PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
 
-        return ApiResponse.success(
-                "HORSE_OWNER".equals(currentUser.getRole())
-                        ? ownerAdmissionService.getMyAdmission(currentUser.getUserId(), id)
-                        : admissionQueryService.getAdmissionDetail(id)
-        );
+        if ("HORSE_OWNER".equals(currentUser.getRole())) {
+            return ApiResponse.success(ownerAdmissionService.getMyAdmission(currentUser.getUserId(), id));
+        }
+        if ("VETERINARIAN".equals(currentUser.getRole())) {
+            admissionQueryService.assertVetAssignedOrManager(id, currentUser);
+        } else {
+            ownerAdmissionService.assertViewerCanRead(id, currentUser);
+        }
+        return ApiResponse.success(admissionQueryService.getAdmissionDetail(id));
     }
 
     @PostMapping("/{id}/manager-review")

@@ -41,9 +41,16 @@ public class PreventiveCareService {
         }
         CreateNextScheduleRequest next = new CreateNextScheduleRequest();
         next.setHorseId(request.getHorseId());
+        CareSchedule source = schedules
+                .findFirstByVeterinarianIdAndHorseIdAndStatusOrderByCompletedAtDesc(
+                        user.getUserId(), request.getHorseId(), com.rtms.backend.enums.CareScheduleStatus.COMPLETED)
+                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
+                        "A veterinarian may only schedule preventive care for a horse they previously examined"));
+        next.setSourceScheduleId(source.getId());
         next.setCareType(CareType.ROUTINE);
         next.setScheduledDate(request.getScheduledDate() == null ? null : request.getScheduledDate().toString());
         next.setDescription(request.getCareType() + ": " + (request.getDescription() == null ? "" : request.getDescription()));
+        next.setIdempotencyKey("preventive:" + request.getCareType() + ":" + request.getHorseId() + ":" + request.getScheduledDate());
         CareScheduleResponse created = care.createNextSchedule(next, user.getUserId());
         return schedules.findById(created.id()).orElseThrow();
     }

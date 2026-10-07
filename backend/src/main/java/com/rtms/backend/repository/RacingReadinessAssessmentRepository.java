@@ -12,6 +12,8 @@ public interface RacingReadinessAssessmentRepository
 
     Optional<RacingReadinessAssessment> findByAdmissionId(Long admissionId);
 
+    Optional<RacingReadinessAssessment> findByTrainerScheduleId(Long trainerScheduleId);
+
     /** Toàn bộ lịch sử của một chiến mã, mới nhất trước. */
     List<RacingReadinessAssessment> findByHorseIdOrderByAssessmentDateDesc(Long horseId);
 

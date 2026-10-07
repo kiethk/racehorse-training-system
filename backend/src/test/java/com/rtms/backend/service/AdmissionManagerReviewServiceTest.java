@@ -1,19 +1,20 @@
 package com.rtms.backend.service;
+
 import com.rtms.backend.dto.ManagerReviewRequest;
 import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.enums.ReviewDecision;
-import com.rtms.backend.repository.AdmissionApplicationRepository;
-import com.rtms.backend.entity.CareSchedule;
-import com.rtms.backend.enums.CareScheduleStatus;
-import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.entity.Horse;
-import com.rtms.backend.enums.HorseStatus;
-import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.entity.CareSchedule;
+import com.rtms.backend.enums.AdmissionStatus;
+import com.rtms.backend.enums.CareScheduleStatus;
+import com.rtms.backend.enums.HorseStatus;
+import com.rtms.backend.enums.ReviewDecision;
 import com.rtms.backend.enums.StallStatus;
+import com.rtms.backend.enums.TrainingDecision;
+import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.CareScheduleRepository;
+import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.StableStallRepository;
-import com.rtms.backend.enums.TrainingStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -180,7 +181,9 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.OVERDUE)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
+                .thenReturn(List.of());
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.SCHEDULED)))
                 .thenReturn(List.of());
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -201,7 +204,7 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("REJECT: lịch REQUESTED và SCHEDULED bị CANCELLED, lịch COMPLETED không bị ảnh hưởng")
+    @DisplayName("REJECT: chỉ lịch SCHEDULED bị CANCELLED")
     void reject_cancelsActiveSchedules_notCompleted() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -220,20 +223,22 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.OVERDUE)))
-                .thenReturn(List.of(pending, overdue));
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
+                .thenReturn(List.of());
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.SCHEDULED)))
+                .thenReturn(List.of(overdue));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         service.review(1L, 5L, rejectRequest("Rejected"));
 
-        assertEquals(CareScheduleStatus.CANCELLED, pending.getStatus());
+        assertEquals(CareScheduleStatus.REQUESTED, pending.getStatus());
         assertEquals(CareScheduleStatus.CANCELLED, overdue.getStatus());
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CareSchedule>> captor = ArgumentCaptor.forClass(List.class);
         verify(careScheduleRepository).saveAll(captor.capture());
         List<CareSchedule> saved = captor.getValue();
-        assertEquals(2, saved.size());
+        assertEquals(1, saved.size());
         assertTrue(saved.stream().allMatch(s -> s.getStatus() == CareScheduleStatus.CANCELLED));
 
         // COMPLETED schedules are never queried in this call — no interference
@@ -250,7 +255,9 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.AWAITING_VET_CONFIRMATION, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.OVERDUE)))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
+                .thenReturn(List.of());
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.SCHEDULED)))
                 .thenReturn(List.of());
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -260,8 +267,8 @@ class AdmissionManagerReviewServiceTest {
     }
 
     @Test
-    @DisplayName("REJECT: huỷ các CareSchedule đang active (REQUESTED, AWAITING_VET_CONFIRMATION, SCHEDULED, IN_PROGRESS)")
-    void reject_cancelsActiveCareSchedules() {
+    @DisplayName("REJECT: không chuyển REQUESTED hoặc IN_PROGRESS sang CANCELLED")
+    void reject_doesNotCancelInvalidTransitions() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         StableStall qStall = buildStall(99L, StallStatus.OCCUPIED);
@@ -279,21 +286,18 @@ class AdmissionManagerReviewServiceTest {
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(eq(10L), any()))
+        when(careScheduleRepository.findByHorseIdAndStatusIn(10L, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS)))
                 .thenReturn(List.of(requested, inProgress));
-        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        service.review(1L, 5L, rejectRequest("Rejected"));
+        assertThrows(IllegalStateException.class,
+                () -> service.review(1L, 5L, rejectRequest("Rejected")));
 
-        assertEquals(CareScheduleStatus.CANCELLED, requested.getStatus());
-        assertEquals("Admission rejected by manager", requested.getCancelReason());
-        assertEquals(CareScheduleStatus.CANCELLED, inProgress.getStatus());
-        assertEquals("Admission rejected by manager", inProgress.getCancelReason());
+        assertEquals(CareScheduleStatus.REQUESTED, requested.getStatus());
+        assertNull(requested.getCancelReason());
+        assertEquals(CareScheduleStatus.IN_PROGRESS, inProgress.getStatus());
+        assertNull(inProgress.getCancelReason());
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<CareSchedule>> captor = ArgumentCaptor.forClass(List.class);
-        verify(careScheduleRepository).saveAll(captor.capture());
-        assertEquals(2, captor.getValue().size());
+        verify(careScheduleRepository, never()).saveAll(any());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -506,7 +510,7 @@ class AdmissionManagerReviewServiceTest {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         horse.setTrainingLocked(true);
-        horse.setTrainingStatus(TrainingStatus.BLOCKED);
+        horse.setTrainingStatus(TrainingDecision.BLOCKED);
         horse.setTrainingLockVetId(3L);
         horse.setTrainingLockReason("Left forelimb tendon strain - rest prescribed by vet");
 
@@ -527,7 +531,7 @@ class AdmissionManagerReviewServiceTest {
 
         // Lock must be preserved!
         assertTrue(horse.isTrainingLocked());
-        assertEquals(TrainingStatus.BLOCKED, horse.getTrainingStatus());
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingStatus());
         assertEquals(3L, horse.getTrainingLockVetId());
         assertEquals("Left forelimb tendon strain - rest prescribed by vet", horse.getTrainingLockReason());
         verify(horseRepository).save(horse);

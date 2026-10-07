@@ -30,10 +30,12 @@ public class AdmissionDetailResponse {
 
     private Long veterinarianId;
     private VetDecision vetDecision;
+    private String vetTrainingDecision;
     private String vetFeedback;
     private LocalDateTime vetReviewedAt;
 
     private Long trainerId;
+    private String trainerName;
     private String trainerFeedback;
     private LocalDateTime trainerReviewedAt;
 
@@ -170,6 +172,14 @@ public class AdmissionDetailResponse {
         this.vetDecision = vetDecision;
     }
 
+    public String getVetTrainingDecision() {
+        return vetTrainingDecision;
+    }
+
+    public void setVetTrainingDecision(String vetTrainingDecision) {
+        this.vetTrainingDecision = vetTrainingDecision;
+    }
+
     public String getVetFeedback() {
         return vetFeedback;
     }
@@ -193,6 +203,10 @@ public class AdmissionDetailResponse {
     public void setTrainerId(Long trainerId) {
         this.trainerId = trainerId;
     }
+
+    public String getTrainerName() { return trainerName; }
+
+    public void setTrainerName(String trainerName) { this.trainerName = trainerName; }
 
     public String getTrainerFeedback() {
         return trainerFeedback;

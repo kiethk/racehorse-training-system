@@ -1,26 +1,26 @@
 package com.rtms.backend.service;
+
 import com.rtms.backend.dto.TrainerAdmissionReviewRequest;
 import com.rtms.backend.entity.AdmissionApplication;
+import com.rtms.backend.entity.TrainerSchedule;
 import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.repository.AdmissionApplicationRepository;
-import com.rtms.backend.entity.Horse;
-import com.rtms.backend.entity.RacingReadinessAssessment;
 import com.rtms.backend.enums.RacingReadinessStatus;
-import com.rtms.backend.repository.RacingReadinessAssessmentRepository;
+import com.rtms.backend.enums.TrainerScheduleStatus;
+import com.rtms.backend.repository.AdmissionApplicationRepository;
+import com.rtms.backend.repository.TrainerScheduleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,109 +30,112 @@ class AdmissionTrainerReviewServiceTest {
     private AdmissionApplicationRepository admissionRepository;
 
     @Mock
-    private RacingReadinessAssessmentRepository assessmentRepository;
+    private TrainerScheduleRepository trainerScheduleRepository;
 
-    private AdmissionTrainerReviewService trainerReviewService;
+    @Mock
+    private TrainerScheduleService trainerScheduleService;
+
+    private AdmissionTrainerReviewService service;
 
     @BeforeEach
     void setUp() {
-        trainerReviewService = new AdmissionTrainerReviewService(admissionRepository, assessmentRepository);
+        service = new AdmissionTrainerReviewService(
+                admissionRepository,
+                trainerScheduleRepository,
+                trainerScheduleService);
     }
 
     @Test
-    @DisplayName("Trainer hoàn thành đánh giá thành công: lưu assessment và chuyển đơn sang MANAGER_REVIEW")
+    @DisplayName("Trainer hoàn thành đánh giá qua Admission delegation thành công")
     void testCompleteAssessment_Success() {
+        TrainerSchedule schedule = new TrainerSchedule();
+        schedule.setId(100L);
+        schedule.setAdmissionId(10L);
+        schedule.setTrainerId(2L);
+        schedule.setStatus(TrainerScheduleStatus.IN_PROGRESS);
+
         AdmissionApplication admission = new AdmissionApplication();
         admission.setId(10L);
         admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
-        admission.setHorseId(7L);
+        admission.setHorseId(20L);
 
-        when(admissionRepository.findById(10L)).thenReturn(Optional.of(admission));
-        when(assessmentRepository.save(any(RacingReadinessAssessment.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(admissionRepository.save(any(AdmissionApplication.class))).thenAnswer(inv -> inv.getArgument(0));
+        AdmissionApplication updatedAdmission = new AdmissionApplication();
+        updatedAdmission.setId(10L);
+        updatedAdmission.setStatus(AdmissionStatus.MANAGER_REVIEW);
+        updatedAdmission.setTrainerFeedback("Good candidate");
+
+        when(admissionRepository.findById(10L))
+                .thenReturn(Optional.of(admission))
+                .thenReturn(Optional.of(updatedAdmission));
+        when(trainerScheduleRepository.findByAdmissionId(10L))
+                .thenReturn(Optional.of(schedule));
 
         TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
-        req.setReadinessStatus(RacingReadinessStatus.NEEDS_MORE_TRAINING);
-        req.setConformationScore(new BigDecimal("7.5"));
-        req.setTemperamentScore(new BigDecimal("8.0"));
-        req.setGaitQualityScore(new BigDecimal("6.5"));
-        req.setEstimatedMonthsToRace(4);
-        req.setRemarks("Dáng vóc cân đối, bước đi đều.");
+        req.setReadinessStatus(RacingReadinessStatus.READY);
+        req.setConformationScore(new BigDecimal("8.0"));
+        req.setRemarks("Good candidate");
 
-        AdmissionApplication result = trainerReviewService.completeAssessment(10L, req, 2L);
+        AdmissionApplication result = service.completeAssessment(10L, req, 2L);
 
+        verify(trainerScheduleService).completeSchedule(100L, req, 2L);
         assertEquals(AdmissionStatus.MANAGER_REVIEW, result.getStatus());
-        assertEquals(2L, result.getTrainerId());
-        assertEquals("Dáng vóc cân đối, bước đi đều.", result.getTrainerFeedback());
-        assertNotNull(result.getTrainerReviewedAt());
-
-        ArgumentCaptor<RacingReadinessAssessment> captor = ArgumentCaptor.forClass(RacingReadinessAssessment.class);
-        verify(assessmentRepository).save(captor.capture());
-        RacingReadinessAssessment savedAssessment = captor.getValue();
-
-        assertEquals(7L, savedAssessment.getHorseId());
-        assertEquals(10L, savedAssessment.getAdmissionId());
-        assertEquals(2L, savedAssessment.getTrainerId());
-        assertEquals(RacingReadinessStatus.NEEDS_MORE_TRAINING, savedAssessment.getReadinessStatus());
-        assertEquals(new BigDecimal("7.5"), savedAssessment.getConformationScore());
-        assertEquals(new BigDecimal("8.0"), savedAssessment.getTemperamentScore());
-        assertEquals(new BigDecimal("6.5"), savedAssessment.getGaitQualityScore());
-        assertEquals(4, savedAssessment.getEstimatedMonthsToRace());
-        assertNull(savedAssessment.getFitnessScore());
-        assertNull(savedAssessment.getValidUntil());
+        assertEquals("Good candidate", result.getTrainerFeedback());
     }
 
     @Test
-    @DisplayName("Chặn Trainer đánh giá đơn đã phân công cho Trainer khác (403)")
-    void testCompleteAssessment_AssignedToAnotherTrainer_ThrowsAccessDenied() {
+    @DisplayName("Trainer hoàn thành đánh giá khi schedule đang ở trạng thái SCHEDULED sẽ tự kích hoạt startSchedule")
+    void testCompleteAssessment_ScheduledStatus_StartsSchedule() {
+        TrainerSchedule schedule = new TrainerSchedule();
+        schedule.setId(100L);
+        schedule.setAdmissionId(10L);
+        schedule.setTrainerId(2L);
+        schedule.setStatus(TrainerScheduleStatus.SCHEDULED);
+
         AdmissionApplication admission = new AdmissionApplication();
         admission.setId(10L);
         admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
-        admission.setHorseId(7L);
-        admission.setTrainerId(5L);              // đơn của Trainer #5
+        admission.setHorseId(20L);
 
-        when(admissionRepository.findById(10L)).thenReturn(Optional.of(admission));
+        when(admissionRepository.findById(10L))
+                .thenReturn(Optional.of(admission))
+                .thenReturn(Optional.of(admission));
+        when(trainerScheduleRepository.findByAdmissionId(10L))
+                .thenReturn(Optional.of(schedule));
 
         TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
         req.setReadinessStatus(RacingReadinessStatus.READY);
 
-        // Trainer #9 cố nộp -> phải bị chặn, dù danh sách đã ẩn đơn này đi
-        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
-                () -> trainerReviewService.completeAssessment(10L, req, 9L));
+        service.completeAssessment(10L, req, 2L);
 
-        assertTrue(ex.getMessage().contains("Huấn luyện viên khác"));
-        verify(assessmentRepository, never()).save(any());
-        verify(admissionRepository, never()).save(any());
-        assertEquals(5L, admission.getTrainerId());   // KHÔNG bị ghi đè
+        verify(trainerScheduleService).startSchedule(100L, 2L);
+        verify(trainerScheduleService).completeSchedule(100L, req, 2L);
     }
 
     @Test
-    @DisplayName("Giữ nguyên trainerId khi đơn đã được phân công sẵn cho chính mình")
-    void testCompleteAssessment_PreAssignedToSelf_KeepsTrainerId() {
+    @DisplayName("Chặn Trainer đánh giá đơn đã phân công cho Trainer khác trong TrainerSchedule (403)")
+    void testCompleteAssessment_AssignedToAnotherTrainer_ThrowsForbidden() {
         AdmissionApplication admission = new AdmissionApplication();
         admission.setId(10L);
         admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
         admission.setHorseId(7L);
-        admission.setTrainerId(5L);
+
+        TrainerSchedule schedule = new TrainerSchedule();
+        schedule.setId(100L);
+        schedule.setAdmissionId(10L);
+        schedule.setTrainerId(5L);
 
         when(admissionRepository.findById(10L)).thenReturn(Optional.of(admission));
-        when(assessmentRepository.save(any(RacingReadinessAssessment.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-        when(admissionRepository.save(any(AdmissionApplication.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
+        when(trainerScheduleRepository.findByAdmissionId(10L)).thenReturn(Optional.of(schedule));
 
         TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
         req.setReadinessStatus(RacingReadinessStatus.READY);
 
-        AdmissionApplication result = trainerReviewService.completeAssessment(10L, req, 5L);
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.completeAssessment(10L, req, 9L));
 
-        assertEquals(5L, result.getTrainerId());
-        assertEquals(AdmissionStatus.MANAGER_REVIEW, result.getStatus());
-
-        ArgumentCaptor<RacingReadinessAssessment> captor =
-                ArgumentCaptor.forClass(RacingReadinessAssessment.class);
-        verify(assessmentRepository).save(captor.capture());
-        assertEquals(5L, captor.getValue().getTrainerId());
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Chỉ Trainer được phân công"));
+        verifyNoInteractions(trainerScheduleService);
     }
 
     @Test
@@ -149,10 +152,10 @@ class AdmissionTrainerReviewServiceTest {
         req.setReadinessStatus(RacingReadinessStatus.READY);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> trainerReviewService.completeAssessment(10L, req, 2L));
+                () -> service.completeAssessment(10L, req, 2L));
 
         assertTrue(ex.getMessage().contains("không phải TRAINER_REVIEW"));
-        verify(assessmentRepository, never()).save(any());
+        verifyNoInteractions(trainerScheduleService);
     }
 
     @Test
@@ -169,68 +172,31 @@ class AdmissionTrainerReviewServiceTest {
         req.setReadinessStatus(RacingReadinessStatus.READY);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> trainerReviewService.completeAssessment(10L, req, 2L));
+                () -> service.completeAssessment(10L, req, 2L));
 
         assertTrue(ex.getMessage().contains("Đơn chưa gắn hồ sơ chiến mã"));
-        verify(assessmentRepository, never()).save(any());
+        verifyNoInteractions(trainerScheduleService);
     }
 
     @Test
-    @DisplayName("Chặn đánh giá nếu thiếu readinessStatus")
-    void testCompleteAssessment_MissingReadinessStatus_ThrowsException() {
+    @DisplayName("Chặn đánh giá nếu không tìm thấy TrainerSchedule cho đơn (404)")
+    void testCompleteAssessment_NoSchedule_ThrowsNotFound() {
         AdmissionApplication admission = new AdmissionApplication();
         admission.setId(10L);
         admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
         admission.setHorseId(7L);
 
         when(admissionRepository.findById(10L)).thenReturn(Optional.of(admission));
-
-        TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
-        req.setReadinessStatus(null);
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> trainerReviewService.completeAssessment(10L, req, 2L));
-
-        assertTrue(ex.getMessage().contains("Phải chọn mức độ sẵn sàng"));
-    }
-
-    @Test
-    @DisplayName("Chặn đánh giá nếu điểm số vượt quá 10 hoặc nhỏ hơn 0")
-    void testCompleteAssessment_InvalidScore_ThrowsException() {
-        AdmissionApplication admission = new AdmissionApplication();
-        admission.setId(10L);
-        admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
-        admission.setHorseId(7L);
-
-        when(admissionRepository.findById(10L)).thenReturn(Optional.of(admission));
+        when(trainerScheduleRepository.findByAdmissionId(10L))
+                .thenReturn(Optional.empty());
 
         TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
         req.setReadinessStatus(RacingReadinessStatus.READY);
-        req.setConformationScore(new BigDecimal("11.0")); // > 10
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> trainerReviewService.completeAssessment(10L, req, 2L));
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.completeAssessment(10L, req, 2L));
 
-        assertTrue(ex.getMessage().contains("Điểm dáng vóc phải từ 0 đến 10"));
-    }
-
-    @Test
-    @DisplayName("Chặn đánh giá nếu estimatedMonthsToRace vượt quá 60")
-    void testCompleteAssessment_InvalidEstimatedMonths_ThrowsException() {
-        AdmissionApplication admission = new AdmissionApplication();
-        admission.setId(10L);
-        admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
-        admission.setHorseId(7L);
-
-        when(admissionRepository.findById(10L)).thenReturn(Optional.of(admission));
-
-        TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
-        req.setReadinessStatus(RacingReadinessStatus.READY);
-        req.setEstimatedMonthsToRace(65); // > 60
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> trainerReviewService.completeAssessment(10L, req, 2L));
-
-        assertTrue(ex.getMessage().contains("Ước tính thời gian phải từ 0 đến 60 tháng"));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verifyNoInteractions(trainerScheduleService);
     }
 }

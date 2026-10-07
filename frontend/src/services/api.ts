@@ -22,18 +22,9 @@ async function responseError(res: Response): Promise<ApiError> {
 }
 
 let refreshPromise: Promise<boolean> | null = null;
-let serverClockOffsetMs = 0;
 
-export function getServerTime(): number {
-  return Date.now() + serverClockOffsetMs;
-}
-
-export function getServerClockOffset(): number {
-  return serverClockOffsetMs;
-}
-
-export function setServerClockOffset(serverTimeMs: number) {
-  serverClockOffsetMs = serverTimeMs - Date.now();
+export function createAuthenticatedEventSource(path: string): EventSource {
+  return new EventSource(`${API_URL}${path}`, { withCredentials: true });
 }
 
 let accessToken: string | null = null;
@@ -95,14 +86,6 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
   finalOptions.headers = headers;
 
   let res = await fetch(`${API_URL}${path}`, finalOptions);
-
-  const dateHeader = res.headers.get('date');
-  if (dateHeader) {
-    const serverMs = Date.parse(dateHeader);
-    if (!Number.isNaN(serverMs)) {
-      serverClockOffsetMs = serverMs - Date.now();
-    }
-  }
 
   if (res.status === 401 && !isAuthEndpoint) {
     const refreshed = await refreshAccessToken();
@@ -169,19 +152,6 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
-export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
-  const res = await doFetch(path, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw await responseError(res);
-  }
-  return res.json();
-}
-
 /** Multipart upload uses the same Bearer API client as JSON requests. */
 export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
   const res = await doFetch(path, {
@@ -195,4 +165,17 @@ export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
     throw new ApiError(res.status, msg, payload?.errorCode);
   }
   return payload as T;
+}
+
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  const res = await doFetch(path, {
+    method: "PATCH",
+    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    credentials: "include",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    throw await responseError(res);
+  }
+  return res.json();
 }
