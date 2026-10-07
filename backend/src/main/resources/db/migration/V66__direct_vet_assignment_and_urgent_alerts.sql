@@ -63,7 +63,7 @@ WITH ranked_urgent AS (
 UPDATE care_schedule schedule
 SET status = 'CANCELLED',
     cancel_reason = COALESCE(schedule.cancel_reason || '; ', '')
-        || 'Superseded by active urgent-case invariant during V62 migration',
+        || 'Superseded by active urgent-case invariant during V66 migration',
     updated_at = NOW()
 FROM ranked_urgent ranked
 WHERE schedule.id = ranked.id
