@@ -95,9 +95,9 @@ export function TopNav() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-6 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 sm:gap-6 sm:px-4">
       {/* Brand */}
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <BrandLogo className="h-7 w-7" />
         <span className="text-[15px] font-semibold tracking-tight text-[var(--color-text-primary)]">
           RTMS
@@ -149,7 +149,7 @@ export function TopNav() {
       </nav>
 
       {/* Mobile Navigation Dropdown */}
-      <div className="relative md:hidden ml-auto flex-1">
+      <div className="relative ml-auto min-w-0 flex-1 md:hidden">
         <span className="sr-only">Current module</span>
         <select
           aria-label="Current module"
@@ -159,7 +159,7 @@ export function TopNav() {
               router.push(event.target.value);
             }
           }}
-          className="h-8 w-full max-w-[150px] appearance-none rounded-[var(--radius-xs)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2.5 pr-6 text-[12px] font-medium text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+          className="h-8 w-full max-w-[150px] appearance-none rounded-[var(--radius-xs)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 pr-6 text-[12px] font-medium text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
         >
           {navItems.map((item) => (
             <option key={item.id} value={item.href || ''} disabled={!item.href}>
@@ -175,7 +175,7 @@ export function TopNav() {
       </div>
 
       {/* User / Notification Controls */}
-      <div className="ml-auto flex items-center gap-1.5 md:ml-auto md:flex-none">
+      <div className="ml-auto flex shrink-0 items-center gap-1.5 md:ml-auto md:flex-none">
         {/* Notification Bell */}
         <div className="relative" ref={notifRef}>
           <button
@@ -197,7 +197,7 @@ export function TopNav() {
           </button>
 
           {notificationsOpen && (
-            <div className="absolute right-0 top-10 z-40 w-80 sm:w-96 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl shadow-black/10 overflow-hidden">
+            <div className="fixed inset-x-3 top-16 z-40 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl shadow-black/10 sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:w-96">
               <div className="flex items-center justify-between border-b border-[var(--color-border)] px-3.5 py-2.5">
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">

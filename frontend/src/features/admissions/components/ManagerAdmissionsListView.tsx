@@ -3,12 +3,14 @@
 import {useEffect, useMemo, useState} from 'react';
 import {usePathname, useRouter, useSearchParams} from 'next/navigation';
 import {Button} from '@/components/ui/Button';
-import {Panel} from '@/components/ui/Panel';
-import {Icon} from '@/components/ui/Icon';
-import {EmptyState, ListSkeleton} from '@/components/ui/states';
+import {ListSkeleton} from '@/components/ui/states';
+import {Notice} from '@/components/ui/Notice';
+import {FilterBar} from '@/components/ui/FilterBar';
 import {admissionsApi} from '../services/api';
 import type {AdmissionStatus, AdmissionSummaryResponse} from '../types';
 import {AdmissionTable} from '../shared/components/AdmissionTable';
+import {AdmissionListLayout} from '../shared/components/AdmissionListLayout';
+import {AdmissionSearchField} from '../shared/components/AdmissionSearchField';
 
 const VALID_STATUSES: ReadonlyArray<AdmissionStatus | 'ALL'> = [
   'ALL',
@@ -133,9 +135,9 @@ export function ManagerAdmissionsListView() {
 
   if (loading) {
     return (
-      <Panel>
+      <AdmissionListLayout title="Admissions" description="Review and manage horse admission applications.">
         <ListSkeleton rows={10} />
-      </Panel>
+      </AdmissionListLayout>
     );
   }
 
@@ -161,24 +163,13 @@ export function ManagerAdmissionsListView() {
   const detailQuery = detailParams.toString() ? `?${detailParams.toString()}` : '';
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-[20px] font-semibold tracking-tight text-[var(--color-text-primary)]">
-          Admissions
-        </h1>
-      </div>
-
-      <form
-        className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(170px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto] xl:items-end"
+    <AdmissionListLayout title="Admissions" description="Review and manage horse admission applications.">
+      <FilterBar
+        layout="grid"
+        className="sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(170px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto] xl:items-end"
         onSubmit={(event) => { event.preventDefault(); apply(); }}
       >
-        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Search horse name
-          <span className="relative mt-1.5 block">
-            <Icon name="search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
-            <input value={draft.candidateName} onChange={(event) => setDraft({ ...draft, candidateName: event.target.value })} placeholder="Search horse name" className="h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] pl-9 pr-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]" />
-          </span>
-        </label>
+        <AdmissionSearchField value={draft.candidateName} onChange={(candidateName) => setDraft({ ...draft, candidateName })} />
         <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
           Status
           <select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as AdmissionStatus | 'ALL' })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">
@@ -197,28 +188,18 @@ export function ManagerAdmissionsListView() {
           <Button type="submit" variant="primary" size="sm">Apply</Button>
           <Button type="button" variant="secondary" size="sm" onClick={clear}>Clear</Button>
         </div>
-      </form>
+      </FilterBar>
 
-      {error && <div role="alert" className="border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]">{error}</div>}
+      {error && <Notice tone="error">{error}</Notice>}
 
-      <Panel className="overflow-hidden">
-        {filteredAdmissions.length === 0 ? (
-            <EmptyState
-                title="No matching applications"
-                description="Change the filters or clear them to see other records."
-                action={
-                  <Button size="sm" onClick={clear}>
-                    Clear filters
-                  </Button>
-                }
-            />
-        ) : (
-            <AdmissionTable
-                admissions={filteredAdmissions}
-                detailHref={id => `/manager/admissions/${id}${detailQuery}`}
-            />
-        )}
-      </Panel>
-    </div>
+      <AdmissionTable
+        admissions={filteredAdmissions}
+        detailHref={id => `/manager/admissions/${id}${detailQuery}`}
+        searchable={false}
+        emptyTitle="No matching applications"
+        emptyDescription="Change the filters or clear them to see other records."
+        emptyAction={<Button size="sm" onClick={clear}>Clear filters</Button>}
+      />
+    </AdmissionListLayout>
   );
 }

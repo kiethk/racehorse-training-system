@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
+import { formatDate } from '@/lib/display';
 import { Panel, SectionTitle } from '@/components/ui/Panel';
 import type { AdmissionDocument } from '../../types';
 import { AdmissionDocumentPreview } from './AdmissionDocumentPreview';
@@ -18,7 +19,7 @@ const documentNames: Record<string, string> = {
 };
 
 function date(value: string | null) {
-  return value ? new Date(value).toLocaleDateString() : 'Not recorded';
+  return value ? formatDate(value) : 'Not recorded';
 }
 
 export function AdmissionDocumentsSection({ documents, assetUrl }: { documents: AdmissionDocument[]; assetUrl: (url: string) => string }) {

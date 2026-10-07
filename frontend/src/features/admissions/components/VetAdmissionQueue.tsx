@@ -12,6 +12,12 @@ import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
 import { DetailSkeleton, EmptyState, ListSkeleton } from '@/components/ui/states';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { AdmissionListLayout } from '../shared/components/AdmissionListLayout';
+import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
+import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
+import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
+import { AdmissionSearchField } from '../shared/components/AdmissionSearchField';
 import { admissionsApi } from '../services/api';
 import type {
   AdmissionDetailResponse,
@@ -554,7 +560,7 @@ export function VetAdmissionQueue() {
   ];
 
   return (
-    <div className="space-y-4">
+    <AdmissionListLayout title="Veterinary admissions" description="Review initial veterinary examinations for horse admissions.">
       {/* Global Alerts */}
       {success && (
         <div
@@ -618,20 +624,25 @@ export function VetAdmissionQueue() {
 
       {!drawerOpen && (
         <>
-      {/* Page Header with Compact Interactive Filter Pills */}
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
-              <Icon name="stethoscope" size={20} />
-            </span>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
-              Veterinary Admissions
-            </h1>
-          </div>
+      <FilterBar
+        layout="grid"
+        onSubmit={(event) => event.preventDefault()}
+        className="w-full sm:grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(260px,1fr)_auto_auto] xl:items-center"
+      >
+        <AdmissionSearchField
+          className="w-full"
+          label="Search admissions"
+          placeholder="Search horse name, admission number, or breed"
+          value={searchQuery}
+          onChange={(value) => {
+            setSearchQuery(value);
+            setPage(0);
+          }}
+        />
 
-          {/* Compact Interactive Filter Pills */}
-          <div className="flex flex-wrap items-center gap-1.5 pl-1 sm:border-l sm:border-[var(--color-border)] sm:pl-3">
+        {/* Queue status filters */}
+      <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => {
@@ -645,7 +656,7 @@ export function VetAdmissionQueue() {
               }`}
             >
               <span>Active</span>
-              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
+              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-metric">
                 {summary.total}
               </span>
             </button>
@@ -665,7 +676,7 @@ export function VetAdmissionQueue() {
               }`}
             >
               <span>Awaiting</span>
-              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
+              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-metric">
                 {summary.awaiting}
               </span>
             </button>
@@ -685,15 +696,15 @@ export function VetAdmissionQueue() {
               }`}
             >
               <span>In Exam</span>
-              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
+              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-metric">
                 {summary.inProgress}
               </span>
             </button>
           </div>
-        </div>
 
         <div className="flex items-center gap-2">
           <Button
+            type="button"
             onClick={handleRefresh}
             disabled={loading}
             icon="refresh"
@@ -703,41 +714,10 @@ export function VetAdmissionQueue() {
             Refresh
           </Button>
         </div>
-      </header>
+      </div>
 
-      {/* Main Full-Width Schedule List Panel */}
-      <Panel className="overflow-hidden">
-        {/* Toolbar: Search input & Popover Filters Button */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
-          <div className="relative flex-1 min-w-[240px] max-w-md">
-            <span className="pointer-events-none absolute left-2.5 top-2.5 text-[var(--color-text-muted)]">
-              <Icon name="search" size={14} />
-            </span>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(0);
-              }}
-              placeholder="Search candidate name, admission #, or breed..."
-              className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 pl-8 pr-7 text-[12px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)]"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery('');
-                  setPage(0);
-                }}
-                className="absolute right-2 top-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-                aria-label="Clear search"
-              >
-                <Icon name="x" size={14} />
-              </button>
-            )}
-          </div>
-
+        {/* Search and advanced filters */}
+        <div className="flex items-center justify-end">
           {/* Consolidated Popover Filters Button */}
           <div className="relative" ref={filterPopoverRef}>
             <button
@@ -862,7 +842,10 @@ export function VetAdmissionQueue() {
             )}
           </div>
         </div>
+      </FilterBar>
 
+      {/* Queue results */}
+      <Panel className="overflow-hidden">
         {/* Admission Schedule List Content */}
         {loading ? (
           <ListSkeleton rows={6} />
@@ -1014,7 +997,7 @@ export function VetAdmissionQueue() {
                           icon="activity"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Tiếp tục
+                          Continue
                         </Button>
                       ) : isScheduled ? (
                         <Button
@@ -1023,7 +1006,7 @@ export function VetAdmissionQueue() {
                           icon="stethoscope"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Khám
+                          Examine
                         </Button>
                       ) : isCompleted ? (
                         <Button
@@ -1032,7 +1015,7 @@ export function VetAdmissionQueue() {
                           icon="check"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Xem kết quả
+                          View results
                         </Button>
                       ) : (
                         <Button
@@ -1041,7 +1024,7 @@ export function VetAdmissionQueue() {
                           icon="chevron-right"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Chi tiết
+                          Details
                         </Button>
                       )}
                     </div>
@@ -1085,114 +1068,24 @@ export function VetAdmissionQueue() {
 
       {/* Full-page clinical examination workspace */}
       {drawerOpen && (selectedId !== null || targetScheduleId !== null) && (
-        <div className="space-y-3">
-          <Button
-            size="sm"
-            variant="secondary"
-            icon="chevron-left"
-            onClick={handleRequestCloseDrawer}
-          >
-            Back to Admissions
-          </Button>
-
-          {/* Full-width detail container, matching the Trainer admission pattern */}
-          <div
-            aria-labelledby="examination-horse-name"
-            className="w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm"
-          >
-            {/* Header */}
-            <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 sm:px-5 sm:py-3.5 shrink-0">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <HorseAvatar
-                    name={detail?.candidate?.name ?? selectedRow?.candidateName ?? 'Candidate'}
-                    image={selectedRow?.imageUrl}
-                    size={42}
-                    rounded="md"
-                  />
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2
-                        id="examination-horse-name"
-                        className="text-[17px] font-bold tracking-tight text-[var(--color-text-primary)]"
-                      >
-                        {detail?.candidate?.name ?? selectedRow?.candidateName ?? 'Candidate'}
-                      </h2>
-                      {selectedRow && (
-                        <Pill
-                          tone={getPriorityBadge(selectedRow.careSchedule?.careType).tone}
-                          size="sm"
-                        >
-                          {getPriorityBadge(selectedRow.careSchedule?.careType).label}
-                        </Pill>
-                      )}
-                      {currentActiveSchedule && (
-                        <Pill tone={examTone(currentActiveSchedule.status)} size="sm">
-                          {formatLabel(currentActiveSchedule.status)}
-                        </Pill>
-                      )}
-                      <span className="inline-flex items-center gap-1 rounded bg-[var(--color-isolated-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--color-isolated)]">
-                        <Icon name="shield" size={10} />
-                        {detail?.quarantineStallCode || selectedRow?.quarantineStallCode || 'Quarantine Stall'}
-                      </span>
-                    </div>
-
-                    {/* Consolidated Metadata Line */}
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                      <span className="font-metric font-semibold text-[var(--color-text-primary)]">
-                        {detail?.admissionId ?? selectedId
-                          ? `Admission #${detail?.admissionId ?? selectedId}`
-                          : `Care schedule #${targetScheduleId}`}
-                      </span>
-                      {detail?.horseId && <span>· Horse #{detail.horseId}</span>}
-                      {detail?.ownerId && <span>· Owner #{detail.ownerId}</span>}
-                      <span>· {detail?.candidate?.breed ?? selectedRow?.breed ?? 'Equine'}</span>
-                      <span>· {calculateAge(detail?.candidate?.dateOfBirth ?? selectedRow?.dateOfBirth)}</span>
-                      <span>· Trainer: {detail?.trainerName || selectedRow?.trainerName || (detail?.trainerId ? `Trainer #${detail.trainerId}` : 'Pending Trainer Assignment')}</span>
-                      {currentActiveSchedule?.scheduledAt && (
-                        <span>· Scheduled: {formatDate(currentActiveSchedule.scheduledAt, true)}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Header Actions */}
-                <div className="flex items-center gap-2">
-                  {canStartExam && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      loading={startingExam}
-                      onClick={handleStartExam}
-                      icon="activity"
-                    >
-                      Bắt đầu khám
-                    </Button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleRequestCloseDrawer}
-                    className="hidden h-8 items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 text-[12px] font-semibold text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)] sm:inline-flex"
-                    aria-label="Back to admissions"
-                  >
-                    <Icon name="chevron-left" size={15} />
-                    Back
-                  </button>
-                </div>
-              </div>
-
-              {/* Examination workspace tabs */}
-              <div className="mt-3">
-                <Tabs
-                  tabs={workspaceTabs}
-                  active={activeTab}
-                  onChange={setActiveTab}
-                />
-              </div>
+        <AdmissionDetailLayout
+          onBack={handleRequestCloseDrawer}
+          header={detail ? (
+            <AdmissionDetailHeader
+              detail={detail}
+              horsePhotoUrl={detail.documents.find((doc) => doc.documentType === 'HORSE_PHOTO')
+                ? admissionsApi.assetUrl(detail.documents.find((doc) => doc.documentType === 'HORSE_PHOTO')!.fileUrl)
+                : undefined}
+            />
+          ) : (
+            <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm font-semibold text-[var(--color-text-primary)]">
+              {selectedRow?.candidateName ?? 'Loading admission'}
             </div>
-
-            {/* Examination workspace body */}
-            <div className="p-4 sm:p-5">
+          )}
+          pipeline={detail ? <AdmissionPipeline detail={detail} /> : <DetailSkeleton />}
+          content={(
+            <div className="min-w-0 space-y-5">
+              <Tabs tabs={workspaceTabs} active={activeTab} onChange={setActiveTab} />
               {loadingDetail || (!detail && !detailError) ? (
                 <DetailSkeleton />
               ) : detailError ? (
@@ -1570,8 +1463,25 @@ export function VetAdmissionQueue() {
                 </div>
               ) : null}
             </div>
-          </div>
-        </div>
+          )}
+          sidebar={detail ? (
+            <Panel className="space-y-4 p-4">
+              <h2 className="text-sm font-bold text-[var(--color-text-primary)]">Examination details</h2>
+              <div className="space-y-2 text-xs text-[var(--color-text-secondary)]">
+                <p><span className="font-medium text-[var(--color-text-primary)]">Priority:</span> {selectedRow ? getPriorityBadge(selectedRow.careSchedule?.careType).label : 'Standard'}</p>
+                <p><span className="font-medium text-[var(--color-text-primary)]">Schedule:</span> {currentActiveSchedule ? formatLabel(currentActiveSchedule.status) : 'Not scheduled'}</p>
+                <p><span className="font-medium text-[var(--color-text-primary)]">Quarantine stall:</span> {detail.quarantineStallCode || 'Not assigned'}</p>
+                <p><span className="font-medium text-[var(--color-text-primary)]">Trainer:</span> {detail.trainerName || (detail.trainerId ? `Trainer #${detail.trainerId}` : 'Pending assignment')}</p>
+                {currentActiveSchedule?.scheduledAt && <p><span className="font-medium text-[var(--color-text-primary)]">Scheduled:</span> {formatDate(currentActiveSchedule.scheduledAt, true)}</p>}
+              </div>
+              {canStartExam && (
+                <Button type="button" className="w-full" size="sm" variant="primary" loading={startingExam} onClick={handleStartExam} icon="activity">
+                  Start examination
+                </Button>
+              )}
+            </Panel>
+          ) : null}
+        />
       )}
 
       {/* Discard Changes Confirmation Dialog */}
@@ -1593,6 +1503,6 @@ export function VetAdmissionQueue() {
         }}
         onCancel={() => setShowCloseConfirm(false)}
       />
-    </div>
+    </AdmissionListLayout>
   );
 }

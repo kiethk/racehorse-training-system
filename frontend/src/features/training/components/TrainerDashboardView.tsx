@@ -7,6 +7,12 @@ import type { TrainerDashboardHorse } from '../types';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { ScreenLayout } from '@/components/ui/ScreenLayout';
+import { Notice } from '@/components/ui/Notice';
+import { MetricCard } from '@/components/ui/MetricCard';
+import { ListSkeleton } from '@/components/ui/states';
+import { displayError } from '@/lib/display';
 
 export function TrainerDashboardView() {
   const [horses, setHorses] = useState<TrainerDashboardHorse[]>([]);
@@ -23,8 +29,7 @@ export function TrainerDashboardView() {
       const data = await trainingService.getDashboard();
       setHorses(data);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải dữ liệu dashboard huấn luyện';
-      setError(msg);
+      setError(displayError(err, 'Unable to load training dashboard data.'));
     } finally {
       setLoading(false);
     }
@@ -84,124 +89,54 @@ export function TrainerDashboardView() {
   }, [horses, searchTerm, filterMode]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
-            Tổng Quan Thể Lực & Tiến Độ Huấn Luyện
-          </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            Theo dõi tiến độ toàn bộ chiến mã trong khu vực huấn luyện và phát hiện sớm rủi ro quá tải
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+    <ScreenLayout variant="dashboard">
+      <PageHeader
+        title="Fitness and training overview"
+        description="Track training progress across your stable and identify overtraining risks early."
+        actions={<>
           <Link href="/trainer/plans">
             <Button variant="secondary" size="sm">
               <Icon name="clipboard" size={14} />
-              Quản lý kế hoạch
+              Manage plans
             </Button>
           </Link>
           <Button variant="secondary" size="sm" onClick={loadDashboard}>
             <Icon name="refresh" size={14} />
-            Làm mới
+            Refresh
           </Button>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Panel padded className="space-y-1">
-          <div className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
-            <Icon name="horse" size={14} />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Tổng chiến mã</span>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="font-metric text-2xl font-bold text-[var(--color-text-primary)]">
-              {totalHorses}
-            </span>
-            <span className="text-xs text-[var(--color-text-secondary)]">con</span>
-          </div>
-          <p className="text-[11px] text-[var(--color-text-muted)]">Khu vực phụ trách</p>
-        </Panel>
-
-        <Panel padded className="space-y-1">
-          <div className="flex items-center gap-1.5 text-blue-600">
-            <Icon name="activity" size={14} />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Đang huấn luyện</span>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="font-metric text-2xl font-bold text-blue-600">
-              {activeCount}
-            </span>
-            <span className="text-xs text-[var(--color-text-secondary)]">kế hoạch Active</span>
-          </div>
-          <p className="text-[11px] text-[var(--color-text-muted)]">Có lịch tập thường xuyên</p>
-        </Panel>
-
-        <Panel padded className="space-y-1">
-          <div className="flex items-center gap-1.5 text-red-600">
-            <Icon name="alert-triangle" size={14} />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Cảnh báo rủi ro</span>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span
-              className={`font-metric text-2xl font-bold ${
-                alertHorsesCount > 0 ? 'text-red-600' : 'text-emerald-600'
-              }`}
-            >
-              {alertHorsesCount}
-            </span>
-            <span className="text-xs text-[var(--color-text-secondary)]">ngựa cần theo dõi</span>
-          </div>
-          {/*
-            Chỉ liệt kê đúng những luật ĐANG chạy trong getHorseAlerts.
-            Luật "phong độ tụt" cần 3 buổi giảm liên tiếp nên rất hiếm khi
-            kích hoạt — ghi vào đây sẽ khiến người dùng tưởng cứ tụt điểm là
-            có cảnh báo, rồi không thấy gì lại nghĩ hệ thống hỏng.
-          */}
-          <p className="text-[11px] text-[var(--color-text-muted)]">
-            Nhịp tim vượt ngưỡng · hồi phục kém · sự cố lặp lại
-          </p>
-        </Panel>
-
-        <Panel padded className="space-y-1">
-          <div className="flex items-center gap-1.5 text-emerald-600">
-            <Icon name="trending-up" size={14} />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Phong độ TB (30d)</span>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="font-metric text-2xl font-bold text-emerald-600">
-              {avgTeamPerformance ? `${avgTeamPerformance}/10` : '-'}
-            </span>
-          </div>
-          <p className="text-[11px] text-[var(--color-text-muted)]">Toàn bộ đàn chiến mã</p>
-        </Panel>
+      <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4">
+        <MetricCard label="Total horses" value={totalHorses} icon="horse" hint="Assigned stable" />
+        <MetricCard label="In training" value={activeCount} icon="activity" tone="info" unit="active plans" hint="With scheduled sessions" />
+        <MetricCard label="Risk alerts" value={alertHorsesCount} icon="alert-triangle" tone={alertHorsesCount > 0 ? 'danger' : 'success'} unit="horses" hint="Horses to monitor" />
+        <MetricCard label="Average performance (30 days)" value={avgTeamPerformance ? `${avgTeamPerformance}/10` : '—'} icon="trending-up" tone="success" hint="Across all assigned horses" />
       </div>
 
       {/* Performance Distribution Bar */}
       <Panel padded className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Phân Bổ Phong Độ Toàn Đội
+            Team performance distribution
           </h3>
           <div className="flex items-center gap-4 text-xs">
             <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Xuất sắc (≥8.0): <strong>{performanceDist.excellent}</strong>
+              Excellent (≥8.0): <strong>{performanceDist.excellent}</strong>
             </span>
             <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
               <span className="h-2 w-2 rounded-full bg-blue-500" />
-              Đạt chuẩn (6.0 - 7.9): <strong>{performanceDist.good}</strong>
+              On target (6.0–7.9): <strong>{performanceDist.good}</strong>
             </span>
             <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
               <span className="h-2 w-2 rounded-full bg-amber-500" />
-              Cần cải thiện (&lt;6.0): <strong>{performanceDist.needImprovement}</strong>
+              Needs improvement (&lt;6.0): <strong>{performanceDist.needImprovement}</strong>
             </span>
             <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
               <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-700" />
-              Chưa có dữ liệu: <strong>{performanceDist.noData}</strong>
+              No data: <strong>{performanceDist.noData}</strong>
             </span>
           </div>
         </div>
@@ -213,28 +148,28 @@ export function TrainerDashboardView() {
               <div
                 style={{ width: `${(performanceDist.excellent / totalHorses) * 100}%` }}
                 className="bg-emerald-500 transition-all"
-                title={`Xuất sắc: ${performanceDist.excellent}`}
+                title={`Excellent: ${performanceDist.excellent}`}
               />
             )}
             {performanceDist.good > 0 && (
               <div
                 style={{ width: `${(performanceDist.good / totalHorses) * 100}%` }}
                 className="bg-blue-500 transition-all"
-                title={`Đạt chuẩn: ${performanceDist.good}`}
+                title={`On target: ${performanceDist.good}`}
               />
             )}
             {performanceDist.needImprovement > 0 && (
               <div
                 style={{ width: `${(performanceDist.needImprovement / totalHorses) * 100}%` }}
                 className="bg-amber-500 transition-all"
-                title={`Cần cải thiện: ${performanceDist.needImprovement}`}
+                title={`Needs improvement: ${performanceDist.needImprovement}`}
               />
             )}
             {performanceDist.noData > 0 && (
               <div
                 style={{ width: `${(performanceDist.noData / totalHorses) * 100}%` }}
                 className="bg-gray-300 dark:bg-gray-700 transition-all"
-                title={`Chưa có dữ liệu: ${performanceDist.noData}`}
+                title={`No data: ${performanceDist.noData}`}
               />
             )}
           </div>
@@ -254,7 +189,7 @@ export function TrainerDashboardView() {
                   : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
-              Tất cả ({totalHorses})
+              All ({totalHorses})
             </button>
             <button
               type="button"
@@ -265,7 +200,7 @@ export function TrainerDashboardView() {
                   : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
-              Đang huấn luyện ({activeCount})
+              In training ({activeCount})
             </button>
             <button
               type="button"
@@ -276,7 +211,7 @@ export function TrainerDashboardView() {
                   : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
-              Có cảnh báo ({alertHorsesCount})
+              With alerts ({alertHorsesCount})
             </button>
           </div>
 
@@ -286,8 +221,8 @@ export function TrainerDashboardView() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Tìm tên chiến mã..."
-                className="w-56 rounded border border-[var(--color-border)] bg-[var(--color-surface)] py-1 pl-7 pr-2.5 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+                placeholder="Search horses..."
+                className="w-full max-w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] py-1 pl-7 pr-2.5 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none sm:w-56"
               />
               <span className="pointer-events-none absolute left-2 top-1.5 text-[var(--color-text-muted)]">
                 <Icon name="search" size={12} />
@@ -297,19 +232,15 @@ export function TrainerDashboardView() {
         </div>
 
         {error && (
-          <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-            {error}
-          </div>
+          <Notice tone="error">{error}</Notice>
         )}
 
         {loading ? (
-          <div className="flex h-48 items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
-          </div>
+          <ListSkeleton rows={5} />
         ) : filteredHorses.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-sm font-medium text-[var(--color-text-secondary)]">
-              Không tìm thấy chiến mã nào phù hợp với bộ lọc
+              No horses match the selected filters.
             </p>
           </div>
         ) : (
@@ -317,14 +248,14 @@ export function TrainerDashboardView() {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-[var(--color-border)] text-[var(--color-text-secondary)]">
-                  <th className="py-3 px-3 font-semibold">Chiến mã</th>
-                  <th className="py-3 px-3 font-semibold">Khóa huấn luyện</th>
-                  <th className="py-3 px-3 font-semibold">Trạng thái</th>
-                  <th className="py-3 px-3 font-semibold">Tiến độ khóa</th>
-                  <th className="py-3 px-3 font-semibold text-center">Phong độ gần nhất</th>
-                  <th className="py-3 px-3 font-semibold text-center">TB 30 ngày</th>
-                  <th className="py-3 px-3 font-semibold text-center">Cảnh báo</th>
-                  <th className="py-3 px-3 font-semibold text-right">Thao tác</th>
+                  <th className="py-3 px-3 font-semibold">Horse</th>
+                  <th className="py-3 px-3 font-semibold">Training course</th>
+                  <th className="py-3 px-3 font-semibold">Status</th>
+                  <th className="py-3 px-3 font-semibold">Course progress</th>
+                  <th className="py-3 px-3 font-semibold text-center">Latest performance</th>
+                  <th className="py-3 px-3 font-semibold text-center">30-day average</th>
+                  <th className="py-3 px-3 font-semibold text-center">Alerts</th>
+                  <th className="py-3 px-3 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border-subtle)] text-[var(--color-text-primary)]">
@@ -344,36 +275,36 @@ export function TrainerDashboardView() {
                       </td>
                       <td className="py-3 px-3 text-[var(--color-text-secondary)]">
                         {horse.courseName || (
-                          <span className="italic text-[var(--color-text-muted)]">Chưa đăng ký</span>
+                          <span className="italic text-[var(--color-text-muted)]">Not enrolled</span>
                         )}
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         {horse.planStatus === 'ACTIVE' && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-[10px] font-semibold">
                             <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                            Đang tập
+                            In training
                           </span>
                         )}
                         {horse.planStatus === 'UPCOMING' && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-semibold">
                             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                            Sắp tới
+                            Upcoming
                           </span>
                         )}
                         {horse.planStatus === 'COMPLETED' && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-semibold">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            Hoàn thành
+                            Completed
                           </span>
                         )}
                         {(horse.planStatus === 'NO_PLAN' || !horse.planStatus) && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-0.5 text-[10px] font-medium">
-                            Chưa có plan
+                            No plan
                           </span>
                         )}
                         {horse.planStatus === 'CANCELLED' && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-2 py-0.5 text-[10px] font-medium">
-                            Đã huỷ
+                            Cancelled
                           </span>
                         )}
                       </td>
@@ -382,7 +313,7 @@ export function TrainerDashboardView() {
                           <div className="space-y-1">
                             <div className="flex items-center justify-between text-[10px] text-[var(--color-text-secondary)]">
                               <span>
-                                {horse.completedSessions}/{horse.totalSessions} buổi
+                                {horse.completedSessions}/{horse.totalSessions} sessions
                               </span>
                               <span className="font-semibold">{horse.progressPercent}%</span>
                             </div>
@@ -427,12 +358,12 @@ export function TrainerDashboardView() {
                         {(horse.alertCount ?? horse.alertsCount ?? 0) > 0 ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 text-[10px] font-bold">
                             <Icon name="alert-triangle" size={10} />
-                            {horse.alertCount ?? horse.alertsCount} cảnh báo
+                            {horse.alertCount ?? horse.alertsCount} alerts
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-emerald-600 text-[10px] font-medium">
                             <Icon name="check" size={12} />
-                            An toàn
+                            Clear
                           </span>
                         )}
                       </td>
@@ -440,7 +371,7 @@ export function TrainerDashboardView() {
                         <Link href={`/trainer/horses/${horse.horseId}`}>
                           <Button variant="secondary" size="sm">
                             <Icon name="trending-up" size={12} />
-                            Xem thể lực
+                            View fitness
                           </Button>
                         </Link>
                       </td>
@@ -452,6 +383,6 @@ export function TrainerDashboardView() {
           </div>
         )}
       </Panel>
-    </div>
+    </ScreenLayout>
   );
 }

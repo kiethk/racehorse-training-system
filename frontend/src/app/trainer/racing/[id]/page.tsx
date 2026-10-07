@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { TrainerRaceDetail } from '@/features/racing/components/TrainerRaceDetail';
 
 export const metadata: Metadata = {
-  title: 'Chi tiết đơn đề cử dự đua | Huấn luyện viên',
+  title: 'Race nomination details | Trainer | RTMS',
 };
 
 type RouteParams = Promise<{ id: string }>;
@@ -27,7 +27,7 @@ export default async function TrainerRaceDetailPage({
             <TrainerRaceDetail id={raceId} />
           ) : (
             <p role="alert" className="text-sm text-[var(--color-danger)]">
-              Mã đơn đề cử không hợp lệ.
+              This race nomination ID is invalid.
             </p>
           )}
         </PageContainer>

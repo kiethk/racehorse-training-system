@@ -12,8 +12,8 @@ export function TrainingCoursesView() {
     <div className="space-y-6">
       <Tabs
         tabs={[
-          { id: 'courses', label: 'Khóa huấn luyện (Courses)', icon: 'activity' },
-          { id: 'subjects', label: 'Thư viện bài tập (Subjects)', icon: 'clipboard' },
+          { id: 'courses', label: 'Training courses', icon: 'activity' },
+          { id: 'subjects', label: 'Exercise library', icon: 'clipboard' },
         ]}
         active={activeTab}
         onChange={(id) => setActiveTab(id as 'courses' | 'subjects')}

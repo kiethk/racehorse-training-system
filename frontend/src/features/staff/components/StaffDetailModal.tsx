@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/Button';
+import { displayError } from '@/lib/display';
 import { getStaffDetail, updateStaff } from '../services/staffService';
 import type { StaffDetailResponse, StaffSummary, StaffUpdateRequest } from '../types';
 
@@ -67,7 +68,7 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
       const res = await getStaffDetail(id);
       setDetail(res.data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load staff detail');
+      setError(displayError(err, 'Unable to load staff details.'));
     } finally {
       setLoading(false);
     }

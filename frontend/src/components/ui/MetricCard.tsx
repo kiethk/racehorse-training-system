@@ -20,10 +20,11 @@ interface MetricCardProps {
   tone?: Tone;
   hint?: string;
   onClick?: () => void;
+  active?: boolean;
 }
 
 /** Compact Prism-style operational metric. Not a marketing KPI card. */
-export function MetricCard({ label, value, unit, icon, tone = 'default', hint, onClick }: MetricCardProps) {
+export function MetricCard({ label, value, unit, icon, tone = 'default', hint, onClick, active = false }: MetricCardProps) {
   const Wrapper = onClick ? 'button' : 'div';
   return (
     <Wrapper
@@ -32,7 +33,7 @@ export function MetricCard({ label, value, unit, icon, tone = 'default', hint, o
       className={
         'flex flex-col rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left ' +
         (onClick
-          ? 'outline-none transition-colors hover:border-[var(--color-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]'
+          ? `outline-none transition-colors hover:border-[var(--color-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${active ? 'border-[var(--color-primary)] bg-[var(--color-primary-subtle)]' : ''}`
           : '')
       }
     >

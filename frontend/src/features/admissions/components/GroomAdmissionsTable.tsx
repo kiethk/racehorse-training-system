@@ -5,11 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
-import { Panel, SectionTitle } from '@/components/ui/Panel';
-import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { admissionsApi } from '../services/api';
-import type { AdmissionStatus, GroomQueueFilters, GroomQueueResponse } from '../types';
+import type { AdmissionStatus, AdmissionSummaryResponse, GroomQueueFilters, GroomQueueResponse } from '../types';
+import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
+import { AdmissionListLayout } from '../shared/components/AdmissionListLayout';
+import { AdmissionSearchField } from '../shared/components/AdmissionSearchField';
 
 const statuses: { value: AdmissionStatus | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
@@ -37,19 +40,6 @@ function toQuery(filters: GroomQueueFilters) {
   if (filters.page > 0) params.set('page', String(filters.page));
   const query = params.toString();
   return query ? `?${query}` : '';
-}
-
-function prettyStatus(status: AdmissionStatus) {
-  return status.toLowerCase().replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function statusTone(status: AdmissionStatus): 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral' {
-  if (status === 'GROOM_REVIEW') return 'primary';
-  if (status === 'WAITING_FOR_STALL' || status === 'WAITING_FOR_ARRIVAL' || status === 'ARRIVAL_EXPIRED') return 'warning';
-  if (status === 'APPROVED') return 'success';
-  if (status === 'REJECTED') return 'danger';
-  if (status === 'VET_REVIEW' || status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW') return 'info';
-  return 'neutral';
 }
 
 function formatDate(value: string) {
@@ -85,8 +75,34 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
 
   const applications = useMemo(() => result?.content ?? [], [result]);
   const total = result?.totalElements ?? 0;
-  const showingFrom = total === 0 ? 0 : result!.page * result!.size + 1;
-  const showingTo = result ? Math.min((result.page + 1) * result.size, total) : 0;
+
+  const columns: DataTableColumn<AdmissionSummaryResponse>[] = [
+    {
+      id: 'horse',
+      header: 'Horse',
+      render: (admission) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <HorseAvatar name={admission.candidateName} size={36} />
+          <div className="min-w-0">
+            <p className="truncate font-medium">{admission.candidateName}</p>
+            <p className="truncate text-xs text-[var(--color-text-muted)]">{admission.breed || 'Breed not provided'}</p>
+          </div>
+        </div>
+      ),
+    },
+    { id: 'status', header: 'Status', render: (admission) => <AdmissionStatusBadge status={admission.status} /> },
+    { id: 'submitted', header: 'Submitted', render: (admission) => formatDate(admission.submittedAt) },
+    {
+      id: 'action',
+      header: 'Action',
+      align: 'right',
+      render: (admission) => (
+        <Link href={`/groom/admissions/${admission.admissionId}${toQuery(applied)}`} className="inline-flex min-h-9 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] px-4 text-xs font-semibold text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary-subtle)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
+          View
+        </Link>
+      ),
+    },
+  ];
 
   const apply = () => {
     const next = { ...draft, candidateName: draft.candidateName.trim(), page: 0 };
@@ -108,36 +124,29 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
   };
 
   if (loading && !result) {
-    return <div className="space-y-5"><PageHeading /><Panel><ListSkeleton rows={8} /></Panel></div>;
+    return <AdmissionListLayout title="Admissions" description="Review applications, quarantine capacity and horse arrivals."><ListSkeleton rows={8} /></AdmissionListLayout>;
   }
 
   if (error && !result) {
     return (
-      <div className="space-y-5">
-        <PageHeading />
-        <Panel>
-          <EmptyState
-            title="Unable to load applications"
-            description={error}
-            action={<Button size="sm" onClick={() => setReloadKey((value) => value + 1)}>Retry</Button>}
-          />
-        </Panel>
-      </div>
+      <AdmissionListLayout title="Admissions" description="Review applications, quarantine capacity and horse arrivals.">
+        <EmptyState
+          title="Unable to load applications"
+          description={error}
+          action={<Button size="sm" onClick={() => setReloadKey((value) => value + 1)}>Retry</Button>}
+        />
+      </AdmissionListLayout>
     );
   }
 
   return (
-    <div className="space-y-5">
-      <PageHeading />
-
-      <form
-        className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1.5fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto] xl:items-end"
+    <AdmissionListLayout title="Admissions" description="Review applications, quarantine capacity and horse arrivals.">
+      <FilterBar
+        layout="grid"
+        className="sm:grid-cols-2 xl:grid-cols-[minmax(260px,1.5fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto] xl:items-end"
         onSubmit={(event) => { event.preventDefault(); apply(); }}
       >
-        <label className="block text-[11px] font-medium text-[var(--color-text-muted)]">
-          Search horse name
-          <input value={draft.candidateName} onChange={(event) => setDraft({ ...draft, candidateName: event.target.value })} placeholder="Search horse name" className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[12px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]" />
-        </label>
+        <AdmissionSearchField value={draft.candidateName} onChange={(candidateName) => setDraft({ ...draft, candidateName })} />
         <label className="block text-[11px] font-medium text-[var(--color-text-muted)]">
           Status
           <select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as AdmissionStatus | '' })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[12px] text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">
@@ -156,72 +165,21 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
           <Button type="submit" variant="primary" size="sm">Apply</Button>
           <Button type="button" variant="secondary" size="sm" onClick={clear}>Clear</Button>
         </div>
-      </form>
+      </FilterBar>
 
       {error && <div role="alert" className="border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-[12px] text-[var(--color-text-primary)]">{error}</div>}
 
-      <Panel className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-4 py-3">
-          <SectionTitle>Admission applications</SectionTitle>
-          <span className="text-[11px] text-[var(--color-text-muted)]">{total} applications</span>
-        </div>
-
-        {applications.length === 0 ? (
-          <EmptyState
-            title={total > 0 ? 'No matching applications' : 'No applications'}
-            description={total > 0 ? 'Change the filters or clear them to see other records.' : 'New applications will appear here.'}
-            action={total > 0 ? <Button size="sm" onClick={clear}>Clear filters</Button> : undefined}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-left">
-              <thead className="bg-[var(--color-surface-subtle)] text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
-                <tr>
-                  <th scope="col" className="px-4 py-3">Horse</th>
-                  <th scope="col" className="px-4 py-3">Status</th>
-                  <th scope="col" className="px-4 py-3">Submitted</th>
-                  <th scope="col" className="px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)]">
-                {applications.map((admission) => (
-                  <tr key={admission.admissionId} className="bg-[var(--color-surface)] transition-colors hover:bg-[var(--color-surface-subtle)]">
-                    <td className="px-4 py-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <HorseAvatar name={admission.candidateName} size={36} />
-                        <div className="min-w-0">
-                          <p className="truncate text-[13px] font-medium text-[var(--color-text-primary)]">{admission.candidateName}</p>
-                          <p className="truncate text-[11px] text-[var(--color-text-muted)]">{admission.breed || 'Breed not provided'}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3"><Pill tone={statusTone(admission.status)} size="sm">{prettyStatus(admission.status)}</Pill></td>
-                    <td className="px-4 py-3 text-[12px] text-[var(--color-text-secondary)]">{formatDate(admission.submittedAt)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <Link href={`/groom/admissions/${admission.admissionId}${toQuery(applied)}`} className="inline-flex h-8 items-center rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] px-4 text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">View</Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {result && total > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] px-4 py-3 text-[11px] text-[var(--color-text-secondary)]">
-            <span>Showing {showingFrom}-{showingTo} of {total}</span>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="secondary" disabled={result.page <= 0 || loading} onClick={() => changePage(result.page - 1)}>Previous</Button>
-              <span className="min-w-16 text-center">{result.page + 1} / {Math.max(1, result.totalPages)}</span>
-              <Button size="sm" variant="secondary" disabled={result.page + 1 >= result.totalPages || loading} onClick={() => changePage(result.page + 1)}>Next</Button>
-            </div>
-          </div>
-        )}
-      </Panel>
-    </div>
+      <DataTable
+        rows={applications}
+        columns={columns}
+        getRowKey={(admission) => admission.admissionId}
+        ariaLabel="Admission records"
+        loading={loading}
+        emptyTitle={total > 0 ? 'No matching applications' : 'No applications'}
+        emptyDescription={total > 0 ? 'Change the filters or clear them to see other records.' : 'New applications will appear here.'}
+        emptyAction={total > 0 ? <Button size="sm" onClick={clear}>Clear filters</Button> : undefined}
+        pagination={result ? { page: result.page, pageSize: result.size, total, onPageChange: changePage, disabled: loading } : undefined}
+      />
+    </AdmissionListLayout>
   );
-}
-
-function PageHeading() {
-  return <header><h1 className="text-[21px] font-semibold tracking-tight text-[var(--color-text-primary)]">Admissions</h1></header>;
 }

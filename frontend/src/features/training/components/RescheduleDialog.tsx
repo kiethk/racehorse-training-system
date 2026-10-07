@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { Notice } from '@/components/ui/Notice';
+import { displayError } from '@/lib/display';
+import { controlClassName, FormField } from '@/components/ui/FormField';
 import { trainingApi } from '../services/trainingService';
 import type { TrainingLotResponse } from '../types';
 
@@ -54,7 +57,7 @@ export function RescheduleDialog({
     const endMins = toMinutes(newEndTime);
     if (startMins < WINDOW_START || endMins > WINDOW_END) {
       setError(
-        `Buổi tập chỉ được xếp trong khoảng 06:00 – 10:00. Giờ vừa chọn (${newStartTime} – ${newEndTime}) nằm ngoài khoảng này.`,
+        `Sessions can only be scheduled between 06:00 and 10:00. The selected time (${newStartTime}–${newEndTime}) is outside this window.`,
       );
       return;
     }
@@ -69,7 +72,7 @@ export function RescheduleDialog({
       await onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Dời giờ lot thất bại.');
+      setError(displayError(err, 'Unable to reschedule this lot.'));
     } finally {
       setSubmitting(false);
     }
@@ -88,61 +91,51 @@ export function RescheduleDialog({
         className="relative w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl"
       >
         <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-          Dời giờ Lot #{lot.lotId} ({lot.subjectName})
+          Reschedule lot #{lot.lotId} ({lot.subjectName})
         </h2>
         <p className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
-          Cả hàng {lot.occupied} chiến mã trong lot sẽ cùng được dời sang khung giờ mới.
+          All {lot.occupied} horses in this lot will move to the new time slot.
         </p>
 
-        {error && (
-          <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] p-3 text-[12px] text-[var(--color-danger)] leading-relaxed">
-            {error}
-          </div>
-        )}
+        {error && <Notice tone="error" className="mt-3">{error}</Notice>}
 
         <form onSubmit={handleReschedule} className="mt-4 space-y-4">
           <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-3 text-[12px]">
-            <div>Thời lượng bài tập: <strong>{duration} phút</strong></div>
-            <div>Giờ bắt đầu cũ: <strong>{lot.startTime} – {lot.endTime}</strong></div>
+            <div>Session duration: <strong>{duration} minutes</strong></div>
+            <div>Current time: <strong>{lot.startTime} – {lot.endTime}</strong></div>
           </div>
 
-          <div>
-            <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-              Giờ bắt đầu mới (06:00 – 10:00) *
-            </label>
+          <FormField label="New start time (06:00–10:00)" htmlFor="lot-start-time" required hint={`Estimated end time: ${newEndTime}`}>
             <input
+              id="lot-start-time"
               type="time"
               required
               min="06:00"
               max="10:00"
               value={newStartTime}
               onChange={(e) => setNewStartTime(e.target.value)}
-              className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+              className={controlClassName}
+              aria-describedby="lot-start-time-description"
             />
-            <div className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-              Giờ kết thúc dự kiến: <strong>{newEndTime}</strong>
-            </div>
-          </div>
+          </FormField>
 
-          <div>
-            <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-              Lý do dời giờ
-            </label>
+          <FormField label="Reason for rescheduling" htmlFor="lot-reschedule-reason">
             <input
+              id="lot-reschedule-reason"
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Ví dụ: Điều kiện thời tiết, đường chạy bảo trì..."
-              className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+              placeholder="For example: weather conditions, track maintenance..."
+              className={controlClassName}
             />
-          </div>
+          </FormField>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-[var(--color-border)]">
             <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={submitting}>
-              Huỷ
+              Cancel
             </Button>
             <Button variant="primary" size="sm" type="submit" disabled={submitting}>
-              {submitting ? 'Đang dời...' : 'Xác nhận dời giờ'}
+              {submitting ? 'Rescheduling…' : 'Confirm reschedule'}
             </Button>
           </div>
         </form>

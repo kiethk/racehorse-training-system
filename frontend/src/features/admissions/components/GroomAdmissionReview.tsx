@@ -3,16 +3,17 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { HorseAvatar } from '@/components/ui/HorseAvatar';
-import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { Panel, SectionTitle } from '@/components/ui/Panel';
-import { Pill } from '@/components/ui/StatusBadge';
 import { admissionsApi } from '../services/api';
-import type { AdmissionDetailResponse, AdmissionStatus } from '../types';
+import { formatDate, formatDateTime } from '@/lib/display';
+import type { AdmissionDetailResponse } from '../types';
+import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
+import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
+import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 
 function date(value: string | null) {
-  return value ? new Date(value).toLocaleDateString() : 'Not recorded';
+  return value ? formatDate(value) : 'Not recorded';
 }
 
 const documentNames: Record<string, string> = {
@@ -29,11 +30,10 @@ const documentNames: Record<string, string> = {
 interface Props {
   admissionId: number;
   returnTo: string;
-  embedded?: boolean;
   onUpdated?: () => void;
 }
 
-export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, onUpdated }: Props) {
+export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props) {
   const [detail, setDetail] = useState<AdmissionDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,46 +136,14 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
       : 'The current capacity snapshot could not be loaded.';
 
   return (
-    <div className={embedded ? 'flex h-[750px] flex-col overflow-y-auto scroll-slim' : 'space-y-5'}>
-      {!embedded && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href={returnTo} className="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"><Icon name="arrow-left" size={15} />Back to applications</Link>
-          <Pill tone={statusTone(detail.status)}>{prettyStatus(detail.status)}</Pill>
-        </div>
-      )}
-
-      <header className="flex shrink-0 items-center gap-4 border-b border-[var(--color-border)] px-6 py-5">
-        <HorseAvatar name={candidate.name} image={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined} size={56} rounded="md" />
-        <div className="min-w-0 flex-1">
-          <h1 className="mb-2 flex flex-wrap items-center gap-2 text-[20px] font-bold text-[var(--color-text-primary)]">
-            <span className="truncate">{candidate.name}</span>
-            <Pill tone={statusTone(detail.status)} size="sm">{prettyStatus(detail.status)}</Pill>
-          </h1>
-          <div className="grid grid-cols-2 gap-x-5 gap-y-2 text-[12px] md:grid-cols-4">
-            <HeaderValue label="OWNER" value={detail.ownerName ? `${detail.ownerName} (#${detail.ownerId})` : `#${detail.ownerId}`} />
-            <HeaderValue label="BREED" value={candidate.breed || 'Not provided'} />
-            <HeaderValue label="DATE OF BIRTH" value={date(candidate.dateOfBirth)} />
-            <HeaderValue label="SUBMITTED" value={date(detail.submittedAt)} />
-          </div>
-        </div>
-      </header>
-
-      <div className={embedded ? 'flex-1 space-y-6 bg-[var(--color-surface-subtle)] p-6' : 'space-y-5'}>
+    <AdmissionDetailLayout
+      returnTo={returnTo}
+      header={<AdmissionDetailHeader detail={detail} horsePhotoUrl={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined} />}
+      pipeline={<AdmissionPipeline detail={detail} />}
+      content={(
+      <div className="min-w-0 space-y-5">
         {notice && <div role="status" className="border-l-2 border-[var(--color-success)] bg-[var(--color-success-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]">{notice}</div>}
         {error && detail && <div role="alert" className="border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]">{error}</div>}
-
-        <Panel padded className="bg-[var(--color-surface)]">
-          <SectionTitle>Review pipeline</SectionTitle>
-          <div className="mt-4 flex flex-wrap gap-2 text-[12px]">
-            <PipelineStep label="Groom review" isDone={!!detail.groomReviewedAt} isActive={detail.status === 'GROOM_REVIEW'} />
-            <PipelineStep label="Stall assignment" isDone={!!detail.quarantineStallCode || detail.status === 'ARRIVAL_EXPIRED'} isActive={detail.status === 'WAITING_FOR_STALL'} />
-            <PipelineStep label="Waiting for arrival" isDone={Boolean(detail.arrivedAt)} isActive={detail.status === 'WAITING_FOR_ARRIVAL'} />
-            <PipelineStep label="Arrival expired" isDone={false} isActive={detail.status === 'ARRIVAL_EXPIRED'} />
-            <PipelineStep label="Veterinarian review" isDone={!!detail.vetReviewedAt} isActive={detail.status === 'VET_REVIEW'} />
-            <PipelineStep label="Head Trainer review" isDone={!!detail.trainerReviewedAt} isActive={detail.status === 'TRAINER_REVIEW'} />
-            <PipelineStep label="Manager final review" isDone={!!detail.managerReviewedAt} isActive={detail.status === 'MANAGER_REVIEW'} />
-          </div>
-        </Panel>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Panel padded className="bg-[var(--color-surface)]">
@@ -203,7 +171,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
               </div>
               {!isReady && capacity && <p className="text-[11px] text-[var(--color-text-secondary)]">Regular reserve required: {capacity.occupiedQuarantineStalls + 1} available regular stall(s).</p>}
               {detail.quarantineStallCode && <InfoRow label="Assigned Q stall" value={detail.quarantineStallCode} />}
-              {detail.arrivalDeadlineAt && <InfoRow label="Arrival deadline" value={new Date(detail.arrivalDeadlineAt).toLocaleString()} />}
+              {detail.arrivalDeadlineAt && <InfoRow label="Arrival deadline" value={formatDateTime(detail.arrivalDeadlineAt)} />}
             </div>
           </Panel>
         </div>
@@ -240,6 +208,10 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
             </dl>
           </Panel>
         </div>
+      </div>
+      )}
+      actions={(
+        <div className="space-y-4">
 
         {canReview && (
           <Panel padded className="border-2 border-[var(--color-primary)] bg-[var(--color-surface)]">
@@ -275,7 +247,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
           <Panel padded className="border-2 border-[var(--color-primary)] bg-[var(--color-surface)]">
             <SectionTitle>Confirm horse arrival</SectionTitle>
             <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
-              Quarantine stall {detail.quarantineStallCode || 'reserved'} is held until {detail.arrivalDeadlineAt ? new Date(detail.arrivalDeadlineAt).toLocaleString() : 'the 14-day arrival deadline'}.
+              Quarantine stall {detail.quarantineStallCode || 'reserved'} is held until {detail.arrivalDeadlineAt ? formatDateTime(detail.arrivalDeadlineAt) : 'the 14-day arrival deadline'}.
               Confirm only after the horse physically arrives. Confirmation creates the horse record and schedules veterinary review.
             </p>
             <div className="mt-4 flex justify-end">
@@ -293,25 +265,9 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
 
         {!canReview && !waiting && detail.status !== 'WAITING_FOR_ARRIVAL' && detail.status !== 'ARRIVAL_EXPIRED' && <Panel padded className="bg-[var(--color-surface)]"><p className="text-sm text-[var(--color-text-secondary)]">This application is read-only at its current stage.</p></Panel>}
       </div>
-    </div>
+      )}
+    />
   );
-}
-
-function prettyStatus(status: AdmissionStatus) {
-  return status.toLowerCase().replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function statusTone(status: AdmissionStatus): 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral' {
-  if (status === 'GROOM_REVIEW') return 'primary';
-  if (status === 'WAITING_FOR_STALL' || status === 'WAITING_FOR_ARRIVAL' || status === 'ARRIVAL_EXPIRED') return 'warning';
-  if (status === 'APPROVED') return 'success';
-  if (status === 'REJECTED') return 'danger';
-  if (status === 'VET_REVIEW' || status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW') return 'info';
-  return 'neutral';
-}
-
-function HeaderValue({ label, value }: { label: string; value: string }) {
-  return <div><span className="mb-1 block text-[10px] text-[var(--color-text-muted)]">{label}</span><span className="font-medium text-[var(--color-text-primary)]">{value}</span></div>;
 }
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
@@ -325,10 +281,4 @@ function DocumentTypeMark({ documentType }: { documentType: string }) {
       {isPhoto ? 'PHOTO' : 'FILE'}
     </span>
   );
-}
-
-function PipelineStep({ label, isDone, isActive }: { label: string; isDone: boolean; isActive: boolean }) {
-  if (isActive) return <div className="rounded border border-[var(--color-primary)] bg-[var(--color-primary-soft)] px-3 py-2 font-medium text-[var(--color-primary)]"><span className="mr-1.5">●</span>{label}</div>;
-  if (isDone) return <div className="rounded border border-[var(--color-success)] bg-[var(--color-success-soft)] px-3 py-2 text-[var(--color-success)]"><span className="mr-1.5">✓</span>{label}</div>;
-  return <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-2 text-[var(--color-text-muted)]"><span className="mr-1.5 opacity-40">-</span>{label}</div>;
 }

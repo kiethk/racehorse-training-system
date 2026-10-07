@@ -9,6 +9,7 @@ import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { trainingApi } from '../services/trainingService';
 import type { TrainingLotResponse } from '../types';
 import { RescheduleDialog } from './RescheduleDialog';
+import { displayError, formatDate } from '@/lib/display';
 
 const WINDOW_START = 6 * 60; // 06:00 (360')
 const WINDOW_END = 10 * 60;  // 10:00 (600')
@@ -40,8 +41,8 @@ export function LotTimeline() {
       const data = await trainingApi.getLots(selectedDate, selectedDate, false);
       setLots(data);
     } catch (err) {
-      console.error('Lỗi khi nạp lịch lot:', err);
-      setError('Không tải được danh sách lot của ngày đã chọn.');
+      console.error('Unable to load the lot schedule:', err);
+      setError(displayError(err, 'Unable to load training lots for the selected date.'));
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,7 @@ export function LotTimeline() {
       setCancelTargetLot(null);
       await loadLots();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Huỷ lot thất bại.');
+      alert(displayError(err, 'Unable to cancel this lot.'));
     } finally {
       setCancelling(false);
     }
@@ -83,16 +84,16 @@ export function LotTimeline() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-            Lịch buổi tập trong ngày
+            Daily training schedule
           </h1>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Quan sát trực quan các lot tập từ 06:00 đến 10:00 và nhận diện các khe giờ còn trống.
+            View training lots between 06:00 and 10:00 and identify available time slots.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <label className="text-[12px] font-medium text-[var(--color-text-primary)]">
-            Chọn ngày:
+            Date:
           </label>
           <input
             type="date"
@@ -101,14 +102,14 @@ export function LotTimeline() {
             className="rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
           />
           <Button variant="secondary" size="sm" onClick={() => loadLots()}>
-            Tải lại
+            Refresh
           </Button>
         </div>
       </div>
 
       {error ? (
         <Panel padded>
-          <EmptyState icon="alert-triangle" title="Lỗi nạp dữ liệu" description={error} />
+          <EmptyState icon="alert-triangle" title="Unable to load data" description={error} />
         </Panel>
       ) : (
         <>
@@ -116,16 +117,16 @@ export function LotTimeline() {
           <Panel padded>
             <div className="flex items-center justify-between mb-3 text-[13px]">
               <span className="font-semibold text-[var(--color-text-primary)]">
-                Dải thời gian 06:00 – 10:00 ({selectedDate})
+                Schedule window 06:00–10:00 ({formatDate(selectedDate)})
               </span>
               <span className="text-[12px] text-[var(--color-text-secondary)]">
-                Đã dùng: <strong>{totalOccupiedMinutes}/240 phút</strong> • Còn trống:{' '}
-                <strong>{Math.max(0, 240 - totalOccupiedMinutes)} phút</strong>
+                Used: <strong>{totalOccupiedMinutes}/240 minutes</strong> · Available:{' '}
+                <strong>{Math.max(0, 240 - totalOccupiedMinutes)} minutes</strong>
               </span>
             </div>
 
             {/* Thước đo giờ */}
-            <div className="relative h-6 text-[10px] text-[var(--color-text-muted)] font-mono border-b border-[var(--color-border)] mb-2">
+            <div className="relative h-6 text-[10px] text-[var(--color-text-muted)] font-metric border-b border-[var(--color-border)] mb-2">
               <span className="absolute left-0">06:00</span>
               <span className="absolute left-[25%] -translate-x-1/2">07:00</span>
               <span className="absolute left-[50%] -translate-x-1/2">08:00</span>
@@ -153,13 +154,13 @@ export function LotTimeline() {
                     key={lot.lotId}
                     style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
                     className={`absolute top-1 bottom-1 rounded border px-2 py-1 flex flex-col justify-center overflow-hidden transition shadow-sm ${tone}`}
-                    title={`Lot #${lot.lotId}: ${lot.subjectName} (${lot.startTime} - ${lot.endTime}) - ${lot.occupied}/${lot.maxCapacity} ngựa`}
+                    title={`Lot #${lot.lotId}: ${lot.subjectName} (${lot.startTime} - ${lot.endTime}) - ${lot.occupied}/${lot.maxCapacity} horses`}
                   >
                     <div className="text-[11px] font-bold truncate">
                       #{lot.lotId} {lot.subjectName}
                     </div>
                     <div className="text-[10px] truncate">
-                      {lot.startTime.substring(0, 5)}–{lot.endTime.substring(0, 5)} ({lot.occupied}/{lot.maxCapacity} ngựa)
+                      {lot.startTime.substring(0, 5)}–{lot.endTime.substring(0, 5)} ({lot.occupied}/{lot.maxCapacity} horses)
                     </div>
                   </div>
                 );
@@ -170,15 +171,15 @@ export function LotTimeline() {
           {/* Danh sách thẻ chi tiết từng Lot */}
           <div className="space-y-3">
             <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
-              Chi tiết các Lot trong ngày ({sortedLots.length})
+              Lots for this day ({sortedLots.length})
             </h2>
 
             {sortedLots.length === 0 ? (
               <Panel padded>
                 <EmptyState
                   icon="activity"
-                  title="Không có lot nào trong ngày"
-                  description="Khung giờ vàng 06:00 – 10:00 hoàn toàn trống trong ngày này."
+                  title="No lots scheduled"
+                  description="There are no lots scheduled between 06:00 and 10:00 on this day."
                 />
               </Panel>
             ) : (
@@ -195,7 +196,7 @@ export function LotTimeline() {
                               </span>
                             </div>
                             <div className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">
-                              ⏱️ <strong>{lot.startTime} – {lot.endTime}</strong> ({lot.durationMinutes} phút)
+                              <strong>{lot.startTime} – {lot.endTime}</strong> ({lot.durationMinutes} min)
                             </div>
                           </div>
 
@@ -209,18 +210,18 @@ export function LotTimeline() {
                             }
                             size="sm"
                           >
-                            {lot.occupied}/{lot.maxCapacity} ngựa {lot.remainingSlots === 0 ? '(Đầy)' : ''}
+                            {lot.occupied}/{lot.maxCapacity} horses {lot.remainingSlots === 0 ? '(Full)' : ''}
                           </Pill>
                         </div>
 
                         <div className="mt-3 text-[12px] border-t border-[var(--color-border)] pt-2">
                           <div className="text-[11px] text-[var(--color-text-muted)]">
-                            Chiến mã tham gia ({lot.horseNames.length}):
+                          Participating horses ({lot.horseNames.length}):
                           </div>
                           <div className="mt-1 flex flex-wrap gap-1.5">
                             {lot.horseNames.length === 0 ? (
                               <span className="text-[11px] text-[var(--color-text-muted)] italic">
-                                Không có ngựa
+                                No horses
                               </span>
                             ) : (
                               lot.horseNames.map((name, i) => (
@@ -242,14 +243,14 @@ export function LotTimeline() {
                           size="sm"
                           onClick={() => setRescheduleLot(lot)}
                         >
-                          Dời giờ
+                          Reschedule
                         </Button>
                         <Button
                           variant="destructive"
                           size="sm"
                           onClick={() => setCancelTargetLot(lot)}
                         >
-                          Huỷ lot
+                          Cancel lot
                         </Button>
                       </div>
                     </div>
@@ -272,15 +273,15 @@ export function LotTimeline() {
       {/* Confirm dialog huỷ lot */}
       <ConfirmDialog
         open={cancelTargetLot !== null}
-        title={`Huỷ lot #${cancelTargetLot?.lotId} (${cancelTargetLot?.subjectName})?`}
+        title={`Cancel lot #${cancelTargetLot?.lotId} (${cancelTargetLot?.subjectName})?`}
         description={
           <div>
-            Toàn bộ <strong>{cancelTargetLot?.occupied} buổi tập</strong> của các chiến mã trong lot sẽ bị huỷ theo.
-            Khe giờ {cancelTargetLot?.startTime} – {cancelTargetLot?.endTime} sẽ được trả lại cho lot khác.
+            All <strong>{cancelTargetLot?.occupied} horse sessions</strong> in this lot will also be cancelled.
+            The {cancelTargetLot?.startTime}–{cancelTargetLot?.endTime} time slot will be released.
           </div>
         }
         tone="danger"
-        confirmLabel="Xác nhận huỷ"
+        confirmLabel="Confirm cancellation"
         loading={cancelling}
         onConfirm={handleConfirmCancel}
         onCancel={() => setCancelTargetLot(null)}

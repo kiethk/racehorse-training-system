@@ -7,23 +7,21 @@ import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { admissionsApi } from '../services/api';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
 import type { TrainerAdmissionView } from '../types/trainer';
+import { formatDate, formatDateTime } from '@/lib/display';
 
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
+import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionInfoSection, InfoRow } from '../shared/components/AdmissionInfoSection';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { TrainerReviewActionPanel } from './TrainerReviewActionPanel';
 
 function date(value: string | null) {
-  return value
-    ? new Date(value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-    : 'Not recorded';
+  return value ? formatDate(value) : 'Not recorded';
 }
 
 function datetime(value: string | null) {
-  return value
-    ? new Date(value).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })
-    : 'Not recorded';
+  return value ? formatDateTime(value) : 'Not recorded';
 }
 
 interface TrainerAdmissionDetailViewProps {
@@ -138,7 +136,7 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
       {healthMetrics && healthMetrics.length > 0 && (
         <div className="pt-2 border-t border-[var(--color-border)] space-y-1.5">
           <span className="text-[var(--color-text-muted)] block font-medium">
-            Latest Vital Signs ({new Date(healthMetrics[0].recordedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}):
+            Latest Vital Signs ({formatDate(healthMetrics[0].recordedAt)}):
           </span>
           <div className="grid grid-cols-2 gap-2 text-[11px] bg-[var(--color-surface-muted)] p-2 rounded">
             <div>Temperature: <strong>{healthMetrics[0].temperature != null ? `${healthMetrics[0].temperature} °C` : '—'}</strong></div>
@@ -248,12 +246,9 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
           <AdmissionDetailHeader
             detail={detail}
             horsePhotoUrl={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined}
-            simplifiedStatus
           />
         }
-        // Trainer không cần biết đơn đang chờ ai hay đã qua bước nào — huy
-        // hiệu ở header (In Progress / Approved / Rejected) là đủ.
-        pipeline={null}
+        pipeline={<AdmissionPipeline detail={detail} />}
         sections={[
           candidateSection,
           healthSection,

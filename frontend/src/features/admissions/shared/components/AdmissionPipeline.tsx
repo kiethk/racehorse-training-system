@@ -1,4 +1,5 @@
 import { Panel, SectionTitle } from '@/components/ui/Panel';
+import { formatDate } from '@/lib/display';
 import type { AdmissionDetailResponse } from '../../types';
 
 function PipelineStep({ label, isDone, isActive, note }: { label: string; isDone: boolean; isActive: boolean; note?: string }) {
@@ -38,7 +39,7 @@ export function AdmissionPipeline({ detail }: { detail: PipelineDetail }) {
       <div className="mt-4 flex flex-wrap gap-2 text-[12px]">
         <PipelineStep label="Groom Review" isDone={done(detail.groomReviewedAt, 1)} isActive={detail.status === 'GROOM_REVIEW'} />
         <PipelineStep label="Waiting for Stall" isDone={done(detail.quarantineStallCode, 2)} isActive={detail.status === 'WAITING_FOR_STALL'} />
-        <PipelineStep label="Waiting for Arrival" isDone={done(detail.arrivedAt, 3)} isActive={detail.status === 'WAITING_FOR_ARRIVAL'} note={detail.arrivalDeadlineAt ? `by ${new Date(detail.arrivalDeadlineAt).toLocaleDateString()}` : undefined} />
+        <PipelineStep label="Waiting for Arrival" isDone={done(detail.arrivedAt, 3)} isActive={detail.status === 'WAITING_FOR_ARRIVAL'} note={detail.arrivalDeadlineAt ? `by ${formatDate(detail.arrivalDeadlineAt)}` : undefined} />
         <PipelineStep label="Arrival Expired" isDone={detail.status === 'ARRIVAL_EXPIRED'} isActive={detail.status === 'ARRIVAL_EXPIRED'} />
         <PipelineStep label="Vet Review" isDone={done(detail.vetReviewedAt, 5)} isActive={detail.status === 'VET_REVIEW'} />
         <PipelineStep label="Trainer Review" isDone={done(detail.trainerReviewedAt, 6)} isActive={detail.status === 'TRAINER_REVIEW'} />

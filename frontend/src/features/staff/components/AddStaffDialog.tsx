@@ -104,7 +104,7 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
                 {creationResult.assignedAreaCodes && creationResult.assignedAreaCodes.length > 0 ? (
                   <div className="flex gap-2 flex-wrap">
                     {creationResult.assignedAreaCodes.map((code) => (
-                      <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-mono font-semibold text-[12px]">
+                      <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-metric font-semibold text-[12px]">
                         Area {code}
                       </span>
                     ))}
@@ -135,7 +135,7 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
                         <p className="text-[var(--color-text-muted)] text-[12px]">Area <strong>{creationResult.assignedAreaCode}</strong></p>
                         <div className="flex gap-2 flex-wrap">
                           {(creationResult.assignedStallCodes ?? []).map((code) => (
-                            <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-mono font-semibold text-[12px]">
+                            <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-metric font-semibold text-[12px]">
                               {code}
                             </span>
                           ))}

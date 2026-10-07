@@ -368,7 +368,7 @@ export function AccessControlView() {
                     {!isGroupCollapsed(group.key) && group.permissions.map(permission => (
                       <tr key={permission.id} className="hover:bg-[var(--color-surface-muted)] transition-colors">
                         <td className="p-3 pl-8">
-                          <div className="font-medium text-[var(--color-text-primary)] font-mono text-[12px]">
+                          <div className="font-medium text-[var(--color-text-primary)] font-metric text-[12px]">
                             {permission.code}
                           </div>
                           <div className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">

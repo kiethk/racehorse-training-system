@@ -5,22 +5,23 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
-import { Icon } from '@/components/ui/Icon';
 import { admissionsApi } from '../services/api';
+import { formatDate, formatDateTime } from '@/lib/display';
 import type { AdmissionDetailResponse } from '../types';
 
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionInfoSection, InfoRow } from '../shared/components/AdmissionInfoSection';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
+import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { ManagerFinalReviewPanel } from './ManagerFinalReviewPanel';
 
 function date(value: string | null) {
-  return value ? new Date(value).toLocaleDateString() : 'Not recorded';
+  return value ? formatDate(value) : 'Not recorded';
 }
 
 function datetime(value: string | null) {
-  return value ? new Date(value).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' }) : 'Not recorded';
+  return value ? formatDateTime(value) : 'Not recorded';
 }
 
 interface ManagerAdmissionDetailViewProps {
@@ -195,36 +196,27 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href={returnTo} className="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
-          <Icon name="arrow-left" size={15} /> Back to admissions
-        </Link>
-      </div>
-
       {error && <div role="alert" className="border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]">{error}</div>}
 
-      <div className="rounded-[var(--radius-lg)] overflow-hidden border border-[var(--color-border)] shadow-sm bg-[var(--color-surface)]">
-        <AdmissionDetailHeader detail={detail} horsePhotoUrl={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined} />
-        
-        <div className="border-t border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-6">
-          <AdmissionPipeline detail={detail} />
-          
-          <div className="mt-8 flex flex-col lg:flex-row gap-8 items-start">
-            {/* Main Content (Tabs) */}
-            <div className="w-full lg:flex-[3] min-w-0">
-              <div className="mb-5">
-                <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} />
-              </div>
-              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {activeTab === 'overview' && renderOverview()}
-                {activeTab === 'documents' && renderDocuments()}
-                {activeTab === 'medical' && renderMedical()}
-                {activeTab === 'history' && renderHistory()}
-              </div>
+      <AdmissionDetailLayout
+        returnTo={returnTo}
+        header={<AdmissionDetailHeader detail={detail} horsePhotoUrl={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined} />}
+        pipeline={<AdmissionPipeline detail={detail} />}
+        content={(
+          <div className="min-w-0">
+            <div className="mb-5">
+              <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} />
             </div>
-
-            {/* Right Summary/Action Column */}
-            <div className="w-full lg:flex-[1] space-y-5 lg:sticky lg:top-6">
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {activeTab === 'overview' && renderOverview()}
+              {activeTab === 'documents' && renderDocuments()}
+              {activeTab === 'medical' && renderMedical()}
+              {activeTab === 'history' && renderHistory()}
+            </div>
+          </div>
+        )}
+        sidebar={(
+          <>
               {/* Admission at a glance */}
               <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-5 space-y-4">
                 <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Admission at a glance</h3>
@@ -294,10 +286,9 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      </div>
+          </>
+        )}
+      />
     </div>
   );
 }
