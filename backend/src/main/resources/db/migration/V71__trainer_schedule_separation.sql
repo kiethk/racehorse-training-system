@@ -1,4 +1,4 @@
--- V70: Separate Trainer Schedule from Vet Care Schedule
+-- V71: Separate Trainer Schedule from Vet Care Schedule
 -- Domain separation:
 --   care_schedule: exclusively the Veterinarian task schedule
 --   trainer_schedule: exclusively the Head Trainer readiness review task schedule
@@ -123,7 +123,7 @@ WHERE rra.id = (
 )
   AND rra.trainer_schedule_id IS NULL;
 
--- 7. Remove obsolete trainer_id on care_schedule and admission_applications
+-- 7. Remove obsolete trainer_id on care_schedule
 DROP INDEX IF EXISTS idx_care_schedule_trainer;
 ALTER TABLE care_schedule DROP COLUMN IF EXISTS trainer_id;
-ALTER TABLE admission_applications DROP COLUMN IF EXISTS trainer_id;
+

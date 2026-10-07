@@ -1,4 +1,3 @@
--- Added after the established V57-V60 care-schedule migration sequence.
 ALTER TABLE audit_logs
     ADD COLUMN http_method VARCHAR(10),
     ADD COLUMN request_path VARCHAR(500),

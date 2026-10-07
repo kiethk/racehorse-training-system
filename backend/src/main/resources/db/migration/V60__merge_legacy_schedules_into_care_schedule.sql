@@ -1,4 +1,4 @@
--- Finish V57 without modifying any already applied migration. Flyway runs this
+-- V60 completes the CareSchedule refactor introduced in V58. Flyway runs this
 -- in one transaction; unexpected FK or clinical link conflicts abort the merge.
 ALTER TABLE care_schedules RENAME TO care_schedule;
 
