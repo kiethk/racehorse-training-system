@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { getStaffList, createStaff, updateStaffStatus } from '../services/staffService';
-import type { StaffSummary, StaffCreationRequest } from '../types';
+import type { StaffSummary, StaffCreationRequest, StaffCreationResponse } from '../types';
 import { StaffTable } from './StaffTable';
 import { AddStaffDialog } from './AddStaffDialog';
 import { StaffDetailModal } from './StaffDetailModal';
@@ -46,14 +46,15 @@ export function StaffManagementView() {
     }
   }
 
-  async function handleCreateStaff(req: StaffCreationRequest) {
+  async function handleCreateStaff(req: StaffCreationRequest): Promise<StaffCreationResponse | null> {
     setAddLoading(true);
     try {
-      await createStaff(req);
-      setAddDialogOpen(false);
+      const res = await createStaff(req);
+      // Refresh the list in the background; dialog shows assignment summary
+      void fetchStaff();
       setSuccessMsg('Staff member created successfully.');
       setTimeout(() => setSuccessMsg(''), 5000);
-      await fetchStaff();
+      return res.data ?? null;
     } finally {
       setAddLoading(false);
     }

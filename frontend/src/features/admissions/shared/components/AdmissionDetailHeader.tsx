@@ -19,7 +19,12 @@ function date(value: string | null) {
   return value ? new Date(value).toLocaleDateString() : 'Not recorded';
 }
 
-export function AdmissionDetailHeader({ detail, horsePhotoUrl }: { detail: HeaderDetail; horsePhotoUrl?: string }) {
+export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus = false }: {
+  detail: HeaderDetail;
+  horsePhotoUrl?: string;
+  /** Chuyển xuống badge: chỉ hiện In Progress / Approved / Rejected. */
+  simplifiedStatus?: boolean;
+}) {
   const candidate = detail.candidate;
   if (!candidate) return null;
   
@@ -29,7 +34,7 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl }: { detail: Heade
       <div className="min-w-0 flex-1">
         <h1 className="mb-2 flex flex-wrap items-center gap-2 text-[20px] font-bold text-[var(--color-text-primary)]">
           <span className="truncate">{candidate.name}</span>
-          <AdmissionStatusBadge status={detail.status} size="sm" />
+          <AdmissionStatusBadge status={detail.status} size="sm" simplified={simplifiedStatus} />
         </h1>
         <div className="grid grid-cols-2 gap-x-5 gap-y-2 text-[12px] md:grid-cols-4">
           <HeaderValue label="ADMISSION ID" value={`#${detail.admissionId}`} />

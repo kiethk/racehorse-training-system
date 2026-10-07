@@ -1,6 +1,6 @@
 import { apiGet, apiPost } from '@/services/api';
-import type { AdmissionSummaryResponse } from '../types';
 import type {
+  TrainerAdmissionQueue,
   TrainerAdmissionView,
   TrainerReviewRequest,
   TrainerScheduleDetailResponse,
@@ -63,10 +63,12 @@ export const trainerAdmissionsApi = {
   },
 
   /**
-   * TẤT CẢ hồ sơ tiếp nhận — màn hình tự chia thành "chờ đánh giá" và "đã đánh giá".
+   * Hàng chờ của CHÍNH Trainer đang đăng nhập — hai nhóm trong một lời gọi.
    */
-  getAll: async (): Promise<AdmissionSummaryResponse[]> => {
-    const res = await apiGet<ApiResponse<AdmissionSummaryResponse[]>>('/api/admissions');
+  getQueue: async (): Promise<TrainerAdmissionQueue> => {
+    const res = await apiGet<ApiResponse<TrainerAdmissionQueue>>(
+      '/api/admissions/trainer/queue',
+    );
     return res.data;
   },
 

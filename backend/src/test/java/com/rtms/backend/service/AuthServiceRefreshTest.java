@@ -112,8 +112,9 @@ class AuthServiceRefreshTest {
         when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(refreshToken));
         when(jwtUtil.generateToken(1L, "test@test.com", "CLUB_MANAGER")).thenReturn("new_access_token");
 
-        String newAccessToken = authService.refresh("some_raw_token");
-        assertEquals("new_access_token", newAccessToken);
+        AuthService.RefreshResult result = authService.refresh("some_raw_token");
+        assertEquals("new_access_token", result.accessToken());
+        assertNotNull(result.refreshToken());
     }
 
     @Test

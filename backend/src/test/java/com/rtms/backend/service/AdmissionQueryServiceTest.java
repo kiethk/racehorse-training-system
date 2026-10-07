@@ -1,6 +1,9 @@
 package com.rtms.backend.service;
 
 import com.rtms.backend.dto.GroomAdmissionQueueResponse;
+import com.rtms.backend.dto.TrainerAdmissionQueueResponse;
+import com.rtms.backend.entity.AdmissionApplication;
+import com.rtms.backend.entity.CandidateHorseProfile;
 import com.rtms.backend.enums.AdmissionStatus;
 import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.AdmissionDocumentRepository;
@@ -18,6 +21,7 @@ import org.springframework.data.domain.Sort;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -26,14 +30,18 @@ import static org.mockito.Mockito.*;
 
 class AdmissionQueryServiceTest {
     private AdmissionApplicationRepository admissions;
+    private CandidateHorseProfileRepository candidates;
+    private AdmissionDocumentRepository documents;
     private AdmissionQueryService service;
 
     @BeforeEach
     void setUp() {
         admissions = mock(AdmissionApplicationRepository.class);
+        candidates = mock(CandidateHorseProfileRepository.class);
+        documents = mock(AdmissionDocumentRepository.class);
         service = new AdmissionQueryService(admissions,
-                mock(CandidateHorseProfileRepository.class),
-                mock(AdmissionDocumentRepository.class),
+                candidates,
+                documents,
                 mock(StableStallRepository.class),
                 mock(HealthRecordRepository.class),
                 mock(AdmissionFileStorage.class),
@@ -63,5 +71,51 @@ class AdmissionQueryServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.getGroomQueue("", null,
                 LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 8), 0, 10));
         verifyNoInteractions(admissions);
+    }
+
+    /**
+     * Hàng chờ Trainer phải tách hai nhóm và chỉ hỏi dữ liệu của CHÍNH Trainer
+     * đó — không được rơi về findAll()/findByStatus() như endpoint dùng chung
+     * GET /api/admissions, vì khi đó mọi Trainer lại thấy hồ sơ của nhau.
+     */
+    @Test
+    void trainerQueueSplitsPendingAndReviewedForThatTrainerOnly() {
+        AdmissionApplication pending = admission(1L, AdmissionStatus.TRAINER_REVIEW, null);
+        AdmissionApplication reviewed = admission(2L, AdmissionStatus.MANAGER_REVIEW,
+                LocalDateTime.of(2026, 3, 1, 9, 0));
+
+        when(admissions.findTrainerPendingQueue(7L, AdmissionStatus.TRAINER_REVIEW))
+                .thenReturn(List.of(pending));
+        when(admissions.findByTrainerIdAndTrainerReviewedAtIsNotNullOrderByTrainerReviewedAtDesc(7L))
+                .thenReturn(List.of(reviewed));
+        when(documents.findByAdmissionId(anyLong())).thenReturn(List.of());
+
+        TrainerAdmissionQueueResponse response = service.getTrainerQueue(7L);
+
+        assertEquals(1, response.pending().size());
+        assertEquals(1L, response.pending().get(0).getAdmissionId());
+        assertEquals(1, response.reviewed().size());
+        assertEquals(2L, response.reviewed().get(0).getAdmissionId());
+
+        verify(admissions, never()).findAll();
+        verify(admissions, never()).findByStatus(any());
+    }
+
+    /** Đơn nào cũng phải có CandidateHorseProfile, nếu không toSummaryResponse ném lỗi. */
+    private AdmissionApplication admission(Long id, AdmissionStatus status,
+                                           LocalDateTime trainerReviewedAt) {
+        AdmissionApplication a = new AdmissionApplication();
+        a.setId(id);
+        a.setStatus(status);
+        a.setTrainerId(7L);
+        a.setSubmittedAt(LocalDateTime.of(2026, 2, 1, 8, 0));
+        a.setTrainerReviewedAt(trainerReviewedAt);
+
+        CandidateHorseProfile profile = new CandidateHorseProfile();
+        profile.setName("Ngựa #" + id);
+        profile.setBreed("Thoroughbred");
+        when(candidates.findByAdmissionId(id)).thenReturn(Optional.of(profile));
+
+        return a;
     }
 }

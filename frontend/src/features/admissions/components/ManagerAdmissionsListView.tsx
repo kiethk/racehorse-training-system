@@ -1,16 +1,14 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { Panel } from '@/components/ui/Panel';
-import { Icon } from '@/components/ui/Icon';
-import { EmptyState, ListSkeleton } from '@/components/ui/states';
-import { HorseAvatar } from '@/components/ui/HorseAvatar';
-import { admissionsApi } from '../services/api';
-import type { AdmissionSummaryResponse, AdmissionStatus } from '../types';
-import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
+import {useEffect, useMemo, useState} from 'react';
+import {usePathname, useRouter, useSearchParams} from 'next/navigation';
+import {Button} from '@/components/ui/Button';
+import {Panel} from '@/components/ui/Panel';
+import {Icon} from '@/components/ui/Icon';
+import {EmptyState, ListSkeleton} from '@/components/ui/states';
+import {admissionsApi} from '../services/api';
+import type {AdmissionStatus, AdmissionSummaryResponse} from '../types';
+import {AdmissionTable} from '../shared/components/AdmissionTable';
 
 const VALID_STATUSES: ReadonlyArray<AdmissionStatus | 'ALL'> = [
   'ALL',
@@ -201,46 +199,20 @@ export function ManagerAdmissionsListView() {
 
       <Panel className="overflow-hidden">
         {filteredAdmissions.length === 0 ? (
-          <EmptyState title="No matching applications" description="Change the filters or clear them to see other records." action={<Button size="sm" onClick={clear}>Clear filters</Button>} />
+            <EmptyState
+                title="No matching applications"
+                description="Change the filters or clear them to see other records."
+                action={
+                  <Button size="sm" onClick={clear}>
+                    Clear filters
+                  </Button>
+                }
+            />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="border-b border-[var(--color-border)] text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
-                <tr>
-                  <th className="px-6 py-4">Horse</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Submitted</th>
-                  <th className="px-6 py-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)]">
-                {filteredAdmissions.map((admission) => (
-                  <tr key={admission.admissionId} className="hover:bg-[var(--color-surface-muted)] transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <HorseAvatar name={admission.candidateName} image={admission.imageUrl} size={32} rounded="md" />
-                        <div>
-                          <span className="font-semibold block">{admission.candidateName}</span>
-                          <span className="text-[11px] text-[var(--color-text-muted)]">{admission.breed}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <AdmissionStatusBadge status={admission.status} />
-                    </td>
-                    <td className="px-6 py-4 text-[var(--color-text-secondary)]">
-                      {new Date(admission.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Link href={`/manager/admissions/${admission.admissionId}${detailQuery}`} className="inline-flex items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] px-4 py-1.5 text-xs font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)] transition-colors">
-                        View
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            <AdmissionTable
+                admissions={filteredAdmissions}
+                detailHref={id => `/manager/admissions/${id}${detailQuery}`}
+            />
         )}
       </Panel>
     </div>

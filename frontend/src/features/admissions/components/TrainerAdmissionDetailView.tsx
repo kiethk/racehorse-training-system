@@ -10,7 +10,6 @@ import type { TrainerAdmissionView } from '../types/trainer';
 
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
-import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionInfoSection, InfoRow } from '../shared/components/AdmissionInfoSection';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { TrainerReviewActionPanel } from './TrainerReviewActionPanel';
@@ -250,9 +249,12 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
           <AdmissionDetailHeader
             detail={detail}
             horsePhotoUrl={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined}
+            simplifiedStatus
           />
         }
-        pipeline={<AdmissionPipeline detail={detail} />}
+        // Trainer không cần biết đơn đang chờ ai hay đã qua bước nào — huy
+        // hiệu ở header (In Progress / Approved / Rejected) là đủ.
+        pipeline={null}
         sections={[
           candidateSection,
           healthSection,

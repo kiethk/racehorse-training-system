@@ -9,8 +9,8 @@ import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
-import type { AdmissionSummaryResponse } from '../types';
-import type { TrainerScheduleResponse, TrainerScheduleStatus } from '../types/trainer';
+import type { TrainerAdmissionQueue } from '../types/trainer';
+import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
 
 type Tab = 'PENDING' | 'REVIEWED';
 
@@ -19,42 +19,6 @@ interface TrainerQueueFilters {
   candidateName: string;
   submittedFrom: string;
   submittedTo: string;
-}
-
-interface TrainerQueueRow {
-  admissionId: number;
-  scheduleId?: number;
-  candidateName: string;
-  breed?: string | null;
-  imageUrl?: string | null;
-  quarantineStallCode?: string | null;
-  scheduleStatus: TrainerScheduleStatus;
-  scheduledAt: string;
-  durationMinutes: number;
-  submittedAt: string;
-  completedAt?: string | null;
-}
-
-function TrainerScheduleStatusBadge({ status }: { status: TrainerScheduleStatus }) {
-  if (status === 'SCHEDULED') {
-    return (
-      <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium bg-[var(--color-info-soft)] text-[var(--color-info)] border border-[var(--color-info-soft)]">
-        Scheduled
-      </span>
-    );
-  }
-  if (status === 'IN_PROGRESS') {
-    return (
-      <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium bg-[var(--color-warning-soft)] text-[var(--color-warning)] border border-[var(--color-warning-soft)]">
-        In Progress
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium bg-[var(--color-success-soft)] text-[var(--color-success)] border border-[var(--color-success-soft)]">
-      Completed
-    </span>
-  );
 }
 
 export function TrainerAdmissionsListView() {
@@ -73,8 +37,7 @@ export function TrainerAdmissionsListView() {
     };
   }, [searchParams]);
 
-  const [admissions, setAdmissions] = useState<AdmissionSummaryResponse[]>([]);
-  const [schedules, setSchedules] = useState<TrainerScheduleResponse[]>([]);
+  const [queue, setQueue] = useState<TrainerAdmissionQueue>({ pending: [], reviewed: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<TrainerQueueFilters>(urlFilters);
@@ -85,17 +48,16 @@ export function TrainerAdmissionsListView() {
       try {
         setLoading(true);
         setError(null);
-        const [admissionsData, schedulesData] = await Promise.all([
-          trainerAdmissionsApi.getAll(),
-          trainerAdmissionsApi.getSchedules(),
-        ]);
-        if (active) {
-          setAdmissions(admissionsData);
-          setSchedules(schedulesData);
-        }
+        const data = await trainerAdmissionsApi.getQueue();
+        if (active) setQueue(data);
       } catch (err) {
-        console.error('Failed to load trainer queue:', err);
-        if (active) setError('Failed to load admission applications. Please try again.');
+        console.error('Failed to load admissions:', err);
+        if (active)
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Failed to load admission applications. Please try again.',
+          );
       } finally {
         if (active) setLoading(false);
       }
@@ -111,58 +73,27 @@ export function TrainerAdmissionsListView() {
     setDraft(urlFilters);
   }, [urlFilters]);
 
-  // Combine admissions & schedules
-  const allRows: TrainerQueueRow[] = useMemo(() => {
-    return schedules.map((sched) => {
-      const admissionMatch = admissions.find((a) => a.admissionId === sched.admissionId);
-      return {
-        admissionId: sched.admissionId,
-        scheduleId: sched.id,
-        candidateName: sched.candidateName || admissionMatch?.candidateName || `Horse #${sched.horseId}`,
-        breed: sched.breed || admissionMatch?.breed || null,
-        imageUrl: admissionMatch?.imageUrl || null,
-        quarantineStallCode: sched.quarantineStallCode || admissionMatch?.quarantineStallCode || null,
-        scheduleStatus: sched.status,
-        scheduledAt: sched.scheduledAt,
-        durationMinutes: sched.durationMinutes,
-        submittedAt: admissionMatch?.submittedAt || sched.createdAt,
-        completedAt: sched.completedAt,
-      };
-    });
-  }, [admissions, schedules]);
+  // Backend đã lọc theo Trainer đang đăng nhập và tách sẵn hai nhóm, nên
+  // số đếm chỉ là độ dài mảng — không lọc lại theo status/trainerId ở client.
+  const pendingCount = queue.pending.length;
+  const reviewedCount = queue.reviewed.length;
 
-  // Counts by review tab
-  const pendingCount = useMemo(
-    () => allRows.filter((r) => r.scheduleStatus === 'SCHEDULED' || r.scheduleStatus === 'IN_PROGRESS').length,
-    [allRows],
-  );
+  // Chỉ còn lọc theo tên và ngày nộp — hai thứ người dùng gõ tại màn hình này.
+  const filteredAdmissions = useMemo(() => {
+    const source = urlFilters.tab === 'REVIEWED' ? queue.reviewed : queue.pending;
 
-  const reviewedCount = useMemo(
-    () => allRows.filter((r) => r.scheduleStatus === 'COMPLETED').length,
-    [allRows],
-  );
-
-  // Filter rows list
-  const filteredRows = useMemo(() => {
-    return allRows.filter((r) => {
-      // Filter by tab
-      if (urlFilters.tab === 'PENDING') {
-        if (r.scheduleStatus === 'COMPLETED') return false;
-      } else if (urlFilters.tab === 'REVIEWED') {
-        if (r.scheduleStatus !== 'COMPLETED') return false;
-      }
-
+    return source.filter((a) => {
       // Filter by horse name
       if (
         urlFilters.candidateName &&
-        !r.candidateName.toLowerCase().includes(urlFilters.candidateName.toLowerCase())
+        !a.candidateName.toLowerCase().includes(urlFilters.candidateName.toLowerCase())
       ) {
         return false;
       }
 
       // Filter by submission date
       if (urlFilters.submittedFrom || urlFilters.submittedTo) {
-        const submittedTime = new Date(r.submittedAt).getTime();
+        const submittedTime = new Date(a.submittedAt).getTime();
         if (urlFilters.submittedFrom) {
           const fromTime = new Date(urlFilters.submittedFrom).getTime();
           if (submittedTime < fromTime) return false;
@@ -175,7 +106,7 @@ export function TrainerAdmissionsListView() {
 
       return true;
     });
-  }, [allRows, urlFilters]);
+  }, [queue, urlFilters]);
 
   const updateUrl = (filters: TrainerQueueFilters) => {
     const params = new URLSearchParams();
@@ -226,14 +157,14 @@ export function TrainerAdmissionsListView() {
       {/* Header */}
       <div>
         <h1 className="text-[20px] font-bold tracking-tight text-[var(--color-text-primary)]">
-          Trainer Readiness Assessments
+          Horse Admissions
         </h1>
         <p className="text-[13px] text-[var(--color-text-secondary)]">
           Assess racing potential and readiness of candidate horses in the quarantine facility.
         </p>
       </div>
 
-      {/* Filter Toolbar */}
+      {/* Filter Toolbar (Merged review type filter) */}
       <form
         onSubmit={applyFilters}
         className="grid grid-cols-1 gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:items-end"
@@ -310,9 +241,9 @@ export function TrainerAdmissionsListView() {
 
       {/* Admissions Table */}
       <Panel className="overflow-hidden">
-        {filteredRows.length === 0 ? (
+        {filteredAdmissions.length === 0 ? (
           <EmptyState
-            title="No evaluation tasks found"
+            title="No admission records found"
             description="Try adjusting your search filters or switch the application type."
             action={<Button size="sm" onClick={clearFilters}>Reset Filters</Button>}
           />
@@ -322,17 +253,17 @@ export function TrainerAdmissionsListView() {
               <thead className="border-b border-[var(--color-border)] text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
                 <tr>
                   <th className="px-6 py-3.5">Candidate Horse</th>
-                  <th className="px-6 py-3.5">Schedule Status</th>
+                  <th className="px-6 py-3.5">Status</th>
                   <th className="px-6 py-3.5">Quarantine Stall</th>
-                  <th className="px-6 py-3.5">Scheduled Time</th>
+                  <th className="px-6 py-3.5">Submitted Date</th>
                   {draft.tab === 'REVIEWED' && (
-                    <th className="px-6 py-3.5">Completed Date</th>
+                    <th className="px-6 py-3.5">Evaluated Date</th>
                   )}
                   <th className="px-6 py-3.5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)]">
-                {filteredRows.map((item) => (
+                {filteredAdmissions.map((item) => (
                   <tr
                     key={item.admissionId}
                     className="transition-colors hover:bg-[var(--color-surface-muted)]"
@@ -354,7 +285,7 @@ export function TrainerAdmissionsListView() {
                       </div>
                     </td>
                     <td className="px-6 py-3.5">
-                      <TrainerScheduleStatusBadge status={item.scheduleStatus} />
+                      <AdmissionStatusBadge status={item.status} simplified />
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
                       {item.quarantineStallCode ? (
@@ -366,28 +297,16 @@ export function TrainerAdmissionsListView() {
                       )}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
-                      {item.scheduledAt ? (
-                        <div>
-                          <span>
-                            {new Date(item.scheduledAt).toLocaleString('en-US', {
-                              dateStyle: 'short',
-                              timeStyle: 'short',
-                            })}
-                          </span>
-                          {item.durationMinutes && (
-                            <span className="block text-[11px] text-[var(--color-text-muted)]">
-                              ({item.durationMinutes} mins)
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-[var(--color-text-muted)] italic">Pending</span>
-                      )}
+                      {new Date(item.submittedAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
                     </td>
                     {draft.tab === 'REVIEWED' && (
                       <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
-                        {item.completedAt
-                          ? new Date(item.completedAt).toLocaleDateString('en-US', {
+                        {item.trainerReviewedAt
+                          ? new Date(item.trainerReviewedAt).toLocaleDateString('en-US', {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric',
@@ -399,18 +318,12 @@ export function TrainerAdmissionsListView() {
                       <Link
                         href={`/trainer/admissions/${item.admissionId}${detailQuery}`}
                         className={`inline-flex items-center justify-center rounded-[var(--radius-sm)] px-4 py-1.5 text-xs font-semibold transition-colors ${
-                          item.scheduleStatus === 'SCHEDULED'
+                          item.status === 'TRAINER_REVIEW'
                             ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:opacity-90'
-                            : item.scheduleStatus === 'IN_PROGRESS'
-                            ? 'bg-[var(--color-warning)] text-[var(--color-text-inverse)] hover:opacity-90'
                             : 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]'
                         }`}
                       >
-                        {item.scheduleStatus === 'SCHEDULED'
-                          ? 'Start Evaluation'
-                          : item.scheduleStatus === 'IN_PROGRESS'
-                          ? 'Continue Evaluation'
-                          : 'View Summary'}
+                        {item.status === 'TRAINER_REVIEW' ? 'Evaluate' : 'View'}
                       </Link>
                     </td>
                   </tr>

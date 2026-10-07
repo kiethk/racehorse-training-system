@@ -22,8 +22,8 @@ export function TodayChecklist() {
       const data = await groomApi.getTodayTasks();
       setTasks(data);
     } catch (err) {
-      console.error('Lỗi khi nạp công việc hôm nay:', err);
-      setError('Không tải được danh sách công việc. Vui lòng thử lại sau.');
+      console.error("Unable to load today's tasks:", err);
+      setError("Unable to load today's tasks. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -40,7 +40,7 @@ export function TodayChecklist() {
       await groomApi.generateRoutine();
       await loadTasks();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Sinh việc thường nhật thất bại.');
+      alert(err instanceof Error ? err.message : 'Failed to generate routine tasks.');
     } finally {
       setGenerating(false);
     }
@@ -52,13 +52,13 @@ export function TodayChecklist() {
       await groomApi.completeTask(refId);
       await loadTasks();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Hoàn thành công việc thất bại.');
+      alert(err instanceof Error ? err.message : 'Failed to complete the task.');
     } finally {
       setCompletingId(null);
     }
   }
 
-  // Sắp xếp theo dòng thời gian trong ngày (Plan 6)
+  // Sort tasks by their time of day.
   const sortedTasks = useMemo(() => {
     return [...tasks].sort((a, b) => a.startTime.localeCompare(b.startTime));
   }, [tasks]);
@@ -74,7 +74,7 @@ export function TodayChecklist() {
   if (error) {
     return (
       <Panel padded>
-        <EmptyState icon="alert-triangle" title="Lỗi nạp dữ liệu" description={error} />
+        <EmptyState icon="alert-triangle" title="Unable to load data" description={error} />
       </Panel>
     );
   }
@@ -84,10 +84,10 @@ export function TodayChecklist() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-            Bảng công việc hôm nay (Today Checklist)
+            Today&apos;s Task Checklist
           </h1>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Tổng hợp lịch chăm sóc thường nhật (SOP), buổi tập và theo dõi thú y cho các chuồng bạn phụ trách.
+            Daily care SOPs, workouts, and veterinary follow-ups for your assigned stalls.
           </p>
         </div>
 
@@ -98,19 +98,19 @@ export function TodayChecklist() {
             onClick={handleGenerateRoutine}
             disabled={generating}
           >
-            {generating ? 'Đang sinh việc...' : '⚡ Sinh việc thường nhật (SOP)'}
+            {generating ? 'Generating routine tasks...' : 'Generate routine tasks'}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => loadTasks()}>
-            Làm mới
+            Refresh
           </Button>
         </div>
       </div>
 
-      {/* Thống kê tiến độ trong ngày */}
+      {/* Daily progress summary */}
       <Panel padded>
         <div className="flex items-center justify-between text-[13px]">
           <span className="font-semibold text-[var(--color-text-primary)]">
-            Tiến độ công việc hôm nay: {stats.completed}/{stats.total} mục hoàn tất
+            Today&apos;s progress: {stats.completed}/{stats.total} items completed
           </span>
           <span className="text-[12px] text-[var(--color-text-muted)]">
             {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
@@ -126,13 +126,13 @@ export function TodayChecklist() {
         </div>
       </Panel>
 
-      {/* Danh sách công việc theo dòng thời gian */}
+      {/* Tasks ordered by time */}
       {sortedTasks.length === 0 ? (
         <Panel padded>
           <EmptyState
             icon="clipboard"
-            title="Chưa có công việc nào hôm nay"
-            description="Hãy bấm 'Sinh việc thường nhật (SOP)' ở góc trên để tạo lịch cho ăn, dọn chuồng và tắm chải."
+            title="No tasks scheduled for today"
+            description="Select 'Generate routine tasks' above to create feeding, stall cleaning, and grooming schedules."
           />
         </Panel>
       ) : (
@@ -149,13 +149,13 @@ export function TodayChecklist() {
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  {/* Thời gian */}
+                  {/* Time */}
                   <div className="font-mono text-[12px] font-bold text-[var(--color-text-primary)] w-16 pt-0.5">
                     {task.startTime.substring(0, 5)}
                     {task.endTime && `–${task.endTime.substring(0, 5)}`}
                   </div>
 
-                  {/* Chi tiết việc */}
+                  {/* Task details */}
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-[var(--color-text-primary)]">
@@ -176,13 +176,13 @@ export function TodayChecklist() {
                     </div>
 
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-[var(--color-text-secondary)]">
-                      <span>🏇 Chiến mã: <strong>{task.horseName}</strong></span>
+                      <span>Horse: <strong>{task.horseName}</strong></span>
                       {task.note && <span>• {task.note}</span>}
                     </div>
                   </div>
                 </div>
 
-                {/* Hành động dựa trên actionable (Plan 6) */}
+                {/* Actions depend on whether the task is actionable. */}
                 <div className="flex items-center gap-2">
                   {task.actionable && !isCompleted ? (
                     <Button
@@ -191,19 +191,19 @@ export function TodayChecklist() {
                       onClick={() => handleComplete(task.refId)}
                       disabled={completingId === task.refId}
                     >
-                      {completingId === task.refId ? 'Đang lưu...' : '✓ Hoàn thành'}
+                      {completingId === task.refId ? 'Saving...' : 'Complete'}
                     </Button>
                   ) : isCompleted ? (
                     <Pill tone="success" size="sm">
-                      ✓ Đã hoàn thành
+                      Completed
                     </Pill>
                   ) : task.source === 'WORKOUT' ? (
                     <span className="text-[11px] text-[var(--color-text-muted)] italic">
-                      (Trainer đóng)
+                      (Managed by Trainer)
                     </span>
                   ) : (
                     <span className="text-[11px] text-[var(--color-text-muted)] italic">
-                      (Thú y phụ trách)
+                      (Managed by Veterinary)
                     </span>
                   )}
                 </div>

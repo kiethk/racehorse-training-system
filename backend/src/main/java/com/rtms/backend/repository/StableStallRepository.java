@@ -117,4 +117,42 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             ORDER BY a.code ASC, ss.stall_number ASC
             """, nativeQuery = true)
     List<StableStall> findAllAvailableRegularStallsOrdered();
+
+    /**
+     * Find all stalls in a given area with stall_number within [fromNumber, toNumber], ordered ascending.
+     * Used for groom block assignment to inspect a specific 3-stall block.
+     */
+    List<StableStall> findByAreaIdAndStallNumberBetweenOrderByStallNumberAsc(
+            Long areaId, Integer stallNumberFrom, Integer stallNumberTo);
+
+    /**
+     * Reload and row-lock the exact stalls of a candidate 3-stall block inside the current transaction.
+     * Must be called AFTER the candidate block has been chosen via the non-locking scan, and BEFORE
+     * any groom_id is written, to prevent concurrent double-assignment.
+     * <p>
+     * Uses {@code FOR UPDATE} so concurrent transactions that attempt to lock the same rows will block
+     * (rather than silently reading stale data), ensuring exactly one Groom wins each block.
+     */
+    @Query(value = """
+            SELECT ss.*
+            FROM stable_stalls ss
+            WHERE ss.area_id = :areaId
+              AND ss.stall_number BETWEEN :fromNumber AND :toNumber
+            ORDER BY ss.stall_number ASC
+            FOR UPDATE
+            """, nativeQuery = true)
+    List<StableStall> findBlockForUpdate(
+            @Param("areaId") Long areaId,
+            @Param("fromNumber") Integer fromNumber,
+            @Param("toNumber") Integer toNumber);
+
+    /** Find all stalls belonging to any of the given area IDs, ordered area code + stall_number ascending. */
+    @Query(value = """
+            SELECT ss.*
+            FROM stable_stalls ss
+            JOIN areas a ON a.id = ss.area_id
+            WHERE ss.area_id IN :areaIds
+            ORDER BY a.code ASC, ss.stall_number ASC
+            """, nativeQuery = true)
+    List<StableStall> findByAreaIdInOrdered(@Param("areaIds") List<Long> areaIds);
 }

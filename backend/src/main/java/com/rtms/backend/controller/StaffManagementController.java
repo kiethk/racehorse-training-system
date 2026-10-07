@@ -2,6 +2,7 @@ package com.rtms.backend.controller;
 
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.StaffCreationRequest;
+import com.rtms.backend.dto.StaffCreationResponse;
 import com.rtms.backend.dto.StaffDetailResponse;
 import com.rtms.backend.dto.StaffStatusUpdateRequest;
 import com.rtms.backend.dto.StaffSummaryResponse;
@@ -46,7 +47,7 @@ public class StaffManagementController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('USER_MANAGE')")
-    public ApiResponse<StaffSummaryResponse> createStaff(@RequestBody StaffCreationRequest request) {
+    public ApiResponse<StaffCreationResponse> createStaff(@RequestBody StaffCreationRequest request) {
         return ApiResponse.success(staffManagementService.createStaff(request));
     }
 

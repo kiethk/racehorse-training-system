@@ -49,6 +49,12 @@ public class AdmissionTrainerReviewService {
                     admission.getStatus()));
         }
 
+        if (admission.getTrainerId() != null
+                && !admission.getTrainerId().equals(trainerId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Hồ sơ này đã được phân công cho Huấn luyện viên khác đánh giá!");
+        }
+
         if (admission.getHorseId() == null) {
             throw new IllegalStateException(
                     "Đơn chưa gắn hồ sơ chiến mã. Bước Groom phải tạo Horse (CANDIDATE) "
@@ -69,6 +75,11 @@ public class AdmissionTrainerReviewService {
         }
 
         trainerScheduleService.completeSchedule(schedule.getId(), request, trainerId);
+
+        if (admission.getTrainerId() == null) {
+            admission.setTrainerId(trainerId);
+            admissionRepository.save(admission);
+        }
 
         return admissionRepository.findById(admissionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,

@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { IncidentList } from '@/features/groom/components/IncidentList';
 
 export const metadata: Metadata = {
-  title: 'Báo cáo sự cố | Groom',
+  title: 'Incident Reports | Groom',
 };
 
 export default function GroomIncidentsPage() {

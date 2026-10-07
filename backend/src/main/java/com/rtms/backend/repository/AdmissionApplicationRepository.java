@@ -65,4 +65,16 @@ public interface AdmissionApplicationRepository
             ORDER BY a.submittedAt ASC, a.id ASC
             """)
     List<AdmissionApplication> findPendingTrainerScheduleAdmissions();
+
+    @Query("""
+            SELECT a FROM AdmissionApplication a
+            WHERE a.status = :status
+              AND (a.trainerId = :trainerId OR a.trainerId IS NULL)
+            ORDER BY a.submittedAt ASC, a.id ASC
+            """)
+    List<AdmissionApplication> findTrainerPendingQueue(@Param("trainerId") Long trainerId,
+                                                       @Param("status") AdmissionStatus status);
+
+    List<AdmissionApplication> findByTrainerIdAndTrainerReviewedAtIsNotNullOrderByTrainerReviewedAtDesc(
+            Long trainerId);
 }

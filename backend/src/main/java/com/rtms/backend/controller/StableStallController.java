@@ -79,8 +79,16 @@ public class StableStallController {
                 stableStallRepository.findAll());
     }
 
+    /**
+     * Phân công Groom cho chuồng — thuộc Quản lý câu lạc bộ (V63).
+     *
+     * Quyền riêng STALL_GROOM_ASSIGN, KHÔNG dùng STABLE_STALL_UPDATE: quyền
+     * đó cũng gác PUT /api/horses/{id}/assign-stall, mà Huấn luyện viên vẫn
+     * phải giữ để đổi chuồng cho ngựa. Dùng chung một quyền thì không tách
+     * được hai việc.
+     */
     @PutMapping("/{id}/assign-groom")
-    @PreAuthorize("hasAuthority('STABLE_STALL_UPDATE')")
+    @PreAuthorize("hasAuthority('STALL_GROOM_ASSIGN')")
     public ApiResponse<StableStall> assignGroom(
             @PathVariable Long id,
             @RequestParam(required = false) Long groomId) {
