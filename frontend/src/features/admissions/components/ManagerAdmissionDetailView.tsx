@@ -33,6 +33,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('overview');
+  const [reopening, setReopening] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,6 +46,19 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
       setLoading(false);
     }
   }, [admissionId]);
+
+  const reopenExpiredArrival = async () => {
+    setReopening(true);
+    setError(null);
+    try {
+      await admissionsApi.reopenExpiredArrival(admissionId);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to reopen the arrival window.');
+    } finally {
+      setReopening(false);
+    }
+  };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -253,6 +267,14 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
                   )}
                 </div>
               </div>
+
+              {detail.status === 'ARRIVAL_EXPIRED' && (
+                <div className="bg-[var(--color-surface)] border border-[var(--color-warning)] rounded-[var(--radius-md)] p-5 space-y-3">
+                  <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Arrival window expired</h3>
+                  <p className="text-xs text-[var(--color-text-secondary)]">The quarantine reservation was released. Reopening attempts to reserve an available quarantine stall and starts a new 14-day window.</p>
+                  <Button type="button" size="sm" loading={reopening} onClick={() => void reopenExpiredArrival()}>Reopen arrival window</Button>
+                </div>
+              )}
 
               {/* Manager Final Review / Decision Panel */}
               {detail.status === 'MANAGER_REVIEW' && (

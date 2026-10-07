@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 @Repository
 public interface AdmissionApplicationRepository
@@ -30,6 +31,9 @@ public interface AdmissionApplicationRepository
     List<AdmissionApplication> findByGroomId(Long groomId);
 
     Optional<AdmissionApplication> findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus status);
+
+    List<AdmissionApplication> findByStatusAndArrivalDeadlineAtLessThanEqualOrderByArrivalDeadlineAtAscIdAsc(
+            AdmissionStatus status, LocalDateTime cutoff);
 
     @Query("""
             SELECT a FROM AdmissionApplication a

@@ -74,7 +74,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
       onUpdated?.();
       setNotice(updated.status === 'WAITING_FOR_STALL'
         ? 'Groom approved this application. Capacity is not available yet, so it is waiting for a stall.'
-        : decision === 'REJECTED' ? 'Application rejected.' : 'Application approved and moved to Vet review.');
+        : decision === 'REJECTED' ? 'Application rejected.' : 'Application approved. A quarantine stall is reserved for 14 days while waiting for arrival.');
     } catch (cause) {
       setNotice(null);
       setError(cause instanceof Error ? cause.message : 'Unable to submit the Groom decision.');
@@ -93,9 +93,27 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
       onUpdated?.();
       setNotice(updated.status === 'WAITING_FOR_STALL'
         ? 'Capacity is still unavailable. The application remains in the waiting queue.'
-        : 'A quarantine stall was allocated and the application moved to Vet review.');
+        : 'A quarantine stall is reserved for 14 days while waiting for arrival.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to retry stall allocation.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const confirmArrival = async () => {
+    setSubmitting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const updated = await admissionsApi.confirmArrival(admissionId);
+      setDetail(updated);
+      onUpdated?.();
+      setNotice(updated.status === 'ARRIVAL_EXPIRED'
+        ? 'The arrival deadline has passed. The reservation was released; ask an authorized manager to reopen the admission.'
+        : 'Arrival confirmed and the horse was registered. Veterinary assignment is being scheduled with workload and overdue appointments taken into account.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to confirm horse arrival.');
     } finally {
       setSubmitting(false);
     }
@@ -150,7 +168,9 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
           <SectionTitle>Review pipeline</SectionTitle>
           <div className="mt-4 flex flex-wrap gap-2 text-[12px]">
             <PipelineStep label="Groom review" isDone={!!detail.groomReviewedAt} isActive={detail.status === 'GROOM_REVIEW'} />
-            <PipelineStep label="Stall assignment" isDone={!!detail.quarantineStallCode} isActive={detail.status === 'WAITING_FOR_STALL'} />
+            <PipelineStep label="Stall assignment" isDone={!!detail.quarantineStallCode || detail.status === 'ARRIVAL_EXPIRED'} isActive={detail.status === 'WAITING_FOR_STALL'} />
+            <PipelineStep label="Waiting for arrival" isDone={Boolean(detail.arrivedAt)} isActive={detail.status === 'WAITING_FOR_ARRIVAL'} />
+            <PipelineStep label="Arrival expired" isDone={false} isActive={detail.status === 'ARRIVAL_EXPIRED'} />
             <PipelineStep label="Veterinarian review" isDone={!!detail.vetReviewedAt} isActive={detail.status === 'VET_REVIEW'} />
             <PipelineStep label="Head Trainer review" isDone={!!detail.trainerReviewedAt} isActive={detail.status === 'TRAINER_REVIEW'} />
             <PipelineStep label="Manager final review" isDone={!!detail.managerReviewedAt} isActive={detail.status === 'MANAGER_REVIEW'} />
@@ -183,6 +203,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
               </div>
               {!isReady && capacity && <p className="text-[11px] text-[var(--color-text-secondary)]">Regular reserve required: {capacity.occupiedQuarantineStalls + 1} available regular stall(s).</p>}
               {detail.quarantineStallCode && <InfoRow label="Assigned Q stall" value={detail.quarantineStallCode} />}
+              {detail.arrivalDeadlineAt && <InfoRow label="Arrival deadline" value={new Date(detail.arrivalDeadlineAt).toLocaleString()} />}
             </div>
           </Panel>
         </div>
@@ -214,7 +235,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
             <dl className="mt-4 space-y-3 text-[12px]">
               <InfoRow label="Horse name" value={candidate.name} />
               <InfoRow label="Owner" value={detail.ownerName ? `${detail.ownerName} (ID ${detail.ownerId})` : `ID ${detail.ownerId}`} />
-              <InfoRow label="Horse ID" value={detail.horseId ? String(detail.horseId) : 'Created after approval'} />
+              <InfoRow label="Horse ID" value={detail.horseId ? String(detail.horseId) : 'Created after arrival confirmation'} />
               <InfoRow label="Groom feedback" value={detail.groomFeedback} />
             </dl>
           </Panel>
@@ -250,7 +271,27 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
           </Panel>
         )}
 
-        {!canReview && !waiting && <Panel padded className="bg-[var(--color-surface)]"><p className="text-sm text-[var(--color-text-secondary)]">This application is read-only at its current stage.</p></Panel>}
+        {detail.status === 'WAITING_FOR_ARRIVAL' && (
+          <Panel padded className="border-2 border-[var(--color-primary)] bg-[var(--color-surface)]">
+            <SectionTitle>Confirm horse arrival</SectionTitle>
+            <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
+              Quarantine stall {detail.quarantineStallCode || 'reserved'} is held until {detail.arrivalDeadlineAt ? new Date(detail.arrivalDeadlineAt).toLocaleString() : 'the 14-day arrival deadline'}.
+              Confirm only after the horse physically arrives. Confirmation creates the horse record and schedules veterinary review.
+            </p>
+            <div className="mt-4 flex justify-end">
+              <Button type="button" size="sm" loading={submitting} onClick={() => void confirmArrival()}>Mark horse arrived</Button>
+            </div>
+          </Panel>
+        )}
+
+        {detail.status === 'ARRIVAL_EXPIRED' && (
+          <Panel padded className="border border-[var(--color-warning)] bg-[var(--color-surface)]">
+            <SectionTitle>Arrival window expired</SectionTitle>
+            <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">The reserved quarantine stall was released after 14 days. An authorized manager can reopen the arrival window if needed.</p>
+          </Panel>
+        )}
+
+        {!canReview && !waiting && detail.status !== 'WAITING_FOR_ARRIVAL' && detail.status !== 'ARRIVAL_EXPIRED' && <Panel padded className="bg-[var(--color-surface)]"><p className="text-sm text-[var(--color-text-secondary)]">This application is read-only at its current stage.</p></Panel>}
       </div>
     </div>
   );
@@ -262,7 +303,7 @@ function prettyStatus(status: AdmissionStatus) {
 
 function statusTone(status: AdmissionStatus): 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral' {
   if (status === 'GROOM_REVIEW') return 'primary';
-  if (status === 'WAITING_FOR_STALL') return 'warning';
+  if (status === 'WAITING_FOR_STALL' || status === 'WAITING_FOR_ARRIVAL' || status === 'ARRIVAL_EXPIRED') return 'warning';
   if (status === 'APPROVED') return 'success';
   if (status === 'REJECTED') return 'danger';
   if (status === 'VET_REVIEW' || status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW') return 'info';

@@ -15,6 +15,8 @@ const statuses: { value: AdmissionStatus | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
   { value: 'GROOM_REVIEW', label: 'Groom review' },
   { value: 'WAITING_FOR_STALL', label: 'Waiting for stall' },
+  { value: 'WAITING_FOR_ARRIVAL', label: 'Waiting for arrival' },
+  { value: 'ARRIVAL_EXPIRED', label: 'Arrival expired' },
   { value: 'VET_REVIEW', label: 'Vet review' },
   { value: 'TRAINER_REVIEW', label: 'Trainer review' },
   { value: 'MANAGER_REVIEW', label: 'Manager review' },
@@ -43,7 +45,7 @@ function prettyStatus(status: AdmissionStatus) {
 
 function statusTone(status: AdmissionStatus): 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral' {
   if (status === 'GROOM_REVIEW') return 'primary';
-  if (status === 'WAITING_FOR_STALL') return 'warning';
+  if (status === 'WAITING_FOR_STALL' || status === 'WAITING_FOR_ARRIVAL' || status === 'ARRIVAL_EXPIRED') return 'warning';
   if (status === 'APPROVED') return 'success';
   if (status === 'REJECTED') return 'danger';
   if (status === 'VET_REVIEW' || status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW') return 'info';

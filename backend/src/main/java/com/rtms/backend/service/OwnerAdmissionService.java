@@ -222,7 +222,8 @@ public class OwnerAdmissionService {
             case "CLUB_MANAGER" -> true;
             case "HORSE_OWNER" -> java.util.Objects.equals(admission.getOwnerId(), viewer.getUserId());
             case "HEAD_TRAINER" -> java.util.Objects.equals(admission.getTrainerId(), viewer.getUserId());
-            case "GROOM" -> java.util.Objects.equals(admission.getGroomId(), viewer.getUserId());
+            case "GROOM" -> java.util.Objects.equals(admission.getGroomId(), viewer.getUserId())
+                    || admission.getStatus() == AdmissionStatus.GROOM_REVIEW;
             default -> false;
         };
         if (!allowed) throw new org.springframework.security.access.AccessDeniedException("Admission is not assigned to you");

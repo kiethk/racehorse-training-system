@@ -27,6 +27,8 @@ public class AdmissionDetailResponse {
     private ReviewDecision groomDecision;
     private String groomFeedback;
     private LocalDateTime groomReviewedAt;
+    private LocalDateTime arrivalDeadlineAt;
+    private LocalDateTime arrivedAt;
 
     private Long veterinarianId;
     private TrainingDecision vetTrainingDecision;
@@ -151,6 +153,14 @@ public class AdmissionDetailResponse {
     public void setGroomReviewedAt(LocalDateTime groomReviewedAt) {
         this.groomReviewedAt = groomReviewedAt;
     }
+
+    public LocalDateTime getArrivalDeadlineAt() { return arrivalDeadlineAt; }
+
+    public void setArrivalDeadlineAt(LocalDateTime arrivalDeadlineAt) { this.arrivalDeadlineAt = arrivalDeadlineAt; }
+
+    public LocalDateTime getArrivedAt() { return arrivedAt; }
+
+    public void setArrivedAt(LocalDateTime arrivedAt) { this.arrivedAt = arrivedAt; }
 
     public Long getVeterinarianId() {
         return veterinarianId;

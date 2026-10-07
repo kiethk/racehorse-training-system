@@ -38,6 +38,12 @@ public class AdmissionApplication {
     @Column(name = "groom_reviewed_at")
     private LocalDateTime groomReviewedAt;
 
+    @Column(name = "arrival_deadline_at")
+    private LocalDateTime arrivalDeadlineAt;
+
+    @Column(name = "arrived_at")
+    private LocalDateTime arrivedAt;
+
     @Column(name = "veterinarian_id")
     private Long veterinarianId;
 
@@ -173,6 +179,14 @@ public class AdmissionApplication {
     public void setGroomReviewedAt(LocalDateTime groomReviewedAt) {
         this.groomReviewedAt = groomReviewedAt;
     }
+
+    public LocalDateTime getArrivalDeadlineAt() { return arrivalDeadlineAt; }
+
+    public void setArrivalDeadlineAt(LocalDateTime arrivalDeadlineAt) { this.arrivalDeadlineAt = arrivalDeadlineAt; }
+
+    public LocalDateTime getArrivedAt() { return arrivedAt; }
+
+    public void setArrivedAt(LocalDateTime arrivedAt) { this.arrivedAt = arrivedAt; }
 
     public Long getVeterinarianId() {
         return veterinarianId;

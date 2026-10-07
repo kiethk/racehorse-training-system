@@ -51,7 +51,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
             WHERE a.type = 'QUARANTINE'
-              AND ss.status = 'OCCUPIED'
+              AND ss.status IN ('OCCUPIED', 'RESERVED')
             """, nativeQuery = true)
     long countOccupiedQuarantineStalls();
 

@@ -65,9 +65,26 @@ public class AdmissionGroomReviewController {
     @PostMapping("/{id}/quarantine-allocation")
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_GROOM_REVIEW')")
     public ApiResponse<AdmissionDetailResponse> processWaitingForStall(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
 
-        AdmissionApplication admission = admissionGroomReviewService.processWaitingForStall(id);
+        AdmissionApplication admission = admissionGroomReviewService.processWaitingForStall(id, currentUser.getUserId());
+        return ApiResponse.success(admissionQueryService.getAdmissionDetail(admission.getId()));
+    }
+
+    @PostMapping("/{id}/arrival-confirmation")
+    @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_GROOM_REVIEW')")
+    public ApiResponse<AdmissionDetailResponse> confirmArrival(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        AdmissionApplication admission = admissionGroomReviewService.confirmArrival(id, currentUser.getUserId());
+        return ApiResponse.success(admissionQueryService.getAdmissionDetail(admission.getId()));
+    }
+
+    @PostMapping("/{id}/arrival-reopen")
+    @PreAuthorize("hasAuthority('ADMISSION_ARRIVAL_REOPEN')")
+    public ApiResponse<AdmissionDetailResponse> reopenExpiredArrival(@PathVariable Long id) {
+        AdmissionApplication admission = admissionGroomReviewService.reopenExpiredArrival(id);
         return ApiResponse.success(admissionQueryService.getAdmissionDetail(admission.getId()));
     }
 }

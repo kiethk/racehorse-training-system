@@ -8,7 +8,7 @@ type Tone = 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral';
 
 export function statusTone(status: AdmissionStatus | string): Tone {
   if (status === 'GROOM_REVIEW') return 'primary';
-  if (status === 'WAITING_FOR_STALL') return 'warning';
+  if (status === 'WAITING_FOR_STALL' || status === 'WAITING_FOR_ARRIVAL' || status === 'ARRIVAL_EXPIRED') return 'warning';
   if (status === 'APPROVED') return 'success';
   if (status === 'REJECTED') return 'danger';
   if (status === 'VET_REVIEW' || status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW') return 'info';

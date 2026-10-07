@@ -1,6 +1,8 @@
 export type AdmissionStatus =
   | 'GROOM_REVIEW'
   | 'WAITING_FOR_STALL'
+  | 'WAITING_FOR_ARRIVAL'
+  | 'ARRIVAL_EXPIRED'
   | 'VET_REVIEW'
   | 'TRAINER_REVIEW'
   | 'MANAGER_REVIEW'
@@ -67,6 +69,8 @@ export interface AdmissionDetailResponse {
   status: AdmissionStatus;
   quarantineStallId: number | null;
   quarantineStallCode: string | null;
+  arrivalDeadlineAt: string | null;
+  arrivedAt: string | null;
   
   candidate: {
     id: number;

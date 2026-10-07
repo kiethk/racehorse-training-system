@@ -14,6 +14,7 @@ import java.util.List;
 
 @Service
 public class AdmissionGroomReviewService {
+    private static final int ARRIVAL_WINDOW_DAYS = 14;
 
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final CandidateHorseProfileRepository candidateHorseProfileRepository;
@@ -68,18 +69,101 @@ public class AdmissionGroomReviewService {
         }
 
         stampGroomReview(admission, groomId, ReviewDecision.APPROVED, feedback);
-        return moveForwardIfCapacityAvailable(admission);
+        return reserveQuarantineStallIfCapacityAvailable(admission);
     }
 
     @Transactional
     public AdmissionApplication processWaitingForStall(Long admissionId) {
+        return processWaitingForStall(admissionId, null);
+    }
+
+    @Transactional
+    public AdmissionApplication processWaitingForStall(Long admissionId, Long groomId) {
         AdmissionApplication admission = admissionApplicationRepository.findByIdForUpdate(admissionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
 
         if (admission.getStatus() != AdmissionStatus.WAITING_FOR_STALL) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Admission is not waiting for stall capacity");
         }
-        return moveForwardIfCapacityAvailable(admission);
+        if (groomId != null && !java.util.Objects.equals(admission.getGroomId(), groomId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the Groom handling this admission can retry allocation");
+        }
+        return reserveQuarantineStallIfCapacityAvailable(admission);
+    }
+
+    @Transactional
+    public AdmissionApplication confirmArrival(Long admissionId, Long groomId) {
+        AdmissionApplication admission = admissionApplicationRepository.findByIdForUpdate(admissionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
+        if (!java.util.Objects.equals(admission.getGroomId(), groomId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the Groom handling this admission can confirm arrival");
+        }
+        if (admission.getStatus() != AdmissionStatus.WAITING_FOR_ARRIVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Admission is not waiting for horse arrival");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (admission.getArrivalDeadlineAt() == null || !admission.getArrivalDeadlineAt().isAfter(now)) {
+            expireArrivalReservation(admission);
+            return admissionApplicationRepository.save(admission);
+        }
+
+        StableStall quarantineStall = stableStallRepository
+                .findQuarantineStallByIdForUpdate(admission.getQuarantineStallId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Reserved quarantine stall no longer exists"));
+        if (quarantineStall.getStatus() != StallStatus.RESERVED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Reserved quarantine stall is no longer available");
+        }
+
+        CandidateHorseProfile candidate = candidateHorseProfileRepository
+                .findByAdmissionId(admissionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Candidate horse profile not found"));
+
+        quarantineStall.setStatus(StallStatus.OCCUPIED);
+        stableStallRepository.save(quarantineStall);
+
+        Horse horse = findReusableHorseOrCreateNew(admission, candidate);
+        applyCandidateSnapshot(horse, admission, candidate, quarantineStall);
+        horse = horseRepository.save(horse);
+        updatePedigree(horse.getId(), candidate);
+
+        admission.setHorseId(horse.getId());
+        admission.setArrivedAt(now);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+        CareSchedule initialSchedule = ensureInitialCareSchedule(admissionId, horse.getId());
+        admission = admissionApplicationRepository.save(admission);
+        dispatchAssignmentNotifications(admission, horse, initialSchedule);
+        return admission;
+    }
+
+    @Transactional
+    public AdmissionApplication reopenExpiredArrival(Long admissionId) {
+        AdmissionApplication admission = admissionApplicationRepository.findByIdForUpdate(admissionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
+        if (admission.getStatus() != AdmissionStatus.ARRIVAL_EXPIRED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Admission arrival reservation has not expired");
+        }
+        admission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
+        AdmissionApplication saved = admissionApplicationRepository.save(admission);
+        return reserveQuarantineStallIfCapacityAvailable(saved);
+    }
+
+    @Transactional
+    public void expireOverdueArrivalReservations() {
+        LocalDateTime now = LocalDateTime.now();
+        List<AdmissionApplication> due = admissionApplicationRepository
+                .findByStatusAndArrivalDeadlineAtLessThanEqualOrderByArrivalDeadlineAtAscIdAsc(
+                        AdmissionStatus.WAITING_FOR_ARRIVAL, now);
+        for (AdmissionApplication candidate : due) {
+            AdmissionApplication admission = admissionApplicationRepository.findByIdForUpdate(candidate.getId())
+                    .orElse(null);
+            if (admission == null || admission.getStatus() != AdmissionStatus.WAITING_FOR_ARRIVAL
+                    || admission.getArrivalDeadlineAt() == null || admission.getArrivalDeadlineAt().isAfter(now)) {
+                continue;
+            }
+            expireArrivalReservation(admission);
+            admissionApplicationRepository.save(admission);
+        }
     }
 
     private AdmissionApplication reject(AdmissionApplication admission, Long groomId, String feedback) {
@@ -88,45 +172,35 @@ public class AdmissionGroomReviewService {
         return admissionApplicationRepository.save(admission);
     }
 
-    private AdmissionApplication moveForwardIfCapacityAvailable(AdmissionApplication admission) {
+    private AdmissionApplication reserveQuarantineStallIfCapacityAvailable(AdmissionApplication admission) {
         stableStallRepository.lockAdmissionCapacityStallsForUpdate();
         if (!hasAdmissionCapacity()) {
             admission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
             return admissionApplicationRepository.save(admission);
         }
-
-        CandidateHorseProfile candidate = candidateHorseProfileRepository
-                .findByAdmissionId(admission.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Candidate horse profile not found"));
-
         StableStall quarantineStall = stableStallRepository
                 .findFirstAvailableQuarantineStallForUpdate()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No quarantine stall available"));
-
-        // 1. Tạo hoặc tái sử dụng Horse CANDIDATE
-        Horse horse = findReusableHorseOrCreateNew(admission, candidate);
-        applyCandidateSnapshot(horse, admission, candidate, quarantineStall);
-        horse = horseRepository.save(horse);
-
-        updatePedigree(horse.getId(), candidate);
-
-        // 2. Tạo hoặc tái sử dụng INITIAL CareSchedule và gán Vet
-        CareSchedule initialSchedule = ensureInitialCareSchedule(admission.getId(), horse.getId());
-
-        // 3. Gán chuồng cách ly
-        quarantineStall.setStatus(StallStatus.OCCUPIED);
+        quarantineStall.setStatus(StallStatus.RESERVED);
         stableStallRepository.save(quarantineStall);
-
-        admission.setHorseId(horse.getId());
         admission.setQuarantineStallId(quarantineStall.getId());
+        admission.setArrivalDeadlineAt(LocalDateTime.now().plusDays(ARRIVAL_WINDOW_DAYS));
+        admission.setArrivedAt(null);
+        admission.setStatus(AdmissionStatus.WAITING_FOR_ARRIVAL);
+        return admissionApplicationRepository.save(admission);
+    }
 
-        admission.setStatus(AdmissionStatus.VET_REVIEW);
-        admission = admissionApplicationRepository.save(admission);
-
-        // 4. Tạo notification "new horse assignment" cho Vet (có khóa chống trùng)
-        dispatchAssignmentNotifications(admission, horse, initialSchedule);
-
-        return admission;
+    private void expireArrivalReservation(AdmissionApplication admission) {
+        if (admission.getQuarantineStallId() != null) {
+            StableStall stall = stableStallRepository.findQuarantineStallByIdForUpdate(admission.getQuarantineStallId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Reserved quarantine stall no longer exists"));
+            if (stall.getStatus() == StallStatus.RESERVED) {
+                stall.setStatus(StallStatus.AVAILABLE);
+                stableStallRepository.save(stall);
+            }
+        }
+        admission.setQuarantineStallId(null);
+        admission.setStatus(AdmissionStatus.ARRIVAL_EXPIRED);
     }
 
     private void dispatchAssignmentNotifications(AdmissionApplication admission, Horse horse, CareSchedule initialSchedule) {
