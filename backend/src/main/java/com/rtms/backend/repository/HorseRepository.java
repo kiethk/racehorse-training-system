@@ -50,4 +50,22 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
             GROUP BY a.trainerId
             """)
     List<Object[]> countHorsesByTrainerIds(@Param("trainerIds") java.util.Collection<Long> trainerIds);
+
+    @Query("""
+            SELECT a.trainerId, h.id
+            FROM Horse h
+            JOIN StableStall ss ON h.currentStallId = ss.id
+            JOIN Area a ON ss.areaId = a.id
+            WHERE a.trainerId IN :trainerIds
+            """)
+    List<Object[]> findManagedHorsePairs(@Param("trainerIds") java.util.Collection<Long> trainerIds);
+
+    @Query("""
+            SELECT DISTINCT h.id
+            FROM Horse h
+            JOIN StableStall ss ON h.currentStallId = ss.id
+            JOIN Area a ON ss.areaId = a.id
+            WHERE a.trainerId = :trainerId
+            """)
+    List<Long> findManagedHorseIdsByTrainerId(@Param("trainerId") Long trainerId);
 }

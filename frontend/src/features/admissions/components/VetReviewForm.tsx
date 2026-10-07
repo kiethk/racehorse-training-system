@@ -429,11 +429,16 @@ export function VetReviewForm({
     findings.trim() !== '' ||
     diagnosis.trim() !== '' ||
     examMode !== 'NORMAL' ||
+    Object.values(systemFindings).some((f) => f !== 'NORMAL') ||
+    selectedSymptoms.length > 1 ||
+    (selectedSymptoms.length === 1 && selectedSymptoms[0] !== 'No symptoms observed') ||
+    structuredDiagnosis !== 'Clinically healthy' ||
     treatment.trim() !== '' ||
     notes.trim() !== '' ||
     trainingDecision !== 'ALLOWED' ||
     restrictionDetails.trim() !== '' ||
-    scheduleFollowUp;
+    scheduleFollowUp ||
+    followUpDate !== '';
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -543,17 +548,21 @@ export function VetReviewForm({
     setRestrictionDetails('');
     setScheduleFollowUp(false);
     setFollowUpDate('');
+    setFollowUpDescription('Routine follow-up recheck examination');
+    setPhysicalExamConfirmed(true);
+    setFieldErrors({});
     setDraftSavedTime(null);
   };
 
   // 15-second debounce auto-save when dirty (FR-CHUNG-93)
+  // Do NOT autosave while an unrestored draft banner is pending user action to prevent overwriting
   useEffect(() => {
-    if (!isDirty || isGated) return;
+    if (!isDirty || isGated || availableDraft !== null) return;
     const timer = setTimeout(() => {
       handleSaveDraft();
     }, 15000);
     return () => clearTimeout(timer);
-  }, [isDirty, isGated, handleSaveDraft]);
+  }, [isDirty, isGated, availableDraft, handleSaveDraft]);
 
   const generatedSymptoms =
     examMode === 'NORMAL'
@@ -780,6 +789,25 @@ export function VetReviewForm({
                 Start Examination
               </Button>
             )}
+          </div>
+        )}
+        {/* Gate Warning when REQUESTED */}
+        {scheduleStatus === 'REQUESTED' && (
+          <div
+            role="status"
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-3 text-[13px] text-[var(--color-info)]"
+          >
+            <div className="flex items-center gap-2">
+              <Icon name="clock" size={18} className="shrink-0 text-[var(--color-info)]" />
+              <div>
+                <strong className="block text-[13px] font-bold">
+                  Care schedule is REQUESTED
+                </strong>
+                <p className="text-[12px] opacity-90">
+                  This examination schedule is waiting for slot scheduling and assignment before it can be started.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 

@@ -82,7 +82,10 @@ public class GroomIncidentReportService {
                         horse.getId(), CareType.URGENT, activeStatuses)
                 .orElse(null);
         if (active == null) {
-            careScheduleService.createSchedule(horse.getId(), CareType.URGENT, null, null, saved.getId());
+            String scheduleDescription = (report.getDescription() != null && !report.getDescription().trim().isEmpty())
+                    ? report.getDescription().trim()
+                    : "Incident reported";
+            careScheduleService.createSchedule(horse.getId(), CareType.URGENT, scheduleDescription, null, saved.getId());
             active = careScheduleRepository
                     .findFirstByHorseIdAndCareTypeAndStatusInOrderByCreatedAtDesc(
                             horse.getId(), CareType.URGENT, activeStatuses)

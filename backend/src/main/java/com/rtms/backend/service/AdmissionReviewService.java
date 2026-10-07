@@ -92,13 +92,35 @@ public class AdmissionReviewService {
 
         HealthRecord hr = healthRecordRepository.findByCareScheduleId(schedule.getId()).orElse(null);
 
-        // Map the trainingDecision back to a VetDecision for the response
+        // Map the trainingDecision back to a VetDecision for the response (nullable per modern workflow)
         VetDecision responseDecision = admission.getVetDecision();
+        TrainingDecision trainingDecision = hr != null && hr.getTrainingDecision() != null
+                ? hr.getTrainingDecision()
+                : compReq.getTrainingDecision();
+        String restrictionDetails = hr != null && hr.getRestrictionDetails() != null
+                ? hr.getRestrictionDetails()
+                : compReq.getRestrictionDetails();
+        Long careScheduleId = completed != null ? completed.id() : schedule.getId();
+        Long vetExamId = careScheduleId;
 
-        return new VetReviewResponse(admission.getId(), admission.getStatus(), actorId,
-                responseDecision, admission.getVetFeedback(), admission.getVetReviewedAt(),
-                horse.getId(), horse.getCurrentStatus(), admission.getQuarantineStallId(),
-                qStallCode, CareScheduleStatus.COMPLETED, hr != null ? hr.getId() : null, completed.id());
+        return new VetReviewResponse(
+                admission.getId(),
+                admission.getStatus(),
+                actorId,
+                responseDecision,
+                trainingDecision,
+                restrictionDetails,
+                admission.getVetFeedback(),
+                admission.getVetReviewedAt(),
+                horse.getId(),
+                horse.getCurrentStatus(),
+                admission.getQuarantineStallId(),
+                qStallCode,
+                CareScheduleStatus.COMPLETED,
+                hr != null ? hr.getId() : null,
+                vetExamId,
+                careScheduleId
+        );
     }
 
     private CompleteCareScheduleRequest buildCompleteCareScheduleRequest(VetReviewRequest request) {

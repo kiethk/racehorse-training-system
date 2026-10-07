@@ -65,7 +65,7 @@ class AssignmentEnforcementTest {
     private NotificationRepository notificationRepository;
 
     @Mock
-    private HeadTrainerWorkloadService headTrainerWorkloadService;
+    private TrainerScheduleAssignmentService trainerScheduleAssignmentService;
 
     private CareScheduleService careScheduleService;
     private NotificationService notificationService;
@@ -88,7 +88,7 @@ class AssignmentEnforcementTest {
                 eventPublisher,
                 entityManager,
                 notificationService,
-                headTrainerWorkloadService
+                trainerScheduleAssignmentService
         );
     }
 

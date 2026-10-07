@@ -54,9 +54,6 @@ public class AdmissionApplication {
     @Column(name = "vet_reviewed_at")
     private LocalDateTime vetReviewedAt;
 
-    @Column(name = "trainer_id")
-    private Long trainerId;
-
     @Column(name = "trainer_feedback", columnDefinition = "TEXT")
     private String trainerFeedback;
 
@@ -211,14 +208,6 @@ public class AdmissionApplication {
 
     public void setVetReviewedAt(LocalDateTime vetReviewedAt) {
         this.vetReviewedAt = vetReviewedAt;
-    }
-
-    public Long getTrainerId() {
-        return trainerId;
-    }
-
-    public void setTrainerId(Long trainerId) {
-        this.trainerId = trainerId;
     }
 
     public String getTrainerFeedback() {

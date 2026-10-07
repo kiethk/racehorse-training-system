@@ -64,7 +64,7 @@ public class CareScheduleController {
         if ("VETERINARIAN".equals(currentUser.getRole())) {
             veterinarianId = currentUser.getUserId();
         }
-        if ("HEAD_TRAINER".equals(currentUser.getRole()) || "GROOM".equals(currentUser.getRole())) {
+        if ("GROOM".equals(currentUser.getRole())) {
             return ApiResponse.success(careScheduleService.listSchedulesForAdmissionAssignee(status, careType,
                     horseId, veterinarianId, admissionId, currentUser.getUserId(), currentUser.getRole(), pageable));
         }
@@ -78,7 +78,7 @@ public class CareScheduleController {
         if ("VETERINARIAN".equals(currentUser.getRole())) {
             return ApiResponse.success(careScheduleService.getAssignedScheduleDetail(id, currentUser.getUserId()));
         }
-        if ("HEAD_TRAINER".equals(currentUser.getRole()) || "GROOM".equals(currentUser.getRole())) {
+        if ("GROOM".equals(currentUser.getRole())) {
             return ApiResponse.success(careScheduleService.getScheduleDetailForAdmissionAssignee(
                     id, currentUser.getUserId(), currentUser.getRole()));
         }

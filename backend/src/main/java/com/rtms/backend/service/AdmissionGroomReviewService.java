@@ -22,7 +22,6 @@ public class AdmissionGroomReviewService {
     private final HorsePedigreeRepository horsePedigreeRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final CareScheduleService careScheduleService;
-    private final HeadTrainerWorkloadService headTrainerWorkloadService;
     private final NotificationService notificationService;
 
     public AdmissionGroomReviewService(
@@ -33,7 +32,6 @@ public class AdmissionGroomReviewService {
             HorsePedigreeRepository horsePedigreeRepository,
             CareScheduleRepository careScheduleRepository,
             CareScheduleService careScheduleService,
-            HeadTrainerWorkloadService headTrainerWorkloadService,
             NotificationService notificationService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
@@ -42,7 +40,6 @@ public class AdmissionGroomReviewService {
         this.horsePedigreeRepository = horsePedigreeRepository;
         this.careScheduleRepository = careScheduleRepository;
         this.careScheduleService = careScheduleService;
-        this.headTrainerWorkloadService = headTrainerWorkloadService;
         this.notificationService = notificationService;
     }
 
@@ -85,38 +82,6 @@ public class AdmissionGroomReviewService {
         return moveForwardIfCapacityAvailable(admission);
     }
 
-    @Transactional
-    public void assignPendingTrainers() {
-        List<AdmissionApplication> pending = admissionApplicationRepository.findByStatusInAndTrainerIdIsNull(
-                List.of(AdmissionStatus.VET_REVIEW, AdmissionStatus.TRAINER_REVIEW, AdmissionStatus.MANAGER_REVIEW),
-                org.springframework.data.domain.PageRequest.of(0, 25)
-        );
-
-        for (AdmissionApplication item : pending) {
-            admissionApplicationRepository.findByIdForUpdate(item.getId()).ifPresent(admission -> {
-                if (admission.getTrainerId() == null) {
-                    headTrainerWorkloadService.selectLeastLoadedHeadTrainerId().ifPresent(trainerId -> {
-                        admission.setTrainerId(trainerId);
-                        admissionApplicationRepository.save(admission);
-
-                        if (admission.getHorseId() != null) {
-                            horseRepository.findById(admission.getHorseId()).ifPresent(horse -> {
-                                notificationService.sendAssignmentNotification(
-                                        trainerId,
-                                        admission.getId(),
-                                        horse.getId(),
-                                        NotificationTypes.ADMISSION_TRAINER_ASSIGNED,
-                                        "New horse assignment",
-                                        "You have been assigned to candidate horse " + horse.getName() + " for racing readiness assessment."
-                                );
-                            });
-                        }
-                    });
-                }
-            });
-        }
-    }
-
     private AdmissionApplication reject(AdmissionApplication admission, Long groomId, String feedback) {
         stampGroomReview(admission, groomId, ReviewDecision.REJECTED, feedback);
         admission.setStatus(AdmissionStatus.REJECTED);
@@ -155,17 +120,10 @@ public class AdmissionGroomReviewService {
         admission.setHorseId(horse.getId());
         admission.setQuarantineStallId(quarantineStall.getId());
 
-        // 4. Chọn Head Trainer có workload thấp nhất và gán vào AdmissionApplication.trainerId
-        // Nếu đã được gán trước đó thì giữ nguyên
-        if (admission.getTrainerId() == null) {
-            headTrainerWorkloadService.selectLeastLoadedHeadTrainerId()
-                    .ifPresent(admission::setTrainerId);
-        }
-
         admission.setStatus(AdmissionStatus.VET_REVIEW);
         admission = admissionApplicationRepository.save(admission);
 
-        // 5. Tạo notification "new horse assignment" cho Vet và Trainer (có khóa chống trùng)
+        // 4. Tạo notification "new horse assignment" cho Vet (có khóa chống trùng)
         dispatchAssignmentNotifications(admission, horse, initialSchedule);
 
         return admission;
@@ -181,18 +139,6 @@ public class AdmissionGroomReviewService {
                     NotificationTypes.ADMISSION_VET_ASSIGNED,
                     "New horse assignment",
                     "You have been assigned to candidate horse " + horse.getName() + " for initial admission examination in quarantine."
-            );
-        }
-
-        // Notification cho Trainer
-        if (admission.getTrainerId() != null) {
-            notificationService.sendAssignmentNotification(
-                    admission.getTrainerId(),
-                    admission.getId(),
-                    horse.getId(),
-                    NotificationTypes.ADMISSION_TRAINER_ASSIGNED,
-                    "New horse assignment",
-                    "You have been assigned to candidate horse " + horse.getName() + " for racing readiness assessment."
             );
         }
     }

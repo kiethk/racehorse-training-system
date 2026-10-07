@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
@@ -135,6 +135,7 @@ function MedicalNoteBlock({
 
 export function VetAdmissionQueue() {
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Server-side queue state
@@ -382,7 +383,6 @@ export function VetAdmissionQueue() {
         status: (detail.initialExamSchedule.status as CareScheduleStatus) || 'REQUESTED',
         veterinarianId: detail.initialExamSchedule.veterinarianId,
         assignedVetId: detail.initialExamSchedule.veterinarianId,
-        trainerId: detail?.trainerId ?? null,
         scheduledAt: detail.initialExamSchedule.scheduledAt,
         scheduledDate: detail.initialExamSchedule.scheduledDate,
       }
@@ -444,7 +444,7 @@ export function VetAdmissionQueue() {
     }> = [];
 
     careSchedules
-      .filter((cs) => cs.admissionId === selectedId || (detail?.horseId && cs.horseId === detail.horseId))
+      .filter((cs) => cs.admissionId === selectedId)
       .forEach((cs) => {
         list.push({
           id: cs.id,
@@ -479,8 +479,12 @@ export function VetAdmissionQueue() {
       setShowCloseConfirm(true);
     } else {
       setDrawerOpen(false);
+      setSelectedId(null);
+      setTargetScheduleId(null);
+      setDeepLinkedSchedule(null);
+      router.replace('/veterinarian/admissions', { scroll: false });
     }
-  }, [isDrawerDirty]);
+  }, [isDrawerDirty, router]);
 
   // Keep the full-page examination workspace aligned with the Trainer detail flow.
   useEffect(() => {
@@ -551,6 +555,67 @@ export function VetAdmissionQueue() {
 
   return (
     <div className="space-y-4">
+      {/* Global Alerts */}
+      {success && (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-3 text-[13px] text-[var(--color-success)]"
+        >
+          <div className="flex items-start gap-2">
+            <Icon name="check" size={16} className="mt-0.5 shrink-0" />
+            <span className="font-medium">{success}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccess('')}
+            className="text-[var(--color-success)] hover:opacity-70"
+            aria-label="Dismiss alert"
+          >
+            <Icon name="x" size={14} />
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-[13px] text-[var(--color-danger)]"
+        >
+          <div className="flex items-start gap-2">
+            <Icon name="alert-triangle" size={16} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setError('')}
+            className="text-[var(--color-danger)] hover:opacity-70"
+            aria-label="Dismiss alert"
+          >
+            <Icon name="x" size={14} />
+          </button>
+        </div>
+      )}
+
+      {scheduleWarning && (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 text-[13px] text-[var(--color-warning)]"
+        >
+          <div className="flex items-start gap-2">
+            <Icon name="alert-triangle" size={16} className="mt-0.5 shrink-0" />
+            <span>{scheduleWarning}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setScheduleWarning('')}
+            className="text-[var(--color-warning)] hover:opacity-70"
+            aria-label="Dismiss warning"
+          >
+            <Icon name="x" size={14} />
+          </button>
+        </div>
+      )}
+
       {!drawerOpen && (
         <>
       {/* Page Header with Compact Interactive Filter Pills */}
@@ -639,67 +704,6 @@ export function VetAdmissionQueue() {
           </Button>
         </div>
       </header>
-
-      {/* Global Alerts */}
-      {success && (
-        <div
-          role="status"
-          className="flex items-start justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-3 text-[13px] text-[var(--color-success)]"
-        >
-          <div className="flex items-start gap-2">
-            <Icon name="check" size={16} className="mt-0.5 shrink-0" />
-            <span className="font-medium">{success}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSuccess('')}
-            className="text-[var(--color-success)] hover:opacity-70"
-            aria-label="Dismiss alert"
-          >
-            <Icon name="x" size={14} />
-          </button>
-        </div>
-      )}
-
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-[13px] text-[var(--color-danger)]"
-        >
-          <div className="flex items-start gap-2">
-            <Icon name="alert-triangle" size={16} className="mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setError('')}
-            className="text-[var(--color-danger)] hover:opacity-70"
-            aria-label="Dismiss alert"
-          >
-            <Icon name="x" size={14} />
-          </button>
-        </div>
-      )}
-
-      {scheduleWarning && (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 text-[13px] text-[var(--color-warning)]"
-        >
-          <div className="flex items-start gap-2">
-            <Icon name="alert-triangle" size={16} className="mt-0.5 shrink-0" />
-            <span>{scheduleWarning}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setScheduleWarning('')}
-            className="text-[var(--color-warning)] hover:opacity-70"
-            aria-label="Dismiss warning"
-          >
-            <Icon name="x" size={14} />
-          </button>
-        </div>
-      )}
 
       {/* Main Full-Width Schedule List Panel */}
       <Panel className="overflow-hidden">
@@ -1205,66 +1209,65 @@ export function VetAdmissionQueue() {
               ) : detail ? (
                 <div>
                   {/* Tab 1: Clinical Examination & VetReviewForm */}
-                  {activeTab === 'exam' && (
-                    <div>
-                      {canCompleteExam ? (
-                        <VetReviewForm
-                          key={`${detail.admissionId}-${currentActiveSchedule?.id}`}
-                          admissionId={detail.admissionId}
-                          horseId={detail.horseId}
-                          candidateName={detail.candidate?.name ?? selectedRow?.candidateName ?? 'Candidate'}
-                          quarantineStallCode={detail.quarantineStallCode}
-                          careScheduleId={currentActiveSchedule?.id}
-                          careType={currentActiveSchedule?.careType}
-                          scheduleStatus={currentActiveSchedule?.status}
-                          onStartExam={handleStartExam}
-                          onSuccess={handleReviewSuccess}
-                          onDirtyChange={handleDirtyChange}
-                        />
-                      ) : currentActiveSchedule?.status === 'COMPLETED' ? (
-                        <div className="rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-5 text-center">
-                          <Icon name="check" size={28} className="mx-auto text-[var(--color-success)]" />
-                          <h3 className="mt-2 text-[15px] font-bold text-[var(--color-success)]">
-                            Examination Completed
-                          </h3>
-                          <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
-                            {currentActiveSchedule.careType === 'INITIAL'
-                              ? 'The veterinary review for this intake stage has already been submitted and finalized.'
-                              : 'This care schedule has already been completed. The Admission workflow was not changed.'}
-                          </p>
-                          {displayedTrainingDecision && (
-                            <div className="mt-3">
-                              <Pill
-                                tone={
-                                  displayedTrainingDecision === 'ALLOWED'
-                                    ? 'success'
-                                    : displayedTrainingDecision === 'RESTRICTED'
-                                      ? 'warning'
-                                      : 'danger'
-                                }
-                              >
-                                Training Decision: {formatLabel(displayedTrainingDecision)}
-                              </Pill>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="p-8 text-center text-[var(--color-text-muted)]">
-                          <Icon name="stethoscope" size={32} className="mx-auto mb-2 opacity-40" />
-                          <p className="text-[14px] font-semibold text-[var(--color-text-secondary)]">
-                            Clinical review locked
-                          </p>
-                          <p className="text-[12px] mt-1">
-                            {currentActiveSchedule?.status === 'REQUESTED'
-                              ? 'The care schedule is waiting for automatic assignment.'
-                              : assignedElsewhere
-                                ? 'This case is assigned to another veterinarian.'
-                                : 'No active examination found for this admission.'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Tab 1: Clinical Examination & VetReviewForm (kept mounted to preserve state across tab switches) */}
+                  <div className={activeTab === 'exam' ? 'block' : 'hidden'}>
+                    {canCompleteExam ? (
+                      <VetReviewForm
+                        key={`${detail.admissionId}-${currentActiveSchedule?.id}`}
+                        admissionId={detail.admissionId}
+                        horseId={detail.horseId}
+                        candidateName={detail.candidate?.name ?? selectedRow?.candidateName ?? 'Candidate'}
+                        quarantineStallCode={detail.quarantineStallCode}
+                        careScheduleId={currentActiveSchedule?.id}
+                        careType={currentActiveSchedule?.careType}
+                        scheduleStatus={currentActiveSchedule?.status}
+                        onStartExam={handleStartExam}
+                        onSuccess={handleReviewSuccess}
+                        onDirtyChange={handleDirtyChange}
+                      />
+                    ) : currentActiveSchedule?.status === 'COMPLETED' ? (
+                      <div className="rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-5 text-center">
+                        <Icon name="check" size={28} className="mx-auto text-[var(--color-success)]" />
+                        <h3 className="mt-2 text-[15px] font-bold text-[var(--color-success)]">
+                          Examination Completed
+                        </h3>
+                        <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
+                          {currentActiveSchedule.careType === 'INITIAL'
+                            ? 'The veterinary review for this intake stage has already been submitted and finalized.'
+                            : 'This care schedule has already been completed. The Admission workflow was not changed.'}
+                        </p>
+                        {displayedTrainingDecision && (
+                          <div className="mt-3">
+                            <Pill
+                              tone={
+                                displayedTrainingDecision === 'ALLOWED'
+                                  ? 'success'
+                                  : displayedTrainingDecision === 'RESTRICTED'
+                                    ? 'warning'
+                                    : 'danger'
+                              }
+                            >
+                              Training Decision: {formatLabel(displayedTrainingDecision)}
+                            </Pill>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center text-[var(--color-text-muted)]">
+                        <Icon name="stethoscope" size={32} className="mx-auto mb-2 opacity-40" />
+                        <p className="text-[14px] font-semibold text-[var(--color-text-secondary)]">
+                          Clinical review locked
+                        </p>
+                        <p className="text-[12px] mt-1">
+                          {currentActiveSchedule?.status === 'REQUESTED'
+                            ? 'The care schedule is waiting for automatic assignment.'
+                            : assignedElsewhere
+                              ? 'This case is assigned to another veterinarian.'
+                              : 'No active examination found for this admission.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Tab 2: Medical Records History */}
                   {activeTab === 'history' && (
@@ -1599,6 +1602,10 @@ export function VetAdmissionQueue() {
           setIsDrawerDirty(false);
           setShowCloseConfirm(false);
           setDrawerOpen(false);
+          setSelectedId(null);
+          setTargetScheduleId(null);
+          setDeepLinkedSchedule(null);
+          router.replace('/veterinarian/admissions', { scroll: false });
         }}
         onCancel={() => setShowCloseConfirm(false)}
       />

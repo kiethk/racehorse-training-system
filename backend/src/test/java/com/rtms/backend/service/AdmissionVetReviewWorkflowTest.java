@@ -58,7 +58,9 @@ class AdmissionVetReviewWorkflowTest {
     @Mock
     private NotificationService notificationService;
     @Mock
-    private HeadTrainerWorkloadService headTrainerWorkloadService;
+    private TrainerScheduleAssignmentService trainerScheduleAssignmentService;
+    @Mock
+    private TrainerScheduleRepository trainerScheduleRepository;
     @Mock
     private CandidateHorseProfileRepository candidateProfileRepository;
     @Mock
@@ -86,7 +88,7 @@ class AdmissionVetReviewWorkflowTest {
                 eventPublisher,
                 entityManager,
                 notificationService,
-                headTrainerWorkloadService
+                trainerScheduleAssignmentService
         );
 
         admissionQueryService = new AdmissionQueryService(
@@ -97,7 +99,8 @@ class AdmissionVetReviewWorkflowTest {
                 healthRecordRepository,
                 fileStorage,
                 userRepository,
-                careScheduleRepository
+                careScheduleRepository,
+                trainerScheduleRepository
         );
 
         admissionReviewService = new AdmissionReviewService(
@@ -182,7 +185,6 @@ class AdmissionVetReviewWorkflowTest {
         admission.setId(admissionId);
         admission.setHorseId(horseId);
         admission.setStatus(AdmissionStatus.VET_REVIEW);
-        admission.setTrainerId(8L);
 
         when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
         when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
@@ -210,8 +212,8 @@ class AdmissionVetReviewWorkflowTest {
         assertEquals(CareScheduleStatus.COMPLETED, schedule.getStatus());
         assertEquals(AdmissionStatus.TRAINER_REVIEW, admission.getStatus());
         assertEquals("ALLOWED", admission.getVetTrainingDecision());
-        assertEquals(8L, admission.getTrainerId(), "Trainer assignment must be preserved");
         assertEquals(15L, admission.getVeterinarianId(), "Vet assignment must be preserved");
+        verify(trainerScheduleAssignmentService).assignForCompletedInitialCare(admissionId, scheduleId);
     }
 
     @Test
@@ -239,7 +241,6 @@ class AdmissionVetReviewWorkflowTest {
         adm.setOwnerId(5L);
         adm.setHorseId(20L);
         adm.setStatus(AdmissionStatus.VET_REVIEW);
-        adm.setTrainerId(8L);
         adm.setSubmittedAt(LocalDateTime.now().minusDays(1));
         when(admissionRepository.findAllById(any())).thenReturn(List.of(adm));
 
@@ -258,6 +259,11 @@ class AdmissionVetReviewWorkflowTest {
         trainer.setId(8L);
         trainer.setFullName("Trainer Mike");
         when(userRepository.findAllById(any())).thenReturn(List.of(owner, trainer));
+
+        TrainerSchedule ts = new TrainerSchedule();
+        ts.setAdmissionId(1L);
+        ts.setTrainerId(8L);
+        when(trainerScheduleRepository.findByAdmissionId(1L)).thenReturn(Optional.of(ts));
 
         Page<VetAdmissionQueueItemResponse> queue = admissionQueryService.getVetQueue(
                 vetId, null, null, null, null, null, null, pageRequest);

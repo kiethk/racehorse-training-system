@@ -51,6 +51,8 @@ export interface TrainerAdmissionView {
   healthMetrics: HorseHealthMetricResponse[];
   /** Khác null = đã đánh giá rồi -> form chuyển sang chỉ đọc. */
   existingAssessment: RacingReadinessAssessment | null;
+  /** Trainer Schedule được gán trực tiếp cho Head Trainer */
+  trainerSchedule?: TrainerScheduleResponse | null;
 }
 
 export interface TrainerReviewRequest {
@@ -60,4 +62,32 @@ export interface TrainerReviewRequest {
   gaitQualityScore?: number | null;
   estimatedMonthsToRace?: number | null;
   remarks?: string | null;
+}
+
+export type TrainerScheduleStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED';
+
+export interface TrainerScheduleResponse {
+  id: number;
+  horseId: number;
+  admissionId: number;
+  sourceCareScheduleId: number;
+  trainerId: number;
+  status: TrainerScheduleStatus;
+  scheduledAt: string;
+  durationMinutes: number;
+  completedAt: string | null;
+  candidateName?: string | null;
+  breed?: string | null;
+  quarantineStallCode?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TrainerScheduleDetailResponse {
+  schedule: TrainerScheduleResponse;
+  admission: AdmissionDetailResponse;
+  horse: HorseSummary | null;
+  healthRecords: HealthRecord[];
+  healthMetrics: HorseHealthMetricResponse[];
+  existingAssessment: RacingReadinessAssessment | null;
 }

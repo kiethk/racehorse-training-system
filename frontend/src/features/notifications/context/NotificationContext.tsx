@@ -83,7 +83,8 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
         .filter(
           (n) =>
           (n.notificationType === 'ADMISSION_VET_ASSIGNED' ||
-            n.notificationType === 'ADMISSION_TRAINER_ASSIGNED') &&
+            n.notificationType === 'ADMISSION_TRAINER_ASSIGNED' ||
+            n.notificationType === 'TRAINER_SCHEDULE_ASSIGNED') &&
           !temporarilyDismissedIds.has(n.id)
         )
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id - b.id);
@@ -150,6 +151,8 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
         const refId = notification.referenceId;
         if (notification.referenceType === 'CARE_SCHEDULE' && refId && user?.role === 'VETERINARIAN') {
           router.push(`/veterinarian/admissions?scheduleId=${refId}`);
+        } else if (notification.referenceType === 'TRAINER_SCHEDULE' || notification.notificationType === 'TRAINER_SCHEDULE_ASSIGNED') {
+          router.push('/trainer/admissions');
         } else if (notification.notificationType === 'ADMISSION_VET_ASSIGNED' && refId) {
           router.push(`/veterinarian/admissions?id=${refId}`);
         } else if (notification.notificationType === 'ADMISSION_TRAINER_ASSIGNED' && refId) {

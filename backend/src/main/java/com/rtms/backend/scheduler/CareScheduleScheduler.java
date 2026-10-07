@@ -1,7 +1,7 @@
 package com.rtms.backend.scheduler;
 
-import com.rtms.backend.service.AdmissionGroomReviewService;
 import com.rtms.backend.service.CareScheduleService;
+import com.rtms.backend.service.TrainerScheduleAssignmentService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -9,17 +9,17 @@ import org.springframework.stereotype.Component;
 public class CareScheduleScheduler {
 
     private final CareScheduleService careScheduleService;
-    private final AdmissionGroomReviewService admissionGroomReviewService;
+    private final TrainerScheduleAssignmentService trainerScheduleAssignmentService;
 
     public CareScheduleScheduler(CareScheduleService careScheduleService,
-                                 AdmissionGroomReviewService admissionGroomReviewService) {
+                                 TrainerScheduleAssignmentService trainerScheduleAssignmentService) {
         this.careScheduleService = careScheduleService;
-        this.admissionGroomReviewService = admissionGroomReviewService;
+        this.trainerScheduleAssignmentService = trainerScheduleAssignmentService;
     }
 
     @Scheduled(fixedRate = 60000)
     public void runCareScheduleMaintenance() {
         careScheduleService.assignRequestedSchedules();
-        admissionGroomReviewService.assignPendingTrainers();
+        trainerScheduleAssignmentService.retryPendingAssignments();
     }
 }

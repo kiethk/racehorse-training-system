@@ -117,6 +117,9 @@ class AdmissionReviewServiceTest {
         assertEquals(CareScheduleStatus.COMPLETED, response.initialExamStatus());
         assertEquals(30L, response.healthRecordId());
         assertEquals(20L, response.vetExamId());
+        assertEquals(20L, response.careScheduleId());
+        assertEquals(VetDecision.APPROVED, response.decision());
+        assertEquals(TrainingDecision.ALLOWED, response.trainingDecision());
         verify(careScheduleService).startCareSchedule(20L, 5L);
     }
 
@@ -161,10 +164,11 @@ class AdmissionReviewServiceTest {
         when(careScheduleService.completeCareSchedule(eq(20L), any(), eq(5L))).thenAnswer(invocation -> {
             CompleteCareScheduleRequest comp = invocation.getArgument(1);
             admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
-            admission.setVetDecision(VetDecision.APPROVED);
+            admission.setVetDecision(null);
             admission.setVetFeedback(comp.getFindings());
             admission.setVetReviewedAt(LocalDateTime.now());
             schedule.setStatus(CareScheduleStatus.COMPLETED);
+            horse.setTrainingStatus(TrainingDecision.BLOCKED);
             return CareScheduleResponse.from(schedule);
         });
         when(healthRecordRepository.findByCareScheduleId(20L)).thenReturn(Optional.empty());
@@ -179,11 +183,59 @@ class AdmissionReviewServiceTest {
         var response = service.reviewByVet(1L, request, 5L);
 
         assertEquals(AdmissionStatus.TRAINER_REVIEW, response.status());
-        assertEquals(VetDecision.APPROVED, response.decision());
+        assertNull(response.decision(), "Legacy decision should be null for BLOCKED training decision");
+        assertEquals(TrainingDecision.BLOCKED, response.trainingDecision());
+        assertEquals("No track work for 30 days", response.restrictionDetails());
+        assertEquals(20L, response.careScheduleId());
+        assertEquals(20L, response.vetExamId());
         ArgumentCaptor<CompleteCareScheduleRequest> completion = ArgumentCaptor.forClass(CompleteCareScheduleRequest.class);
         verify(careScheduleService).completeCareSchedule(eq(20L), completion.capture(), eq(5L));
         assertFalse(completion.getValue().isRejectAdmission());
         assertEquals(TrainingDecision.BLOCKED, completion.getValue().getTrainingDecision());
+    }
+
+    @Test
+    void restrictedTrainingDecisionMapsContractAndNullLegacyDecision() {
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        when(admissions.findById(1L)).thenReturn(Optional.of(admission));
+        when(careSchedules.findFirstByAdmissionIdAndStatusOrderByCreatedAtDesc(1L, CareScheduleStatus.IN_PROGRESS))
+                .thenReturn(Optional.of(schedule));
+        when(horses.findById(10L)).thenReturn(Optional.of(horse));
+        when(stalls.findById(99L)).thenReturn(Optional.of(quarantine));
+
+        HealthRecord hr = new HealthRecord();
+        hr.setId(31L);
+        hr.setCareScheduleId(20L);
+        hr.setTrainingDecision(TrainingDecision.RESTRICTED);
+        hr.setRestrictionDetails("Light work only");
+        when(healthRecordRepository.findByCareScheduleId(20L)).thenReturn(Optional.of(hr));
+
+        when(careScheduleService.completeCareSchedule(eq(20L), any(), eq(5L))).thenAnswer(invocation -> {
+            CompleteCareScheduleRequest comp = invocation.getArgument(1);
+            admission.setStatus(AdmissionStatus.TRAINER_REVIEW);
+            admission.setVetDecision(null);
+            admission.setVetFeedback(comp.getFindings());
+            admission.setVetReviewedAt(LocalDateTime.now());
+            schedule.setStatus(CareScheduleStatus.COMPLETED);
+            horse.setTrainingStatus(TrainingDecision.RESTRICTED);
+            return CareScheduleResponse.from(schedule);
+        });
+
+        VetReviewRequest request = new VetReviewRequest();
+        request.setPhysicalExamConfirmed(true);
+        request.setFindings("Mild lameness");
+        request.setTrainingDecision(TrainingDecision.RESTRICTED);
+        request.setRestrictionDetails("Light work only");
+
+        var response = service.reviewByVet(1L, request, 5L);
+
+        assertEquals(AdmissionStatus.TRAINER_REVIEW, response.status());
+        assertNull(response.decision());
+        assertEquals(TrainingDecision.RESTRICTED, response.trainingDecision());
+        assertEquals("Light work only", response.restrictionDetails());
+        assertEquals(31L, response.healthRecordId());
+        assertEquals(20L, response.careScheduleId());
+        assertEquals(20L, response.vetExamId());
     }
 
     @Test

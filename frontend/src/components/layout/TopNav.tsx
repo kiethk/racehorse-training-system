@@ -64,6 +64,8 @@ export function TopNav() {
     const refId = item.referenceId;
     if (item.referenceType === 'CARE_SCHEDULE' && refId && user.role === 'VETERINARIAN') {
       router.push(`/veterinarian/admissions?scheduleId=${refId}`);
+    } else if (item.referenceType === 'TRAINER_SCHEDULE' || item.notificationType === 'TRAINER_SCHEDULE_ASSIGNED') {
+      router.push('/trainer/admissions');
     } else if (item.notificationType === 'ADMISSION_VET_ASSIGNED' && refId) {
       router.push(`/veterinarian/admissions?id=${refId}`);
     } else if (item.notificationType === 'ADMISSION_TRAINER_ASSIGNED' && refId) {

@@ -1,4 +1,4 @@
--- V58__refactor_vet_care_schedule_mvp.sql
+-- V57__refactor_vet_care_schedule_mvp.sql
 -- S2 Care Schedule and Vet Offer MVP schema refactoring
 
 -- 1. Care Schedules table

@@ -29,7 +29,7 @@ class CareScheduleHardeningTests {
     private VeterinarianProfileRepository profiles;
     private GroomIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private HeadTrainerWorkloadService headTrainerWorkloadService;
+    private TrainerScheduleAssignmentService trainerScheduleAssignmentService;
     private NotificationService notificationService;
     private AdmissionApplicationRepository admissionRepository;
     private CareScheduleService service;
@@ -42,7 +42,7 @@ class CareScheduleHardeningTests {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(GroomIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        headTrainerWorkloadService = mock(HeadTrainerWorkloadService.class);
+        trainerScheduleAssignmentService = mock(TrainerScheduleAssignmentService.class);
         notificationService = mock(NotificationService.class);
         admissionRepository = mock(AdmissionApplicationRepository.class);
 
@@ -60,7 +60,7 @@ class CareScheduleHardeningTests {
                 events,
                 mock(EntityManager.class),
                 notificationService,
-                headTrainerWorkloadService
+                trainerScheduleAssignmentService
         );
 
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -100,12 +100,11 @@ class CareScheduleHardeningTests {
     }
 
     @Test
-    @DisplayName("Stage 2A: ROUTINE schedule không có admission vẫn gửi notification cho Vet và Trainer")
-    void routineWithoutAdmission_assignSendsNotificationToVetAndTrainer() {
+    @DisplayName("Stage 2A: ROUTINE schedule không có admission chỉ gửi notification cho Vet")
+    void routineWithoutAdmission_assignSendsNotificationToVet() {
         mockHorse(10L, "Thunder");
         User vet = mockVet(5L);
         when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
-        when(headTrainerWorkloadService.selectLeastLoadedHeadTrainerId()).thenReturn(Optional.of(8L));
 
         CareSchedule routine = new CareSchedule();
         routine.setId(101L);
@@ -119,7 +118,6 @@ class CareScheduleHardeningTests {
 
         assertEquals(CareScheduleStatus.SCHEDULED, routine.getStatus());
         assertEquals(5L, routine.getVeterinarianId());
-        assertEquals(8L, routine.getTrainerId());
 
         // Verify Vet notification keyed on CARE_SCHEDULE:101
         verify(notificationService).sendAssignmentNotification(
@@ -131,26 +129,14 @@ class CareScheduleHardeningTests {
                 anyString(),
                 contains("Thunder")
         );
-
-        // Verify Trainer notification keyed on CARE_SCHEDULE:101
-        verify(notificationService).sendAssignmentNotification(
-                eq(8L),
-                eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
-                eq(101L),
-                eq(10L),
-                eq(NotificationTypes.CARE_SCHEDULE_TRAINER_ASSIGNED),
-                anyString(),
-                contains("Thunder")
-        );
     }
 
     @Test
-    @DisplayName("Stage 2A: URGENT schedule không có admission vẫn gửi notification và publish alert")
-    void urgentWithoutAdmission_assignSendsNotificationToVetAndTrainer() {
+    @DisplayName("Stage 2A: URGENT schedule không có admission gửi notification cho Vet và publish alert")
+    void urgentWithoutAdmission_assignSendsNotificationToVet() {
         mockHorse(10L, "Storm");
         User vet = mockVet(5L);
         when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
-        when(headTrainerWorkloadService.selectLeastLoadedHeadTrainerId()).thenReturn(Optional.of(8L));
 
         GroomIncidentReport incident = new GroomIncidentReport();
         incident.setId(50L);
@@ -171,7 +157,6 @@ class CareScheduleHardeningTests {
 
         assertEquals(CareScheduleStatus.SCHEDULED, urgent.getStatus());
         assertEquals(5L, urgent.getVeterinarianId());
-        assertEquals(8L, urgent.getTrainerId());
 
         verify(notificationService).sendAssignmentNotification(
                 eq(5L),
@@ -179,15 +164,6 @@ class CareScheduleHardeningTests {
                 eq(102L),
                 eq(10L),
                 eq(NotificationTypes.ADMISSION_VET_ASSIGNED),
-                anyString(),
-                anyString()
-        );
-        verify(notificationService).sendAssignmentNotification(
-                eq(8L),
-                eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
-                eq(102L),
-                eq(10L),
-                eq(NotificationTypes.CARE_SCHEDULE_TRAINER_ASSIGNED),
                 anyString(),
                 anyString()
         );
@@ -212,54 +188,6 @@ class CareScheduleHardeningTests {
     }
 
     @Test
-    @DisplayName("Stage 2D: trainerId được gán cho Trainer có tải thấp nhất; tie-break chọn ID nhỏ hơn")
-    void assignRequestedSchedule_picksLeastLoadedHeadTrainer_breaksTiesOnLowerId() {
-        mockHorse(10L, "Hero");
-        User vet = mockVet(5L);
-        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
-
-        // When multiple trainers are available, tie break selects trainer with lower id
-        when(headTrainerWorkloadService.selectLeastLoadedHeadTrainerId()).thenReturn(Optional.of(3L));
-
-        CareSchedule schedule = new CareSchedule();
-        schedule.setId(301L);
-        schedule.setHorseId(10L);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
-        schedule.setCareType(CareType.INITIAL);
-
-        service.assignRequestedSchedule(schedule);
-
-        assertEquals(3L, schedule.getTrainerId());
-        assertEquals(5L, schedule.getVeterinarianId());
-        assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus());
-    }
-
-    @Test
-    @DisplayName("Stage 2D: Khi không có Head Trainer hợp lệ, lịch vẫn được xếp với trainerId = null")
-    void assignRequestedSchedule_noEligibleTrainer_stillSchedulesVetWithNullTrainer() {
-        mockHorse(10L, "Hero");
-        User vet = mockVet(5L);
-        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
-        when(headTrainerWorkloadService.selectLeastLoadedHeadTrainerId()).thenReturn(Optional.empty());
-
-        CareSchedule schedule = new CareSchedule();
-        schedule.setId(302L);
-        schedule.setHorseId(10L);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
-        schedule.setCareType(CareType.INITIAL);
-
-        service.assignRequestedSchedule(schedule);
-
-        assertNull(schedule.getTrainerId());
-        assertEquals(5L, schedule.getVeterinarianId());
-        assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus());
-
-        // Trainer notification should not be sent
-        verify(notificationService, never()).sendAssignmentNotification(
-                isNull(), anyString(), anyLong(), anyLong(), eq(NotificationTypes.CARE_SCHEDULE_TRAINER_ASSIGNED), anyString(), anyString());
-    }
-
-    @Test
     @DisplayName("Stage 2D: Re-running scheduler không reassign lịch đã SCHEDULED")
     void reRunningScheduler_doesNotReassignOrDoubleCount() {
         CareSchedule alreadyScheduled = new CareSchedule();
@@ -267,7 +195,6 @@ class CareScheduleHardeningTests {
         alreadyScheduled.setHorseId(10L);
         alreadyScheduled.setStatus(CareScheduleStatus.SCHEDULED);
         alreadyScheduled.setVeterinarianId(5L);
-        alreadyScheduled.setTrainerId(8L);
 
         service.assignRequestedSchedule(alreadyScheduled);
 

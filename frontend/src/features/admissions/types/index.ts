@@ -172,7 +172,6 @@ export interface CareSchedule {
   id: number;
   horseId: number;
   veterinarianId?: number | null;
-  trainerId?: number | null;
   admissionId?: number | null;
   candidateName?: string;
   careType: CareType;
@@ -189,7 +188,6 @@ export interface CareScheduleDetail {
   schedule: CareSchedule;
   horse: HorseSummary | null;
   veterinarian: { id: number; fullName: string; email: string } | null;
-  trainer: { id: number; fullName: string; email: string } | null;
   healthRecord: {
     id: number;
     findings: string;
@@ -207,7 +205,6 @@ export interface CareScheduleFilters {
   admissionId?: number;
   vetId?: number;
   veterinarianId?: number;
-  trainerId?: number | null;
   page?: number;
   size?: number;
 }
@@ -322,20 +319,20 @@ export interface VetReviewResponse {
   admissionId: number;
   status: AdmissionStatus;
   veterinarianId: number;
-  decision: string;
-  trainingDecision?: TrainingDecision;
-  trainingStatus?: TrainingDecision;
-  restrictionDetails?: string | null;
+  /** @deprecated Use trainingDecision instead */
+  decision: string | null;
+  trainingDecision: TrainingDecision;
+  restrictionDetails: string | null;
   feedback: string | null;
   reviewedAt: string;
   horseId: number;
   horseStatus: string;
-  quarantineStallId: number;
-  quarantineStallCode: string;
+  quarantineStallId: number | null;
+  quarantineStallCode: string | null;
   initialExamStatus: string;
   healthRecordId: number | null;
   vetExamId?: number;
-  careScheduleId?: number;
+  careScheduleId: number;
 }
 
 export interface GroomQueueFilters {

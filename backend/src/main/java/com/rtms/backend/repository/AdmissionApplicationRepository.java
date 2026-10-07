@@ -27,8 +27,6 @@ public interface AdmissionApplicationRepository
 
     List<AdmissionApplication> findByStatus(AdmissionStatus status);
 
-    List<AdmissionApplication> findByTrainerId(Long trainerId);
-
     List<AdmissionApplication> findByGroomId(Long groomId);
 
     Optional<AdmissionApplication> findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus status);
@@ -61,17 +59,10 @@ public interface AdmissionApplicationRepository
     Optional<AdmissionApplication> findByIdForUpdate(@Param("id") Long id);
 
     @Query("""
-            SELECT a.trainerId, COUNT(a.id)
-            FROM AdmissionApplication a
-            WHERE a.trainerId IN :trainerIds
-              AND a.status NOT IN :terminalStatuses
-            GROUP BY a.trainerId
+            SELECT a FROM AdmissionApplication a
+            WHERE a.status = 'TRAINER_REVIEW'
+              AND NOT EXISTS (SELECT 1 FROM TrainerSchedule ts WHERE ts.admissionId = a.id)
+            ORDER BY a.submittedAt ASC, a.id ASC
             """)
-    List<Object[]> countActiveAdmissionsByTrainerIds(
-            @Param("trainerIds") Collection<Long> trainerIds,
-            @Param("terminalStatuses") Collection<AdmissionStatus> terminalStatuses);
-
-    List<AdmissionApplication> findByStatusInAndTrainerIdIsNull(
-            Collection<AdmissionStatus> statuses,
-            Pageable pageable);
+    List<AdmissionApplication> findPendingTrainerScheduleAdmissions();
 }

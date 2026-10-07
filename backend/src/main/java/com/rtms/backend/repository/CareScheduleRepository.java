@@ -77,6 +77,9 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     List<CareSchedule> findByVeterinarianIdAndCareTypeAndStatus(
             Long veterinarianId, CareType careType, CareScheduleStatus status);
 
+    List<CareSchedule> findByVeterinarianIdAndCareTypeAndStatusIn(
+            Long veterinarianId, CareType careType, Collection<CareScheduleStatus> statuses);
+
     boolean existsByVeterinarianIdAndStatus(Long veterinarianId, CareScheduleStatus status);
 
     boolean existsByHorseIdAndStatus(Long horseId, CareScheduleStatus status);
@@ -100,15 +103,13 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             + "AND (:status IS NULL OR cs.status = :status) AND (:careType IS NULL OR cs.careType = :careType) "
             + "AND (:horseId IS NULL OR cs.horseId = :horseId) AND (:vetId IS NULL OR cs.veterinarianId = :vetId) "
             + "AND (:admissionId IS NULL OR cs.admissionId = :admissionId) "
-            + "AND ((:role = 'HEAD_TRAINER' AND a.trainerId = :userId) OR (:role = 'GROOM' AND a.groomId = :userId))")
-    Page<CareSchedule> findFilteredForAdmissionAssignee(@Param("status") CareScheduleStatus status,
+            + "AND a.groomId = :userId")
+    Page<CareSchedule> findFilteredForGroom(@Param("status") CareScheduleStatus status,
             @Param("careType") CareType careType, @Param("horseId") Long horseId,
             @Param("vetId") Long vetId, @Param("admissionId") Long admissionId,
-            @Param("userId") Long userId, @Param("role") String role, Pageable pageable);
-    boolean existsByAdmissionIdAndVeterinarianId(Long admissionId, Long veterinarianId);
+            @Param("userId") Long userId, Pageable pageable);
 
-    @Query("SELECT cs.trainerId, COUNT(cs.id) FROM CareSchedule cs WHERE cs.trainerId IN :trainerIds AND cs.status IN :statuses GROUP BY cs.trainerId")
-    List<Object[]> countActiveCareSchedulesByTrainerIds(@Param("trainerIds") Collection<Long> trainerIds, @Param("statuses") Collection<CareScheduleStatus> statuses);
+    boolean existsByAdmissionIdAndVeterinarianId(Long admissionId, Long veterinarianId);
 
     @Query("""
         SELECT cs FROM CareSchedule cs

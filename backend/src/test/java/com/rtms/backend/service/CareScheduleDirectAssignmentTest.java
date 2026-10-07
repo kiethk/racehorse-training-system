@@ -25,7 +25,7 @@ class CareScheduleDirectAssignmentTest {
     private VeterinarianProfileRepository profiles;
     private GroomIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private HeadTrainerWorkloadService headTrainerWorkloadService;
+    private TrainerScheduleAssignmentService trainerScheduleAssignmentService;
     private CareScheduleService service;
 
     @BeforeEach
@@ -36,7 +36,7 @@ class CareScheduleDirectAssignmentTest {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(GroomIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        headTrainerWorkloadService = mock(HeadTrainerWorkloadService.class);
+        trainerScheduleAssignmentService = mock(TrainerScheduleAssignmentService.class);
         service = new CareScheduleService(
                 schedules,
                 horses,
@@ -51,7 +51,7 @@ class CareScheduleDirectAssignmentTest {
                 events,
                 mock(EntityManager.class),
                 mock(NotificationService.class),
-                headTrainerWorkloadService);
+                trainerScheduleAssignmentService);
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(schedules.findScheduledForHorse(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
         when(schedules.findScheduledForVet(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
