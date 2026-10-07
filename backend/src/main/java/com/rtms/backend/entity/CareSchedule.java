@@ -25,6 +25,18 @@ public class CareSchedule {
     @Column(name = "source_incident_id")
     private Long sourceIncidentId;
 
+    @Column(name = "source_schedule_id")
+    private Long sourceScheduleId;
+
+    @Column(name = "requested_by_id")
+    private Long requestedById;
+
+    @Column(name = "idempotency_key", length = 100)
+    private String idempotencyKey;
+
+    @Column(name = "request_fingerprint", length = 64)
+    private String requestFingerprint;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "care_type", nullable = false, length = 50)
     private CareType careType;
@@ -86,6 +98,18 @@ public class CareSchedule {
 
     public Long getSourceIncidentId() { return sourceIncidentId; }
     public void setSourceIncidentId(Long sourceIncidentId) { this.sourceIncidentId = sourceIncidentId; }
+
+    public Long getSourceScheduleId() { return sourceScheduleId; }
+    public void setSourceScheduleId(Long sourceScheduleId) { this.sourceScheduleId = sourceScheduleId; }
+
+    public Long getRequestedById() { return requestedById; }
+    public void setRequestedById(Long requestedById) { this.requestedById = requestedById; }
+
+    public String getIdempotencyKey() { return idempotencyKey; }
+    public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
+
+    public String getRequestFingerprint() { return requestFingerprint; }
+    public void setRequestFingerprint(String requestFingerprint) { this.requestFingerprint = requestFingerprint; }
 
     public CareType getCareType() { return careType; }
     public void setCareType(CareType careType) { this.careType = careType; }

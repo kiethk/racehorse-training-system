@@ -124,16 +124,8 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
   const healthSection = (
     <AdmissionInfoSection title="Veterinary Examination & Vitals">
       <InfoRow
-        label="Veterinary Decision"
-        value={
-          detail.vetDecision
-            ? detail.vetDecision === 'APPROVED'
-              ? 'PASSED (Eligible)'
-              : detail.vetDecision === 'RECHECK_REQUIRED'
-              ? 'RECHECK REQUIRED'
-              : 'REJECTED'
-            : 'Pending Decision'
-        }
+        label="Veterinary Training Decision"
+        value={detail.vetTrainingDecision ?? healthRecords.find((record) => record.trainingDecision)?.trainingDecision ?? 'Pending Decision'}
       />
       {detail.vetFeedback && (
         <div className="pt-2 border-t border-[var(--color-border)]">
@@ -207,7 +199,10 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
             <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
               Veterinarian
             </h4>
-            <InfoRow label="Decision" value={detail.vetDecision} />
+            <InfoRow
+              label="Training Decision"
+              value={detail.vetTrainingDecision ?? healthRecords.find((record) => record.trainingDecision)?.trainingDecision}
+            />
             <InfoRow label="Date & Time" value={datetime(detail.vetReviewedAt)} />
             <InfoRow label="Feedback" value={detail.vetFeedback} />
           </div>

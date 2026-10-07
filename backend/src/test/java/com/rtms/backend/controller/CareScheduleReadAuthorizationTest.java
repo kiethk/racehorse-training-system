@@ -1,6 +1,8 @@
 package com.rtms.backend.controller;
 
+import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.CareScheduleService;
+import com.rtms.backend.service.UrgentAlertStreamService;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -22,8 +24,9 @@ class CareScheduleReadAuthorizationTest {
     @EnableMethodSecurity
     static class Config {
         @Bean CareScheduleService service() { return mock(CareScheduleService.class); }
-        @Bean CareScheduleController controller(CareScheduleService service) {
-            return new CareScheduleController(service);
+        @Bean UrgentAlertStreamService urgentAlertStreamService() { return mock(UrgentAlertStreamService.class); }
+        @Bean CareScheduleController controller(CareScheduleService service, UrgentAlertStreamService streamService) {
+            return new CareScheduleController(service, streamService);
         }
     }
 
@@ -33,9 +36,10 @@ class CareScheduleReadAuthorizationTest {
             var controller = context.getBean(CareScheduleController.class);
             SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                     "owner", "", List.of(new SimpleGrantedAuthority("ROLE_OWNER"))));
-            assertThrows(AccessDeniedException.class, () -> controller.getById(1L));
+            var owner = new AuthenticatedUser(1L, "owner@example.com", "HORSE_OWNER");
+            assertThrows(AccessDeniedException.class, () -> controller.getById(1L, owner));
             assertThrows(AccessDeniedException.class,
-                    () -> controller.list(null, null, null, null, null, PageRequest.of(0, 10)));
+                    () -> controller.list(null, null, null, null, null, PageRequest.of(0, 10), owner));
             verifyNoInteractions(context.getBean(CareScheduleService.class));
         } finally {
             SecurityContextHolder.clearContext();
@@ -51,8 +55,9 @@ class CareScheduleReadAuthorizationTest {
             when(service.listSchedules(null, null, null, null, 2L, page)).thenReturn(Page.empty());
             SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                     "vet", "", List.of(new SimpleGrantedAuthority("VET_EXAM_VIEW"))));
-            assertDoesNotThrow(() -> controller.getById(1L));
-            assertDoesNotThrow(() -> controller.list(null, null, null, null, 2L, page));
+            var manager = new AuthenticatedUser(9L, "manager@example.com", "CLUB_MANAGER");
+            assertDoesNotThrow(() -> controller.getById(1L, manager));
+            assertDoesNotThrow(() -> controller.list(null, null, null, null, 2L, page, manager));
             verify(service).getScheduleDetail(1L);
             verify(service).listSchedules(null, null, null, null, 2L, page);
         } finally {

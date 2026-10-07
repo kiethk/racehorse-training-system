@@ -16,9 +16,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.id = :id")
     Optional<User> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
 
-    @Query("SELECT u FROM User u WHERE u.isActive = true AND u.role.name = 'VETERINARIAN' ORDER BY u.id")
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.id IN :ids ORDER BY u.id")
+    List<User> findByIdsForUpdate(@org.springframework.data.repository.query.Param("ids") java.util.Collection<Long> ids);
+
+    @Query("SELECT u FROM User u JOIN VeterinarianProfile vp ON vp.userId = u.id "
+            + "WHERE u.isActive = true AND u.role.name = 'VETERINARIAN' "
+            + "AND vp.licenseNumber IS NOT NULL AND TRIM(vp.licenseNumber) <> '' ORDER BY u.id")
     List<User> findActiveVeterinarians();
 
-    @Query("SELECT u FROM User u WHERE u.isActive = true AND u.role.name = 'HEAD_TRAINER' ORDER BY u.id")
+    @Query("SELECT u FROM User u JOIN TrainerProfile tp ON tp.userId = u.id "
+            + "WHERE u.isActive = true AND u.role.name = 'HEAD_TRAINER' "
+            + "AND tp.certificationNumber IS NOT NULL AND TRIM(tp.certificationNumber) <> '' ORDER BY u.id")
     List<User> findActiveHeadTrainers();
 }

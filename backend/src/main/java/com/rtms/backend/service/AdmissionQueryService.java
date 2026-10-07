@@ -2,6 +2,26 @@ package com.rtms.backend.service;
 
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.dto.AdmissionCapacitySummary;
+import com.rtms.backend.dto.VetAdmissionQueueItemResponse;
+import com.rtms.backend.dto.VetQueueSummaryResponse;
+import com.rtms.backend.dto.CareScheduleResponse;
+import com.rtms.backend.entity.User;
+import com.rtms.backend.enums.CareScheduleStatus;
+import com.rtms.backend.enums.CareType;
+import com.rtms.backend.security.AuthenticatedUser;
+import org.springframework.data.domain.Pageable;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import com.rtms.backend.dto.AdmissionDetailResponse;
 import com.rtms.backend.dto.AdmissionDocumentResponse;
 import com.rtms.backend.dto.AdmissionSummaryResponse;
@@ -42,6 +62,7 @@ public class AdmissionQueryService {
     private final AdmissionFileStorage fileStorage;
     private final UserRepository userRepository;
     private final CareScheduleRepository careScheduleRepository;
+    private final com.rtms.backend.repository.TrainerScheduleRepository trainerScheduleRepository;
 
     @Autowired
     public AdmissionQueryService(
@@ -52,7 +73,8 @@ public class AdmissionQueryService {
             HealthRecordRepository healthRecordRepository,
             AdmissionFileStorage fileStorage,
             UserRepository userRepository,
-            CareScheduleRepository careScheduleRepository) {
+            CareScheduleRepository careScheduleRepository,
+            com.rtms.backend.repository.TrainerScheduleRepository trainerScheduleRepository) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.admissionDocumentRepository = admissionDocumentRepository;
@@ -61,9 +83,9 @@ public class AdmissionQueryService {
         this.fileStorage = fileStorage;
         this.userRepository = userRepository;
         this.careScheduleRepository = careScheduleRepository;
+        this.trainerScheduleRepository = trainerScheduleRepository;
     }
 
-    @Deprecated
     public AdmissionQueryService(
             AdmissionApplicationRepository admissionApplicationRepository,
             CandidateHorseProfileRepository candidateHorseProfileRepository,
@@ -72,10 +94,9 @@ public class AdmissionQueryService {
             HealthRecordRepository healthRecordRepository,
             AdmissionFileStorage fileStorage,
             UserRepository userRepository,
-            Object vetExamRepository,
             CareScheduleRepository careScheduleRepository) {
         this(admissionApplicationRepository, candidateHorseProfileRepository, admissionDocumentRepository,
-                stableStallRepository, healthRecordRepository, fileStorage, userRepository, careScheduleRepository);
+                stableStallRepository, healthRecordRepository, fileStorage, userRepository, careScheduleRepository, null);
     }
 
     public AdmissionQueryService(
@@ -177,8 +198,9 @@ public class AdmissionQueryService {
 
         response.setAdmissionId(admission.getId());
         response.setOwnerId(admission.getOwnerId());
-        response.setOwnerName(userRepository.findById(admission.getOwnerId())
-                .map(com.rtms.backend.entity.User::getFullName).orElse(null));
+        response.setOwnerName(admission.getOwnerId() == null ? null
+                : userRepository.findById(admission.getOwnerId())
+                        .map(com.rtms.backend.entity.User::getFullName).orElse(null));
         response.setStatus(admission.getStatus());
         response.setQuarantineStallId(admission.getQuarantineStallId());
 
@@ -192,10 +214,20 @@ public class AdmissionQueryService {
 
         response.setVeterinarianId(admission.getVeterinarianId());
         response.setVetDecision(admission.getVetDecision());
+        response.setVetTrainingDecision(admission.getVetTrainingDecision());
         response.setVetFeedback(admission.getVetFeedback());
         response.setVetReviewedAt(admission.getVetReviewedAt());
 
-        response.setTrainerId(admission.getTrainerId());
+        Long trainerId = null;
+        if (trainerScheduleRepository != null) {
+            trainerId = trainerScheduleRepository.findByAdmissionId(admission.getId())
+                    .map(com.rtms.backend.entity.TrainerSchedule::getTrainerId)
+                    .orElse(null);
+        }
+        response.setTrainerId(trainerId);
+        response.setTrainerName(trainerId == null ? null
+                : userRepository.findById(trainerId)
+                        .map(com.rtms.backend.entity.User::getFullName).orElse(null));
 
         response.setTrainerFeedback(admission.getTrainerFeedback());
         response.setTrainerReviewedAt(admission.getTrainerReviewedAt());
@@ -264,6 +296,13 @@ public class AdmissionQueryService {
                 .map(fileStorage::downloadUrl)
                 .orElse(null);
 
+        Long trainerId = null;
+        if (trainerScheduleRepository != null) {
+            trainerId = trainerScheduleRepository.findByAdmissionId(admission.getId())
+                    .map(com.rtms.backend.entity.TrainerSchedule::getTrainerId)
+                    .orElse(null);
+        }
+
         return new AdmissionSummaryResponse(
                 admission.getId(),
                 admission.getStatus(),
@@ -274,7 +313,7 @@ public class AdmissionQueryService {
                 admission.getQuarantineStallId(),
                 stallCode,
                 imageUrl,
-                admission.getTrainerId(),
+                trainerId,
                 admission.getTrainerReviewedAt());
     }
 
@@ -292,5 +331,159 @@ public class AdmissionQueryService {
                 true;
             default -> false;
         };
+    }
+
+    public void assertVetAssignedOrManager(Long admissionId, AuthenticatedUser user) {
+        if ("CLUB_MANAGER".equals(user.getRole())) {
+            return;
+        }
+        if ("VETERINARIAN".equals(user.getRole())) {
+            boolean isAssigned = (careScheduleRepository != null && careScheduleRepository.existsByAdmissionIdAndVeterinarianId(admissionId, user.getUserId()))
+                    || admissionApplicationRepository.findById(admissionId)
+                            .map(a -> Objects.equals(a.getVeterinarianId(), user.getUserId()))
+                            .orElse(false);
+            if (!isAssigned) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "You are not assigned to examine this admission");
+            }
+            return;
+        }
+        throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied");
+    }
+
+    public List<AdmissionSummaryResponse> getAdmissionsForVet(Long vetId, AdmissionStatus status) {
+        if (careScheduleRepository == null) return List.of();
+        Set<Long> assignedIds = careScheduleRepository.findVetAdmissionSchedules(vetId).stream()
+                .map(com.rtms.backend.entity.CareSchedule::getAdmissionId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        return admissionApplicationRepository.findAllById(assignedIds).stream()
+                .filter(a -> status == null || a.getStatus() == status)
+                .sorted(Comparator.comparing(AdmissionApplication::getSubmittedAt).reversed()
+                        .thenComparing(AdmissionApplication::getId).reversed())
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
+    public List<AdmissionSummaryResponse> getAdmissionsForTrainer(Long trainerId, AdmissionStatus status) {
+        if (trainerScheduleRepository == null) return List.of();
+        List<com.rtms.backend.entity.TrainerSchedule> schedules = trainerScheduleRepository.findByTrainerId(trainerId);
+        List<Long> admissionIds = schedules.stream()
+                .map(com.rtms.backend.entity.TrainerSchedule::getAdmissionId)
+                .toList();
+        return admissionApplicationRepository.findAllById(admissionIds).stream()
+                .filter(a -> status == null || a.getStatus() == status)
+                .sorted(Comparator.comparing(AdmissionApplication::getSubmittedAt).reversed()
+                        .thenComparing(AdmissionApplication::getId).reversed())
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
+    public List<AdmissionSummaryResponse> getAdmissionsForGroom(Long groomId, AdmissionStatus status) {
+        return admissionApplicationRepository.findByGroomId(groomId).stream()
+                .filter(a -> status == null || a.getStatus() == status)
+                .sorted(Comparator.comparing(AdmissionApplication::getSubmittedAt).reversed()
+                        .thenComparing(AdmissionApplication::getId).reversed())
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
+    /** Removes capacity/final-manager data that is unrelated to a Vet's assigned clinical work. */
+    public AdmissionDetailResponse getVetAdmissionDetail(Long admissionId) {
+        AdmissionDetailResponse response = getAdmissionDetail(admissionId);
+        response.setCapacity(null);
+        response.setAvailableRegularStalls(null);
+        response.setManagerId(null);
+        response.setManagerDecision(null);
+        response.setManagerFeedback(null);
+        response.setManagerReviewedAt(null);
+        return response;
+    }
+
+    public Page<VetAdmissionQueueItemResponse> getVetQueue(
+            Long vetId,
+            String search,
+            String pill,
+            AdmissionStatus admissionStatus,
+            CareScheduleStatus scheduleStatus,
+            CareType careType,
+            String priority,
+            Pageable pageable) {
+
+        if (careScheduleRepository == null) {
+            return Page.empty(pageable);
+        }
+
+        String normalizedSearch = search == null ? "" : search.trim();
+        String normalizedPill = pill == null ? "" : pill.trim().toUpperCase(Locale.ROOT);
+        String normalizedPriority = priority == null ? "" : priority.trim().toUpperCase(Locale.ROOT);
+        Page<com.rtms.backend.entity.CareSchedule> schedulePage = careScheduleRepository.findVetQueuePage(
+                vetId, !normalizedSearch.isBlank(), normalizedSearch, normalizedPill,
+                admissionStatus, scheduleStatus, careType, normalizedPriority, pageable);
+        if (schedulePage.isEmpty()) return Page.empty(pageable);
+
+        Set<Long> admissionIds = schedulePage.getContent().stream()
+                .map(com.rtms.backend.entity.CareSchedule::getAdmissionId).collect(Collectors.toSet());
+        Map<Long, AdmissionApplication> admissions = admissionApplicationRepository.findAllById(admissionIds).stream()
+                .collect(Collectors.toMap(AdmissionApplication::getId, a -> a));
+        Map<Long, CandidateHorseProfile> candidates = candidateHorseProfileRepository.findByAdmissionIdIn(admissionIds).stream()
+                .collect(Collectors.toMap(CandidateHorseProfile::getAdmissionId, c -> c));
+        Map<Long, Long> admissionTrainerMap = new HashMap<>();
+        if (trainerScheduleRepository != null) {
+            for (Long aId : admissionIds) {
+                trainerScheduleRepository.findByAdmissionId(aId)
+                        .ifPresent(ts -> admissionTrainerMap.put(aId, ts.getTrainerId()));
+            }
+        }
+        Set<Long> userIds = admissions.values().stream()
+                .map(AdmissionApplication::getOwnerId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        userIds.addAll(admissionTrainerMap.values());
+        Map<Long, User> users = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+        Set<Long> stallIds = admissions.values().stream().map(AdmissionApplication::getQuarantineStallId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, StableStall> stalls = stableStallRepository.findAllById(stallIds).stream()
+                .collect(Collectors.toMap(StableStall::getId, s -> s));
+
+        List<VetAdmissionQueueItemResponse> items = schedulePage.getContent().stream().map(cs -> {
+            AdmissionApplication adm = admissions.get(cs.getAdmissionId());
+            CandidateHorseProfile cand = candidates.get(cs.getAdmissionId());
+            if (adm == null || cand == null) return null;
+            User owner = users.get(adm.getOwnerId());
+            Long trainerId = admissionTrainerMap.get(adm.getId());
+            User trainer = trainerId == null ? null : users.get(trainerId);
+            StableStall stall = stalls.get(adm.getQuarantineStallId());
+            return new VetAdmissionQueueItemResponse(
+                    adm.getId(),
+                    adm.getOwnerId(),
+                    owner == null ? null : owner.getFullName(),
+                    cand.getName(),
+                    cand.getBreed(),
+                    cand.getDateOfBirth(),
+                    adm.getStatus(),
+                    adm.getSubmittedAt(),
+                    adm.getQuarantineStallId(),
+                    stall == null ? null : stall.getStallCode(),
+                    adm.getHorseId(),
+                    trainerId,
+                    trainer == null ? null : trainer.getFullName(),
+                    CareScheduleResponse.from(cs)
+            );
+        }).filter(Objects::nonNull).toList();
+        return new org.springframework.data.domain.PageImpl<>(items, pageable, schedulePage.getTotalElements());
+    }
+
+    public VetQueueSummaryResponse getVetQueueSummary(Long vetId) {
+        if (careScheduleRepository == null) {
+            return new VetQueueSummaryResponse(0, 0, 0);
+        }
+        long total = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
+                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED,
+                        CareScheduleStatus.IN_PROGRESS));
+        long awaiting = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
+                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));
+        long inProgress = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
+                vetId, List.of(CareScheduleStatus.IN_PROGRESS));
+        return new VetQueueSummaryResponse(total, awaiting, inProgress);
     }
 }

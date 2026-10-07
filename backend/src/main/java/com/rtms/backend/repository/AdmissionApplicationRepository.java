@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,8 @@ public interface AdmissionApplicationRepository
     List<AdmissionApplication> findByOwnerIdOrderBySubmittedAtDesc(Long ownerId);
 
     List<AdmissionApplication> findByStatus(AdmissionStatus status);
+
+    List<AdmissionApplication> findByGroomId(Long groomId);
 
     Optional<AdmissionApplication> findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus status);
 
@@ -55,25 +58,14 @@ public interface AdmissionApplicationRepository
             """)
     Optional<AdmissionApplication> findByIdForUpdate(@Param("id") Long id);
 
-    /**
-     * Hàng chờ đánh giá của MỘT Trainer.
-     *
-     * Điều kiện "trainerId IS NULL" là cầu nối tạm thời: bước Thú y sẽ chạy
-     * thuật toán chọn Trainer và ghi sẵn trainer_id, nhưng phần đó chưa làm.
-     * Nếu lọc chặt ngay (chỉ trainer_id = :trainerId) thì toàn bộ đơn đang có
-     * trong cơ sở dữ liệu — vốn đều mang trainer_id = NULL — biến mất khỏi mọi
-     * hàng chờ, không ai đánh giá được gì nữa.
-     *
-     * Đơn chưa phân công vẫn hiện cho mọi Trainer (đúng như hành vi cũ), còn
-     * đơn ĐÃ phân công thì chỉ người được chỉ định thấy. Khi bước Thú y hoàn
-     * thành, mọi đơn mới đều có trainer_id nên nhánh NULL tự khô cạn mà không
-     * cần sửa gì ở đây.
-     *
-     * TODO(sau khi Thú y gán trainer_id tự động): bỏ "OR a.trainerId IS NULL".
-     *
-     * Sắp xếp tăng dần theo ngày nộp — đơn chờ lâu nhất lên đầu, tránh để hồ
-     * sơ cũ bị chôn dưới đáy danh sách.
-     */
+    @Query("""
+            SELECT a FROM AdmissionApplication a
+            WHERE a.status = 'TRAINER_REVIEW'
+              AND NOT EXISTS (SELECT 1 FROM TrainerSchedule ts WHERE ts.admissionId = a.id)
+            ORDER BY a.submittedAt ASC, a.id ASC
+            """)
+    List<AdmissionApplication> findPendingTrainerScheduleAdmissions();
+
     @Query("""
             SELECT a FROM AdmissionApplication a
             WHERE a.status = :status
@@ -83,13 +75,6 @@ public interface AdmissionApplicationRepository
     List<AdmissionApplication> findTrainerPendingQueue(@Param("trainerId") Long trainerId,
                                                        @Param("status") AdmissionStatus status);
 
-    /**
-     * Hồ sơ Trainer này ĐÃ đánh giá — không lọc theo status.
-     *
-     * Lý do không dùng status: đánh giá xong là đơn chuyển MANAGER_REVIEW, rồi
-     * có thể thành APPROVED hoặc REJECTED. Không trạng thái nào mang nghĩa
-     * "Trainer đã duyệt", nên dấu vết duy nhất là trainer_reviewed_at.
-     */
     List<AdmissionApplication> findByTrainerIdAndTrainerReviewedAtIsNotNullOrderByTrainerReviewedAtDesc(
             Long trainerId);
 }

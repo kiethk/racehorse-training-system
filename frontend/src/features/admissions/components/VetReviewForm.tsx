@@ -9,10 +9,11 @@ import { Pill } from '@/components/ui/StatusBadge';
 import { admissionsApi } from '../services/api';
 import type {
   CareType,
+  CareSchedule,
   CareScheduleStatus,
+  CompleteCareScheduleRequest,
   HorseHealthMetricRequest,
   TrainingDecision,
-  VetDecision,
   VetReviewRequest,
   VetReviewResponse,
 } from '../types';
@@ -87,14 +88,7 @@ const restrictionOptions = [
   'Isolation protocol; no contact with other horses',
 ];
 
-const rejectionReasonOptions = [
-  'Communicable or infectious disease risk',
-  'Severe musculoskeletal unsoundness',
-  'Serious cardiovascular or respiratory abnormality',
-  'Neurological condition incompatible with safe training',
-  'Medical condition requiring care beyond admission capability',
-  'Permanent medical disqualification from training',
-];
+
 
 const followUpDescriptionOptions = [
   'Routine follow-up recheck examination',
@@ -230,10 +224,29 @@ const emptyMetrics: Record<MetricField, string> = {
   notes: '',
 };
 
-function tomorrowIsoDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return date.toISOString().slice(0, 10);
+const BUSINESS_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
+function businessDateFromToday(dayOffset: number) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const year = Number(parts.find((part) => part.type === 'year')?.value);
+  const month = Number(parts.find((part) => part.type === 'month')?.value);
+  const day = Number(parts.find((part) => part.type === 'day')?.value);
+  const target = new Date(Date.UTC(year, month - 1, day + dayOffset));
+
+  return [
+    target.getUTCFullYear(),
+    String(target.getUTCMonth() + 1).padStart(2, '0'),
+    String(target.getUTCDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function tomorrowBusinessDate() {
+  return businessDateFromToday(1);
 }
 
 function getMetricBorderTone(
@@ -302,7 +315,7 @@ export interface VetReviewFormProps {
   careType?: CareType;
   scheduleStatus?: CareScheduleStatus;
   onStartExam?: () => Promise<void>;
-  onSuccess: (result: VetReviewResponse, scheduleWarning?: string) => void;
+  onSuccess: (result: VetReviewResponse | CareSchedule, completionKind: 'INITIAL' | 'CARE_SCHEDULE') => void;
   onDirtyChange?: (dirty: boolean) => void;
 }
 
@@ -318,18 +331,22 @@ export function VetReviewForm({
   onSuccess,
   onDirtyChange,
 }: VetReviewFormProps) {
+  const draftStorageKey = careScheduleId
+    ? `draft:care-schedule:${careScheduleId}`
+    : `draft:admission:${admissionId}`;
   // Decision Panel State
   const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>('ALLOWED');
   const [restrictionDetails, setRestrictionDetails] = useState('');
   const [scheduleFollowUp, setScheduleFollowUp] = useState(false);
   const [followUpDate, setFollowUpDate] = useState('');
   const [followUpDescription, setFollowUpDescription] = useState('Routine follow-up recheck examination');
+  const [followUpIdempotencyKey, setFollowUpIdempotencyKey] = useState(() =>
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `follow-up-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
 
-  // Rejection Modal State
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [customRejectionReason, setCustomRejectionReason] = useState('');
-  const [rejectionError, setRejectionError] = useState('');
+
 
   // Clinical Findings Form State
   const [physicalExamConfirmed, setPhysicalExamConfirmed] = useState(true);
@@ -372,13 +389,14 @@ export function VetReviewForm({
     scheduleFollowUp?: boolean;
     followUpDate?: string;
     followUpDescription?: string;
+    followUpIdempotencyKey?: string;
     timestamp: string;
   } | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
-      const storageKey = `draft:admission:${admissionId}`;
-      const fallbackKey = `rtms_vet_draft_${admissionId}`;
-      const saved = localStorage.getItem(storageKey) || localStorage.getItem(fallbackKey);
+      const storageKey = draftStorageKey;
+      const fallbackKey = careScheduleId ? null : `rtms_vet_draft_${admissionId}`;
+      const saved = localStorage.getItem(storageKey) || (fallbackKey ? localStorage.getItem(fallbackKey) : null);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.timestamp) {
@@ -411,11 +429,16 @@ export function VetReviewForm({
     findings.trim() !== '' ||
     diagnosis.trim() !== '' ||
     examMode !== 'NORMAL' ||
+    Object.values(systemFindings).some((f) => f !== 'NORMAL') ||
+    selectedSymptoms.length > 1 ||
+    (selectedSymptoms.length === 1 && selectedSymptoms[0] !== 'No symptoms observed') ||
+    structuredDiagnosis !== 'Clinically healthy' ||
     treatment.trim() !== '' ||
     notes.trim() !== '' ||
     trainingDecision !== 'ALLOWED' ||
     restrictionDetails.trim() !== '' ||
-    scheduleFollowUp;
+    scheduleFollowUp ||
+    followUpDate !== '';
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -438,13 +461,14 @@ export function VetReviewForm({
     if (availableDraft.scheduleFollowUp !== undefined) setScheduleFollowUp(availableDraft.scheduleFollowUp);
     if (availableDraft.followUpDate !== undefined) setFollowUpDate(availableDraft.followUpDate);
     if (availableDraft.followUpDescription !== undefined) setFollowUpDescription(availableDraft.followUpDescription);
+    if (availableDraft.followUpIdempotencyKey) setFollowUpIdempotencyKey(availableDraft.followUpIdempotencyKey);
     setDraftSavedTime(availableDraft.timestamp);
     setAvailableDraft(null);
   };
 
   const handleDiscardAvailableDraft = () => {
     try {
-      localStorage.removeItem(`draft:admission:${admissionId}`);
+      localStorage.removeItem(draftStorageKey);
       localStorage.removeItem(`rtms_vet_draft_${admissionId}`);
     } catch {
       // Ignore storage errors in restricted environments
@@ -454,7 +478,7 @@ export function VetReviewForm({
 
   const handleSaveDraft = useCallback(() => {
     try {
-      const storageKey = `draft:admission:${admissionId}`;
+      const storageKey = draftStorageKey;
       const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const payload = {
         metrics,
@@ -472,16 +496,19 @@ export function VetReviewForm({
         scheduleFollowUp,
         followUpDate,
         followUpDescription,
+        followUpIdempotencyKey,
         timestamp,
       };
       localStorage.setItem(storageKey, JSON.stringify(payload));
-      localStorage.setItem(`rtms_vet_draft_${admissionId}`, JSON.stringify(payload));
+      if (!careScheduleId) localStorage.setItem(`rtms_vet_draft_${admissionId}`, JSON.stringify(payload));
       setDraftSavedTime(timestamp);
     } catch {
       // Storage write error
     }
   }, [
     admissionId,
+    careScheduleId,
+    draftStorageKey,
     metrics,
     examMode,
     systemFindings,
@@ -497,11 +524,12 @@ export function VetReviewForm({
     scheduleFollowUp,
     followUpDate,
     followUpDescription,
+    followUpIdempotencyKey,
   ]);
 
   const handleClearDraft = () => {
     try {
-      localStorage.removeItem(`draft:admission:${admissionId}`);
+      localStorage.removeItem(draftStorageKey);
       localStorage.removeItem(`rtms_vet_draft_${admissionId}`);
     } catch {
       // Ignore storage errors in restricted environments
@@ -520,17 +548,21 @@ export function VetReviewForm({
     setRestrictionDetails('');
     setScheduleFollowUp(false);
     setFollowUpDate('');
+    setFollowUpDescription('Routine follow-up recheck examination');
+    setPhysicalExamConfirmed(true);
+    setFieldErrors({});
     setDraftSavedTime(null);
   };
 
   // 15-second debounce auto-save when dirty (FR-CHUNG-93)
+  // Do NOT autosave while an unrestored draft banner is pending user action to prevent overwriting
   useEffect(() => {
-    if (!isDirty || isGated) return;
+    if (!isDirty || isGated || availableDraft !== null) return;
     const timer = setTimeout(() => {
       handleSaveDraft();
     }, 15000);
     return () => clearTimeout(timer);
-  }, [isDirty, isGated, handleSaveDraft]);
+  }, [isDirty, isGated, availableDraft, handleSaveDraft]);
 
   const generatedSymptoms =
     examMode === 'NORMAL'
@@ -548,7 +580,7 @@ export function VetReviewForm({
   const effectiveFindings = isUrgent ? findings.trim() : generatedFindings;
   const effectiveDiagnosis = isUrgent ? diagnosis.trim() : structuredDiagnosis;
 
-  function validate(rejectMode = false): Record<string, string> {
+  function validate(): Record<string, string> {
     const errors: Record<string, string> = {};
 
     if (!physicalExamConfirmed) {
@@ -564,28 +596,21 @@ export function VetReviewForm({
       errors.diagnosis = 'Clinical diagnosis is required.';
     }
     if (
-      !rejectMode &&
       !isUrgent &&
       examMode === 'ABNORMAL' &&
       bodySystems.every(({ key }) => systemFindings[key] === 'NORMAL')
     ) {
       errors.systemFindings = 'Select at least one abnormal or not-examined body system.';
     }
-    if (!rejectMode && (trainingDecision === 'RESTRICTED' || trainingDecision === 'BLOCKED')) {
+    if (trainingDecision === 'RESTRICTED' || trainingDecision === 'BLOCKED') {
       if (!restrictionDetails.trim()) {
         errors.restrictionDetails = 'Restriction details are mandatory when training is restricted or blocked.';
       }
     }
-    if (rejectMode) {
-      const finalReason = rejectionReason === 'OTHER' ? customRejectionReason.trim() : rejectionReason.trim();
-      if (!finalReason) {
-        errors.rejectionReason = 'A formal medical rejection reason is mandatory when rejecting admission.';
-      }
-    }
-    if (!rejectMode && scheduleFollowUp) {
+    if (scheduleFollowUp) {
       if (!followUpDate) {
         errors.followUpDate = 'Follow-up date is required when scheduling follow-up care.';
-      } else if (followUpDate < tomorrowIsoDate()) {
+      } else if (followUpDate < tomorrowBusinessDate()) {
         errors.followUpDate = 'Follow-up date must be at least one day in the future.';
       }
       if (!followUpDescription.trim()) {
@@ -593,14 +618,12 @@ export function VetReviewForm({
       }
     }
 
-    if (!rejectMode) {
-      for (const cfg of metricConfigs) {
-        const val = metrics[cfg.key];
-        if (val && val.trim()) {
-          const num = Number(val);
-          if (Number.isNaN(num) || num <= 0) {
-            errors[cfg.key] = `${cfg.label} must be a valid positive number.`;
-          }
+    for (const cfg of metricConfigs) {
+      const val = metrics[cfg.key];
+      if (val && val.trim()) {
+        const num = Number(val);
+        if (Number.isNaN(num) || num <= 0) {
+          errors[cfg.key] = `${cfg.label} must be a valid positive number.`;
         }
       }
     }
@@ -614,7 +637,7 @@ export function VetReviewForm({
       setFormError('Care schedule is SCHEDULED. Physical examination must be started before recording and submitting findings.');
       return;
     }
-    const errors = validate(false);
+    const errors = validate();
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
       setFormError('Please resolve all validation errors before submitting.');
@@ -624,23 +647,19 @@ export function VetReviewForm({
     setShowApproveConfirm(true);
   }
 
-  async function executeSubmit(rejectMode = false, confirmedRejectionReason = '') {
+  async function executeSubmit() {
     if (inFlight.current) return;
     if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS') {
       setFormError('Care schedule is SCHEDULED. Physical examination must be started before recording and submitting findings.');
       setShowApproveConfirm(false);
-      setShowRejectModal(false);
       return;
     }
 
-    const errors = validate(rejectMode);
+    const errors = validate();
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       const msg = 'Please resolve all validation errors before submitting.';
       setFormError(msg);
-      if (rejectMode) {
-        setRejectionError(Object.values(errors).join(' '));
-      }
       setShowApproveConfirm(false);
       return;
     }
@@ -658,81 +677,71 @@ export function VetReviewForm({
         ]),
     ) as HorseHealthMetricRequest;
 
-    const legacyDecision: VetDecision = rejectMode
-      ? 'REJECTED'
-      : trainingDecision === 'RESTRICTED' && scheduleFollowUp
-        ? 'RECHECK_REQUIRED'
-        : 'APPROVED';
-
-    const effectiveTrainingDecision: TrainingDecision = rejectMode ? 'BLOCKED' : trainingDecision;
-    const finalRejectionReason = confirmedRejectionReason.trim() || undefined;
-
-    const request: VetReviewRequest = {
-      careScheduleId: careScheduleId ?? undefined,
-      decision: legacyDecision,
-      trainingDecision: effectiveTrainingDecision,
-      restrictionDetails: !rejectMode ? (restrictionDetails.trim() || undefined) : undefined,
-      rejectAdmission: rejectMode,
-      rejectionReason: finalRejectionReason,
-      physicalExamConfirmed: true,
-      findings: effectiveFindings,
-      diagnosis: effectiveDiagnosis,
-      treatment: treatment.trim() || undefined,
-      symptoms: effectiveSymptoms || undefined,
-      notes: notes.trim() || undefined,
-      feedback: notes.trim() || finalRejectionReason,
-      followUpDate: !rejectMode && scheduleFollowUp ? followUpDate : undefined,
-      metrics: Object.keys(metricValues).length ? [metricValues] : undefined,
-    };
+    const nextScheduleRequest = scheduleFollowUp && followUpDate ? {
+      horseId: horseId ?? undefined,
+      admissionId,
+      careType: 'ROUTINE' as const,
+      scheduledDate: followUpDate,
+      description: followUpDescription.trim() || 'Follow-up veterinary examination',
+      idempotencyKey: followUpIdempotencyKey,
+    } : undefined;
 
     try {
-      const result = await admissionsApi.vetReview(admissionId, request);
-
-      // Create next care schedule if follow-up is requested
-      let scheduleWarning = '';
-      if (!rejectMode && scheduleFollowUp) {
-        if (!horseId) {
-          scheduleWarning = 'Horse ID is not yet assigned to this admission; follow-up care schedule could not be created automatically. Please schedule it after horse profile creation.';
-        } else {
-          try {
-            await admissionsApi.createNextSchedule({
-              horseId,
-              admissionId,
-              careType: 'ROUTINE',
-              scheduledDate: followUpDate,
-              description: followUpDescription.trim() || 'Follow-up veterinary recheck',
-            });
-          } catch (scheduleErr) {
-            console.error('Next care schedule creation failed:', scheduleErr);
-            scheduleWarning = `Follow-up care schedule could not be created automatically: ${scheduleErr instanceof Error ? scheduleErr.message : 'server error'}. Please schedule it manually.`;
-          }
-        }
+      let result: VetReviewResponse | CareSchedule;
+      let completionKind: 'INITIAL' | 'CARE_SCHEDULE';
+      if (careType === 'INITIAL') {
+        const request: VetReviewRequest = {
+          careScheduleId: careScheduleId ?? undefined,
+          decision: 'APPROVED',
+          trainingDecision,
+          restrictionDetails: restrictionDetails.trim() || undefined,
+          rejectAdmission: false,
+          physicalExamConfirmed: true,
+          findings: effectiveFindings,
+          diagnosis: effectiveDiagnosis,
+          treatment: treatment.trim() || undefined,
+          symptoms: effectiveSymptoms || undefined,
+          notes: notes.trim() || undefined,
+          feedback: notes.trim() || undefined,
+          nextSchedule: nextScheduleRequest,
+          metrics: Object.keys(metricValues).length ? [metricValues] : undefined,
+        };
+        result = await admissionsApi.vetReview(admissionId, request);
+        completionKind = 'INITIAL';
+      } else {
+        if (!careScheduleId) throw new Error('The care schedule identifier is missing. Reload this examination and try again.');
+        const request: CompleteCareScheduleRequest = {
+          findings: effectiveFindings,
+          diagnosis: effectiveDiagnosis,
+          symptoms: effectiveSymptoms || undefined,
+          treatment: treatment.trim() || undefined,
+          trainingDecision,
+          restrictionDetails: restrictionDetails.trim() || undefined,
+          notes: notes.trim() || undefined,
+          nextSchedule: nextScheduleRequest,
+          metrics: Object.keys(metricValues).length ? [metricValues] : undefined,
+        };
+        result = await admissionsApi.completeCareSchedule(careScheduleId, request);
+        completionKind = 'CARE_SCHEDULE';
       }
 
       // Clear draft on successful submission
       try {
-        localStorage.removeItem(`draft:admission:${admissionId}`);
+        localStorage.removeItem(draftStorageKey);
         localStorage.removeItem(`rtms_vet_draft_${admissionId}`);
       } catch {
         // Ignore
       }
 
       setShowApproveConfirm(false);
-      setShowRejectModal(false);
-      onSuccess(result, scheduleWarning || undefined);
+      onSuccess(result, completionKind);
     } catch (cause) {
       if (cause instanceof ApiError) {
         const errorMsg = `${cause.status === 403 ? 'Permission denied' : cause.status === 409 ? 'Review state conflict' : 'Review failed'} (${cause.status}${cause.errorCode ? ` · ${cause.errorCode}` : ''}): ${cause.message}`;
         setFormError(errorMsg);
-        if (rejectMode) {
-          setRejectionError(errorMsg);
-        }
       } else {
         const errorMsg = cause instanceof Error ? cause.message : 'Failed to submit review.';
         setFormError(errorMsg);
-        if (rejectMode) {
-          setRejectionError(errorMsg);
-        }
       }
       setShowApproveConfirm(false);
     } finally {
@@ -740,24 +749,6 @@ export function VetReviewForm({
       setSubmitting(false);
     }
   }
-
-  const handleConfirmRejectionSubmit = () => {
-    const finalReason = rejectionReason === 'OTHER' ? customRejectionReason.trim() : rejectionReason.trim();
-    if (!finalReason) {
-      setRejectionError('A formal medical rejection reason is mandatory.');
-      return;
-    }
-    const errors = validate(true);
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      setRejectionError(Object.values(errors).join(' '));
-      return;
-    }
-    setRejectionError('');
-    executeSubmit(true, finalReason);
-  };
-
-  const isFormValid = Object.keys(validate(false)).length === 0;
 
   return (
     <>
@@ -798,6 +789,25 @@ export function VetReviewForm({
                 Start Examination
               </Button>
             )}
+          </div>
+        )}
+        {/* Gate Warning when REQUESTED */}
+        {scheduleStatus === 'REQUESTED' && (
+          <div
+            role="status"
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-3 text-[13px] text-[var(--color-info)]"
+          >
+            <div className="flex items-center gap-2">
+              <Icon name="clock" size={18} className="shrink-0 text-[var(--color-info)]" />
+              <div>
+                <strong className="block text-[13px] font-bold">
+                  Care schedule is REQUESTED
+                </strong>
+                <p className="text-[12px] opacity-90">
+                  This examination schedule is waiting for slot scheduling and assignment before it can be started.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1433,9 +1443,7 @@ export function VetReviewForm({
                     const checked = e.target.checked;
                     setScheduleFollowUp(checked);
                     if (checked && !followUpDate) {
-                      const target = new Date();
-                      target.setDate(target.getDate() + 7);
-                      setFollowUpDate(target.toISOString().slice(0, 10));
+                      setFollowUpDate(businessDateFromToday(7));
                     }
                   }}
                   className="h-4 w-4 rounded accent-[var(--color-primary)]"
@@ -1454,7 +1462,7 @@ export function VetReviewForm({
                     <input
                       id="field-followup-date"
                       type="date"
-                      min={tomorrowIsoDate()}
+                      min={tomorrowBusinessDate()}
                       value={followUpDate}
                       onChange={(e) => {
                         setFollowUpDate(e.target.value);
@@ -1466,9 +1474,7 @@ export function VetReviewForm({
                     />
                     <div className="mt-1 flex gap-1">
                       {[3, 7, 14].map((days) => {
-                        const target = new Date();
-                        target.setDate(target.getDate() + days);
-                        const iso = target.toISOString().slice(0, 10);
+                        const iso = businessDateFromToday(days);
                         return (
                           <button
                             key={days}
@@ -1543,24 +1549,8 @@ export function VetReviewForm({
                 icon="check"
                 className="w-full justify-center bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
               >
-                {scheduleFollowUp ? 'Complete & Schedule Follow-Up' : 'Complete & Approve'}
+                Complete Examination
               </Button>
-
-              {/* Dedicated Red Outline Reject Admission Button */}
-              <button
-                type="button"
-                disabled={submitting || startingExam || isGated}
-                onClick={() => {
-                  setRejectionReason('');
-                  setCustomRejectionReason('');
-                  setRejectionError('');
-                  setShowRejectModal(true);
-                }}
-                className="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-danger)] px-3 py-2 text-[12px] font-bold text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)] disabled:opacity-50"
-              >
-                <Icon name="x" size={14} />
-                Reject Admission (Từ chối)
-              </button>
 
               {/* Save Draft Action */}
               <button
@@ -1597,41 +1587,28 @@ export function VetReviewForm({
             </div>
           )}
           <div className="flex items-center justify-between gap-2.5">
-            <button
-              type="button"
-              disabled={submitting || startingExam || isGated}
-              onClick={() => {
-                setRejectionReason('');
-                setCustomRejectionReason('');
-                setRejectionError('');
-                setShowRejectModal(true);
-              }}
-              className="flex-1 rounded-[var(--radius-md)] border border-[var(--color-danger)] px-3 py-2 text-[12px] font-bold text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] disabled:opacity-50 transition-colors"
-            >
-              Từ chối
-            </button>
             <Button
               type="submit"
               variant="primary"
               loading={submitting}
               disabled={submitting || startingExam || isGated}
               icon="check"
-              className="flex-1 justify-center bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] text-[12px] py-2"
+              className="w-full justify-center bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] text-[12px] py-2"
             >
-              {scheduleFollowUp ? 'Lên lịch tái khám' : 'Hoàn thành & Duyệt'}
+              Complete Examination
             </Button>
           </div>
         </div>
       </form>
 
-      {/* Approve Confirmation Dialog */}
+      {/* Complete Examination Confirmation Dialog */}
       <ConfirmDialog
         open={showApproveConfirm}
-        title="Submit Veterinary Clearance & Approval?"
+        title="Submit Veterinary Examination?"
         description={
           <div className="space-y-2 text-[13px]">
             <p>
-              You are certifying medical clearance for <strong>{candidateName}</strong> with training decision{' '}
+              You are certifying medical examination for <strong>{candidateName}</strong> with training decision{' '}
               <strong className="uppercase text-[var(--color-primary)]">{trainingDecision}</strong>.
             </p>
             {scheduleFollowUp && (
@@ -1640,92 +1617,18 @@ export function VetReviewForm({
               </div>
             )}
             <p className="text-[12px] text-[var(--color-text-secondary)]">
-              This action writes the official clinical record and advances the admission workflow.
+              {careType === 'INITIAL'
+                ? 'This action writes the official clinical record and advances the admission to trainer review.'
+                : 'This action completes only this care schedule and does not change the admission workflow.'}
             </p>
           </div>
         }
-        confirmLabel="Confirm & Approve"
+        confirmLabel="Confirm & Submit"
         cancelLabel="Back to Review"
         tone="primary"
         loading={submitting}
-        onConfirm={() => executeSubmit(false)}
+        onConfirm={() => executeSubmit()}
         onCancel={() => setShowApproveConfirm(false)}
-      />
-
-      {/* Reject Admission Confirmation Dialog with Mandatory Reason */}
-      <ConfirmDialog
-        open={showRejectModal}
-        title="Confirm Medical Admission Rejection?"
-        description={
-          <div className="space-y-3 text-[13px]">
-            <p className="text-[var(--color-danger)] font-semibold">
-              Rejection permanently disqualifies candidate on veterinary grounds and releases quarantine facility.
-            </p>
-
-            <div>
-              <label
-                htmlFor="modal-rejection-reason"
-                className="mb-1 block text-[12px] font-bold text-[var(--color-text-primary)]"
-              >
-                Mandatory Medical Rejection Reason <span className="text-[var(--color-danger)]">*</span>
-              </label>
-              <select
-                id="modal-rejection-reason"
-                value={rejectionReason}
-                onChange={(e) => {
-                  setRejectionReason(e.target.value);
-                  setRejectionError('');
-                }}
-                className="w-full rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-surface)] p-2 text-[12px] text-[var(--color-text-primary)] outline-none"
-              >
-                <option value="">Select disqualifying medical pathology...</option>
-                {rejectionReasonOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-                <option value="OTHER">Other medical reason (specify below)...</option>
-              </select>
-            </div>
-
-            {rejectionReason === 'OTHER' && (
-              <div>
-                <label
-                  htmlFor="modal-custom-rejection"
-                  className="mb-1 block text-[11px] font-medium text-[var(--color-text-secondary)]"
-                >
-                  Custom Rejection Explanation <span className="text-[var(--color-danger)]">*</span>
-                </label>
-                <textarea
-                  id="modal-custom-rejection"
-                  rows={2}
-                  value={customRejectionReason}
-                  onChange={(e) => {
-                    setCustomRejectionReason(e.target.value);
-                    setRejectionError('');
-                  }}
-                  className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[12px] outline-none"
-                  placeholder="Detail exact veterinary grounds..."
-                />
-              </div>
-            )}
-
-            {rejectionError && (
-              <p className="text-[11px] font-bold text-[var(--color-danger)]">
-                {rejectionError}
-              </p>
-            )}
-          </div>
-        }
-        confirmLabel="Reject Admission"
-        cancelLabel="Cancel"
-        tone="danger"
-        loading={submitting}
-        confirmDisabled={
-          !rejectionReason || (rejectionReason === 'OTHER' && !customRejectionReason.trim())
-        }
-        onConfirm={handleConfirmRejectionSubmit}
-        onCancel={() => setShowRejectModal(false)}
       />
     </>
   );

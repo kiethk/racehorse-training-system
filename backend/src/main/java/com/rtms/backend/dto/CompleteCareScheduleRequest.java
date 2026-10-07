@@ -31,6 +31,7 @@ public class CompleteCareScheduleRequest {
     private String notes;
     private java.time.LocalDate followUpDate;
     private List<@NotNull @Valid HorseHealthMetricRequest> metrics;
+    private CreateNextScheduleRequest nextSchedule;
 
     public String getFindings() { return findings; }
     public void setFindings(String findings) { this.findings = findings; }
@@ -55,6 +56,9 @@ public class CompleteCareScheduleRequest {
 
     public java.time.LocalDate getFollowUpDate() { return followUpDate; }
     public void setFollowUpDate(java.time.LocalDate followUpDate) { this.followUpDate = followUpDate; }
+
+    public CreateNextScheduleRequest getNextSchedule() { return nextSchedule; }
+    public void setNextSchedule(CreateNextScheduleRequest nextSchedule) { this.nextSchedule = nextSchedule; }
 
     public List<HorseHealthMetricRequest> getMetrics() { return metrics; }
     public void setMetrics(List<HorseHealthMetricRequest> metrics) { this.metrics = metrics; }

@@ -4,16 +4,19 @@ import {
   AdmissionDetailResponse,
   AdmissionDocument,
   CareSchedule,
+  CareScheduleDetail,
   CareScheduleFilters,
   CompleteCareScheduleRequest,
-  CreateNextScheduleRequest,
   GroomQueueFilters,
   GroomQueueResponse,
   GroomReviewRequest,
   HorseHealthMetricResponse,
   ManagerReviewRequest,
   PageResponse,
-  PendingVetOfferResponse,
+  UrgentAssignmentAlert,
+  VetAdmissionQueueItem,
+  VetQueueSummary,
+  VetQueueFilters,
   VetReviewRequest,
   VetReviewResponse,
 } from '../types';
@@ -55,29 +58,38 @@ export const admissionsApi = {
     return response.data;
   },
 
-  // Care schedule and vet offer operations
-  getPendingOffers: async (): Promise<PendingVetOfferResponse[]> => {
-    const response = await apiGet<unknown>('/api/vet-offers/pending');
-    if (Array.isArray(response)) return response;
-    if (response && typeof response === 'object' && 'data' in response) {
-      const data = (response as { data: unknown }).data;
-      if (Array.isArray(data)) return data;
-      if (data && typeof data === 'object' && 'content' in data && Array.isArray((data as { content: unknown }).content)) {
-        return (data as { content: PendingVetOfferResponse[] }).content;
-      }
-    }
-    if (response && typeof response === 'object' && 'content' in response && Array.isArray((response as { content: unknown }).content)) {
-      return (response as { content: PendingVetOfferResponse[] }).content;
-    }
-    return [];
+  getVetQueue: async (filters: VetQueueFilters = {}): Promise<PageResponse<VetAdmissionQueueItem>> => {
+    const params = new URLSearchParams();
+    if (filters.search?.trim()) params.set('search', filters.search.trim());
+    if (filters.pill && filters.pill !== 'ALL') params.set('pill', filters.pill);
+    if (filters.admissionStatus && filters.admissionStatus !== 'ALL') params.set('admissionStatus', filters.admissionStatus);
+    if (filters.scheduleStatus && filters.scheduleStatus !== 'ALL') params.set('scheduleStatus', filters.scheduleStatus);
+    if (filters.careType && filters.careType !== 'ALL') params.set('careType', filters.careType);
+    if (filters.priority && filters.priority !== 'ALL') params.set('priority', filters.priority);
+    params.set('page', String(filters.page ?? 0));
+    params.set('size', String(filters.size ?? 10));
+    const response = await apiGet<ApiResponse<PageResponse<VetAdmissionQueueItem>>>(`/api/admissions/vet/queue?${params}`);
+    return response.data;
   },
 
-  acceptOffer: async (offerId: number): Promise<void> => {
-    await apiPost(`/api/vet-offers/${offerId}/accept`, {});
+  getVetQueueSummary: async (): Promise<VetQueueSummary> => {
+    const response = await apiGet<ApiResponse<VetQueueSummary>>('/api/admissions/vet/summary');
+    return response.data;
   },
 
-  declineOffer: async (offerId: number): Promise<void> => {
-    await apiPost(`/api/vet-offers/${offerId}/decline`, {});
+  getVetAdmissionDetail: async (id: number): Promise<AdmissionDetailResponse> => {
+    const response = await apiGet<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/vet/${id}`);
+    return response.data;
+  },
+
+  getPendingUrgentAlerts: async (): Promise<UrgentAssignmentAlert[]> => {
+    const response = await apiGet<ApiResponse<UrgentAssignmentAlert[]>>('/api/care-schedules/urgent-alerts/pending');
+    return response.data;
+  },
+
+  getUrgentCase: async (scheduleId: number): Promise<UrgentAssignmentAlert> => {
+    const response = await apiGet<ApiResponse<UrgentAssignmentAlert>>(`/api/care-schedules/urgent-alerts/${scheduleId}`);
+    return response.data;
   },
 
   getCareSchedules: async (filters: CareScheduleFilters = {}): Promise<PageResponse<CareSchedule>> => {
@@ -112,6 +124,11 @@ export const admissionsApi = {
     return { content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 };
   },
 
+  getCareScheduleDetail: async (id: number): Promise<CareScheduleDetail> => {
+    const response = await apiGet<ApiResponse<CareScheduleDetail>>(`/api/care-schedules/${id}`);
+    return response.data;
+  },
+
   startCareSchedule: async (id: number): Promise<CareSchedule> => {
     const response = await apiPost<ApiResponse<CareSchedule> | CareSchedule>(`/api/care-schedules/${id}/start`, {});
     if (response && 'data' in response && response.data) return response.data;
@@ -120,12 +137,6 @@ export const admissionsApi = {
 
   completeCareSchedule: async (id: number, data: CompleteCareScheduleRequest): Promise<CareSchedule> => {
     const response = await apiPost<ApiResponse<CareSchedule> | CareSchedule>(`/api/care-schedules/${id}/complete`, data);
-    if (response && 'data' in response && response.data) return response.data;
-    return response as CareSchedule;
-  },
-
-  createNextSchedule: async (data: CreateNextScheduleRequest): Promise<CareSchedule> => {
-    const response = await apiPost<ApiResponse<CareSchedule> | CareSchedule>('/api/care-schedules/create-next', data);
     if (response && 'data' in response && response.data) return response.data;
     return response as CareSchedule;
   },
