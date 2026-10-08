@@ -599,10 +599,25 @@ public class CareScheduleService {
         Horse horse = horseRepository.findByIdForUpdate(schedule.getHorseId()).orElse(null);
         if (horse == null) return;
 
-        LocalDateTime slot = findAssignmentSlot(schedule);
+        LocalDateTime now = LocalDateTime.now();
+        Map<Long, Integer> overdueAppointmentsByVet = new HashMap<>();
+        Map<Long, Integer> scheduledMinutesByVet = new HashMap<>();
+        for (CareSchedule assigned : careScheduleRepository
+                .findByStatusInAndScheduledAtIsNotNull(List.of(
+                        CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS))) {
+            if (assigned.getVeterinarianId() == null) continue;
+            scheduledMinutesByVet.merge(assigned.getVeterinarianId(),
+                    assigned.getDurationMinutes() > 0 ? assigned.getDurationMinutes() : DEFAULT_DURATION_MINUTES,
+                    Integer::sum);
+            if (assigned.getScheduledAt().isBefore(now)) {
+                overdueAppointmentsByVet.merge(assigned.getVeterinarianId(), 1, Integer::sum);
+            }
+        }
+
+        LocalDateTime slot = findAssignmentSlot(schedule, overdueAppointmentsByVet, scheduledMinutesByVet);
         if (slot == null) return;
 
-        List<User> ranked = rankVeterinarians(schedule, slot);
+        List<User> ranked = rankVeterinarians(schedule, slot, overdueAppointmentsByVet, scheduledMinutesByVet);
         for (User candidate : ranked) {
             User lockedVet = userRepository.findByIdForUpdate(candidate.getId()).orElse(null);
             if (!isStillEligible(lockedVet)) continue;
@@ -645,7 +660,8 @@ public class CareScheduleService {
         }
     }
 
-    private LocalDateTime findAssignmentSlot(CareSchedule schedule) {
+    private LocalDateTime findAssignmentSlot(CareSchedule schedule,
+            Map<Long, Integer> overdueAppointmentsByVet, Map<Long, Integer> scheduledMinutesByVet) {
         if (schedule.getCareType() == CareType.URGENT) return LocalDateTime.now();
 
         LocalDateTime requested = schedule.getRequestedAt();
@@ -666,7 +682,8 @@ public class CareScheduleService {
                 LocalDateTime slot = day.atTime(time);
                 if (requested != null && slot.isBefore(requested)) continue;
                 if (slot.isBefore(LocalDateTime.now())) continue;
-                if (!horseHasConflict(schedule, slot) && !rankVeterinarians(schedule, slot).isEmpty()) {
+                if (!horseHasConflict(schedule, slot)
+                        && !rankVeterinarians(schedule, slot, overdueAppointmentsByVet, scheduledMinutesByVet).isEmpty()) {
                     return slot;
                 }
             }
@@ -682,7 +699,8 @@ public class CareScheduleService {
                 .stream().anyMatch(other -> !Objects.equals(other.getId(), schedule.getId()) && overlaps(schedule, slot, other));
     }
 
-    private List<User> rankVeterinarians(CareSchedule schedule, LocalDateTime slot) {
+    private List<User> rankVeterinarians(CareSchedule schedule, LocalDateTime slot,
+            Map<Long, Integer> overdueAppointmentsByVet, Map<Long, Integer> scheduledMinutesByVet) {
         List<User> vets = Optional.ofNullable(userRepository.findActiveVeterinarians()).orElseGet(List::of);
         LocalDateTime dayStart = slot.toLocalDate().atStartOfDay();
         LocalDateTime dayEnd = dayStart.plusDays(1);
@@ -703,7 +721,9 @@ public class CareScheduleService {
                 .filter(v -> careScheduleRepository.findScheduledForVet(v.getId(), CareScheduleStatus.SCHEDULED)
                         .stream().noneMatch(other -> overlaps(schedule, slot, other)))
                 .sorted(Comparator
-                        .comparingInt((User v) -> horsesByVet.getOrDefault(v.getId(), Set.of()).size())
+                        .comparingInt((User v) -> overdueAppointmentsByVet.getOrDefault(v.getId(), 0))
+                        .thenComparingInt(v -> scheduledMinutesByVet.getOrDefault(v.getId(), 0))
+                        .thenComparingInt(v -> horsesByVet.getOrDefault(v.getId(), Set.of()).size())
                         .thenComparingInt(v -> minutesByVet.getOrDefault(v.getId(), 0))
                         .thenComparing((User v) -> schedule.getCareType() == CareType.URGENT ? false
                                 : !careScheduleRepository.existsByVeterinarianIdAndHorseIdAndStatusIn(

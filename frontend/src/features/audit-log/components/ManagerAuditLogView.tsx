@@ -273,7 +273,7 @@ export function ManagerAuditLogView() {
                         <MethodBadge method={log.httpMethod} />
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-mono text-xs text-[var(--color-text-primary)] max-w-xs md:max-w-md lg:max-w-lg truncate block" title={log.requestPath}>
+                        <span className="font-metric text-xs text-[var(--color-text-primary)] max-w-xs md:max-w-md lg:max-w-lg truncate block" title={log.requestPath}>
                           {log.requestPath}
                         </span>
                       </td>

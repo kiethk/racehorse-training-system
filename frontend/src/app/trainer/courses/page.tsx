@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { TrainingCoursesView } from '@/features/training/components/TrainingCoursesView';
 
 export const metadata: Metadata = {
-  title: 'Khóa học & Bài tập | Huấn luyện viên',
+  title: 'Courses and subjects | Trainer | RTMS',
 };
 
 export default function TrainerCoursesPage() {

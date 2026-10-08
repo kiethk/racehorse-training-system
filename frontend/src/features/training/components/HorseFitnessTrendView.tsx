@@ -8,6 +8,8 @@ import { FitnessTrendChart } from './FitnessTrendChart';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
+import { ScreenLayout } from '@/components/ui/ScreenLayout';
+import { displayError, formatDate } from '@/lib/display';
 
 interface HorseFitnessTrendViewProps {
   horseId: number;
@@ -27,7 +29,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
 
-  // Tính toán khoảng ngày theo preset
+  // Calculate the date range for the selected preset.
   const getDateRange = useCallback((selectedPreset: DatePreset) => {
     const today = new Date();
     const to = today.toISOString().split('T')[0];
@@ -70,8 +72,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
       setTrend(trendData);
       setReadiness(readinessData);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu thể lực của chiến mã';
-      setError(message);
+      setError(displayError(err, 'Unable to load horse fitness data.'));
     } finally {
       setLoading(false);
     }
@@ -92,7 +93,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
     loadData();
   };
 
-  // Tính các chỉ số tóm tắt nhanh từ trend
+  // Calculate summary metrics from the trend.
   const completedCount = trend.length;
   const avgRating =
     completedCount > 0
@@ -113,7 +114,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
       : null;
 
   return (
-    <div className="space-y-6">
+    <ScreenLayout variant="detail">
       {/* Breadcrumb & Navigation */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
@@ -128,11 +129,11 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
             href="/trainer/horses"
             className="hover:text-[var(--color-text-primary)] transition-colors"
           >
-            Chiến mã
+            Horses
           </Link>
           <span>/</span>
           <span className="font-semibold text-[var(--color-text-primary)]">
-            {horse?.name || `Chiến mã #${horseId}`}
+            {horse?.name || `Horse #${horseId}`}
           </span>
         </div>
 
@@ -140,12 +141,12 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
           <Link href="/trainer/horses">
             <Button variant="secondary" size="sm">
               <Icon name="arrow-left" size={14} />
-              Quay lại danh sách
+              Back to horses
             </Button>
           </Link>
           <Button variant="secondary" size="sm" onClick={() => loadData()}>
             <Icon name="refresh" size={14} />
-            Làm mới
+            Refresh
           </Button>
         </div>
       </div>
@@ -155,10 +156,10 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
-              {horse?.name || `Chiến mã #${horseId}`}
+              {horse?.name || `Horse #${horseId}`}
             </h1>
             {horse?.ueln && (
-              <span className="rounded bg-[var(--color-surface-subtle)] px-2 py-0.5 text-xs font-mono font-medium text-[var(--color-text-secondary)]">
+              <span className="rounded bg-[var(--color-surface-subtle)] px-2 py-0.5 text-xs font-metric font-medium text-[var(--color-text-secondary)]">
                 UELN: {horse.ueln}
               </span>
             )}
@@ -169,20 +170,20 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
             )}
           </div>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            Theo dõi xu hướng thể lực, phân tích nguy cơ chấn thương và tiến độ phát triển
+            Track fitness trends, injury risks and development progress.
           </p>
         </div>
 
         {/* Quick stat highlights */}
         <div className="flex items-center gap-6">
           <div className="text-right">
-            <span className="text-xs uppercase text-[var(--color-text-muted)]">Số buổi đã tập</span>
+            <span className="text-xs uppercase text-[var(--color-text-muted)]">Completed sessions</span>
             <p className="font-metric text-xl font-bold text-[var(--color-text-primary)]">
               {completedCount}
             </p>
           </div>
           <div className="text-right">
-            <span className="text-xs uppercase text-[var(--color-text-muted)]">Phong độ TB</span>
+            <span className="text-xs uppercase text-[var(--color-text-muted)]">Average performance</span>
             <p className="font-metric text-xl font-bold text-emerald-600">
               {avgRating ? `${avgRating}/10` : '-'}
             </p>
@@ -206,11 +207,11 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Cảnh Báo Thể Lực & Rủi Ro Chấn Thương (Thời Gian Thực)
+            Fitness and injury risk alerts
           </h2>
           {alerts.length > 0 && (
             <span className="rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 text-xs font-semibold">
-              {alerts.length} cảnh báo đang kích hoạt
+              {alerts.length} active alerts
             </span>
           )}
         </div>
@@ -219,9 +220,9 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
           <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20 p-4 text-emerald-800 dark:text-emerald-300">
             <Icon name="check" size={20} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
             <div>
-              <p className="text-sm font-semibold">Chỉ số thể lực trong ngưỡng an toàn</p>
+              <p className="text-sm font-semibold">Fitness indicators are within safe ranges</p>
               <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                Không phát hiện quá tải nhịp tim, hồi phục kém hay sự cố lặp lại.
+                No elevated heart rate, poor recovery or recurring incidents detected.
               </p>
             </div>
           </div>
@@ -266,7 +267,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                           : 'bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200'
                       }`}
                     >
-                      {isDanger ? 'Nguy hiểm' : 'Cảnh báo'}
+                      {isDanger ? 'Critical' : 'Warning'}
                     </span>
                   </div>
 
@@ -280,7 +281,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
 
                   <div className="mt-3 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 text-[11px] text-[var(--color-text-secondary)]">
                     <span>
-                      Giá trị: <strong>{alert.metricValue}</strong> / Ngưỡng:{' '}
+                      Value: <strong>{alert.metricValue}</strong> / Threshold:{' '}
                       <strong>{alert.thresholdValue}</strong>
                     </span>
                     {/*
@@ -290,9 +291,9 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                       chỉ số xong thấy đèn chưa tắt lại tưởng hệ thống hỏng.
                     */}
                     <span>
-                      Ghi nhận ngày{' '}
+                      Recorded on{' '}
                       <strong>
-                        {new Date(alert.triggeredAt).toLocaleDateString('vi-VN')}
+                        {formatDate(alert.triggeredAt)}
                       </strong>
                     </span>
                   </div>
@@ -307,7 +308,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
       <Panel padded className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-[var(--color-text-secondary)]">
-            Thời gian:
+            Date range:
           </span>
           {(['7D', '30D', '90D', 'ALL'] as DatePreset[]).map((p) => (
             <button
@@ -321,12 +322,12 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
               }`}
             >
               {p === '7D'
-                ? '7 ngày'
+                ? '7 days'
                 : p === '30D'
-                ? '30 ngày'
+                ? '30 days'
                 : p === '90D'
-                ? '90 ngày'
-                : 'Tất cả'}
+                ? '90 days'
+                : 'All time'}
             </button>
           ))}
         </div>
@@ -337,7 +338,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
             className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-xs text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-            placeholder="Từ ngày"
+            aria-label="Start date"
           />
           <span className="text-xs text-[var(--color-text-muted)]">-</span>
           <input
@@ -345,11 +346,11 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
             className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-xs text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-            placeholder="Đến ngày"
+            aria-label="End date"
           />
           <Button type="submit" variant="secondary" size="sm">
             <Icon name="filter" size={12} />
-            Lọc
+            Apply
           </Button>
         </form>
       </Panel>
@@ -376,28 +377,28 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
       <Panel padded>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-            Lịch Sử Buổi Tập Đã Hoàn Thành ({trend.length})
+            Completed session history ({trend.length})
           </h3>
           <span className="text-xs text-[var(--color-text-muted)]">
-            Dữ liệu ghi nhận từ các buổi tập thực tế
+            Data from completed training sessions
           </span>
         </div>
 
         {trend.length === 0 ? (
           <div className="py-8 text-center text-xs text-[var(--color-text-muted)]">
-            Chưa có buổi tập nào hoàn thành trong khoảng thời gian đã chọn.
+            No completed sessions were found in the selected date range.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-[var(--color-border)] text-[var(--color-text-secondary)]">
-                  <th className="py-2.5 px-3 font-semibold">Ngày</th>
-                  <th className="py-2.5 px-3 font-semibold">Bài tập</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Cự ly (m)</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Vận tốc (TB / Max)</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Nhịp tim (TB / Max / Hồi phục)</th>
-                  <th className="py-2.5 px-3 font-semibold text-center">Phong độ</th>
+                  <th className="py-2.5 px-3 font-semibold">Date</th>
+                  <th className="py-2.5 px-3 font-semibold">Subject</th>
+                  <th className="py-2.5 px-3 font-semibold text-right">Distance (m)</th>
+                  <th className="py-2.5 px-3 font-semibold text-right">Speed (average / max)</th>
+                  <th className="py-2.5 px-3 font-semibold text-right">Heart rate (average / max / recovery)</th>
+                  <th className="py-2.5 px-3 font-semibold text-center">Performance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border-subtle)] text-[var(--color-text-primary)]">
@@ -465,6 +466,6 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
           </div>
         )}
       </Panel>
-    </div>
+    </ScreenLayout>
   );
 }

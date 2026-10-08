@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { ScreenLayout } from '@/components/ui/ScreenLayout';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { displayError, formatDate } from '@/lib/display';
 import { stableApi } from '@/features/stable/services/stableService';
 import type { UserSummary } from '@/features/stable/types';
 import { trainingApi } from '../services/trainingService';
@@ -36,8 +39,8 @@ export function PlanDetail({ planId }: PlanDetailProps) {
       setDetail(data);
       setGrooms(groomList);
     } catch (err) {
-      console.error('Lỗi khi nạp chi tiết kế hoạch:', err);
-      setError('Không tải được thông tin kế hoạch huấn luyện.');
+      console.error('Unable to load training plan details:', err);
+      setError(displayError(err, 'Unable to load training plan details.'));
     } finally {
       setLoading(false);
     }
@@ -70,7 +73,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
   if (error || !detail) {
     return (
       <Panel padded>
-        <EmptyState icon="alert-triangle" title="Không tìm thấy kế hoạch" description={error || 'Kế hoạch không tồn tại.'} />
+        <EmptyState icon="alert-triangle" title="Training plan unavailable" description={error || 'This training plan could not be found.'} />
       </Panel>
     );
   }
@@ -78,59 +81,27 @@ export function PlanDetail({ planId }: PlanDetailProps) {
   const { plan, workouts } = detail;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-              {detail.horseName ?? `Chiến mã #${plan.horseId}`}
-            </h1>
-            <Pill
-              tone={
-                plan.status === 'COMPLETED'
-                  ? 'success'
-                  : plan.status === 'ACTIVE'
-                  ? 'primary'
-                  : plan.status === 'CANCELLED'
-                  ? 'danger'
-                  : 'info'
-              }
-            >
-              {plan.status}
-            </Pill>
-          </div>
-          <p className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">
-            Khoá: <strong>{detail.courseName ?? `#${plan.courseId}`}</strong>
-          </p>
-          <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Từ {plan.startDate} đến {plan.endDate} • {workouts.length} buổi tập dự kiến
-          </p>
-        </div>
-
-        <div className="flex gap-2">
-          <Link href="/trainer/plans">
-            <Button variant="secondary" size="sm">
-              ← Danh sách kế hoạch
-            </Button>
-          </Link>
-          <Link href="/trainer/schedule">
-            <Button variant="secondary" size="sm">
-              Xem lịch Lot tổng thể
-            </Button>
-          </Link>
-        </div>
-      </div>
+    <ScreenLayout variant="detail">
+      <PageHeader
+        title={detail.horseName ?? `Horse #${plan.horseId}`}
+        description={<>Course: <strong>{detail.courseName ?? `#${plan.courseId}`}</strong><br />{formatDate(plan.startDate)} – {formatDate(plan.endDate)} · {workouts.length} planned sessions</>}
+        breadcrumbs={[{ label: 'Training plans', href: '/trainer/plans' }, { label: detail.horseName ?? `Horse #${plan.horseId}` }]}
+        actions={<>
+          <Pill tone={plan.status === 'COMPLETED' ? 'success' : plan.status === 'ACTIVE' ? 'primary' : plan.status === 'CANCELLED' ? 'danger' : 'info'}>{plan.status}</Pill>
+          <Link href="/trainer/schedule"><Button variant="secondary" size="sm">View lot schedule</Button></Link>
+        </>}
+      />
 
       {/* Thanh tiến độ */}
       <Panel padded>
         <div className="space-y-2">
           <div className="flex items-center justify-between text-[13px]">
             <span className="font-medium text-[var(--color-text-primary)]">
-              Tiến độ hoàn thành: {progress.completed}/{progress.total} buổi ({progress.percent}%)
+              Progress: {progress.completed}/{progress.total} sessions ({progress.percent}%)
             </span>
             {progress.cancelled > 0 && (
               <span className="text-[11px] text-[var(--color-text-muted)]">
-                (Đã huỷ {progress.cancelled} buổi)
+                ({progress.cancelled} cancelled)
               </span>
             )}
           </div>
@@ -146,12 +117,12 @@ export function PlanDetail({ planId }: PlanDetailProps) {
       {/* Danh sách các buổi tập */}
       <Panel padded>
         <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-4">
-          Lịch trình chi tiết từng buổi tập
+          Session schedule
         </h2>
 
         {workouts.length === 0 ? (
           <p className="text-[12px] text-[var(--color-text-muted)] italic">
-            Chưa có buổi tập nào được phân bổ trong kế hoạch này.
+            No sessions have been scheduled for this plan yet.
           </p>
         ) : (
           <div className="divide-y divide-[var(--color-border)]">
@@ -179,8 +150,8 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                     </Pill>
                   </div>
                   <div className="mt-1 text-[11px] text-[var(--color-text-secondary)] flex flex-wrap gap-3">
-                    <span>📅 Ngày: <strong>{w.lotDate}</strong></span>
-                    <span>⏱️ Khung giờ: <strong>{w.startTime} – {w.endTime}</strong></span>
+                    <span>Date: <strong>{formatDate(w.lotDate)}</strong></span>
+                    <span>Time: <strong>{w.startTime} – {w.endTime}</strong></span>
                     {/*
                       lotId DÙNG CHUNG với các chiến mã khác, còn assignedGroomId
                       là RIÊNG của con ngựa này. Hai thứ khác hẳn bản chất, nên
@@ -191,7 +162,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                       🏷️ Lot #{w.lotId}
                       {w.lotOccupancy && w.lotOccupancy > 1 && (
                         <span className="text-[var(--color-text-muted)]">
-                          {' '}(chung với {w.lotOccupancy - 1} chiến mã khác)
+                          {' '}({w.lotOccupancy - 1} other horses)
                         </span>
                       )}
                     </span>
@@ -202,14 +173,14 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                     */}
                     {w.assignedGroomId ? (
                       <span>
-                        👤 Người dắt:{' '}
+                        Groom:{' '}
                         <strong>
                           {groomNameById.get(w.assignedGroomId) ?? `#${w.assignedGroomId}`}
                         </strong>
                       </span>
                     ) : (
                       <span className="text-[var(--color-warning)]">
-                        ⚠ Chưa phân công Groom
+                        Groom not assigned
                       </span>
                     )}
                   </div>
@@ -217,11 +188,11 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                   {w.status === 'COMPLETED' && (
                     <div className="mt-2 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-2 text-[11px] text-[var(--color-text-secondary)] space-y-0.5">
                       <div className="font-medium text-[var(--color-text-primary)]">
-                        ⭐ Đánh giá: {w.performanceRating}/10
-                        {w.topSpeedKmh && ` • Max: ${w.topSpeedKmh} km/h`}
-                        {w.actualDistanceMeters && ` • Cự ly: ${w.actualDistanceMeters}m`}
+                        Rating: {w.performanceRating}/10
+                        {w.topSpeedKmh && ` · Max speed: ${w.topSpeedKmh} km/h`}
+                        {w.actualDistanceMeters && ` · Distance: ${w.actualDistanceMeters} m`}
                       </div>
-                      {w.trainerFeedback && <div>Nhận xét: {w.trainerFeedback}</div>}
+                      {w.trainerFeedback && <div>Feedback: {w.trainerFeedback}</div>}
                     </div>
                   )}
                 </div>
@@ -232,7 +203,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                     size="sm"
                     onClick={() => setActiveWorkout(w)}
                   >
-                    Nhập kết quả buổi tập
+                    Record session results
                   </Button>
                 )}
               </div>
@@ -247,6 +218,6 @@ export function PlanDetail({ planId }: PlanDetailProps) {
         onClose={() => setActiveWorkout(null)}
         onSuccess={loadData}
       />
-    </div>
+    </ScreenLayout>
   );
 }

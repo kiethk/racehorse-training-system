@@ -195,6 +195,8 @@ public class AdmissionQueryService {
         response.setGroomDecision(admission.getGroomDecision());
         response.setGroomFeedback(admission.getGroomFeedback());
         response.setGroomReviewedAt(admission.getGroomReviewedAt());
+        response.setArrivalDeadlineAt(admission.getArrivalDeadlineAt());
+        response.setArrivedAt(admission.getArrivedAt());
 
         response.setVeterinarianId(admission.getVeterinarianId());
         response.setVetTrainingDecision(admission.getVetTrainingDecision());

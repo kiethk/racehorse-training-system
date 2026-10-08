@@ -45,7 +45,8 @@ type IconName =
   | 'image'
   | 'external-link'
   | 'star'
-  | 'filter';
+  | 'filter'
+  | 'info';
 
 const paths: Record<IconName, ReactElement> = {
   search: (
@@ -254,6 +255,12 @@ const paths: Record<IconName, ReactElement> = {
   ),
   filter: (
     <path d="M4 5h16M7 12h10M10 19h4" />
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
   ),
 };
 

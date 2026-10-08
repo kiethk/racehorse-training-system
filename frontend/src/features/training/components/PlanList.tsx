@@ -12,10 +12,10 @@ import type { PlanSummaryResponse } from '../types';
 type StatusFilter = 'ALL' | 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
 const STATUS_LABEL: Record<Exclude<StatusFilter, 'ALL'>, string> = {
-  UPCOMING: 'Sắp bắt đầu',
-  ACTIVE: 'Đang tập',
-  COMPLETED: 'Đã hoàn thành',
-  CANCELLED: 'Đã huỷ',
+  UPCOMING: 'Upcoming',
+  ACTIVE: 'Training',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
 };
 
 const STATUS_TONE: Record<Exclude<StatusFilter, 'ALL'>, 'info' | 'success' | 'neutral'> = {
@@ -37,8 +37,8 @@ export function PlanList() {
       setError(null);
       setPlans(await trainingApi.getPlans());
     } catch (err) {
-      console.error('Lỗi khi nạp danh sách kế hoạch:', err);
-      setError('Không tải được danh sách kế hoạch huấn luyện.');
+      console.error('Failed to load training plans:', err);
+      setError('Unable to load training plans.');
     } finally {
       setLoading(false);
     }
@@ -59,7 +59,7 @@ export function PlanList() {
   if (error) {
     return (
       <Panel padded>
-        <EmptyState icon="alert-triangle" title="Lỗi tải dữ liệu" description={error} />
+      <EmptyState icon="alert-triangle" title="Unable to load data" description={error} />
       </Panel>
     );
   }
@@ -69,20 +69,20 @@ export function PlanList() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[18px] font-semibold tracking-tight text-[var(--color-text-primary)]">
-            Kế hoạch huấn luyện
+          Training plans
           </h1>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Theo dõi tiến độ tập luyện của từng chiến mã.
+          Track each horse’s training progress.
           </p>
         </div>
         <Link href="/trainer/plans/new">
-          <Button variant="primary" size="sm">+ Ghi danh chiến mã</Button>
+        <Button variant="primary" size="sm" icon="plus">Enroll horses</Button>
         </Link>
       </div>
 
       <Panel padded>
         <div className="flex flex-wrap items-center gap-2">
-          <SectionTitle>Bộ lọc</SectionTitle>
+          <SectionTitle>Filters</SectionTitle>
           {(['ALL', 'UPCOMING', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as StatusFilter[]).map((s) => (
             <button
               key={s}
@@ -94,7 +94,7 @@ export function PlanList() {
                   : 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]'
               }`}
             >
-              {s === 'ALL' ? `Tất cả (${plans.length})` : STATUS_LABEL[s]}
+              {s === 'ALL' ? `All (${plans.length})` : STATUS_LABEL[s]}
             </button>
           ))}
         </div>
@@ -104,8 +104,8 @@ export function PlanList() {
         <Panel padded>
           <EmptyState
             icon="clipboard"
-            title="Chưa có kế hoạch nào"
-            description="Ghi danh chiến mã vào một khoá huấn luyện để bắt đầu."
+            title="No training plans yet"
+            description="Enroll a horse in a training course to get started."
           />
         </Panel>
       ) : (
@@ -143,7 +143,7 @@ export function PlanList() {
                     <div className="w-40">
                       <div className="flex justify-between text-[11px] text-[var(--color-text-secondary)]">
                         <span>
-                          {p.completedSessions}/{denominator} buổi
+          {p.completedSessions}/{denominator} sessions
                         </span>
                         <span>{percent}%</span>
                       </div>
@@ -155,13 +155,13 @@ export function PlanList() {
                       </div>
                       {p.cancelledSessions > 0 && (
                         <div className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
-                          Đã huỷ {p.cancelledSessions} buổi
+          {p.cancelledSessions} sessions cancelled
                         </div>
                       )}
                     </div>
 
                     <Link href={`/trainer/plans/${p.planId}`}>
-                      <Button variant="secondary" size="sm">Chi tiết</Button>
+          <Button variant="secondary" size="sm">Details</Button>
                     </Link>
                   </div>
                 </div>

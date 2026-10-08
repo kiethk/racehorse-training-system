@@ -4,13 +4,16 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { Panel } from '@/components/ui/Panel';
-import { Icon } from '@/components/ui/Icon';
-import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { ListSkeleton } from '@/components/ui/states';
+import { Notice } from '@/components/ui/Notice';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
 import type { TrainerAdmissionQueue } from '../types/trainer';
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
+import { AdmissionListLayout } from '../shared/components/AdmissionListLayout';
+import { AdmissionSearchField } from '../shared/components/AdmissionSearchField';
 
 type Tab = 'PENDING' | 'REVIEWED';
 
@@ -41,6 +44,7 @@ export function TrainerAdmissionsListView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<TrainerQueueFilters>(urlFilters);
+  const [tablePage, setTablePage] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -121,11 +125,13 @@ export function TrainerAdmissionsListView() {
   const handleTabChange = (nextTab: Tab) => {
     const next = { ...draft, tab: nextTab };
     setDraft(next);
+    setTablePage(0);
     updateUrl(next);
   };
 
   const applyFilters = (e: React.FormEvent) => {
     e.preventDefault();
+    setTablePage(0);
     updateUrl(draft);
   };
 
@@ -137,6 +143,7 @@ export function TrainerAdmissionsListView() {
       submittedTo: '',
     };
     setDraft(reset);
+    setTablePage(0);
     updateUrl(reset);
   };
 
@@ -150,24 +157,63 @@ export function TrainerAdmissionsListView() {
     return s ? `?${s}` : '';
   }, [urlFilters]);
 
-  if (loading) return <ListSkeleton rows={6} />;
+  if (loading) return <AdmissionListLayout title="Admissions" description="Assess racing potential and readiness of candidate horses in the quarantine facility."><ListSkeleton rows={6} /></AdmissionListLayout>;
+
+  const columns: DataTableColumn<TrainerAdmissionQueue['pending'][number]>[] = [
+    {
+      id: 'horse',
+      header: 'Horse',
+      sortValue: (admission) => admission.candidateName,
+      render: (admission) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <HorseAvatar name={admission.candidateName} image={admission.imageUrl} size={36} rounded="md" />
+          <div className="min-w-0">
+            <span className="block truncate font-semibold">{admission.candidateName}</span>
+            <span className="block truncate text-xs text-[var(--color-text-muted)]">{admission.breed || 'Unknown breed'}</span>
+          </div>
+        </div>
+      ),
+    },
+    { id: 'status', header: 'Status', sortValue: (admission) => admission.status, render: (admission) => <AdmissionStatusBadge status={admission.status} simplified /> },
+    {
+      id: 'stall',
+      header: 'Quarantine stall',
+      sortValue: (admission) => admission.quarantineStallCode ?? '',
+      render: (admission) => admission.quarantineStallCode
+        ? `Stall ${admission.quarantineStallCode}`
+        : <span className="italic text-[var(--color-text-muted)]">Unassigned</span>,
+    },
+    { id: 'submitted', header: 'Submitted', sortValue: (admission) => new Date(admission.submittedAt), render: (admission) => new Date(admission.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }) },
+    ...(urlFilters.tab === 'REVIEWED' ? [{
+      id: 'reviewed',
+      header: 'Evaluated',
+      sortValue: (admission: TrainerAdmissionQueue['pending'][number]) => admission.trainerReviewedAt ? new Date(admission.trainerReviewedAt) : null,
+      render: (admission: TrainerAdmissionQueue['pending'][number]) => admission.trainerReviewedAt
+        ? new Date(admission.trainerReviewedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })
+        : '—',
+    }] : []),
+    {
+      id: 'action',
+      header: 'Action',
+      align: 'right',
+      render: (admission) => (
+        <Link
+          href={`/trainer/admissions/${admission.admissionId}${detailQuery}`}
+          className={`${admission.status === 'TRAINER_REVIEW' ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:opacity-90' : 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]'} inline-flex min-h-9 items-center justify-center rounded-[var(--radius-sm)] px-4 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]`}
+        >
+          {admission.status === 'TRAINER_REVIEW' ? 'Evaluate' : 'View'}
+        </Link>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div>
-        <h1 className="text-[20px] font-bold tracking-tight text-[var(--color-text-primary)]">
-          Horse Admissions
-        </h1>
-        <p className="text-[13px] text-[var(--color-text-secondary)]">
-          Assess racing potential and readiness of candidate horses in the quarantine facility.
-        </p>
-      </div>
-
+    <AdmissionListLayout title="Admissions" description="Assess racing potential and readiness of candidate horses in the quarantine facility.">
       {/* Filter Toolbar (Merged review type filter) */}
-      <form
+      <FilterBar
+        layout="grid"
         onSubmit={applyFilters}
-        className="grid grid-cols-1 gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:items-end"
+        className="sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:items-end"
       >
         <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
           Application Type
@@ -181,23 +227,12 @@ export function TrainerAdmissionsListView() {
           </select>
         </label>
 
-        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Candidate Horse Name
-          <div className="relative mt-1">
-            <input
-              type="text"
-              placeholder="Search horse name..."
-              value={draft.candidateName}
-              onChange={(e) => setDraft({ ...draft, candidateName: e.target.value })}
-              className="h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] pl-8 pr-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-            />
-            <Icon
-              name="search"
-              size={14}
-              className="absolute left-2.5 top-2.5 text-[var(--color-text-muted)]"
-            />
-          </div>
-        </label>
+        <AdmissionSearchField
+          label="Candidate horse name"
+          placeholder="Search horse name"
+          value={draft.candidateName}
+          onChange={(candidateName) => setDraft({ ...draft, candidateName })}
+        />
 
         <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
           Submitted From
@@ -228,111 +263,22 @@ export function TrainerAdmissionsListView() {
             Reset
           </Button>
         </div>
-      </form>
+      </FilterBar>
 
       {error && (
-        <div
-          role="alert"
-          className="border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]"
-        >
-          {error}
-        </div>
+        <Notice tone="error">{error}</Notice>
       )}
 
-      {/* Admissions Table */}
-      <Panel className="overflow-hidden">
-        {filteredAdmissions.length === 0 ? (
-          <EmptyState
-            title="No admission records found"
-            description="Try adjusting your search filters or switch the application type."
-            action={<Button size="sm" onClick={clearFilters}>Reset Filters</Button>}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="border-b border-[var(--color-border)] text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
-                <tr>
-                  <th className="px-6 py-3.5">Candidate Horse</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">Quarantine Stall</th>
-                  <th className="px-6 py-3.5">Submitted Date</th>
-                  {draft.tab === 'REVIEWED' && (
-                    <th className="px-6 py-3.5">Evaluated Date</th>
-                  )}
-                  <th className="px-6 py-3.5 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)]">
-                {filteredAdmissions.map((item) => (
-                  <tr
-                    key={item.admissionId}
-                    className="transition-colors hover:bg-[var(--color-surface-muted)]"
-                  >
-                    <td className="px-6 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <HorseAvatar
-                          name={item.candidateName}
-                          image={item.imageUrl}
-                          size={32}
-                          rounded="md"
-                        />
-                        <div>
-                          <span className="font-semibold block">{item.candidateName}</span>
-                          <span className="text-[11px] text-[var(--color-text-muted)]">
-                            {item.breed || 'Unknown breed'}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <AdmissionStatusBadge status={item.status} simplified />
-                    </td>
-                    <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
-                      {item.quarantineStallCode ? (
-                        <span className="inline-flex items-center gap-1 font-medium text-[var(--color-text-primary)]">
-                          Stall {item.quarantineStallCode}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--color-text-muted)] italic">Unassigned</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
-                      {new Date(item.submittedAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </td>
-                    {draft.tab === 'REVIEWED' && (
-                      <td className="px-6 py-3.5 text-[12px] text-[var(--color-text-secondary)]">
-                        {item.trainerReviewedAt
-                          ? new Date(item.trainerReviewedAt).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            })
-                          : '—'}
-                      </td>
-                    )}
-                    <td className="px-6 py-3.5 text-right">
-                      <Link
-                        href={`/trainer/admissions/${item.admissionId}${detailQuery}`}
-                        className={`inline-flex items-center justify-center rounded-[var(--radius-sm)] px-4 py-1.5 text-xs font-semibold transition-colors ${
-                          item.status === 'TRAINER_REVIEW'
-                            ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:opacity-90'
-                            : 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]'
-                        }`}
-                      >
-                        {item.status === 'TRAINER_REVIEW' ? 'Evaluate' : 'View'}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Panel>
-    </div>
+      <DataTable
+        rows={filteredAdmissions}
+        columns={columns}
+        getRowKey={(admission) => admission.admissionId}
+        ariaLabel="Trainer admission records"
+        emptyTitle="No admission records found"
+        emptyDescription="Try adjusting your search filters or switch the application type."
+        emptyAction={<Button size="sm" onClick={clearFilters}>Reset filters</Button>}
+        pagination={{ page: tablePage, pageSize: 10, total: filteredAdmissions.length, onPageChange: setTablePage }}
+      />
+    </AdmissionListLayout>
   );
 }

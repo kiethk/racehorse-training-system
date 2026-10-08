@@ -6,7 +6,15 @@
  * không gọi fetch() trực tiếp ở component.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+const API_URL = (configuredApiUrl || (process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '')).replace(/\/+$/, '');
+
+function getApiUrl(path: string): string {
+  if (!API_URL) {
+    throw new Error('The API connection is not configured. Set NEXT_PUBLIC_API_URL and rebuild the frontend.');
+  }
+  return `${API_URL}${path}`;
+}
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public errorCode?: string) {
@@ -24,7 +32,7 @@ async function responseError(res: Response): Promise<ApiError> {
 let refreshPromise: Promise<boolean> | null = null;
 
 export function createAuthenticatedEventSource(path: string): EventSource {
-  return new EventSource(`${API_URL}${path}`, { withCredentials: true });
+  return new EventSource(getApiUrl(path), { withCredentials: true });
 }
 
 let accessToken: string | null = null;
@@ -42,7 +50,7 @@ export async function refreshAccessToken(): Promise<boolean> {
 
   refreshPromise = (async () => {
     try {
-      const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
+      const refreshRes = await fetch(getApiUrl('/api/auth/refresh'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -85,7 +93,7 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
   
   finalOptions.headers = headers;
 
-  let res = await fetch(`${API_URL}${path}`, finalOptions);
+  let res = await fetch(getApiUrl(path), finalOptions);
 
   if (res.status === 401 && !isAuthEndpoint) {
     const refreshed = await refreshAccessToken();
@@ -93,7 +101,7 @@ async function doFetch(path: string, options: RequestInit): Promise<Response> {
       // Retry original request exactly once
       headers.set('Authorization', `Bearer ${accessToken}`);
       finalOptions.headers = headers;
-      res = await fetch(`${API_URL}${path}`, finalOptions);
+      res = await fetch(getApiUrl(path), finalOptions);
     }
   }
 

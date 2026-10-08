@@ -47,13 +47,13 @@ export function ConfirmDialog({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl shadow-black/10"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-xl shadow-black/10 sm:p-6"
       >
         <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">{title}</h2>
         <div className="mt-2 text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
           {description}
         </div>
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex flex-col justify-end gap-2 sm:flex-row">
           <Button variant="secondary" onClick={onCancel} disabled={loading}>
             {cancelLabel}
           </Button>

@@ -7,6 +7,11 @@ import type { TrainerDashboardHorse } from '../types';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageSection, ScreenLayout } from '@/components/ui/ScreenLayout';
+import { Notice } from '@/components/ui/Notice';
+import { ListSkeleton } from '@/components/ui/states';
+import { displayError } from '@/lib/display';
 
 export function TrainerHorseListView() {
   const [horses, setHorses] = useState<TrainerDashboardHorse[]>([]);
@@ -23,8 +28,7 @@ export function TrainerHorseListView() {
       const data = await trainingService.getDashboard();
       setHorses(data);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải danh sách chiến mã';
-      setError(msg);
+      setError(displayError(err, 'Unable to load the horse list.'));
     } finally {
       setLoading(false);
     }
@@ -47,33 +51,21 @@ export function TrainerHorseListView() {
   }, [horses, searchTerm, filterMode]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
-            Danh Sách Chiến Mã Phụ Trách
-          </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            Xem hồ sơ, biểu đồ thể lực và theo dõi chỉ số sức khỏe của từng chiến mã
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+    <ScreenLayout variant="list">
+      <PageHeader title="Assigned horses" description="Review each horse’s profile, fitness trend and health indicators." actions={<>
           <Link href="/trainer/dashboard">
             <Button variant="secondary" size="sm">
               <Icon name="grid" size={14} />
-              Xem Dashboard
+              View dashboard
             </Button>
           </Link>
           <Button variant="secondary" size="sm" onClick={loadHorses}>
             <Icon name="refresh" size={14} />
-            Làm mới
+            Refresh
           </Button>
-        </div>
-      </div>
+      </>} />
 
-      {/* Main Panel */}
+      <PageSection title="Assigned horse overview">
       <Panel padded className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -86,7 +78,7 @@ export function TrainerHorseListView() {
                   : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
-              Tất cả ({horses.length})
+              All ({horses.length})
             </button>
             <button
               type="button"
@@ -97,7 +89,7 @@ export function TrainerHorseListView() {
                   : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
-              Đang tập ({horses.filter((h) => h.planStatus === 'ACTIVE').length})
+              In training ({horses.filter((h) => h.planStatus === 'ACTIVE').length})
             </button>
             <button
               type="button"
@@ -108,7 +100,7 @@ export function TrainerHorseListView() {
                   : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
-              Cảnh báo ({horses.filter((h) => (h.alertCount ?? h.alertsCount ?? 0) > 0).length})
+              Alerts ({horses.filter((h) => (h.alertCount ?? h.alertsCount ?? 0) > 0).length})
             </button>
           </div>
 
@@ -117,8 +109,8 @@ export function TrainerHorseListView() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Tìm tên chiến mã..."
-              className="w-60 rounded border border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 pl-7 pr-2.5 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+              placeholder="Search horses..."
+              className="w-full max-w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 pl-7 pr-2.5 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none sm:w-60"
             />
             <span className="pointer-events-none absolute left-2 top-2 text-[var(--color-text-muted)]">
               <Icon name="search" size={12} />
@@ -126,20 +118,14 @@ export function TrainerHorseListView() {
           </div>
         </div>
 
-        {error && (
-          <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-            {error}
-          </div>
-        )}
+        {error && <Notice tone="error">{error}</Notice>}
 
         {loading ? (
-          <div className="flex h-48 items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
-          </div>
+          <ListSkeleton rows={5} />
         ) : filteredHorses.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-sm font-medium text-[var(--color-text-secondary)]">
-              Không tìm thấy chiến mã nào phù hợp.
+              No horses match the selected filters.
             </p>
           </div>
         ) : (
@@ -156,19 +142,19 @@ export function TrainerHorseListView() {
                         {horse.horseName}
                       </h3>
                       <p className="text-xs text-[var(--color-text-secondary)]">
-                        {horse.courseName || 'Chưa xếp khóa huấn luyện'}
+                        {horse.courseName || 'No training course assigned'}
                       </p>
                     </div>
 
                     {(horse.alertCount ?? horse.alertsCount ?? 0) > 0 ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-2 py-0.5 text-[10px] font-bold">
                         <Icon name="alert-triangle" size={10} />
-                        {horse.alertCount ?? horse.alertsCount} cảnh báo
+                        {horse.alertCount ?? horse.alertsCount} alerts
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-medium">
                         <Icon name="check" size={10} />
-                        An toàn
+                        Clear
                       </span>
                     )}
                   </div>
@@ -178,9 +164,9 @@ export function TrainerHorseListView() {
                     {horse.totalSessions > 0 ? (
                       <div>
                         <div className="flex items-center justify-between text-[11px] text-[var(--color-text-secondary)]">
-                          <span>Tiến độ khóa</span>
+                          <span>Course progress</span>
                           <span className="font-semibold text-[var(--color-text-primary)]">
-                            {horse.completedSessions}/{horse.totalSessions} buổi ({horse.progressPercent}%)
+                            {horse.completedSessions}/{horse.totalSessions} sessions ({horse.progressPercent}%)
                           </span>
                         </div>
                         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-subtle)]">
@@ -192,14 +178,14 @@ export function TrainerHorseListView() {
                       </div>
                     ) : (
                       <div className="text-xs text-[var(--color-text-muted)] italic">
-                        Chưa có lịch buổi tập
+                        No sessions scheduled
                       </div>
                     )}
 
                     <div className="grid grid-cols-2 gap-2 border-t border-[var(--color-border-subtle)] pt-2.5 text-xs">
                       <div>
                         <span className="text-[10px] uppercase text-[var(--color-text-muted)]">
-                          Phong độ gần nhất
+                          Latest performance
                         </span>
                         <p className="font-semibold text-[var(--color-text-primary)]">
                           {horse.latestPerformanceRating != null
@@ -209,7 +195,7 @@ export function TrainerHorseListView() {
                       </div>
                       <div>
                         <span className="text-[10px] uppercase text-[var(--color-text-muted)]">
-                          Điểm TB (30 ngày)
+                          30-day average
                         </span>
                         <p className="font-semibold text-emerald-600">
                           {horse.avgPerformanceRating30d != null
@@ -225,7 +211,7 @@ export function TrainerHorseListView() {
                   <Link href={`/trainer/horses/${horse.horseId}`} className="w-full">
                     <Button variant="secondary" size="sm" className="w-full justify-center">
                       <Icon name="trending-up" size={13} />
-                      Xem biểu đồ thể lực & cảnh báo
+                      View fitness and alerts
                     </Button>
                   </Link>
                 </div>
@@ -234,6 +220,7 @@ export function TrainerHorseListView() {
           </div>
         )}
       </Panel>
-    </div>
+      </PageSection>
+    </ScreenLayout>
   );
 }

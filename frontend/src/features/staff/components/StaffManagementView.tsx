@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { ScreenLayout } from '@/components/ui/ScreenLayout';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { MetricCard } from '@/components/ui/MetricCard';
+import { Notice } from '@/components/ui/Notice';
+import { ListSkeleton } from '@/components/ui/states';
+import { displayError } from '@/lib/display';
 import { getStaffList, createStaff, updateStaffStatus } from '../services/staffService';
 import type { StaffSummary, StaffCreationRequest, StaffCreationResponse } from '../types';
 import { StaffTable } from './StaffTable';
@@ -40,7 +47,7 @@ export function StaffManagementView() {
       const res = await getStaffList();
       setStaff(res.data || []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch staff list');
+      setError(displayError(err, 'Unable to load the staff list.'));
     } finally {
       setLoading(false);
     }
@@ -69,7 +76,7 @@ export function StaffManagementView() {
       setSuccessMsg('Status updated successfully.');
       setTimeout(() => setSuccessMsg(''), 5000);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Failed to update status');
+      alert(displayError(err, 'Unable to update staff status.'));
     } finally {
       setActionLoadingId(null);
     }
@@ -86,61 +93,43 @@ export function StaffManagementView() {
   const headTrainers = staff.filter(s => s.role === 'HEAD_TRAINER' && s.active);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-tight text-[var(--color-text-primary)]">Staff</h1>
-          <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
-            Manage employee accounts and roles.
-          </p>
-        </div>
-        <Button variant="primary" icon="plus" onClick={() => setAddDialogOpen(true)}>
-          Add Staff
-        </Button>
-      </div>
+    <ScreenLayout variant="list">
+      <PageHeader
+        title="Staff"
+        description="Manage employee accounts and roles."
+        actions={<Button variant="primary" icon="plus" onClick={() => setAddDialogOpen(true)}>Add Staff</Button>}
+      />
 
       {successMsg && (
-        <div className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-[var(--color-success-soft,#f0fdf4)] px-3 py-2.5 text-[12px] text-[var(--color-success,#16a34a)]">
-          <Icon name="check" size={14} className="mt-0.5 shrink-0" />
-          <span>{successMsg}</span>
-        </div>
+        <Notice tone="success">{successMsg}</Notice>
       )}
 
       {error && (
-        <div className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-[var(--color-danger-soft)] px-3 py-2.5 text-[12px] text-[var(--color-danger)]">
-          <Icon name="alert-triangle" size={14} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
+        <Notice tone="error">{error}</Notice>
       )}
 
       {/* Statistic Cards */}
       {!loading && staff.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-4">
           {[
             { label: 'Total Staff', count: staff.length, role: 'ALL' },
             { label: 'Grooms', count: staff.filter(s => s.role === 'GROOM').length, role: 'GROOM' },
             { label: 'Trainers', count: staff.filter(s => s.role === 'HEAD_TRAINER').length, role: 'HEAD_TRAINER' },
             { label: 'Veterinarians', count: staff.filter(s => s.role === 'VETERINARIAN').length, role: 'VETERINARIAN' },
           ].map((card) => (
-            <button
+            <MetricCard
               key={card.role}
+              label={card.label}
+              value={card.count}
               onClick={() => setRoleFilter(card.role)}
-              className={`flex flex-col rounded-[var(--radius-lg)] border p-4 text-left shadow-sm transition-colors ${
-                roleFilter === card.role
-                  ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
-                  : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-surface-muted)]'
-              }`}
-            >
-              <span className="text-[12px] font-medium text-[var(--color-text-secondary)]">{card.label}</span>
-              <span className="mt-1 text-[24px] font-semibold text-[var(--color-text-primary)]">{card.count}</span>
-            </button>
+              active={roleFilter === card.role}
+            />
           ))}
         </div>
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+      <FilterBar onSubmit={(event) => event.preventDefault()}>
         <div className="relative min-w-[200px] flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[var(--color-text-muted)]">
             <Icon name="search" size={14} />
@@ -174,14 +163,10 @@ export function StaffManagementView() {
           <option value="ACTIVE">Active</option>
           <option value="INACTIVE">Inactive</option>
         </select>
-      </div>
+      </FilterBar>
 
       {/* Main Content */}
-      {loading ? (
-        <div className="flex h-40 items-center justify-center">
-          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
-        </div>
-      ) : (
+      {loading ? <ListSkeleton rows={6} /> : (
         <StaffTable 
           staff={filteredStaff} 
           onToggleStatus={handleToggleStatus} 
@@ -208,6 +193,6 @@ export function StaffManagementView() {
           setTimeout(() => setSuccessMsg(''), 5000);
         }}
       />
-    </div>
+    </ScreenLayout>
   );
 }

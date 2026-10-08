@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { admissionsApi } from '../services/api';
+import { displayError } from '@/lib/display';
 import type {
   CompleteCareScheduleRequest,
   HorseHealthMetricRequest,
@@ -28,11 +29,11 @@ function newIdempotencyKey() {
 }
 
 function formatDateTime(value: string | null) {
-  if (!value) return 'Chưa xác định';
+  if (!value) return 'Not specified';
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+    : new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
 export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
@@ -53,7 +54,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [restrictionDetails, setRestrictionDetails] = useState('');
   // Chặn tập bắt buộc kèm lịch khám lại — "tạm nghỉ đến" chính là ngày này.
   const [followUpDate, setFollowUpDate] = useState(() => businessDate(3));
-  const [followUpDescription, setFollowUpDescription] = useState('Tái khám sau ca khẩn cấp');
+  const [followUpDescription, setFollowUpDescription] = useState('Follow-up after the urgent examination');
   const [followUpKey] = useState(newIdempotencyKey);
   const [notes, setNotes] = useState('');
   const [temperature, setTemperature] = useState('');
@@ -75,7 +76,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       })
       .catch((cause: unknown) => {
         if (!active) return;
-        setError(cause instanceof ApiError ? cause.message : 'Không thể tải ca khẩn cấp.');
+      setError(cause instanceof ApiError ? displayError(cause, 'Unable to load the urgent case.') : 'Unable to load the urgent case.');
       })
       .finally(() => active && setLoading(false));
     return () => {
@@ -91,7 +92,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       const schedule = await admissionsApi.startCareSchedule(urgentCase.scheduleId);
       setUrgentCase((current) => (current ? { ...current, status: schedule.status } : current));
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Không thể bắt đầu khám.');
+      setError(cause instanceof ApiError ? displayError(cause, 'Unable to start the examination.') : 'Unable to start the examination.');
     } finally {
       setStarting(false);
     }
@@ -101,25 +102,25 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     const errors: Record<string, string> = {};
 
     if (!symptoms.trim()) {
-      errors.symptoms = 'Triệu chứng (symptoms) là bắt buộc đối với ca khám khẩn cấp.';
+      errors.symptoms = 'Symptoms are required for an urgent examination.';
     }
     if (!findings.trim()) {
-      errors.findings = 'Kết quả khám thực thể (findings) là bắt buộc.';
+      errors.findings = 'Examination findings are required.';
     }
     if (!diagnosis.trim()) {
-      errors.diagnosis = 'Chẩn đoán lâm sàng (diagnosis) là bắt buộc.';
+      errors.diagnosis = 'A clinical diagnosis is required.';
     }
     if (trainingDecision === 'BLOCKED') {
       if (!restrictionDetails.trim()) {
-        errors.restrictionDetails = 'Lý do chặn tập là bắt buộc khi quyết định BLOCKED.';
+      errors.restrictionDetails = 'Restriction details are required when training is blocked.';
       }
       if (!followUpDate) {
-        errors.followUpDate = 'Phải chọn ngày khám lại khi chặn tập.';
+      errors.followUpDate = 'Select a follow-up date when training is blocked.';
       } else if (followUpDate < businessDate(1)) {
-        errors.followUpDate = 'Ngày khám lại phải từ ngày mai trở đi.';
+      errors.followUpDate = 'The follow-up date must be tomorrow or later.';
       }
       if (!followUpDescription.trim()) {
-        errors.followUpDescription = 'Nội dung khám lại là bắt buộc.';
+      errors.followUpDescription = 'A follow-up description is required.';
       }
     }
 
@@ -132,7 +133,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     if (!urgentCase) return;
 
     if (!validateForm()) {
-      setSubmitError('Vui lòng kiểm tra lại các trường thông tin bắt buộc.');
+      setSubmitError('Check the required fields and try again.');
       return;
     }
 
@@ -174,7 +175,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       setSubmitError(
         cause instanceof ApiError
           ? cause.message
-          : 'Có lỗi xảy ra khi hoàn tất ca khám. Dữ liệu đã nhập được giữ nguyên, vui lòng thử lại.',
+          : 'Unable to complete the examination. Your entries have been kept; please try again.',
       );
     } finally {
       setSubmitting(false);
@@ -182,12 +183,12 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   }
 
   if (loading) {
-    return <Panel className="p-8 text-sm text-[var(--color-text-secondary)]">Đang tải ca khẩn cấp…</Panel>;
+    return <Panel className="p-8 text-sm text-[var(--color-text-secondary)]">Loading urgent case…</Panel>;
   }
   if (!urgentCase) {
     return (
       <Panel className="border-[var(--color-danger)] p-8 text-sm text-[var(--color-danger)]">
-        {error || 'Không tìm thấy ca khẩn cấp.'}
+        {error || 'Urgent case not found.'}
       </Panel>
     );
   }
@@ -201,11 +202,11 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--color-danger)]">
-              Ca khẩn cấp #{urgentCase.scheduleId}
+            Urgent case #{urgentCase.scheduleId}
             </p>
             <h1 className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{urgentCase.title}</h1>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              Bạn đã được hệ thống phân công trực tiếp cho ca này.
+            You have been assigned directly to this case.
             </p>
           </div>
           <div className="flex gap-2">
@@ -223,37 +224,37 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Chuồng / vị trí</dt>
+            <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Stall / Location</dt>
               <dd className="mt-1 font-semibold">
-                {[urgentCase.stallCode, urgentCase.stableLocation].filter(Boolean).join(' · ') || 'Chưa cập nhật'}
+            {[urgentCase.stallCode, urgentCase.stableLocation].filter(Boolean).join(' · ') || 'Not provided'}
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Người báo</dt>
+            <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Reported by</dt>
               <dd className="mt-1 font-semibold">
-                {urgentCase.reportedByName || 'Không rõ tên'} · #{urgentCase.reportedById}
+            {urgentCase.reportedByName || 'Unknown'} · #{urgentCase.reportedById}
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Thời điểm báo</dt>
+            <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Reported at</dt>
               <dd className="mt-1 font-semibold">{formatDateTime(urgentCase.reportedAt)}</dd>
             </div>
             <div>
               <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">
-                Thời điểm phân công
+            Assigned at
               </dt>
               <dd className="mt-1 font-semibold">{formatDateTime(urgentCase.assignedAt)}</dd>
             </div>
             <div>
-              <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Quyết định tập luyện</dt>
+            <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Training decision</dt>
               <dd className="mt-1 font-bold text-[var(--color-danger)]">
-                {urgentCase.trainingDecision} — Tạm dừng tập cho tới khi khám xong
+            {urgentCase.trainingDecision} — Training is paused until the examination is complete.
               </dd>
             </div>
           </dl>
 
           <section className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
-            <h2 className="text-sm font-bold text-[var(--color-text-primary)]">Triệu chứng / mô tả ban đầu</h2>
+          <h2 className="text-sm font-bold text-[var(--color-text-primary)]">Symptoms / Initial description</h2>
             <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-text-secondary)]">
               {urgentCase.description}
             </p>
@@ -269,7 +270,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={admissionsApi.assetUrl(urgentCase.imageUrl)}
-                alt="Ảnh báo cáo ca khẩn cấp"
+            alt="Urgent case report"
                 className="max-h-[28rem] w-full object-contain"
               />
             </a>
@@ -285,7 +286,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           {urgentCase.status === 'SCHEDULED' && (
             <div className="pt-2">
               <Button variant="destructive" icon="activity" disabled={starting} onClick={startExam}>
-                {starting ? 'Đang bắt đầu…' : 'Bắt đầu khám'}
+                {starting ? 'Starting…' : 'Start examination'}
               </Button>
             </div>
           )}
@@ -294,10 +295,10 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             <form onSubmit={handleSubmit} className="space-y-5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
               <div className="border-b border-[var(--color-border)] pb-3">
                 <h3 className="text-lg font-bold text-[var(--color-text-primary)]">
-                  Phiếu hoàn tất khám khẩn cấp
+                  Urgent Examination Record
                 </h3>
                 <p className="text-xs text-[var(--color-text-secondary)]">
-                  Nhập thông tin đánh giá lâm sàng và quyết định huấn luyện y tế cho ca khẩn cấp.
+                  Record clinical findings and the medical training decision for this urgent case.
                 </p>
               </div>
 
@@ -310,12 +311,12 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
               {/* Vitals Telemetry */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
-                  1. Sinh hiệu lâm sàng (Vitals)
+                  1. Clinical Vitals
                 </label>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div>
                     <label htmlFor="vital-temp" className="block text-xs font-medium text-[var(--color-text-primary)]">
-                      Nhiệt độ (°C)
+                      Temperature (°C)
                     </label>
                     <input
                       id="vital-temp"
@@ -329,7 +330,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   </div>
                   <div>
                     <label htmlFor="vital-hr" className="block text-xs font-medium text-[var(--color-text-primary)]">
-                      Nhịp tim (bpm)
+                      Heart rate (bpm)
                     </label>
                     <input
                       id="vital-hr"
@@ -343,7 +344,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   </div>
                   <div>
                     <label htmlFor="vital-rr" className="block text-xs font-medium text-[var(--color-text-primary)]">
-                      Nhịp thở (rpm)
+                      Respiratory rate (rpm)
                     </label>
                     <input
                       id="vital-rr"
@@ -357,7 +358,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   </div>
                   <div>
                     <label htmlFor="vital-wt" className="block text-xs font-medium text-[var(--color-text-primary)]">
-                      Cân nặng (kg)
+                      Weight (kg)
                     </label>
                     <input
                       id="vital-wt"
@@ -375,12 +376,12 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
               {/* Clinical Details */}
               <div className="space-y-4">
                 <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                  2. Khám và chẩn đoán
+                  2. Examination & Diagnosis
                 </label>
 
                 <div>
                   <label htmlFor="urgent-symptoms" className="block text-xs font-semibold text-[var(--color-text-primary)]">
-                    Triệu chứng khẩn cấp quan sát được <span className="text-[var(--color-danger)]">*</span>
+                  Observed urgent symptoms <span className="text-[var(--color-danger)]">*</span>
                   </label>
                   <textarea
                     id="urgent-symptoms"
@@ -390,7 +391,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       setSymptoms(e.target.value);
                       if (fieldErrors.symptoms) setFieldErrors((prev) => ({ ...prev, symptoms: '' }));
                     }}
-                    placeholder="Mô tả triệu chứng, biểu hiện bệnh/chấn thương của ngựa..."
+                  placeholder="Describe the horse’s symptoms or signs of illness or injury…"
                     className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs outline-none focus:border-[var(--color-primary)]"
                   />
                   {fieldErrors.symptoms && (
@@ -400,7 +401,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
                 <div>
                   <label htmlFor="urgent-findings" className="block text-xs font-semibold text-[var(--color-text-primary)]">
-                    Kết quả khám thực thể (Findings) <span className="text-[var(--color-danger)]">*</span>
+                  Examination findings <span className="text-[var(--color-danger)]">*</span>
                   </label>
                   <textarea
                     id="urgent-findings"
@@ -410,7 +411,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       setFindings(e.target.value);
                       if (fieldErrors.findings) setFieldErrors((prev) => ({ ...prev, findings: '' }));
                     }}
-                    placeholder="Ghi nhận cụ thể tình trạng cơ thể, vết thương, vị trí đau..."
+                  placeholder="Describe the horse’s condition, injuries, or areas of pain…"
                     className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs outline-none focus:border-[var(--color-primary)]"
                   />
                   {fieldErrors.findings && (
@@ -421,7 +422,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label htmlFor="urgent-diagnosis" className="block text-xs font-semibold text-[var(--color-text-primary)]">
-                      Chẩn đoán (Diagnosis) <span className="text-[var(--color-danger)]">*</span>
+                  Diagnosis <span className="text-[var(--color-danger)]">*</span>
                     </label>
                     <input
                       id="urgent-diagnosis"
@@ -431,7 +432,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                         setDiagnosis(e.target.value);
                         if (fieldErrors.diagnosis) setFieldErrors((prev) => ({ ...prev, diagnosis: '' }));
                       }}
-                      placeholder="Chẩn đoán xác định hoặc dự kiến..."
+                  placeholder="Enter a confirmed or provisional diagnosis…"
                       className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
                     />
                     {fieldErrors.diagnosis && (
@@ -441,14 +442,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
                   <div>
                     <label htmlFor="urgent-treatment" className="block text-xs font-semibold text-[var(--color-text-primary)]">
-                      Phác đồ điều trị / sơ cứu (Treatment)
+                  Treatment / First aid
                     </label>
                     <input
                       id="urgent-treatment"
                       type="text"
                       value={treatment}
                       onChange={(e) => setTreatment(e.target.value)}
-                      placeholder="Thuốc, băng bó, chỉ định chăm sóc..."
+                  placeholder="Medication, bandaging, or care instructions…"
                       className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
                     />
                   </div>
@@ -456,14 +457,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
                 <div>
                   <label htmlFor="urgent-notes" className="block text-xs font-semibold text-[var(--color-text-primary)]">
-                    Ghi chú thêm (Notes)
+                  Additional notes
                   </label>
                   <textarea
                     id="urgent-notes"
                     rows={2}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Lưu ý chăm sóc, theo dõi thêm..."
+                  placeholder="Care instructions or follow-up observations…"
                     className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs outline-none focus:border-[var(--color-primary)]"
                   />
                 </div>
@@ -472,15 +473,15 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
               {/* Training Clearance Decision */}
               <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
                 <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                  3. Quyết định huấn luyện (Training Decision) <span className="text-[var(--color-danger)]">*</span>
+                  3. Training Decision <span className="text-[var(--color-danger)]">*</span>
                 </label>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {[
-                    { value: 'ALLOWED' as const, label: 'ALLOWED', desc: 'Cho phép tập luyện bình thường' },
+                    { value: 'ALLOWED' as const, label: 'ALLOWED', desc: 'Normal training may continue' },
                     {
                       value: 'BLOCKED' as const,
                       label: 'BLOCKED',
-                      desc: 'Tạm nghỉ tới lần khám lại; buổi tập tương lai bị hủy',
+                      desc: 'Rest until the follow-up examination; upcoming workouts will be cancelled',
                     },
                   ].map((option) => (
                     <label
@@ -521,7 +522,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   <div className="mt-3 space-y-3">
                     <div>
                       <label htmlFor="restriction-details" className="block text-xs font-semibold text-[var(--color-danger)]">
-                        Lý do chặn tập / chế độ nghỉ <span className="text-[var(--color-danger)]">*</span>
+                        Training restriction / Rest instructions <span className="text-[var(--color-danger)]">*</span>
                       </label>
                       <textarea
                         id="restriction-details"
@@ -533,7 +534,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                             setFieldErrors((prev) => ({ ...prev, restrictionDetails: '' }));
                           }
                         }}
-                        placeholder="Mô tả cụ thể chế độ hạn chế (ví dụ: chỉ dắt đi bộ 15 phút, nghỉ chuồng tuyệt đối...)"
+                        placeholder="Describe the restrictions (for example, 15 minutes of walking only or complete stall rest)…"
                         className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-surface)] p-2.5 text-xs outline-none focus:ring-1 focus:ring-[var(--color-danger)]"
                       />
                       {fieldErrors.restrictionDetails && (
@@ -544,7 +545,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
                         <label htmlFor="follow-up-date" className="block text-xs font-semibold text-[var(--color-danger)]">
-                          Ngày khám lại <span className="text-[var(--color-danger)]">*</span>
+                          Follow-up date <span className="text-[var(--color-danger)]">*</span>
                         </label>
                         <input
                           id="follow-up-date"
@@ -565,7 +566,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                               onClick={() => setFollowUpDate(businessDate(days))}
                               className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]"
                             >
-                              +{days} ngày
+                              +{days} days
                             </button>
                           ))}
                         </div>
@@ -575,7 +576,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       </div>
                       <div>
                         <label htmlFor="follow-up-desc" className="block text-xs font-semibold text-[var(--color-danger)]">
-                          Nội dung khám lại <span className="text-[var(--color-danger)]">*</span>
+                          Follow-up instructions <span className="text-[var(--color-danger)]">*</span>
                         </label>
                         <input
                           id="follow-up-desc"
@@ -595,7 +596,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       </div>
                     </div>
                     <p className="text-[11px] text-[var(--color-text-secondary)]">
-                      Ngựa tạm nghỉ tới lần khám này. Trainer sẽ thấy lý do và ngày khám lại khi lập kế hoạch.
+                      The horse will rest until this follow-up examination. The trainer will see the reason and date when creating a plan.
                     </p>
                   </div>
                 )}
@@ -603,7 +604,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
               <div className="border-t border-[var(--color-border)] pt-4">
                 <Button type="submit" variant="primary" loading={submitting} icon="check" className="w-full sm:w-auto">
-                  Hoàn tất ca khám khẩn cấp
+                  Complete urgent examination
                 </Button>
               </div>
             </form>
@@ -613,34 +614,34 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             <div className="space-y-4 rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-6">
               <div className="flex items-center gap-3 text-[var(--color-success)]">
                 <Icon name="check" size={24} />
-                <h3 className="text-base font-bold">Ca khám khẩn cấp đã hoàn tất thành công!</h3>
+                <h3 className="text-base font-bold">Urgent examination completed successfully</h3>
               </div>
               <p className="text-xs text-[var(--color-text-secondary)]">
-                Hồ sơ bệnh án và quyết định huấn luyện đã được ghi nhận vào hệ thống.
+                The medical record and training decision have been saved.
               </p>
               {completedData && (
                 <dl className="grid gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-xs sm:grid-cols-2">
                   <div>
-                    <dt className="font-semibold text-[var(--color-text-muted)]">Chẩn đoán</dt>
+                    <dt className="font-semibold text-[var(--color-text-muted)]">Diagnosis</dt>
                     <dd className="mt-1 font-bold text-[var(--color-text-primary)]">{completedData.diagnosis}</dd>
                   </div>
                   <div>
-                    <dt className="font-semibold text-[var(--color-text-muted)]">Quyết định huấn luyện</dt>
+                    <dt className="font-semibold text-[var(--color-text-muted)]">Training decision</dt>
                     <dd className="mt-1 font-bold text-[var(--color-danger)]">{completedData.trainingDecision}</dd>
                   </div>
                   <div className="sm:col-span-2">
-                    <dt className="font-semibold text-[var(--color-text-muted)]">Kết quả khám</dt>
+                    <dt className="font-semibold text-[var(--color-text-muted)]">Examination findings</dt>
                     <dd className="mt-1 text-[var(--color-text-secondary)]">{completedData.findings}</dd>
                   </div>
                   {completedData.restrictionDetails && (
                     <div className="sm:col-span-2">
-                      <dt className="font-semibold text-[var(--color-text-muted)]">Lý do chặn tập</dt>
+                      <dt className="font-semibold text-[var(--color-text-muted)]">Training restriction</dt>
                       <dd className="mt-1 text-[var(--color-danger)]">{completedData.restrictionDetails}</dd>
                     </div>
                   )}
                   {completedData.nextSchedule && (
                     <div className="sm:col-span-2">
-                      <dt className="font-semibold text-[var(--color-text-muted)]">Khám lại</dt>
+                      <dt className="font-semibold text-[var(--color-text-muted)]">Follow-up</dt>
                       <dd className="mt-1 text-[var(--color-text-primary)]">
                         {completedData.nextSchedule.scheduledDate} — {completedData.nextSchedule.description}
                       </dd>

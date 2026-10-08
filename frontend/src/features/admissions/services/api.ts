@@ -157,6 +157,14 @@ export const admissionsApi = {
     const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/quarantine-allocation`, {});
     return response.data;
   },
+  confirmArrival: async (id: number): Promise<AdmissionDetailResponse> => {
+    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/arrival-confirmation`, {});
+    return response.data;
+  },
+  reopenExpiredArrival: async (id: number): Promise<AdmissionDetailResponse> => {
+    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/arrival-reopen`, {});
+    return response.data;
+  },
   assetUrl: (url: string): string => {
     if (/^https?:\/\//i.test(url)) return url;
     const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? '';

@@ -40,8 +40,8 @@ export function SubjectList() {
         setCategoryId(cats[0].id);
       }
     } catch (err) {
-      console.error('Lỗi khi nạp danh sách bài tập:', err);
-      setError('Không tải được danh mục bài tập.');
+      console.error('Failed to load exercises:', err);
+      setError('Unable to load the exercise library.');
     } finally {
       setLoading(false);
     }
@@ -55,12 +55,12 @@ export function SubjectList() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !categoryId) {
-      setFormError('Vui lòng nhập tên bài tập và chọn phân loại.');
+      setFormError('Enter an exercise name and select a category.');
       return;
     }
     // Chặn thời lượng vượt quá 240 phút (khung giờ vàng 06:00 - 10:00)
     if (durationMinutes <= 0 || durationMinutes > 240) {
-      setFormError('Thời lượng phải từ 1 đến 240 phút.');
+      setFormError('Duration must be between 1 and 240 minutes.');
       return;
     }
 
@@ -82,7 +82,7 @@ export function SubjectList() {
       setShowForm(false);
       await loadData();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Tạo bài tập thất bại.');
+      setFormError(err instanceof Error ? err.message : 'Unable to create the exercise.');
     } finally {
       setSubmitting(false);
     }
@@ -95,7 +95,7 @@ export function SubjectList() {
   if (error) {
     return (
       <Panel padded>
-        <EmptyState icon="alert-triangle" title="Lỗi nạp dữ liệu" description={error} />
+      <EmptyState icon="alert-triangle" title="Unable to load data" description={error} />
       </Panel>
     );
   }
@@ -105,14 +105,14 @@ export function SubjectList() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-            Thư viện bài tập ({subjects.length})
+            Exercise library ({subjects.length})
           </h2>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Các bài tập tiêu chuẩn để xây dựng giáo án huấn luyện.
+            Standard exercises for building training courses.
           </p>
         </div>
         <Button variant="primary" size="sm" onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Đóng form' : '+ Tạo bài tập mới'}
+          {showForm ? 'Close form' : 'Create exercise'}
         </Button>
       </div>
 
@@ -120,7 +120,7 @@ export function SubjectList() {
         <Panel padded>
           <form onSubmit={handleCreate} className="space-y-4">
             <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-              Tạo bài tập mới
+              Create exercise
             </h3>
 
             {formError && (
@@ -132,21 +132,21 @@ export function SubjectList() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Tên bài tập *
+                  Exercise name *
                 </label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ví dụ: Gallop 1200m"
+                  placeholder="e.g. Gallop 1,200 m"
                   className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                 />
               </div>
 
               <div>
                 <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Phân loại (Category) *
+                  Category *
                 </label>
                 <select
                   value={categoryId}
@@ -163,37 +163,37 @@ export function SubjectList() {
 
               <div>
                 <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Mặt sân (Surface)
+                  Track surface
                 </label>
                 <select
                   value={surfaceType}
                   onChange={(e) => setSurfaceType(e.target.value as SurfaceType)}
                   className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                 >
-                  <option value="TURF">Cỏ tự nhiên (TURF)</option>
-                  <option value="DIRT">Cát / Đất (DIRT)</option>
-                  <option value="SYNTHETIC">Nhân tạo (SYNTHETIC)</option>
+                  <option value="TURF">Turf (TURF)</option>
+                  <option value="DIRT">Dirt (DIRT)</option>
+                  <option value="SYNTHETIC">Synthetic (SYNTHETIC)</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Cường độ (Intensity)
+                  Intensity
                 </label>
                 <select
                   value={intensityLevel}
                   onChange={(e) => setIntensityLevel(e.target.value as IntensityLevel)}
                   className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                 >
-                  <option value="LOW">Nhẹ (LOW)</option>
-                  <option value="MEDIUM">Vừa phải (MEDIUM)</option>
-                  <option value="HIGH">Nặng / Tối đa (HIGH)</option>
+                  <option value="LOW">Low (LOW)</option>
+                  <option value="MEDIUM">Medium (MEDIUM)</option>
+                  <option value="HIGH">High (HIGH)</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Cự ly mục tiêu (mét)
+                  Target distance (metres)
                 </label>
                 <input
                   type="number"
@@ -207,7 +207,7 @@ export function SubjectList() {
 
               <div>
                 <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Thời lượng dự kiến (phút, tối đa 240) *
+                  Estimated duration (minutes, max 240) *
                 </label>
                 <input
                   type="number"
@@ -220,7 +220,7 @@ export function SubjectList() {
                   className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                 />
                 <span className="text-[11px] text-[var(--color-text-muted)]">
-                  Quyết định độ dài lot. Khung giờ vàng tối đa 240 phút.
+                Determines lot duration. The training window is limited to 240 minutes.
                 </span>
               </div>
             </div>
@@ -228,23 +228,23 @@ export function SubjectList() {
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Mô tả chi tiết
+                Description
               </label>
               <textarea
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ghi chú kỹ thuật hoặc hướng dẫn cho Groom..."
+                placeholder="Technical notes or instructions for the groom…"
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" size="sm" type="button" onClick={() => setShowForm(false)}>
-                Huỷ
+                Cancel
               </Button>
               <Button variant="primary" size="sm" type="submit" disabled={submitting}>
-                {submitting ? 'Đang tạo...' : 'Lưu bài tập'}
+                {submitting ? 'Creating…' : 'Save exercise'}
               </Button>
             </div>
           </form>
@@ -255,8 +255,8 @@ export function SubjectList() {
         <Panel padded>
           <EmptyState
             icon="clipboard"
-            title="Chưa có bài tập nào"
-            description="Hãy tạo bài tập đầu tiên để bắt đầu xây dựng khoá huấn luyện."
+            title="No exercises yet"
+            description="Create your first exercise to start building a training course."
           />
         </Panel>
       ) : (
@@ -269,7 +269,7 @@ export function SubjectList() {
                     {sub.name}
                   </h4>
                   <div className="text-[11px] text-[var(--color-text-muted)]">
-                    {categoryMap.get(sub.categoryId) || `Nhóm #${sub.categoryId}`}
+                    {categoryMap.get(sub.categoryId) || `Category #${sub.categoryId}`}
                   </div>
                 </div>
                 <Pill
@@ -293,7 +293,7 @@ export function SubjectList() {
               )}
 
               <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)] border-t border-[var(--color-border)] pt-2">
-                <span>⏱️ {sub.durationMinutes} phút</span>
+                <span>{sub.durationMinutes} min</span>
                 <span>📏 {sub.targetDistanceMeters}m</span>
                 <span>🏟️ {sub.surfaceType}</span>
               </div>

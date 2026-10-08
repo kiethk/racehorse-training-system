@@ -7,6 +7,7 @@ import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { groomApi } from '../services/groomService';
 import type { TodayTaskItem } from '../types';
+import { displayError } from '@/lib/display';
 
 export function TodayChecklist() {
   const [tasks, setTasks] = useState<TodayTaskItem[]>([]);
@@ -40,7 +41,7 @@ export function TodayChecklist() {
       await groomApi.generateRoutine();
       await loadTasks();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to generate routine tasks.');
+      alert(displayError(err, 'Failed to generate routine tasks.'));
     } finally {
       setGenerating(false);
     }
@@ -52,7 +53,7 @@ export function TodayChecklist() {
       await groomApi.completeTask(refId);
       await loadTasks();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to complete the task.');
+      alert(displayError(err, 'Failed to complete the task.'));
     } finally {
       setCompletingId(null);
     }
@@ -150,7 +151,7 @@ export function TodayChecklist() {
               >
                 <div className="flex items-start gap-3">
                   {/* Time */}
-                  <div className="font-mono text-[12px] font-bold text-[var(--color-text-primary)] w-16 pt-0.5">
+                  <div className="font-metric text-[12px] font-bold text-[var(--color-text-primary)] w-16 pt-0.5">
                     {task.startTime.substring(0, 5)}
                     {task.endTime && `–${task.endTime.substring(0, 5)}`}
                   </div>
