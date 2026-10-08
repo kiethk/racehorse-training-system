@@ -1,8 +1,9 @@
 package com.rtms.backend.controller;
+
+import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreatePrescriptionRequest;
 import com.rtms.backend.dto.PrescriptionResponse;
 import com.rtms.backend.service.TreatmentPlanService;
-import com.rtms.backend.dto.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
-import { Table, TablePagination } from '@/components/ui/Table';
 import { auditLogApi } from '../services/api';
 import type { AuditLogItem, AuditLogFilters, PageResponse } from '../types';
 
@@ -232,7 +231,7 @@ export function ManagerAuditLogView() {
         ) : (
           <div className="flex flex-col h-full">
             <div className="overflow-x-auto">
-              <Table className="min-w-[860px] whitespace-nowrap text-sm">
+              <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="border-b border-[var(--color-border)] text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider bg-[var(--color-surface-muted)]">
                   <tr>
                     <th className="px-6 py-4">Time</th>
@@ -274,7 +273,7 @@ export function ManagerAuditLogView() {
                         <MethodBadge method={log.httpMethod} />
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-metric text-xs text-[var(--color-text-primary)] max-w-xs md:max-w-md lg:max-w-lg truncate block" title={log.requestPath}>
+                        <span className="font-mono text-xs text-[var(--color-text-primary)] max-w-xs md:max-w-md lg:max-w-lg truncate block" title={log.requestPath}>
                           {log.requestPath}
                         </span>
                       </td>
@@ -284,18 +283,33 @@ export function ManagerAuditLogView() {
                     </tr>
                   ))}
                 </tbody>
-              </Table>
+              </table>
             </div>
             
             {/* Pagination footer */}
-            <TablePagination
-              page={data.pageable.pageNumber}
-              pageSize={data.pageable.pageSize}
-              total={data.totalElements}
-              onPageChange={(page) => {
-                if (!loading) handlePageChange(page);
-              }}
-            />
+            <div className="flex items-center justify-between border-t border-[var(--color-border)] px-6 py-3">
+              <div className="text-sm text-[var(--color-text-secondary)]">
+                Showing <span className="font-medium text-[var(--color-text-primary)]">{data.pageable.pageNumber * data.pageable.pageSize + 1}</span> to <span className="font-medium text-[var(--color-text-primary)]">{Math.min((data.pageable.pageNumber + 1) * data.pageable.pageSize, data.totalElements)}</span> of <span className="font-medium text-[var(--color-text-primary)]">{data.totalElements}</span> results
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  disabled={data.first || loading} 
+                  onClick={() => handlePageChange(data.pageable.pageNumber - 1)}
+                >
+                  Previous
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  disabled={data.last || loading} 
+                  onClick={() => handlePageChange(data.pageable.pageNumber + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </Panel>

@@ -57,8 +57,8 @@ export function StableMap() {
       setGrooms(groomsRes);
       setUnassignedHorses(unassignedRes);
     } catch (err) {
-      console.error('Failed to load stable data:', err);
-      setError('Unable to load the stable map. Please try again later.');
+      console.error('Lỗi khi nạp dữ liệu chuồng trại:', err);
+      setError('Không tải được sơ đồ chuồng trại. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
     }
@@ -105,7 +105,7 @@ export function StableMap() {
   if (error) {
     return (
       <Panel padded>
-        <EmptyState icon="alert-triangle" title="Unable to load data" description={error} />
+        <EmptyState icon="alert-triangle" title="Lỗi nạp dữ liệu" description={error} />
       </Panel>
     );
   }
@@ -115,14 +115,14 @@ export function StableMap() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[18px] font-semibold tracking-tight text-[var(--color-text-primary)]">
-            Stable map
+            Sơ đồ chuồng trại
           </h1>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Assign horses to stalls and view the responsible groom.
+            Xếp chiến mã vào chuồng và xem Groom phụ trách từng chuồng.
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => loadAll()}>
-          Refresh
+          Làm mới
         </Button>
       </div>
 
@@ -130,8 +130,8 @@ export function StableMap() {
         <Panel padded>
           <EmptyState
             icon="activity"
-            title="No training area assigned"
-            description="You have not been assigned a REGULAR stable area."
+            title="Chưa có khu vực huấn luyện"
+            description="Bạn chưa được phân công quản lý khu vực chuồng trại REGULAR nào."
           />
         </Panel>
       ) : (
@@ -145,13 +145,13 @@ export function StableMap() {
                     Khu {area.code} — {area.name}
                   </h2>
                   <Pill tone="primary" size="sm">
-                    {areaStalls.length} stalls
+                    {areaStalls.length} chuồng
                   </Pill>
                 </div>
               </div>
 
               {areaStalls.length === 0 ? (
-                <p className="text-[12px] text-[var(--color-text-muted)]">This area has no stalls.</p>
+                <p className="text-[12px] text-[var(--color-text-muted)]">Khu vực này chưa có chuồng nào.</p>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {areaStalls.map((stall) => {
@@ -171,7 +171,7 @@ export function StableMap() {
                         <div>
                           <div className="flex items-center justify-between">
                             <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                              Stall {stall.stallCode}
+                              Chuồng {stall.stallCode}
                             </span>
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
@@ -180,14 +180,14 @@ export function StableMap() {
                                   : 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)]'
                               }`}
                             >
-                              {isOccupied ? 'Occupied' : 'Available'}
+                              {isOccupied ? 'Có ngựa' : 'Trống'}
                             </span>
                           </div>
 
                           <div className="mt-2 text-[12px]">
-                            <div className="text-[11px] text-[var(--color-text-muted)]">Horse:</div>
+                            <div className="text-[11px] text-[var(--color-text-muted)]">Chiến mã:</div>
                             <div className="font-semibold text-[var(--color-text-primary)] truncate">
-                              {currentHorse ? currentHorse.name : 'No horse assigned'}
+                              {currentHorse ? currentHorse.name : 'Chưa xếp ngựa'}
                             </div>
                             {currentHorse?.breed && (
                               <div className="text-[11px] text-[var(--color-text-secondary)]">
@@ -197,14 +197,14 @@ export function StableMap() {
                           </div>
 
                           <div className="mt-2">
-                            <div className="text-[11px] text-[var(--color-text-muted)]">Responsible groom:</div>
+                            <div className="text-[11px] text-[var(--color-text-muted)]">Groom phụ trách:</div>
                             {stall.groomId ? (
                               <Pill tone="info" size="sm">
                                 {currentGroom ? currentGroom.fullName : `#${stall.groomId}`}
                               </Pill>
                             ) : (
                               <span className="text-[11px] text-[var(--color-text-muted)] italic">
-                                Unassigned
+                                Chưa phân công
                               </span>
                             )}
                           </div>
@@ -221,7 +221,7 @@ export function StableMap() {
                                 : 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white'
                             }`}
                           >
-                            {isOccupied ? 'Horse assigned' : 'Assign horse'}
+                            {isOccupied ? 'Đã có ngựa' : 'Xếp ngựa'}
                           </button>
                           {isOccupied && (
                             <button
@@ -232,7 +232,7 @@ export function StableMap() {
                               }}
                               className="flex-1 rounded px-2 py-1 text-[11px] font-medium text-center bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition"
                             >
-                              Unassign horse
+                              Gỡ ngựa
                             </button>
                           )}
                         </div>
@@ -258,22 +258,22 @@ export function StableMap() {
       <ConfirmDialog
         open={unassignStall !== null}
         tone="danger"
-        title={`Unassign horse from stall ${unassignStall?.stallCode ?? ''}?`}
-        confirmLabel="Unassign horse"
-        cancelLabel="Cancel"
+        title={`Gỡ chiến mã khỏi chuồng ${unassignStall?.stallCode ?? ''}?`}
+        confirmLabel="Gỡ ngựa"
+        cancelLabel="Huỷ"
         loading={unassigning}
         description={
           <div className="space-y-1.5">
             <p>
-              The horse{' '}
+              Chiến mã{' '}
               <strong>
                 {unassignStall ? horseByStallId.get(unassignStall.id)?.name ?? '' : ''}
               </strong>{' '}
-              will no longer be assigned to a stall.
+              sẽ không còn ở chuồng nào.
             </p>
             <p>
-              <strong>Upcoming</strong> training sessions will become
-              &quot;groom unassigned&quot;. Completed sessions remain unchanged.
+              Các buổi tập <strong>chưa diễn ra</strong> sẽ chuyển sang trạng thái
+              &quot;chưa phân công Groom&quot;. Buổi đã hoàn thành giữ nguyên.
             </p>
             {unassignError && (
               <p className="text-[var(--color-danger)]">{unassignError}</p>
@@ -292,7 +292,7 @@ export function StableMap() {
             setUnassignStall(null);
             await loadAll();
           } catch (err) {
-            setUnassignError(err instanceof Error ? err.message : 'Unable to unassign the horse.');
+            setUnassignError(err instanceof Error ? err.message : 'Gỡ ngựa thất bại.');
           } finally {
             setUnassigning(false);
           }

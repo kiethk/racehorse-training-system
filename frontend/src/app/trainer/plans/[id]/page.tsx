@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PlanDetail } from '@/features/training/components/PlanDetail';
 
 export const metadata: Metadata = {
-  title: 'Training Plan Details | RTMS',
+  title: 'Chi tiết kế hoạch huấn luyện | Huấn luyện viên',
 };
 
 export default async function TrainingPlanDetailPage({

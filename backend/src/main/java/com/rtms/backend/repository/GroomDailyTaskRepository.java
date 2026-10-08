@@ -1,4 +1,5 @@
 package com.rtms.backend.repository;
+
 import com.rtms.backend.entity.GroomDailyTask;
 import com.rtms.backend.enums.GroomTaskType;
 import org.springframework.data.jpa.repository.JpaRepository;

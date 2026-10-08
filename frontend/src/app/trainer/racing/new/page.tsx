@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { TrainerRaceForm } from '@/features/racing/components/TrainerRaceForm';
 
 export const metadata: Metadata = {
-  title: 'Create Race Nomination | RTMS',
+  title: 'Tạo đơn đề cử dự đua | Huấn luyện viên',
 };
 
 export default function TrainerNewRaceNominationPage() {

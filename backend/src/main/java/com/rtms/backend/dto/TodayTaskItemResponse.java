@@ -1,6 +1,6 @@
 package com.rtms.backend.dto;
+
 import com.rtms.backend.enums.TaskSource;
-import com.rtms.backend.enums.WorkoutStatus;
 
 import java.time.LocalTime;
 

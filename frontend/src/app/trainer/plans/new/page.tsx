@@ -6,7 +6,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { EnrollmentForm } from '@/features/training/components/EnrollmentForm';
 
 export const metadata: Metadata = {
-  title: 'Group Training Enrollment | RTMS',
+  title: 'Ghi danh huấn luyện theo nhóm | Huấn luyện viên',
 };
 
 export default function NewTrainingPlanPage() {
@@ -14,7 +14,7 @@ export default function NewTrainingPlanPage() {
     <RoleGuard allowedRoles={['HEAD_TRAINER']}>
       <AppShell>
         <PageContainer>
-          <Suspense fallback={<div className="p-4">Loading...</div>}>
+          <Suspense fallback={<div className="p-4">Đang tải...</div>}>
             <EnrollmentForm />
           </Suspense>
         </PageContainer>

@@ -7,7 +7,7 @@ import type { AdmissionStatus, GroomQueueFilters } from '@/features/admissions/t
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const validStatuses: AdmissionStatus[] = [
-  'GROOM_REVIEW', 'WAITING_FOR_STALL', 'WAITING_FOR_ARRIVAL', 'VET_REVIEW', 'TRAINER_REVIEW', 'MANAGER_REVIEW', 'APPROVED', 'REJECTED',
+  'GROOM_REVIEW', 'WAITING_FOR_STALL', 'VET_REVIEW', 'TRAINER_REVIEW', 'MANAGER_REVIEW', 'APPROVED', 'REJECTED',
 ];
 
 function first(value: string | string[] | undefined) {

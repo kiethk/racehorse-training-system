@@ -3,7 +3,6 @@ import {HorseAvatar} from '@/components/ui/HorseAvatar';
 import type {AdmissionSummaryResponse} from '../../types';
 import {AdmissionStatusBadge} from './AdmissionStatusBadge';
 import type {ReactNode} from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui/Table';
 
 interface AdmissionTableProps {
     admissions: AdmissionSummaryResponse[];
@@ -20,23 +19,24 @@ export function AdmissionTable({
                                     renderAvatar,
                                }: AdmissionTableProps) {
     return (
-        <TableShell>
-            <Table>
-                <TableHeader className="uppercase tracking-wider">
+        <div className="overflow-x-auto">
+            <table className="w-full whitespace-nowrap text-left text-sm">
+                <thead className="border-b border-[var(--color-border)] text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
                 <tr>
-                    <TableHead>Horse</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead align="right">Action</TableHead>
+                    <th scope="col" className="px-6 py-4">Horse</th>
+                    <th scope="col" className="px-6 py-4">Status</th>
+                    <th scope="col" className="px-6 py-4">Submitted</th>
+                    <th scope="col" className="px-6 py-4 text-right">Action</th>
                 </tr>
-                </TableHeader>
+                </thead>
 
-                <TableBody>
+                <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)]">
                 {admissions.map(admission => (
-                    <TableRow
+                    <tr
                         key={admission.admissionId}
+                        className="transition-colors hover:bg-[var(--color-surface-muted)]"
                     >
-                        <TableCell>
+                        <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                                 {renderAvatar ? (
                                     renderAvatar(admission)
@@ -57,13 +57,13 @@ export function AdmissionTable({
                     </span>
                                 </div>
                             </div>
-                        </TableCell>
+                        </td>
 
-                        <TableCell>
+                        <td className="px-6 py-4">
                             <AdmissionStatusBadge status={admission.status} />
-                        </TableCell>
+                        </td>
 
-                        <TableCell className="text-[var(--color-text-secondary)]">
+                        <td className="px-6 py-4 text-[var(--color-text-secondary)]">
                             {new Date(admission.submittedAt).toLocaleDateString(
                                 'en-GB',
                                 {
@@ -72,20 +72,20 @@ export function AdmissionTable({
                                     year: 'numeric',
                                 }
                             )}
-                        </TableCell>
+                        </td>
 
-                        <TableCell align="right">
+                        <td className="px-6 py-4 text-right">
                             <Link
                                 href={detailHref(admission.admissionId)}
                                 className="inline-flex items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] px-4 py-1.5 text-xs font-semibold text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary-subtle)]"
                             >
                                 View
                             </Link>
-                        </TableCell>
-                    </TableRow>
+                        </td>
+                    </tr>
                 ))}
-                </TableBody>
-            </Table>
-        </TableShell>
+                </tbody>
+            </table>
+        </div>
     );
 }

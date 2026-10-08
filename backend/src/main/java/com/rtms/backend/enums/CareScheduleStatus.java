@@ -4,7 +4,6 @@ public enum CareScheduleStatus {
     REQUESTED,
     SCHEDULED,
     IN_PROGRESS,
-    OVERDUE,
     COMPLETED,
     CANCELLED
 }

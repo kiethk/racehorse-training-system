@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PlanList } from '@/features/training/components/PlanList';
 
 export const metadata: Metadata = {
-  title: 'Training Plans | RTMS',
+  title: 'Kế hoạch huấn luyện | Huấn luyện viên',
 };
 
 export default function TrainerPlansPage() {

@@ -1,4 +1,5 @@
 package com.rtms.backend.repository;
+
 import com.rtms.backend.entity.InjuryRecord;
 
 import java.util.List;

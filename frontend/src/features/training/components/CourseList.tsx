@@ -40,8 +40,8 @@ export function CourseList() {
       setCourses(crs);
       setSubjects(subs);
     } catch (err) {
-      console.error('Failed to load courses:', err);
-      setError('Unable to load training courses.');
+      console.error('Lỗi nạp khóa học:', err);
+      setError('Không tải được danh sách khóa huấn luyện.');
     } finally {
       setLoading(false);
     }
@@ -58,7 +58,7 @@ export function CourseList() {
       const detail = await trainingApi.getCourse(courseId);
       setViewDetail(detail);
     } catch (err) {
-      console.error('Unable to load course details:', err);
+      console.error('Không tải được chi tiết khóa học:', err);
     } finally {
       setDetailLoading(false);
     }
@@ -75,11 +75,11 @@ export function CourseList() {
   async function handleCreateCourse(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || totalSessions <= 0) {
-      setFormError('Enter a course name and a valid session count.');
+      setFormError('Vui lòng nhập tên khóa học và tổng số buổi hợp lệ.');
       return;
     }
     if (selectedSubjectIds.length === 0) {
-      setFormError('Select at least one workout in the session rotation.');
+      setFormError('Vui lòng chọn ít nhất 1 bài tập trong vòng xoay bài học.');
       return;
     }
 
@@ -105,7 +105,7 @@ export function CourseList() {
       setShowForm(false);
       await loadData();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Unable to create the course.');
+      setFormError(err instanceof Error ? err.message : 'Tạo khóa học thất bại.');
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +118,7 @@ export function CourseList() {
   if (error) {
     return (
       <Panel padded>
-        <EmptyState icon="alert-triangle" title="Unable to load data" description={error} />
+        <EmptyState icon="alert-triangle" title="Lỗi nạp dữ liệu" description={error} />
       </Panel>
     );
   }
@@ -128,20 +128,20 @@ export function CourseList() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-            Training courses ({courses.length})
+            Khóa học huấn luyện ({courses.length})
           </h2>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Complete curricula with workout rotations for horse enrollment.
+            Giáo trình hoàn chỉnh gồm chu kỳ các bài tập để ghi danh cho các chiến mã.
           </p>
         </div>
         <div className="flex gap-2">
           <Link href="/trainer/plans/new">
             <Button variant="secondary" size="sm">
-              Enroll horses
+              🏇 Ghi danh chiến mã
             </Button>
           </Link>
           <Button variant="primary" size="sm" onClick={() => setShowForm(!showForm)}>
-            {showForm ? 'Close form' : '+ Create course'}
+            {showForm ? 'Đóng form' : '+ Tạo khóa học mới'}
           </Button>
         </div>
       </div>
@@ -150,7 +150,7 @@ export function CourseList() {
         <Panel padded>
           <form onSubmit={handleCreateCourse} className="space-y-4">
             <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-              Create course (with workout rotation)
+              Tạo khóa học mới (kèm vòng xoay bài học)
             </h3>
 
             {formError && (
@@ -162,21 +162,21 @@ export function CourseList() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Course name *
+                  Tên khóa học *
                 </label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="For example: Sprint 2YO Foundation"
+                  placeholder="Ví dụ: Sprint 2YO Foundation"
                   className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                 />
               </div>
 
               <div>
                 <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Total sessions *
+                  Tổng số buổi (Total Sessions) *
                 </label>
                 <input
                   type="number"
@@ -187,33 +187,33 @@ export function CourseList() {
                   className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                 />
                 <span className="text-[11px] text-[var(--color-text-muted)]">
-                Workouts rotate sequentially until this number of sessions is reached.
+                  Bài tập sẽ tự động xoay vòng tuần tự cho đến khi đủ số buổi này.
                 </span>
               </div>
             </div>
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Target goal
+                Mục tiêu khóa học (Target Goal)
               </label>
               <input
                 type="text"
                 value={targetGoal}
                 onChange={(e) => setTargetGoal(e.target.value)}
-                placeholder="For example: Eligible for a 1,200 m short-distance race"
+                placeholder="Ví dụ: Đủ điều kiện đăng ký giải cự ly ngắn 1200m"
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
             </div>
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Course description
+                Mô tả khóa học
               </label>
               <textarea
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the route and suitable fitness level..."
+                placeholder="Giới thiệu về lộ trình, thể trạng phù hợp..."
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
             </div>
@@ -221,17 +221,17 @@ export function CourseList() {
             {/* Chọn vòng xoay bài học */}
             <div className="border-t border-[var(--color-border)] pt-3">
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Workout rotation ({selectedSubjectIds.length} selected)
+                Vòng xoay bài tập (Đã chọn: {selectedSubjectIds.length} bài)
               </label>
               <p className="text-[11px] text-[var(--color-text-muted)]">
-                Select workouts below to add them to the rotation order:
+                Nhấn vào các bài tập bên dưới để đưa vào chu kỳ lặp lại theo thứ tự:
               </p>
 
               {/* Danh sách các bài đã chọn */}
               <div className="mt-2 min-h-12 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-muted)] p-2">
                 {selectedSubjectIds.length === 0 ? (
                   <span className="text-[12px] text-[var(--color-text-muted)] italic">
-                    No workouts selected for the rotation.
+                    Chưa chọn bài tập nào vào chu kỳ.
                   </span>
                 ) : (
                   <div className="flex flex-wrap gap-2">
@@ -243,7 +243,7 @@ export function CourseList() {
                           className="flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-[12px]"
                         >
                           <span className="font-bold text-[var(--color-primary)]">#{idx + 1}</span>
-                          <span>{s?.name || `Workout #${subId}`}</span>
+                          <span>{s?.name || `Bài #${subId}`}</span>
                           <button
                             type="button"
                             onClick={() => removeSubjectFromSequence(idx)}
@@ -275,10 +275,10 @@ export function CourseList() {
 
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--color-border)]">
               <Button variant="secondary" size="sm" type="button" onClick={() => setShowForm(false)}>
-                Cancel
+                Huỷ
               </Button>
               <Button variant="primary" size="sm" type="submit" disabled={submitting}>
-                {submitting ? 'Creating...' : 'Save course'}
+                {submitting ? 'Đang tạo...' : 'Lưu khóa học'}
               </Button>
             </div>
           </form>
@@ -289,8 +289,8 @@ export function CourseList() {
         <Panel padded>
           <EmptyState
             icon="activity"
-            title="No training courses"
-            description="Create the first course to prepare horses for training."
+            title="Chưa có khóa học nào"
+            description="Hãy tạo khóa học đầu tiên để chuẩn bị huấn luyện cho chiến mã."
           />
         </Panel>
       ) : (
@@ -304,7 +304,7 @@ export function CourseList() {
                       {course.name}
                     </h3>
                     <Pill tone="primary" size="sm">
-                      {course.totalSessions} sessions
+                      {course.totalSessions} buổi
                     </Pill>
                   </div>
 
@@ -328,7 +328,7 @@ export function CourseList() {
                     onClick={() => handleOpenDetail(course.id)}
                     disabled={detailLoading}
                   >
-                    View course details
+                    Xem chi tiết giáo án
                   </Button>
                   <Link href={`/trainer/plans/new?courseId=${course.id}`}>
                     <Button variant="primary" size="sm">
@@ -361,7 +361,7 @@ export function CourseList() {
                   {viewDetail.course.name}
                 </h3>
                 <div className="text-[12px] text-[var(--color-text-secondary)]">
-                  Total sessions: {viewDetail.course.totalSessions}
+                  Tổng số buổi: {viewDetail.course.totalSessions} buổi
                 </div>
               </div>
               <button
@@ -375,13 +375,13 @@ export function CourseList() {
 
             {viewDetail.course.targetGoal && (
               <p className="mt-2 text-[13px] text-[var(--color-primary)] font-medium">
-                Goal: {viewDetail.course.targetGoal}
+                Mục tiêu: {viewDetail.course.targetGoal}
               </p>
             )}
 
             <div className="mt-4">
               <h4 className="text-[13px] font-medium text-[var(--color-text-primary)] mb-2">
-                Sequential workout rotation ({viewDetail.subjects.length} workouts):
+                Chuỗi bài tập tuần tự ({viewDetail.subjects.length} bài trong vòng xoay):
               </h4>
               <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
                 {viewDetail.subjects.map((s) => (
@@ -390,13 +390,13 @@ export function CourseList() {
                     className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] p-2 text-[12px]"
                   >
                     <span className="font-semibold text-[var(--color-primary)]">
-                      Session {s.orderIndex}:
+                      Buổi thứ i ≡ {s.orderIndex}:
                     </span>
                     <span className="font-medium text-[var(--color-text-primary)]">
                       {s.subjectName}
                     </span>
                     <span className="text-[var(--color-text-muted)]">
-                      {s.durationMinutes} minutes
+                      {s.durationMinutes} phút
                     </span>
                   </div>
                 ))}
@@ -405,11 +405,11 @@ export function CourseList() {
 
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="secondary" size="sm" onClick={() => setViewDetail(null)}>
-                Close
+                Đóng
               </Button>
               <Link href={`/trainer/plans/new?courseId=${viewDetail.course.id}`}>
                 <Button variant="primary" size="sm">
-                  Enroll group in this course
+                  Ghi danh nhóm cho khóa này
                 </Button>
               </Link>
             </div>

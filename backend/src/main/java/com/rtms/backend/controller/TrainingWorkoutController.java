@@ -1,9 +1,9 @@
 package com.rtms.backend.controller;
-import com.rtms.backend.entity.Permission;
-import com.rtms.backend.security.AuthenticatedUser;
+
 import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CompleteWorkoutRequest;
 import com.rtms.backend.dto.PlanWorkoutItemResponse;
+import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.HorseTrainingPlanService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

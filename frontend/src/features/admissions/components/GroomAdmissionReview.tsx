@@ -74,9 +74,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
       onUpdated?.();
       setNotice(updated.status === 'WAITING_FOR_STALL'
         ? 'Groom approved this application. Capacity is not available yet, so it is waiting for a stall.'
-        : updated.status === 'WAITING_FOR_ARRIVAL'
-          ? 'Groom approved this application. The Q-stall is reserved; confirm the physical horse arrival when it arrives.'
-          : decision === 'REJECTED' ? 'Application rejected.' : 'Application approved and moved to Vet review.');
+        : decision === 'REJECTED' ? 'Application rejected.' : 'Application approved and moved to Vet review.');
     } catch (cause) {
       setNotice(null);
       setError(cause instanceof Error ? cause.message : 'Unable to submit the Groom decision.');
@@ -95,35 +93,9 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
       onUpdated?.();
       setNotice(updated.status === 'WAITING_FOR_STALL'
         ? 'Capacity is still unavailable. The application remains in the waiting queue.'
-        : 'A quarantine stall was reserved. Confirm the horse arrival when the horse is physically present.');
+        : 'A quarantine stall was allocated and the application moved to Vet review.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to retry stall allocation.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const confirmArrival = async (confirmed: boolean) => {
-    if (!confirmed && !feedback.trim()) {
-      setFeedbackError('Feedback is required when rejecting the arriving horse.');
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    setFeedbackError(null);
-    setNotice(null);
-    try {
-      const updated = await admissionsApi.confirmHorseArrival(admissionId, {
-        confirmed,
-        feedback: feedback.trim() || undefined,
-      });
-      setDetail(updated);
-      onUpdated?.();
-      setNotice(confirmed
-        ? 'Horse arrival confirmed. The Horse and initial veterinary schedule were created.'
-        : 'The admission was rejected because the arriving horse did not match the application.');
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to confirm horse arrival.');
     } finally {
       setSubmitting(false);
     }
@@ -137,7 +109,6 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
   const horsePhoto = detail.documents.find((doc) => doc.documentType === 'HORSE_PHOTO');
   const canReview = detail.status === 'GROOM_REVIEW';
   const waiting = detail.status === 'WAITING_FOR_STALL';
-  const waitingForArrival = detail.status === 'WAITING_FOR_ARRIVAL';
   const capacity = detail.capacity;
   const isReady = capacity?.admissionCapacityAvailable ?? false;
   const blockingText = capacity?.blockingReason === 'NO_QUARANTINE_STALL'
@@ -180,7 +151,6 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
           <div className="mt-4 flex flex-wrap gap-2 text-[12px]">
             <PipelineStep label="Groom review" isDone={!!detail.groomReviewedAt} isActive={detail.status === 'GROOM_REVIEW'} />
             <PipelineStep label="Stall assignment" isDone={!!detail.quarantineStallCode} isActive={detail.status === 'WAITING_FOR_STALL'} />
-            <PipelineStep label="Horse arrival" isDone={detail.arrivalStatus === 'CONFIRMED'} isActive={waitingForArrival} />
             <PipelineStep label="Veterinarian review" isDone={!!detail.vetReviewedAt} isActive={detail.status === 'VET_REVIEW'} />
             <PipelineStep label="Head Trainer review" isDone={!!detail.trainerReviewedAt} isActive={detail.status === 'TRAINER_REVIEW'} />
             <PipelineStep label="Manager final review" isDone={!!detail.managerReviewedAt} isActive={detail.status === 'MANAGER_REVIEW'} />
@@ -244,8 +214,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
             <dl className="mt-4 space-y-3 text-[12px]">
               <InfoRow label="Horse name" value={candidate.name} />
               <InfoRow label="Owner" value={detail.ownerName ? `${detail.ownerName} (ID ${detail.ownerId})` : `ID ${detail.ownerId}`} />
-              <InfoRow label="Horse ID" value={detail.horseId ? String(detail.horseId) : 'Created after arrival confirmation'} />
-              <InfoRow label="Arrival status" value={detail.arrivalStatus === 'CONFIRMED' ? 'Confirmed' : 'Waiting for Groom confirmation'} />
+              <InfoRow label="Horse ID" value={detail.horseId ? String(detail.horseId) : 'Created after approval'} />
               <InfoRow label="Groom feedback" value={detail.groomFeedback} />
             </dl>
           </Panel>
@@ -281,37 +250,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, embedded = false, 
           </Panel>
         )}
 
-        {waitingForArrival && (
-          <Panel padded className="border-2 border-[var(--color-primary)] bg-[var(--color-surface)]">
-            <SectionTitle>Horse arrival confirmation</SectionTitle>
-            <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
-              The Q-stall is reserved. Confirm only when the physical horse has arrived and matches the submitted profile.
-            </p>
-            <label htmlFor="arrival-feedback" className="mt-4 block text-[13px] font-medium text-[var(--color-text-primary)]">
-              Arrival note
-            </label>
-            <textarea
-              id="arrival-feedback"
-              value={feedback}
-              onChange={(event) => { setFeedback(event.target.value); setFeedbackError(null); }}
-              rows={3}
-              maxLength={2000}
-              className="mt-2 w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-              placeholder="Optional for confirmation; required when rejecting a mismatch."
-            />
-            {feedbackError && <p role="alert" className="mt-2 text-xs text-[var(--color-danger)]">{feedbackError}</p>}
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="destructive" size="sm" loading={submitting} onClick={() => void confirmArrival(false)}>
-                Reject mismatch
-              </Button>
-              <Button type="button" variant="primary" size="sm" loading={submitting} onClick={() => void confirmArrival(true)}>
-                Confirm horse arrived
-              </Button>
-            </div>
-          </Panel>
-        )}
-
-        {!canReview && !waiting && !waitingForArrival && <Panel padded className="bg-[var(--color-surface)]"><p className="text-sm text-[var(--color-text-secondary)]">This application is read-only at its current stage.</p></Panel>}
+        {!canReview && !waiting && <Panel padded className="bg-[var(--color-surface)]"><p className="text-sm text-[var(--color-text-secondary)]">This application is read-only at its current stage.</p></Panel>}
       </div>
     </div>
   );
@@ -323,7 +262,7 @@ function prettyStatus(status: AdmissionStatus) {
 
 function statusTone(status: AdmissionStatus): 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral' {
   if (status === 'GROOM_REVIEW') return 'primary';
-  if (status === 'WAITING_FOR_STALL' || status === 'WAITING_FOR_ARRIVAL') return 'warning';
+  if (status === 'WAITING_FOR_STALL') return 'warning';
   if (status === 'APPROVED') return 'success';
   if (status === 'REJECTED') return 'danger';
   if (status === 'VET_REVIEW' || status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW') return 'info';

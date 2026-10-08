@@ -1,9 +1,9 @@
 package com.rtms.backend.service;
+
 import com.rtms.backend.dto.CreateHealthRecordRequest;
 import com.rtms.backend.entity.HealthRecord;
-import com.rtms.backend.repository.HealthRecordRepository;
-import com.rtms.backend.entity.Horse;
 import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.repository.HealthRecordRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.stereotype.Service;
 

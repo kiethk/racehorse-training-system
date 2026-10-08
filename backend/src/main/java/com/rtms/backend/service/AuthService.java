@@ -1,4 +1,6 @@
 package com.rtms.backend.service;
+
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.dto.LoginRequest;
 import com.rtms.backend.dto.LoginResponse;
 import com.rtms.backend.dto.OwnerRegistrationRequest;
@@ -13,7 +15,6 @@ import com.rtms.backend.repository.TrainerProfileRepository;
 import com.rtms.backend.repository.UserRepository;
 import com.rtms.backend.repository.VeterinarianProfileRepository;
 import com.rtms.backend.security.JwtUtil;
-import com.rtms.backend.config.ApiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;

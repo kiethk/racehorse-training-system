@@ -1,7 +1,7 @@
 package com.rtms.backend.dto;
-import com.rtms.backend.enums.TrainingDecision;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.rtms.backend.enums.TrainingDecision;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;

@@ -28,10 +28,10 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
     return (
       <div className="flex h-64 flex-col items-center justify-center rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-6 text-center">
         <p className="text-sm font-medium text-[var(--color-text-secondary)]">
-          No completed session data is available for this period.
+          Chưa có dữ liệu buổi tập hoàn thành trong khoảng thời gian này
         </p>
         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-          The fitness chart will appear after sessions are completed and metrics are recorded.
+          Sau khi hoàn thành các buổi tập và ghi nhận chỉ số, biểu đồ thể lực sẽ tự động hiển thị ở đây.
         </p>
       </div>
     );
@@ -106,10 +106,10 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
         <div>
           <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-            Fitness & Performance Progress
+            Biểu Đồ Tiến Độ Thể Lực & Phong Độ
           </h3>
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Track fitness trends across workouts and periodic assessments.
+            Theo dõi xu hướng thể lực qua các buổi tập và các đợt đánh giá định kỳ
           </p>
         </div>
         <div className="flex rounded-[var(--radius-sm)] bg-[var(--color-surface-subtle)] p-0.5">
@@ -122,7 +122,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            All metrics
+            Tất cả chỉ số
           </button>
           <button
             type="button"
@@ -133,7 +133,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            Performance & readiness
+            Phong độ & Sẵn sàng
           </button>
           <button
             type="button"
@@ -144,7 +144,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            Heart rate (BPM)
+            Nhịp tim (BPM)
           </button>
           <button
             type="button"
@@ -155,7 +155,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            Speed & distance
+            Vận tốc & Cự ly
           </button>
         </div>
       </div>
@@ -165,16 +165,16 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
         <div className="relative rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-              Race performance (1 - 10) & readiness score
+              Phong độ thi đấu (1 - 10) & Điểm Đánh giá sẵn sàng
             </span>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                Session performance (rating)
+                Phong độ buổi tập (Rating)
               </span>
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
                 <span className="h-2.5 w-2.5 rotate-45 transform bg-purple-600" />
-                Periodic assessment (readiness score)
+                Đánh giá định kỳ (Readiness Score)
               </span>
             </div>
           </div>
@@ -303,7 +303,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
         <div className="relative rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-              Heart Rate (BPM) & Safety Threshold
+              Nhịp Tim (BPM) & Ngưỡng An Toàn
             </span>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
@@ -320,7 +320,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
               </span>
               <span className="flex items-center gap-1.5 text-rose-600 font-medium">
                 <span className="h-0.5 w-3 border-t-2 border-dashed border-rose-500" />
-                Max threshold: 220 bpm
+                Ngưỡng Max: 220 bpm
               </span>
             </div>
           </div>
@@ -486,16 +486,16 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
         <div className="relative rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-              Speed (km/h) & Distance (m)
+              Vận Tốc (km/h) & Cự Ly (m)
             </span>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
                 <span className="h-2 w-4 bg-indigo-500 rounded-sm" />
-                Top speed
+                Vận tốc tối đa (Top Speed)
               </span>
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
                 <span className="h-2 w-4 bg-cyan-500 rounded-sm" />
-                Average speed
+                Vận tốc trung bình (Avg Speed)
               </span>
             </div>
           </div>
@@ -632,13 +632,13 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
           </p>
           <div className="mt-1 space-y-0.5 text-[11px] text-[var(--color-text-secondary)]">
             <p>
-              Performance:{' '}
+              Phong độ:{' '}
               <span className="font-semibold text-emerald-600">
                 {hoveredPoint.data.performanceRating ?? 'N/A'}/10
               </span>
             </p>
             <p>
-              Heart rate:{' '}
+              Nhịp tim:{' '}
               <span>
                 Avg {hoveredPoint.data.averageHeartRate ?? '-'} | Max{' '}
                 <strong className={hoveredPoint.data.maxHeartRate && hoveredPoint.data.maxHeartRate > 220 ? 'text-red-500' : ''}>
@@ -652,11 +652,11 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
               </span>
             </p>
             <p>
-              Speed: Avg {hoveredPoint.data.averageSpeedKmh ?? '-'} km/h | Top{' '}
+              Tốc độ: Avg {hoveredPoint.data.averageSpeedKmh ?? '-'} km/h | Top{' '}
               {hoveredPoint.data.topSpeedKmh ?? '-'} km/h
             </p>
             {hoveredPoint.data.distanceMeters && (
-              <p>Distance: {hoveredPoint.data.distanceMeters.toLocaleString()} m</p>
+              <p>Cự ly: {hoveredPoint.data.distanceMeters.toLocaleString()} m</p>
             )}
           </div>
         </div>
@@ -672,20 +672,20 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
           }}
         >
           <p className="text-xs font-bold text-purple-700">
-            Periodic Readiness Assessment • {hoveredReadiness.data.assessmentDate}
+            Đánh Giá Sẵn Sàng Định Kỳ • {hoveredReadiness.data.assessmentDate}
           </p>
           <div className="mt-1 space-y-0.5 text-[11px] text-[var(--color-text-secondary)]">
             <p>
-              Fitness score:{' '}
+              Điểm thể lực (Fitness Score):{' '}
               <strong className="text-purple-700">
-                {hoveredReadiness.data.fitnessScore ?? 'Not scored'}/10
+                {hoveredReadiness.data.fitnessScore ?? 'Chưa chấm'}/10
               </strong>
             </p>
             <p>
-              Status: <strong>{hoveredReadiness.data.readinessStatus}</strong>
+              Trạng thái: <strong>{hoveredReadiness.data.readinessStatus}</strong>
             </p>
             {hoveredReadiness.data.estimatedMonthsToRace !== null && (
-              <p>Estimated race readiness: {hoveredReadiness.data.estimatedMonthsToRace} months</p>
+              <p>Dự kiến sẵn sàng thi đấu: {hoveredReadiness.data.estimatedMonthsToRace} tháng</p>
             )}
           </div>
         </div>

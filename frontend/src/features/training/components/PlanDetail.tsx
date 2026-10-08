@@ -36,8 +36,8 @@ export function PlanDetail({ planId }: PlanDetailProps) {
       setDetail(data);
       setGrooms(groomList);
     } catch (err) {
-      console.error('Failed to load training plan details:', err);
-      setError('Unable to load training plan details.');
+      console.error('Lỗi khi nạp chi tiết kế hoạch:', err);
+      setError('Không tải được thông tin kế hoạch huấn luyện.');
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
   if (error || !detail) {
     return (
       <Panel padded>
-        <EmptyState icon="alert-triangle" title="Training plan not found" description={error || 'This training plan is unavailable.'} />
+        <EmptyState icon="alert-triangle" title="Không tìm thấy kế hoạch" description={error || 'Kế hoạch không tồn tại.'} />
       </Panel>
     );
   }
@@ -83,7 +83,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-              {detail.horseName ?? `Horse #${plan.horseId}`}
+              {detail.horseName ?? `Chiến mã #${plan.horseId}`}
             </h1>
             <Pill
               tone={
@@ -100,22 +100,22 @@ export function PlanDetail({ planId }: PlanDetailProps) {
             </Pill>
           </div>
           <p className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">
-            Course: <strong>{detail.courseName ?? `#${plan.courseId}`}</strong>
+            Khoá: <strong>{detail.courseName ?? `#${plan.courseId}`}</strong>
           </p>
           <p className="text-[12px] text-[var(--color-text-secondary)]">
-            {plan.startDate} to {plan.endDate} • {workouts.length} planned sessions
+            Từ {plan.startDate} đến {plan.endDate} • {workouts.length} buổi tập dự kiến
           </p>
         </div>
 
         <div className="flex gap-2">
           <Link href="/trainer/plans">
             <Button variant="secondary" size="sm">
-              ← Training plans
+              ← Danh sách kế hoạch
             </Button>
           </Link>
           <Link href="/trainer/schedule">
             <Button variant="secondary" size="sm">
-            View full lot schedule
+              Xem lịch Lot tổng thể
             </Button>
           </Link>
         </div>
@@ -126,11 +126,11 @@ export function PlanDetail({ planId }: PlanDetailProps) {
         <div className="space-y-2">
           <div className="flex items-center justify-between text-[13px]">
             <span className="font-medium text-[var(--color-text-primary)]">
-              Completion: {progress.completed}/{progress.total} sessions ({progress.percent}%)
+              Tiến độ hoàn thành: {progress.completed}/{progress.total} buổi ({progress.percent}%)
             </span>
             {progress.cancelled > 0 && (
               <span className="text-[11px] text-[var(--color-text-muted)]">
-                ({progress.cancelled} cancelled)
+                (Đã huỷ {progress.cancelled} buổi)
               </span>
             )}
           </div>
@@ -146,12 +146,12 @@ export function PlanDetail({ planId }: PlanDetailProps) {
       {/* Danh sách các buổi tập */}
       <Panel padded>
         <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-4">
-          Detailed session schedule
+          Lịch trình chi tiết từng buổi tập
         </h2>
 
         {workouts.length === 0 ? (
           <p className="text-[12px] text-[var(--color-text-muted)] italic">
-            No sessions have been assigned to this plan.
+            Chưa có buổi tập nào được phân bổ trong kế hoạch này.
           </p>
         ) : (
           <div className="divide-y divide-[var(--color-border)]">
@@ -179,8 +179,8 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                     </Pill>
                   </div>
                   <div className="mt-1 text-[11px] text-[var(--color-text-secondary)] flex flex-wrap gap-3">
-                    <span>Date: <strong>{w.lotDate}</strong></span>
-                    <span>Time: <strong>{w.startTime} – {w.endTime}</strong></span>
+                    <span>📅 Ngày: <strong>{w.lotDate}</strong></span>
+                    <span>⏱️ Khung giờ: <strong>{w.startTime} – {w.endTime}</strong></span>
                     {/*
                       lotId DÙNG CHUNG với các chiến mã khác, còn assignedGroomId
                       là RIÊNG của con ngựa này. Hai thứ khác hẳn bản chất, nên
@@ -191,7 +191,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                       🏷️ Lot #{w.lotId}
                       {w.lotOccupancy && w.lotOccupancy > 1 && (
                         <span className="text-[var(--color-text-muted)]">
-                          {' '}(shared with {w.lotOccupancy - 1} other horses)
+                          {' '}(chung với {w.lotOccupancy - 1} chiến mã khác)
                         </span>
                       )}
                     </span>
@@ -202,14 +202,14 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                     */}
                     {w.assignedGroomId ? (
                       <span>
-                        Handler:{' '}
+                        👤 Người dắt:{' '}
                         <strong>
                           {groomNameById.get(w.assignedGroomId) ?? `#${w.assignedGroomId}`}
                         </strong>
                       </span>
                     ) : (
                       <span className="text-[var(--color-warning)]">
-                        ⚠ Groom unassigned
+                        ⚠ Chưa phân công Groom
                       </span>
                     )}
                   </div>
@@ -217,11 +217,11 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                   {w.status === 'COMPLETED' && (
                     <div className="mt-2 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-2 text-[11px] text-[var(--color-text-secondary)] space-y-0.5">
                       <div className="font-medium text-[var(--color-text-primary)]">
-                      Performance: {w.performanceRating}/10
+                        ⭐ Đánh giá: {w.performanceRating}/10
                         {w.topSpeedKmh && ` • Max: ${w.topSpeedKmh} km/h`}
-                      {w.actualDistanceMeters && ` • Distance: ${w.actualDistanceMeters}m`}
+                        {w.actualDistanceMeters && ` • Cự ly: ${w.actualDistanceMeters}m`}
                       </div>
-                      {w.trainerFeedback && <div>Feedback: {w.trainerFeedback}</div>}
+                      {w.trainerFeedback && <div>Nhận xét: {w.trainerFeedback}</div>}
                     </div>
                   )}
                 </div>
@@ -232,7 +232,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                     size="sm"
                     onClick={() => setActiveWorkout(w)}
                   >
-                    Enter session result
+                    Nhập kết quả buổi tập
                   </Button>
                 )}
               </div>

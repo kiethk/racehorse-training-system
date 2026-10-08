@@ -1,5 +1,4 @@
 package com.rtms.backend.dto;
-import com.rtms.backend.entity.Horse;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import jakarta.validation.constraints.NotBlank;

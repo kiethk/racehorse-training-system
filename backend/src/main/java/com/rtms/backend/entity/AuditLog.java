@@ -1,5 +1,5 @@
 package com.rtms.backend.entity;
-import com.rtms.backend.entity.User;
+
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 

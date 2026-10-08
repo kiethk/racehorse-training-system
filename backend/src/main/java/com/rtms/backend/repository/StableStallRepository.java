@@ -1,4 +1,5 @@
 package com.rtms.backend.repository;
+
 import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.StallStatus;
 import org.springframework.data.jpa.repository.JpaRepository;

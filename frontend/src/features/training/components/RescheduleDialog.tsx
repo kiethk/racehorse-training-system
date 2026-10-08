@@ -54,7 +54,7 @@ export function RescheduleDialog({
     const endMins = toMinutes(newEndTime);
     if (startMins < WINDOW_START || endMins > WINDOW_END) {
       setError(
-        `Training sessions must be scheduled between 06:00 and 10:00. The selected time (${newStartTime} – ${newEndTime}) is outside this window.`,
+        `Buổi tập chỉ được xếp trong khoảng 06:00 – 10:00. Giờ vừa chọn (${newStartTime} – ${newEndTime}) nằm ngoài khoảng này.`,
       );
       return;
     }
@@ -69,7 +69,7 @@ export function RescheduleDialog({
       await onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to reschedule the lot.');
+      setError(err instanceof Error ? err.message : 'Dời giờ lot thất bại.');
     } finally {
       setSubmitting(false);
     }
@@ -88,10 +88,10 @@ export function RescheduleDialog({
         className="relative w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl"
       >
         <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-          Reschedule lot #{lot.lotId} ({lot.subjectName})
+          Dời giờ Lot #{lot.lotId} ({lot.subjectName})
         </h2>
         <p className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
-          All {lot.occupied} horses in this lot will move to the new time.
+          Cả hàng {lot.occupied} chiến mã trong lot sẽ cùng được dời sang khung giờ mới.
         </p>
 
         {error && (
@@ -102,13 +102,13 @@ export function RescheduleDialog({
 
         <form onSubmit={handleReschedule} className="mt-4 space-y-4">
           <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-3 text-[12px]">
-            <div>Workout duration: <strong>{duration} minutes</strong></div>
-            <div>Current time: <strong>{lot.startTime} – {lot.endTime}</strong></div>
+            <div>Thời lượng bài tập: <strong>{duration} phút</strong></div>
+            <div>Giờ bắt đầu cũ: <strong>{lot.startTime} – {lot.endTime}</strong></div>
           </div>
 
           <div>
             <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-              New start time (06:00 – 10:00) *
+              Giờ bắt đầu mới (06:00 – 10:00) *
             </label>
             <input
               type="time"
@@ -120,29 +120,29 @@ export function RescheduleDialog({
               className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
             />
             <div className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-              Expected end time: <strong>{newEndTime}</strong>
+              Giờ kết thúc dự kiến: <strong>{newEndTime}</strong>
             </div>
           </div>
 
           <div>
             <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-              Reschedule reason
+              Lý do dời giờ
             </label>
             <input
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="For example: Weather conditions or track maintenance..."
+              placeholder="Ví dụ: Điều kiện thời tiết, đường chạy bảo trì..."
               className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-[var(--color-border)]">
             <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={submitting}>
-              Cancel
+              Huỷ
             </Button>
             <Button variant="primary" size="sm" type="submit" disabled={submitting}>
-            {submitting ? 'Rescheduling...' : 'Confirm reschedule'}
+              {submitting ? 'Đang dời...' : 'Xác nhận dời giờ'}
             </Button>
           </div>
         </form>

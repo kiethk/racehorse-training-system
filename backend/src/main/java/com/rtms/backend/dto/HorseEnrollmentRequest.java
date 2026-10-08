@@ -1,5 +1,4 @@
 package com.rtms.backend.dto;
-import com.rtms.backend.entity.StableStall;
 
 /**
  * Một chiến mã trong lời ghi danh theo nhóm.
