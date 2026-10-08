@@ -1,5 +1,4 @@
 package com.rtms.backend.entity;
-
 import com.rtms.backend.enums.IncidentSeverity;
 import com.rtms.backend.enums.IncidentStatus;
 import jakarta.persistence.*;

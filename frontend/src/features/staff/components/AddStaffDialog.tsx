@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import type { StaffCreationRequest, StaffCreationResponse, StaffSummary } from '../types';
+import type { StaffCreationRequest, StaffCreationResponse } from '../types';
 
 interface AddStaffDialogProps {
   open: boolean;
@@ -9,13 +9,12 @@ interface AddStaffDialogProps {
   /** Called with the creation request; resolves with the backend response. */
   onSubmit: (request: StaffCreationRequest) => Promise<StaffCreationResponse | null>;
   loading: boolean;
-  headTrainers: StaffSummary[];
 }
 
 const inputClassName =
   'mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-focus)] focus:ring-1 focus:ring-[var(--color-focus)]';
 
-export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers }: AddStaffDialogProps) {
+export function AddStaffDialog({ open, onClose, onSubmit, loading }: AddStaffDialogProps) {
   const [role, setRole] = useState<'GROOM' | 'VETERINARIAN' | 'HEAD_TRAINER'>('GROOM');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -104,7 +103,7 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
                 {creationResult.assignedAreaCodes && creationResult.assignedAreaCodes.length > 0 ? (
                   <div className="flex gap-2 flex-wrap">
                     {creationResult.assignedAreaCodes.map((code) => (
-                      <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-mono font-semibold text-[12px]">
+                      <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-metric font-semibold text-[12px]">
                         Area {code}
                       </span>
                     ))}
@@ -135,7 +134,7 @@ export function AddStaffDialog({ open, onClose, onSubmit, loading, headTrainers 
                         <p className="text-[var(--color-text-muted)] text-[12px]">Area <strong>{creationResult.assignedAreaCode}</strong></p>
                         <div className="flex gap-2 flex-wrap">
                           {(creationResult.assignedStallCodes ?? []).map((code) => (
-                            <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-mono font-semibold text-[12px]">
+                            <span key={code} className="rounded px-2 py-0.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-metric font-semibold text-[12px]">
                               {code}
                             </span>
                           ))}

@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { TrainerHorseListView } from '@/features/training/components/TrainerHorseListView';
 
 export const metadata: Metadata = {
-  title: 'Danh sách chiến mã | Huấn luyện viên',
+  title: 'Assigned Horses | RTMS',
 };
 
 export default function TrainerHorsesPage() {

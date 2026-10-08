@@ -1,10 +1,9 @@
 package com.rtms.backend.controller;
-
-import com.rtms.backend.dto.ApiResponse;
 import com.rtms.backend.dto.CreateHealthRecordRequest;
 import com.rtms.backend.entity.HealthRecord;
-import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.service.HealthRecordService;
+import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.dto.ApiResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;

@@ -1,5 +1,4 @@
 package com.rtms.backend.repository;
-
 import com.rtms.backend.entity.HorseBodyRegion;
 
 import java.util.List;

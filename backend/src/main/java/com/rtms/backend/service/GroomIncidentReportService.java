@@ -1,11 +1,12 @@
 package com.rtms.backend.service;
-
+import com.rtms.backend.service.AdmissionFileStorage;
 import com.rtms.backend.dto.CreateGroomIncidentReportRequest;
 import com.rtms.backend.dto.HandleIncidentRequest;
 import com.rtms.backend.entity.GroomIncidentReport;
 import com.rtms.backend.enums.IncidentSeverity;
 import com.rtms.backend.enums.IncidentStatus;
 import com.rtms.backend.repository.GroomIncidentReportRepository;
+import com.rtms.backend.entity.Horse;
 import com.rtms.backend.repository.HorseRepository;
 import com.rtms.backend.repository.CareScheduleRepository;
 import com.rtms.backend.entity.CareSchedule;

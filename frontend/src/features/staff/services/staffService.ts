@@ -2,8 +2,6 @@ import { apiGet, apiPost, apiPatch } from '@/services/api';
 import type { ApiResponse } from '@/types/horse';
 import type { StaffSummary, StaffCreationRequest, StaffCreationResponse, StaffDetailResponse, StaffUpdateRequest } from '../types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 export async function getStaffList(): Promise<ApiResponse<StaffSummary[]>> {
   return apiGet<ApiResponse<StaffSummary[]>>('/api/staff');
 }

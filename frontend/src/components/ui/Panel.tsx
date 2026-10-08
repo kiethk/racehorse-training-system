@@ -10,7 +10,7 @@ export function Panel({ children, padded = false, className = '', ...props }: Pa
     <div
       className={`rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] ${
         padded ? 'p-4' : ''
-      } ${className}`}
+      } shadow-[var(--shadow-sm)] ${className}`}
       {...props}
     >
       {children}

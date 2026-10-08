@@ -1,5 +1,4 @@
 package com.rtms.backend.service;
-
 import com.rtms.backend.dto.OwnerRegistrationRequest;
 import com.rtms.backend.dto.OwnerRegistrationResponse;
 import com.rtms.backend.entity.Role;

@@ -1,5 +1,4 @@
 package com.rtms.backend.service;
-
 import com.rtms.backend.dto.GroomAdmissionQueueResponse;
 import com.rtms.backend.dto.TrainerAdmissionQueueResponse;
 import com.rtms.backend.entity.AdmissionApplication;
@@ -9,8 +8,8 @@ import com.rtms.backend.repository.AdmissionApplicationRepository;
 import com.rtms.backend.repository.AdmissionDocumentRepository;
 import com.rtms.backend.repository.CandidateHorseProfileRepository;
 import com.rtms.backend.repository.HealthRecordRepository;
-import com.rtms.backend.repository.StableStallRepository;
 import com.rtms.backend.repository.UserRepository;
+import com.rtms.backend.repository.StableStallRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;

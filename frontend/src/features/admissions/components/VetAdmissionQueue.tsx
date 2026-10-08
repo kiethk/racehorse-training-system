@@ -12,6 +12,7 @@ import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
 import { DetailSkeleton, EmptyState, ListSkeleton } from '@/components/ui/states';
+import { Table } from '@/components/ui/Table';
 import { admissionsApi } from '../services/api';
 import type {
   AdmissionDetailResponse,
@@ -458,7 +459,7 @@ export function VetAdmissionQueue() {
       });
 
     return list.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
-  }, [careSchedules, selectedId, detail]);
+  }, [careSchedules, selectedId]);
 
   const handleOpenAdmission = (id: number, schedule: CareSchedule | null) => {
     setTargetScheduleId(schedule?.id ?? null);
@@ -645,7 +646,7 @@ export function VetAdmissionQueue() {
               }`}
             >
               <span>Active</span>
-              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
+              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-metric">
                 {summary.total}
               </span>
             </button>
@@ -665,7 +666,7 @@ export function VetAdmissionQueue() {
               }`}
             >
               <span>Awaiting</span>
-              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
+              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-metric">
                 {summary.awaiting}
               </span>
             </button>
@@ -685,7 +686,7 @@ export function VetAdmissionQueue() {
               }`}
             >
               <span>In Exam</span>
-              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-mono">
+              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-metric">
                 {summary.inProgress}
               </span>
             </button>
@@ -1014,7 +1015,7 @@ export function VetAdmissionQueue() {
                           icon="activity"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Tiếp tục
+                          Continue
                         </Button>
                       ) : isScheduled ? (
                         <Button
@@ -1023,7 +1024,7 @@ export function VetAdmissionQueue() {
                           icon="stethoscope"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Khám
+                          Examine
                         </Button>
                       ) : isCompleted ? (
                         <Button
@@ -1032,7 +1033,7 @@ export function VetAdmissionQueue() {
                           icon="check"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Xem kết quả
+                          View result
                         </Button>
                       ) : (
                         <Button
@@ -1041,7 +1042,7 @@ export function VetAdmissionQueue() {
                           icon="chevron-right"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Chi tiết
+                          Details
                         </Button>
                       )}
                     </div>
@@ -1166,7 +1167,7 @@ export function VetAdmissionQueue() {
                       onClick={handleStartExam}
                       icon="activity"
                     >
-                      Bắt đầu khám
+                      Start examination
                     </Button>
                   )}
                   <button
@@ -1388,7 +1389,7 @@ export function VetAdmissionQueue() {
 
                       {metrics.length > 0 ? (
                         <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-border)]">
-                          <table className="w-full text-left text-[12px]">
+                          <Table className="min-w-[760px] text-[12px]">
                             <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[10px] font-semibold uppercase text-[var(--color-text-secondary)]">
                               <tr>
                                 <th className="px-3 py-2">Recorded At</th>
@@ -1422,16 +1423,16 @@ export function VetAdmissionQueue() {
                                   <td className="px-3 py-2">
                                     {m.bodyConditionScore != null ? `${m.bodyConditionScore} / 9` : '—'}
                                   </td>
-                                  <td className="px-3 py-2 font-sans">
+                                  <td className="px-3 py-2">
                                     {m.hydrationStatus || '—'}
                                   </td>
-                                  <td className="px-3 py-2 font-sans text-[var(--color-text-secondary)] max-w-xs truncate">
+                                  <td className="px-3 py-2 text-[var(--color-text-secondary)] max-w-xs truncate">
                                     {m.notes || '—'}
                                   </td>
                                 </tr>
                               ))}
                             </tbody>
-                          </table>
+                          </Table>
                         </div>
                       ) : (
                         <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] p-6 text-center text-[var(--color-text-muted)]">
@@ -1449,28 +1450,28 @@ export function VetAdmissionQueue() {
                           </span>
                           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6 font-metric text-[12px]">
                             <div>
-                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">TEMP</span>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block">TEMP</span>
                               <strong>{latestMetrics.temperature ?? '—'} °C</strong>
                             </div>
                             <div>
-                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">PULSE</span>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block">PULSE</span>
                               <strong>{latestMetrics.heartRate ?? '—'} bpm</strong>
                             </div>
                             <div>
-                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">RESP</span>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block">RESP</span>
                               <strong>{latestMetrics.respiratoryRate ?? '—'} rpm</strong>
                             </div>
                             <div>
-                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">WEIGHT</span>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block">WEIGHT</span>
                               <strong>{latestMetrics.weight ?? '—'} kg</strong>
                             </div>
                             <div>
-                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">BCS</span>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block">BCS</span>
                               <strong>{latestMetrics.bodyConditionScore ?? '—'} / 9</strong>
                             </div>
                             <div>
-                              <span className="text-[9px] text-[var(--color-text-muted)] block font-sans">HYDRATION</span>
-                              <strong className="font-sans text-[11px]">{latestMetrics.hydrationStatus ?? 'Normal'}</strong>
+                              <span className="text-[9px] text-[var(--color-text-muted)] block">HYDRATION</span>
+                              <strong className="text-[11px]">{latestMetrics.hydrationStatus ?? 'Normal'}</strong>
                             </div>
                           </div>
                         </div>

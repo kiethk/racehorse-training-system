@@ -1,6 +1,7 @@
 export type AdmissionStatus =
   | 'GROOM_REVIEW'
   | 'WAITING_FOR_STALL'
+  | 'WAITING_FOR_ARRIVAL'
   | 'VET_REVIEW'
   | 'TRAINER_REVIEW'
   | 'MANAGER_REVIEW'
@@ -105,6 +106,9 @@ export interface AdmissionDetailResponse {
   managerReviewedAt: string | null;
 
   horseId: number | null;
+  arrivalStatus: 'PENDING' | 'CONFIRMED';
+  arrivalConfirmedAt: string | null;
+  arrivalConfirmedBy: number | null;
   submittedAt: string;
 
   availableRegularStalls: StableStall[];

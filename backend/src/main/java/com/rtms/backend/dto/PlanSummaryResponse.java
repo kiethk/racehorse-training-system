@@ -1,5 +1,5 @@
 package com.rtms.backend.dto;
-
+import com.rtms.backend.entity.HorseTrainingPlan;
 import com.rtms.backend.enums.TrainingPlanStatus;
 
 import java.time.LocalDate;

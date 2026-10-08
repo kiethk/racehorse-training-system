@@ -1,6 +1,4 @@
 package com.rtms.backend.service;
-
-import com.rtms.backend.config.ApiException;
 import com.rtms.backend.dto.LoginRequest;
 import com.rtms.backend.entity.RefreshToken;
 import com.rtms.backend.entity.Role;
@@ -12,6 +10,7 @@ import com.rtms.backend.repository.TrainerProfileRepository;
 import com.rtms.backend.repository.UserRepository;
 import com.rtms.backend.repository.VeterinarianProfileRepository;
 import com.rtms.backend.security.JwtUtil;
+import com.rtms.backend.config.ApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

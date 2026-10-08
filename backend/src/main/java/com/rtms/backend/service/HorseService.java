@@ -1,21 +1,22 @@
 package com.rtms.backend.service;
-
 import com.rtms.backend.dto.CreateHorseRequest;
 import com.rtms.backend.dto.HorseAlertResponse;
 import com.rtms.backend.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.entity.Horse;
-import com.rtms.backend.entity.StableStall;
 import com.rtms.backend.enums.HorseStatus;
-import com.rtms.backend.enums.StallStatus;
 import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.repository.StableStallRepository;
-import java.time.LocalDate;
+import com.rtms.backend.config.GlobalExceptionHandler;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.entity.Area;
+import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.enums.StallStatus;
+import com.rtms.backend.repository.AreaRepository;
+import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.service.HorseTrainingPlanService;
+import java.time.LocalDate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.rtms.backend.entity.Area;
-import com.rtms.backend.repository.AreaRepository;
 
 import java.util.List;
 import java.util.Set;

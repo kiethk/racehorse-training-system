@@ -1,5 +1,4 @@
 package com.rtms.backend.service;
-
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.entity.Subject;
 import com.rtms.backend.entity.TrainingLot;

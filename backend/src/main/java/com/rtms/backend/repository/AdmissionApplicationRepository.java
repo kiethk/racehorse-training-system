@@ -1,6 +1,6 @@
 package com.rtms.backend.repository;
-
 import com.rtms.backend.entity.AdmissionApplication;
+import com.rtms.backend.entity.CandidateHorseProfile;
 import com.rtms.backend.enums.AdmissionStatus;
 
 import jakarta.persistence.LockModeType;

@@ -1,5 +1,4 @@
 package com.rtms.backend.repository;
-
 import com.rtms.backend.entity.TrainerProfile;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;

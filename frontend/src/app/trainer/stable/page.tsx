@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { StableMap } from '@/features/stable/components/StableMap';
 
 export const metadata: Metadata = {
-  title: 'Sơ đồ chuồng trại & Phân công Groom | Huấn luyện viên',
+  title: 'Stable Map & Groom Assignments | RTMS',
 };
 
 export default function TrainerStablePage() {

@@ -195,7 +195,6 @@ export function StaffManagementView() {
         onClose={() => setAddDialogOpen(false)} 
         onSubmit={handleCreateStaff}
         loading={addLoading}
-        headTrainers={headTrainers}
       />
 
       <StaffDetailModal 

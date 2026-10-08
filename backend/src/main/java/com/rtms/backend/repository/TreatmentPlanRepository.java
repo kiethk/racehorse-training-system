@@ -1,5 +1,4 @@
 package com.rtms.backend.repository;
-
 import com.rtms.backend.entity.TreatmentPlan;
 import org.springframework.data.jpa.repository.JpaRepository;
 

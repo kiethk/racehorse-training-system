@@ -1,13 +1,13 @@
 package com.rtms.backend.service;
-
-import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.entity.Horse;
-import com.rtms.backend.entity.Role;
-import com.rtms.backend.entity.StableStall;
-import com.rtms.backend.entity.User;
 import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.entity.Role;
+import com.rtms.backend.entity.User;
 import com.rtms.backend.repository.UserRepository;
+import com.rtms.backend.config.FarmSchedulePolicy;
+import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.service.HorseTrainingPlanService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
