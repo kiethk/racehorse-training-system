@@ -170,7 +170,10 @@ public class CareScheduleService {
     }
 
     private void ensureAvailable(CareSchedule schedule, Long vetId, LocalDateTime start) {
-        if (careScheduleRepository.existsByVeterinarianIdAndStatus(vetId, CareScheduleStatus.IN_PROGRESS)
+        boolean vetHasConflict = careScheduleRepository.findByVeterinarianIdAndStatus(
+                        vetId, CareScheduleStatus.IN_PROGRESS).stream()
+                .anyMatch(other -> inProgressConflictsWithSlot(schedule, start, other));
+        if (vetHasConflict
                 || careScheduleRepository.existsByHorseIdAndStatus(schedule.getHorseId(), CareScheduleStatus.IN_PROGRESS)) {
             throw new ApiException(HttpStatus.CONFLICT, "SLOT_UNAVAILABLE", "Veterinarian or horse has an examination in progress");
         }
@@ -603,15 +606,27 @@ public class CareScheduleService {
         Map<Long, Integer> overdueAppointmentsByVet = new HashMap<>();
         Map<Long, Integer> scheduledMinutesByVet = new HashMap<>();
         for (CareSchedule assigned : careScheduleRepository
-                .findByStatusInAndScheduledAtIsNotNull(List.of(
-                        CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS))) {
+                .findByStatusInAndVeterinarianIdIsNotNull(List.of(
+                        CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS))) {
             if (assigned.getVeterinarianId() == null) continue;
             scheduledMinutesByVet.merge(assigned.getVeterinarianId(),
                     assigned.getDurationMinutes() > 0 ? assigned.getDurationMinutes() : DEFAULT_DURATION_MINUTES,
                     Integer::sum);
-            if (assigned.getScheduledAt().isBefore(now)) {
+            if (assigned.getScheduledAt() != null && assigned.getScheduledAt().isBefore(now)
+                    && (assigned.getStatus() == CareScheduleStatus.SCHEDULED
+                            || assigned.getStatus() == CareScheduleStatus.IN_PROGRESS)) {
                 overdueAppointmentsByVet.merge(assigned.getVeterinarianId(), 1, Integer::sum);
             }
+        }
+
+        // Admission INITIAL exams must get a named Vet as soon as the horse arrives,
+        // even when that Vet is currently busy or has no schedulable slot yet.
+        // Keep the schedule REQUESTED until a non-conflicting appointment time is found.
+        if (schedule.getCareType() == CareType.INITIAL && schedule.getVeterinarianId() == null) {
+            User assignedVet = assignInitialExamToLeastLoadedVet(overdueAppointmentsByVet, scheduledMinutesByVet);
+            if (assignedVet == null) return;
+            schedule.setVeterinarianId(assignedVet.getId());
+            careScheduleRepository.save(schedule);
         }
 
         LocalDateTime slot = findAssignmentSlot(schedule, overdueAppointmentsByVet, scheduledMinutesByVet);
@@ -660,6 +675,23 @@ public class CareScheduleService {
         }
     }
 
+    private User assignInitialExamToLeastLoadedVet(Map<Long, Integer> overdueAppointmentsByVet,
+            Map<Long, Integer> scheduledMinutesByVet) {
+        List<User> ranked = Optional.ofNullable(userRepository.findActiveVeterinarians()).orElseGet(List::of)
+                .stream()
+                .sorted(Comparator
+                        .comparingInt((User vet) -> overdueAppointmentsByVet.getOrDefault(vet.getId(), 0))
+                        .thenComparingInt(vet -> scheduledMinutesByVet.getOrDefault(vet.getId(), 0))
+                        .thenComparing(User::getId))
+                .toList();
+
+        for (User candidate : ranked) {
+            User lockedVet = userRepository.findByIdForUpdate(candidate.getId()).orElse(null);
+            if (isStillEligible(lockedVet)) return lockedVet;
+        }
+        return null;
+    }
+
     private LocalDateTime findAssignmentSlot(CareSchedule schedule,
             Map<Long, Integer> overdueAppointmentsByVet, Map<Long, Integer> scheduledMinutesByVet) {
         if (schedule.getCareType() == CareType.URGENT) return LocalDateTime.now();
@@ -701,7 +733,9 @@ public class CareScheduleService {
 
     private List<User> rankVeterinarians(CareSchedule schedule, LocalDateTime slot,
             Map<Long, Integer> overdueAppointmentsByVet, Map<Long, Integer> scheduledMinutesByVet) {
-        List<User> vets = Optional.ofNullable(userRepository.findActiveVeterinarians()).orElseGet(List::of);
+        List<User> vets = schedule.getCareType() == CareType.INITIAL && schedule.getVeterinarianId() != null
+                ? userRepository.findById(schedule.getVeterinarianId()).stream().toList()
+                : Optional.ofNullable(userRepository.findActiveVeterinarians()).orElseGet(List::of);
         LocalDateTime dayStart = slot.toLocalDate().atStartOfDay();
         LocalDateTime dayEnd = dayStart.plusDays(1);
         List<CareSchedule> assigned = careScheduleRepository.findAssignedInDay(dayStart, dayEnd,
@@ -717,7 +751,12 @@ public class CareScheduleService {
         }
 
         return vets.stream()
-                .filter(v -> !careScheduleRepository.existsByVeterinarianIdAndStatus(v.getId(), CareScheduleStatus.IN_PROGRESS))
+                .filter(v -> schedule.getCareType() == CareType.INITIAL && schedule.getVeterinarianId() != null
+                        ? Objects.equals(v.getId(), schedule.getVeterinarianId())
+                        : !careScheduleRepository.existsByVeterinarianIdAndStatus(v.getId(), CareScheduleStatus.IN_PROGRESS))
+                .filter(v -> careScheduleRepository.findByVeterinarianIdAndStatus(
+                                v.getId(), CareScheduleStatus.IN_PROGRESS).stream()
+                        .noneMatch(other -> inProgressConflictsWithSlot(schedule, slot, other)))
                 .filter(v -> careScheduleRepository.findScheduledForVet(v.getId(), CareScheduleStatus.SCHEDULED)
                         .stream().noneMatch(other -> overlaps(schedule, slot, other)))
                 .sorted(Comparator
@@ -731,6 +770,18 @@ public class CareScheduleService {
                                         List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.COMPLETED)))
                         .thenComparing(User::getId))
                 .toList();
+    }
+
+    private boolean inProgressConflictsWithSlot(CareSchedule schedule, LocalDateTime slot, CareSchedule inProgress) {
+        if (schedule.getCareType() != CareType.INITIAL) return true;
+        LocalDateTime scheduledAt = inProgress.getScheduledAt();
+        if (scheduledAt == null) return true;
+        int duration = inProgress.getDurationMinutes() > 0
+                ? inProgress.getDurationMinutes() : DEFAULT_DURATION_MINUTES;
+        // An overdue in-progress visit remains active; retain the Vet assignment but
+        // do not book a conflicting appointment until that visit is completed.
+        if (!scheduledAt.plusMinutes(duration).isAfter(LocalDateTime.now())) return true;
+        return overlaps(schedule, slot, inProgress);
     }
 
     private boolean isStillEligible(User vet) {

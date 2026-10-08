@@ -243,7 +243,12 @@ public class AdmissionQueryService {
         if (admission.getHorseId() != null) {
             if (careScheduleRepository != null) {
                 careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admission.getId(), com.rtms.backend.enums.CareType.INITIAL)
-                        .map(InitialExamScheduleResponse::from).ifPresent(response::setInitialExamSchedule);
+                        .ifPresent(schedule -> {
+                            response.setInitialExamSchedule(InitialExamScheduleResponse.from(schedule));
+                            if (response.getVeterinarianId() == null && schedule.getVeterinarianId() != null) {
+                                response.setVeterinarianId(schedule.getVeterinarianId());
+                            }
+                        });
             }
             List<HealthRecord> healthRecords = healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(
                     admission.getHorseId());
