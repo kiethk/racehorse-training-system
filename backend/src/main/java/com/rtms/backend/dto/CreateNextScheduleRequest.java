@@ -1,6 +1,6 @@
 package com.rtms.backend.dto;
+
 import com.rtms.backend.enums.CareType;
-import com.rtms.backend.entity.Horse;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;

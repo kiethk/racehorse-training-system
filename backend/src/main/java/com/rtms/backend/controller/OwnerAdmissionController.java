@@ -1,14 +1,9 @@
 package com.rtms.backend.controller;
-import com.rtms.backend.dto.AdmissionDocumentMetadataRequest;
-import com.rtms.backend.dto.AdmissionDocumentResponse;
-import com.rtms.backend.dto.AdmissionSummaryResponse;
-import com.rtms.backend.dto.CreateOwnerAdmissionRequest;
-import com.rtms.backend.dto.OwnerAdmissionDetailResponse;
-import com.rtms.backend.enums.AdmissionDocumentType;
-import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.service.OwnerAdmissionService;
+
+import com.rtms.backend.dto.*;
+import com.rtms.backend.enums.*;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.dto.ApiResponse;
+import com.rtms.backend.service.OwnerAdmissionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

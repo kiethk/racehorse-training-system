@@ -1,4 +1,5 @@
 package com.rtms.backend.dto;
+
 import com.rtms.backend.entity.HorseTrainingPlan;
 
 import java.util.List;

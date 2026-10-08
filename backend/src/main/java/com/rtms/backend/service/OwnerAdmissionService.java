@@ -1,18 +1,9 @@
 package com.rtms.backend.service;
-import com.rtms.backend.dto.AdmissionDocumentMetadataRequest;
-import com.rtms.backend.dto.AdmissionDocumentResponse;
-import com.rtms.backend.dto.AdmissionSummaryResponse;
-import com.rtms.backend.dto.CreateOwnerAdmissionRequest;
-import com.rtms.backend.dto.OwnerAdmissionDetailResponse;
-import com.rtms.backend.entity.AdmissionApplication;
-import com.rtms.backend.entity.AdmissionDocument;
-import com.rtms.backend.entity.CandidateHorseProfile;
-import com.rtms.backend.enums.AdmissionDocumentType;
-import com.rtms.backend.enums.AdmissionStatus;
-import com.rtms.backend.repository.AdmissionApplicationRepository;
-import com.rtms.backend.repository.AdmissionDocumentRepository;
-import com.rtms.backend.repository.CandidateHorseProfileRepository;
-import com.rtms.backend.entity.Horse;
+
+import com.rtms.backend.dto.*;
+import com.rtms.backend.entity.*;
+import com.rtms.backend.enums.*;
+import com.rtms.backend.repository.*;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;

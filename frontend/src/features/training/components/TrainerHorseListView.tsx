@@ -23,7 +23,7 @@ export function TrainerHorseListView() {
       const data = await trainingService.getDashboard();
       setHorses(data);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unable to load the horse list.';
+      const msg = err instanceof Error ? err.message : 'Không thể tải danh sách chiến mã';
       setError(msg);
     } finally {
       setLoading(false);
@@ -52,10 +52,10 @@ export function TrainerHorseListView() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
-            Assigned Horses
+            Danh Sách Chiến Mã Phụ Trách
           </h1>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            View profiles, fitness charts and health indicators for each horse.
+            Xem hồ sơ, biểu đồ thể lực và theo dõi chỉ số sức khỏe của từng chiến mã
           </p>
         </div>
 
@@ -68,7 +68,7 @@ export function TrainerHorseListView() {
           </Link>
           <Button variant="secondary" size="sm" onClick={loadHorses}>
             <Icon name="refresh" size={14} />
-            Refresh
+            Làm mới
           </Button>
         </div>
       </div>
@@ -86,7 +86,7 @@ export function TrainerHorseListView() {
                   : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
-              All ({horses.length})
+              Tất cả ({horses.length})
             </button>
             <button
               type="button"
@@ -97,7 +97,7 @@ export function TrainerHorseListView() {
                   : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
-              In training ({horses.filter((h) => h.planStatus === 'ACTIVE').length})
+              Đang tập ({horses.filter((h) => h.planStatus === 'ACTIVE').length})
             </button>
             <button
               type="button"
@@ -108,7 +108,7 @@ export function TrainerHorseListView() {
                   : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
-              Alerts ({horses.filter((h) => (h.alertCount ?? h.alertsCount ?? 0) > 0).length})
+              Cảnh báo ({horses.filter((h) => (h.alertCount ?? h.alertsCount ?? 0) > 0).length})
             </button>
           </div>
 
@@ -117,7 +117,7 @@ export function TrainerHorseListView() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search horse name..."
+              placeholder="Tìm tên chiến mã..."
               className="w-60 rounded border border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 pl-7 pr-2.5 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
             />
             <span className="pointer-events-none absolute left-2 top-2 text-[var(--color-text-muted)]">
@@ -139,7 +139,7 @@ export function TrainerHorseListView() {
         ) : filteredHorses.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-sm font-medium text-[var(--color-text-secondary)]">
-              No horses match the selected filters.
+              Không tìm thấy chiến mã nào phù hợp.
             </p>
           </div>
         ) : (
@@ -156,19 +156,19 @@ export function TrainerHorseListView() {
                         {horse.horseName}
                       </h3>
                       <p className="text-xs text-[var(--color-text-secondary)]">
-                        {horse.courseName || 'No training course assigned'}
+                        {horse.courseName || 'Chưa xếp khóa huấn luyện'}
                       </p>
                     </div>
 
                     {(horse.alertCount ?? horse.alertsCount ?? 0) > 0 ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-2 py-0.5 text-[10px] font-bold">
                         <Icon name="alert-triangle" size={10} />
-                        {horse.alertCount ?? horse.alertsCount} alerts
+                        {horse.alertCount ?? horse.alertsCount} cảnh báo
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-medium">
                         <Icon name="check" size={10} />
-                        Safe
+                        An toàn
                       </span>
                     )}
                   </div>
@@ -178,9 +178,9 @@ export function TrainerHorseListView() {
                     {horse.totalSessions > 0 ? (
                       <div>
                         <div className="flex items-center justify-between text-[11px] text-[var(--color-text-secondary)]">
-                          <span>Course progress</span>
+                          <span>Tiến độ khóa</span>
                           <span className="font-semibold text-[var(--color-text-primary)]">
-                            {horse.completedSessions}/{horse.totalSessions} sessions ({horse.progressPercent}%)
+                            {horse.completedSessions}/{horse.totalSessions} buổi ({horse.progressPercent}%)
                           </span>
                         </div>
                         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-subtle)]">
@@ -192,14 +192,14 @@ export function TrainerHorseListView() {
                       </div>
                     ) : (
                       <div className="text-xs text-[var(--color-text-muted)] italic">
-                        No scheduled sessions
+                        Chưa có lịch buổi tập
                       </div>
                     )}
 
                     <div className="grid grid-cols-2 gap-2 border-t border-[var(--color-border-subtle)] pt-2.5 text-xs">
                       <div>
                         <span className="text-[10px] uppercase text-[var(--color-text-muted)]">
-                          Latest performance
+                          Phong độ gần nhất
                         </span>
                         <p className="font-semibold text-[var(--color-text-primary)]">
                           {horse.latestPerformanceRating != null
@@ -209,7 +209,7 @@ export function TrainerHorseListView() {
                       </div>
                       <div>
                         <span className="text-[10px] uppercase text-[var(--color-text-muted)]">
-                          30-day average
+                          Điểm TB (30 ngày)
                         </span>
                         <p className="font-semibold text-emerald-600">
                           {horse.avgPerformanceRating30d != null
@@ -225,7 +225,7 @@ export function TrainerHorseListView() {
                   <Link href={`/trainer/horses/${horse.horseId}`} className="w-full">
                     <Button variant="secondary" size="sm" className="w-full justify-center">
                       <Icon name="trending-up" size={13} />
-                      View fitness chart & alerts
+                      Xem biểu đồ thể lực & cảnh báo
                     </Button>
                   </Link>
                 </div>

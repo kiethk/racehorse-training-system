@@ -28,8 +28,7 @@ export function EmptyState({
 
 export function ListSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="space-y-1.5 p-2" aria-busy="true" aria-label="Loading" role="status">
-      <span className="sr-only">Loading</span>
+    <div className="space-y-1.5 p-2" aria-hidden="true">
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
@@ -49,8 +48,7 @@ export function ListSkeleton({ rows = 6 }: { rows?: number }) {
 
 export function DetailSkeleton() {
   return (
-    <div className="space-y-4 p-4" aria-busy="true" aria-label="Loading" role="status">
-      <span className="sr-only">Loading</span>
+    <div className="space-y-4 p-4" aria-hidden="true">
       <div className="flex items-center gap-3">
         <div className="h-14 w-14 animate-pulse rounded-[var(--radius-md)] bg-[var(--color-surface-muted)]" />
         <div className="space-y-2">
@@ -66,24 +64,6 @@ export function DetailSkeleton() {
           />
         ))}
       </div>
-    </div>
-  );
-}
-
-export function ErrorState({
-  title = 'Unable to load data',
-  description,
-  action,
-}: {
-  title?: string;
-  description?: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center px-6 py-12 text-center" role="alert">
-      <p className="text-[var(--text-md)] font-semibold text-[var(--color-danger)]">{title}</p>
-      {description && <p className="mt-1 max-w-md text-[var(--text-sm)] text-[var(--color-text-secondary)]">{description}</p>}
-      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Pill } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui/Table';
 import type { StaffSummary } from '../types';
 
 interface StaffTableProps {
@@ -36,42 +35,42 @@ export function StaffTable({ staff, onToggleStatus, loadingActionId, onRowClick 
 
   return (
     <>
-      <TableShell>
-        <Table>
-          <TableHeader>
+      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
+        <table className="w-full text-left text-[13px]">
+          <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[12px] font-medium text-[var(--color-text-secondary)]">
             <tr>
-              <TableHead>Name / Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Profile Summary</TableHead>
-              <TableHead align="right">Actions</TableHead>
+              <th className="px-4 py-3">Name / Email</th>
+              <th className="px-4 py-3">Role</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Profile Summary</th>
+              <th className="px-4 py-3 text-right">Actions</th>
             </tr>
-          </TableHeader>
-          <TableBody>
+          </thead>
+          <tbody className="divide-y divide-[var(--color-border)]">
             {staff.map((s) => (
-              <TableRow
+              <tr 
                 key={s.userId} 
-                className="cursor-pointer"
+                className="transition-colors hover:bg-[var(--color-surface-muted)]/50 cursor-pointer"
                 onClick={() => onRowClick?.(s.userId)}
               >
-                <TableCell>
+                <td className="px-4 py-3">
                   <div className="font-medium text-[var(--color-text-primary)]">{s.fullName}</div>
                   <div className="text-[12px] text-[var(--color-text-muted)]">{s.email}</div>
-                </TableCell>
-                <TableCell>
+                </td>
+                <td className="px-4 py-3">
                   <span className="inline-flex items-center rounded-full bg-[var(--color-border-strong)]/30 px-2.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]">
                     {s.role.replace('_', ' ')}
                   </span>
-                </TableCell>
-                <TableCell>
+                </td>
+                <td className="px-4 py-3">
                   <Pill tone={s.active ? 'success' : 'neutral'}>
                     {s.active ? 'Active' : 'Inactive'}
                   </Pill>
-                </TableCell>
-                <TableCell className="text-[12px] text-[var(--color-text-secondary)]">
+                </td>
+                <td className="px-4 py-3 text-[12px] text-[var(--color-text-secondary)]">
                   {s.profileSummary || '-'}
-                </TableCell>
-                <TableCell align="right">
+                </td>
+                <td className="px-4 py-3 text-right">
                   <Button
                     size="sm"
                     variant={s.active ? 'destructive' : 'primary'}
@@ -83,12 +82,12 @@ export function StaffTable({ staff, onToggleStatus, loadingActionId, onRowClick 
                   >
                     {s.active ? 'Deactivate' : 'Activate'}
                   </Button>
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             ))}
-          </TableBody>
-        </Table>
-      </TableShell>
+          </tbody>
+        </table>
+      </div>
 
       <ConfirmDialog
         open={!!confirmToggle}

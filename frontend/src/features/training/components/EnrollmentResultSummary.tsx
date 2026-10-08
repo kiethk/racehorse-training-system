@@ -67,9 +67,9 @@ export function EnrollmentResultSummary({
         <div className="flex items-start gap-3">
           <span className="text-[22px] leading-none">✅</span>
           <div>
-            <SectionTitle>Created {plans.length} training plans</SectionTitle>
+            <SectionTitle>Đã tạo {plans.length} kế hoạch huấn luyện</SectionTitle>
             <p className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
-              Each horse has an individual plan for recording metrics and feedback.
+              Mỗi chiến mã có một kế hoạch riêng để ghi nhận chỉ số và nhận xét.
             </p>
           </div>
         </div>
@@ -77,7 +77,7 @@ export function EnrollmentResultSummary({
 
       <Panel padded>
         <SectionTitle>
-          First training session{firstDate ? ` — ${firstDate}` : ''}
+          Buổi tập đầu tiên{firstDate ? ` — ${firstDate}` : ''}
         </SectionTitle>
 
         <div className="mt-3 space-y-2">
@@ -100,7 +100,7 @@ export function EnrollmentResultSummary({
                     }
                     size="sm"
                   >
-                    {sample.lotOccupancy ?? entries.length} horses
+                    {sample.lotOccupancy ?? entries.length} chiến mã
                   </Pill>
                 </div>
                 <div className="mt-1.5 text-[11px] text-[var(--color-text-secondary)]">
@@ -115,14 +115,15 @@ export function EnrollmentResultSummary({
 
         {splitIntoMultipleLots && (
           <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-info-soft)] p-3 text-[11px] text-[var(--color-info)]">
-            The group was split across {firstSessionByLot.length} sessions because each
-            lot accepts up to 6 horses and each groom can handle one horse per session.
+            Nhóm được chia thành {firstSessionByLot.length} buổi tập khác giờ, do
+            mỗi buổi chỉ nhận tối đa 6 chiến mã và mỗi Groom chỉ dắt được một con
+            mỗi buổi.
           </div>
         )}
       </Panel>
 
       <Panel padded>
-        <SectionTitle>Newly created plans</SectionTitle>
+        <SectionTitle>Danh sách kế hoạch vừa tạo</SectionTitle>
         <ul className="mt-2 space-y-1.5">
           {plans.map((p) => (
             <li
@@ -131,10 +132,10 @@ export function EnrollmentResultSummary({
             >
               <div>
                 <strong className="text-[var(--color-text-primary)]">
-                  {horseNameById.get(p.plan.horseId) ?? `Horse #${p.plan.horseId}`}
+                  {horseNameById.get(p.plan.horseId) ?? `Chiến mã #${p.plan.horseId}`}
                 </strong>
                 <span className="ml-2 text-[var(--color-text-muted)]">
-                  {p.workouts.length} sessions · {p.plan.startDate} → {p.plan.endDate}
+                  {p.workouts.length} buổi · {p.plan.startDate} → {p.plan.endDate}
                 </span>
                 <Pill
                   tone={p.plan.status === 'ACTIVE' ? 'success' : 'info'}
@@ -147,7 +148,7 @@ export function EnrollmentResultSummary({
                 href={`/trainer/plans/${p.plan.id}`}
                 className="text-[var(--color-primary)] underline"
               >
-                View details
+                Xem chi tiết
               </Link>
             </li>
           ))}
@@ -155,7 +156,7 @@ export function EnrollmentResultSummary({
 
         <div className="mt-4 flex gap-2">
           <Button variant="primary" onClick={onDone}>
-            Back to courses
+            Về danh sách khoá học
           </Button>
         </div>
       </Panel>

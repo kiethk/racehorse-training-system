@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { TrainerRaceList } from '@/features/racing/components/TrainerRaceList';
 
 export const metadata: Metadata = {
-  title: 'Race Nominations | RTMS',
+  title: 'Đề cử dự đua | Huấn luyện viên',
 };
 
 export default function TrainerRacingPage() {

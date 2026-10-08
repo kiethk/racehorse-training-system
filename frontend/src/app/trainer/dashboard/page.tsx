@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { TrainerDashboardView } from '@/features/training/components/TrainerDashboardView';
 
 export const metadata: Metadata = {
-  title: 'Trainer Dashboard | RTMS',
+  title: 'Dashboard Huấn luyện viên | RTMS',
 };
 
 export default function TrainerDashboardPage() {

@@ -1,4 +1,5 @@
 package com.rtms.backend.scheduler;
+
 import com.rtms.backend.service.CareScheduleService;
 import com.rtms.backend.service.TrainerAssignmentTriggers;
 import org.springframework.scheduling.annotation.Scheduled;

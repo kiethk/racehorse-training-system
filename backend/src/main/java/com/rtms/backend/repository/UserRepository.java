@@ -2,7 +2,6 @@ package com.rtms.backend.repository;
 
 import com.rtms.backend.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -25,12 +24,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
             + "WHERE u.isActive = true AND u.role.name = 'VETERINARIAN' "
             + "AND vp.licenseNumber IS NOT NULL AND TRIM(vp.licenseNumber) <> '' ORDER BY u.id")
     List<User> findActiveVeterinarians();
-
-    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT u FROM User u JOIN VeterinarianProfile vp ON vp.userId = u.id "
-            + "WHERE u.isActive = true AND u.role.name = 'VETERINARIAN' "
-            + "AND vp.licenseNumber IS NOT NULL AND TRIM(vp.licenseNumber) <> '' ORDER BY u.id")
-    List<User> findActiveVeterinariansForUpdate();
 
     @Query("SELECT u FROM User u JOIN TrainerProfile tp ON tp.userId = u.id "
             + "WHERE u.isActive = true AND u.role.name = 'HEAD_TRAINER' "

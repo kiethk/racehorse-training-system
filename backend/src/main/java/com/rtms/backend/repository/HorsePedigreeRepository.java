@@ -1,4 +1,5 @@
 package com.rtms.backend.repository;
+
 import com.rtms.backend.entity.HorsePedigree;
 import org.springframework.data.jpa.repository.JpaRepository;
 

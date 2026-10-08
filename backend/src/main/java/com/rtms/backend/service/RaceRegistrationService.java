@@ -1,18 +1,19 @@
 package com.rtms.backend.service;
-import com.rtms.backend.entity.Horse;
-import com.rtms.backend.enums.HorseStatus;
-import com.rtms.backend.repository.HorseRepository;
-import com.rtms.backend.security.AuthenticatedUser;
+
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.dto.CreateRaceRegistrationRequest;
 import com.rtms.backend.dto.RaceRegistrationResponse;
 import com.rtms.backend.dto.ReviewRaceRegistrationRequest;
-import com.rtms.backend.entity.RaceRegistration;
-import com.rtms.backend.repository.RaceRegistrationRepository;
-import com.rtms.backend.config.ApiException;
 import com.rtms.backend.entity.Area;
+import com.rtms.backend.entity.Horse;
+import com.rtms.backend.entity.RaceRegistration;
 import com.rtms.backend.entity.StableStall;
+import com.rtms.backend.enums.HorseStatus;
 import com.rtms.backend.repository.AreaRepository;
+import com.rtms.backend.repository.HorseRepository;
+import com.rtms.backend.repository.RaceRegistrationRepository;
 import com.rtms.backend.repository.StableStallRepository;
+import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;

@@ -19,13 +19,13 @@ import type {
 import { EnrollmentResultSummary } from './EnrollmentResultSummary';
 
 const DAYS_OF_WEEK: { value: TrainingDay; label: string }[] = [
-  { value: 'MONDAY', label: 'Monday' },
-  { value: 'TUESDAY', label: 'Tuesday' },
-  { value: 'WEDNESDAY', label: 'Wednesday' },
-  { value: 'THURSDAY', label: 'Thursday' },
-  { value: 'FRIDAY', label: 'Friday' },
-  { value: 'SATURDAY', label: 'Saturday' },
-  { value: 'SUNDAY', label: 'Sunday' },
+  { value: 'MONDAY', label: 'Thứ 2' },
+  { value: 'TUESDAY', label: 'Thứ 3' },
+  { value: 'WEDNESDAY', label: 'Thứ 4' },
+  { value: 'THURSDAY', label: 'Thứ 5' },
+  { value: 'FRIDAY', label: 'Thứ 6' },
+  { value: 'SATURDAY', label: 'Thứ 7' },
+  { value: 'SUNDAY', label: 'Chủ Nhật' },
 ];
 
 export function EnrollmentForm() {
@@ -75,8 +75,8 @@ export function EnrollmentForm() {
         setCourseId(crs[0].id);
       }
     } catch (err) {
-      console.error('Failed to load enrollment data:', err);
-      setError('Unable to load eligible courses or horses.');
+      console.error('Lỗi khi nạp dữ liệu ghi danh:', err);
+      setError('Không tải được danh sách khóa học hoặc chiến mã đủ điều kiện.');
     } finally {
       setLoading(false);
     }
@@ -99,7 +99,7 @@ export function EnrollmentForm() {
       .getJoinableCohorts(Number(courseId))
       .then((data) => setCohorts(data))
       .catch((err) => {
-        console.warn('Unable to load cohort suggestions:', err);
+        console.warn('Không tải được gợi ý nhóm:', err);
         setCohorts([]);
       })
       .finally(() => setCohortsLoading(false));
@@ -129,15 +129,15 @@ export function EnrollmentForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!courseId) {
-      setSubmitError('Please select a course.');
+      setSubmitError('Vui lòng chọn khóa học.');
       return;
     }
     if (selectedHorseIds.length === 0) {
-      setSubmitError('Select at least one horse for the training group.');
+      setSubmitError('Vui lòng chọn ít nhất 1 chiến mã vào nhóm huấn luyện.');
       return;
     }
     if (trainingDays.length === 0) {
-      setSubmitError('Select at least one training day.');
+      setSubmitError('Vui lòng chọn ít nhất 1 ngày tập trong tuần.');
       return;
     }
 
@@ -163,7 +163,7 @@ export function EnrollmentForm() {
       }
     } catch (err) {
       // 4. Lỗi "hết khe giờ vàng" phải hiện nguyên văn số liệu chi tiết từ backend
-      setSubmitError(err instanceof Error ? err.message : 'Unable to create the training plan.');
+      setSubmitError(err instanceof Error ? err.message : 'Tạo kế hoạch huấn luyện thất bại.');
     } finally {
       setSubmitting(false);
     }
@@ -174,7 +174,7 @@ export function EnrollmentForm() {
   if (error) {
     return (
       <Panel padded>
-        <EmptyState icon="alert-triangle" title="Data error" description={error} />
+        <EmptyState icon="alert-triangle" title="Lỗi dữ liệu" description={error} />
       </Panel>
     );
   }
@@ -194,16 +194,16 @@ export function EnrollmentForm() {
     <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-          Group training enrollment
+          Ghi danh huấn luyện theo nhóm
         </h1>
         <p className="text-[12px] text-[var(--color-text-secondary)]">
-          Select multiple horses and let the system schedule shared sessions.
+          Chọn nhiều chiến mã cùng lúc để hệ thống tự xếp chung buổi tập.
         </p>
       </div>
 
       {submitError && (
         <div className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-4 text-[13px] text-[var(--color-danger)] leading-relaxed">
-          <div className="font-semibold mb-1">Unable to create plan:</div>
+          <div className="font-semibold mb-1">⚠️ Không thể lập kế hoạch:</div>
           <div>{submitError}</div>
         </div>
       )}
@@ -212,7 +212,7 @@ export function EnrollmentForm() {
         {/* Bước 1: Chọn khóa học */}
         <Panel padded>
           <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)] mb-3">
-            1. Select target course
+            1. Chọn khóa học mục tiêu
           </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
@@ -223,7 +223,7 @@ export function EnrollmentForm() {
               >
                 {courses.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.totalSessions} sessions)
+                    {c.name} ({c.totalSessions} buổi)
                   </option>
                 ))}
               </select>
@@ -240,13 +240,13 @@ export function EnrollmentForm() {
           {/* Gợi ý nhóm đồng bộ (Joinable Cohorts) */}
           <div className="mt-4 pt-3 border-t border-[var(--color-border)]">
             <div className="text-[12px] font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
-              <span>Suggested joinable cohorts</span>
-              {cohortsLoading && <span className="text-[11px] text-[var(--color-text-muted)]">(Scanning...)</span>}
+              <span>💡 Gợi ý nhóm có thể ghép chung (Joinable Cohorts)</span>
+              {cohortsLoading && <span className="text-[11px] text-[var(--color-text-muted)]">(Đang quét...)</span>}
             </div>
 
             {cohorts.length === 0 ? (
               <p className="mt-1 text-[11px] text-[var(--color-text-muted)] italic">
-                No open cohorts are available for this course. Your group will start a new cohort.
+                Chưa có nhóm nào đang mở cho khóa này. Nhóm bạn tạo sẽ là nhóm khởi đầu.
               </p>
             ) : (
               <div className="mt-2 space-y-2">
@@ -257,22 +257,23 @@ export function EnrollmentForm() {
                   >
                     <div>
                       <div className="font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
-                        <span>Cohort &quot;{cohort.courseName}&quot;</span>
+                        <span>Nhóm &quot;{cohort.courseName}&quot;</span>
                         <Pill tone={cohort.cohortStatus === 'ACTIVE' ? 'success' : 'info'} size="sm">
                           {cohort.cohortStatus} ({cohort.horseCount} con)
                         </Pill>
                       </div>
                       <div className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
-                        {cohort.note} • Starts {cohort.suggestedStartDate} (wait {cohort.waitDays} days)
+                        {cohort.note} • Bắt đầu {cohort.suggestedStartDate} (chờ {cohort.waitDays} ngày)
                       </div>
                       {/*
-                        Synchronized start does not guarantee a shared lot. Full cohorts move
-                        the next horse to another lot in the same 240-minute window.
+                        Đồng pha KHÔNG bảo đảm chung lot. Nhóm đã đầy thì con
+                        tiếp theo sẽ sang lot thứ hai trong cùng khung giờ vàng,
+                        và khung đó chỉ có 240 phút.
                       */}
                       {cohort.horseCount >= cohort.lotCapacity && (
                         <div className="mt-1 text-[11px] text-[var(--color-warning)]">
-                          Cohort is full at {cohort.lotCapacity} horses. Another horse will
-                          train in a different session that day.
+                          ⚠ Nhóm đã đủ {cohort.lotCapacity} chiến mã. Thêm con nữa sẽ
+                          phải tập ở buổi khác trong ngày.
                         </div>
                       )}
                     </div>
@@ -282,7 +283,7 @@ export function EnrollmentForm() {
                       type="button"
                       onClick={() => applyCohortSuggestion(cohort)}
                     >
-                      Use this cohort schedule
+                      Dùng lịch nhóm này
                     </Button>
                   </div>
                 ))}
@@ -296,10 +297,10 @@ export function EnrollmentForm() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-                2. Select horses ({selectedHorseIds.length} selected)
+                2. Chọn chiến mã tham gia nhóm ({selectedHorseIds.length} con đã chọn)
               </h2>
               <p className="text-[11px] text-[var(--color-text-secondary)]">
-                Only horses in your area with ELIGIBLE status are shown.
+                Chỉ hiển thị các chiến mã trong khu vực của bạn và đạt trạng thái ELIGIBLE.
               </p>
             </div>
             {horses.length > 0 && (
@@ -313,14 +314,14 @@ export function EnrollmentForm() {
                   )
                 }
               >
-                {selectedHorseIds.length === horses.length ? 'Clear selection' : 'Select all'}
+                {selectedHorseIds.length === horses.length ? 'Bỏ chọn hết' : 'Chọn tất cả'}
               </Button>
             )}
           </div>
 
           {horses.length === 0 ? (
             <p className="text-[12px] text-[var(--color-text-muted)] italic">
-              No ELIGIBLE horses are available in your area. Complete admission or stall assignment first.
+              Không có chiến mã nào ở trạng thái ELIGIBLE trong khu của bạn. Vui lòng hoàn tất tiếp nhận hoặc xếp chuồng trước.
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
@@ -346,7 +347,7 @@ export function EnrollmentForm() {
                         {horse.name}
                       </div>
                       <div className="text-[10px] text-[var(--color-text-muted)]">
-                        {horse.breed || 'Unknown breed'}
+                        {horse.breed || 'Chưa rõ giống'}
                       </div>
                     </div>
                   </label>
@@ -359,13 +360,13 @@ export function EnrollmentForm() {
         {/* Bước 3: Ngày bắt đầu và các thứ tập trong tuần */}
         <Panel padded>
           <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)] mb-3">
-            3. Schedule &amp; training days
+            3. Lịch trình &amp; Các ngày tập trong tuần
           </h2>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Start date *
+                Ngày bắt đầu (Start Date) *
               </label>
               <input
                 type="date"
@@ -375,13 +376,13 @@ export function EnrollmentForm() {
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
               <span className="text-[11px] text-[var(--color-text-muted)]">
-                The group will start its first session on this date.
+                Cả nhóm sẽ bắt đầu buổi học đầu tiên từ ngày này.
               </span>
             </div>
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Training days *
+                Các thứ tập trong tuần (Training Days) *
               </label>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {DAYS_OF_WEEK.map((d) => {
@@ -407,13 +408,13 @@ export function EnrollmentForm() {
 
           <div className="mt-4">
             <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-              Plan notes
+              Ghi chú kế hoạch
             </label>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="For example: Three-horse group preparing for the autumn race..."
+              placeholder="Ví dụ: Nhóm 3 ngựa chuẩn bị cho giải mùa thu..."
               className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
             />
           </div>
@@ -421,14 +422,14 @@ export function EnrollmentForm() {
 
         <div className="flex items-center justify-end gap-3 pt-2">
           <Button variant="secondary" type="button" onClick={() => router.back()}>
-            Back
+            Quay lại
           </Button>
           <Button
             variant="primary"
             type="submit"
             disabled={submitting || selectedHorseIds.length === 0}
           >
-            {submitting ? 'Scheduling lots...' : `Enroll ${selectedHorseIds.length} horses`}
+            {submitting ? 'Đang lên lịch lot...' : `Ghi danh ${selectedHorseIds.length} chiến mã`}
           </Button>
         </div>
       </form>

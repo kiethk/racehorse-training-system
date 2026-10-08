@@ -8,7 +8,6 @@ import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Panel, SectionTitle } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui/Table';
 import { admissionsApi } from '../services/api';
 import type { AdmissionStatus, GroomQueueFilters, GroomQueueResponse } from '../types';
 
@@ -16,7 +15,6 @@ const statuses: { value: AdmissionStatus | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
   { value: 'GROOM_REVIEW', label: 'Groom review' },
   { value: 'WAITING_FOR_STALL', label: 'Waiting for stall' },
-  { value: 'WAITING_FOR_ARRIVAL', label: 'Waiting for horse arrival' },
   { value: 'VET_REVIEW', label: 'Vet review' },
   { value: 'TRAINER_REVIEW', label: 'Trainer review' },
   { value: 'MANAGER_REVIEW', label: 'Manager review' },
@@ -45,7 +43,7 @@ function prettyStatus(status: AdmissionStatus) {
 
 function statusTone(status: AdmissionStatus): 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral' {
   if (status === 'GROOM_REVIEW') return 'primary';
-  if (status === 'WAITING_FOR_STALL' || status === 'WAITING_FOR_ARRIVAL') return 'warning';
+  if (status === 'WAITING_FOR_STALL') return 'warning';
   if (status === 'APPROVED') return 'success';
   if (status === 'REJECTED') return 'danger';
   if (status === 'VET_REVIEW' || status === 'TRAINER_REVIEW' || status === 'MANAGER_REVIEW') return 'info';
@@ -173,20 +171,20 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
             action={total > 0 ? <Button size="sm" onClick={clear}>Clear filters</Button> : undefined}
           />
         ) : (
-          <TableShell className="rounded-none border-0 shadow-none">
-            <Table>
-              <TableHeader className="bg-[var(--color-surface-subtle)] text-[10px] uppercase tracking-wide">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse text-left">
+              <thead className="bg-[var(--color-surface-subtle)] text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
                 <tr>
-                  <TableHead>Horse</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead align="right">Action</TableHead>
+                  <th scope="col" className="px-4 py-3">Horse</th>
+                  <th scope="col" className="px-4 py-3">Status</th>
+                  <th scope="col" className="px-4 py-3">Submitted</th>
+                  <th scope="col" className="px-4 py-3 text-right">Action</th>
                 </tr>
-              </TableHeader>
-              <TableBody>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border)]">
                 {applications.map((admission) => (
-                  <TableRow key={admission.admissionId} className="bg-[var(--color-surface)]">
-                    <TableCell>
+                  <tr key={admission.admissionId} className="bg-[var(--color-surface)] transition-colors hover:bg-[var(--color-surface-subtle)]">
+                    <td className="px-4 py-3">
                       <div className="flex min-w-0 items-center gap-3">
                         <HorseAvatar name={admission.candidateName} size={36} />
                         <div className="min-w-0">
@@ -194,17 +192,17 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
                           <p className="truncate text-[11px] text-[var(--color-text-muted)]">{admission.breed || 'Breed not provided'}</p>
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell><Pill tone={statusTone(admission.status)} size="sm">{prettyStatus(admission.status)}</Pill></TableCell>
-                    <TableCell className="text-[12px] text-[var(--color-text-secondary)]">{formatDate(admission.submittedAt)}</TableCell>
-                    <TableCell align="right">
+                    </td>
+                    <td className="px-4 py-3"><Pill tone={statusTone(admission.status)} size="sm">{prettyStatus(admission.status)}</Pill></td>
+                    <td className="px-4 py-3 text-[12px] text-[var(--color-text-secondary)]">{formatDate(admission.submittedAt)}</td>
+                    <td className="px-4 py-3 text-right">
                       <Link href={`/groom/admissions/${admission.admissionId}${toQuery(applied)}`} className="inline-flex h-8 items-center rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] px-4 text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">View</Link>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          </TableShell>
+              </tbody>
+            </table>
+          </div>
         )}
 
         {result && total > 0 && (

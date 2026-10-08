@@ -1,7 +1,5 @@
 package com.rtms.backend.dto;
-import com.rtms.backend.entity.CandidateHorseProfile;
-import com.rtms.backend.entity.HealthRecord;
-import com.rtms.backend.entity.HorseHealthMetric;
+
 import com.rtms.backend.entity.Horse;
 import com.rtms.backend.entity.RacingReadinessAssessment;
 

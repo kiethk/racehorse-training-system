@@ -35,7 +35,7 @@ export function CompleteWorkoutDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (performanceRating < 1 || performanceRating > 10) {
-      setError('Performance rating must be between 1 and 10.');
+      setError('Điểm đánh giá thể hiện (performance rating) phải từ 1 đến 10.');
       return;
     }
 
@@ -59,7 +59,7 @@ export function CompleteWorkoutDialog({
       await onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to complete the workout.');
+      setError(err instanceof Error ? err.message : 'Đóng buổi tập thất bại.');
     } finally {
       setSubmitting(false);
     }
@@ -80,10 +80,10 @@ export function CompleteWorkoutDialog({
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-              Record workout result #{workout.workoutId}
+              Ghi nhận kết quả buổi tập #{workout.workoutId}
             </h2>
             <p className="text-[12px] text-[var(--color-text-secondary)]">
-              {workout.subjectName} • Date {workout.lotDate} ({workout.startTime} – {workout.endTime})
+              {workout.subjectName} • Ngày {workout.lotDate} ({workout.startTime} – {workout.endTime})
             </p>
           </div>
           <button
@@ -105,7 +105,7 @@ export function CompleteWorkoutDialog({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Performance rating (1–10) *
+                Điểm thể hiện (Rating: 1–10) *
               </label>
               <input
                 type="number"
@@ -120,7 +120,7 @@ export function CompleteWorkoutDialog({
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Actual distance (meters)
+                Cự ly thực tế (mét)
               </label>
               <input
                 type="number"
@@ -128,14 +128,14 @@ export function CompleteWorkoutDialog({
                 step="10"
                 value={actualDistanceMeters}
                 onChange={(e) => setActualDistanceMeters(e.target.value ? Number(e.target.value) : '')}
-                placeholder="For example: 1200"
+                placeholder="Ví dụ: 1200"
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
             </div>
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Actual duration (minutes)
+                Thời lượng thực tế (phút)
               </label>
               <input
                 type="number"
@@ -143,14 +143,14 @@ export function CompleteWorkoutDialog({
                 step="0.1"
                 value={actualDurationMinutes}
                 onChange={(e) => setActualDurationMinutes(e.target.value ? Number(e.target.value) : '')}
-                placeholder="For example: 4.5"
+                placeholder="Ví dụ: 4.5"
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
             </div>
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Maximum speed (km/h)
+                Tốc độ tối đa (km/h)
               </label>
               <input
                 type="number"
@@ -158,14 +158,14 @@ export function CompleteWorkoutDialog({
                 step="0.1"
                 value={topSpeedKmh}
                 onChange={(e) => setTopSpeedKmh(e.target.value ? Number(e.target.value) : '')}
-                placeholder="For example: 58.5"
+                placeholder="Ví dụ: 58.5"
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
             </div>
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Average speed (km/h)
+                Tốc độ trung bình (km/h)
               </label>
               <input
                 type="number"
@@ -173,49 +173,49 @@ export function CompleteWorkoutDialog({
                 step="0.1"
                 value={averageSpeedKmh}
                 onChange={(e) => setAverageSpeedKmh(e.target.value ? Number(e.target.value) : '')}
-                placeholder="For example: 46.2"
+                placeholder="Ví dụ: 46.2"
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
             </div>
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Average heart rate (bpm)
+                Nhịp tim trung bình (bpm)
               </label>
               <input
                 type="number"
                 min="0"
                 value={averageHeartRate}
                 onChange={(e) => setAverageHeartRate(e.target.value ? Number(e.target.value) : '')}
-                placeholder="For example: 165"
+                placeholder="Ví dụ: 165"
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
             </div>
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Maximum heart rate (bpm)
+                Nhịp tim tối đa (bpm)
               </label>
               <input
                 type="number"
                 min="0"
                 value={maxHeartRate}
                 onChange={(e) => setMaxHeartRate(e.target.value ? Number(e.target.value) : '')}
-                placeholder="For example: 210"
+                placeholder="Ví dụ: 210"
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
             </div>
 
             <div>
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Recovery heart rate (bpm after 15 min)
+                Nhịp tim phục hồi (bpm sau 15p)
               </label>
               <input
                 type="number"
                 min="0"
                 value={recoveryHeartRate}
                 onChange={(e) => setRecoveryHeartRate(e.target.value ? Number(e.target.value) : '')}
-                placeholder="For example: 88"
+                placeholder="Ví dụ: 88"
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
             </div>
@@ -223,23 +223,23 @@ export function CompleteWorkoutDialog({
 
           <div>
             <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-              Trainer feedback
+              Nhận xét của Trainer
             </label>
             <textarea
               rows={3}
               value={trainerFeedback}
               onChange={(e) => setTrainerFeedback(e.target.value)}
-              placeholder="Notes about gait, acceleration or endurance..."
+              placeholder="Ghi chú về dáng chạy, độ bứt tốc, sức bền..."
               className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-[var(--color-border)]">
             <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={submitting}>
-              Cancel
+              Huỷ
             </Button>
             <Button variant="primary" size="sm" type="submit" disabled={submitting}>
-              {submitting ? 'Saving...' : 'Complete workout'}
+              {submitting ? 'Đang lưu...' : 'Hoàn thành buổi tập'}
             </Button>
           </div>
         </form>

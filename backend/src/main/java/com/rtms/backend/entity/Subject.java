@@ -1,4 +1,5 @@
 package com.rtms.backend.entity;
+
 import com.rtms.backend.enums.IntensityLevel;
 import com.rtms.backend.enums.SurfaceType;
 import jakarta.persistence.*;

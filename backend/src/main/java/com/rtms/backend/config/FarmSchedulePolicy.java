@@ -1,6 +1,4 @@
 package com.rtms.backend.config;
-import com.rtms.backend.enums.SopSlot;
-import com.rtms.backend.service.CareScheduleService;
 
 import java.time.Duration;
 import java.time.LocalTime;
