@@ -126,6 +126,7 @@ SELECT a.id AS admission_id,
        c.name AS candidate_name,
        c.registration_number,
        a.status,
+       a.veterinarian_id,
        a.groom_id,
        a.quarantine_stall_id,
        a.arrival_deadline_at,
@@ -140,14 +141,17 @@ SELECT a.id AS admission_id,
        c.name AS candidate_name,
        a.status AS admission_status,
        a.arrived_at,
+       a.veterinarian_id AS admission_veterinarian_id,
+       admission_vet.full_name AS admission_assigned_vet,
        cs.id AS initial_schedule_id,
        cs.status AS schedule_status,
-       cs.veterinarian_id,
-       vet.full_name AS assigned_vet,
+       cs.veterinarian_id AS schedule_veterinarian_id,
+       schedule_vet.full_name AS schedule_assigned_vet,
        cs.scheduled_at,
        cs.duration_minutes
 FROM admission_applications a
 JOIN candidate_horse_profiles c ON c.admission_id = a.id
 LEFT JOIN care_schedule cs ON cs.admission_id = a.id AND cs.care_type = 'INITIAL'
-LEFT JOIN users vet ON vet.id = cs.veterinarian_id
+LEFT JOIN users admission_vet ON admission_vet.id = a.veterinarian_id
+LEFT JOIN users schedule_vet ON schedule_vet.id = cs.veterinarian_id
 WHERE c.registration_number = 'TSTARRIVAL00001';
