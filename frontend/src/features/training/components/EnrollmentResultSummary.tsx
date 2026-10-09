@@ -9,17 +9,17 @@ import type { Horse } from '@/features/stable/types';
 import type { HorseTrainingPlanDetailResponse, PlanWorkoutItemResponse } from '../types';
 
 /**
- * Màn tóm tắt sau khi ghi danh nhóm.
+ * Summary screen shown after a group enrollment.
  *
- * VÌ SAO CẦN:
- * Ghi danh 7 con sẽ tạo 7 kế hoạch. Trước đây frontend nhảy thẳng tới
- * kế hoạch đầu tiên, vứt đi 6 kết quả còn lại — trong khi backend đã trả
- * về đầy đủ cả 7 kèm lotId từng buổi.
+ * WHY IT EXISTS:
+ * Enrolling 7 horses creates 7 plans. The frontend used to jump straight to the
+ * first plan and throw away the other 6 results — even though the backend already
+ * returned all 7 with the lotId of each session.
  *
- * Quan trọng hơn: nhóm có thể bị TÁCH sang nhiều lot vì hai lý do
- * (vượt sức chứa BR-10, hoặc hai con cùng Groom BR-09). Đó là hành vi
- * ĐÚNG, nhưng nếu không nói ra thì Trainer sẽ tưởng cơ chế ghép nhóm hỏng.
- * Màn này chính là chỗ demo cơ chế lot rõ nhất.
+ * More importantly: a group can be SPLIT across several lots for two reasons
+ * (over capacity BR-10, or two horses sharing a Groom BR-09). That behaviour is
+ * CORRECT, but unless it is spelled out the Trainer will think group matching is broken.
+ * This screen is the clearest demonstration of how lots work.
  */
 export function EnrollmentResultSummary({
   plans,
@@ -36,11 +36,11 @@ export function EnrollmentResultSummary({
   );
 
   /**
-   * Gom buổi tập của BUỔI ĐẦU TIÊN theo lot.
+   * Groups the sessions of the FIRST training day by lot.
    *
-   * Chỉ lấy buổi đầu vì đó đã đủ để thấy nhóm bị tách hay không — các buổi
-   * sau lặp lại cùng cấu trúc (cùng nhóm, cùng Groom, cùng sức chứa).
-   * Hiện cả 12 buổi sẽ thành một bức tường số liệu không ai đọc.
+   * Only the first day is used because it is enough to see whether the group was split — later
+   * days repeat the same structure (same group, same Groom, same capacity).
+   * Showing all 12 days would be a wall of numbers nobody reads.
    */
   const firstSessionByLot = useMemo(() => {
     const byLot = new Map<number, { item: PlanWorkoutItemResponse; horseId: number }[]>();

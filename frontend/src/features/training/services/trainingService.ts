@@ -30,7 +30,7 @@ interface ApiResponse<T> {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 /**
- * Giữ nguyên message lỗi chi tiết từ backend (ví dụ: thông báo hết khe giờ vàng kèm số phút cụ thể)
+ * Keeps the backend's detailed error message (e.g. the golden-hour-full notice with the exact minutes)
  */
 async function postWithMessage<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
@@ -61,7 +61,7 @@ async function patchWithMessage<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export const trainingApi = {
-  // Bài tập (Subjects)
+  // Subjects
   getSubjects: async (): Promise<Subject[]> =>
     (await apiGet<ApiResponse<Subject[]>>('/api/subjects')).data,
 
@@ -71,7 +71,7 @@ export const trainingApi = {
   getCategories: async (): Promise<SubjectCategory[]> =>
     (await apiGet<ApiResponse<SubjectCategory[]>>('/api/subject-categories')).data,
 
-  // Khóa học (Courses)
+  // Courses
   getCourses: async (): Promise<Course[]> =>
     (await apiGet<ApiResponse<Course[]>>('/api/courses')).data,
 
@@ -87,7 +87,7 @@ export const trainingApi = {
   ): Promise<CourseSubjectResponse> =>
     (await apiPost<ApiResponse<CourseSubjectResponse>>(`/api/courses/${courseId}/subjects`, data)).data,
 
-  // Kế hoạch huấn luyện (Training Plans)
+  // Training plans
   getJoinableCohorts: async (courseId: number): Promise<JoinableCohortResponse[]> =>
     (await apiGet<ApiResponse<JoinableCohortResponse[]>>(
       `/api/training-plans/joinable-cohorts?courseId=${courseId}`,
@@ -101,13 +101,13 @@ export const trainingApi = {
   getPlanById: async (id: number): Promise<HorseTrainingPlanDetailResponse> =>
     (await apiGet<ApiResponse<HorseTrainingPlanDetailResponse>>(`/api/training-plans/${id}`)).data,
 
-  /** Danh sách kế hoạch kèm tên ngựa, tên khoá và tiến độ. */
+  /** Plans with horse name, course name and progress. */
   getPlans: async (horseId?: number): Promise<PlanSummaryResponse[]> => {
     const url = horseId ? `/api/training-plans?horseId=${horseId}` : '/api/training-plans';
     return (await apiGet<ApiResponse<PlanSummaryResponse[]>>(url)).data;
   },
 
-  // Vận hành Lot (Training Lots)
+  // Training lots
   getLots: async (from: string, to: string, includeCancelled: boolean = false): Promise<TrainingLotResponse[]> =>
     (await apiGet<ApiResponse<TrainingLotResponse[]>>(
       `/api/lots?from=${from}&to=${to}&includeCancelled=${includeCancelled}`,
@@ -122,12 +122,12 @@ export const trainingApi = {
   cancelLot: async (id: number): Promise<TrainingLotResponse> =>
     await patchWithMessage<TrainingLotResponse>(`/api/lots/${id}/cancel`),
 
-  // Buổi tập (Workouts)
+  // Workouts
   completeWorkout: async (workoutId: number, data: CompleteWorkoutRequest): Promise<void> => {
     await patchWithMessage(`/api/workouts/${workoutId}/complete`, data);
   },
 
-  // Đợt 7: Dashboard, Thể lực & Cảnh báo
+  // Phase 7: dashboard, fitness & alerts
   getDashboard: async (): Promise<TrainerDashboardHorse[]> => {
     const res = await apiGet<ApiResponse<TrainerDashboardHorse[]>>('/api/training-plans/dashboard');
     return res.data;

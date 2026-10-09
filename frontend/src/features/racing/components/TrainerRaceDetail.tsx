@@ -126,7 +126,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
         </Link>
       </div>
 
-      {/* Cảnh báo nguồn tin */}
+      {/* Source warning */}
       <div className="rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-3 text-[12px] text-[var(--color-info)] flex items-center gap-2">
         <span>ℹ️</span>
         <span>
@@ -134,7 +134,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
         </span>
       </div>
 
-      {/* Khối phản hồi của Quản lý (nếu đã xét duyệt) */}
+      {/* Manager feedback block (if already reviewed) */}
       {data.status !== 'PENDING' && (
         <div
           className={`rounded-[var(--radius-md)] border p-4 text-[13px] ${
@@ -160,9 +160,9 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
         </div>
       )}
 
-      {/* Grid 2 cột: Chiến mã & Thông tin giải */}
+      {/* Two-column grid: horse & race information */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Cột 1: Chiến mã */}
+        {/* Column 1: horse */}
         <div className="space-y-6">
           <Panel padded>
             <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
@@ -197,7 +197,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
             </div>
           </Panel>
 
-          {/* Cột 1: Thông tin tham khảo */}
+          {/* Column 1: reference information */}
           <Panel padded>
             <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
               Technical details & Notes
@@ -244,7 +244,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
           </Panel>
         </div>
 
-        {/* Cột 2: Chi tiết cuộc đua */}
+        {/* Column 2: race details */}
         <div className="space-y-6">
           <Panel padded>
             <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">

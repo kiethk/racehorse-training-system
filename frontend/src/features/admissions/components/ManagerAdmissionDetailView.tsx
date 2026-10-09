@@ -76,7 +76,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
   const horsePhoto = detail.documents.find((doc) => doc.documentType === 'HORSE_PHOTO');
   const currentTrainingDecision =
     detail.vetTrainingDecision ?? detail.healthRecords?.find((record) => record.trainingDecision)?.trainingDecision ?? null;
-  // Đơn đã qua Thú y nhưng hệ thống chưa tìm được Trainer đủ điều kiện để giao.
+  // The admission passed the vet stage but the system has not found an eligible Trainer to assign yet.
   const trainerUnassigned = detail.status === 'TRAINER_REVIEW' && detail.trainerId == null;
   
   const TABS: TabItem[] = [

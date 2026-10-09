@@ -51,7 +51,7 @@ export function RescheduleDialog({
     e.preventDefault();
     setError(null);
 
-    // Chặn trước tại client (BR-03: Khung giờ vàng 06:00 - 10:00)
+    // Block early on the client (BR-03: golden-hour window 06:00 - 10:00)
     const startMins = toMinutes(newStartTime);
     const endMins = toMinutes(newEndTime);
     if (startMins < WINDOW_START || endMins > WINDOW_END) {

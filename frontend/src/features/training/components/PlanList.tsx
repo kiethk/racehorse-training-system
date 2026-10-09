@@ -111,8 +111,8 @@ export function PlanList() {
       ) : (
         <div className="space-y-2">
           {filtered.map((p) => {
-            // Buổi đã huỷ bị trừ khỏi mẫu số — khoá 12 buổi huỷ 1 sẽ đạt
-            // 100% ở 11 buổi thay vì treo mãi ở 91%.
+            // Cancelled sessions are removed from the denominator — a 12-session plan with 1 cancelled reaches
+            // 100% at 11 sessions instead of hanging at 91% forever.
             const denominator = Math.max(p.totalSessions - p.cancelledSessions, 1);
             const percent = Math.min(
               Math.round((p.completedSessions / denominator) * 100),

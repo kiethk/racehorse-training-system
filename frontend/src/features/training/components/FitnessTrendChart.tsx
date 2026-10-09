@@ -37,7 +37,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
     );
   }
 
-  // Sắp xếp theo ngày tăng dần
+  // Sort by date ascending
   const sortedTrend = [...trend].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
@@ -48,13 +48,13 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
-  // Tính vị trí X theo index (hoặc date)
+  // Compute the X position by index (or date)
   const getX = (index: number) => {
     if (sortedTrend.length <= 1) return padding.left + chartW / 2;
     return padding.left + (index / (sortedTrend.length - 1)) * chartW;
   };
 
-  // Helper tính Y từ min, max
+  // Helper to compute Y from min and max
   const getY = (val: number | null | undefined, minVal: number, maxVal: number) => {
     if (val === null || val === undefined) return null;
     const clamped = Math.max(minVal, Math.min(maxVal, val));
@@ -62,7 +62,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
     return padding.top + chartH - ratio * chartH;
   };
 
-  // Ánh xạ ngày của readiness vào vị trí X trên trục thời gian của trend
+  // Map the readiness dates onto X positions on the trend's time axis
   const getReadinessX = (assessmentDate: string) => {
     const time = new Date(assessmentDate).getTime();
     const firstTime = new Date(sortedTrend[0].date).getTime();
@@ -74,7 +74,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
     return padding.left + clampedRatio * chartW;
   };
 
-  // Tạo đường dẫn SVG Path từ danh sách điểm
+  // Build the SVG path from the list of points
   const makePath = (
     accessor: (d: HorseFitnessTrendItem) => number | null | undefined,
     minVal: number,

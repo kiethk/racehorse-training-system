@@ -38,7 +38,7 @@ export function LotTimeline() {
     try {
       setLoading(true);
       setError(null);
-      // Mặc định includeCancelled = false theo Plan 6
+      // includeCancelled defaults to false per Plan 6
       const data = await trainingApi.getLots(selectedDate, selectedDate, false);
       setLots(data);
     } catch (err) {
@@ -68,12 +68,12 @@ export function LotTimeline() {
     }
   }
 
-  // Sắp xếp lot theo giờ bắt đầu
+  // Sort lots by start time
   const sortedLots = useMemo(() => {
     return [...lots].sort((a, b) => a.startTime.localeCompare(b.startTime));
   }, [lots]);
 
-  // Tính tổng phút đã sử dụng trong khung giờ vàng
+  // Total minutes used within the golden-hour window
   const totalOccupiedMinutes = useMemo(() => {
     return lots.reduce((acc, l) => acc + (l.durationMinutes || 0), 0);
   }, [lots]);
@@ -114,7 +114,7 @@ export function LotTimeline() {
         </Panel>
       ) : (
         <>
-          {/* Dải thời gian trực quan (Timeline bar) */}
+          {/* Visual timeline bar */}
           <Panel padded>
             <div className="flex items-center justify-between mb-3 text-[13px]">
               <span className="font-semibold text-[var(--color-text-primary)]">
@@ -126,7 +126,7 @@ export function LotTimeline() {
               </span>
             </div>
 
-            {/* Thước đo giờ */}
+            {/* Hour ruler */}
             <div className="relative h-6 text-[10px] text-[var(--color-text-muted)] font-metric border-b border-[var(--color-border)] mb-2">
               <span className="absolute left-0">06:00</span>
               <span className="absolute left-[25%] -translate-x-1/2">07:00</span>
@@ -135,7 +135,7 @@ export function LotTimeline() {
               <span className="absolute right-0">10:00</span>
             </div>
 
-            {/* Dải trực quan các Lot */}
+            {/* Visual strip of the lots */}
             <div className="relative h-16 w-full rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] border border-[var(--color-border)] overflow-hidden">
               {sortedLots.map((lot) => {
                 const startMins = toMinutes(lot.startTime);
@@ -169,7 +169,7 @@ export function LotTimeline() {
             </div>
           </Panel>
 
-          {/* Danh sách thẻ chi tiết từng Lot */}
+          {/* Detail cards for each lot */}
           <div className="space-y-3">
             <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
               Lots for this day ({sortedLots.length})
@@ -263,7 +263,7 @@ export function LotTimeline() {
         </>
       )}
 
-      {/* Modal dời giờ */}
+      {/* Reschedule modal */}
       <RescheduleDialog
         lot={rescheduleLot}
         open={rescheduleLot !== null}
@@ -271,7 +271,7 @@ export function LotTimeline() {
         onSuccess={loadLots}
       />
 
-      {/* Confirm dialog huỷ lot */}
+      {/* Cancel-lot confirm dialog */}
       <ConfirmDialog
         open={cancelTargetLot !== null}
         title={`Cancel lot #${cancelTargetLot?.lotId} (${cancelTargetLot?.subjectName})?`}

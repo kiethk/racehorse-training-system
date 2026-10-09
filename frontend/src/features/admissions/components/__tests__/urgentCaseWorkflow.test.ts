@@ -78,12 +78,12 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
       followUpDate: string;
     }): Record<string, string> {
       const errors: Record<string, string> = {};
-      if (!data.symptoms.trim()) errors.symptoms = 'Triệu chứng là bắt buộc';
-      if (!data.findings.trim()) errors.findings = 'Kết quả khám là bắt buộc';
-      if (!data.diagnosis.trim()) errors.diagnosis = 'Chẩn đoán là bắt buộc';
+      if (!data.symptoms.trim()) errors.symptoms = 'Symptoms are required';
+      if (!data.findings.trim()) errors.findings = 'Examination findings are required';
+      if (!data.diagnosis.trim()) errors.diagnosis = 'Diagnosis is required';
       if (data.trainingDecision === 'BLOCKED') {
-        if (!data.restrictionDetails.trim()) errors.restrictionDetails = 'Lý do chặn tập là bắt buộc';
-        if (!data.followUpDate) errors.followUpDate = 'Phải chọn ngày khám lại';
+        if (!data.restrictionDetails.trim()) errors.restrictionDetails = 'A reason for blocking training is required';
+        if (!data.followUpDate) errors.followUpDate = 'A follow-up exam date must be selected';
       }
       return errors;
     }
@@ -151,7 +151,7 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
         horseId: 99,
         careType: 'ROUTINE',
         scheduledDate: '2026-10-10',
-        description: 'Tái khám sau ca khẩn cấp',
+        description: 'Follow-up after urgent case',
         idempotencyKey: 'follow-up-1',
       },
     };

@@ -409,7 +409,7 @@ export function VetReviewForm({
   const inFlight = useRef(false);
 
   const isGated = scheduleStatus != null && scheduleStatus !== 'IN_PROGRESS';
-  // Chặn tập luôn phải có lịch khám lại: "tạm nghỉ đến" chính là ngày khám đó.
+  // Blocking training always needs a follow-up exam: "rest until" is that exam's date.
   const followUpRequired = trainingDecision === 'BLOCKED';
   const followUpActive = scheduleFollowUp || followUpRequired;
   const isFormDisabled = submitting || startingExam || isGated;
@@ -455,7 +455,7 @@ export function VetReviewForm({
     if (availableDraft.symptoms !== undefined) setSymptoms(availableDraft.symptoms);
     if (availableDraft.findings !== undefined) setFindings(availableDraft.findings);
     if (availableDraft.diagnosis !== undefined) setDiagnosis(availableDraft.diagnosis);
-    // Bản nháp cũ có thể còn RESTRICTED -> nay gộp vào BLOCKED.
+    // Old drafts may still hold RESTRICTED -> it is now merged into BLOCKED.
     if (availableDraft.trainingDecision) {
       setTrainingDecision(availableDraft.trainingDecision === 'ALLOWED' ? 'ALLOWED' : 'BLOCKED');
     }

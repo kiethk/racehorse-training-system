@@ -4,17 +4,17 @@ import type { Area, Horse, StableStall, UserSummary, HorseStatus } from '../type
 interface ApiResponse<T> { success: boolean; data: T; message?: string; }
 
 /**
- * Hàm putWithMessage cục bộ ĐÃ XOÁ — services/api.ts giờ đã có apiPut, và
- * responseError() ở đó đọc payload.message nên lỗi nghiệp vụ (BR-07 "Chuồng
- * X đang có chiến mã Y") vẫn hiện nguyên văn.
+ * The local putWithMessage helper was REMOVED — services/api.ts now has apiPut, and
+ * responseError() there reads payload.message, so business errors (BR-07 "Stall
+ * X is occupied by horse Y") are still shown verbatim.
  *
- * Quan trọng hơn chuyện gọn gàng: hàm cũ tự gọi fetch() nên KHÔNG đi qua
- * doFetch(), tức là bỏ qua luôn cơ chế tự làm mới token khi gặp 401. JWT hết
- * hạn giữa lúc đang xem sơ đồ chuồng thì thao tác xếp ngựa thất bại thẳng,
- * trong khi mọi lời gọi qua apiGet/apiPut đều tự refresh rồi thử lại một lần.
+ * More important than tidiness: the old helper called fetch() itself, so it did NOT go through
+ * doFetch() and skipped the automatic token refresh on 401. If the JWT expired
+ * while viewing the stable map, assigning a horse failed outright,
+ * whereas every call through apiGet/apiPut refreshes and retries once.
  *
- * Body {} là chỗ giữ chỗ: hai endpoint dưới đây nhận @RequestParam, không có
- * @RequestBody, nên Spring bỏ qua phần thân.
+ * The {} body is a placeholder: the two endpoints below take @RequestParam, not
+ * @RequestBody, so Spring ignores the body.
  */
 export const stableApi = {
   getAreas: async (): Promise<Area[]> =>
@@ -25,13 +25,13 @@ export const stableApi = {
     return (await apiGet<ApiResponse<StableStall[]>>(url)).data;
   },
 
-  /** mine=true -> chỉ ngựa trong khu Trainer phụ trách (BE-2.1). */
+  /** mine=true -> only horses in the block the Trainer is responsible for (BE-2.1). */
   /**
-   * mine       -> ngựa trong khu Trainer phụ trách (đã xếp chuồng).
-   * unassigned -> ngựa CHƯA xếp chuồng, dùng cho hộp thoại xếp ngựa.
+   * mine       -> horses in the Trainer's block (already assigned to a stall).
+   * unassigned -> horses NOT yet assigned to a stall, for the assign-horse dialog.
    *
-   * Hai cờ loại trừ nhau: "khu của tôi" suy ra TỪ chuồng, nên ngựa chưa có
-   * chuồng không bao giờ thoả mine=true. Truyền cả hai sẽ luôn ra rỗng.
+   * The two flags are mutually exclusive: "my block" is derived FROM the stall, so a horse without
+   * a stall never satisfies mine=true. Passing both always returns an empty list.
    */
   getHorses: async (opts?: {
     mine?: boolean;
@@ -49,22 +49,22 @@ export const stableApi = {
   getGrooms: async (): Promise<UserSummary[]> =>
     (await apiGet<ApiResponse<UserSummary[]>>('/api/users?role=GROOM')).data,
 
-  /** LƯU Ý: backend nhận @RequestParam, KHÔNG phải body. */
+  /** NOTE: the backend takes @RequestParam, NOT a body. */
   assignHorseToStall: async (horseId: number, stallId: number): Promise<void> => {
     await apiPut(`/api/horses/${horseId}/assign-stall?stallId=${stallId}`, {});
   },
 
   /**
-   * Gỡ chiến mã khỏi chuồng — bỏ trống stallId.
+   * Remove a horse from its stall — leave stallId empty.
    *
-   * Các buổi tập chưa diễn ra sẽ thành "chưa phân công Groom".
+   * Sessions that have not happened yet become "no Groom assigned".
    */
   unassignHorseFromStall: async (horseId: number): Promise<void> => {
     await apiPut(`/api/horses/${horseId}/assign-stall`, {});
   },
 
-  // ĐÃ XOÁ: assignGroomToStall — phân công Groom cho chuồng chuyển sang Quản
-  // lý câu lạc bộ (V63). PUT /api/stalls/{id}/assign-groom vẫn tồn tại nhưng
-  // đòi quyền STALL_GROOM_ASSIGN mà Huấn luyện viên không có, nên gọi từ đây
-  // chỉ nhận 403. Trainer vẫn đổi chuồng cho ngựa bằng assignHorseToStall.
+  // REMOVED: assignGroomToStall — assigning a Groom to a stall moved to the Club
+  // Manager (V63). PUT /api/stalls/{id}/assign-groom still exists but
+  // requires the STALL_GROOM_ASSIGN permission, which Head Trainers do not have, so calling it from here
+  // only returns 403. Trainers still move a horse to another stall with assignHorseToStall.
 };
