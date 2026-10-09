@@ -656,7 +656,7 @@ export function VetAdmissionQueue() {
               }`}
             >
               <span>Active</span>
-              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-metric">
+              <span className="rounded-full bg-black/15 px-1.5 py-0.5 text-[10px] font-metric">
                 {summary.total}
               </span>
             </button>
@@ -676,7 +676,7 @@ export function VetAdmissionQueue() {
               }`}
             >
               <span>Awaiting</span>
-              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-metric">
+              <span className="rounded-full bg-black/15 px-1.5 py-0.5 text-[10px] font-metric">
                 {summary.awaiting}
               </span>
             </button>
@@ -696,7 +696,7 @@ export function VetAdmissionQueue() {
               }`}
             >
               <span>In Exam</span>
-              <span className="rounded-full bg-black/15 px-1.5 py-0.2 text-[10px] font-metric">
+              <span className="rounded-full bg-black/15 px-1.5 py-0.5 text-[10px] font-metric">
                 {summary.inProgress}
               </span>
             </button>
@@ -925,12 +925,12 @@ export function VetAdmissionQueue() {
                           <span>·</span>
                           <span>{calculateAge(row.dateOfBirth)}</span>
                           <span>·</span>
-                          <span className="inline-flex items-center gap-1 rounded bg-[var(--color-isolated-soft)] px-1.5 py-0.2 text-[10px] font-semibold text-[var(--color-isolated)]">
+                          <span className="inline-flex items-center gap-1 rounded bg-[var(--color-isolated-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-isolated)]">
                             <Icon name="shield" size={10} />
                             {stallCode}
                           </span>
                           <span>·</span>
-                          <span className="inline-flex items-center gap-1 rounded bg-[var(--color-surface-muted)] px-1.5 py-0.2 text-[10px] font-medium text-[var(--color-text-secondary)]">
+                          <span className="inline-flex items-center gap-1 rounded bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-secondary)]">
                             <Icon name="user" size={10} />
                             {row.trainerName
                               ? `Trainer: ${row.trainerName}`

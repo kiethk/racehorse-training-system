@@ -164,7 +164,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
               </span>
             )}
             {horse?.status && (
-              <span className="rounded-full bg-blue-100 dark:bg-blue-900/30 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
                 {horse.status}
               </span>
             )}
@@ -210,18 +210,18 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
             Fitness and injury risk alerts
           </h2>
           {alerts.length > 0 && (
-            <span className="rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 text-xs font-semibold">
+            <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-xs font-semibold">
               {alerts.length} active alerts
             </span>
           )}
         </div>
 
         {alerts.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20 p-4 text-emerald-800 dark:text-emerald-300">
-            <Icon name="check" size={20} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
+            <Icon name="check" size={20} className="text-emerald-600 flex-shrink-0" />
             <div>
               <p className="text-sm font-semibold">Fitness indicators are within safe ranges</p>
-              <p className="text-xs text-emerald-700 dark:text-emerald-400">
+              <p className="text-xs text-emerald-700">
                 No elevated heart rate, poor recovery or recurring incidents detected.
               </p>
             </div>
@@ -241,8 +241,8 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                   key={`${alert.ruleCode}-${idx}`}
                   className={`rounded-[var(--radius-md)] border p-4 shadow-sm ${
                     isDanger
-                      ? 'border-red-300 bg-red-50/80 dark:border-red-900 dark:bg-red-950/30'
-                      : 'border-amber-300 bg-amber-50/80 dark:border-amber-900 dark:bg-amber-950/30'
+                      ? 'border-red-300 bg-red-50/80'
+                      : 'border-amber-300 bg-amber-50/80'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -250,11 +250,11 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                       <Icon
                         name="alert-triangle"
                         size={18}
-                        className={isDanger ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}
+                        className={isDanger ? 'text-red-600' : 'text-amber-600'}
                       />
                       <h4
                         className={`text-sm font-bold ${
-                          isDanger ? 'text-red-900 dark:text-red-200' : 'text-amber-900 dark:text-amber-200'
+                          isDanger ? 'text-red-900' : 'text-amber-900'
                         }`}
                       >
                         {alert.title}
@@ -263,8 +263,8 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                     <span
                       className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                         isDanger
-                          ? 'bg-red-200 text-red-900 dark:bg-red-900/60 dark:text-red-200'
-                          : 'bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200'
+                          ? 'bg-red-200 text-red-900'
+                          : 'bg-amber-200 text-amber-900'
                       }`}
                     >
                       {isDanger ? 'Critical' : 'Warning'}
@@ -273,13 +273,13 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
 
                   <p
                     className={`mt-2 text-xs leading-relaxed ${
-                      isDanger ? 'text-red-800 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'
+                      isDanger ? 'text-red-800' : 'text-amber-800'
                     }`}
                   >
                     {alert.description}
                   </p>
 
-                  <div className="mt-3 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 text-[11px] text-[var(--color-text-secondary)]">
+                  <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-2 text-[11px] text-[var(--color-text-secondary)]">
                     <span>
                       Value: <strong>{alert.metricValue}</strong> / Threshold:{' '}
                       <strong>{alert.thresholdValue}</strong>
@@ -318,7 +318,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
               className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
                 preset === p
                   ? 'bg-[var(--color-primary)] text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
               }`}
             >
               {p === '7D'
@@ -401,7 +401,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                   <th className="py-2.5 px-3 font-semibold text-center">Performance</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--color-border-subtle)] text-[var(--color-text-primary)]">
+              <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)]">
                 {trend.map((row) => (
                   <tr key={row.workoutId} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
                     <td className="py-2.5 px-3 font-medium whitespace-nowrap">
@@ -447,10 +447,10 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                         <span
                           className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${
                             row.performanceRating >= 8
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                              ? 'bg-emerald-100 text-emerald-800'
                               : row.performanceRating >= 6
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-                              : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-amber-100 text-amber-800'
                           }`}
                         >
                           {row.performanceRating}/10

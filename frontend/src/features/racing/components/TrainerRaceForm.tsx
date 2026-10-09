@@ -461,7 +461,7 @@ export function TrainerRaceForm() {
 
       {/* Hành động */}
       <div className="flex flex-col items-end gap-2 border-t border-[var(--color-border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-[12px] font-medium text-[var(--color-warning-strong)] bg-[var(--color-warning-soft)] px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--color-warning)]">
+        <p className="text-[12px] font-medium text-[var(--color-warning)] bg-[var(--color-warning-soft)] px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--color-warning)]">
           This is an internal nomination and is not a registration with the event organiser.
         </p>
 

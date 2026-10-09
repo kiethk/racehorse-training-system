@@ -130,7 +130,7 @@ export function TrainerRaceList() {
             >
               <span>{tab.label}</span>
               <span
-                className={`rounded-full px-1.5 py-0.2 text-[11px] ${
+                className={`rounded-full px-1.5 py-0.5 text-[11px] ${
                   activeTab === tab.key
                     ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-semibold'
                     : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'

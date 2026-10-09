@@ -10,6 +10,7 @@ import { trainingApi } from '../services/trainingService';
 import type { TrainingLotResponse } from '../types';
 import { RescheduleDialog } from './RescheduleDialog';
 import { displayError, formatDate } from '@/lib/display';
+import { toast } from '@/lib/toast';
 
 const WINDOW_START = 6 * 60; // 06:00 (360')
 const WINDOW_END = 10 * 60;  // 10:00 (600')
@@ -61,7 +62,7 @@ export function LotTimeline() {
       setCancelTargetLot(null);
       await loadLots();
     } catch (err) {
-      alert(displayError(err, 'Unable to cancel this lot.'));
+      toast.error(displayError(err, 'Unable to cancel this lot.'));
     } finally {
       setCancelling(false);
     }

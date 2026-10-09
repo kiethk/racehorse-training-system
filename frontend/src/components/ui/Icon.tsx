@@ -46,7 +46,11 @@ type IconName =
   | 'external-link'
   | 'star'
   | 'filter'
-  | 'info';
+  | 'info'
+  | 'home'
+  | 'log-out'
+  | 'panel-left'
+  | 'layers';
 
 const paths: Record<IconName, ReactElement> = {
   search: (
@@ -260,6 +264,30 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
+  home: (
+    <>
+      <path d="m3 10.5 9-7 9 7V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" />
+      <path d="M9.5 21v-6h5v6" />
+    </>
+  ),
+  'log-out': (
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5M21 12H9" />
+    </>
+  ),
+  'panel-left': (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16" />
+    </>
+  ),
+  layers: (
+    <>
+      <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+      <path d="m3 13 9 5 9-5" />
     </>
   ),
 };

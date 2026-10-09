@@ -135,7 +135,7 @@ export function TrainerDashboardView() {
               Needs improvement (&lt;6.0): <strong>{performanceDist.needImprovement}</strong>
             </span>
             <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
-              <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-700" />
+              <span className="h-2 w-2 rounded-full bg-gray-300" />
               No data: <strong>{performanceDist.noData}</strong>
             </span>
           </div>
@@ -168,7 +168,7 @@ export function TrainerDashboardView() {
             {performanceDist.noData > 0 && (
               <div
                 style={{ width: `${(performanceDist.noData / totalHorses) * 100}%` }}
-                className="bg-gray-300 dark:bg-gray-700 transition-all"
+                className="bg-gray-300 transition-all"
                 title={`No data: ${performanceDist.noData}`}
               />
             )}
@@ -186,7 +186,7 @@ export function TrainerDashboardView() {
               className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                 filterMode === 'ALL'
                   ? 'bg-[var(--color-primary)] text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
               }`}
             >
               All ({totalHorses})
@@ -197,7 +197,7 @@ export function TrainerDashboardView() {
               className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                 filterMode === 'ACTIVE'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
               }`}
             >
               In training ({activeCount})
@@ -208,7 +208,7 @@ export function TrainerDashboardView() {
               className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                 filterMode === 'ALERT'
                   ? 'bg-red-600 text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
               }`}
             >
               With alerts ({alertHorsesCount})
@@ -258,7 +258,7 @@ export function TrainerDashboardView() {
                   <th className="py-3 px-3 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--color-border-subtle)] text-[var(--color-text-primary)]">
+              <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)]">
                 {filteredHorses.map((horse) => {
                   return (
                     <tr
@@ -280,30 +280,30 @@ export function TrainerDashboardView() {
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         {horse.planStatus === 'ACTIVE' && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-[10px] font-semibold">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[10px] font-semibold">
                             <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                             In training
                           </span>
                         )}
                         {horse.planStatus === 'UPCOMING' && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-semibold">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] font-semibold">
                             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                             Upcoming
                           </span>
                         )}
                         {horse.planStatus === 'COMPLETED' && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-semibold">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-semibold">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                             Completed
                           </span>
                         )}
                         {(horse.planStatus === 'NO_PLAN' || !horse.planStatus) && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-0.5 text-[10px] font-medium">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-[10px] font-medium">
                             No plan
                           </span>
                         )}
                         {horse.planStatus === 'CANCELLED' && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-2 py-0.5 text-[10px] font-medium">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium">
                             Cancelled
                           </span>
                         )}
@@ -333,10 +333,10 @@ export function TrainerDashboardView() {
                           <span
                             className={`inline-block rounded px-1.5 py-0.5 font-bold ${
                               horse.latestPerformanceRating >= 8
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                ? 'bg-emerald-100 text-emerald-800'
                                 : horse.latestPerformanceRating >= 6
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-                                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-amber-100 text-amber-800'
                             }`}
                           >
                             {horse.latestPerformanceRating}/10
@@ -356,7 +356,7 @@ export function TrainerDashboardView() {
                       </td>
                       <td className="py-3 px-3 text-center">
                         {(horse.alertCount ?? horse.alertsCount ?? 0) > 0 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 text-[10px] font-bold">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-bold">
                             <Icon name="alert-triangle" size={10} />
                             {horse.alertCount ?? horse.alertsCount} alerts
                           </span>

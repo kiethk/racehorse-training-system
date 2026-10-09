@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button, FormField, Modal, Notice, Select } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { stableApi } from '../services/stableService';
 import type { StableStall, Horse } from '../types';
@@ -47,62 +47,15 @@ export function AssignHorseDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={() => !submitting && onClose()}
-        aria-hidden="true"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="relative w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl"
-      >
-        <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-          Assign horse to stall {stall.stallCode}
-        </h2>
-        <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
-          Choose an unassigned horse for this stall.
-        </p>
-
-        {isStallOccupied && (
-          <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] p-3 text-[12px] text-[var(--color-danger)]">
-            This stall is occupied. Remove or move the current horse before assigning another horse.
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] p-3 text-[12px] text-[var(--color-danger)]">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-4">
-          <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-            Available horses ({availableHorses.length})
-          </label>
-          {availableHorses.length === 0 ? (
-            <p className="mt-2 text-[12px] text-[var(--color-text-muted)]">
-              There are no unassigned horses available.
-            </p>
-          ) : (
-            <select
-              value={selectedHorseId}
-              onChange={(e) => setSelectedHorseId(e.target.value ? Number(e.target.value) : '')}
-              disabled={isStallOccupied || submitting}
-              className="mt-1.5 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            >
-              <option value="">-- Select a horse --</option>
-              {availableHorses.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name} ({h.breed || 'Breed unknown'} · Status: {h.currentStatus})
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        <div className="mt-6 flex justify-end gap-2">
+    <Modal
+      open
+      onClose={onClose}
+      size="sm"
+      dismissible={!submitting}
+      title={`Assign horse to stall ${stall.stallCode}`}
+      description="Choose an unassigned horse for this stall."
+      footer={
+        <>
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
@@ -113,8 +66,39 @@ export function AssignHorseDialog({
           >
             {submitting ? 'Assigning…' : 'Confirm assignment'}
           </Button>
-        </div>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {isStallOccupied && (
+          <Notice tone="error">
+            This stall is occupied. Remove or move the current horse before assigning another horse.
+          </Notice>
+        )}
+
+        {error && <Notice tone="error">{error}</Notice>}
+
+        <FormField label={`Available horses (${availableHorses.length})`}>
+          {availableHorses.length === 0 ? (
+            <p className="text-xs text-[var(--color-text-muted)]">
+              There are no unassigned horses available.
+            </p>
+          ) : (
+            <Select
+              value={selectedHorseId}
+              onChange={(e) => setSelectedHorseId(e.target.value ? Number(e.target.value) : '')}
+              disabled={isStallOccupied || submitting}
+            >
+              <option value="">-- Select a horse --</option>
+              {availableHorses.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name} ({h.breed || 'Breed unknown'} · Status: {h.currentStatus})
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
       </div>
-    </div>
+    </Modal>
   );
 }

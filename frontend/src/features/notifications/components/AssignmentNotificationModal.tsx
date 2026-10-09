@@ -40,41 +40,41 @@ export function AssignmentNotificationModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="notification-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px] animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-md bg-white dark:bg-neutral-900 rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 p-6 overflow-hidden">
+      <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 p-6 overflow-hidden">
         {/* Close icon button for temporary dismiss */}
         <button
           type="button"
           onClick={onDismissTemporary}
-          className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors p-1 rounded-md"
+          className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-600 transition-colors p-1 rounded-md"
           aria-label="Close"
         >
           <Icon name="x" className="w-5 h-5" />
         </button>
 
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-xl shrink-0">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
             <Icon name="clipboard" className="w-6 h-6" />
           </div>
 
           <div className="flex-1 pr-6">
-            <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 mb-2">
+            <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded bg-blue-100 text-blue-800 mb-2">
               Assignment Notification
             </span>
             <h3
               id="notification-modal-title"
-              className="text-base font-bold text-neutral-900 dark:text-neutral-100"
+              className="text-base font-bold text-neutral-900"
             >
               {notification.title || 'New horse assignment'}
             </h3>
-            <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
+            <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
               {notification.message}
             </p>
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+        <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-neutral-100">
           <Button
             variant="secondary"
             size="sm"

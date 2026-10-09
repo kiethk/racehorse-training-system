@@ -106,7 +106,7 @@ export function IncidentList() {
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               statusFilter === tab.id
                 ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] hover:text-[var(--color-text-primary)]'
+                : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] hover:text-[var(--color-text-primary)]'
             }`}
           >
             {tab.label}
@@ -143,7 +143,7 @@ export function IncidentList() {
             return (
               <Panel key={report.id} padded>
                 <div className="space-y-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--color-border-subtle)] pb-2.5">
+                  <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--color-border)] pb-2.5">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-[var(--color-text-muted)]">

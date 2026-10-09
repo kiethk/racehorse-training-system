@@ -70,7 +70,11 @@ The `RoleGuard` intercepts unauthenticated users and redirects them to `/login`.
 
 ## 5. Application Shell
 
-The `AppShell` component wraps all authenticated pages. It renders the `TopNav` (which displays role-specific navigation items from `config/navigation.ts`) and provides a flexible container for page content. Page contents should be wrapped in the `PageContainer` component for consistent max-width and padding.
+Every signed-in route lives in the `src/app/(app)/` route group. Its `layout.tsx` mounts `AuthGate` and `AppShell` once, so the shell stays mounted while you navigate. Pages must **not** render `AppShell` themselves.
+
+`AppShell` renders a vertical `Sidebar` on the left (role-specific sections and items from `config/navigation.ts`, collapsible to icons, with the account menu at the bottom) and a `TopBar` (sidebar toggle, current section, notifications). Page contents should be wrapped in the `PageContainer` component for consistent max-width and padding.
+
+The UI is desktop-first: 1024px and wider is the supported range. Below that the sidebar stays collapsed; a mobile drawer is not built yet.
 
 ---
 
@@ -80,7 +84,7 @@ The `frontend/src/` directory is strictly organized by responsibility:
 
 - `app/`: Next.js App Router definitions. Used exclusively for route definition and page composition.
 - `features/`: Contains business feature modules (e.g., `admissions`, `horses`).
-- `components/layout/`: Global layout structures (`AppShell`, `TopNav`, `PageContainer`).
+- `components/layout/`: Global layout structures (`AppShell`, `Sidebar`, `TopBar`, `PageContainer`).
 - `components/ui/`: Pure, reusable, business-agnostic visual components (`Button`, `Panel`, `Icon`).
 - `components/auth/`: Components related to auth states and routing (`RoleGuard`, `RoleLanding`).
 - `services/`: Shared infrastructure, including the core `api.ts` transport layer and global auth service.
@@ -132,11 +136,9 @@ Next.js `page.tsx` files should be incredibly thin containers.
 export default function AdmissionsPage() {
   return (
     <RoleGuard allowedRoles={['HEAD_TRAINER', 'CLUB_MANAGER']}>
-      <AppShell>
-        <PageContainer>
-          <TrainerAdmissionsScreen />
-        </PageContainer>
-      </AppShell>
+      <PageContainer>
+        <TrainerAdmissionsScreen />
+      </PageContainer>
     </RoleGuard>
   );
 }
@@ -150,7 +152,9 @@ export default function AdmissionsPage() {
 ## 10. UI Component Rules
 
 **Shared UI (`components/ui/`):**
-Only place generic primitives here if they contain NO RTMS business logic (e.g., `Button`, `Panel`, `StatusBadge`, `DataTable`).
+Only place generic primitives here if they contain NO RTMS business logic (e.g., `Button`, `Panel`, `Modal`, `Input`, `DataTable`). Import them from `@/components/ui`. The full "need → primitive" table is in `AGENTS.md`, and every primitive is shown live at `/design-test`.
+
+Feature code must not use raw `<button>`, `<input>`, `<select>`, `<textarea>`, `<table>` or hand-rolled overlays. `npm run lint` warns when it does.
 
 **Feature UI (`features/<feature>/components/`):**
 Place components here if they understand domain concepts (e.g., `Horse`, `HealthRecord`). Do NOT place these in `components/ui/`.
@@ -164,6 +168,9 @@ The Figma/reference design tokens defined in `src/app/globals.css` are the visua
 - **Prefer existing tokens:** Always use CSS variables (e.g., `bg-[var(--color-surface)]`, `text-[var(--color-text-primary)]`) over hardcoded Tailwind utility colors (`bg-white`, `text-gray-900`).
 - **Reuse UI Components:** Rely on standard components (`Panel`, `Button`) to ensure consistent border radius, shadows, and padding.
 - **No inline hex codes:** Do not extract arbitrary hex codes from Figma. If a color exists, there is a token for it.
+- **No Tailwind palette or `dark:` classes:** `bg-blue-600`, `text-gray-500` and `dark:*` are off-system. The app is light-only.
+- **Class names:** Combine classes with `cn()` from `@/lib/cn`.
+- **Motion:** Use the `--duration-*` tokens and the `animate-in` / `animate-out` utilities. Animate opacity and transform only. `prefers-reduced-motion` is handled globally.
 
 ---
 
@@ -237,7 +244,8 @@ Do not silently render blank screens on failure. Reuse components to display the
 2. Create feature types in `src/features/horses/types/horse.ts` matching the backend DTOs.
 3. Create feature service in `src/features/horses/services/horseService.ts`.
 4. Create domain UI in `src/features/horses/components/HorseList.tsx`.
-5. Create the Next.js page in `src/app/horses/page.tsx`, import the component, and wrap it in `RoleGuard`, `AppShell`, and `PageContainer`.
+5. Create the Next.js page in `src/app/(app)/<role>/horses/page.tsx`, import the component, and wrap it in `RoleGuard` and `PageContainer`.
+6. Add the route to that role's section in `src/config/navigation.ts` so it appears in the sidebar.
 
 ---
 
@@ -254,6 +262,6 @@ Do not silently render blank screens on failure. Reuse components to display the
 ## 20. Current Foundation Status
 
 - **Auth:** Complete (Cookie-based JWT, RoleGuard).
-- **Layout:** Complete (AppShell, TopNav, PageContainer).
+- **Layout:** Complete (AppShell with vertical Sidebar and TopBar, PageContainer).
 - **Design Tokens:** Complete (Tailwind v4 with UI reference tokens).
 - **Feature Structure:** Established with empty directories ready for implementation (`admissions/`, `horses/`, `health/`, etc.).

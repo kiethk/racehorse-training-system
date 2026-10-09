@@ -206,7 +206,7 @@ export function IncidentForm() {
               <select
                 value={horseId}
                 onChange={(e) => setHorseId(Number(e.target.value))}
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 required
               >
                 {horses.map((h) => {
@@ -237,7 +237,7 @@ export function IncidentForm() {
                     className={`flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-md)] border p-2.5 transition-colors ${
                       severity === opt.value
                         ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
-                        : 'border-[var(--color-border)] bg-[var(--color-bg-primary)] hover:border-gray-300'
+                        : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-gray-300'
                     }`}
                   >
                     <input
@@ -275,7 +275,7 @@ export function IncidentForm() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Example: Swollen right front knee, missed breakfast..."
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 required
               />
             </div>
@@ -290,7 +290,7 @@ export function IncidentForm() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe the symptoms, time discovered, horse behavior, and pain or injury location..."
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 required
               />
             </div>
@@ -305,7 +305,7 @@ export function IncidentForm() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={handleFileChange}
-                  className="text-xs text-[var(--color-text-secondary)] file:mr-3 file:rounded-[var(--radius-sm)] file:border-0 file:bg-[var(--color-bg-secondary)] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--color-text-primary)] hover:file:bg-[var(--color-border)]"
+                  className="text-xs text-[var(--color-text-secondary)] file:mr-3 file:rounded-[var(--radius-sm)] file:border-0 file:bg-[var(--color-surface-subtle)] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--color-text-primary)] hover:file:bg-[var(--color-border)]"
                 />
                 <p className="text-[11px] text-[var(--color-text-muted)]">
                   JPEG, PNG, and WebP only. Maximum size: 10 MB.

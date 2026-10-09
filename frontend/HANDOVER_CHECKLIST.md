@@ -18,6 +18,8 @@ Please review this checklist before starting and before finishing any frontend t
 - [ ] No direct `fetch` in feature component
 - [ ] No hardcoded backend URL
 - [ ] Uses shared UI/design tokens
+- [ ] No raw `<button>`, `<input>`, `<select>`, `<textarea>`, `<table>` or hand-rolled overlay in feature code
+- [ ] No Tailwind palette colours, hex codes or `dark:` classes
 - [ ] Loading state handled
 - [ ] Error state handled
 - [ ] Empty state handled where relevant

@@ -75,7 +75,7 @@ export function TrainerHorseListView() {
               className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                 filterMode === 'ALL'
                   ? 'bg-[var(--color-primary)] text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
               }`}
             >
               All ({horses.length})
@@ -86,7 +86,7 @@ export function TrainerHorseListView() {
               className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                 filterMode === 'ACTIVE'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
               }`}
             >
               In training ({horses.filter((h) => h.planStatus === 'ACTIVE').length})
@@ -97,7 +97,7 @@ export function TrainerHorseListView() {
               className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                 filterMode === 'ALERT'
                   ? 'bg-red-600 text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
               }`}
             >
               Alerts ({horses.filter((h) => (h.alertCount ?? h.alertsCount ?? 0) > 0).length})
@@ -147,12 +147,12 @@ export function TrainerHorseListView() {
                     </div>
 
                     {(horse.alertCount ?? horse.alertsCount ?? 0) > 0 ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-2 py-0.5 text-[10px] font-bold">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-bold">
                         <Icon name="alert-triangle" size={10} />
                         {horse.alertCount ?? horse.alertsCount} alerts
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-medium">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-medium">
                         <Icon name="check" size={10} />
                         Clear
                       </span>
@@ -182,7 +182,7 @@ export function TrainerHorseListView() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2 border-t border-[var(--color-border-subtle)] pt-2.5 text-xs">
+                    <div className="grid grid-cols-2 gap-2 border-t border-[var(--color-border)] pt-2.5 text-xs">
                       <div>
                         <span className="text-[10px] uppercase text-[var(--color-text-muted)]">
                           Latest performance
@@ -207,7 +207,7 @@ export function TrainerHorseListView() {
                   </div>
                 </div>
 
-                <div className="mt-4 border-t border-[var(--color-border-subtle)] pt-3">
+                <div className="mt-4 border-t border-[var(--color-border)] pt-3">
                   <Link href={`/trainer/horses/${horse.horseId}`} className="w-full">
                     <Button variant="secondary" size="sm" className="w-full justify-center">
                       <Icon name="trending-up" size={13} />

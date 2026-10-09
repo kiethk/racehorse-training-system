@@ -10,6 +10,7 @@ import { MetricCard } from '@/components/ui/MetricCard';
 import { Notice } from '@/components/ui/Notice';
 import { ListSkeleton } from '@/components/ui/states';
 import { displayError } from '@/lib/display';
+import { toast } from '@/lib/toast';
 import { getStaffList, createStaff, updateStaffStatus } from '../services/staffService';
 import type { StaffSummary, StaffCreationRequest, StaffCreationResponse } from '../types';
 import { StaffTable } from './StaffTable';
@@ -76,7 +77,7 @@ export function StaffManagementView() {
       setSuccessMsg('Status updated successfully.');
       setTimeout(() => setSuccessMsg(''), 5000);
     } catch (err: unknown) {
-      alert(displayError(err, 'Unable to update staff status.'));
+      toast.error(displayError(err, 'Unable to update staff status.'));
     } finally {
       setActionLoadingId(null);
     }

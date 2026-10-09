@@ -8,6 +8,7 @@ import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { groomApi } from '../services/groomService';
 import type { TodayTaskItem } from '../types';
 import { displayError } from '@/lib/display';
+import { toast } from '@/lib/toast';
 
 export function TodayChecklist() {
   const [tasks, setTasks] = useState<TodayTaskItem[]>([]);
@@ -41,7 +42,7 @@ export function TodayChecklist() {
       await groomApi.generateRoutine();
       await loadTasks();
     } catch (err) {
-      alert(displayError(err, 'Failed to generate routine tasks.'));
+      toast.error(displayError(err, 'Failed to generate routine tasks.'));
     } finally {
       setGenerating(false);
     }
@@ -53,7 +54,7 @@ export function TodayChecklist() {
       await groomApi.completeTask(refId);
       await loadTasks();
     } catch (err) {
-      alert(displayError(err, 'Failed to complete the task.'));
+      toast.error(displayError(err, 'Failed to complete the task.'));
     } finally {
       setCompletingId(null);
     }

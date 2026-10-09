@@ -251,7 +251,7 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
                 </div>
               </div>
 
-              <div className="h-px bg-[var(--color-border-subtle)]" />
+              <div className="h-px bg-[var(--color-border)]" />
 
               {/* Role-Specific Profile */}
               <div>

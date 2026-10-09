@@ -301,7 +301,7 @@ export function AccessControlView() {
         </div>
         
         {saveError && (
-          <div className="mt-4 rounded-md bg-[var(--color-danger-muted)] p-3 text-[13px] text-[var(--color-danger)]">
+          <div className="mt-4 rounded-md bg-[var(--color-danger-soft)] p-3 text-[13px] text-[var(--color-danger)]">
             <div className="flex items-start gap-2">
               <Icon name="alert-triangle" size={16} className="mt-0.5 shrink-0" />
               <span>{saveError}</span>
