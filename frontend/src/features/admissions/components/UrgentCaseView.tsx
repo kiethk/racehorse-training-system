@@ -15,7 +15,7 @@ import type {
   UrgentAssignmentAlert,
 } from '../types';
 
-/** Ngày theo giờ Việt Nam, cộng thêm dayOffset ngày, dạng yyyy-MM-dd (khớp backend). */
+/** Date in Vietnam time, plus dayOffset days, as yyyy-MM-dd (matches the backend). */
 function businessDate(dayOffset: number) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
   const [year, month, day] = today.split('-').map(Number);
@@ -52,7 +52,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [treatment, setTreatment] = useState('');
   const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>('BLOCKED');
   const [restrictionDetails, setRestrictionDetails] = useState('');
-  // Chặn tập bắt buộc kèm lịch khám lại — "tạm nghỉ đến" chính là ngày này.
+  // Blocking training requires a follow-up exam — "rest until" is that exam's date.
   const [followUpDate, setFollowUpDate] = useState(() => businessDate(3));
   const [followUpDescription, setFollowUpDescription] = useState('Follow-up after the urgent examination');
   const [followUpKey] = useState(newIdempotencyKey);

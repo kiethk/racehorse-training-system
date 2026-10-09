@@ -36,7 +36,7 @@ export function EnrollmentForm() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [horses, setHorses] = useState<Horse[]>([]);
   const [cohorts, setCohorts] = useState<JoinableCohortResponse[]>([]);
-  /** Kết quả ghi danh — khác null thì thay form bằng màn tóm tắt. */
+  /** Enrollment result — when non-null the form is replaced by the summary screen. */
   const [result, setResult] = useState<HorseTrainingPlanDetailResponse[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [cohortsLoading, setCohortsLoading] = useState(false);
@@ -49,7 +49,7 @@ export function EnrollmentForm() {
   const [selectedHorseIds, setSelectedHorseIds] = useState<number[]>([]);
   const [startDate, setStartDate] = useState<string>(
     // eslint-disable-next-line react-hooks/purity
-    new Date(Date.now() + 86400000).toISOString().split('T')[0], // Mặc định ngày mai
+    new Date(Date.now() + 86400000).toISOString().split('T')[0], // Defaults to tomorrow
   );
   const [trainingDays, setTrainingDays] = useState<TrainingDay[]>([
     'MONDAY',
@@ -60,7 +60,7 @@ export function EnrollmentForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // 1. Nạp danh sách khóa học và ngựa (chỉ ngựa trong khu của Trainer & trạng thái ELIGIBLE)
+  // 1. Load courses and horses (only horses in the Trainer's block with status ELIGIBLE)
   const loadInitial = useCallback(async () => {
     try {
       setLoading(true);
@@ -87,7 +87,7 @@ export function EnrollmentForm() {
     loadInitial();
   }, [loadInitial]);
 
-  // 2. Tự động gọi joinable-cohorts khi chọn xong khóa học
+  // 2. Call joinable-cohorts automatically once a course is selected
   useEffect(() => {
     if (!courseId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -154,15 +154,15 @@ export function EnrollmentForm() {
 
       const result = await trainingApi.createPlan(payload);
       if (result && result.length > 0) {
-        // KHÔNG nhảy thẳng tới plan đầu tiên: ghi danh nhóm tạo ra N kế hoạch,
-        // làm vậy là vứt N-1 kết quả. Hiện màn tóm tắt để Trainer thấy nhóm
-        // được xếp vào mấy lot và vì sao.
+        // Do NOT jump straight to the first plan: a group enrollment creates N plans,
+        // and doing that throws away N-1 results. Show the summary so the Trainer sees how many
+        // lots the group was placed into and why.
         setResult(result);
       } else {
         router.push('/trainer/courses');
       }
     } catch (err) {
-      // 4. Lỗi "hết khe giờ vàng" phải hiện nguyên văn số liệu chi tiết từ backend
+      // 4. The "golden-hour slots are full" error must show the backend's detailed figures verbatim
       setSubmitError(err instanceof Error ? err.message : 'Unable to create training plans.');
     } finally {
       setSubmitting(false);
@@ -179,7 +179,7 @@ export function EnrollmentForm() {
     );
   }
 
-  // Ghi danh xong -> thay toàn bộ form bằng màn tóm tắt kết quả
+  // Enrollment done -> replace the whole form with the result summary
   if (result) {
     return (
       <EnrollmentResultSummary
@@ -207,7 +207,7 @@ export function EnrollmentForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Bước 1: Chọn khóa học */}
+        {/* Step 1: choose a course */}
         <Panel padded>
           <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)] mb-3">
           1. Select a training course
@@ -235,7 +235,7 @@ export function EnrollmentForm() {
             )}
           </div>
 
-          {/* Gợi ý nhóm đồng bộ (Joinable Cohorts) */}
+          {/* Synchronized group suggestions (Joinable Cohorts) */}
           <div className="mt-4 pt-3 border-t border-[var(--color-border)]">
             <div className="text-[12px] font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
             <span>Suggested groups to join</span>
@@ -287,7 +287,7 @@ export function EnrollmentForm() {
           </div>
         </Panel>
 
-        {/* Bước 2: Chọn nhiều chiến mã */}
+        {/* Step 2: choose one or more horses */}
         <Panel padded>
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -352,7 +352,7 @@ export function EnrollmentForm() {
           )}
         </Panel>
 
-        {/* Bước 3: Ngày bắt đầu và các thứ tập trong tuần */}
+        {/* Step 3: start date and training weekdays */}
         <Panel padded>
           <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)] mb-3">
           3. Schedule &amp; Training Days

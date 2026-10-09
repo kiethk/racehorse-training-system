@@ -17,7 +17,7 @@ import { displayError } from '@/lib/display';
 export function TrainerRaceForm() {
   const router = useRouter();
 
-  // Ngựa
+  // Horse
   const [horses, setHorses] = useState<Horse[]>([]);
   const [loadingHorses, setLoadingHorses] = useState(true);
   const [horseError, setHorseError] = useState<string | null>(null);
@@ -48,9 +48,9 @@ export function TrainerRaceForm() {
       try {
         setLoadingHorses(true);
         setHorseError(null);
-        // Lấy ngựa trong khu trainer (mine=true), đủ điều kiện (ELIGIBLE)
+        // Load horses in the trainer's block (mine=true) that are eligible (ELIGIBLE)
         const list = await stableApi.getHorses({ mine: true, status: 'ELIGIBLE' });
-        // Khớp Horse.canTrain() ở backend: ELIGIBLE và Thú y không chặn tập.
+        // Matches Horse.canTrain() on the backend: ELIGIBLE and not blocked from training by the vet.
         const available = list.filter((h) => h.trainingDecision !== 'BLOCKED');
         setHorses(available);
       } catch (err) {
@@ -171,7 +171,7 @@ export function TrainerRaceForm() {
         </div>
       )}
 
-      {/* Phần 1: Ngựa đề cử */}
+      {/* Part 1: nominated horse */}
       <Panel padded>
         <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-1 flex items-center gap-2">
           1. Nominated horse
@@ -259,7 +259,7 @@ export function TrainerRaceForm() {
         )}
       </Panel>
 
-      {/* Phần 2: Thông tin cuộc đua */}
+      {/* Part 2: race information */}
       <Panel padded>
         <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-1 flex items-center gap-2">
           2. Race and event details
@@ -391,7 +391,7 @@ export function TrainerRaceForm() {
         </div>
       </Panel>
 
-      {/* Phần 3: Thông tin tham khảo */}
+      {/* Part 3: reference information */}
       <Panel padded>
         <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-1 flex items-center gap-2">
           3. Additional event information
@@ -459,7 +459,7 @@ export function TrainerRaceForm() {
         </div>
       </Panel>
 
-      {/* Hành động */}
+      {/* Actions */}
       <div className="flex flex-col items-end gap-2 border-t border-[var(--color-border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-[12px] font-medium text-[var(--color-warning)] bg-[var(--color-warning-soft)] px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--color-warning)]">
           This is an internal nomination and is not a registration with the event organiser.

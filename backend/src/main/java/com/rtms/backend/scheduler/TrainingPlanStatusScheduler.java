@@ -1,6 +1,6 @@
 package com.rtms.backend.scheduler;
 
-import com.rtms.backend.service.HorseTrainingPlanService;
+import com.rtms.backend.training.service.HorseTrainingPlanService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;

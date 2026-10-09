@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
 
-/** Vòng đời ngựa trong CLB. Sức khỏe không nằm ở đây — xem trainingDecision. */
+/** A horse's lifecycle in the club. Health is not tracked here — see trainingDecision. */
 export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED';
 
 type Tone = 'success' | 'warning' | 'danger' | 'info' | 'isolated' | 'primary' | 'neutral';

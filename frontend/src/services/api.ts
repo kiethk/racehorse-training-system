@@ -1,9 +1,9 @@
 /**
  * API service — REFERENCE IMPLEMENTATION
  *
- * Đây là file nền tảng dùng chung cho toàn bộ nhóm.
- * Mọi HTTP call tới backend đều phải đi qua các hàm ở đây,
- * không gọi fetch() trực tiếp ở component.
+ * This is the shared foundation file for the whole team.
+ * Every HTTP call to the backend must go through the functions here;
+ * do not call fetch() directly in components.
  */
 
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();

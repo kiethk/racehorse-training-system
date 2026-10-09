@@ -58,7 +58,7 @@ export function SubjectList() {
       setFormError('Enter an exercise name and select a category.');
       return;
     }
-    // Chặn thời lượng vượt quá 240 phút (khung giờ vàng 06:00 - 10:00)
+    // Block durations over 240 minutes (golden-hour window 06:00 - 10:00)
     if (durationMinutes <= 0 || durationMinutes > 240) {
       setFormError('Duration must be between 1 and 240 minutes.');
       return;

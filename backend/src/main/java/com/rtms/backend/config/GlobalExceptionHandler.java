@@ -1,6 +1,6 @@
 package com.rtms.backend.config;
 
-import com.rtms.backend.dto.ApiResponse;
+import com.rtms.backend.common.dto.ApiResponse;
 import jakarta.persistence.PersistenceException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;

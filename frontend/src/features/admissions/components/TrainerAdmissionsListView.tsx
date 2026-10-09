@@ -76,12 +76,12 @@ export function TrainerAdmissionsListView() {
     setDraft(urlFilters);
   }, [urlFilters]);
 
-  // Backend đã lọc theo Trainer đang đăng nhập và tách sẵn hai nhóm, nên
-  // số đếm chỉ là độ dài mảng — không lọc lại theo status/trainerId ở client.
+  // The backend already filters by the signed-in Trainer and splits the two groups, so
+  // the counts are just array lengths — do not filter by status/trainerId again on the client.
   const pendingCount = queue.pending.length;
   const reviewedCount = queue.reviewed.length;
 
-  // Chỉ còn lọc theo tên và ngày nộp — hai thứ người dùng gõ tại màn hình này.
+  // Only name and submission date are filtered here — the two things the user types on this screen.
   const filteredAdmissions = useMemo(() => {
     const source = urlFilters.tab === 'REVIEWED' ? queue.reviewed : queue.pending;
 

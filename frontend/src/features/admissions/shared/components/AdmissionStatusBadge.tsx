@@ -19,11 +19,11 @@ export function statusTone(status: AdmissionStatus | string): Tone {
 export type SimpleAdmissionStatus = 'IN_PROGRESS' | 'APPROVED' | 'REJECTED';
 
 /**
- * Gộp mọi bước trung gian thành "đang xử lý".
+ * Collapses every intermediate step into "in progress".
  *
- * Màn Trainer chỉ cần biết kết quả cuối, không cần biết đơn đang chờ ai hay đã
- * qua những bước nào. Manager và Owner KHÔNG dùng hàm này: Manager phải phân
- * biệt được đơn MANAGER_REVIEW (đang chờ mình) với đơn còn ở khâu Thú y.
+ * The Trainer screens only need the final outcome, not who the admission is waiting on or
+ * which steps it has passed. Manager and Owner do NOT use this: the Manager must be able to
+ * tell an admission in MANAGER_REVIEW (waiting on them) from one still at the vet stage.
  */
 export function simplifyStatus(status: AdmissionStatus | string): SimpleAdmissionStatus {
   if (status === 'APPROVED') return 'APPROVED';
@@ -43,7 +43,7 @@ const SIMPLE_TONE: Record<SimpleAdmissionStatus, Tone> = {
   REJECTED: 'danger',
 };
 
-/** Nhãn 3 trạng thái, dùng cả cho badge lẫn các dòng chữ mô tả trạng thái. */
+/** Three-state label, used by the badge and by sentences that describe the status. */
 export function simpleStatusLabel(status: AdmissionStatus | string): string {
   return SIMPLE_LABEL[simplifyStatus(status)];
 }
@@ -52,8 +52,8 @@ interface AdmissionStatusBadgeProps {
   status: AdmissionStatus | string;
   size?: 'sm' | 'md';
   /**
-   * Chỉ hiện 3 trạng thái: In Progress / Approved / Rejected.
-   * Mặc định tắt để Manager và Owner giữ nguyên nhãn chi tiết từng bước.
+   * Show only three states: In Progress / Approved / Rejected.
+   * Off by default so Manager and Owner keep the detailed per-step labels.
    */
   simplified?: boolean;
 }

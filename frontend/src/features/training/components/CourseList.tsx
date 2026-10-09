@@ -218,7 +218,7 @@ export function CourseList() {
               />
             </div>
 
-            {/* Chọn vòng xoay bài học */}
+            {/* Pick the subject rotation */}
             <div className="border-t border-[var(--color-border)] pt-3">
               <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
                   Exercise rotation ({selectedSubjectIds.length} selected)
@@ -227,7 +227,7 @@ export function CourseList() {
                   Select exercises below to add them to the rotation in order:
               </p>
 
-              {/* Danh sách các bài đã chọn */}
+              {/* Selected subjects */}
               <div className="mt-2 min-h-12 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-muted)] p-2">
                 {selectedSubjectIds.length === 0 ? (
                   <span className="text-[12px] text-[var(--color-text-muted)] italic">
@@ -258,7 +258,7 @@ export function CourseList() {
                 )}
               </div>
 
-              {/* Danh sách bài có sẵn để bấm chọn */}
+              {/* Available subjects to pick from */}
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {subjects.map((sub) => (
                   <button
@@ -342,7 +342,7 @@ export function CourseList() {
         </div>
       )}
 
-      {/* Modal chi tiết khóa học */}
+      {/* Course detail modal */}
       {viewDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div

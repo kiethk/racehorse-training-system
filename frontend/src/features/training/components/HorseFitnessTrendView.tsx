@@ -229,10 +229,10 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/*
-              Cảnh báo dựa trên dữ liệu 30 NGÀY GẦN NHẤT, không chỉ buổi mới
-              nhất. Một buổi bất thường sẽ còn hiện ở đây tới 30 ngày, kể cả
-              khi các buổi sau đã trở lại bình thường — xem ngày ghi nhận ở
-              góc dưới mỗi thẻ để biết chuyện xảy ra lúc nào.
+              Alerts are based on the LAST 30 DAYS of data, not just the most recent
+              session. One abnormal session stays here for up to 30 days, even
+              after later sessions are back to normal — see the recorded date at
+              the bottom corner of each card to know when it happened.
             */}
             {alerts.map((alert, idx) => {
               const isDanger = alert.severity === 'DANGER';
@@ -285,10 +285,10 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                       <strong>{alert.thresholdValue}</strong>
                     </span>
                     {/*
-                      Ghi rõ "Ghi nhận ngày" chứ không để trơ một mốc thời gian.
-                      Cảnh báo quét 30 ngày gần nhất nên vẫn hiện dù buổi tập
-                      mới nhất đã bình thường — không nói rõ thì người dùng sửa
-                      chỉ số xong thấy đèn chưa tắt lại tưởng hệ thống hỏng.
+                      Say "Recorded on" explicitly instead of leaving a bare timestamp.
+                      Alerts scan the last 30 days, so they still show even when the latest
+                      session is normal — without saying so, a user who fixes the
+                      metric and still sees the light on will think the system is broken.
                     */}
                     <span>
                       Recorded on{' '}

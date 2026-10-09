@@ -25,7 +25,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [activeWorkout, setActiveWorkout] = useState<PlanWorkoutItemResponse | null>(null);
-  /** Tra tên Groom — dùng lại endpoint danh bạ nhân sự của màn chuồng trại. */
+  /** Groom name lookup — reuses the staff directory endpoint of the stable screen. */
   const [grooms, setGrooms] = useState<UserSummary[]>([]);
 
   const loadData = useCallback(async () => {
@@ -56,7 +56,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
     [grooms],
   );
 
-  // Tính thanh tiến độ theo công thức: mẫu số trừ buổi đã huỷ (Plan 6)
+  // Progress bar formula: the denominator excludes cancelled sessions (Plan 6)
   const progress = useMemo(() => {
     if (!detail?.workouts || detail.workouts.length === 0) {
       return { percent: 0, completed: 0, total: 0, cancelled: 0 };
@@ -92,7 +92,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
         </>}
       />
 
-      {/* Thanh tiến độ */}
+      {/* Progress bar */}
       <Panel padded>
         <div className="space-y-2">
           <div className="flex items-center justify-between text-[13px]">
@@ -114,7 +114,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
         </div>
       </Panel>
 
-      {/* Danh sách các buổi tập */}
+      {/* Session list */}
       <Panel padded>
         <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-4">
           Session schedule
@@ -153,10 +153,10 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                     <span>Date: <strong>{formatDate(w.lotDate)}</strong></span>
                     <span>Time: <strong>{w.startTime} – {w.endTime}</strong></span>
                     {/*
-                      lotId DÙNG CHUNG với các chiến mã khác, còn assignedGroomId
-                      là RIÊNG của con ngựa này. Hai thứ khác hẳn bản chất, nên
-                      phải ghi chữ rõ ràng — để cạnh nhau cùng dạng "#số" sẽ bị
-                      đọc thành "groom của lot", mà một lot có tới 6 groom.
+                      lotId is SHARED with other horses, while assignedGroomId
+                      belongs to THIS horse only. They are different in nature, so
+                      label them in words — side by side as "#number" they would be
+                      read as "the lot's groom", and one lot can have up to 6 grooms.
                     */}
                     <span>
                       🏷️ Lot #{w.lotId}
@@ -167,9 +167,9 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                       )}
                     </span>
                     {/*
-                      Dùng ? : chứ KHÔNG dùng &&. Với && thì assignedGroomId = null
-                      sẽ không render gì cả, khiến trạng thái "chưa phân công"
-                      trở nên vô hình — trong khi đó mới là thông tin cần báo.
+                      Use ? : and NOT &&. With &&, assignedGroomId = null
+                      would render nothing, making the "unassigned" state
+                      invisible — when that is exactly what needs to be shown.
                     */}
                     {w.assignedGroomId ? (
                       <span>

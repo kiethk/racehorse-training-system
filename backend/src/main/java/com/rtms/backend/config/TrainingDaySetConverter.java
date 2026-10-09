@@ -1,6 +1,6 @@
 package com.rtms.backend.config;
 
-import com.rtms.backend.enums.TrainingDay;
+import com.rtms.backend.training.enums.TrainingDay;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 

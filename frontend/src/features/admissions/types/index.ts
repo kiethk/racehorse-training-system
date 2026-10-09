@@ -19,10 +19,10 @@ export interface AdmissionSummaryResponse {
   submittedAt: string; // ISO datetime string
   quarantineStallId: number | null;
   quarantineStallCode: string | null;
-  /** Huấn luyện viên đã đánh giá hồ sơ này. null = chưa ai đánh giá. */
+  /** The trainer who evaluated this admission. null = not evaluated yet. */
   trainerId: number | null;
   trainerName?: string | null;
-  /** Thời điểm đánh giá, dạng ISO. null = chưa đánh giá. */
+  /** When it was evaluated, ISO format. null = not evaluated yet. */
   trainerReviewedAt: string | null;
 }
 
@@ -92,12 +92,12 @@ export interface AdmissionDetailResponse {
   groomReviewedAt: string | null;
 
   veterinarianId: number | null;
-  /** Kết luận lần khám nhập học. Thú y không duyệt/từ chối đơn. */
+  /** Outcome of the admission exam. The vet does not approve or reject the admission. */
   vetTrainingDecision: TrainingDecision | null;
   vetFeedback: string | null;
   vetReviewedAt: string | null;
 
-  /** Trainer được hệ thống phân công. null ở TRAINER_REVIEW = chưa có Trainer đủ điều kiện. */
+  /** Trainer assigned by the system. null in TRAINER_REVIEW = no eligible Trainer yet. */
   trainerId: number | null;
   trainerName?: string | null;
   trainerFeedback: string | null;
@@ -272,8 +272,8 @@ export interface VetQueueFilters {
 }
 
 /**
- * Ngựa có được tập không. BLOCKED luôn đi kèm lịch khám lại (nextSchedule):
- * "tạm nghỉ đến" chính là ngày của lịch đó.
+ * Whether the horse may train. BLOCKED always comes with a follow-up exam (nextSchedule):
+ * "rest until" is that schedule's date.
  */
 export type TrainingDecision = 'ALLOWED' | 'BLOCKED';
 

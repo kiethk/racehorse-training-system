@@ -27,7 +27,7 @@ export function AssignHorseDialog({
 
   if (!open || !stall) return null;
 
-  // BR-07: Chỉ liệt kê ngựa chưa có chuồng (currentStallId == null)
+  // BR-07: list only horses without a stall (currentStallId == null)
   const availableHorses = horses.filter((h) => h.currentStallId === null);
   const isStallOccupied = stall.status === 'OCCUPIED';
 

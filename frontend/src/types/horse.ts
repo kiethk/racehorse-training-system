@@ -1,13 +1,13 @@
 /**
  * Horse types — REFERENCE IMPLEMENTATION
  *
- * Đây là ví dụ mẫu (reference) về cách định nghĩa TypeScript types cho một entity.
- * Mỗi entity backend cần có một file types tương ứng trong thư mục này.
+ * This is a reference example of how to define TypeScript types for an entity.
+ * Each backend entity needs a matching types file in this folder.
  *
  * Convention:
- *   - Interface tên PascalCase, map 1-1 với entity Java (camelCase field names)
- *   - Các field nullable ở DB → dùng `string | null` ở đây, không dùng `string | undefined`
- *   - ApiResponse<T> là wrapper chung cho mọi response từ backend
+ *   - PascalCase interface name, mapped 1-1 to the Java entity (camelCase field names)
+ *   - DB-nullable fields → use `string | null` here, not `string | undefined`
+ *   - ApiResponse<T> is the common wrapper for every backend response
  */
 
 export interface Horse {

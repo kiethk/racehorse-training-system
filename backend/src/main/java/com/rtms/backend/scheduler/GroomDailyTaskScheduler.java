@@ -1,7 +1,7 @@
 package com.rtms.backend.scheduler;
 
-import com.rtms.backend.entity.GroomDailyTask;
-import com.rtms.backend.service.GroomDailyTaskService;
+import com.rtms.backend.stable.entity.GroomDailyTask;
+import com.rtms.backend.stable.service.GroomDailyTaskService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;

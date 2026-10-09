@@ -19,25 +19,25 @@ export function StableMap() {
   const [stalls, setStalls] = useState<StableStall[]>([]);
   const [horses, setHorses] = useState<Horse[]>([]);
   /**
-   * Ngựa CHƯA xếp chuồng — danh sách riêng cho hộp thoại xếp ngựa.
-   * Không dùng chung với `horses` được: `horses` lấy bằng mine=true nên
-   * backend đã loại hết ngựa chưa có chuồng, lọc lại ở client sẽ luôn rỗng.
+   * Horses NOT yet assigned to a stall — a separate list for the assign-horse dialog.
+   * It cannot share `horses`: `horses` is fetched with mine=true, so the backend
+   * has already dropped every unassigned horse and filtering on the client would always be empty.
    */
   const [unassignedHorses, setUnassignedHorses] = useState<Horse[]>([]);
   /**
-   * Chỉ dùng để hiện TÊN Groom trên từng ô chuồng.
+   * Used only to show the Groom's NAME on each stall cell.
    *
-   * Trainer không còn phân công Groom (V63 — việc đó thuộc Quản lý câu lạc
-   * bộ), nhưng vẫn phải biết ai chăm con nào để điều phối lot: khi hai ngựa
-   * cùng một Groom bị xếp vào cùng một lot thì vướng BR-09, và cách chữa là
-   * dời ngựa sang chuồng của Groom khác hoặc chọn Groom riêng cho buổi tập.
+   * Trainers no longer assign Grooms (V63 — that belongs to the Club
+   * Manager), but they still need to know who cares for which horse to coordinate lots: when two
+   * horses with the same Groom land in the same lot it hits BR-09, and the fix is to
+   * move a horse to another Groom's stall or pick a separate Groom for the session.
    */
   const [grooms, setGrooms] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [assignHorseStall, setAssignHorseStall] = useState<StableStall | null>(null);
-  /** Chuồng đang chờ xác nhận gỡ ngựa. */
+  /** The stall waiting for unassign confirmation. */
   const [unassignStall, setUnassignStall] = useState<StableStall | null>(null);
   const [unassigning, setUnassigning] = useState(false);
   const [unassignError, setUnassignError] = useState<string | null>(null);
@@ -49,9 +49,9 @@ export function StableMap() {
       const [areasRes, stallsRes, horsesRes, groomsRes, unassignedRes] = await Promise.all([
         stableApi.getAreas(),
         stableApi.getStalls(),
-        stableApi.getHorses({ mine: true }),        // đã xếp chuồng -> vẽ lên ô
+        stableApi.getHorses({ mine: true }),        // assigned to a stall -> drawn on the cells
         stableApi.getGrooms(),
-        stableApi.getHorses({ unassigned: true }),  // chưa xếp -> cho hộp thoại
+        stableApi.getHorses({ unassigned: true }),  // unassigned -> for the dialog
       ]);
       setAreas(areasRes);
       setStalls(stallsRes);
@@ -84,7 +84,7 @@ export function StableMap() {
     [grooms],
   );
 
-  // Chỉ hiện khu REGULAR do chính Trainer này phụ trách (nếu có trainerId), hoặc tất cả khu REGULAR
+  // Show only REGULAR blocks this Trainer is responsible for (if there is a trainerId), otherwise all REGULAR blocks
   const myAreas = useMemo(() => {
     const filtered = areas.filter(
       (a) => a.type === 'REGULAR' && (user?.userId ? a.trainerId === user.userId : true),

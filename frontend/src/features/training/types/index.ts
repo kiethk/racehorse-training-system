@@ -93,14 +93,14 @@ export interface JoinableCohortResponse {
   trainingDays: TrainingDay[];
   horseCount: number;
   /**
-   * Số buổi ĐỒNG PHA — cùng ngày, cùng bài tập.
-   * KHÔNG phải "số buổi chung lot": đồng pha chỉ là điều kiện CẦN.
-   * Nhóm vẫn bị tách lot nếu vượt sức chứa (BR-10) hoặc trùng Groom (BR-09).
+   * Number of IN-PHASE sessions — same day, same subject.
+   * NOT "sessions in the same lot": being in phase is only a NECESSARY condition.
+   * The group is still split across lots if over capacity (BR-10) or sharing a Groom (BR-09).
    */
   sharedSessions: number;
   totalSessions: number;
   waitDays: number;
-  /** Sức chứa một lot, backend trả về để không phải hardcode số 6. */
+  /** Capacity of one lot, returned by the backend so the number 6 is not hardcoded. */
   lotCapacity: number;
   note: string;
 }
@@ -114,9 +114,9 @@ export interface PlanWorkoutItemResponse {
   subjectId: number;
   subjectName: string;
   horseId: number;
-  /** Người dắt RIÊNG con ngựa này — KHÔNG phải "groom của lot". */
+  /** The handler of THIS horse only — NOT "the lot's groom". */
   assignedGroomId: number | null;
-  /** Tổng số chiến mã còn hiệu lực trong lot, để thấy cơ chế ghép nhóm. */
+  /** Total active horses in the lot, to show how group matching works. */
   lotOccupancy: number | null;
   status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
   actualDistanceMeters: number | null;
@@ -144,7 +144,7 @@ export interface HorseTrainingPlanDetailResponse {
   courseName: string | null;
 }
 
-/** Một dòng trong danh sách kế hoạch huấn luyện. */
+/** One row in the training plan list. */
 export interface PlanSummaryResponse {
   planId: number;
   horseId: number;
@@ -156,7 +156,7 @@ export interface PlanSummaryResponse {
   status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   totalSessions: number;
   completedSessions: number;
-  /** Buổi đã huỷ — bị trừ khỏi mẫu số khi tính tiến độ. */
+  /** Cancelled sessions — removed from the denominator when computing progress. */
   cancelledSessions: number;
 }
 

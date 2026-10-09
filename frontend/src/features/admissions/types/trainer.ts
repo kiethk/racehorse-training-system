@@ -6,25 +6,25 @@ import type {
 } from './index';
 
 /**
- * Khớp dto/TrainerAdmissionQueueResponse.java.
+ * Matches dto/TrainerAdmissionQueueResponse.java.
  *
- * Backend đã lọc theo Trainer đang đăng nhập, nên màn hình KHÔNG lọc lại theo
- * trainerId hay status nữa — chỉ cần chọn đúng mảng theo tab.
+ * The backend already filters by the signed-in Trainer, so the screen does NOT filter by
+ * trainerId or status again — it only picks the right array for the tab.
  */
 export interface TrainerAdmissionQueue {
-  /** Đơn ở bước TRAINER_REVIEW được hệ thống phân công cho tôi. */
+  /** Admissions in TRAINER_REVIEW that the system assigned to me. */
   pending: AdmissionSummaryResponse[];
-  /** Đơn tôi đã đánh giá — mọi trạng thái về sau, kể cả bị Quản lý từ chối. */
+  /** Admissions I have evaluated — every later status, including rejected by the Manager. */
   reviewed: AdmissionSummaryResponse[];
 }
 
 /**
- * Khớp enums/RacingReadinessStatus.java.
- * DB có CHECK constraint chk_rra_status chỉ nhận đúng 3 giá trị này.
+ * Matches enums/RacingReadinessStatus.java.
+ * The DB has CHECK constraint chk_rra_status that accepts exactly these 3 values.
  *
- * UNSUITABLE đổi tên từ NOT_READY (V47) vì tên cũ không phân biệt được với
- * NEEDS_MORE_TRAINING. Đây là kênh DUY NHẤT để Trainer báo hiệu "không nên
- * nhận con này" — Trainer không có quyền từ chối đơn.
+ * UNSUITABLE was renamed from NOT_READY (V47) because the old name could not be told apart from
+ * NEEDS_MORE_TRAINING. This is the ONLY channel for the Trainer to signal "we should not
+ * take this horse" — the Trainer cannot reject an admission.
  */
 export type RacingReadinessStatus = 'READY' | 'NEEDS_MORE_TRAINING' | 'UNSUITABLE';
 
@@ -32,18 +32,18 @@ export interface RacingReadinessAssessment {
   id: number;
   horseId: number;
   readinessStatus: RacingReadinessStatus;
-  /** LUÔN null ở bước tiếp nhận — ngựa đang cách ly, không đo được thể lực. */
+  /** ALWAYS null at intake — the horse is in quarantine, fitness cannot be measured. */
   fitnessScore: number | null;
   conformationScore: number | null;
   temperamentScore: number | null;
   gaitQualityScore: number | null;
   estimatedMonthsToRace: number | null;
   assessmentDate: string;
-  /** null ở bước tiếp nhận (CHECK chk_rra_valid_until). */
+  /** null at intake (CHECK chk_rra_valid_until). */
   validUntil: string | null;
   remarks: string | null;
   trainerId: number | null;
-  /** NOT NULL = đánh giá lúc tiếp nhận. null = đánh giá định kỳ. */
+  /** NOT NULL = intake evaluation. null = periodic evaluation. */
   admissionId: number | null;
   createdAt: string;
 }
@@ -61,13 +61,13 @@ export interface HorseSummary {
 
 export interface TrainerAdmissionView {
   admission: AdmissionDetailResponse;
-  /** null nếu bước Groom chưa tạo hồ sơ Horse. Khi đó KHÔNG nộp đánh giá được. */
+  /** null if the Groom step has not created the Horse record. The evaluation CANNOT be submitted then. */
   horse: HorseSummary | null;
-  /** Dữ liệu khám bệnh của Vet. */
+  /** The vet's examination data. */
   healthRecords: HealthRecord[];
-  /** Dữ liệu chỉ số sinh hiệu (nhiệt độ, nhịp tim, nhịp thở...). */
+  /** Vital signs data (temperature, heart rate, respiratory rate...). */
   healthMetrics: HorseHealthMetricResponse[];
-  /** Khác null = đã đánh giá rồi -> form chuyển sang chỉ đọc. */
+  /** Non-null = already evaluated -> the form becomes read-only. */
   existingAssessment: RacingReadinessAssessment | null;
 }
 

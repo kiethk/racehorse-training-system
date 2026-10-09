@@ -28,7 +28,7 @@ function date(value: string | null) {
 export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus = false }: {
   detail: HeaderDetail;
   horsePhotoUrl?: string;
-  /** Chuyển xuống badge: chỉ hiện In Progress / Approved / Rejected. */
+  /** Passed down to the badge: show only In Progress / Approved / Rejected. */
   simplifiedStatus?: boolean;
 }) {
   const candidate = detail.candidate;
