@@ -4,28 +4,22 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
-import { Panel, SectionTitle } from '@/components/ui/Panel';
+import { FormField } from '@/components/ui/FormField';
+import { Textarea } from '@/components/ui/Input';
+import { Notice } from '@/components/ui/Notice';
 import { admissionsApi } from '../services/api';
 import { formatDate, formatDateTime } from '@/lib/display';
 import type { AdmissionDetailResponse } from '../types';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
+import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
+import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
+import { AdmissionInfoSection, AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
 
 function date(value: string | null) {
   return value ? formatDate(value) : 'Not recorded';
 }
-
-const documentNames: Record<string, string> = {
-  HORSE_PHOTO: 'Horse photo',
-  REGISTRATION_DOCUMENT: 'Registration document',
-  PEDIGREE_CERTIFICATE: 'Horse birth certificate',
-  VACCINATION_RECORD: 'Vaccination record',
-  DEWORMING_RECORD: 'Deworming record',
-  HEALTH_CERTIFICATE: 'Health certificate',
-  PREVIOUS_MEDICAL_RECORD: 'Previous medical record',
-  PREVIOUS_INJURY_RECORD: 'Previous injury record',
-};
 
 interface Props {
   admissionId: number;
@@ -136,149 +130,121 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
       : 'The current capacity snapshot could not be loaded.';
 
   return (
-    <AdmissionDetailLayout
-      returnTo={returnTo}
-      header={<AdmissionDetailHeader detail={detail} horsePhotoUrl={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined} />}
-      pipeline={<AdmissionPipeline detail={detail} />}
-      content={(
-      <div className="min-w-0 space-y-5">
-        {notice && <div role="status" className="border-l-2 border-[var(--color-success)] bg-[var(--color-success-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]">{notice}</div>}
-        {error && detail && <div role="alert" className="border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]">{error}</div>}
+    <div className="space-y-5">
+      {notice && <Notice tone="success">{notice}</Notice>}
+      {error && detail && <Notice tone="error">{error}</Notice>}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Panel padded className="bg-[var(--color-surface)]">
-            <SectionTitle>Pedigree &amp; registration</SectionTitle>
-            <div className="mt-4 space-y-3 text-[12px]">
-              <InfoRow label="Registry name" value={candidate.registryName} />
-              <InfoRow label="Registration no." value={candidate.registrationNumber} />
-              <InfoRow label="Date of birth" value={date(candidate.dateOfBirth)} />
-              <div className="space-y-3 border-t border-[var(--color-border)] pt-3">
-                <InfoRow label="Sire" value={candidate.sireName} />
-                <InfoRow label="Dam" value={candidate.damName} />
-                {candidate.pedigreeNotes && <p className="text-[var(--color-text-secondary)] italic">&quot;{candidate.pedigreeNotes}&quot;</p>}
-              </div>
-            </div>
-          </Panel>
-
-          <Panel padded className="bg-[var(--color-surface)]">
-            <SectionTitle>Admission capacity</SectionTitle>
-            <div className="mt-4 space-y-3 text-[12px]">
+      <AdmissionDetailLayout
+        returnTo={returnTo}
+        header={<AdmissionDetailHeader detail={detail} horsePhotoUrl={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined} />}
+        pipeline={<AdmissionPipeline detail={detail} />}
+        content={(
+          <AdmissionDetailTabs
+            tabs={[
+              {
+                id: 'overview',
+                label: 'Overview',
+                content: (
+                  <>
+                    <AdmissionInfoSection title="Horse and owner">
+                      <InfoRow label="Horse name" value={candidate.name} />
+                      <InfoRow label="Owner" value={detail.ownerName ? `${detail.ownerName} (ID ${detail.ownerId})` : `ID ${detail.ownerId}`} />
+                      <InfoRow label="Horse ID" value={detail.horseId ? String(detail.horseId) : 'Created after arrival confirmation'} />
+                      <InfoRow label="Groom feedback" value={detail.groomFeedback} />
+                    </AdmissionInfoSection>
+                    <AdmissionInfoSection title="Pedigree & Registration">
+                      <InfoRow label="Registry name" value={candidate.registryName} />
+                      <InfoRow label="Registration no." value={candidate.registrationNumber} />
+                      <InfoRow label="Date of birth" value={date(candidate.dateOfBirth)} />
+                      <div className="space-y-3 border-t border-[var(--color-border)] pt-3">
+                        <InfoRow label="Sire" value={candidate.sireName} />
+                        <InfoRow label="Dam" value={candidate.damName} />
+                        {candidate.pedigreeNotes && <p className="italic text-[var(--color-text-secondary)]">&quot;{candidate.pedigreeNotes}&quot;</p>}
+                      </div>
+                    </AdmissionInfoSection>
+                  </>
+                ),
+              },
+              {
+                id: 'documents',
+                label: 'Documents',
+                count: detail.documents.length,
+                content: <AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />,
+              },
+            ]}
+          />
+        )}
+        sidebar={(
+          <>
+            <AdmissionSideCard title="Admission capacity">
               <InfoRow label="Available quarantine stalls" value={String(capacity?.availableQuarantineStalls ?? '—')} />
               <InfoRow label="Available regular stalls" value={String(capacity?.availableRegularStalls ?? '—')} />
               <InfoRow label="Occupied quarantine stalls" value={String(capacity?.occupiedQuarantineStalls ?? '—')} />
-              <div className={`border-t border-[var(--color-border)] pt-3 font-medium ${isReady ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'}`}>
-                {isReady ? 'Capacity is sufficient for admission.' : blockingText}
-              </div>
-              {!isReady && capacity && <p className="text-[11px] text-[var(--color-text-secondary)]">Regular reserve required: {capacity.occupiedQuarantineStalls + 1} available regular stall(s).</p>}
               {detail.quarantineStallCode && <InfoRow label="Assigned Q stall" value={detail.quarantineStallCode} />}
               {detail.arrivalDeadlineAt && <InfoRow label="Arrival deadline" value={formatDateTime(detail.arrivalDeadlineAt)} />}
-            </div>
-          </Panel>
-        </div>
+              <Notice tone={isReady ? 'success' : 'warning'}>
+                {isReady ? 'Capacity is sufficient for admission.' : blockingText}
+                {!isReady && capacity && (
+                  <span className="mt-1 block text-xs">Regular reserve required: {capacity.occupiedQuarantineStalls + 1} available regular stall(s).</span>
+                )}
+              </Notice>
+            </AdmissionSideCard>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Panel padded className="bg-[var(--color-surface)]">
-            <div className="flex items-center justify-between gap-3">
-              <SectionTitle>Documents</SectionTitle>
-              <span className="text-[11px] text-[var(--color-text-muted)]">{detail.documents.length} files</span>
-            </div>
-            {detail.documents.length ? (
-              <ul className="mt-4 space-y-2 text-[12px]">
-                {detail.documents.map((document) => (
-                  <li key={document.id} className="flex items-center gap-3 rounded border border-[var(--color-border)] p-2 transition-colors hover:bg-[var(--color-surface-muted)]">
-                    <DocumentTypeMark documentType={document.documentType} />
-                    <div className="min-w-0 flex-1">
-                      <a href={admissionsApi.assetUrl(document.fileUrl)} target="_blank" rel="noreferrer" className="block truncate font-medium text-[var(--color-primary)] hover:underline">{document.originalFileName || documentNames[document.documentType] || document.documentType}</a>
-                      <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">{documentNames[document.documentType] || document.documentType} · Recorded {date(document.recordDate)} · Uploaded {date(document.uploadedAt)}</p>
-                    </div>
-                    <a href={admissionsApi.assetUrl(document.fileUrl)} target="_blank" rel="noreferrer" className="shrink-0 rounded-[var(--radius-sm)] px-2 py-1 text-[11px] font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]">View</a>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="mt-4 text-[12px] italic text-[var(--color-text-muted)]">No documents attached.</p>}
-          </Panel>
+            {canReview && (
+              <AdmissionSideCard title="Groom decision" tone="primary" className="space-y-4">
+                <FormField
+                  label="Feedback"
+                  required
+                  error={feedbackError ?? undefined}
+                  hint={`Required for approval and rejection · ${feedback.length}/2000`}
+                >
+                  <Textarea
+                    value={feedback}
+                    onChange={(event) => { setFeedback(event.target.value); setFeedbackError(null); }}
+                    rows={4}
+                    maxLength={2000}
+                  />
+                </FormField>
+                <div className="space-y-2">
+                  <Button type="button" variant="primary" className="w-full" loading={submitting} disabled={!feedback.trim() || !isReady} onClick={() => void review('APPROVED')}>Approve</Button>
+                  <Button type="button" variant="secondary" className="w-full" loading={submitting} disabled={!feedback.trim() || isReady} onClick={() => void review('APPROVED')}>Approve &amp; wait for stall</Button>
+                  <Button type="button" variant="destructive" className="w-full" loading={submitting} disabled={!feedback.trim()} onClick={() => void review('REJECTED')}>Reject</Button>
+                </div>
+              </AdmissionSideCard>
+            )}
 
-          <Panel padded className="bg-[var(--color-surface)]">
-            <SectionTitle>Horse and owner</SectionTitle>
-            <dl className="mt-4 space-y-3 text-[12px]">
-              <InfoRow label="Horse name" value={candidate.name} />
-              <InfoRow label="Owner" value={detail.ownerName ? `${detail.ownerName} (ID ${detail.ownerId})` : `ID ${detail.ownerId}`} />
-              <InfoRow label="Horse ID" value={detail.horseId ? String(detail.horseId) : 'Created after arrival confirmation'} />
-              <InfoRow label="Groom feedback" value={detail.groomFeedback} />
-            </dl>
-          </Panel>
-        </div>
-      </div>
-      )}
-      actions={(
-        <div className="space-y-4">
+            {waiting && (
+              <AdmissionSideCard title="Waiting for stall" tone="warning">
+                <p className="text-[var(--color-text-secondary)]">Groom approved this admission, but capacity was unavailable. Retry when a quarantine stall becomes available.</p>
+                <InfoRow label="Feedback" value={detail.groomFeedback || 'Not recorded'} />
+                <Button type="button" variant="warning" className="w-full" loading={submitting} onClick={() => void retryAllocation()}>Retry allocation</Button>
+              </AdmissionSideCard>
+            )}
 
-        {canReview && (
-          <Panel padded className="border-2 border-[var(--color-primary)] bg-[var(--color-surface)]">
-            <SectionTitle>Groom decision</SectionTitle>
-            <div className="mt-4 space-y-4">
-              <label htmlFor={`groom-feedback-${admissionId}`} className="block text-[13px] font-medium text-[var(--color-text-primary)]">Feedback <span className="text-[var(--color-danger)]">*</span></label>
-              <textarea id={`groom-feedback-${admissionId}`} value={feedback} onChange={(event) => { setFeedback(event.target.value); setFeedbackError(null); }} rows={4} maxLength={2000} required aria-invalid={Boolean(feedbackError)} className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]" />
-              <div className="flex justify-between text-xs">
-                {feedbackError ? <span role="alert" className="text-[var(--color-danger)]">{feedbackError}</span> : <span className="text-[var(--color-text-muted)]">Required for approval and rejection</span>}
-                <span className="text-[var(--color-text-muted)]">{feedback.length}/2000</span>
-              </div>
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button type="button" variant="destructive" size="sm" loading={submitting} disabled={!feedback.trim()} onClick={() => void review('REJECTED')}>Reject</Button>
-                <Button type="button" variant="secondary" size="sm" loading={submitting} disabled={!feedback.trim() || isReady} onClick={() => void review('APPROVED')}>Approve &amp; wait</Button>
-                <Button type="button" variant="primary" size="sm" loading={submitting} disabled={!feedback.trim() || !isReady} onClick={() => void review('APPROVED')}>Approve</Button>
-              </div>
-            </div>
-          </Panel>
+            {detail.status === 'WAITING_FOR_ARRIVAL' && (
+              <AdmissionSideCard title="Confirm horse arrival" tone="primary">
+                <p className="text-[var(--color-text-secondary)]">
+                  Quarantine stall {detail.quarantineStallCode || 'reserved'} is held until {detail.arrivalDeadlineAt ? formatDateTime(detail.arrivalDeadlineAt) : 'the 14-day arrival deadline'}.
+                  Confirm only after the horse physically arrives. Confirmation creates the horse record and schedules veterinary review.
+                </p>
+                <Button type="button" variant="primary" className="w-full" loading={submitting} onClick={() => void confirmArrival()}>Mark horse arrived</Button>
+              </AdmissionSideCard>
+            )}
+
+            {detail.status === 'ARRIVAL_EXPIRED' && (
+              <AdmissionSideCard title="Arrival window expired" tone="warning">
+                <p className="text-[var(--color-text-secondary)]">The reserved quarantine stall was released after 14 days. An authorized manager can reopen the arrival window if needed.</p>
+              </AdmissionSideCard>
+            )}
+
+            {!canReview && !waiting && detail.status !== 'WAITING_FOR_ARRIVAL' && detail.status !== 'ARRIVAL_EXPIRED' && (
+              <AdmissionSideCard title="Groom decision">
+                <p className="text-[var(--color-text-secondary)]">This application is read-only at its current stage.</p>
+              </AdmissionSideCard>
+            )}
+          </>
         )}
-
-        {waiting && (
-          <Panel padded className="border-2 border-[var(--color-warning)] bg-[var(--color-surface)]">
-            <SectionTitle>Waiting for stall</SectionTitle>
-            <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">Groom approved this admission, but capacity was unavailable. Retry when a quarantine stall becomes available.</p>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <span className="text-[12px] text-[var(--color-text-secondary)]">Feedback: {detail.groomFeedback || 'Not recorded'}</span>
-              <Button type="button" size="sm" loading={submitting} onClick={() => void retryAllocation()} className="bg-[var(--color-warning)] text-white hover:opacity-90">Retry allocation</Button>
-            </div>
-          </Panel>
-        )}
-
-        {detail.status === 'WAITING_FOR_ARRIVAL' && (
-          <Panel padded className="border-2 border-[var(--color-primary)] bg-[var(--color-surface)]">
-            <SectionTitle>Confirm horse arrival</SectionTitle>
-            <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
-              Quarantine stall {detail.quarantineStallCode || 'reserved'} is held until {detail.arrivalDeadlineAt ? formatDateTime(detail.arrivalDeadlineAt) : 'the 14-day arrival deadline'}.
-              Confirm only after the horse physically arrives. Confirmation creates the horse record and schedules veterinary review.
-            </p>
-            <div className="mt-4 flex justify-end">
-              <Button type="button" size="sm" loading={submitting} onClick={() => void confirmArrival()}>Mark horse arrived</Button>
-            </div>
-          </Panel>
-        )}
-
-        {detail.status === 'ARRIVAL_EXPIRED' && (
-          <Panel padded className="border border-[var(--color-warning)] bg-[var(--color-surface)]">
-            <SectionTitle>Arrival window expired</SectionTitle>
-            <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">The reserved quarantine stall was released after 14 days. An authorized manager can reopen the arrival window if needed.</p>
-          </Panel>
-        )}
-
-        {!canReview && !waiting && detail.status !== 'WAITING_FOR_ARRIVAL' && detail.status !== 'ARRIVAL_EXPIRED' && <Panel padded className="bg-[var(--color-surface)]"><p className="text-sm text-[var(--color-text-secondary)]">This application is read-only at its current stage.</p></Panel>}
-      </div>
-      )}
-    />
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
-  return <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-[var(--color-text-muted)]">{label}</span><span className="text-right font-medium text-[var(--color-text-primary)]">{value || <span className="font-normal italic text-[var(--color-text-muted)]">N/A</span>}</span></div>;
-}
-
-function DocumentTypeMark({ documentType }: { documentType: string }) {
-  const isPhoto = documentType === 'HORSE_PHOTO';
-  return (
-    <span className="flex h-9 w-10 shrink-0 items-center justify-center rounded-[var(--radius-xs)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[9px] font-semibold tracking-wide text-[var(--color-text-muted)]">
-      {isPhoto ? 'PHOTO' : 'FILE'}
-    </span>
+      />
+    </div>
   );
 }

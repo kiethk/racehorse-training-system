@@ -4,13 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
-import { Panel } from '@/components/ui/Panel';
+import { Notice } from '@/components/ui/Notice';
 import { ownerAdmissionApi, type OwnerAdmissionDetail } from '../services/ownerApi';
 import { admissionsApi } from '../services/api';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
-import { AdmissionInfoSection, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { AdmissionInfoSection, AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { AdmissionDocumentUploads } from './AdmissionDocumentUploads';
 
@@ -56,8 +57,8 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
     void load();
   }, [load]);
 
-  if (loading) return <ListSkeleton rows={8} />;
-  if (error && !detail) return <EmptyState icon="alert-triangle" title="Unable to load application" description={error} action={<Button onClick={() => void load()}>Retry</Button>} />;
+  if (loading) return <div className="p-6"><ListSkeleton rows={8} /></div>;
+  if (error && !detail) return <EmptyState icon="alert-triangle" title="Unable to load application" description={error} action={<Button size="sm" onClick={() => void load()}>Retry</Button>} />;
   if (!detail) return <EmptyState title="Application not found" description="This admission record is unavailable." />;
 
   const candidate = detail.candidate;
@@ -74,64 +75,80 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
     return activeStage !== null && stage > activeStage ? 'Not yet in review' : 'No feedback recorded';
   };
   return (
-    <div className="space-y-4">
-      {created && <p role="status" className="rounded-[var(--radius-md)] bg-[var(--color-success-soft)] p-3 text-sm">Admission and supporting documents submitted for Groom review.</p>}
-      {error && <p role="alert" className="text-sm text-[var(--color-danger)]">{error}</p>}
+    <div className="space-y-5">
+      {created && <Notice tone="success">Admission and supporting documents submitted for Groom review.</Notice>}
+      {error && <Notice tone="error">{error}</Notice>}
+      {detail.status === 'REJECTED' && (
+        <Notice tone="error" title="Application rejected">
+          {feedback.length > 0 ? (
+            <div className="mt-1 space-y-1 text-[var(--color-text-primary)]">
+              {feedback.map(({ label, value }) => (
+                <p key={label} className="whitespace-pre-wrap break-words">
+                  <span className="font-medium">{label}:</span> {value}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[var(--color-text-secondary)]">No review feedback is recorded on this application.</p>
+          )}
+        </Notice>
+      )}
       <AdmissionDetailLayout
         returnTo="/owner/admissions"
-        header={(
-          <div>
-            <AdmissionDetailHeader detail={{ ...detail, ownerId: user?.userId, ownerName: user?.fullName }} horsePhotoUrl={photo ? admissionsApi.assetUrl(photo.fileUrl) : undefined} />
-            {detail.status === 'REJECTED' && (
-              <section aria-labelledby="rejection-feedback-title" className="border-b border-[var(--color-border)] bg-[var(--color-danger-soft)] px-6 py-4">
-                <h2 id="rejection-feedback-title" className="text-sm font-semibold text-[var(--color-danger)]">Application rejected</h2>
-                {feedback.length > 0 ? (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-xs text-[var(--color-text-secondary)]">Review feedback recorded on this application:</p>
-                    {feedback.map(({ label, value }) => (
-                      <p key={label} className="whitespace-pre-wrap break-words text-sm text-[var(--color-text-primary)]">
-                        <span className="font-medium">{label}:</span> {value}
-                      </p>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">No review feedback is recorded on this application.</p>
-                )}
-              </section>
-            )}
-          </div>
-        )}
+        header={<AdmissionDetailHeader detail={{ ...detail, ownerId: user?.userId, ownerName: user?.fullName }} horsePhotoUrl={photo ? admissionsApi.assetUrl(photo.fileUrl) : undefined} />}
         pipeline={<AdmissionPipeline detail={detail} />}
-        sections={[
-          <AdmissionInfoSection key="profile" title="Candidate horse">
-            <InfoRow label="Horse name" value={candidate.name} />
-            <InfoRow label="Breed" value={candidate.breed} />
-            <InfoRow label="Date of birth" value={candidate.dateOfBirth} />
-          </AdmissionInfoSection>,
-          <AdmissionInfoSection key="pedigree" title="Pedigree & registration">
-            <InfoRow label="Registry name" value={candidate.registryName} />
-            <InfoRow label="Registration number" value={candidate.registrationNumber} />
-            <InfoRow label="Sire" value={candidate.sireName} />
-            <InfoRow label="Sire UELN" value={candidate.sireRegistrationNumber} />
-            <InfoRow label="Dam" value={candidate.damName} />
-            <InfoRow label="Dam UELN" value={candidate.damRegistrationNumber} />
-            {candidate.pedigreeNotes && <p className="whitespace-pre-wrap break-words text-[var(--color-text-secondary)]">{candidate.pedigreeNotes}</p>}
-          </AdmissionInfoSection>,
-          <AdmissionDocumentsSection key="documents" documents={detail.documents} assetUrl={admissionsApi.assetUrl} />,
-          <AdmissionInfoSection key="reviews" title="Review feedback">
-            <InfoRow label="Groom" value={feedbackValue('groomFeedback', 0)} />
-            <InfoRow label="Veterinarian" value={feedbackValue('vetFeedback', 2)} />
-            <InfoRow label="Trainer" value={feedbackValue('trainerFeedback', 3)} />
-            <InfoRow label="Manager" value={feedbackValue('managerFeedback', 4)} />
-          </AdmissionInfoSection>,
-        ]}
-        actions={locked ? undefined : (
-          <Panel padded className="space-y-4">
-            <h2 className="text-sm font-semibold">Additional supporting documents</h2>
-            <p className="text-sm text-[var(--color-text-secondary)]">You can add documents while your application is in Groom review.</p>
+        content={(
+          <AdmissionDetailTabs
+            tabs={[
+              {
+                id: 'overview',
+                label: 'Overview',
+                content: (
+                  <>
+                    <AdmissionInfoSection title="Candidate horse">
+                      <InfoRow label="Horse name" value={candidate.name} />
+                      <InfoRow label="Breed" value={candidate.breed} />
+                      <InfoRow label="Date of birth" value={candidate.dateOfBirth} />
+                    </AdmissionInfoSection>
+                    <AdmissionInfoSection title="Pedigree & Registration">
+                      <InfoRow label="Registry name" value={candidate.registryName} />
+                      <InfoRow label="Registration number" value={candidate.registrationNumber} />
+                      <InfoRow label="Sire" value={candidate.sireName} />
+                      <InfoRow label="Sire UELN" value={candidate.sireRegistrationNumber} />
+                      <InfoRow label="Dam" value={candidate.damName} />
+                      <InfoRow label="Dam UELN" value={candidate.damRegistrationNumber} />
+                      {candidate.pedigreeNotes && <p className="whitespace-pre-wrap break-words text-[var(--color-text-secondary)]">{candidate.pedigreeNotes}</p>}
+                    </AdmissionInfoSection>
+                  </>
+                ),
+              },
+              {
+                id: 'documents',
+                label: 'Documents',
+                count: detail.documents.length,
+                content: <AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />,
+              },
+              {
+                id: 'history',
+                label: 'Review History',
+                content: (
+                  <AdmissionInfoSection title="Review feedback">
+                    <InfoRow label="Groom" value={feedbackValue('groomFeedback', 0)} />
+                    <InfoRow label="Veterinarian" value={feedbackValue('vetFeedback', 2)} />
+                    <InfoRow label="Trainer" value={feedbackValue('trainerFeedback', 3)} />
+                    <InfoRow label="Manager" value={feedbackValue('managerFeedback', 4)} />
+                  </AdmissionInfoSection>
+                ),
+              },
+            ]}
+          />
+        )}
+        sidebar={locked ? undefined : (
+          <AdmissionSideCard title="Additional supporting documents">
+            <p className="text-[var(--color-text-secondary)]">You can add documents while your application is in Groom review.</p>
             <AdmissionDocumentUploads admissionId={admissionId} documents={detail.documents} locked={locked}
               onUploaded={async () => { setDetail(await ownerAdmissionApi.detail(admissionId)); }} />
-          </Panel>
+          </AdmissionSideCard>
         )}
       />
     </div>

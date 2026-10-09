@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 @theme {
   /* Brand */
@@ -81,6 +82,23 @@
   --shadow-panel: 0 1px 2px rgb(24 24 27 / 0.05);
   --shadow-popover: 0 12px 32px rgb(24 24 27 / 0.12);
   --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* App shell */
+  --sidebar-width: 15rem;
+  --sidebar-width-collapsed: 4rem;
+  --topbar-height: 3.5rem;
+  /* Offset for sticky elements inside page content, so they clear the top bar. */
+  --sticky-top: calc(var(--topbar-height) + 1.5rem);
+
+  /* Layering */
+  --z-sidebar: 30;
+  --z-dropdown: 40;
+  --z-modal: 50;
+  --z-confirm: 70;
+  --z-toast: 80;
 }
 
 html,
@@ -119,6 +137,19 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/*
+ * Stopgap for forms whose raw <input>/<select>/<textarea> are not yet on the shared
+ * Input/Select/Textarea primitives: brings them to the standard control size.
+ * Remove the class from a form once its controls are migrated.
+ */
+.legacy-controls :is(input:not([type='checkbox'], [type='radio'], [type='file']), select) {
+  min-height: 2.25rem;
+  font-size: var(--text-sm);
+}
+.legacy-controls textarea {
+  font-size: var(--text-sm);
 }
 
 /* Thin operational scrollbars */

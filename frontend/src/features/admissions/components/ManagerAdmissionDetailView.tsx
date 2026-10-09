@@ -3,15 +3,17 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { Notice } from '@/components/ui/Notice';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
 import { admissionsApi } from '../services/api';
-import { formatDate, formatDateTime } from '@/lib/display';
+import { formatDate, formatDateTime, formatEnumLabel } from '@/lib/display';
 import type { AdmissionDetailResponse } from '../types';
 
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
-import { AdmissionInfoSection, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { AdmissionInfoSection, AdmissionSideCard, InfoGroupTitle, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { ManagerFinalReviewPanel } from './ManagerFinalReviewPanel';
@@ -85,11 +87,11 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
   ];
 
   const renderOverview = () => (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <AdmissionInfoSection title="Pedigree & Registration">
         <InfoRow label="Registry Name" value={candidate.registryName} />
         <InfoRow label="Registration No." value={candidate.registrationNumber} />
-        <div className="pt-2 border-t border-[var(--color-border)] space-y-3">
+        <div className="space-y-3 border-t border-[var(--color-border)] pt-3">
           <InfoRow label="Sire" value={candidate.sireName} />
           <InfoRow label="Dam" value={candidate.damName} />
           {candidate.pedigreeNotes && (
@@ -115,7 +117,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
   );
 
   const renderMedical = () => (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <AdmissionInfoSection title="Health & Veterinary">
         <InfoRow label="Training Decision" value={currentTrainingDecision} />
         {detail.vetFeedback && (
@@ -130,7 +132,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         {detail.healthRecords && detail.healthRecords.length > 0 ? (
           <ul className="space-y-3">
             {detail.healthRecords.map(hr => (
-              <li key={hr.id} className="bg-[var(--color-surface)] border border-[var(--color-border)] p-4 rounded-[var(--radius-md)]">
+              <li key={hr.id} className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
                 <div className="flex justify-between mb-2">
                   <span className="font-semibold text-[var(--color-text-primary)]">{hr.recordType}</span>
                   <span className="text-xs text-[var(--color-text-muted)]">{date(hr.examinedAt)}</span>
@@ -154,7 +156,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
       <div className="space-y-5">
         {detail.groomReviewedAt && (
           <div className="space-y-2">
-            <h4 className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">Groom Review</h4>
+            <InfoGroupTitle>Groom Review</InfoGroupTitle>
             <InfoRow label="Decision" value={detail.groomDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.groomReviewedAt)} />
             {detail.groomFeedback && <InfoRow label="Feedback" value={detail.groomFeedback} />}
@@ -163,7 +165,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         
         {detail.vetReviewedAt && (
           <div className="space-y-2 pt-4 border-t border-[var(--color-border)]">
-            <h4 className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">Veterinarian Review</h4>
+            <InfoGroupTitle>Veterinarian Review</InfoGroupTitle>
             <InfoRow label="Training Decision" value={currentTrainingDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.vetReviewedAt)} />
             {detail.vetFeedback && <InfoRow label="Feedback" value={detail.vetFeedback} />}
@@ -172,7 +174,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         
         {detail.trainerReviewedAt && (
           <div className="space-y-2 pt-4 border-t border-[var(--color-border)]">
-            <h4 className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">Trainer Readiness Assessment</h4>
+            <InfoGroupTitle>Trainer Readiness Assessment</InfoGroupTitle>
             <InfoRow label="Assessed At" value={datetime(detail.trainerReviewedAt)} />
             {detail.trainerFeedback && <InfoRow label="Assessment Notes" value={detail.trainerFeedback} />}
           </div>
@@ -180,7 +182,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
 
         {detail.managerReviewedAt && (
           <div className="space-y-2 pt-4 border-t border-[var(--color-border)]">
-            <h4 className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">Manager Decision</h4>
+            <InfoGroupTitle>Manager Decision</InfoGroupTitle>
             <InfoRow label="Decision" value={detail.managerDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.managerReviewedAt)} />
             {detail.managerFeedback && <InfoRow label="Notes" value={detail.managerFeedback} />}
@@ -196,7 +198,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
 
   return (
     <div className="space-y-5">
-      {error && <div role="alert" className="border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]">{error}</div>}
+      {error && <Notice tone="error">{error}</Notice>}
 
       <AdmissionDetailLayout
         returnTo={returnTo}
@@ -207,7 +209,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
             <div className="mb-5">
               <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} />
             </div>
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div key={activeTab} className="animate-in fade-in slide-in-from-bottom-1 duration-200">
               {activeTab === 'overview' && renderOverview()}
               {activeTab === 'documents' && renderDocuments()}
               {activeTab === 'medical' && renderMedical()}
@@ -217,75 +219,41 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         )}
         sidebar={(
           <>
-              {/* Admission at a glance */}
-              <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-5 space-y-4">
-                <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Admission at a glance</h3>
-                <div className="space-y-3 text-[13px]">
-                  <div className="flex justify-between items-center gap-4">
-                    <span className="text-[var(--color-text-secondary)] whitespace-nowrap">Current Status</span>
-                    <span className="font-medium text-[var(--color-text-primary)] text-right">{detail.status}</span>
-                  </div>
-                  {detail.quarantineStallCode && (
-                    <div className="flex justify-between items-center gap-4">
-                      <span className="text-[var(--color-text-secondary)] whitespace-nowrap">Quarantine Stall</span>
-                      <span className="font-medium text-[var(--color-text-primary)] text-right">{detail.quarantineStallCode}</span>
-                    </div>
-                  )}
-                  {currentTrainingDecision && (
-                    <div className="flex justify-between items-center gap-4">
-                      <span className="text-[var(--color-text-secondary)] whitespace-nowrap">Training</span>
-                      <span className="font-medium text-[var(--color-text-primary)] text-right">
-                        {currentTrainingDecision}
-                      </span>
-                    </div>
-                  )}
-                  {detail.trainerId != null && (
-                    <div className="flex justify-between items-center gap-4">
-                      <span className="text-[var(--color-text-secondary)] whitespace-nowrap">Head Trainer</span>
-                      <span className="font-medium text-[var(--color-text-primary)] text-right">
-                        {detail.trainerName ?? `#${detail.trainerId}`}
-                      </span>
-                    </div>
-                  )}
-                  {trainerUnassigned && (
-                    <div
-                      role="status"
-                      className="rounded-[var(--radius-sm)] bg-[var(--color-warning-soft)] p-2.5 text-[12px] text-[var(--color-warning)]"
-                    >
-                      <span className="font-semibold block">No Head Trainer assigned yet</span>
-                      No eligible Head Trainer is available. The system retries automatically; check that at
-                      least one active Head Trainer has a certification number.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {detail.status === 'ARRIVAL_EXPIRED' && (
-                <div className="bg-[var(--color-surface)] border border-[var(--color-warning)] rounded-[var(--radius-md)] p-5 space-y-3">
-                  <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Arrival window expired</h3>
-                  <p className="text-xs text-[var(--color-text-secondary)]">The quarantine reservation was released. Reopening attempts to reserve an available quarantine stall and starts a new 14-day window.</p>
-                  <Button type="button" size="sm" loading={reopening} onClick={() => void reopenExpiredArrival()}>Reopen arrival window</Button>
-                </div>
+            <AdmissionSideCard title="Admission at a glance">
+              <InfoRow label="Current status" value={<AdmissionStatusBadge status={detail.status} size="sm" />} />
+              {detail.quarantineStallCode && <InfoRow label="Quarantine stall" value={detail.quarantineStallCode} />}
+              {currentTrainingDecision && <InfoRow label="Training" value={formatEnumLabel(currentTrainingDecision)} />}
+              {detail.trainerId != null && <InfoRow label="Head Trainer" value={detail.trainerName ?? `#${detail.trainerId}`} />}
+              {trainerUnassigned && (
+                <Notice tone="warning" title="No Head Trainer assigned yet">
+                  No eligible Head Trainer is available. The system retries automatically; check that at
+                  least one active Head Trainer has a certification number.
+                </Notice>
               )}
+            </AdmissionSideCard>
 
-              {/* Manager Final Review / Decision Panel */}
-              {detail.status === 'MANAGER_REVIEW' && (
-                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-5">
-                  <h3 className="text-sm font-bold text-[var(--color-text-primary)] mb-4">Final Admission Decision</h3>
-                  <ManagerFinalReviewPanel detailData={detail} onSuccess={load} />
-                  
-                  <div className="mt-4 pt-4 border-t border-[var(--color-border)] space-y-2">
-                    <p className="text-[11px] text-[var(--color-text-muted)]">
-                      <span className="font-semibold block text-[var(--color-text-secondary)]">If Approved:</span>
-                      Horse is allocated a regular stall (or auto-assigned) and becomes eligible. Quarantine stall is released.
-                    </p>
-                    <p className="text-[11px] text-[var(--color-text-muted)]">
-                      <span className="font-semibold block text-[var(--color-text-secondary)]">If Rejected:</span>
-                      Admission is terminated. Quarantine stall is released.
-                    </p>
-                  </div>
+            {detail.status === 'ARRIVAL_EXPIRED' && (
+              <AdmissionSideCard title="Arrival window expired" tone="warning">
+                <p className="text-[var(--color-text-secondary)]">The quarantine reservation was released. Reopening attempts to reserve an available quarantine stall and starts a new 14-day window.</p>
+                <Button type="button" className="w-full" loading={reopening} onClick={() => void reopenExpiredArrival()}>Reopen arrival window</Button>
+              </AdmissionSideCard>
+            )}
+
+            {detail.status === 'MANAGER_REVIEW' && (
+              <AdmissionSideCard title="Final admission decision" tone="primary" className="space-y-4">
+                <ManagerFinalReviewPanel detailData={detail} onSuccess={load} />
+                <div className="space-y-2 border-t border-[var(--color-border)] pt-3 text-xs text-[var(--color-text-muted)]">
+                  <p>
+                    <span className="block font-semibold text-[var(--color-text-secondary)]">If approved</span>
+                    Horse is allocated a regular stall (or auto-assigned) and becomes eligible. Quarantine stall is released.
+                  </p>
+                  <p>
+                    <span className="block font-semibold text-[var(--color-text-secondary)]">If rejected</span>
+                    Admission is terminated. Quarantine stall is released.
+                  </p>
                 </div>
-              )}
+              </AdmissionSideCard>
+            )}
           </>
         )}
       />

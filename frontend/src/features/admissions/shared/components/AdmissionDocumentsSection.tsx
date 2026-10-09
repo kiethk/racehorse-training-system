@@ -26,21 +26,21 @@ export function AdmissionDocumentsSection({ documents, assetUrl }: { documents: 
   const [selectedDocument, setSelectedDocument] = useState<AdmissionDocument | null>(null);
   return (
     <>
-      <Panel padded className="bg-[var(--color-surface)]">
+      <Panel padded>
         <div className="flex items-center justify-between gap-3">
           <SectionTitle>Documents</SectionTitle>
-          <span className="text-[11px] text-[var(--color-text-muted)]">{documents.length} files</span>
+          <span className="text-xs text-[var(--color-text-muted)]">{documents.length} files</span>
         </div>
         {documents.length ? (
-          <ul className="mt-4 space-y-2 text-[12px]">
+          <ul className="mt-4 space-y-2 text-sm">
             {documents.map((document) => (
-              <li key={document.id} className="flex items-start gap-2 rounded border border-[var(--color-border)] p-2 transition-colors hover:bg-[var(--color-surface-muted)]">
+              <li key={document.id} className="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 transition-colors hover:bg-[var(--color-surface-muted)]">
                 <Icon name={document.documentType === 'HORSE_PHOTO' ? 'image' : 'file-text'} className="mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <button type="button" onClick={() => setSelectedDocument(document)} aria-haspopup="dialog" className="block max-w-full truncate rounded text-left font-medium text-[var(--color-primary)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
                     {document.originalFileName || documentNames[document.documentType] || document.documentType}
                   </button>
-                  <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
+                  <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
                     {documentNames[document.documentType] || document.documentType} · Recorded {date(document.recordDate)} · Uploaded {date(document.uploadedAt)}
                   </p>
                 </div>
@@ -51,7 +51,7 @@ export function AdmissionDocumentsSection({ documents, assetUrl }: { documents: 
             ))}
           </ul>
         ) : (
-          <p className="mt-4 text-[12px] italic text-[var(--color-text-muted)]">No documents attached.</p>
+          <p className="mt-4 text-sm italic text-[var(--color-text-muted)]">No documents attached.</p>
         )}
       </Panel>
       {selectedDocument && (

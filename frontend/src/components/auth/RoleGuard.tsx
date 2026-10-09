@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { LoadingScreen } from '@/components/ui/Spinner';
 import { getRoleRoute } from '@/lib/roleRoute';
 import type { Role } from '@/types/auth';
 
@@ -17,6 +18,9 @@ interface RoleGuardProps {
  * - If not authenticated → redirects to /login
  * - If authenticated but wrong role → redirects to the user's correct landing page
  * - If role matches → renders children
+ *
+ * Inside the (app) route group AuthGate has already handled the first two cases,
+ * so the spinner here only fills the content area and the shell stays mounted.
  */
 export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const { user, loading, isAuthenticated } = useAuth();
@@ -35,31 +39,9 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
     }
   }, [loading, isAuthenticated, user, allowedRoles, router]);
 
-  if (loading) {
-    return <AuthLoadingScreen />;
-  }
-
-  if (!isAuthenticated || !user) {
-    return <AuthLoadingScreen />;
-  }
-
-  if (!allowedRoles.includes(user.role)) {
-    return <AuthLoadingScreen />;
+  if (loading || !isAuthenticated || !user || !allowedRoles.includes(user.role)) {
+    return <LoadingScreen />;
   }
 
   return <>{children}</>;
-}
-
-function AuthLoadingScreen() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
-      <div className="flex flex-col items-center gap-3">
-        <span
-          className="h-7 w-7 animate-spin rounded-full border-[3px] border-[var(--color-border-strong)] border-t-[var(--color-primary)]"
-          aria-label="Loading…"
-        />
-        <p className="text-[12px] text-[var(--color-text-muted)]">Loading…</p>
-      </div>
-    </div>
-  );
 }

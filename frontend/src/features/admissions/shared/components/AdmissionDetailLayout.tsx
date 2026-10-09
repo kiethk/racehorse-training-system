@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import { Icon } from '@/components/ui/Icon';
+import { Button, LinkButton } from '@/components/ui';
+import { cn } from '@/lib/cn';
 
 interface AdmissionDetailLayoutProps {
   returnTo?: string;
@@ -10,7 +10,15 @@ interface AdmissionDetailLayoutProps {
   content?: React.ReactNode;
   sidebar?: React.ReactNode;
   actions?: React.ReactNode;
+  /** Give the main column the full width, for content that brings its own side column. */
+  asideHidden?: boolean;
 }
+
+/** Two-column grid shared by every admission detail screen and by forms that embed their own aside. */
+export const admissionDetailGridClassName = 'grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,22rem)]';
+
+/** Side column that stays in view below the top bar while the main column scrolls. */
+export const admissionAsideClassName = 'min-w-0 space-y-5 lg:sticky lg:top-[var(--sticky-top)] lg:self-start';
 
 export function AdmissionDetailLayout({
   returnTo,
@@ -21,28 +29,30 @@ export function AdmissionDetailLayout({
   content,
   sidebar,
   actions,
+  asideHidden = false,
 }: AdmissionDetailLayoutProps) {
+  const aside = asideHidden ? null : (sidebar ?? actions);
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {onBack ? (
-          <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
-            <Icon name="arrow-left" size={15} /> Back to admissions
-          </button>
-        ) : (
-          <Link href={returnTo ?? '/'} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
-            <Icon name="arrow-left" size={15} /> Back to admissions
-          </Link>
-        )}
-      </div>
+    <div className="space-y-4">
+      {onBack ? (
+        <Button variant="tertiary" size="sm" icon="arrow-left" onClick={onBack} className="-ml-2.5">
+          Back to admissions
+        </Button>
+      ) : (
+        <LinkButton variant="tertiary" size="sm" icon="arrow-left" href={returnTo ?? '/'} className="-ml-2.5">
+          Back to admissions
+        </LinkButton>
+      )}
 
-      <div className="min-w-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-sm">
-        {header}
+      {/* No overflow-hidden here: it would turn this card into the scroll container and stop the aside from sticking. */}
+      <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-panel)]">
+        <div className="overflow-hidden rounded-t-[var(--radius-lg)]">{header}</div>
 
-        <div className="space-y-6 bg-[var(--color-surface-subtle)] p-4 sm:p-6">
+        <div className="space-y-5 rounded-b-[var(--radius-lg)] bg-[var(--color-surface-subtle)] p-4 sm:p-6">
           {pipeline}
 
-          <div className={`grid min-w-0 gap-5 ${sidebar || actions ? 'lg:grid-cols-[minmax(0,1fr)_minmax(17rem,22rem)]' : 'grid-cols-1'}`}>
+          <div className={aside ? admissionDetailGridClassName : 'grid min-w-0 grid-cols-1 gap-5'}>
             <main className="min-w-0 space-y-5">
               {content ?? (
                 <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
@@ -52,11 +62,7 @@ export function AdmissionDetailLayout({
                 </div>
               )}
             </main>
-            {(sidebar || actions) && (
-              <aside className="min-w-0 space-y-5 lg:sticky lg:top-6">
-                {sidebar ?? actions}
-              </aside>
-            )}
+            {aside && <aside className={cn(admissionAsideClassName)}>{aside}</aside>}
           </div>
         </div>
       </div>

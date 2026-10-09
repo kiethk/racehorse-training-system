@@ -4,13 +4,13 @@ import type { AdmissionDetailResponse } from '../../types';
 
 function PipelineStep({ label, isDone, isActive, note }: { label: string; isDone: boolean; isActive: boolean; note?: string }) {
   if (isActive) return (
-    <div className="rounded border border-[var(--color-primary)] bg-[var(--color-primary-soft)] px-3 py-2 font-medium text-[var(--color-primary)]">
+    <div className="rounded-[var(--radius-sm)] border border-[var(--color-primary)] bg-[var(--color-primary-soft)] px-3 py-2 font-medium text-[var(--color-primary)]">
       <span className="mr-1.5">●</span>{label}
-      {note && <span className="ml-1.5 text-[10px] font-normal opacity-75">({note})</span>}
+      {note && <span className="ml-1.5 text-xs font-normal opacity-75">({note})</span>}
     </div>
   );
-  if (isDone) return <div className="rounded border border-[var(--color-success)] bg-[var(--color-success-soft)] px-3 py-2 text-[var(--color-success)]"><span className="mr-1.5">✓</span>{label}</div>;
-  return <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-2 text-[var(--color-text-muted)]"><span className="mr-1.5 opacity-40">-</span>{label}</div>;
+  if (isDone) return <div className="rounded-[var(--radius-sm)] border border-[var(--color-success)] bg-[var(--color-success-soft)] px-3 py-2 text-[var(--color-success)]"><span className="mr-1.5">✓</span>{label}</div>;
+  return <div className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-2 text-[var(--color-text-muted)]"><span className="mr-1.5 opacity-40">-</span>{label}</div>;
 }
 
 type PipelineDetail = Pick<AdmissionDetailResponse, 'status'> & Partial<Pick<AdmissionDetailResponse,
@@ -24,7 +24,7 @@ export function AdmissionPipeline({ detail }: { detail: PipelineDetail }) {
   const stage = stages.indexOf(detail.status);
   const done = (value: string | null | undefined, threshold: number) => value === undefined ? stage >= threshold : Boolean(value);
   return (
-    <Panel padded className="bg-[var(--color-surface)]">
+    <Panel padded>
       <SectionTitle>Review pipeline</SectionTitle>
       {isRejected && (
         <p role="status" className="mt-3 rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-3 py-2 text-sm font-medium text-[var(--color-danger)]">
@@ -36,7 +36,7 @@ export function AdmissionPipeline({ detail }: { detail: PipelineDetail }) {
           This application has been approved.
         </p>
       )}
-      <div className="mt-4 flex flex-wrap gap-2 text-[12px]">
+      <div className="mt-4 flex flex-wrap gap-2 text-xs">
         <PipelineStep label="Groom Review" isDone={done(detail.groomReviewedAt, 1)} isActive={detail.status === 'GROOM_REVIEW'} />
         <PipelineStep label="Waiting for Stall" isDone={done(detail.quarantineStallCode, 2)} isActive={detail.status === 'WAITING_FOR_STALL'} />
         <PipelineStep label="Waiting for Arrival" isDone={done(detail.arrivedAt, 3)} isActive={detail.status === 'WAITING_FOR_ARRIVAL'} note={detail.arrivalDeadlineAt ? `by ${formatDate(detail.arrivalDeadlineAt)}` : undefined} />

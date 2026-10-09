@@ -38,11 +38,11 @@ function StatusBadge({ code }: { code: number }) {
   let colorClass = 'bg-[var(--color-surface-muted)] text-[var(--color-text-primary)] border border-[var(--color-border)]';
   
   if (code >= 200 && code < 300) {
-    colorClass = 'bg-[var(--color-success-soft)] text-[var(--color-success)] border border-[var(--color-success-border)]';
+    colorClass = 'bg-[var(--color-success-soft)] text-[var(--color-success)] border border-[var(--color-success)]';
   } else if (code >= 400 && code < 500) {
-    colorClass = 'bg-[var(--color-warning-soft)] text-[var(--color-warning-strong)] border border-[var(--color-warning-border)]';
+    colorClass = 'bg-[var(--color-warning-soft)] text-[var(--color-warning)] border border-[var(--color-warning)]';
   } else if (code >= 500) {
-    colorClass = 'bg-[var(--color-danger-soft)] text-[var(--color-danger)] border border-[var(--color-danger-border)]';
+    colorClass = 'bg-[var(--color-danger-soft)] text-[var(--color-danger)] border border-[var(--color-danger)]';
   }
 
   return (
@@ -56,9 +56,9 @@ function MethodBadge({ method }: { method: string }) {
   let colorClass = 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)]';
   
   switch (method) {
-    case 'POST': colorClass = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'; break;
-    case 'PUT': colorClass = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'; break;
-    case 'PATCH': colorClass = 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'; break;
+    case 'POST': colorClass = 'bg-blue-100 text-blue-700'; break;
+    case 'PUT': colorClass = 'bg-amber-100 text-amber-700'; break;
+    case 'PATCH': colorClass = 'bg-orange-100 text-orange-700'; break;
     case 'DELETE': colorClass = 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'; break;
   }
 

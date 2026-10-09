@@ -16,3 +16,18 @@ export function formatDate(value: string | Date | null | undefined, options?: In
 export function formatDateTime(value: string | Date | null | undefined): string {
   return formatDate(value, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+/** Turns a backend enum such as `HEAD_TRAINER` into "Head trainer". */
+export function formatEnumLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  const words = value.replaceAll('_', ' ').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+export function formatNumber(value: number | null | undefined, fractionDigits = 0): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat('en-GB', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
+}

@@ -1,19 +1,18 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { ListSkeleton } from '@/components/ui/states';
 import { Notice } from '@/components/ui/Notice';
-import { FilterBar } from '@/components/ui/FilterBar';
-import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
-import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { type DataTableColumn } from '@/components/ui/DataTable';
+import { FilterChips } from '@/components/ui/SegmentedControl';
+import { formatDate } from '@/lib/display';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
 import type { TrainerAdmissionQueue } from '../types/trainer';
-import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
 import { AdmissionListLayout } from '../shared/components/AdmissionListLayout';
-import { AdmissionSearchField } from '../shared/components/AdmissionSearchField';
+import { AdmissionFilterBar, FilterDateRange } from '../shared/components/AdmissionFilterBar';
+import { AdmissionTable } from '../shared/components/AdmissionTable';
 
 type Tab = 'PENDING' | 'REVIEWED';
 
@@ -129,8 +128,7 @@ export function TrainerAdmissionsListView() {
     updateUrl(next);
   };
 
-  const applyFilters = (e: React.FormEvent) => {
-    e.preventDefault();
+  const applyFilters = () => {
     setTablePage(0);
     updateUrl(draft);
   };
@@ -159,22 +157,8 @@ export function TrainerAdmissionsListView() {
 
   if (loading) return <AdmissionListLayout title="Admissions" description="Assess racing potential and readiness of candidate horses in the quarantine facility."><ListSkeleton rows={6} /></AdmissionListLayout>;
 
-  const columns: DataTableColumn<TrainerAdmissionQueue['pending'][number]>[] = [
-    {
-      id: 'horse',
-      header: 'Horse',
-      sortValue: (admission) => admission.candidateName,
-      render: (admission) => (
-        <div className="flex min-w-0 items-center gap-3">
-          <HorseAvatar name={admission.candidateName} image={admission.imageUrl} size={36} rounded="md" />
-          <div className="min-w-0">
-            <span className="block truncate font-semibold">{admission.candidateName}</span>
-            <span className="block truncate text-xs text-[var(--color-text-muted)]">{admission.breed || 'Unknown breed'}</span>
-          </div>
-        </div>
-      ),
-    },
-    { id: 'status', header: 'Status', sortValue: (admission) => admission.status, render: (admission) => <AdmissionStatusBadge status={admission.status} simplified /> },
+  type Row = TrainerAdmissionQueue['pending'][number];
+  const extraColumns: DataTableColumn<Row>[] = [
     {
       id: 'stall',
       header: 'Quarantine stall',
@@ -183,100 +167,54 @@ export function TrainerAdmissionsListView() {
         ? `Stall ${admission.quarantineStallCode}`
         : <span className="italic text-[var(--color-text-muted)]">Unassigned</span>,
     },
-    { id: 'submitted', header: 'Submitted', sortValue: (admission) => new Date(admission.submittedAt), render: (admission) => new Date(admission.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }) },
     ...(urlFilters.tab === 'REVIEWED' ? [{
       id: 'reviewed',
       header: 'Evaluated',
-      sortValue: (admission: TrainerAdmissionQueue['pending'][number]) => admission.trainerReviewedAt ? new Date(admission.trainerReviewedAt) : null,
-      render: (admission: TrainerAdmissionQueue['pending'][number]) => admission.trainerReviewedAt
-        ? new Date(admission.trainerReviewedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })
-        : '—',
+      sortValue: (admission: Row) => admission.trainerReviewedAt ? new Date(admission.trainerReviewedAt) : null,
+      render: (admission: Row) => formatDate(admission.trainerReviewedAt),
     }] : []),
-    {
-      id: 'action',
-      header: 'Action',
-      align: 'right',
-      render: (admission) => (
-        <Link
-          href={`/trainer/admissions/${admission.admissionId}${detailQuery}`}
-          className={`${admission.status === 'TRAINER_REVIEW' ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:opacity-90' : 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]'} inline-flex min-h-9 items-center justify-center rounded-[var(--radius-sm)] px-4 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]`}
-        >
-          {admission.status === 'TRAINER_REVIEW' ? 'Evaluate' : 'View'}
-        </Link>
-      ),
-    },
   ];
 
   return (
     <AdmissionListLayout title="Admissions" description="Assess racing potential and readiness of candidate horses in the quarantine facility.">
-      {/* Filter Toolbar (Merged review type filter) */}
-      <FilterBar
-        layout="grid"
-        onSubmit={applyFilters}
-        className="sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:items-end"
+      <FilterChips
+        label="Application type"
+        value={urlFilters.tab}
+        onChange={handleTabChange}
+        options={[
+          { value: 'PENDING', label: 'Pending evaluation', count: pendingCount },
+          { value: 'REVIEWED', label: 'Evaluated by you', count: reviewedCount },
+        ]}
+      />
+
+      <AdmissionFilterBar
+        search={draft.candidateName}
+        onSearchChange={(candidateName) => setDraft({ ...draft, candidateName })}
+        onApply={applyFilters}
+        onClear={clearFilters}
       >
-        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Application Type
-          <select
-            value={draft.tab}
-            onChange={(e) => handleTabChange(e.target.value as Tab)}
-            className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-          >
-            <option value="PENDING">Pending Evaluation ({pendingCount})</option>
-            <option value="REVIEWED">Evaluated by You ({reviewedCount})</option>
-          </select>
-        </label>
-
-        <AdmissionSearchField
-          label="Candidate horse name"
-          placeholder="Search horse name"
-          value={draft.candidateName}
-          onChange={(candidateName) => setDraft({ ...draft, candidateName })}
+        <FilterDateRange
+          from={draft.submittedFrom}
+          to={draft.submittedTo}
+          onFromChange={(submittedFrom) => setDraft({ ...draft, submittedFrom })}
+          onToChange={(submittedTo) => setDraft({ ...draft, submittedTo })}
         />
-
-        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Submitted From
-          <input
-            type="date"
-            value={draft.submittedFrom}
-            onChange={(e) => setDraft({ ...draft, submittedFrom: e.target.value })}
-            className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-          />
-        </label>
-
-        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Submitted To
-          <input
-            type="date"
-            min={draft.submittedFrom || undefined}
-            value={draft.submittedTo}
-            onChange={(e) => setDraft({ ...draft, submittedTo: e.target.value })}
-            className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-          />
-        </label>
-
-        <div className="flex items-center gap-2">
-          <Button type="submit" variant="primary" size="sm">
-            Apply
-          </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={clearFilters}>
-            Reset
-          </Button>
-        </div>
-      </FilterBar>
+      </AdmissionFilterBar>
 
       {error && (
         <Notice tone="error">{error}</Notice>
       )}
 
-      <DataTable
-        rows={filteredAdmissions}
-        columns={columns}
-        getRowKey={(admission) => admission.admissionId}
-        ariaLabel="Trainer admission records"
+      <AdmissionTable
+        admissions={filteredAdmissions}
+        detailHref={(id) => `/trainer/admissions/${id}${detailQuery}`}
+        extraColumns={extraColumns}
+        simplifiedStatus
+        action={(admission) => admission.status === 'TRAINER_REVIEW' ? { label: 'Evaluate', primary: true } : { label: 'View' }}
+        searchable={false}
         emptyTitle="No admission records found"
         emptyDescription="Try adjusting your search filters or switch the application type."
-        emptyAction={<Button size="sm" onClick={clearFilters}>Reset filters</Button>}
+        emptyAction={<Button size="sm" onClick={clearFilters}>Clear filters</Button>}
         pagination={{ page: tablePage, pageSize: 10, total: filteredAdmissions.length, onPageChange: setTablePage }}
       />
     </AdmissionListLayout>

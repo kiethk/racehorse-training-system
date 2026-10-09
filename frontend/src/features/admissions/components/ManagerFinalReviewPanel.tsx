@@ -4,10 +4,7 @@ import { useState } from 'react';
 import { ApiError } from '@/services/api';
 import { admissionsApi } from '../services/api';
 import type { AdmissionDetailResponse } from '../types';
-import { Panel, SectionTitle } from '@/components/ui/Panel';
-import { Button } from '@/components/ui/Button';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { Icon } from '@/components/ui/Icon';
+import { Button, Checkbox, ConfirmDialog, FormField, Notice, Select, Textarea } from '@/components/ui';
 
 interface Props {
   detailData: AdmissionDetailResponse;
@@ -81,134 +78,101 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
 
   return (
     <>
-      <Panel padded className="border-[var(--color-primary)] border-2">
-        <SectionTitle>Manager Final Review</SectionTitle>
-        <div className="mt-4 space-y-4">
-          
-          {error && (
-            <div className="p-3 bg-[var(--color-danger-soft)] text-[var(--color-danger)] text-[13px] rounded-[var(--radius-sm)] flex items-start gap-2">
-              <Icon name="alert-triangle" className="shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
+      <div className="space-y-4">
+        {error && <Notice tone="error">{error}</Notice>}
 
-          {actionMode === 'INITIAL' && (
-            <div className="flex gap-2">
-              <Button variant="destructive" onClick={() => setActionMode('REJECT')}>
-                Reject
+        {actionMode === 'INITIAL' && (
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="destructive" onClick={() => setActionMode('REJECT')}>
+              Reject
+            </Button>
+            <Button variant="primary" onClick={() => setActionMode('APPROVE')}>
+              Approve
+            </Button>
+          </div>
+        )}
+
+        {actionMode === 'APPROVE' && (
+          <div className="space-y-4">
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-medium text-[var(--color-text-primary)]">Stall assignment</legend>
+              <Checkbox
+                type="radio"
+                name="stallMode"
+                label="Automatic assignment"
+                checked={stallMode === 'auto'}
+                onChange={() => setStallMode('auto')}
+              />
+              <Checkbox
+                type="radio"
+                name="stallMode"
+                label="Manual selection"
+                checked={stallMode === 'manual'}
+                onChange={() => setStallMode('manual')}
+                disabled={availableStalls.length === 0}
+              />
+            </fieldset>
+
+            {stallMode === 'manual' && (
+              availableStalls.length > 0 ? (
+                <FormField label="Regular stall" required>
+                  <Select value={stallId || ''} onChange={(e) => setStallId(Number(e.target.value))}>
+                    <option value="" disabled>Select a stall...</option>
+                    {availableStalls.map(stall => (
+                      <option key={stall.id} value={stall.id}>Stall {stall.stallCode}</option>
+                    ))}
+                  </Select>
+                </FormField>
+              ) : (
+                <Notice tone="error">No regular stalls available. Cannot approve in manual mode.</Notice>
+              )
+            )}
+
+            <FormField label="Feedback (optional)">
+              <Textarea
+                rows={2}
+                placeholder="Enter optional feedback..."
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+              />
+            </FormField>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={cancelAction} disabled={submitting}>
+                Cancel
               </Button>
-              <Button variant="primary" onClick={() => setActionMode('APPROVE')}>
-                Approve
+              <Button variant="primary" onClick={() => handleActionClick('APPROVED')} disabled={submitting || (stallMode === 'manual' && (!stallId || availableStalls.length === 0))}>
+                Confirm Approve
               </Button>
             </div>
-          )}
-          
-          {actionMode === 'APPROVE' && (
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <label className="text-[13px] font-medium text-[var(--color-text-primary)]">Stall Assignment</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-[13px] cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="stallMode" 
-                      checked={stallMode === 'auto'} 
-                      onChange={() => setStallMode('auto')} 
-                      className="accent-[var(--color-primary)]"
-                    />
-                    Automatic assignment
-                  </label>
-                  <label className="flex items-center gap-2 text-[13px] cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="stallMode" 
-                      checked={stallMode === 'manual'} 
-                      onChange={() => setStallMode('manual')} 
-                      className="accent-[var(--color-primary)]"
-                      disabled={availableStalls.length === 0}
-                    />
-                    Manual selection
-                  </label>
-                </div>
-                
-                {stallMode === 'manual' && (
-                  <div className="mt-2">
-                    {availableStalls.length > 0 ? (
-                      <select 
-                        value={stallId || ''} 
-                        onChange={(e) => setStallId(Number(e.target.value))}
-                        className="w-full max-w-sm p-2 text-[13px] border border-[var(--color-border)] rounded bg-[var(--color-surface)] outline-none focus:border-[var(--color-primary)]"
-                      >
-                        <option value="" disabled>Select a stall...</option>
-                        {availableStalls.map(stall => (
-                          <option key={stall.id} value={stall.id}>Stall {stall.stallCode}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="text-[12px] text-[var(--color-danger)] flex items-center gap-1.5 p-2 bg-[var(--color-danger-soft)] rounded-[var(--radius-sm)]">
-                        <Icon name="alert-triangle" size={14} />
-                        No regular stalls available. Cannot approve in manual mode.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+          </div>
+        )}
 
-              <div className="space-y-1">
-                <label className="text-[13px] font-medium text-[var(--color-text-primary)]">
-                  Feedback (Optional)
-                </label>
-                <textarea
-                  className="w-full p-2 text-[13px] border border-[var(--color-border)] rounded bg-[var(--color-surface)] outline-none focus:border-[var(--color-primary)] resize-none"
-                  rows={2}
-                  placeholder="Enter optional feedback..."
-                  value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                />
-              </div>
+        {actionMode === 'REJECT' && (
+          <div className="space-y-4">
+            <FormField label="Feedback" required>
+              <Textarea
+                rows={3}
+                placeholder="Enter reasoning (required for rejection)..."
+                value={feedback}
+                onChange={(e) => {
+                  setFeedback(e.target.value);
+                  if (error) setError(null);
+                }}
+              />
+            </FormField>
 
-              <div className="flex gap-2 justify-end pt-2">
-                <Button variant="secondary" onClick={cancelAction} disabled={submitting}>
-                  Cancel
-                </Button>
-                <Button variant="primary" onClick={() => handleActionClick('APPROVED')} disabled={submitting || (stallMode === 'manual' && (!stallId || availableStalls.length === 0))}>
-                  Confirm Approve
-                </Button>
-              </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={cancelAction} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={() => handleActionClick('REJECTED')} disabled={submitting || !feedback.trim()}>
+                Confirm Reject
+              </Button>
             </div>
-          )}
-
-          {actionMode === 'REJECT' && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[13px] font-medium text-[var(--color-text-primary)]">
-                  Feedback <span className="text-[var(--color-danger)]">*</span>
-                </label>
-                <textarea
-                  className="w-full p-2 text-[13px] border border-[var(--color-border)] rounded bg-[var(--color-surface)] outline-none focus:border-[var(--color-primary)] resize-none"
-                  rows={3}
-                  placeholder="Enter reasoning (required for rejection)..."
-                  value={feedback}
-                  onChange={(e) => {
-                    setFeedback(e.target.value);
-                    if (error) setError(null);
-                  }}
-                />
-              </div>
-
-              <div className="flex gap-2 justify-end pt-2">
-                <Button variant="secondary" onClick={cancelAction} disabled={submitting}>
-                  Cancel
-                </Button>
-                <Button variant="destructive" onClick={() => handleActionClick('REJECTED')} disabled={submitting || !feedback.trim()}>
-                  Confirm Reject
-                </Button>
-              </div>
-            </div>
-          )}
-
-        </div>
-      </Panel>
+          </div>
+        )}
+      </div>
 
       <ConfirmDialog
         open={confirmDecision === 'APPROVED'}

@@ -52,7 +52,7 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
     };
   }, [document.fileUrl]);
 
-  const actionClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-[13px] font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]';
+  const actionClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]';
 
   return (
     <dialog
@@ -66,8 +66,8 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
         <header className="flex shrink-0 items-start gap-3 border-b border-[var(--color-border)] px-4 py-3 sm:px-5">
           <Icon name="file-text" size={20} className="mt-1 shrink-0 text-[var(--color-text-muted)]" />
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="break-words text-[15px] font-semibold">{filename}</h2>
-            <p className="mt-0.5 text-[12px] text-[var(--color-text-muted)]">{label}</p>
+            <h2 id={titleId} className="break-words text-lg font-semibold">{filename}</h2>
+            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{label}</p>
           </div>
           <Button type="button" variant="tertiary" icon="x" aria-label="Close preview" onClick={onClose} />
         </header>
@@ -78,7 +78,7 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
           {file?.kind === 'image' && !error && (
             <div className="ml-auto flex items-center gap-1">
               <Button type="button" size="sm" variant="tertiary" icon="minus" aria-label="Zoom out" disabled={zoom === 100} onClick={() => setZoom((value) => value - 25)} />
-              <span className="w-11 text-center text-[12px]" aria-live="polite">{zoom}%</span>
+              <span className="w-11 text-center text-xs" aria-live="polite">{zoom}%</span>
               <Button type="button" size="sm" variant="tertiary" icon="plus" aria-label="Zoom in" disabled={zoom === 200} onClick={() => setZoom((value) => value + 25)} />
               <Button type="button" size="sm" variant="tertiary" onClick={() => setZoom(100)}>Fit</Button>
             </div>
@@ -87,9 +87,9 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
 
         <div className="min-h-0 flex-1 overflow-auto overscroll-contain bg-[var(--color-surface-muted)]" aria-busy={!file && !error}>
           {error ? (
-            <div role="alert" className="flex h-full items-center justify-center p-6 text-center text-[13px]">{error}</div>
+            <div role="alert" className="flex h-full items-center justify-center p-6 text-center text-sm">{error}</div>
           ) : !file ? (
-            <div role="status" className="flex h-full items-center justify-center gap-2 text-[13px] text-[var(--color-text-muted)]"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />Loading document…</div>
+            <div role="status" className="flex h-full items-center justify-center gap-2 text-sm text-[var(--color-text-muted)]"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />Loading document…</div>
           ) : file.kind === 'image' ? (
             <div className="relative" style={{ width: `${zoom}%`, height: `${zoom}%` }}>
               {/* Blob URLs are authenticated local previews; no image optimization request is needed. */}
@@ -98,14 +98,14 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
             </div>
           ) : file.kind === 'pdf' ? (
             <div className="flex h-full flex-col">
-              <p className="shrink-0 px-4 py-2 text-[12px] text-[var(--color-text-muted)]">If the PDF viewer is unavailable, download the file or open it in a new tab.</p>
+              <p className="shrink-0 px-4 py-2 text-xs text-[var(--color-text-muted)]">If the PDF viewer is unavailable, download the file or open it in a new tab.</p>
               <iframe src={file.url} title={`Preview of ${filename}`} className="min-h-0 w-full flex-1 border-0" onError={() => setError('This PDF could not be displayed. Download it or open it in a new tab.')} />
             </div>
           ) : (
-            <div className="flex h-full items-center justify-center p-6 text-center text-[13px]">Preview is available for JPEG, PNG, WebP and PDF files. Download this file or open it in a new tab.</div>
+            <div className="flex h-full items-center justify-center p-6 text-center text-sm">Preview is available for JPEG, PNG, WebP and PDF files. Download this file or open it in a new tab.</div>
           )}
         </div>
-        {document.note && <p className="max-h-24 shrink-0 overflow-auto whitespace-pre-wrap break-words border-t border-[var(--color-border)] px-4 py-3 text-[12px] text-[var(--color-text-secondary)]"><span className="font-medium">Note: </span>{document.note}</p>}
+        {document.note && <p className="max-h-24 shrink-0 overflow-auto whitespace-pre-wrap break-words border-t border-[var(--color-border)] px-4 py-3 text-xs text-[var(--color-text-secondary)]"><span className="font-medium">Note: </span>{document.note}</p>}
       </div>
     </dialog>
   );
