@@ -197,11 +197,11 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     <div className="mx-auto w-full max-w-4xl space-y-5">
       <Panel className="overflow-hidden border-2 border-[var(--color-danger)] p-0">
         <header className="flex flex-wrap items-start gap-4 border-b border-[var(--color-danger)]/30 bg-[var(--color-danger-soft)] p-6">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-danger)] text-white">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-danger)] text-[var(--color-text-inverse)]">
             <Icon name="alert-triangle" size={24} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--color-danger)]">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-danger)]">
             Urgent case #{urgentCase.scheduleId}
             </p>
             <h1 className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{urgentCase.title}</h1>
@@ -218,35 +218,35 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
         <div className="space-y-5 p-6">
           <dl className="grid gap-4 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-4 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Horse</dt>
+              <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Horse</dt>
               <dd className="mt-1 font-bold">
                 {urgentCase.horseName} · #{urgentCase.horseId}
               </dd>
             </div>
             <div>
-            <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Stall / Location</dt>
+            <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Stall / Location</dt>
               <dd className="mt-1 font-semibold">
             {[urgentCase.stallCode, urgentCase.stableLocation].filter(Boolean).join(' · ') || 'Not provided'}
               </dd>
             </div>
             <div>
-            <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Reported by</dt>
+            <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Reported by</dt>
               <dd className="mt-1 font-semibold">
             {urgentCase.reportedByName || 'Unknown'} · #{urgentCase.reportedById}
               </dd>
             </div>
             <div>
-            <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Reported at</dt>
+            <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Reported at</dt>
               <dd className="mt-1 font-semibold">{formatDateTime(urgentCase.reportedAt)}</dd>
             </div>
             <div>
-              <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">
+              <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">
             Assigned at
               </dt>
               <dd className="mt-1 font-semibold">{formatDateTime(urgentCase.assignedAt)}</dd>
             </div>
             <div>
-            <dt className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">Training decision</dt>
+            <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Training decision</dt>
               <dd className="mt-1 font-bold text-[var(--color-danger)]">
             {urgentCase.trainingDecision} — Training is paused until the examination is complete.
               </dd>
@@ -292,7 +292,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           )}
 
           {urgentCase.status === 'IN_PROGRESS' && (
-            <form onSubmit={handleSubmit} className="space-y-5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+            <form onSubmit={handleSubmit} className="legacy-controls space-y-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
               <div className="border-b border-[var(--color-border)] pb-3">
                 <h3 className="text-lg font-bold text-[var(--color-text-primary)]">
                   Urgent Examination Record
@@ -513,7 +513,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                         />
                         <span className="text-xs font-bold">{option.label}</span>
                       </div>
-                      <p className="mt-1 text-[11px] text-[var(--color-text-secondary)]">{option.desc}</p>
+                      <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{option.desc}</p>
                     </label>
                   ))}
                 </div>
@@ -564,7 +564,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                               key={days}
                               type="button"
                               onClick={() => setFollowUpDate(businessDate(days))}
-                              className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]"
+                              className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]"
                             >
                               +{days} days
                             </button>
@@ -595,7 +595,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                         )}
                       </div>
                     </div>
-                    <p className="text-[11px] text-[var(--color-text-secondary)]">
+                    <p className="text-xs text-[var(--color-text-secondary)]">
                       The horse will rest until this follow-up examination. The trainer will see the reason and date when creating a plan.
                     </p>
                   </div>

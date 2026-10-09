@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Notice } from '@/components/ui/Notice';
+import { admissionAsideClassName, admissionDetailGridClassName } from '../shared/components/AdmissionDetailLayout';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Pill } from '@/components/ui/StatusBadge';
 import { admissionsApi } from '../services/api';
@@ -306,6 +308,8 @@ export interface VetReviewFormProps {
   careType?: CareType;
   scheduleStatus?: CareScheduleStatus;
   onStartExam?: () => Promise<void>;
+  /** Rendered above the decision panel in the side column (e.g. the examination details card). */
+  asideTop?: ReactNode;
   onSuccess: (result: VetReviewResponse | CareSchedule, completionKind: 'INITIAL' | 'CARE_SCHEDULE') => void;
   onDirtyChange?: (dirty: boolean) => void;
 }
@@ -319,6 +323,7 @@ export function VetReviewForm({
   careType = 'INITIAL',
   scheduleStatus,
   onStartExam,
+  asideTop,
   onSuccess,
   onDirtyChange,
 }: VetReviewFormProps) {
@@ -745,25 +750,25 @@ export function VetReviewForm({
 
   return (
     <>
-      <form onSubmit={handleFormSubmit} className="pb-24 md:pb-0">
+      <form onSubmit={handleFormSubmit} className="legacy-controls pb-24 md:pb-0">
         {/* Gate Warning when SCHEDULED */}
         {scheduleStatus === 'SCHEDULED' && (
           <div
             role="status"
-            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 text-[13px] text-[var(--color-warning)]"
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 text-sm text-[var(--color-warning)]"
           >
             <div className="flex items-center gap-2">
               <Icon name="alert-triangle" size={18} className="shrink-0 text-[var(--color-warning)]" />
               <div>
-                <strong className="block text-[13px] font-bold">
+                <strong className="block text-sm font-bold">
                   Care schedule is SCHEDULED
                 </strong>
-                <p className="text-[12px] opacity-90">
+                <p className="text-xs opacity-90">
                   Physical examination must be started before clinical findings and decisions can be recorded.
                 </p>
               </div>
             </div>
-            {onStartExam && (
+            {onStartExam && !asideTop && (
               <Button
                 type="button"
                 size="sm"
@@ -788,15 +793,15 @@ export function VetReviewForm({
         {scheduleStatus === 'REQUESTED' && (
           <div
             role="status"
-            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-3 text-[13px] text-[var(--color-info)]"
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-3 text-sm text-[var(--color-info)]"
           >
             <div className="flex items-center gap-2">
               <Icon name="clock" size={18} className="shrink-0 text-[var(--color-info)]" />
               <div>
-                <strong className="block text-[13px] font-bold">
+                <strong className="block text-sm font-bold">
                   Care schedule is REQUESTED
                 </strong>
-                <p className="text-[12px] opacity-90">
+                <p className="text-xs opacity-90">
                   This examination schedule is waiting for slot scheduling and assignment before it can be started.
                 </p>
               </div>
@@ -808,7 +813,7 @@ export function VetReviewForm({
         {formError && (
           <div
             role="alert"
-            className="mb-4 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-[13px] text-[var(--color-danger)]"
+            className="mb-4 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]"
           >
             <Icon name="alert-triangle" size={16} className="mt-0.5 shrink-0" />
             <span>{formError}</span>
@@ -819,7 +824,7 @@ export function VetReviewForm({
         {availableDraft && (
           <div
             role="status"
-            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-sm)] border border-[var(--color-primary)] bg-[var(--color-primary-soft)] px-3 py-2 text-[12px] text-[var(--color-text-primary)]"
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-sm)] border border-[var(--color-primary)] bg-[var(--color-primary-soft)] px-3 py-2 text-xs text-[var(--color-text-primary)]"
           >
             <div className="flex items-center gap-2">
               <Icon name="clipboard" size={14} className="text-[var(--color-primary)] shrink-0" />
@@ -850,7 +855,7 @@ export function VetReviewForm({
 
         {/* Draft Saved Status (FR-CHUNG-92) */}
         {draftSavedTime && !availableDraft && (
-          <div className="mb-4 flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-1.5 text-[11px] text-[var(--color-text-secondary)]">
+          <div className="mb-4 flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)]">
             <span className="flex items-center gap-1.5 font-medium">
               <Icon name="check" size={12} className="text-[var(--color-success)]" />
               Draft saved at {draftSavedTime}
@@ -866,22 +871,22 @@ export function VetReviewForm({
         )}
 
         {/* Main Two-Column Body: Form (~65%) & Sticky Decision Panel (~35%) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className={admissionDetailGridClassName}>
           {/* LEFT COLUMN: Clinical Examination (~65% width = lg:col-span-8) */}
-          <div className="lg:col-span-8 space-y-6">
+          <div className="min-w-0 space-y-5">
             {/* Section 1: Patient Vitals & Telemetry */}
-            <fieldset disabled={isFormDisabled} className="space-y-3">
+            <fieldset disabled={isFormDisabled} className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)] space-y-4">
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-                <legend className="text-[12px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
                   1. Patient Vitals &amp; Telemetry
-                </legend>
-                <span className="text-[11px] text-[var(--color-text-muted)]">
+                </h3>
+                <span className="text-xs text-[var(--color-text-muted)]">
                   Standard equine reference ranges
                 </span>
               </div>
 
               {/* Vitals Grid without heavy card wrappers */}
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-5">
                 {metricConfigs.map((cfg) => {
                   const borderInfo = getMetricBorderTone(
                     metrics[cfg.key],
@@ -892,7 +897,7 @@ export function VetReviewForm({
                   );
                   return (
                     <div key={cfg.key} className="space-y-1">
-                      <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center justify-between text-xs">
                         <label
                           htmlFor={`metric-${cfg.key}`}
                           className="font-medium text-[var(--color-text-primary)]"
@@ -901,7 +906,7 @@ export function VetReviewForm({
                         </label>
                         {borderInfo.statusLabel && (
                           <span
-                            className={`text-[10px] font-bold ${
+                            className={`text-xs font-bold ${
                               borderInfo.tone === 'danger'
                                 ? 'text-[var(--color-danger)]'
                                 : borderInfo.tone === 'warning'
@@ -925,18 +930,18 @@ export function VetReviewForm({
                           onChange={(e) =>
                             setMetrics((curr) => ({ ...curr, [cfg.key]: e.target.value }))
                           }
-                          className={`w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface)] px-2.5 py-1.5 pr-8 font-metric text-[13px] font-semibold text-[var(--color-text-primary)] outline-none transition-all ${borderInfo.borderClass}`}
+                          className={`w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface)] px-3 pr-10 font-metric text-sm font-semibold text-[var(--color-text-primary)] outline-none transition-all ${borderInfo.borderClass}`}
                         />
-                        <span className="pointer-events-none absolute right-2 top-1.5 text-[11px] text-[var(--color-text-muted)]">
+                        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--color-text-muted)]">
                           {cfg.unit}
                         </span>
                       </div>
 
-                      <span className="block text-[10px] text-[var(--color-text-muted)]">
+                      <span className="block text-xs text-[var(--color-text-muted)]">
                         {cfg.normalLabel}
                       </span>
                       {fieldErrors[cfg.key] && (
-                        <span className="block text-[10px] font-medium text-[var(--color-danger)]">
+                        <span className="block text-xs font-medium text-[var(--color-danger)]">
                           {fieldErrors[cfg.key]}
                         </span>
                       )}
@@ -950,13 +955,13 @@ export function VetReviewForm({
                 <div>
                   <label
                     htmlFor="metric-hydration"
-                    className="mb-1 block text-[11px] font-medium text-[var(--color-text-secondary)]"
+                    className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]"
                   >
                     Hydration &amp; Mucous Membranes
                   </label>
                   <select
                     id="metric-hydration"
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
+                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
                     value={metrics.hydrationStatus}
                     onChange={(e) => setMetrics((curr) => ({ ...curr, hydrationStatus: e.target.value }))}
                   >
@@ -976,7 +981,7 @@ export function VetReviewForm({
                 <div>
                   <label
                     htmlFor="metric-notes"
-                    className="mb-1 block text-[11px] font-medium text-[var(--color-text-secondary)]"
+                    className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]"
                   >
                     Telemetry &amp; Observation Context
                   </label>
@@ -984,7 +989,7 @@ export function VetReviewForm({
                     id="metric-notes"
                     type="text"
                     maxLength={2000}
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
+                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
                     value={metrics.notes}
                     onChange={(e) => setMetrics((curr) => ({ ...curr, notes: e.target.value }))}
                     placeholder="e.g. Calm disposition, post-transport check"
@@ -994,12 +999,12 @@ export function VetReviewForm({
             </fieldset>
 
             {/* Section 2: Clinical Findings & Diagnostics */}
-            <fieldset disabled={isFormDisabled} className="space-y-4 border-t border-[var(--color-border)] pt-4">
+            <fieldset disabled={isFormDisabled} className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)] space-y-4">
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-                <legend className="text-[12px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
                   2. Clinical Findings &amp; Examination
-                </legend>
-                <span className="text-[11px] font-medium text-[var(--color-danger)]">
+                </h3>
+                <span className="text-xs font-medium text-[var(--color-danger)]">
                   * Required
                 </span>
               </div>
@@ -1018,16 +1023,16 @@ export function VetReviewForm({
                     }}
                     className="h-4 w-4 rounded accent-[var(--color-primary)]"
                   />
-                  <span className="text-[12px] font-semibold text-[var(--color-text-primary)]">
+                  <span className="text-xs font-semibold text-[var(--color-text-primary)]">
                     Physical Exam Conducted In-Person
                   </span>
                 </label>
-                <span className="text-[11px] text-[var(--color-text-muted)]">
+                <span className="text-xs text-[var(--color-text-muted)]">
                   Quarantine facility: {quarantineStallCode || 'Stall verified'}
                 </span>
               </div>
               {fieldErrors.physicalExamConfirmed && (
-                <p className="text-[11px] font-medium text-[var(--color-danger)]">
+                <p className="text-xs font-medium text-[var(--color-danger)]">
                   {fieldErrors.physicalExamConfirmed}
                 </p>
               )}
@@ -1038,20 +1043,20 @@ export function VetReviewForm({
                   <div>
                     <label
                       htmlFor="field-symptoms"
-                      className="mb-1 block text-[11px] font-medium text-[var(--color-text-primary)]"
+                      className="mb-1 block text-xs font-medium text-[var(--color-text-primary)]"
                     >
                       Urgent Presenting Symptoms <span className="text-[var(--color-danger)]">*</span>
                     </label>
                     <textarea
                       id="field-symptoms"
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[12px] outline-none focus:border-[var(--color-primary)]"
+                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs outline-none focus:border-[var(--color-primary)]"
                       rows={3}
                       value={symptoms}
                       onChange={(e) => setSymptoms(e.target.value)}
                       placeholder="Describe onset, symptoms, and urgency..."
                     />
                     {fieldErrors.symptoms && (
-                      <p className="text-[11px] font-medium text-[var(--color-danger)]">
+                      <p className="text-xs font-medium text-[var(--color-danger)]">
                         {fieldErrors.symptoms}
                       </p>
                     )}
@@ -1059,20 +1064,20 @@ export function VetReviewForm({
                   <div>
                     <label
                       htmlFor="field-findings"
-                      className="mb-1 block text-[11px] font-medium text-[var(--color-text-primary)]"
+                      className="mb-1 block text-xs font-medium text-[var(--color-text-primary)]"
                     >
                       Urgent Physical Findings <span className="text-[var(--color-danger)]">*</span>
                     </label>
                     <textarea
                       id="field-findings"
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[12px] outline-none focus:border-[var(--color-primary)]"
+                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs outline-none focus:border-[var(--color-primary)]"
                       rows={3}
                       value={findings}
                       onChange={(e) => setFindings(e.target.value)}
                       placeholder="Document trauma, distress, or acute signs..."
                     />
                     {fieldErrors.findings && (
-                      <p className="text-[11px] font-medium text-[var(--color-danger)]">
+                      <p className="text-xs font-medium text-[var(--color-danger)]">
                         {fieldErrors.findings}
                       </p>
                     )}
@@ -1082,7 +1087,7 @@ export function VetReviewForm({
                 <div className="space-y-3">
                   {/* Segmented Control: Normal | Abnormal */}
                   <div className="space-y-1.5">
-                    <label className="block text-[11px] font-semibold text-[var(--color-text-secondary)]">
+                    <label className="block text-xs font-semibold text-[var(--color-text-secondary)]">
                       Clinical Status Assessment
                     </label>
                     <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-0.5">
@@ -1095,9 +1100,9 @@ export function VetReviewForm({
                           setStructuredDiagnosis('Clinically healthy');
                           setFieldErrors((errs) => ({ ...errs, systemFindings: '' }));
                         }}
-                        className={`flex items-center gap-1.5 rounded-[var(--radius-sm)] px-4 py-1.5 text-[12px] font-bold transition-all ${
+                        className={`flex items-center gap-1.5 rounded-[var(--radius-sm)] px-4 py-1.5 text-xs font-bold transition-all ${
                           examMode === 'NORMAL'
-                            ? 'bg-[var(--color-success)] text-white shadow-xs'
+                            ? 'bg-[var(--color-success)] text-[var(--color-text-inverse)]'
                             : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                         }`}
                       >
@@ -1111,9 +1116,9 @@ export function VetReviewForm({
                           setSelectedSymptoms([]);
                           setStructuredDiagnosis('Minor clinical condition');
                         }}
-                        className={`flex items-center gap-1.5 rounded-[var(--radius-sm)] px-4 py-1.5 text-[12px] font-bold transition-all ${
+                        className={`flex items-center gap-1.5 rounded-[var(--radius-sm)] px-4 py-1.5 text-xs font-bold transition-all ${
                           examMode === 'ABNORMAL'
-                            ? 'bg-[var(--color-warning)] text-white shadow-xs'
+                            ? 'bg-[var(--color-warning)] text-[var(--color-text-inverse)]'
                             : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                         }`}
                       >
@@ -1123,7 +1128,7 @@ export function VetReviewForm({
                     </div>
 
                     {/* Inline Helper Text */}
-                    <p className="text-[11px] text-[var(--color-text-muted)]">
+                    <p className="text-xs text-[var(--color-text-muted)]">
                       {examMode === 'NORMAL'
                         ? 'All 8 body systems are recorded as normal. Findings and symptoms will be generated automatically.'
                         : 'Abnormal findings detected. Specify affected body systems and observed symptoms below.'}
@@ -1135,13 +1140,13 @@ export function VetReviewForm({
                     <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3.5 space-y-4">
                       <div>
                         <div className="flex items-center justify-between">
-                          <h4 className="text-[12px] font-bold text-[var(--color-text-primary)]">
+                          <h4 className="text-xs font-bold text-[var(--color-text-primary)]">
                             8 Body Systems Checklist
                           </h4>
                           <button
                             type="button"
                             onClick={() => setSystemFindings({ ...normalSystemFindings })}
-                            className="text-[11px] font-semibold text-[var(--color-primary)] hover:underline"
+                            className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
                           >
                             Reset All to Normal
                           </button>
@@ -1151,7 +1156,7 @@ export function VetReviewForm({
                             const isAbnormal = systemFindings[key] !== 'NORMAL';
                             return (
                               <label key={key} className="space-y-1">
-                                <span className="block text-[10px] font-medium text-[var(--color-text-secondary)]">
+                                <span className="block text-xs font-medium text-[var(--color-text-secondary)]">
                                   {label}
                                 </span>
                                 <select
@@ -1163,7 +1168,7 @@ export function VetReviewForm({
                                     }));
                                     setFieldErrors((errs) => ({ ...errs, systemFindings: '' }));
                                   }}
-                                  className={`w-full rounded-[var(--radius-sm)] px-2 py-1 text-[11px] outline-none border transition-colors ${
+                                  className={`w-full rounded-[var(--radius-sm)] px-2 py-1 text-xs outline-none border transition-colors ${
                                     isAbnormal
                                       ? 'border-[var(--color-warning)] bg-[var(--color-warning-soft)] text-[var(--color-warning)] font-semibold'
                                       : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)]'
@@ -1182,7 +1187,7 @@ export function VetReviewForm({
                           })}
                         </div>
                         {fieldErrors.systemFindings && (
-                          <p className="mt-1.5 text-[11px] font-medium text-[var(--color-danger)]">
+                          <p className="mt-1.5 text-xs font-medium text-[var(--color-danger)]">
                             {fieldErrors.systemFindings}
                           </p>
                         )}
@@ -1190,7 +1195,7 @@ export function VetReviewForm({
 
                       {/* Symptoms Tags */}
                       <div className="border-t border-[var(--color-border)] pt-3">
-                        <span className="block text-[11px] font-bold text-[var(--color-text-primary)] mb-2">
+                        <span className="block text-xs font-bold text-[var(--color-text-primary)] mb-2">
                           Observed Symptoms Checklist
                         </span>
                         <div className="flex flex-wrap gap-1.5">
@@ -1211,7 +1216,7 @@ export function VetReviewForm({
                                       : [...withoutNone, symptom];
                                   })
                                 }
-                                className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
                                   selected
                                     ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-semibold'
                                     : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)]'
@@ -1234,7 +1239,7 @@ export function VetReviewForm({
                 <div>
                   <label
                     htmlFor="field-assessment-diag"
-                    className="mb-1 block text-[11px] font-semibold text-[var(--color-text-primary)]"
+                    className="mb-1 block text-xs font-semibold text-[var(--color-text-primary)]"
                   >
                     Clinical Assessment &amp; Diagnosis <span className="text-[var(--color-danger)]">*</span>
                   </label>
@@ -1242,20 +1247,20 @@ export function VetReviewForm({
                     <input
                       id="field-assessment-diag"
                       type="text"
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-[12px] outline-none focus:border-[var(--color-primary)]"
+                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
                       value={diagnosis}
                       onChange={(e) => setDiagnosis(e.target.value)}
                       placeholder="Working diagnosis..."
                     />
                   ) : examMode === 'NORMAL' ? (
-                    <div className="flex h-9 items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-success)] bg-[var(--color-success-soft)] px-3 text-[12px] font-semibold text-[var(--color-success)]">
+                    <div className="flex h-9 items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-success)] bg-[var(--color-success-soft)] px-3 text-xs font-semibold text-[var(--color-success)]">
                       <Icon name="check" size={14} />
                       Clinically Healthy
                     </div>
                   ) : (
                     <select
                       id="field-assessment-diag"
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-2 text-[12px] outline-none focus:border-[var(--color-primary)]"
+                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-2 text-xs outline-none focus:border-[var(--color-primary)]"
                       value={structuredDiagnosis}
                       onChange={(e) => setStructuredDiagnosis(e.target.value)}
                     >
@@ -1269,7 +1274,7 @@ export function VetReviewForm({
                     </select>
                   )}
                   {fieldErrors.diagnosis && (
-                    <p className="mt-1 text-[11px] font-medium text-[var(--color-danger)]">
+                    <p className="mt-1 text-xs font-medium text-[var(--color-danger)]">
                       {fieldErrors.diagnosis}
                     </p>
                   )}
@@ -1278,14 +1283,14 @@ export function VetReviewForm({
                 <div>
                   <label
                     htmlFor="field-treatment"
-                    className="mb-1 block text-[11px] font-semibold text-[var(--color-text-primary)]"
+                    className="mb-1 block text-xs font-semibold text-[var(--color-text-primary)]"
                   >
                     Treatment &amp; Care Protocol (Optional)
                   </label>
                   <textarea
                     id="field-treatment"
                     rows={2}
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[12px] outline-none focus:border-[var(--color-primary)] resize-y"
+                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs outline-none focus:border-[var(--color-primary)] resize-y"
                     value={treatment}
                     onChange={(e) => setTreatment(e.target.value)}
                     placeholder="Enter prescribed medications, bandages, or therapy..."
@@ -1297,14 +1302,14 @@ export function VetReviewForm({
               <div>
                 <label
                   htmlFor="field-notes"
-                  className="mb-1 block text-[11px] font-semibold text-[var(--color-text-primary)]"
+                  className="mb-1 block text-xs font-semibold text-[var(--color-text-primary)]"
                 >
                   Veterinarian Notes &amp; Stable Directives (Optional)
                 </label>
                 <textarea
                   id="field-notes"
                   rows={2}
-                  className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[12px] outline-none focus:border-[var(--color-primary)] resize-y"
+                  className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs outline-none focus:border-[var(--color-primary)] resize-y"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Internal notes, groom handling directives, or dietary recommendations..."
@@ -1314,19 +1319,21 @@ export function VetReviewForm({
           </div>
 
           {/* RIGHT COLUMN: Sticky Decision Panel (~35% width = lg:col-span-4) */}
-          <div className="lg:col-span-4 lg:sticky lg:top-0 lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto scroll-slim space-y-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
-            <div className="border-b border-[var(--color-border)] pb-2.5">
-              <h3 className="text-[13px] font-bold text-[var(--color-text-primary)]">
+          <div className={admissionAsideClassName}>
+          {asideTop}
+          <div className="space-y-4 min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)]">
+            <div className="border-b border-[var(--color-border)] pb-3">
+              <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
                 Veterinary Decision Panel
               </h3>
-              <p className="text-[11px] text-[var(--color-text-muted)]">
+              <p className="text-xs text-[var(--color-text-muted)]">
                 Authorizes or restricts athletic activity for {candidateName}.
               </p>
             </div>
 
             {/* Streamlined Training Decision Options */}
             <div className="space-y-2">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+              <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
                 Training Clearance
               </label>
 
@@ -1338,7 +1345,7 @@ export function VetReviewForm({
                       key={opt.value}
                       className={`flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-md)] border p-2.5 transition-all ${
                         isSelected
-                          ? `${opt.activeBorder} ${opt.activeBg} shadow-2xs`
+                          ? `${opt.activeBorder} ${opt.activeBg}`
                           : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-subtle)]'
                       }`}
                     >
@@ -1360,14 +1367,14 @@ export function VetReviewForm({
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="text-[12px] font-bold text-[var(--color-text-primary)]">
+                          <span className="text-xs font-bold text-[var(--color-text-primary)]">
                             {opt.title}
                           </span>
                           <Pill tone={opt.tone} size="sm" icon={opt.icon}>
                             {opt.value}
                           </Pill>
                         </div>
-                        <p className="mt-0.5 text-[10px] text-[var(--color-text-secondary)]">
+                        <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
                           {opt.subtitle}
                         </p>
                       </div>
@@ -1382,18 +1389,18 @@ export function VetReviewForm({
               <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 space-y-1.5 animate-in fade-in duration-200">
                 <label
                   htmlFor="field-restriction-details"
-                  className="block text-[11px] font-bold text-[var(--color-warning)]"
+                  className="block text-xs font-bold text-[var(--color-warning)]"
                 >
                   Mandatory Restriction Protocol <span className="text-[var(--color-danger)]">*</span>
                 </label>
-                <p className="text-[10px] text-[var(--color-text-secondary)]">
+                <p className="text-xs text-[var(--color-text-secondary)]">
                   Shown to the Head Trainer when planning. The horse rests until the follow-up exam below.
                 </p>
                 {isUrgent ? (
                   <textarea
                     id="field-restriction-details"
                     rows={2}
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-surface)] p-2 text-[12px] outline-none focus:border-[var(--color-primary)]"
+                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-surface)] p-2 text-xs outline-none focus:border-[var(--color-primary)]"
                     value={restrictionDetails}
                     onChange={(e) => setRestrictionDetails(e.target.value)}
                     placeholder="Describe restriction rules..."
@@ -1401,7 +1408,7 @@ export function VetReviewForm({
                 ) : (
                   <select
                     id="field-restriction-details"
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-surface)] px-2 py-1.5 text-[11px] outline-none"
+                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-surface)] px-2 py-1.5 text-xs outline-none"
                     value={restrictionDetails}
                     onChange={(e) => {
                       setRestrictionDetails(e.target.value);
@@ -1419,7 +1426,7 @@ export function VetReviewForm({
                   </select>
                 )}
                 {fieldErrors.restrictionDetails && (
-                  <p className="text-[10px] font-medium text-[var(--color-danger)]">
+                  <p className="text-xs font-medium text-[var(--color-danger)]">
                     {fieldErrors.restrictionDetails}
                   </p>
                 )}
@@ -1429,7 +1436,7 @@ export function VetReviewForm({
             {/* Inline Schedule Follow-up Toggle */}
             <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 space-y-2">
               <label className="flex cursor-pointer items-center justify-between">
-                <span className="text-[12px] font-semibold text-[var(--color-text-primary)]">
+                <span className="text-xs font-semibold text-[var(--color-text-primary)]">
                   Schedule Follow-up Exam
                   {followUpRequired && <span className="text-[var(--color-danger)]"> *</span>}
                 </span>
@@ -1448,7 +1455,7 @@ export function VetReviewForm({
                 />
               </label>
               {followUpRequired && (
-                <p className="text-[10px] text-[var(--color-text-secondary)]">
+                <p className="text-xs text-[var(--color-text-secondary)]">
                   Required when training is blocked: the horse stays off training until this exam.
                 </p>
               )}
@@ -1458,7 +1465,7 @@ export function VetReviewForm({
                   <div>
                     <label
                       htmlFor="field-followup-date"
-                      className="mb-1 block text-[10px] font-medium text-[var(--color-text-secondary)]"
+                      className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]"
                     >
                       Target Date <span className="text-[var(--color-danger)]">*</span>
                     </label>
@@ -1473,7 +1480,7 @@ export function VetReviewForm({
                           setFieldErrors((errs) => ({ ...errs, followUpDate: '' }));
                         }
                       }}
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] font-metric outline-none"
+                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs font-metric outline-none"
                     />
                     <div className="mt-1 flex gap-1">
                       {[3, 7, 14].map((days) => {
@@ -1483,7 +1490,7 @@ export function VetReviewForm({
                             key={days}
                             type="button"
                             onClick={() => setFollowUpDate(iso)}
-                            className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[9px] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]"
+                            className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]"
                           >
                             +{days}d
                           </button>
@@ -1491,7 +1498,7 @@ export function VetReviewForm({
                       })}
                     </div>
                     {fieldErrors.followUpDate && (
-                      <p className="mt-0.5 text-[10px] font-medium text-[var(--color-danger)]">
+                      <p className="mt-0.5 text-xs font-medium text-[var(--color-danger)]">
                         {fieldErrors.followUpDate}
                       </p>
                     )}
@@ -1500,7 +1507,7 @@ export function VetReviewForm({
                   <div>
                     <label
                       htmlFor="field-followup-desc"
-                      className="mb-1 block text-[10px] font-medium text-[var(--color-text-secondary)]"
+                      className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]"
                     >
                       Care Procedure <span className="text-[var(--color-danger)]">*</span>
                     </label>
@@ -1513,7 +1520,7 @@ export function VetReviewForm({
                           setFieldErrors((errs) => ({ ...errs, followUpDescription: '' }));
                         }
                       }}
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] outline-none"
+                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs outline-none"
                     >
                       {followUpDescriptionOptions.map((opt) => (
                         <option key={opt} value={opt}>
@@ -1522,7 +1529,7 @@ export function VetReviewForm({
                       ))}
                     </select>
                     {fieldErrors.followUpDescription && (
-                      <p className="mt-0.5 text-[10px] font-medium text-[var(--color-danger)]">
+                      <p className="mt-0.5 text-xs font-medium text-[var(--color-danger)]">
                         {fieldErrors.followUpDescription}
                       </p>
                     )}
@@ -1533,15 +1540,7 @@ export function VetReviewForm({
 
             {/* Action Buttons for Desktop / Tablet (hidden on mobile, visible on >= 768px) */}
             <div className="space-y-2 border-t border-[var(--color-border)] pt-3 hidden md:block">
-              {formError && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-2 text-[11px] text-[var(--color-danger)]"
-                >
-                  <Icon name="alert-triangle" size={14} className="mt-0.5 shrink-0" />
-                  <span className="leading-tight">{formError}</span>
-                </div>
-              )}
+              {formError && <Notice tone="error">{formError}</Notice>}
 
               {/* Primary Purple Action Button */}
               <Button
@@ -1550,24 +1549,19 @@ export function VetReviewForm({
                 loading={submitting}
                 disabled={submitting || startingExam || isGated}
                 icon="check"
-                className="w-full justify-center bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
+                className="w-full"
               >
                 Complete Examination
               </Button>
 
               {/* Save Draft Action */}
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={handleSaveDraft}
-                className="w-full text-center text-[11px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:underline pt-1"
-              >
-                Save Draft Locally
-              </button>
+              <Button type="button" variant="tertiary" size="sm" className="w-full" disabled={submitting} onClick={handleSaveDraft}>
+                Save draft locally
+              </Button>
             </div>
 
             {/* Summary Notice */}
-            <div className="rounded-[var(--radius-sm)] bg-[var(--color-surface-subtle)] p-2.5 text-[11px] text-[var(--color-text-muted)] leading-relaxed">
+            <div className="rounded-[var(--radius-sm)] bg-[var(--color-surface-subtle)] p-2.5 text-xs text-[var(--color-text-muted)] leading-relaxed">
               <span className="font-semibold text-[var(--color-text-secondary)]">Outcome:</span>
               <ul className="mt-1 space-y-0.5 list-disc pl-3.5">
                 <li>Permanently links health examination record.</li>
@@ -1576,19 +1570,12 @@ export function VetReviewForm({
               </ul>
             </div>
           </div>
+          </div>
         </div>
 
         {/* Mobile Fixed Footer Actions (< 768px per R2) */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--color-surface)]/95 backdrop-blur-md border-t border-[var(--color-border)] p-3 shadow-lg space-y-2">
-          {formError && (
-            <div
-              role="alert"
-              className="flex items-start gap-2 rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-2 text-[11px] text-[var(--color-danger)]"
-            >
-              <Icon name="alert-triangle" size={14} className="mt-0.5 shrink-0" />
-              <span className="leading-tight">{formError}</span>
-            </div>
-          )}
+          {formError && <Notice tone="error">{formError}</Notice>}
           <div className="flex items-center justify-between gap-2.5">
             <Button
               type="submit"
@@ -1596,7 +1583,7 @@ export function VetReviewForm({
               loading={submitting}
               disabled={submitting || startingExam || isGated}
               icon="check"
-              className="w-full justify-center bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] text-[12px] py-2"
+              className="w-full"
             >
               Complete Examination
             </Button>
@@ -1609,17 +1596,17 @@ export function VetReviewForm({
         open={showApproveConfirm}
         title="Submit Veterinary Examination?"
         description={
-          <div className="space-y-2 text-[13px]">
+          <div className="space-y-2 text-sm">
             <p>
               You are certifying medical examination for <strong>{candidateName}</strong> with training decision{' '}
               <strong className="uppercase text-[var(--color-primary)]">{trainingDecision}</strong>.
             </p>
             {followUpActive && (
-              <div className="rounded-[var(--radius-sm)] bg-[var(--color-warning-soft)] p-2 text-[12px] text-[var(--color-warning)] font-medium">
+              <div className="rounded-[var(--radius-sm)] bg-[var(--color-warning-soft)] p-2 text-xs text-[var(--color-warning)] font-medium">
                 📅 Follow-up scheduled for <strong>{followUpDate}</strong>: {followUpDescription}.
               </div>
             )}
-            <p className="text-[12px] text-[var(--color-text-secondary)]">
+            <p className="text-xs text-[var(--color-text-secondary)]">
               {careType === 'INITIAL'
                 ? 'This action writes the official clinical record and advances the admission to trainer review.'
                 : 'This action completes only this care schedule and does not change the admission workflow.'}

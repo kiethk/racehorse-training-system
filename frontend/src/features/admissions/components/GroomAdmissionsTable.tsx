@@ -1,18 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
-import { FilterBar } from '@/components/ui/FilterBar';
-import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
+import { Notice } from '@/components/ui/Notice';
 import { admissionsApi } from '../services/api';
-import type { AdmissionStatus, AdmissionSummaryResponse, GroomQueueFilters, GroomQueueResponse } from '../types';
-import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
+import type { AdmissionStatus, GroomQueueFilters, GroomQueueResponse } from '../types';
 import { AdmissionListLayout } from '../shared/components/AdmissionListLayout';
-import { AdmissionSearchField } from '../shared/components/AdmissionSearchField';
+import { AdmissionFilterBar, FilterDateRange, FilterSelect } from '../shared/components/AdmissionFilterBar';
+import { AdmissionTable } from '../shared/components/AdmissionTable';
 
 const statuses: { value: AdmissionStatus | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
@@ -42,12 +39,6 @@ function toQuery(filters: GroomQueueFilters) {
   return query ? `?${query}` : '';
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('en-GB', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  });
-}
-
 export function GroomAdmissionsTable({ initialFilters }: { initialFilters: GroomQueueFilters }) {
   const router = useRouter();
   const [draft, setDraft] = useState(initialFilters);
@@ -75,34 +66,6 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
 
   const applications = useMemo(() => result?.content ?? [], [result]);
   const total = result?.totalElements ?? 0;
-
-  const columns: DataTableColumn<AdmissionSummaryResponse>[] = [
-    {
-      id: 'horse',
-      header: 'Horse',
-      render: (admission) => (
-        <div className="flex min-w-0 items-center gap-3">
-          <HorseAvatar name={admission.candidateName} size={36} />
-          <div className="min-w-0">
-            <p className="truncate font-medium">{admission.candidateName}</p>
-            <p className="truncate text-xs text-[var(--color-text-muted)]">{admission.breed || 'Breed not provided'}</p>
-          </div>
-        </div>
-      ),
-    },
-    { id: 'status', header: 'Status', render: (admission) => <AdmissionStatusBadge status={admission.status} /> },
-    { id: 'submitted', header: 'Submitted', render: (admission) => formatDate(admission.submittedAt) },
-    {
-      id: 'action',
-      header: 'Action',
-      align: 'right',
-      render: (admission) => (
-        <Link href={`/groom/admissions/${admission.admissionId}${toQuery(applied)}`} className="inline-flex min-h-9 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] px-4 text-xs font-semibold text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary-subtle)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
-          View
-        </Link>
-      ),
-    },
-  ];
 
   const apply = () => {
     const next = { ...draft, candidateName: draft.candidateName.trim(), page: 0 };
@@ -141,39 +104,27 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
 
   return (
     <AdmissionListLayout title="Admissions" description="Review applications, quarantine capacity and horse arrivals.">
-      <FilterBar
-        layout="grid"
-        className="sm:grid-cols-2 xl:grid-cols-[minmax(260px,1.5fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto] xl:items-end"
-        onSubmit={(event) => { event.preventDefault(); apply(); }}
+      <AdmissionFilterBar
+        search={draft.candidateName}
+        onSearchChange={(candidateName) => setDraft({ ...draft, candidateName })}
+        onApply={apply}
+        onClear={clear}
       >
-        <AdmissionSearchField value={draft.candidateName} onChange={(candidateName) => setDraft({ ...draft, candidateName })} />
-        <label className="block text-[11px] font-medium text-[var(--color-text-muted)]">
-          Status
-          <select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as AdmissionStatus | '' })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[12px] text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">
-            {statuses.map((status) => <option key={status.value || 'all'} value={status.value}>{status.label}</option>)}
-          </select>
-        </label>
-        <label className="block text-[11px] font-medium text-[var(--color-text-muted)]">
-          From
-          <input type="date" value={draft.submittedFrom} onChange={(event) => setDraft({ ...draft, submittedFrom: event.target.value })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[12px] text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]" />
-        </label>
-        <label className="block text-[11px] font-medium text-[var(--color-text-muted)]">
-          To
-          <input type="date" min={draft.submittedFrom || undefined} value={draft.submittedTo} onChange={(event) => setDraft({ ...draft, submittedTo: event.target.value })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[12px] text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]" />
-        </label>
-        <div className="flex items-center gap-2 sm:col-span-2 xl:col-span-1">
-          <Button type="submit" variant="primary" size="sm">Apply</Button>
-          <Button type="button" variant="secondary" size="sm" onClick={clear}>Clear</Button>
-        </div>
-      </FilterBar>
+        <FilterSelect label="Status" value={draft.status} onChange={(status) => setDraft({ ...draft, status })} options={statuses} />
+        <FilterDateRange
+          from={draft.submittedFrom}
+          to={draft.submittedTo}
+          onFromChange={(submittedFrom) => setDraft({ ...draft, submittedFrom })}
+          onToChange={(submittedTo) => setDraft({ ...draft, submittedTo })}
+        />
+      </AdmissionFilterBar>
 
-      {error && <div role="alert" className="border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-[12px] text-[var(--color-text-primary)]">{error}</div>}
+      {error && <Notice tone="error">{error}</Notice>}
 
-      <DataTable
-        rows={applications}
-        columns={columns}
-        getRowKey={(admission) => admission.admissionId}
-        ariaLabel="Admission records"
+      <AdmissionTable
+        admissions={applications}
+        detailHref={(id) => `/groom/admissions/${id}${toQuery(applied)}`}
+        searchable={false}
         loading={loading}
         emptyTitle={total > 0 ? 'No matching applications' : 'No applications'}
         emptyDescription={total > 0 ? 'Change the filters or clear them to see other records.' : 'New applications will appear here.'}

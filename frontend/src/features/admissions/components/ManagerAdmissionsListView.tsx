@@ -5,12 +5,11 @@ import {usePathname, useRouter, useSearchParams} from 'next/navigation';
 import {Button} from '@/components/ui/Button';
 import {ListSkeleton} from '@/components/ui/states';
 import {Notice} from '@/components/ui/Notice';
-import {FilterBar} from '@/components/ui/FilterBar';
 import {admissionsApi} from '../services/api';
 import type {AdmissionStatus, AdmissionSummaryResponse} from '../types';
 import {AdmissionTable} from '../shared/components/AdmissionTable';
 import {AdmissionListLayout} from '../shared/components/AdmissionListLayout';
-import {AdmissionSearchField} from '../shared/components/AdmissionSearchField';
+import {AdmissionFilterBar, FilterDateRange, FilterSelect} from '../shared/components/AdmissionFilterBar';
 
 const VALID_STATUSES: ReadonlyArray<AdmissionStatus | 'ALL'> = [
   'ALL',
@@ -164,31 +163,20 @@ export function ManagerAdmissionsListView() {
 
   return (
     <AdmissionListLayout title="Admissions" description="Review and manage horse admission applications.">
-      <FilterBar
-        layout="grid"
-        className="sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(170px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto] xl:items-end"
-        onSubmit={(event) => { event.preventDefault(); apply(); }}
+      <AdmissionFilterBar
+        search={draft.candidateName}
+        onSearchChange={(candidateName) => setDraft({ ...draft, candidateName })}
+        onApply={apply}
+        onClear={clear}
       >
-        <AdmissionSearchField value={draft.candidateName} onChange={(candidateName) => setDraft({ ...draft, candidateName })} />
-        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          Status
-          <select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as AdmissionStatus | 'ALL' })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">
-            {statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
-          </select>
-        </label>
-        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          From
-          <input type="date" value={draft.submittedFrom} onChange={(event) => setDraft({ ...draft, submittedFrom: event.target.value })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]" />
-        </label>
-        <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          To
-          <input type="date" min={draft.submittedFrom || undefined} value={draft.submittedTo} onChange={(event) => setDraft({ ...draft, submittedTo: event.target.value })} className="mt-1.5 h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]" />
-        </label>
-        <div className="flex items-center gap-2 sm:col-span-2 xl:col-span-1">
-          <Button type="submit" variant="primary" size="sm">Apply</Button>
-          <Button type="button" variant="secondary" size="sm" onClick={clear}>Clear</Button>
-        </div>
-      </FilterBar>
+        <FilterSelect label="Status" value={draft.status} onChange={(status) => setDraft({ ...draft, status })} options={statuses} />
+        <FilterDateRange
+          from={draft.submittedFrom}
+          to={draft.submittedTo}
+          onFromChange={(submittedFrom) => setDraft({ ...draft, submittedFrom })}
+          onToChange={(submittedTo) => setDraft({ ...draft, submittedTo })}
+        />
+      </AdmissionFilterBar>
 
       {error && <Notice tone="error">{error}</Notice>}
 

@@ -22,7 +22,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     .find((item) => isNavItemActive(pathname, item, user.role));
 
   return (
-    <div className="flex min-h-dvh min-w-0 bg-[var(--color-background)]">
+    // shrink-0: <body> is a fixed-height flex column, so without it this box is clamped to the
+    // viewport, the page overflows it, and the sticky sidebar scrolls away with the content.
+    <div className="flex min-h-dvh min-w-0 shrink-0 bg-[var(--color-background)]">
       <Sidebar sections={sections} role={user.role} collapsed={collapsed} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar

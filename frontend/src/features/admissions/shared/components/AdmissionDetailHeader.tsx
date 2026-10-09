@@ -13,7 +13,12 @@ interface HeaderDetail {
 }
 
 function HeaderValue({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0"><span className="mb-1 block text-[10px] text-[var(--color-text-muted)]">{label}</span><span className="break-words font-medium text-[var(--color-text-primary)]">{value}</span></div>;
+  return (
+    <div className="min-w-0">
+      <span className="mb-0.5 block text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)]">{label}</span>
+      <span className="break-words text-sm font-medium text-[var(--color-text-primary)]">{value}</span>
+    </div>
+  );
 }
 
 function date(value: string | null) {
@@ -28,20 +33,20 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus 
 }) {
   const candidate = detail.candidate;
   if (!candidate) return null;
-  
+
   return (
     <header className="flex min-w-0 shrink-0 items-start gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:items-center sm:gap-4 sm:px-6 sm:py-5">
       <HorseAvatar name={candidate.name} image={horsePhotoUrl} size={56} rounded="md" />
       <div className="min-w-0 flex-1">
-        <h1 className="mb-2 flex flex-wrap items-center gap-2 text-[20px] font-bold text-[var(--color-text-primary)]">
+        <h1 className="mb-2.5 flex flex-wrap items-center gap-2.5 text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">
           <span className="truncate">{candidate.name}</span>
-          <AdmissionStatusBadge status={detail.status} size="sm" simplified={simplifiedStatus} />
+          <AdmissionStatusBadge status={detail.status} simplified={simplifiedStatus} />
         </h1>
-        <div className="grid min-w-0 grid-cols-1 gap-x-5 gap-y-2 text-[12px] min-[480px]:grid-cols-2 lg:grid-cols-4">
-          <HeaderValue label="ADMISSION ID" value={`#${detail.admissionId}`} />
-          <HeaderValue label="OWNER" value={detail.ownerName ? `${detail.ownerName}${detail.ownerId != null ? ` (#${detail.ownerId})` : ''}` : detail.ownerId != null ? `#${detail.ownerId}` : 'You'} />
-          <HeaderValue label="BREED" value={candidate.breed || 'Not provided'} />
-          <HeaderValue label="SUBMITTED" value={date(detail.submittedAt)} />
+        <div className="grid min-w-0 grid-cols-1 gap-x-5 gap-y-2 min-[480px]:grid-cols-2 lg:grid-cols-4">
+          <HeaderValue label="Admission ID" value={`#${detail.admissionId}`} />
+          <HeaderValue label="Owner" value={detail.ownerName ? `${detail.ownerName}${detail.ownerId != null ? ` (#${detail.ownerId})` : ''}` : detail.ownerId != null ? `#${detail.ownerId}` : 'You'} />
+          <HeaderValue label="Breed" value={candidate.breed || 'Not provided'} />
+          <HeaderValue label="Submitted" value={date(detail.submittedAt)} />
         </div>
       </div>
     </header>
