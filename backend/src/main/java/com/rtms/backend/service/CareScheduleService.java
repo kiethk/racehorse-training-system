@@ -627,6 +627,7 @@ public class CareScheduleService {
             if (assignedVet == null) return;
             schedule.setVeterinarianId(assignedVet.getId());
             careScheduleRepository.save(schedule);
+            assignInitialAdmissionVet(schedule, assignedVet.getId());
         }
 
         LocalDateTime slot = findAssignmentSlot(schedule, overdueAppointmentsByVet, scheduledMinutesByVet);
@@ -647,6 +648,7 @@ public class CareScheduleService {
             schedule.setStatus(CareScheduleStatus.SCHEDULED);
 
             careScheduleRepository.save(schedule);
+            assignInitialAdmissionVet(schedule, lockedVet.getId());
 
             notificationService.sendAssignmentNotification(
                     lockedVet.getId(),
@@ -673,6 +675,17 @@ public class CareScheduleService {
             recordAssignmentAudit(schedule, lockedVet);
             return;
         }
+    }
+
+    private void assignInitialAdmissionVet(CareSchedule schedule, Long veterinarianId) {
+        if (schedule.getCareType() != CareType.INITIAL || schedule.getAdmissionId() == null) return;
+
+        admissionRepository.findByIdForUpdate(schedule.getAdmissionId()).ifPresent(admission -> {
+            if (!Objects.equals(admission.getVeterinarianId(), veterinarianId)) {
+                admission.setVeterinarianId(veterinarianId);
+                admissionRepository.save(admission);
+            }
+        });
     }
 
     private User assignInitialExamToLeastLoadedVet(Map<Long, Integer> overdueAppointmentsByVet,
