@@ -1,7 +1,7 @@
 package com.rtms.backend.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rtms.backend.dto.ApiResponse;
+import com.rtms.backend.common.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.AuthenticationException;
@@ -20,7 +20,7 @@ public class CustomAuthEntryPoint implements AuthenticationEntryPoint {
             AuthenticationException authException) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
-        ApiResponse<Object> body = ApiResponse.error("Authentication required - please log in");
+        ApiResponse<Object> body = ApiResponse.error("Authentication required - please log in", "UNAUTHENTICATED");
         response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 }

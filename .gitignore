@@ -10,7 +10,7 @@ frontend/.next/
 .env
 .env.local
 !.env*.example
-**/application-local.properties
+backend/.env.cloud
 
 # IDE
 .idea/
@@ -20,3 +20,15 @@ frontend/.next/
 # OS
 .DS_Store
 Thumbs.db
+
+ui-reference/
+tutorials/
+docs/
+.codex/
+uploads/
+.agents/
+AGENTS.md
+IDEA.md
+GEMINI.md
+gemini.md
+.claude

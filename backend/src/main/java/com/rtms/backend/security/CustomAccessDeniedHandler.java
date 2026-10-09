@@ -1,7 +1,7 @@
 package com.rtms.backend.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rtms.backend.dto.ApiResponse;
+import com.rtms.backend.common.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
@@ -20,7 +20,7 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
                         AccessDeniedException accessDeniedException) throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json");
-        ApiResponse<Object> body = ApiResponse.error("You do not have permission to perform this action");
+        ApiResponse<Object> body = ApiResponse.error("You do not have permission to perform this action", "FORBIDDEN");
         response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 }
