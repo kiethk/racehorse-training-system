@@ -1,0 +1,106 @@
+package com.rtms.backend.stable.controller;
+
+import com.rtms.backend.common.dto.ApiResponse;
+import com.rtms.backend.stable.entity.Area;
+import com.rtms.backend.stable.entity.StableStall;
+import com.rtms.backend.stable.enums.AreaType;
+import com.rtms.backend.stable.enums.StallStatus;
+import com.rtms.backend.stable.repository.AreaRepository;
+import com.rtms.backend.stable.repository.StableStallRepository;
+import com.rtms.backend.stable.service.StableStallService;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/stalls")
+public class StableStallController {
+
+    private final StableStallRepository stableStallRepository;
+    private final AreaRepository areaRepository;
+    private final StableStallService stableStallService;
+
+    public StableStallController(
+            StableStallRepository stableStallRepository,
+            AreaRepository areaRepository,
+            StableStallService stableStallService) {
+        this.stableStallRepository = stableStallRepository;
+        this.areaRepository = areaRepository;
+        this.stableStallService = stableStallService;
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('STABLE_STALL_VIEW')")
+    public ApiResponse<List<StableStall>> getStalls(
+            @RequestParam(required = false) String areaCode,
+            @RequestParam(required = false) AreaType areaType,
+            @RequestParam(required = false) StallStatus status,
+            @RequestParam(required = false) Long groomId) {
+
+        if (groomId != null) {
+            return ApiResponse.success(stableStallRepository.findByGroomId(groomId));
+        }
+
+        if (areaCode != null) {
+            Area area = areaRepository.findByCode(areaCode)
+                    .orElseThrow(() -> new RuntimeException("Area not found with code: " + areaCode));
+
+            if (status != null) {
+                return ApiResponse.success(
+                        stableStallRepository.findByAreaIdAndStatus(area.getId(), status));
+            }
+
+            return ApiResponse.success(
+                    stableStallRepository.findByAreaId(area.getId()));
+        }
+
+        if (areaType != null) {
+            List<Long> areaIds = areaRepository.findByType(areaType)
+                    .stream()
+                    .map(Area::getId)
+                    .toList();
+
+            List<StableStall> stalls = stableStallRepository.findAll()
+                    .stream()
+                    .filter(stall -> areaIds.contains(stall.getAreaId()))
+                    .filter(stall -> status == null || stall.getStatus() == status)
+                    .toList();
+
+            return ApiResponse.success(stalls);
+        }
+
+        if (status != null) {
+            return ApiResponse.success(
+                    stableStallRepository.findByStatus(status));
+        }
+
+        return ApiResponse.success(
+                stableStallRepository.findAll());
+    }
+
+    /**
+     * Phân công Groom cho chuồng — thuộc Quản lý câu lạc bộ (V63).
+     *
+     * Quyền riêng STALL_GROOM_ASSIGN, KHÔNG dùng STABLE_STALL_UPDATE: quyền
+     * đó cũng gác PUT /api/horses/{id}/assign-stall, mà Huấn luyện viên vẫn
+     * phải giữ để đổi chuồng cho ngựa. Dùng chung một quyền thì không tách
+     * được hai việc.
+     */
+    @PutMapping("/{id}/assign-groom")
+    @PreAuthorize("hasAuthority('STALL_GROOM_ASSIGN')")
+    public ApiResponse<StableStall> assignGroom(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long groomId) {
+        return ApiResponse.success(stableStallService.assignGroom(id, groomId));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('STABLE_STALL_VIEW')")
+    public ApiResponse<StableStall> getStallById(@PathVariable Long id) {
+        StableStall stall = stableStallRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Stable stall not found with id: " + id));
+
+        return ApiResponse.success(stall);
+    }
+}
