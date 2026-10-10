@@ -1,5 +1,6 @@
 'use client';
 
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { useState } from 'react';
 import type { HorseFitnessTrendItem, ReadinessAssessment } from '../types';
 
@@ -112,52 +113,17 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
             Track fitness trends across training sessions and periodic assessments.
           </p>
         </div>
-        <div className="flex rounded-[var(--radius-sm)] bg-[var(--color-surface-subtle)] p-0.5">
-          <button
-            type="button"
-            onClick={() => setActiveTab('ALL')}
-            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-              activeTab === 'ALL'
-                ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            All metrics
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('PERFORMANCE')}
-            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-              activeTab === 'PERFORMANCE'
-                ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            Performance and readiness
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('HEART_RATE')}
-            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-              activeTab === 'HEART_RATE'
-                ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            Heart rate (BPM)
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('SPEED_DISTANCE')}
-            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-              activeTab === 'SPEED_DISTANCE'
-                ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            Speed and distance
-          </button>
-        </div>
+        <SegmentedControl
+          label="Chart"
+          value={activeTab}
+          onChange={setActiveTab}
+          options={[
+            { value: 'ALL', label: 'All metrics' },
+            { value: 'PERFORMANCE', label: 'Performance and readiness' },
+            { value: 'HEART_RATE', label: 'Heart rate (BPM)' },
+            { value: 'SPEED_DISTANCE', label: 'Speed and distance' },
+          ]}
+        />
       </div>
 
       {/* Chart 1: Performance Rating (1-10) + Readiness Assessment (Scatter markers) */}
@@ -169,11 +135,11 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
             </span>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-success)]" />
                 Session performance rating
               </span>
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
-                <span className="h-2.5 w-2.5 rotate-45 transform bg-purple-600" />
+                <span className="h-2.5 w-2.5 rotate-45 transform bg-[var(--color-primary)]" />
                 Periodic readiness score
               </span>
             </div>
@@ -195,7 +161,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                       y1={y}
                       x2={padding.left + chartW}
                       y2={y}
-                      stroke="var(--color-border-subtle, #e5e7eb)"
+                      stroke="var(--color-border)"
                       strokeDasharray="3 3"
                     />
                     <text
@@ -203,7 +169,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                       y={y + 3}
                       textAnchor="end"
                       fontSize="10"
-                      fill="var(--color-text-muted, #9ca3af)"
+                      fill="var(--color-text-muted)"
                     >
                       {val}
                     </text>
@@ -224,7 +190,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                     y={padding.top + chartH + 18}
                     textAnchor="middle"
                     fontSize="9"
-                    fill="var(--color-text-secondary, #6b7280)"
+                    fill="var(--color-text-secondary)"
                   >
                     {d.date.slice(5)}
                   </text>
@@ -235,7 +201,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
               <path
                 d={makePath((d) => d.performanceRating, 0, 10)}
                 fill="none"
-                stroke="#10b981"
+                stroke="var(--color-success)"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -252,8 +218,8 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                     cx={x}
                     cy={y}
                     r="4.5"
-                    fill="#10b981"
-                    stroke="#ffffff"
+                    fill="var(--color-success)"
+                    stroke="var(--color-surface)"
                     strokeWidth="1.5"
                     className="cursor-pointer transition-transform hover:scale-150"
                     onMouseEnter={(e) => {
@@ -281,8 +247,8 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                     <polygon
                       key={r.id}
                       points={`${x},${y - 6} ${x + 6},${y} ${x},${y + 6} ${x - 6},${y}`}
-                      fill="#9333ea"
-                      stroke="#ffffff"
+                      fill="var(--color-isolated)"
+                      stroke="var(--color-surface)"
                       strokeWidth="1.5"
                       className="cursor-pointer transition-transform hover:scale-150"
                       onMouseEnter={(e) => {
@@ -307,19 +273,19 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
             </span>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
-                <span className="h-2 w-4 bg-rose-500 rounded-sm" />
+                <span className="h-2 w-4 bg-[var(--color-danger)] rounded-sm" />
                 Max HR
               </span>
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
-                <span className="h-2 w-4 bg-blue-500 rounded-sm" />
+                <span className="h-2 w-4 bg-[var(--color-info)] rounded-sm" />
                 Avg HR
               </span>
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
-                <span className="h-2 w-4 bg-amber-500 rounded-sm" />
+                <span className="h-2 w-4 bg-[var(--color-warning)] rounded-sm" />
                 Recovery HR
               </span>
-              <span className="flex items-center gap-1.5 text-rose-600 font-medium">
-                <span className="h-0.5 w-3 border-t-2 border-dashed border-rose-500" />
+              <span className="flex items-center gap-1.5 text-[var(--color-danger)] font-medium">
+                <span className="h-0.5 w-3 border-t-2 border-dashed border-[var(--color-danger)]" />
                 Maximum threshold: 220 bpm
               </span>
             </div>
@@ -344,7 +310,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                       x2={padding.left + chartW}
                       y2={y}
                       stroke={
-                        is220 ? '#ef4444' : is100 ? '#f59e0b' : 'var(--color-border-subtle, #e5e7eb)'
+                        is220 ? 'var(--color-danger)' : is100 ? 'var(--color-warning)' : 'var(--color-border)'
                       }
                       strokeWidth={is220 || is100 ? 1.5 : 1}
                       strokeDasharray={is220 || is100 ? '4 4' : '3 3'}
@@ -356,10 +322,10 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                       fontSize="10"
                       fill={
                         is220
-                          ? '#ef4444'
+                          ? 'var(--color-danger)'
                           : is100
-                          ? '#f59e0b'
-                          : 'var(--color-text-muted, #9ca3af)'
+                          ? 'var(--color-warning)'
+                          : 'var(--color-text-muted)'
                       }
                       fontWeight={is220 || is100 ? '600' : 'normal'}
                     >
@@ -382,7 +348,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                     y={padding.top + chartH + 18}
                     textAnchor="middle"
                     fontSize="9"
-                    fill="var(--color-text-secondary, #6b7280)"
+                    fill="var(--color-text-secondary)"
                   >
                     {d.date.slice(5)}
                   </text>
@@ -393,7 +359,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
               <path
                 d={makePath((d) => d.maxHeartRate, 50, 250)}
                 fill="none"
-                stroke="#f43f5e"
+                stroke="var(--color-danger)"
                 strokeWidth="2"
                 strokeLinecap="round"
               />
@@ -402,7 +368,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
               <path
                 d={makePath((d) => d.averageHeartRate, 50, 250)}
                 fill="none"
-                stroke="#3b82f6"
+                stroke="var(--color-info)"
                 strokeWidth="2"
                 strokeLinecap="round"
               />
@@ -411,7 +377,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
               <path
                 d={makePath((d) => d.recoveryHeartRate, 50, 250)}
                 fill="none"
-                stroke="#f59e0b"
+                stroke="var(--color-warning)"
                 strokeWidth="2"
                 strokeLinecap="round"
               />
@@ -430,8 +396,8 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                         cx={x}
                         cy={yMax}
                         r="3.5"
-                        fill="#f43f5e"
-                        stroke="#fff"
+                        fill="var(--color-danger)"
+                        stroke="var(--color-surface)"
                         strokeWidth="1"
                         className="cursor-pointer hover:scale-150 transition-transform"
                         onMouseEnter={(e) => {
@@ -446,8 +412,8 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                         cx={x}
                         cy={yAvg}
                         r="3.5"
-                        fill="#3b82f6"
-                        stroke="#fff"
+                        fill="var(--color-info)"
+                        stroke="var(--color-surface)"
                         strokeWidth="1"
                         className="cursor-pointer hover:scale-150 transition-transform"
                         onMouseEnter={(e) => {
@@ -462,8 +428,8 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                         cx={x}
                         cy={yRec}
                         r="3.5"
-                        fill="#f59e0b"
-                        stroke="#fff"
+                        fill="var(--color-warning)"
+                        stroke="var(--color-surface)"
                         strokeWidth="1"
                         className="cursor-pointer hover:scale-150 transition-transform"
                         onMouseEnter={(e) => {
@@ -490,11 +456,11 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
             </span>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
-                <span className="h-2 w-4 bg-indigo-500 rounded-sm" />
+                <span className="h-2 w-4 bg-[var(--color-primary)] rounded-sm" />
                 Maximum speed
               </span>
               <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
-                <span className="h-2 w-4 bg-cyan-500 rounded-sm" />
+                <span className="h-2 w-4 bg-[var(--color-finance)] rounded-sm" />
                 Average speed
               </span>
             </div>
@@ -516,7 +482,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                       y1={y}
                       x2={padding.left + chartW}
                       y2={y}
-                      stroke="var(--color-border-subtle, #e5e7eb)"
+                      stroke="var(--color-border)"
                       strokeDasharray="3 3"
                     />
                     <text
@@ -524,7 +490,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                       y={y + 3}
                       textAnchor="end"
                       fontSize="10"
-                      fill="var(--color-text-muted, #9ca3af)"
+                      fill="var(--color-text-muted)"
                     >
                       {val}
                     </text>
@@ -545,7 +511,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                     y={padding.top + chartH + 18}
                     textAnchor="middle"
                     fontSize="9"
-                    fill="var(--color-text-secondary, #6b7280)"
+                    fill="var(--color-text-secondary)"
                   >
                     {d.date.slice(5)}
                   </text>
@@ -556,7 +522,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
               <path
                 d={makePath((d) => d.topSpeedKmh, 0, 75)}
                 fill="none"
-                stroke="#6366f1"
+                stroke="var(--color-primary)"
                 strokeWidth="2"
                 strokeLinecap="round"
               />
@@ -565,7 +531,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
               <path
                 d={makePath((d) => d.averageSpeedKmh, 0, 75)}
                 fill="none"
-                stroke="#06b6d4"
+                stroke="var(--color-finance)"
                 strokeWidth="2"
                 strokeLinecap="round"
               />
@@ -583,8 +549,8 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                         cx={x}
                         cy={yTop}
                         r="3.5"
-                        fill="#6366f1"
-                        stroke="#fff"
+                        fill="var(--color-primary)"
+                        stroke="var(--color-surface)"
                         strokeWidth="1"
                         className="cursor-pointer hover:scale-150 transition-transform"
                         onMouseEnter={(e) => {
@@ -599,8 +565,8 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
                         cx={x}
                         cy={yAvg}
                         r="3.5"
-                        fill="#06b6d4"
-                        stroke="#fff"
+                        fill="var(--color-finance)"
+                        stroke="var(--color-surface)"
                         strokeWidth="1"
                         className="cursor-pointer hover:scale-150 transition-transform"
                         onMouseEnter={(e) => {
@@ -621,7 +587,7 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
       {/* Floating Tooltip for Workout Point */}
       {hoveredPoint && (
         <div
-          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 shadow-lg"
+          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-popover)]"
           style={{
             left: `${hoveredPoint.x}px`,
             top: `${hoveredPoint.y - 10}px`,
@@ -630,10 +596,10 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
           <p className="text-xs font-bold text-[var(--color-text-primary)]">
             {hoveredPoint.data.date} • {hoveredPoint.data.subjectName}
           </p>
-          <div className="mt-1 space-y-0.5 text-[11px] text-[var(--color-text-secondary)]">
+          <div className="mt-1 space-y-0.5 text-xs text-[var(--color-text-secondary)]">
             <p>
               Performance:{' '}
-              <span className="font-semibold text-emerald-600">
+              <span className="font-semibold text-[var(--color-success)]">
                 {hoveredPoint.data.performanceRating ?? 'N/A'}/10
               </span>
             </p>
@@ -641,11 +607,11 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
               Heart rate:{' '}
               <span>
                 Avg {hoveredPoint.data.averageHeartRate ?? '-'} | Max{' '}
-                <strong className={hoveredPoint.data.maxHeartRate && hoveredPoint.data.maxHeartRate > 220 ? 'text-red-500' : ''}>
+                <strong className={hoveredPoint.data.maxHeartRate && hoveredPoint.data.maxHeartRate > 220 ? 'text-[var(--color-danger)]' : ''}>
                   {hoveredPoint.data.maxHeartRate ?? '-'}
                 </strong>{' '}
                 | Rec{' '}
-                <strong className={hoveredPoint.data.recoveryHeartRate && hoveredPoint.data.recoveryHeartRate > 100 ? 'text-amber-500' : ''}>
+                <strong className={hoveredPoint.data.recoveryHeartRate && hoveredPoint.data.recoveryHeartRate > 100 ? 'text-[var(--color-warning)]' : ''}>
                   {hoveredPoint.data.recoveryHeartRate ?? '-'}
                 </strong>{' '}
                 bpm
@@ -665,19 +631,19 @@ export function FitnessTrendChart({ trend, readiness }: FitnessTrendChartProps) 
       {/* Floating Tooltip for Readiness Point */}
       {hoveredReadiness && (
         <div
-          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-md border border-purple-200 bg-[var(--color-surface)] p-2.5 shadow-lg"
+          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-[var(--radius-md)] border border-[var(--color-primary)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-popover)]"
           style={{
             left: `${hoveredReadiness.x}px`,
             top: `${hoveredReadiness.y - 10}px`,
           }}
         >
-          <p className="text-xs font-bold text-purple-700">
+          <p className="text-xs font-bold text-[var(--color-primary)]">
             Periodic readiness assessment · {hoveredReadiness.data.assessmentDate}
           </p>
-          <div className="mt-1 space-y-0.5 text-[11px] text-[var(--color-text-secondary)]">
+          <div className="mt-1 space-y-0.5 text-xs text-[var(--color-text-secondary)]">
             <p>
               Fitness score:{' '}
-              <strong className="text-purple-700">
+              <strong className="text-[var(--color-primary)]">
                 {hoveredReadiness.data.fitnessScore ?? 'Not rated'}/10
               </strong>
             </p>

@@ -1,5 +1,8 @@
 'use client';
 
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/Table';
+import { Input } from '@/components/ui/Input';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { trainingService } from '../services/trainingService';
@@ -164,7 +167,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
               </span>
             )}
             {horse?.status && (
-              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+              <span className="rounded-full bg-[var(--color-info-soft)] px-2.5 py-0.5 text-xs font-medium text-[var(--color-info)]">
                 {horse.status}
               </span>
             )}
@@ -184,19 +187,19 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
           </div>
           <div className="text-right">
             <span className="text-xs uppercase text-[var(--color-text-muted)]">Average performance</span>
-            <p className="font-metric text-xl font-bold text-emerald-600">
+            <p className="font-metric text-xl font-bold text-[var(--color-success)]">
               {avgRating ? `${avgRating}/10` : '-'}
             </p>
           </div>
           <div className="text-right">
             <span className="text-xs uppercase text-[var(--color-text-muted)]">Max HR</span>
-            <p className={`font-metric text-xl font-bold ${maxRecordedHR && maxRecordedHR > 220 ? 'text-red-600' : 'text-rose-500'}`}>
+            <p className={`font-metric text-xl font-bold ${maxRecordedHR && maxRecordedHR > 220 ? 'text-[var(--color-danger)]' : 'text-[var(--color-danger)]'}`}>
               {maxRecordedHR ? `${maxRecordedHR} bpm` : '-'}
             </p>
           </div>
           <div className="text-right">
             <span className="text-xs uppercase text-[var(--color-text-muted)]">Top Speed</span>
-            <p className="font-metric text-xl font-bold text-indigo-600">
+            <p className="font-metric text-xl font-bold text-[var(--color-primary)]">
               {topRecordedSpeed ? `${topRecordedSpeed} km/h` : '-'}
             </p>
           </div>
@@ -210,18 +213,18 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
             Fitness and injury risk alerts
           </h2>
           {alerts.length > 0 && (
-            <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-xs font-semibold">
+            <span className="rounded-full bg-[var(--color-danger-soft)] text-[var(--color-danger)] px-2 py-0.5 text-xs font-semibold">
               {alerts.length} active alerts
             </span>
           )}
         </div>
 
         {alerts.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
-            <Icon name="check" size={20} className="text-emerald-600 flex-shrink-0" />
+          <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-4 text-[var(--color-success)]">
+            <Icon name="check" size={20} className="text-[var(--color-success)] flex-shrink-0" />
             <div>
               <p className="text-sm font-semibold">Fitness indicators are within safe ranges</p>
-              <p className="text-xs text-emerald-700">
+              <p className="text-xs text-[var(--color-success)]">
                 No elevated heart rate, poor recovery or recurring incidents detected.
               </p>
             </div>
@@ -239,10 +242,10 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
               return (
                 <div
                   key={`${alert.ruleCode}-${idx}`}
-                  className={`rounded-[var(--radius-md)] border p-4 shadow-sm ${
+                  className={`rounded-[var(--radius-md)] border p-4 shadow-[var(--shadow-panel)] ${
                     isDanger
-                      ? 'border-red-300 bg-red-50/80'
-                      : 'border-amber-300 bg-amber-50/80'
+                      ? 'border-[var(--color-danger)] bg-[var(--color-danger-soft)]'
+                      : 'border-[var(--color-warning)] bg-[var(--color-warning-soft)]'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -250,21 +253,21 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                       <Icon
                         name="alert-triangle"
                         size={18}
-                        className={isDanger ? 'text-red-600' : 'text-amber-600'}
+                        className={isDanger ? 'text-[var(--color-danger)]' : 'text-[var(--color-warning)]'}
                       />
                       <h4
                         className={`text-sm font-bold ${
-                          isDanger ? 'text-red-900' : 'text-amber-900'
+                          isDanger ? 'text-[var(--color-danger)]' : 'text-[var(--color-warning)]'
                         }`}
                       >
                         {alert.title}
                       </h4>
                     </div>
                     <span
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                      className={`rounded px-1.5 py-0.5 text-xs font-bold uppercase tracking-wider ${
                         isDanger
-                          ? 'bg-red-200 text-red-900'
-                          : 'bg-amber-200 text-amber-900'
+                          ? 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
+                          : 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]'
                       }`}
                     >
                       {isDanger ? 'Critical' : 'Warning'}
@@ -273,13 +276,13 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
 
                   <p
                     className={`mt-2 text-xs leading-relaxed ${
-                      isDanger ? 'text-red-800' : 'text-amber-800'
+                      isDanger ? 'text-[var(--color-danger)]' : 'text-[var(--color-warning)]'
                     }`}
                   >
                     {alert.description}
                   </p>
 
-                  <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-2 text-[11px] text-[var(--color-text-secondary)]">
+                  <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-2 text-xs text-[var(--color-text-secondary)]">
                     <span>
                       Value: <strong>{alert.metricValue}</strong> / Threshold:{' '}
                       <strong>{alert.thresholdValue}</strong>
@@ -310,42 +313,33 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
           <span className="text-xs font-medium text-[var(--color-text-secondary)]">
             Date range:
           </span>
-          {(['7D', '30D', '90D', 'ALL'] as DatePreset[]).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => handlePresetChange(p)}
-              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-                preset === p
-                  ? 'bg-[var(--color-primary)] text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
-              }`}
-            >
-              {p === '7D'
-                ? '7 days'
-                : p === '30D'
-                ? '30 days'
-                : p === '90D'
-                ? '90 days'
-                : 'All time'}
-            </button>
-          ))}
+          <SegmentedControl
+            label="Date range"
+            value={preset as DatePreset}
+            onChange={handlePresetChange}
+            options={[
+              { value: '7D', label: '7 days' },
+              { value: '30D', label: '30 days' },
+              { value: '90D', label: '90 days' },
+              { value: 'ALL', label: 'All time' },
+            ]}
+          />
         </div>
 
         <form onSubmit={handleCustomFilter} className="flex items-center gap-2">
-          <input
+          <Input
+            className="min-h-8 w-auto"
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-xs text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
             aria-label="Start date"
           />
           <span className="text-xs text-[var(--color-text-muted)]">-</span>
-          <input
+          <Input
+            className="min-h-8 w-auto"
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-xs text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
             aria-label="End date"
           />
           <Button type="submit" variant="secondary" size="sm">
@@ -357,7 +351,7 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
 
       {/* Error display */}
       {error && (
-        <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 p-4 text-xs text-red-700">
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-4 text-xs text-[var(--color-danger)]">
           {error}
         </div>
       )}
@@ -389,43 +383,42 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
             No completed sessions were found in the selected date range.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[var(--color-border)] text-[var(--color-text-secondary)]">
-                  <th className="py-2.5 px-3 font-semibold">Date</th>
-                  <th className="py-2.5 px-3 font-semibold">Subject</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Distance (m)</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Speed (average / max)</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Heart rate (average / max / recovery)</th>
-                  <th className="py-2.5 px-3 font-semibold text-center">Performance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)] text-[var(--color-text-primary)]">
+          <Table bare>
+              <THead>
+                <Tr className="border-b border-[var(--color-border)] text-[var(--color-text-secondary)]">
+                  <Th className="py-2.5 px-3 font-semibold">Date</Th>
+                  <Th className="py-2.5 px-3 font-semibold">Subject</Th>
+                  <Th className="py-2.5 px-3 font-semibold text-right">Distance (m)</Th>
+                  <Th className="py-2.5 px-3 font-semibold text-right">Speed (average / max)</Th>
+                  <Th className="py-2.5 px-3 font-semibold text-right">Heart rate (average / max / recovery)</Th>
+                  <Th className="py-2.5 px-3 font-semibold text-center">Performance</Th>
+                </Tr>
+              </THead>
+              <TBody>
                 {trend.map((row) => (
-                  <tr key={row.workoutId} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
-                    <td className="py-2.5 px-3 font-medium whitespace-nowrap">
+                  <Tr key={row.workoutId} className="hover:bg-[var(--color-surface-subtle)] transition-colors">
+                    <Td className="py-2.5 px-3 font-medium whitespace-nowrap">
                       {row.date}
-                    </td>
-                    <td className="py-2.5 px-3 font-medium">
+                    </Td>
+                    <Td className="py-2.5 px-3 font-medium">
                       {row.subjectName}
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
+                    </Td>
+                    <Td className="py-2.5 px-3 text-right">
                       {row.distanceMeters ? `${row.distanceMeters.toLocaleString()} m` : '-'}
-                    </td>
-                    <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                    </Td>
+                    <Td className="py-2.5 px-3 text-right whitespace-nowrap">
                       <span>{row.averageSpeedKmh != null ? `${row.averageSpeedKmh} km/h` : '-'}</span>
                       <span className="text-[var(--color-text-muted)]"> / </span>
-                      <span className="font-semibold text-indigo-600">
+                      <span className="font-semibold text-[var(--color-primary)]">
                         {row.topSpeedKmh != null ? `${row.topSpeedKmh} km/h` : '-'}
                       </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                    </Td>
+                    <Td className="py-2.5 px-3 text-right whitespace-nowrap">
                       <span>{row.averageHeartRate != null ? `${row.averageHeartRate}` : '-'}</span>
                       <span className="text-[var(--color-text-muted)]"> / </span>
                       <span
                         className={`font-semibold ${
-                          row.maxHeartRate && row.maxHeartRate > 220 ? 'text-red-600' : 'text-rose-600'
+                          row.maxHeartRate && row.maxHeartRate > 220 ? 'text-[var(--color-danger)]' : 'text-[var(--color-danger)]'
                         }`}
                       >
                         {row.maxHeartRate != null ? `${row.maxHeartRate}` : '-'}
@@ -434,23 +427,23 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                       <span
                         className={`font-semibold ${
                           row.recoveryHeartRate && row.recoveryHeartRate > 100
-                            ? 'text-amber-600'
-                            : 'text-emerald-600'
+                            ? 'text-[var(--color-warning)]'
+                            : 'text-[var(--color-success)]'
                         }`}
                       >
                         {row.recoveryHeartRate != null ? `${row.recoveryHeartRate}` : '-'}
                       </span>
-                      <span className="text-[10px] text-[var(--color-text-muted)] ml-1">bpm</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
+                      <span className="text-xs text-[var(--color-text-muted)] ml-1">bpm</span>
+                    </Td>
+                    <Td className="py-2.5 px-3 text-center">
                       {row.performanceRating != null ? (
                         <span
-                          className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${
                             row.performanceRating >= 8
-                              ? 'bg-emerald-100 text-emerald-800'
+                              ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]'
                               : row.performanceRating >= 6
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-amber-100 text-amber-800'
+                              ? 'bg-[var(--color-info-soft)] text-[var(--color-info)]'
+                              : 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]'
                           }`}
                         >
                           {row.performanceRating}/10
@@ -458,12 +451,11 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
                       ) : (
                         <span className="text-[var(--color-text-muted)]">-</span>
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TBody>
+            </Table>
         )}
       </Panel>
     </ScreenLayout>

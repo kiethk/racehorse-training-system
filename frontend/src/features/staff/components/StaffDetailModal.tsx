@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Icon } from '@/components/ui/Icon';
-import { Pill } from '@/components/ui/StatusBadge';
-import { Button } from '@/components/ui/Button';
-import { displayError } from '@/lib/display';
+import { Button, FormField, Input, Modal, Notice, Pill, Select, Spinner } from '@/components/ui';
+import { displayError, formatDateTime, formatEnumLabel } from '@/lib/display';
 import { getStaffDetail, updateStaff } from '../services/staffService';
 import type { StaffDetailResponse, StaffSummary, StaffUpdateRequest } from '../types';
 
@@ -15,11 +13,8 @@ interface StaffDetailModalProps {
   headTrainers: StaffSummary[];
 }
 
-const inputCls =
-  'h-9 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-focus)] focus:ring-1 focus:ring-[var(--color-focus)]';
-
-const readonlyCls = 'text-[13px] text-[var(--color-text-primary)]';
-const labelCls = 'text-[12px] text-[var(--color-text-muted)] mb-0.5';
+const readonlyCls = 'text-sm text-[var(--color-text-primary)]';
+const labelCls = 'mb-0.5 text-xs text-[var(--color-text-muted)]';
 
 interface EditFormState {
   fullName: string;
@@ -138,67 +133,68 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
   if (!userId) return null;
 
   function field(label: string, value: string, editNode?: React.ReactNode) {
+    if (editMode && editNode) return <FormField label={label}>{editNode}</FormField>;
     return (
       <div>
         <div className={labelCls}>{label}</div>
-        {editMode && editNode ? editNode : <div className={readonlyCls}>{value || '-'}</div>}
+        <div className={readonlyCls}>{value || '-'}</div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={!saving ? onClose : undefined} aria-hidden="true" />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="relative flex w-full max-w-2xl max-h-[90vh] flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
-          <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-            Staff Profile {editMode ? '— Editing' : 'Detail'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
-          >
-            <Icon name="x" size={16} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      dismissible={!saving}
+      title={editMode ? 'Staff profile — editing' : 'Staff profile'}
+      footer={!loading && !error && detail ? (
+        editMode ? (
+          <>
+            <Button variant="secondary" onClick={handleCancelEdit} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="primary" loading={saving} onClick={() => { void handleSave(); }}>
+              Save changes
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="secondary" onClick={onClose}>
+              Close
+            </Button>
+            <Button variant="primary" onClick={handleStartEdit}>
+              Update
+            </Button>
+          </>
+        )
+      ) : undefined}
+    >
+        <div>
           {loading && (
             <div className="flex h-32 items-center justify-center">
-              <span className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
+              <Spinner />
             </div>
           )}
 
           {error && (
-            <div className="rounded-[var(--radius-sm)] bg-[var(--color-danger-soft)] p-3 text-[13px] text-[var(--color-danger)]">
-              {error}
-            </div>
+            <Notice tone="error">{error}</Notice>
           )}
 
           {saveError && (
-            <div className="mb-4 rounded-[var(--radius-sm)] bg-[var(--color-danger-soft)] p-3 text-[13px] text-[var(--color-danger)]">
-              {saveError}
-            </div>
+            <Notice tone="error" className="mb-4">{saveError}</Notice>
           )}
 
           {!loading && !error && detail && (
             <div className="space-y-6">
               {/* User Information */}
               <div>
-                <h3 className="mb-3 text-[14px] font-medium text-[var(--color-text-primary)]">User Information</h3>
+                <h3 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">User Information</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {field('Full Name', detail.fullName, (
-                    <input
-                      className={inputCls}
-                      value={form?.fullName ?? ''}
+                    <Input
+                                            value={form?.fullName ?? ''}
                       onChange={e => setForm(f => f ? { ...f, fullName: e.target.value } : f)}
                       disabled={saving}
                     />
@@ -209,9 +205,8 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
                     <div className={readonlyCls}>{detail.email}</div>
                   </div>
                   {field('Phone', detail.phone ?? '', (
-                    <input
-                      className={inputCls}
-                      value={form?.phone ?? ''}
+                    <Input
+                                            value={form?.phone ?? ''}
                       onChange={e => setForm(f => f ? { ...f, phone: e.target.value } : f)}
                       disabled={saving}
                     />
@@ -220,7 +215,7 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
                   <div>
                     <div className={labelCls}>Role</div>
                     <div className="mt-0.5">
-                      <Pill tone="info">{detail.role.replace('_', ' ')}</Pill>
+                      <Pill tone="info">{formatEnumLabel(detail.role)}</Pill>
                     </div>
                   </div>
                   {/* Status — read-only, handled via table action */}
@@ -235,14 +230,13 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
                   <div>
                     <div className={labelCls}>Created At</div>
                     <div className={readonlyCls}>
-                      {detail.createdAt ? new Date(detail.createdAt).toLocaleString() : '-'}
+                      {detail.createdAt ? formatDateTime(detail.createdAt) : '-'}
                     </div>
                   </div>
                   <div className="sm:col-span-2">
                     {field('Address', detail.address ?? '', (
-                      <input
-                        className={inputCls}
-                        value={form?.address ?? ''}
+                      <Input
+                                                value={form?.address ?? ''}
                         onChange={e => setForm(f => f ? { ...f, address: e.target.value } : f)}
                         disabled={saving}
                       />
@@ -255,21 +249,19 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
 
               {/* Role-Specific Profile */}
               <div>
-                <h3 className="mb-3 text-[14px] font-medium text-[var(--color-text-primary)]">Role-Specific Profile</h3>
+                <h3 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Role-Specific Profile</h3>
 
                 {!detail.profile && !editMode && (
-                  <div className="text-[13px] text-[var(--color-text-secondary)] italic">
+                  <div className="text-sm italic text-[var(--color-text-secondary)]">
                     No profile information available.
                   </div>
                 )}
 
                 {detail.role === 'GROOM' && (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <div className={labelCls}>Assigned Head Trainer</div>
-                      {editMode ? (
-                        <select
-                          className={inputCls}
+                    {editMode ? (
+                      <FormField label="Assigned Head Trainer">
+                        <Select
                           value={form?.trainerId ?? ''}
                           onChange={e => setForm(f => f ? { ...f, trainerId: e.target.value } : f)}
                           disabled={saving}
@@ -280,8 +272,11 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
                               {t.fullName} — #{t.userId}
                             </option>
                           ))}
-                        </select>
-                      ) : (
+                        </Select>
+                      </FormField>
+                    ) : (
+                      <div>
+                        <div className={labelCls}>Assigned Head Trainer</div>
                         <div className={readonlyCls}>
                           {(() => {
                             const p = detail.profile as Record<string, unknown> | undefined;
@@ -290,34 +285,31 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
                             return found ? `${found.fullName} — #${found.userId}` : `#${String(p.trainerId)}`;
                           })()}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {detail.role === 'VETERINARIAN' && (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {field('License Number', String((detail.profile as Record<string, unknown>)?.licenseNumber ?? ''), (
-                      <input
-                        className={inputCls}
-                        value={form?.licenseNumber ?? ''}
+                      <Input
+                                                value={form?.licenseNumber ?? ''}
                         onChange={e => setForm(f => f ? { ...f, licenseNumber: e.target.value } : f)}
                         disabled={saving}
                       />
                     ))}
                     {field('License Issued Date', String((detail.profile as Record<string, unknown>)?.licenseIssuedDate ?? ''), (
-                      <input
+                      <Input
                         type="date"
-                        className={inputCls}
-                        value={form?.licenseIssuedDate ?? ''}
+                                                value={form?.licenseIssuedDate ?? ''}
                         onChange={e => setForm(f => f ? { ...f, licenseIssuedDate: e.target.value } : f)}
                         disabled={saving}
                       />
                     ))}
                     {field('Specialization', String((detail.profile as Record<string, unknown>)?.specialization ?? ''), (
-                      <input
-                        className={inputCls}
-                        value={form?.specialization ?? ''}
+                      <Input
+                                                value={form?.specialization ?? ''}
                         onChange={e => setForm(f => f ? { ...f, specialization: e.target.value } : f)}
                         disabled={saving}
                       />
@@ -328,18 +320,16 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
                 {detail.role === 'HEAD_TRAINER' && (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {field('Certification Number', String((detail.profile as Record<string, unknown>)?.certificationNumber ?? ''), (
-                      <input
-                        className={inputCls}
-                        value={form?.certificationNumber ?? ''}
+                      <Input
+                                                value={form?.certificationNumber ?? ''}
                         onChange={e => setForm(f => f ? { ...f, certificationNumber: e.target.value } : f)}
                         disabled={saving}
                       />
                     ))}
                     {field('Certification Issued Date', String((detail.profile as Record<string, unknown>)?.certificationIssuedDate ?? ''), (
-                      <input
+                      <Input
                         type="date"
-                        className={inputCls}
-                        value={form?.certificationIssuedDate ?? ''}
+                                                value={form?.certificationIssuedDate ?? ''}
                         onChange={e => setForm(f => f ? { ...f, certificationIssuedDate: e.target.value } : f)}
                         disabled={saving}
                       />
@@ -350,32 +340,6 @@ export function StaffDetailModal({ userId, onClose, onUpdated, headTrainers }: S
             </div>
           )}
         </div>
-
-        {/* Footer */}
-        {!loading && !error && detail && (
-          <div className="flex items-center justify-end gap-3 border-t border-[var(--color-border)] px-6 py-4">
-            {editMode ? (
-              <>
-                <Button variant="secondary" onClick={handleCancelEdit} disabled={saving}>
-                  Cancel
-                </Button>
-                <Button variant="primary" loading={saving} onClick={() => { void handleSave(); }}>
-                  Save Changes
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="secondary" onClick={onClose}>
-                  Close
-                </Button>
-                <Button variant="primary" onClick={handleStartEdit}>
-                  Update
-                </Button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+    </Modal>
   );
 }

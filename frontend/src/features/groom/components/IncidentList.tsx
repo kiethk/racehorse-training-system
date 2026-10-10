@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Icon } from '@/components/ui/Icon';
+import { FilterChips } from '@/components/ui/SegmentedControl';
+import { formatDateTime } from '@/lib/display';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { incidentApi } from '../services/incidentService';
 import { stableApi } from '@/features/stable/services/stableService';
@@ -68,10 +70,10 @@ export function IncidentList() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             Incident Reports
           </h1>
-          <p className="text-[12px] text-[var(--color-text-secondary)]">
+          <p className="text-xs text-[var(--color-text-secondary)]">
             Monitor unusual horse health conditions and veterinary follow-up.
           </p>
         </div>
@@ -89,30 +91,18 @@ export function IncidentList() {
       </div>
 
       {/* Status filters */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] pb-3">
-        {(
-          [
-            { id: 'ALL', label: 'All' },
-            { id: 'REPORTED', label: 'Awaiting Veterinary Review' },
-            { id: 'IN_REVIEW', label: 'Under Review' },
-            { id: 'RESOLVED', label: 'Resolved' },
-            { id: 'DISMISSED', label: 'No Issue' },
-          ] as const
-        ).map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setStatusFilter(tab.id)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              statusFilter === tab.id
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <FilterChips
+        label="Incident status"
+        value={statusFilter}
+        onChange={setStatusFilter}
+        options={[
+          { value: 'ALL', label: 'All' },
+          { value: 'REPORTED', label: 'Awaiting veterinary review' },
+          { value: 'IN_REVIEW', label: 'Under review' },
+          { value: 'RESOLVED', label: 'Resolved' },
+          { value: 'DISMISSED', label: 'No issue' },
+        ]}
+      />
 
       {loading ? (
         <ListSkeleton rows={4} />
@@ -186,7 +176,7 @@ export function IncidentList() {
                       <img
                         src={imgSrc}
                         alt={`Incident image: ${report.title}`}
-                        className="max-h-56 max-w-sm rounded-[var(--radius-md)] border border-[var(--color-border)] object-cover shadow-sm"
+                        className="max-h-56 max-w-sm rounded-[var(--radius-md)] border border-[var(--color-border)] object-cover shadow-[var(--shadow-panel)]"
                         loading="lazy"
                       />
                     </div>
@@ -194,15 +184,15 @@ export function IncidentList() {
 
                   {/* Veterinary assessment, when available */}
                   {report.handlerNote && (
-                    <div className="rounded-[var(--radius-sm)] border border-emerald-200 bg-emerald-50/50 p-3 text-xs">
-                      <div className="flex items-center gap-1.5 font-medium text-emerald-900">
+                    <div className="rounded-[var(--radius-sm)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-3 text-xs">
+                      <div className="flex items-center gap-1.5 font-medium text-[var(--color-success)]">
                         <Icon name="stethoscope" size={14} />
                         <span>
                           Veterinary assessment & guidance{' '}
-                          {report.handledAt ? `(${new Date(report.handledAt).toLocaleString('en-US')})` : ''}:
+                          {report.handledAt ? `(${formatDateTime(report.handledAt)})` : ''}:
                         </span>
                       </div>
-                      <p className="mt-1.5 text-emerald-800 whitespace-pre-wrap">
+                      <p className="mt-1.5 whitespace-pre-wrap text-[var(--color-text-primary)]">
                         {report.handlerNote}
                       </p>
                     </div>

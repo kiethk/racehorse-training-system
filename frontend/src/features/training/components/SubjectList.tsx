@@ -1,5 +1,8 @@
 'use client';
 
+import { Notice } from '@/components/ui/Notice';
+import { Input, Select, Textarea } from '@/components/ui/Input';
+import { FormField } from '@/components/ui/FormField';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
@@ -104,10 +107,10 @@ export function SubjectList() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
+          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
             Exercise library ({subjects.length})
           </h2>
-          <p className="text-[12px] text-[var(--color-text-secondary)]">
+          <p className="text-xs text-[var(--color-text-secondary)]">
             Standard exercises for building training courses.
           </p>
         </div>
@@ -119,107 +122,93 @@ export function SubjectList() {
       {showForm && (
         <Panel padded>
           <form onSubmit={handleCreate} className="space-y-4">
-            <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
               Create exercise
             </h3>
 
             {formError && (
-              <div className="rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] p-3 text-[12px] text-[var(--color-danger)]">
-                {formError}
-              </div>
+              <Notice tone="error">{formError}</Notice>
             )}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Exercise name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Gallop 1,200 m"
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                />
+                <FormField label="Exercise name" required>
+                  <Input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Gallop 1,200 m"
+                  />
+                </FormField>
               </div>
 
               <div>
-                <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Category *
-                </label>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                <FormField label="Category" required>
+                  <Select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
               </div>
 
               <div>
-                <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Track surface
-                </label>
-                <select
-                  value={surfaceType}
-                  onChange={(e) => setSurfaceType(e.target.value as SurfaceType)}
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                >
-                  <option value="TURF">Turf (TURF)</option>
-                  <option value="DIRT">Dirt (DIRT)</option>
-                  <option value="SYNTHETIC">Synthetic (SYNTHETIC)</option>
-                </select>
+                <FormField label="Track surface">
+                  <Select
+                    value={surfaceType}
+                    onChange={(e) => setSurfaceType(e.target.value as SurfaceType)}
+                  >
+                    <option value="TURF">Turf (TURF)</option>
+                    <option value="DIRT">Dirt (DIRT)</option>
+                    <option value="SYNTHETIC">Synthetic (SYNTHETIC)</option>
+                  </Select>
+                </FormField>
               </div>
 
               <div>
-                <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Intensity
-                </label>
-                <select
-                  value={intensityLevel}
-                  onChange={(e) => setIntensityLevel(e.target.value as IntensityLevel)}
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                >
-                  <option value="LOW">Low (LOW)</option>
-                  <option value="MEDIUM">Medium (MEDIUM)</option>
-                  <option value="HIGH">High (HIGH)</option>
-                </select>
+                <FormField label="Intensity">
+                  <Select
+                    value={intensityLevel}
+                    onChange={(e) => setIntensityLevel(e.target.value as IntensityLevel)}
+                  >
+                    <option value="LOW">Low (LOW)</option>
+                    <option value="MEDIUM">Medium (MEDIUM)</option>
+                    <option value="HIGH">High (HIGH)</option>
+                  </Select>
+                </FormField>
               </div>
 
               <div>
-                <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Target distance (metres)
-                </label>
-                <input
-                  type="number"
-                  min="100"
-                  step="50"
-                  value={targetDistanceMeters}
-                  onChange={(e) => setTargetDistanceMeters(Number(e.target.value))}
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                />
+                <FormField label="Target distance (metres)">
+                  <Input
+                    type="number"
+                    min="100"
+                    step="50"
+                    value={targetDistanceMeters}
+                    onChange={(e) => setTargetDistanceMeters(Number(e.target.value))}
+                  />
+                </FormField>
               </div>
 
               <div>
-                <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Estimated duration (minutes, max 240) *
-                </label>
-                <input
-                  type="number"
-                  min="15"
-                  max="240"
-                  step="5"
-                  required
-                  value={durationMinutes}
-                  onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                />
-                <span className="text-[11px] text-[var(--color-text-muted)]">
+                <FormField label="Estimated duration (minutes, max 240)" required>
+                  <Input
+                    type="number"
+                    min="15"
+                    max="240"
+                    step="5"
+                    required
+                    value={durationMinutes}
+                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                  />
+                </FormField>
+                <span className="text-xs text-[var(--color-text-muted)]">
                 Determines lot duration. The training window is limited to 240 minutes.
                 </span>
               </div>
@@ -227,16 +216,14 @@ export function SubjectList() {
 
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Description
-              </label>
-              <textarea
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Technical notes or instructions for the groom…"
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Description">
+                <Textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Technical notes or instructions for the groom…"
+                />
+              </FormField>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -265,10 +252,10 @@ export function SubjectList() {
             <Panel key={sub.id} padded>
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h4 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+                  <h4 className="text-base font-semibold text-[var(--color-text-primary)]">
                     {sub.name}
                   </h4>
-                  <div className="text-[11px] text-[var(--color-text-muted)]">
+                  <div className="text-xs text-[var(--color-text-muted)]">
                     {categoryMap.get(sub.categoryId) || `Category #${sub.categoryId}`}
                   </div>
                 </div>
@@ -287,12 +274,12 @@ export function SubjectList() {
               </div>
 
               {sub.description && (
-                <p className="mt-2 text-[12px] text-[var(--color-text-secondary)] line-clamp-2">
+                <p className="mt-2 text-xs text-[var(--color-text-secondary)] line-clamp-2">
                   {sub.description}
                 </p>
               )}
 
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)] border-t border-[var(--color-border)] pt-2">
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--color-text-muted)] border-t border-[var(--color-border)] pt-2">
                 <span>{sub.durationMinutes} min</span>
                 <span>📏 {sub.targetDistanceMeters}m</span>
                 <span>🏟️ {sub.surfaceType}</span>

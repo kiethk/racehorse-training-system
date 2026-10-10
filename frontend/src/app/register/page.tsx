@@ -3,12 +3,9 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Icon } from '@/components/ui/Icon';
-import { BrandLogo } from '@/components/ui/BrandLogo';
+import { AuthCard } from '@/components/auth/AuthCard';
+import { Button, FormField, Input, Notice } from '@/components/ui';
 import { registerOwner } from '@/services/auth';
-
-const inputClassName =
-  'mt-1 h-10 w-full rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-focus)] focus:ring-2 focus:ring-[var(--color-focus)]/30';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -66,169 +63,85 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--color-background)] px-4 py-10">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="mb-6 flex items-center justify-center gap-2">
-          <BrandLogo className="h-9 w-9" />
-          <span className="text-[18px] font-semibold tracking-tight text-[var(--color-text-primary)]">
-            RTMS
-          </span>
-        </div>
+    <AuthCard
+      title="Create an account"
+      description="Register as a Horse Owner to submit admission applications."
+      footer={(
+        <>
+          Already have an account?{' '}
+          <Link href="/login" className="font-medium text-[var(--color-primary)] underline-offset-2 hover:underline">
+            Sign in
+          </Link>
+        </>
+      )}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <FormField label="Full name" htmlFor="register-fullname" required>
+          <Input
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Nguyen Van A"
+            autoComplete="name"
+          />
+        </FormField>
 
-        <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl shadow-black/5">
-          <div className="mb-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-primary)]">
-              Riverside Training Club
-            </p>
-            <h1 className="mt-2 text-[22px] font-semibold tracking-tight text-[var(--color-text-primary)]">
-              Create an account
-            </h1>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
-              Register as a Horse Owner to submit admission applications.
-            </p>
-          </div>
+        <FormField label="Email" htmlFor="register-email" required>
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="yourname@example.com"
+            autoComplete="email"
+          />
+        </FormField>
 
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            {/* Full name */}
-            <label className="block">
-              <span className="text-[12px] font-medium text-[var(--color-text-primary)]">
-                Full name <span className="text-[var(--color-danger)]">*</span>
-              </span>
-              <input
-                id="register-fullname"
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className={inputClassName}
-                placeholder="Nguyen Van A"
-                autoComplete="name"
-                required
-              />
-            </label>
+        <FormField label="Phone (optional)" htmlFor="register-phone">
+          <Input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="0901 234 567"
+            autoComplete="tel"
+          />
+        </FormField>
 
-            {/* Email */}
-            <label className="block">
-              <span className="text-[12px] font-medium text-[var(--color-text-primary)]">
-                Email <span className="text-[var(--color-danger)]">*</span>
-              </span>
-              <input
-                id="register-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputClassName}
-                placeholder="yourname@example.com"
-                autoComplete="email"
-                required
-              />
-            </label>
+        <FormField label="Address (optional)" htmlFor="register-address">
+          <Input
+            type="text"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="123 Nguyen Hue, Ho Chi Minh City"
+            autoComplete="street-address"
+          />
+        </FormField>
 
-            {/* Phone (optional) */}
-            <label className="block">
-              <span className="text-[12px] font-medium text-[var(--color-text-primary)]">
-                Phone
-                <span className="ml-1 text-[11px] font-normal text-[var(--color-text-muted)]">(optional)</span>
-              </span>
-              <input
-                id="register-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className={inputClassName}
-                placeholder="0901 234 567"
-                autoComplete="tel"
-              />
-            </label>
+        <FormField label="Password" htmlFor="register-password" required>
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Create a password"
+            autoComplete="new-password"
+          />
+        </FormField>
 
-            {/* Address (optional) */}
-            <label className="block">
-              <span className="text-[12px] font-medium text-[var(--color-text-primary)]">
-                Address
-                <span className="ml-1 text-[11px] font-normal text-[var(--color-text-muted)]">(optional)</span>
-              </span>
-              <input
-                id="register-address"
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className={inputClassName}
-                placeholder="123 Nguyen Hue, Ho Chi Minh City"
-                autoComplete="street-address"
-              />
-            </label>
+        <FormField label="Confirm password" htmlFor="register-confirm-password" required>
+          <Input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Repeat your password"
+            autoComplete="new-password"
+          />
+        </FormField>
 
-            {/* Password */}
-            <label className="block">
-              <span className="text-[12px] font-medium text-[var(--color-text-primary)]">
-                Password <span className="text-[var(--color-danger)]">*</span>
-              </span>
-              <input
-                id="register-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={inputClassName}
-                placeholder="Create a password"
-                autoComplete="new-password"
-                required
-              />
-            </label>
+        {error && <Notice tone="error">{error}</Notice>}
 
-            {/* Confirm password */}
-            <label className="block">
-              <span className="text-[12px] font-medium text-[var(--color-text-primary)]">
-                Confirm password <span className="text-[var(--color-danger)]">*</span>
-              </span>
-              <input
-                id="register-confirm-password"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className={inputClassName}
-                placeholder="Repeat your password"
-                autoComplete="new-password"
-                required
-              />
-            </label>
-
-            {/* Error message */}
-            {error && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-[var(--color-danger-soft)] px-3 py-2.5 text-[12px] text-[var(--color-danger)]"
-              >
-                <Icon name="alert-triangle" size={14} className="mt-0.5 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Submit */}
-            <button
-              type="submit"
-              id="register-submit"
-              disabled={submitting}
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-primary)] px-3 text-[13px] font-medium text-[var(--color-text-inverse)] transition-colors hover:bg-[var(--color-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting && (
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              )}
-              Create account
-            </button>
-          </form>
-
-          {/* Link back to login */}
-          <p className="mt-5 text-center text-[12px] text-[var(--color-text-muted)]">
-            Already have an account?{' '}
-            <Link
-              href="/login"
-              className="font-medium text-[var(--color-primary)] underline-offset-2 hover:underline"
-            >
-              Sign in
-            </Link>
-          </p>
-        </section>
-      </div>
-    </main>
+        <Button type="submit" id="register-submit" variant="primary" className="h-10 w-full" loading={submitting}>
+          Create account
+        </Button>
+      </form>
+    </AuthCard>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/Table';
 import { useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -982,50 +983,50 @@ export function VetAdmissionQueue() {
 
                       {metrics.length > 0 ? (
                         <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-border)]">
-                          <table className="w-full text-left text-xs">
-                            <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-                              <tr>
-                                <th className="px-3 py-2">Recorded At</th>
-                                <th className="px-3 py-2">Temp</th>
-                                <th className="px-3 py-2">Heart Rate</th>
-                                <th className="px-3 py-2">Resp Rate</th>
-                                <th className="px-3 py-2">Weight</th>
-                                <th className="px-3 py-2">BCS</th>
-                                <th className="px-3 py-2">Hydration</th>
-                                <th className="px-3 py-2">Notes</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[var(--color-border)] font-metric">
+                          <Table bare>
+                            <THead>
+                              <Tr>
+                                <Th className="px-3 py-2">Recorded At</Th>
+                                <Th className="px-3 py-2">Temp</Th>
+                                <Th className="px-3 py-2">Heart Rate</Th>
+                                <Th className="px-3 py-2">Resp Rate</Th>
+                                <Th className="px-3 py-2">Weight</Th>
+                                <Th className="px-3 py-2">BCS</Th>
+                                <Th className="px-3 py-2">Hydration</Th>
+                                <Th className="px-3 py-2">Notes</Th>
+                              </Tr>
+                            </THead>
+                            <TBody>
                               {metrics.map((m) => (
-                                <tr key={m.id} className="hover:bg-[var(--color-surface-subtle)]">
-                                  <td className="px-3 py-2 text-[var(--color-text-primary)]">
+                                <Tr key={m.id} className="hover:bg-[var(--color-surface-subtle)]">
+                                  <Td className="px-3 py-2 text-[var(--color-text-primary)]">
                                     {formatDate(m.recordedAt, true)}
-                                  </td>
-                                  <td className="px-3 py-2">
+                                  </Td>
+                                  <Td className="px-3 py-2">
                                     {m.temperature != null ? `${m.temperature} °C` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2">
+                                  </Td>
+                                  <Td className="px-3 py-2">
                                     {m.heartRate != null ? `${m.heartRate} bpm` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2">
+                                  </Td>
+                                  <Td className="px-3 py-2">
                                     {m.respiratoryRate != null ? `${m.respiratoryRate} rpm` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2">
+                                  </Td>
+                                  <Td className="px-3 py-2">
                                     {m.weight != null ? `${m.weight} kg` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2">
+                                  </Td>
+                                  <Td className="px-3 py-2">
                                     {m.bodyConditionScore != null ? `${m.bodyConditionScore} / 9` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2 font-sans">
+                                  </Td>
+                                  <Td className="px-3 py-2 font-sans">
                                     {m.hydrationStatus || '—'}
-                                  </td>
-                                  <td className="px-3 py-2 font-sans text-[var(--color-text-secondary)] max-w-xs truncate">
+                                  </Td>
+                                  <Td className="px-3 py-2 font-sans text-[var(--color-text-secondary)] max-w-xs truncate">
                                     {m.notes || '—'}
-                                  </td>
-                                </tr>
+                                  </Td>
+                                </Tr>
                               ))}
-                            </tbody>
-                          </table>
+                            </TBody>
+                          </Table>
                         </div>
                       ) : (
                         <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] p-6 text-center text-[var(--color-text-muted)]">

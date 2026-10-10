@@ -19,7 +19,7 @@ export { FilterBar } from './FilterBar';
 export { FormField } from './FormField';
 export { HorseAvatar } from './HorseAvatar';
 export { Icon, type IconName } from './Icon';
-export { Checkbox, Input, SearchInput, Select, Textarea } from './Input';
+export { Checkbox, ChoiceInput, FileInput, Input, SearchInput, Select, Textarea } from './Input';
 export { MetricCard } from './MetricCard';
 export { Modal } from './Modal';
 export { Notice } from './Notice';

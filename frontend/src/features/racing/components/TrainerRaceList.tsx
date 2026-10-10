@@ -1,8 +1,11 @@
 'use client';
 
+import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/Table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
+import { Button, LinkButton } from '@/components/ui/Button';
+import { SearchInput } from '@/components/ui/Input';
+import { Tabs } from '@/components/ui/Tabs';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
@@ -105,52 +108,29 @@ export function TrainerRaceList() {
       <PageHeader
         title="Race nominations"
         description="Research races and submit internal nominations for management review."
-        actions={<Link href="/trainer/racing/new"><Button variant="primary" icon="plus">Create nomination</Button></Link>}
+        actions={<LinkButton href="/trainer/racing/new" variant="primary" icon="plus">Create nomination</LinkButton>}
       />
 
       {/* Tabs & Search */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex border-b border-[var(--color-border)]">
-          {(
-            [
-              { key: 'ALL', label: 'All' },
-              { key: 'PENDING', label: 'Pending' },
-              { key: 'APPROVED', label: 'Approved' },
-              { key: 'REJECTED', label: 'Rejected' },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-[13px] font-medium transition ${
-                activeTab === tab.key
-                  ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                  : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-[11px] ${
-                  activeTab === tab.key
-                    ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-semibold'
-                    : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'
-                }`}
-              >
-                {counts[tab.key]}
-              </span>
-            </button>
-          ))}
-        </div>
+        <Tabs
+          size="sm"
+          active={activeTab}
+          onChange={(id) => setActiveTab(id as typeof activeTab)}
+          tabs={[
+            { id: 'ALL', label: 'All', count: counts.ALL },
+            { id: 'PENDING', label: 'Pending', count: counts.PENDING },
+            { id: 'APPROVED', label: 'Approved', count: counts.APPROVED },
+            { id: 'REJECTED', label: 'Rejected', count: counts.REJECTED },
+          ]}
+        />
 
-        <div className="w-full sm:w-64">
-          <input
-            type="text"
-            placeholder="Search races, horses, or locations…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-          />
-        </div>
+        <SearchInput
+          className="w-full sm:w-72"
+          value={search}
+          onChange={setSearch}
+          placeholder="Search races, horses, or locations…"
+        />
       </div>
 
       {/* Content */}
@@ -195,69 +175,65 @@ export function TrainerRaceList() {
           />
         </Panel>
       ) : (
-        <Panel>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
-              <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[12px] font-semibold text-[var(--color-text-secondary)]">
-                <tr>
-                <th className="px-4 py-3">Race & Category</th>
-                <th className="px-4 py-3">Horse</th>
-                <th className="px-4 py-3">Event Date & Location</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Submitted</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)]">
+        <Table>
+              <THead>
+                <Tr>
+                <Th className="px-4 py-3">Race & Category</Th>
+                <Th className="px-4 py-3">Horse</Th>
+                <Th className="px-4 py-3">Event Date & Location</Th>
+                <Th className="px-4 py-3">Status</Th>
+                <Th className="px-4 py-3">Submitted</Th>
+                <Th className="px-4 py-3 text-right">Actions</Th>
+                </Tr>
+              </THead>
+              <TBody>
                 {filteredItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-[var(--color-surface-muted)]/50 transition">
-                    <td className="px-4 py-3.5">
+                  <Tr key={item.id} className="hover:bg-[var(--color-surface-muted)]/50 transition">
+                    <Td className="px-4 py-3.5">
                       <div className="font-semibold text-[var(--color-text-primary)]">
                         {item.raceName}
                       </div>
-                      <div className="text-[12px] text-[var(--color-text-secondary)]">
+                      <div className="text-xs text-[var(--color-text-secondary)]">
                         {item.raceCategory}
                       </div>
-                    </td>
-                    <td className="px-4 py-3.5">
+                    </Td>
+                    <Td className="px-4 py-3.5">
                       <div className="font-medium text-[var(--color-text-primary)] flex items-center gap-1.5">
                         <span>🏇</span>
                       <span>{item.horseName || `Horse #${item.horseId}`}</span>
                       </div>
                       {item.horseRegistrationNumber && (
-                        <div className="text-[11px] text-[var(--color-text-muted)] font-metric">
+                        <div className="text-xs text-[var(--color-text-muted)] font-metric">
                           {item.horseRegistrationNumber}
                         </div>
                       )}
-                    </td>
-                    <td className="px-4 py-3.5">
+                    </Td>
+                    <Td className="px-4 py-3.5">
                       <div className="font-medium text-[var(--color-text-primary)]">
                         📅 {formatDate(item.eventDate)}
                         {item.eventTime && ` • ${item.eventTime.substring(0, 5)}`}
                       </div>
-                      <div className="text-[12px] text-[var(--color-text-secondary)] truncate max-w-xs" title={item.location}>
+                      <div className="text-xs text-[var(--color-text-secondary)] truncate max-w-xs" title={item.location}>
                         📍 {item.location}
                       </div>
-                    </td>
-                    <td className="px-4 py-3.5">
+                    </Td>
+                    <Td className="px-4 py-3.5">
                       {renderStatusBadge(item.status)}
-                    </td>
-                    <td className="px-4 py-3.5 text-[12px] text-[var(--color-text-muted)]">
+                    </Td>
+                    <Td className="px-4 py-3.5 text-xs text-[var(--color-text-muted)]">
                       {formatDateTime(item.createdAt)}
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
+                    </Td>
+                    <Td className="px-4 py-3.5 text-right">
                       <Link href={`/trainer/racing/${item.id}`}>
                         <Button variant="secondary" size="sm">
                         View nomination
                         </Button>
                       </Link>
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+              </TBody>
+            </Table>
       )}
     </ScreenLayout>
   );

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Input } from '@/components/ui/Input';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
@@ -84,23 +85,22 @@ export function LotTimeline() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             Daily training schedule
           </h1>
-          <p className="text-[12px] text-[var(--color-text-secondary)]">
+          <p className="text-xs text-[var(--color-text-secondary)]">
             View training lots between 06:00 and 10:00 and identify available time slots.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-[12px] font-medium text-[var(--color-text-primary)]">
-            Date:
-          </label>
-          <input
+          <span className="text-xs font-medium text-[var(--color-text-primary)]">Date</span>
+          <Input
             type="date"
+            aria-label="Date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+            className="min-h-8 w-auto"
           />
           <Button variant="secondary" size="sm" onClick={() => loadLots()}>
             Refresh
@@ -116,18 +116,18 @@ export function LotTimeline() {
         <>
           {/* Visual timeline bar */}
           <Panel padded>
-            <div className="flex items-center justify-between mb-3 text-[13px]">
+            <div className="flex items-center justify-between mb-3 text-sm">
               <span className="font-semibold text-[var(--color-text-primary)]">
                 Schedule window 06:00–10:00 ({formatDate(selectedDate)})
               </span>
-              <span className="text-[12px] text-[var(--color-text-secondary)]">
+              <span className="text-xs text-[var(--color-text-secondary)]">
                 Used: <strong>{totalOccupiedMinutes}/240 minutes</strong> · Available:{' '}
                 <strong>{Math.max(0, 240 - totalOccupiedMinutes)} minutes</strong>
               </span>
             </div>
 
             {/* Hour ruler */}
-            <div className="relative h-6 text-[10px] text-[var(--color-text-muted)] font-metric border-b border-[var(--color-border)] mb-2">
+            <div className="relative h-6 text-xs text-[var(--color-text-muted)] font-metric border-b border-[var(--color-border)] mb-2">
               <span className="absolute left-0">06:00</span>
               <span className="absolute left-[25%] -translate-x-1/2">07:00</span>
               <span className="absolute left-[50%] -translate-x-1/2">08:00</span>
@@ -154,13 +154,13 @@ export function LotTimeline() {
                   <div
                     key={lot.lotId}
                     style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
-                    className={`absolute top-1 bottom-1 rounded border px-2 py-1 flex flex-col justify-center overflow-hidden transition shadow-sm ${tone}`}
+                    className={`absolute top-1 bottom-1 rounded border px-2 py-1 flex flex-col justify-center overflow-hidden transition shadow-[var(--shadow-panel)] ${tone}`}
                     title={`Lot #${lot.lotId}: ${lot.subjectName} (${lot.startTime} - ${lot.endTime}) - ${lot.occupied}/${lot.maxCapacity} horses`}
                   >
-                    <div className="text-[11px] font-bold truncate">
+                    <div className="text-xs font-bold truncate">
                       #{lot.lotId} {lot.subjectName}
                     </div>
-                    <div className="text-[10px] truncate">
+                    <div className="text-xs truncate">
                       {lot.startTime.substring(0, 5)}–{lot.endTime.substring(0, 5)} ({lot.occupied}/{lot.maxCapacity} horses)
                     </div>
                   </div>
@@ -171,7 +171,7 @@ export function LotTimeline() {
 
           {/* Detail cards for each lot */}
           <div className="space-y-3">
-            <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
               Lots for this day ({sortedLots.length})
             </h2>
 
@@ -192,11 +192,11 @@ export function LotTimeline() {
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-[14px] font-bold text-[var(--color-text-primary)]">
+                              <span className="text-base font-bold text-[var(--color-text-primary)]">
                                 Lot #{lot.lotId} • {lot.subjectName}
                               </span>
                             </div>
-                            <div className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">
+                            <div className="text-xs text-[var(--color-text-secondary)] mt-0.5">
                               <strong>{lot.startTime} – {lot.endTime}</strong> ({lot.durationMinutes} min)
                             </div>
                           </div>
@@ -215,20 +215,20 @@ export function LotTimeline() {
                           </Pill>
                         </div>
 
-                        <div className="mt-3 text-[12px] border-t border-[var(--color-border)] pt-2">
-                          <div className="text-[11px] text-[var(--color-text-muted)]">
+                        <div className="mt-3 text-xs border-t border-[var(--color-border)] pt-2">
+                          <div className="text-xs text-[var(--color-text-muted)]">
                           Participating horses ({lot.horseNames.length}):
                           </div>
                           <div className="mt-1 flex flex-wrap gap-1.5">
                             {lot.horseNames.length === 0 ? (
-                              <span className="text-[11px] text-[var(--color-text-muted)] italic">
+                              <span className="text-xs text-[var(--color-text-muted)] italic">
                                 No horses
                               </span>
                             ) : (
                               lot.horseNames.map((name, i) => (
                                 <span
                                   key={i}
-                                  className="rounded bg-[var(--color-surface-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-text-primary)] border border-[var(--color-border)]"
+                                  className="rounded bg-[var(--color-surface-muted)] px-2 py-0.5 text-xs font-medium text-[var(--color-text-primary)] border border-[var(--color-border)]"
                                 >
                                   🏇 {name}
                                 </span>

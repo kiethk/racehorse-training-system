@@ -1,5 +1,8 @@
 'use client';
 
+import { SearchInput } from '@/components/ui/Input';
+import { FilterChips } from '@/components/ui/SegmentedControl';
+import { Pill } from '@/components/ui/StatusBadge';
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { trainingService } from '../services/trainingService';
@@ -68,54 +71,17 @@ export function TrainerHorseListView() {
       <PageSection title="Assigned horse overview">
       <Panel padded className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setFilterMode('ALL')}
-              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-                filterMode === 'ALL'
-                  ? 'bg-[var(--color-primary)] text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
-              }`}
-            >
-              All ({horses.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterMode('ACTIVE')}
-              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-                filterMode === 'ACTIVE'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
-              }`}
-            >
-              In training ({horses.filter((h) => h.planStatus === 'ACTIVE').length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterMode('ALERT')}
-              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-                filterMode === 'ALERT'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
-              }`}
-            >
-              Alerts ({horses.filter((h) => (h.alertCount ?? h.alertsCount ?? 0) > 0).length})
-            </button>
-          </div>
-
-          <div className="relative">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search horses..."
-              className="w-full max-w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 pl-7 pr-2.5 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none sm:w-60"
-            />
-            <span className="pointer-events-none absolute left-2 top-2 text-[var(--color-text-muted)]">
-              <Icon name="search" size={12} />
-            </span>
-          </div>
+          <FilterChips
+            label="Horse filter"
+            value={filterMode}
+            onChange={setFilterMode}
+            options={[
+              { value: 'ALL', label: 'All', count: horses.length },
+              { value: 'ACTIVE', label: 'In training', count: horses.filter((h) => h.planStatus === 'ACTIVE').length },
+              { value: 'ALERT', label: 'Alerts', count: horses.filter((h) => (h.alertCount ?? h.alertsCount ?? 0) > 0).length },
+            ]}
+          />
+          <SearchInput className="w-full sm:w-64" value={searchTerm} onChange={setSearchTerm} placeholder="Search horses..." />
         </div>
 
         {error && <Notice tone="error">{error}</Notice>}
@@ -133,7 +99,7 @@ export function TrainerHorseListView() {
             {filteredHorses.map((horse) => (
               <div
                 key={horse.horseId}
-                className="flex flex-col justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm hover:border-[var(--color-border-strong)] transition-all"
+                className="flex flex-col justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)] hover:border-[var(--color-border-strong)] transition-all"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
@@ -147,15 +113,9 @@ export function TrainerHorseListView() {
                     </div>
 
                     {(horse.alertCount ?? horse.alertsCount ?? 0) > 0 ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-bold">
-                        <Icon name="alert-triangle" size={10} />
-                        {horse.alertCount ?? horse.alertsCount} alerts
-                      </span>
+                      <Pill tone="danger" size="sm" icon="alert-triangle">{horse.alertCount ?? horse.alertsCount} alerts</Pill>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-medium">
-                        <Icon name="check" size={10} />
-                        Clear
-                      </span>
+                      <Pill tone="success" size="sm" icon="check">Clear</Pill>
                     )}
                   </div>
 
@@ -163,7 +123,7 @@ export function TrainerHorseListView() {
                   <div className="mt-4 space-y-2.5">
                     {horse.totalSessions > 0 ? (
                       <div>
-                        <div className="flex items-center justify-between text-[11px] text-[var(--color-text-secondary)]">
+                        <div className="flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
                           <span>Course progress</span>
                           <span className="font-semibold text-[var(--color-text-primary)]">
                             {horse.completedSessions}/{horse.totalSessions} sessions ({horse.progressPercent}%)
@@ -172,7 +132,7 @@ export function TrainerHorseListView() {
                         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-subtle)]">
                           <div
                             style={{ width: `${Math.min(100, horse.progressPercent)}%` }}
-                            className="h-full bg-blue-500 rounded-full"
+                            className="h-full bg-[var(--color-info)] rounded-full"
                           />
                         </div>
                       </div>
@@ -184,7 +144,7 @@ export function TrainerHorseListView() {
 
                     <div className="grid grid-cols-2 gap-2 border-t border-[var(--color-border)] pt-2.5 text-xs">
                       <div>
-                        <span className="text-[10px] uppercase text-[var(--color-text-muted)]">
+                        <span className="text-xs uppercase text-[var(--color-text-muted)]">
                           Latest performance
                         </span>
                         <p className="font-semibold text-[var(--color-text-primary)]">
@@ -194,10 +154,10 @@ export function TrainerHorseListView() {
                         </p>
                       </div>
                       <div>
-                        <span className="text-[10px] uppercase text-[var(--color-text-muted)]">
+                        <span className="text-xs uppercase text-[var(--color-text-muted)]">
                           30-day average
                         </span>
-                        <p className="font-semibold text-emerald-600">
+                        <p className="font-semibold text-[var(--color-success)]">
                           {horse.avgPerformanceRating30d != null
                             ? `${horse.avgPerformanceRating30d.toFixed(1)}/10`
                             : '-'}

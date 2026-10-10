@@ -1,9 +1,11 @@
 'use client';
 
+import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/Table';
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { Panel, SectionTitle } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { Checkbox, SearchInput } from '@/components/ui/Input';
 import { accessControlService } from '../services/accessControlService';
 import { AccessControlMatrixResponse } from '../types';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
@@ -276,14 +278,14 @@ export function AccessControlView() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <SectionTitle>Role-based access control</SectionTitle>
-            <p className="mt-1 text-[13px] text-[var(--color-text-secondary)] max-w-2xl">
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)] max-w-2xl">
               Manage what different roles can view and do within the system. Check a box to grant permission, or uncheck to revoke it.
             </p>
           </div>
           
           <div className="flex items-center gap-2 self-start">
             {saveSuccess && (
-              <span className="text-[13px] font-medium text-[var(--color-success)] flex items-center gap-1">
+              <span className="text-sm font-medium text-[var(--color-success)] flex items-center gap-1">
                 <Icon name="check" size={14} /> Saved
               </span>
             )}
@@ -301,7 +303,7 @@ export function AccessControlView() {
         </div>
         
         {saveError && (
-          <div className="mt-4 rounded-md bg-[var(--color-danger-soft)] p-3 text-[13px] text-[var(--color-danger)]">
+          <div className="mt-4 rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">
             <div className="flex items-start gap-2">
               <Icon name="alert-triangle" size={16} className="mt-0.5 shrink-0" />
               <span>{saveError}</span>
@@ -311,98 +313,86 @@ export function AccessControlView() {
       </Panel>
 
       <Panel padded>
-        <div className="mb-4 flex items-center">
-          <div className="relative w-full max-w-md">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[var(--color-text-muted)]">
-              <Icon name="search" size={16} />
-            </div>
-            <input
-              type="text"
-              placeholder="Search permissions by code or description..."
-              className="h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] pl-9 pr-3 text-[13px] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
+        <SearchInput
+          className="mb-4 max-w-md"
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="Search permissions by code or description..."
+        />
 
-        <div className="overflow-x-auto rounded-md border border-[var(--color-border)]">
-          <table className="w-full min-w-[800px] border-collapse text-left text-[13px]">
-            <thead>
-              <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-                <th className="p-3 font-semibold text-[var(--color-text-primary)] min-w-[250px]">
+        <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)]">
+          <Table bare className="min-w-[800px]">
+            <THead>
+              <Tr className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+                <Th className="p-3 font-semibold text-[var(--color-text-primary)] min-w-[250px]">
                   Permission
-                </th>
+                </Th>
                 {data.roles.map(role => (
-                  <th key={role.roleId} className="p-3 font-semibold text-[var(--color-text-primary)] text-center w-[120px]">
+                  <Th key={role.roleId} className="p-3 font-semibold text-[var(--color-text-primary)] text-center w-[120px]">
                     {formatRoleName(role.roleName)}
-                  </th>
+                  </Th>
                 ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border)]">
+              </Tr>
+            </THead>
+            <TBody>
               {groupedPermissions.length === 0 ? (
-                <tr>
-                  <td colSpan={data.roles.length + 1} className="p-8 text-center text-[var(--color-text-muted)]">
+                <Tr>
+                  <Td colSpan={data.roles.length + 1} className="p-8 text-center text-[var(--color-text-muted)]">
                     No permissions found matching &quot;{searchTerm}&quot;
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ) : (
                 groupedPermissions.map(group => (
                   <Fragment key={group.key}>
-                    <tr 
+                    <Tr 
                       className="bg-[var(--color-surface-muted)] hover:bg-[var(--color-surface-muted)]/80 transition-colors cursor-pointer"
                       onClick={() => toggleGroup(group.key)}
                     >
-                      <td colSpan={data.roles.length + 1} className="p-3">
+                      <Td colSpan={data.roles.length + 1} className="p-3">
                         <div className="flex items-center gap-2 font-semibold text-[var(--color-text-primary)]">
                           <Icon 
                             name={isGroupCollapsed(group.key) ? 'chevron-right' : 'chevron-down'} 
                             size={16} 
                             className="text-[var(--color-text-muted)]" 
                           />
-                          {group.label} <span className="text-[var(--color-text-muted)] font-normal text-[12px]">({group.totalCount})</span>
+                          {group.label} <span className="text-[var(--color-text-muted)] font-normal text-xs">({group.totalCount})</span>
                         </div>
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                     {!isGroupCollapsed(group.key) && group.permissions.map(permission => (
-                      <tr key={permission.id} className="hover:bg-[var(--color-surface-muted)] transition-colors">
-                        <td className="p-3 pl-8">
-                          <div className="font-medium text-[var(--color-text-primary)] font-metric text-[12px]">
+                      <Tr key={permission.id} className="hover:bg-[var(--color-surface-muted)] transition-colors">
+                        <Td className="p-3 pl-8">
+                          <div className="font-medium text-[var(--color-text-primary)] font-metric text-xs">
                             {permission.code}
                           </div>
-                          <div className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">
+                          <div className="text-xs text-[var(--color-text-secondary)] mt-0.5">
                             {permission.description}
                           </div>
-                        </td>
+                        </Td>
                         {data.roles.map(role => {
                           const isChecked = dirtyMatrix[role.roleId]?.includes(permission.code) || false;
                           const disabled = isSafetyDisabled(role.roleName, permission.code);
                           
                           return (
-                            <td key={role.roleId} className="p-3 text-center align-middle">
-                              <label 
-                                className={`inline-flex cursor-pointer items-center justify-center p-1 ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
-                                title={disabled ? "This permission is required to manage access control." : `Toggle ${permission.code} for ${formatRoleName(role.roleName)}`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)] cursor-pointer disabled:cursor-not-allowed"
-                                  checked={isChecked}
-                                  onChange={() => handleToggle(role.roleId, permission.code, disabled)}
-                                  disabled={disabled || saving}
-                                />
-                              </label>
-                            </td>
+                            <Td key={role.roleId} className="p-3 text-center align-middle">
+                              <Checkbox
+                                className="inline-flex justify-center"
+                                title={disabled ? 'This permission is required to manage access control.' : undefined}
+                                label={<span className="sr-only">{`${permission.code} for ${formatRoleName(role.roleName)}`}</span>}
+                                checked={isChecked}
+                                onChange={() => handleToggle(role.roleId, permission.code, disabled)}
+                                disabled={disabled || saving}
+                              />
+                            </Td>
                           );
                         })}
-                      </tr>
+                      </Tr>
                     ))}
                   </Fragment>
                 ))
               )}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </div>
       </Panel>
     </div>

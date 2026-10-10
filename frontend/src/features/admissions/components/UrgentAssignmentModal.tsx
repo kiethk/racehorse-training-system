@@ -1,8 +1,8 @@
 'use client';
 
-import { Button } from '@/components/ui/Button';
-import { Icon } from '@/components/ui/Icon';
-import { Pill } from '@/components/ui/StatusBadge';
+import type { ReactNode } from 'react';
+import { Button, Modal, Notice, Pill } from '@/components/ui';
+import { formatDateTime } from '@/lib/display';
 import type { UrgentAssignmentAlert } from '../types';
 import { admissionsApi } from '../services/api';
 
@@ -11,101 +11,69 @@ interface Props {
   onOpenCase: (alert: UrgentAssignmentAlert) => void;
 }
 
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+function Detail({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <dt className="text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)]">{label}</dt>
+      <dd className="mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{children}</dd>
+    </div>
+  );
 }
 
 export function UrgentAssignmentModal({ alert, onOpenCase }: Props) {
   if (!alert) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" aria-hidden="true" />
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="urgent-assignment-title"
-        aria-describedby="urgent-assignment-description"
-        className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-lg)] border-2 border-[var(--color-danger)] bg-[var(--color-surface)] shadow-2xl shadow-black/30"
-      >
-        <header className="border-b border-[var(--color-danger)]/30 bg-[var(--color-danger-soft)] px-6 py-5">
-          <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-danger)] text-[var(--color-text-inverse)]">
-              <Icon name="alert-triangle" size={22} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-danger)]">
-                Automatic assignment · No confirmation required
-              </p>
-              <h2 id="urgent-assignment-title" className="mt-1 text-xl font-bold text-[var(--color-text-primary)]">
-                URGENT CASE ASSIGNED
-              </h2>
-              <p id="urgent-assignment-description" className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                You have been assigned to this case. The horse is blocked from training until the examination is complete.
-              </p>
-            </div>
-            <Pill tone="danger">{alert.severity}</Pill>
-          </div>
-        </header>
+    <Modal
+      open
+      // The assignment is automatic and must be acknowledged by opening the case.
+      dismissible={false}
+      onClose={() => undefined}
+      size="lg"
+      tone="danger"
+      title="Urgent case assigned"
+      description="You have been assigned to this case automatically; no confirmation is required. The horse is blocked from training until the examination is complete."
+      footer={(
+        <Button variant="destructive" iconRight="chevron-right" className="w-full" onClick={() => onOpenCase(alert)}>
+          Open urgent case
+        </Button>
+      )}
+    >
+      <div className="space-y-4">
+        <dl className="grid gap-4 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-4 sm:grid-cols-2">
+          <Detail label="Horse">{alert.horseName} · #{alert.horseId}</Detail>
+          <Detail label="Severity"><Pill tone="danger">{alert.severity}</Pill></Detail>
+          <Detail label="Stall / location">
+            {[alert.stallCode, alert.stableLocation].filter(Boolean).join(' · ') || 'See report'}
+          </Detail>
+          <Detail label="Reported by">{alert.reportedByName || 'Unknown'} · #{alert.reportedById}</Detail>
+          <Detail label="Reported at" className="sm:col-span-2">{formatDateTime(alert.reportedAt)}</Detail>
+        </dl>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
-          <dl className="grid gap-4 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-4 text-xs sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Horse</dt>
-              <dd className="mt-1 font-bold text-[var(--color-text-primary)]">{alert.horseName} · #{alert.horseId}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Stall / Location</dt>
-              <dd className="mt-1 font-semibold text-[var(--color-text-primary)]">
-                {[alert.stallCode, alert.stableLocation].filter(Boolean).join(' · ') || 'See report'}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Reported by</dt>
-              <dd className="mt-1 font-semibold text-[var(--color-text-primary)]">
-                {alert.reportedByName || 'Unknown'} · #{alert.reportedById}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Reported at</dt>
-              <dd className="mt-1 font-semibold text-[var(--color-text-primary)]">{formatDateTime(alert.reportedAt)}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Training decision</dt>
-              <dd className="mt-1 font-bold text-[var(--color-danger)]">{alert.trainingDecision} — Training is paused until the examination is complete.</dd>
-            </div>
-          </dl>
+        <Notice tone="error" title={`Training decision: ${alert.trainingDecision}`}>
+          Training is paused until the examination is complete.
+        </Notice>
 
-          <section className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
-            <h3 className="font-bold text-[var(--color-text-primary)]">{alert.title}</h3>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-secondary)]">
-              {alert.description}
-            </p>
-          </section>
+        <section className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{alert.title}</h3>
+          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-secondary)]">
+            {alert.description}
+          </p>
+        </section>
 
-          {alert.imageUrl && (
-            <a
-              href={admissionsApi.assetUrl(alert.imageUrl)}
-              target="_blank"
-              rel="noreferrer"
-              className="block overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)]"
-              aria-label="Open full-size case report image"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={admissionsApi.assetUrl(alert.imageUrl)} alt="Urgent case report" className="max-h-72 w-full object-contain" />
-            </a>
-          )}
-        </div>
-
-        <footer className="border-t border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-6 py-4">
-          <Button variant="destructive" icon="chevron-right" className="w-full" onClick={() => onOpenCase(alert)}>
-            Open urgent case
-          </Button>
-        </footer>
+        {alert.imageUrl && (
+          <a
+            href={admissionsApi.assetUrl(alert.imageUrl)}
+            target="_blank"
+            rel="noreferrer"
+            className="block overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)]"
+            aria-label="Open full-size case report image"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={admissionsApi.assetUrl(alert.imageUrl)} alt="Urgent case report" className="max-h-72 w-full object-contain" />
+          </a>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

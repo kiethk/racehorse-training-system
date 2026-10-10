@@ -60,7 +60,7 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
       aria-labelledby={titleId}
       onCancel={(event) => { event.preventDefault(); onClose(); }}
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-      className="fixed inset-0 m-auto h-dvh max-h-dvh w-screen max-w-none overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)] p-0 text-[var(--color-text-primary)] shadow-xl backdrop:bg-black/50 sm:h-[90dvh] sm:w-[calc(100%_-_3rem)] sm:max-w-5xl sm:rounded-[var(--radius-lg)]"
+      className="fixed inset-0 m-auto h-dvh max-h-dvh w-screen max-w-none overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)] p-0 text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] backdrop:bg-black/50 sm:h-[90dvh] sm:w-[calc(100%_-_3rem)] sm:max-w-5xl sm:rounded-[var(--radius-lg)]"
     >
       <div className="flex h-full min-h-0 flex-col">
         <header className="flex shrink-0 items-start gap-3 border-b border-[var(--color-border)] px-4 py-3 sm:px-5">

@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button, FormField, Input, Modal, Notice, Textarea } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { trainingApi } from '../services/trainingService';
 import type { PlanWorkoutItemResponse, CompleteWorkoutRequest } from '../types';
+
+const FORM_ID = 'complete-workout-form';
 
 interface CompleteWorkoutDialogProps {
   workout: PlanWorkoutItemResponse | null;
@@ -67,184 +69,140 @@ export function CompleteWorkoutDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={() => !submitting && onClose()}
-        aria-hidden="true"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="relative w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl max-h-[90vh] overflow-y-auto"
-      >
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-              Record workout results #{workout.workoutId}
-            </h2>
-            <p className="text-[12px] text-[var(--color-text-secondary)]">
-              {workout.subjectName} • {workout.lotDate} ({workout.startTime} – {workout.endTime})
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[14px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-          >
-            ✕
-          </button>
-        </div>
-
-        {error && (
-          <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] p-3 text-[12px] text-[var(--color-danger)]">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+    <Modal
+      open
+      onClose={onClose}
+      dismissible={!submitting}
+      title={`Record workout results #${workout.workoutId}`}
+      description={`${workout.subjectName} • ${workout.lotDate} (${workout.startTime} – ${workout.endTime})`}
+      footer={(
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" form={FORM_ID} loading={submitting}>
+            Complete workout
+          </Button>
+        </>
+      )}
+    >
+        <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
+          {error && <Notice tone="error">{error}</Notice>}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Performance rating (1–10) *
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                required
-                value={performanceRating}
-                onChange={(e) => setPerformanceRating(Number(e.target.value))}
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Performance rating (1–10)" required>
+                <Input
+                  type="number"
+                  min="1"
+                  max="10"
+                  required
+                  value={performanceRating}
+                  onChange={(e) => setPerformanceRating(Number(e.target.value))}
+                />
+              </FormField>
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Actual distance (metres)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="10"
-                value={actualDistanceMeters}
-                onChange={(e) => setActualDistanceMeters(e.target.value ? Number(e.target.value) : '')}
-                placeholder="e.g. 1200"
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Actual distance (metres)">
+                <Input
+                  type="number"
+                  min="0"
+                  step="10"
+                  value={actualDistanceMeters}
+                  onChange={(e) => setActualDistanceMeters(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 1200"
+                />
+              </FormField>
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Actual duration (minutes)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={actualDurationMinutes}
-                onChange={(e) => setActualDurationMinutes(e.target.value ? Number(e.target.value) : '')}
-                placeholder="e.g. 4.5"
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Actual duration (minutes)">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={actualDurationMinutes}
+                  onChange={(e) => setActualDurationMinutes(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 4.5"
+                />
+              </FormField>
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Top speed (km/h)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={topSpeedKmh}
-                onChange={(e) => setTopSpeedKmh(e.target.value ? Number(e.target.value) : '')}
-                placeholder="e.g. 58.5"
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Top speed (km/h)">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={topSpeedKmh}
+                  onChange={(e) => setTopSpeedKmh(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 58.5"
+                />
+              </FormField>
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Average speed (km/h)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={averageSpeedKmh}
-                onChange={(e) => setAverageSpeedKmh(e.target.value ? Number(e.target.value) : '')}
-                placeholder="e.g. 46.2"
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Average speed (km/h)">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={averageSpeedKmh}
+                  onChange={(e) => setAverageSpeedKmh(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 46.2"
+                />
+              </FormField>
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Average heart rate (bpm)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={averageHeartRate}
-                onChange={(e) => setAverageHeartRate(e.target.value ? Number(e.target.value) : '')}
-                placeholder="e.g. 165"
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Average heart rate (bpm)">
+                <Input
+                  type="number"
+                  min="0"
+                  value={averageHeartRate}
+                  onChange={(e) => setAverageHeartRate(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 165"
+                />
+              </FormField>
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Maximum heart rate (bpm)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={maxHeartRate}
-                onChange={(e) => setMaxHeartRate(e.target.value ? Number(e.target.value) : '')}
-                placeholder="e.g. 210"
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Maximum heart rate (bpm)">
+                <Input
+                  type="number"
+                  min="0"
+                  value={maxHeartRate}
+                  onChange={(e) => setMaxHeartRate(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 210"
+                />
+              </FormField>
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Recovery heart rate (bpm after 15 min)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={recoveryHeartRate}
-                onChange={(e) => setRecoveryHeartRate(e.target.value ? Number(e.target.value) : '')}
-                placeholder="e.g. 88"
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Recovery heart rate (bpm after 15 min)">
+                <Input
+                  type="number"
+                  min="0"
+                  value={recoveryHeartRate}
+                  onChange={(e) => setRecoveryHeartRate(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 88"
+                />
+              </FormField>
             </div>
           </div>
 
           <div>
-            <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Trainer feedback
-            </label>
-            <textarea
-              rows={3}
-              value={trainerFeedback}
-              onChange={(e) => setTrainerFeedback(e.target.value)}
-                placeholder="Notes about gait, acceleration, or endurance…"
-              className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Trainer feedback">
+              <Textarea
+                rows={3}
+                value={trainerFeedback}
+                onChange={(e) => setTrainerFeedback(e.target.value)}
+                  placeholder="Notes about gait, acceleration, or endurance…"
+              />
+            </FormField>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-[var(--color-border)]">
-            <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button variant="primary" size="sm" type="submit" disabled={submitting}>
-              {submitting ? 'Saving…' : 'Complete workout'}
-            </Button>
-          </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
