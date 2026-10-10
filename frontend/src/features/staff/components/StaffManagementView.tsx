@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Icon } from '@/components/ui/Icon';
+import { SearchInput, Select } from '@/components/ui/Input';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ScreenLayout } from '@/components/ui/ScreenLayout';
 import { FilterBar } from '@/components/ui/FilterBar';
@@ -16,9 +16,6 @@ import type { StaffSummary, StaffCreationRequest, StaffCreationResponse } from '
 import { StaffTable } from './StaffTable';
 import { AddStaffDialog } from './AddStaffDialog';
 import { StaffDetailModal } from './StaffDetailModal';
-
-const inputClassName =
-  'h-9 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-[13px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-focus)] focus:ring-1 focus:ring-[var(--color-focus)]';
 
 export function StaffManagementView() {
   const [staff, setStaff] = useState<StaffSummary[]>([]);
@@ -130,40 +127,28 @@ export function StaffManagementView() {
       )}
 
       {/* Filters */}
-      <FilterBar onSubmit={(event) => event.preventDefault()}>
-        <div className="relative min-w-[200px] flex-1">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[var(--color-text-muted)]">
-            <Icon name="search" size={14} />
-          </div>
-          <input
-            type="text"
-            placeholder="Search name or email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={`${inputClassName} w-full pl-8`}
-          />
+      <FilterBar className="[&_input]:min-h-9 [&_select]:min-h-9" onSubmit={(event) => event.preventDefault()}>
+        <SearchInput
+          className="min-w-[14rem] flex-1"
+          value={search}
+          onChange={setSearch}
+          placeholder="Search name or email..."
+        />
+        <div className="min-w-[10rem]">
+          <Select aria-label="Role" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+            <option value="ALL">All roles</option>
+            <option value="GROOM">Groom</option>
+            <option value="VETERINARIAN">Veterinarian</option>
+            <option value="HEAD_TRAINER">Head Trainer</option>
+          </Select>
         </div>
-        
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className={`${inputClassName} min-w-[140px]`}
-        >
-          <option value="ALL">All Roles</option>
-          <option value="GROOM">Groom</option>
-          <option value="VETERINARIAN">Veterinarian</option>
-          <option value="HEAD_TRAINER">Head Trainer</option>
-        </select>
-
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className={`${inputClassName} min-w-[120px]`}
-        >
-          <option value="ALL">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
-        </select>
+        <div className="min-w-[9rem]">
+          <Select aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="ALL">All statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+          </Select>
+        </div>
       </FilterBar>
 
       {/* Main Content */}

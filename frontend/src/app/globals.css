@@ -139,19 +139,6 @@ body {
   }
 }
 
-/*
- * Stopgap for forms whose raw <input>/<select>/<textarea> are not yet on the shared
- * Input/Select/Textarea primitives: brings them to the standard control size.
- * Remove the class from a form once its controls are migrated.
- */
-.legacy-controls :is(input:not([type='checkbox'], [type='radio'], [type='file']), select) {
-  min-height: 2.25rem;
-  font-size: var(--text-sm);
-}
-.legacy-controls textarea {
-  font-size: var(--text-sm);
-}
-
 /* Thin operational scrollbars */
 .scroll-slim {
   scrollbar-width: thin;

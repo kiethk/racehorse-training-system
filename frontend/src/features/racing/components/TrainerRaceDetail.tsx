@@ -104,17 +104,17 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
         <div>
           <Link
             href="/trainer/racing"
-            className="inline-flex items-center text-[12px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition mb-1"
+            className="inline-flex items-center text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition mb-1"
           >
             ← Race nominations
           </Link>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[20px] font-bold text-[var(--color-text-primary)]">
+            <h1 className="text-xl font-bold text-[var(--color-text-primary)]">
               {data.raceName}
             </h1>
             {renderStatusBadge(data.status)}
           </div>
-          <p className="mt-0.5 text-[13px] text-[var(--color-text-secondary)]">
+          <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
             Category: <strong className="text-[var(--color-text-primary)]">{data.raceCategory}</strong> • Submitted: {formatDateTime(data.createdAt)}
           </p>
         </div>
@@ -127,7 +127,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
       </div>
 
       {/* Source warning */}
-      <div className="rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-3 text-[12px] text-[var(--color-info)] flex items-center gap-2">
+      <div className="rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-3 text-xs text-[var(--color-info)] flex items-center gap-2">
         <span>ℹ️</span>
         <span>
           <strong>Note:</strong> The trainer provided the race information. Management will verify it before approval.
@@ -137,7 +137,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
       {/* Manager feedback block (if already reviewed) */}
       {data.status !== 'PENDING' && (
         <div
-          className={`rounded-[var(--radius-md)] border p-4 text-[13px] ${
+          className={`rounded-[var(--radius-md)] border p-4 text-sm ${
             data.status === 'APPROVED'
               ? 'border-[var(--color-success)] bg-[var(--color-success-soft)] text-[var(--color-success)]'
               : 'border-[var(--color-danger)] bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
@@ -150,7 +150,7 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
             </span>
           </div>
           {data.reviewedAt && (
-            <div className="text-[12px] opacity-80 mb-2">
+            <div className="text-xs opacity-80 mb-2">
               Reviewed: {formatDateTime(data.reviewedAt)}
             </div>
           )}
@@ -165,14 +165,14 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
         {/* Column 1: horse */}
         <div className="space-y-6">
           <Panel padded>
-            <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
               Nominated horse
             </h2>
 
-            <div className="space-y-3 text-[13px]">
+            <div className="space-y-3 text-sm">
               <div>
                 <span className="text-[var(--color-text-secondary)]">Horse:</span>{' '}
-                <strong className="text-[var(--color-text-primary)] text-[15px]">
+                <strong className="text-[var(--color-text-primary)] text-lg">
                   {data.horseName || `Horse #${data.horseId}`}
                 </strong>
               </div>
@@ -199,11 +199,11 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
 
           {/* Column 1: reference information */}
           <Panel padded>
-            <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
               Technical details & Notes
             </h2>
 
-            <div className="space-y-3 text-[13px]">
+            <div className="space-y-3 text-sm">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <span className="text-[var(--color-text-secondary)] block">Distance:</span>
@@ -247,14 +247,14 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
         {/* Column 2: race details */}
         <div className="space-y-6">
           <Panel padded>
-            <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
               Race / Event details
             </h2>
 
-            <div className="space-y-3 text-[13px]">
+            <div className="space-y-3 text-sm">
               <div>
                 <span className="text-[var(--color-text-secondary)] block">Event:</span>
-                <span className="font-semibold text-[var(--color-text-primary)] text-[14px]">
+                <span className="font-semibold text-[var(--color-text-primary)] text-base">
                   {data.raceName}
                 </span>
               </div>
@@ -311,10 +311,10 @@ export function TrainerRaceDetail({ id }: TrainerRaceDetailProps) {
                     href={data.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[var(--color-primary)] hover:underline break-all text-[12px] inline-flex items-center gap-1"
+                    className="text-[var(--color-primary)] hover:underline break-all text-xs inline-flex items-center gap-1"
                   >
                     <span>🔗 {data.sourceUrl}</span>
-                    <span className="text-[10px]">↗</span>
+                    <span className="text-xs">↗</span>
                   </a>
                 </div>
               )}

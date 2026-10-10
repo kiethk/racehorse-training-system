@@ -85,10 +85,10 @@ export function TodayChecklist() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             Today&apos;s Task Checklist
           </h1>
-          <p className="text-[12px] text-[var(--color-text-secondary)]">
+          <p className="text-xs text-[var(--color-text-secondary)]">
             Daily care SOPs, workouts, and veterinary follow-ups for your assigned stalls.
           </p>
         </div>
@@ -110,11 +110,11 @@ export function TodayChecklist() {
 
       {/* Daily progress summary */}
       <Panel padded>
-        <div className="flex items-center justify-between text-[13px]">
+        <div className="flex items-center justify-between text-sm">
           <span className="font-semibold text-[var(--color-text-primary)]">
             Today&apos;s progress: {stats.completed}/{stats.total} items completed
           </span>
-          <span className="text-[12px] text-[var(--color-text-muted)]">
+          <span className="text-xs text-[var(--color-text-muted)]">
             {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
           </span>
         </div>
@@ -144,15 +144,15 @@ export function TodayChecklist() {
             return (
               <div
                 key={`${task.source}-${task.refId}-${idx}`}
-                className={`flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border p-3 text-[13px] transition ${
+                className={`flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border p-3 text-sm transition ${
                   isCompleted
                     ? 'border-[var(--color-border)] bg-[var(--color-surface-muted)] opacity-75'
-                    : 'border-[var(--color-border-strong)] bg-[var(--color-surface)] shadow-sm'
+                    : 'border-[var(--color-border-strong)] bg-[var(--color-surface)] shadow-[var(--shadow-panel)]'
                 }`}
               >
                 <div className="flex items-start gap-3">
                   {/* Time */}
-                  <div className="font-metric text-[12px] font-bold text-[var(--color-text-primary)] w-16 pt-0.5">
+                  <div className="font-metric text-xs font-bold text-[var(--color-text-primary)] w-16 pt-0.5">
                     {task.startTime.substring(0, 5)}
                     {task.endTime && `–${task.endTime.substring(0, 5)}`}
                   </div>
@@ -177,7 +177,7 @@ export function TodayChecklist() {
                       </Pill>
                     </div>
 
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-[var(--color-text-secondary)]">
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                       <span>Horse: <strong>{task.horseName}</strong></span>
                       {task.note && <span>• {task.note}</span>}
                     </div>
@@ -200,11 +200,11 @@ export function TodayChecklist() {
                       Completed
                     </Pill>
                   ) : task.source === 'WORKOUT' ? (
-                    <span className="text-[11px] text-[var(--color-text-muted)] italic">
+                    <span className="text-xs text-[var(--color-text-muted)] italic">
                       (Managed by Trainer)
                     </span>
                   ) : (
-                    <span className="text-[11px] text-[var(--color-text-muted)] italic">
+                    <span className="text-xs text-[var(--color-text-muted)] italic">
                       (Managed by Veterinary)
                     </span>
                   )}

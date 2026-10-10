@@ -1,8 +1,12 @@
 'use client';
 
+import { Modal } from '@/components/ui/Modal';
+import { Notice } from '@/components/ui/Notice';
+import { Input, Textarea } from '@/components/ui/Input';
+import { FormField } from '@/components/ui/FormField';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton, LinkButton } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
@@ -127,10 +131,10 @@ export function CourseList() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
+          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
             Training courses ({courses.length})
           </h2>
-          <p className="text-[12px] text-[var(--color-text-secondary)]">
+          <p className="text-xs text-[var(--color-text-secondary)]">
             Create complete training courses with rotating exercises for horse enrollment.
           </p>
         </div>
@@ -149,88 +153,78 @@ export function CourseList() {
       {showForm && (
         <Panel padded>
           <form onSubmit={handleCreateCourse} className="space-y-4">
-            <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
               Create course with exercise rotation
             </h3>
 
             {formError && (
-              <div className="rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] p-3 text-[12px] text-[var(--color-danger)]">
-                {formError}
-              </div>
+              <Notice tone="error">{formError}</Notice>
             )}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Course name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Sprint 2YO Foundation"
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                />
+                <FormField label="Course name" required>
+                  <Input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Sprint 2YO Foundation"
+                  />
+                </FormField>
               </div>
 
               <div>
-                <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Total sessions *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={totalSessions}
-                  onChange={(e) => setTotalSessions(Number(e.target.value))}
-                  className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                />
-                <span className="text-[11px] text-[var(--color-text-muted)]">
+                <FormField label="Total sessions" required>
+                  <Input
+                    type="number"
+                    min="1"
+                    required
+                    value={totalSessions}
+                    onChange={(e) => setTotalSessions(Number(e.target.value))}
+                  />
+                </FormField>
+                <span className="text-xs text-[var(--color-text-muted)]">
                   Exercises repeat in order until the total number of sessions is reached.
                 </span>
               </div>
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Course goal
-              </label>
-              <input
-                type="text"
-                value={targetGoal}
-                onChange={(e) => setTargetGoal(e.target.value)}
-                  placeholder="e.g. Prepare for short-distance races up to 1,200 m"
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Course goal">
+                <Input
+                  type="text"
+                  value={targetGoal}
+                  onChange={(e) => setTargetGoal(e.target.value)}
+                    placeholder="e.g. Prepare for short-distance races up to 1,200 m"
+                />
+              </FormField>
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                  Course description
-              </label>
-              <textarea
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe the training path and suitable fitness level…"
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Course description">
+                <Textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe the training path and suitable fitness level…"
+                />
+              </FormField>
             </div>
 
             {/* Pick the subject rotation */}
             <div className="border-t border-[var(--color-border)] pt-3">
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
+              <label className="block text-xs font-medium text-[var(--color-text-primary)]">
                   Exercise rotation ({selectedSubjectIds.length} selected)
               </label>
-              <p className="text-[11px] text-[var(--color-text-muted)]">
+              <p className="text-xs text-[var(--color-text-muted)]">
                   Select exercises below to add them to the rotation in order:
               </p>
 
               {/* Selected subjects */}
               <div className="mt-2 min-h-12 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-muted)] p-2">
                 {selectedSubjectIds.length === 0 ? (
-                  <span className="text-[12px] text-[var(--color-text-muted)] italic">
+                  <span className="text-xs text-[var(--color-text-muted)] italic">
                   No exercises have been added to the rotation.
                   </span>
                 ) : (
@@ -240,17 +234,11 @@ export function CourseList() {
                       return (
                         <div
                           key={`${subId}-${idx}`}
-                          className="flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-[12px]"
+                          className="flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-xs"
                         >
                           <span className="font-bold text-[var(--color-primary)]">#{idx + 1}</span>
                           <span>{s?.name || `Subject #${subId}`}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeSubjectFromSequence(idx)}
-                            className="ml-1 text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
-                          >
-                            ×
-                          </button>
+                          <IconButton icon="x" size="sm" label="Remove subject" className="-mr-1.5 h-5 w-5" onClick={() => removeSubjectFromSequence(idx)} />
                         </div>
                       );
                     })}
@@ -261,14 +249,15 @@ export function CourseList() {
               {/* Available subjects to pick from */}
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {subjects.map((sub) => (
-                  <button
+                  <Button
                     key={sub.id}
-                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    icon="plus"
                     onClick={() => addSubjectToCourseSequence(sub.id)}
-                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[11px] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition"
                   >
-                    + {sub.name} ({sub.durationMinutes}&apos;)
-                  </button>
+                    {sub.name} ({sub.durationMinutes}&apos;)
+                  </Button>
                 ))}
               </div>
             </div>
@@ -300,7 +289,7 @@ export function CourseList() {
               <div className="flex flex-col justify-between h-full">
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+                    <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
                       {course.name}
                     </h3>
                     <Pill tone="primary" size="sm">
@@ -309,13 +298,13 @@ export function CourseList() {
                   </div>
 
                   {course.targetGoal && (
-                    <div className="mt-1 text-[12px] font-medium text-[var(--color-primary)]">
+                    <div className="mt-1 text-xs font-medium text-[var(--color-primary)]">
                       🎯 {course.targetGoal}
                     </div>
                   )}
 
                   {course.description && (
-                    <p className="mt-2 text-[12px] text-[var(--color-text-secondary)] line-clamp-3">
+                    <p className="mt-2 text-xs text-[var(--color-text-secondary)] line-clamp-3">
                       {course.description}
                     </p>
                   )}
@@ -343,79 +332,47 @@ export function CourseList() {
       )}
 
       {/* Course detail modal */}
-      {viewDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-            onClick={() => setViewDetail(null)}
-            aria-hidden="true"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="relative w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-                  {viewDetail.course.name}
-                </h3>
-                <div className="text-[12px] text-[var(--color-text-secondary)]">
-            Total sessions: {viewDetail.course.totalSessions}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewDetail(null)}
-                className="text-[14px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-              >
-                ✕
-              </button>
-            </div>
-
+      <Modal
+        open={Boolean(viewDetail)}
+        onClose={() => setViewDetail(null)}
+        title={viewDetail?.course.name ?? ''}
+        description={viewDetail ? `Total sessions: ${viewDetail.course.totalSessions}` : undefined}
+        footer={viewDetail && (
+          <>
+            <Button variant="secondary" onClick={() => setViewDetail(null)}>
+              Close
+            </Button>
+            <LinkButton variant="primary" href={`/trainer/plans/new?courseId=${viewDetail.course.id}`}>
+              Enroll a group in this course
+            </LinkButton>
+          </>
+        )}
+      >
+        {viewDetail && (
+          <div className="space-y-4">
             {viewDetail.course.targetGoal && (
-              <p className="mt-2 text-[13px] text-[var(--color-primary)] font-medium">
-            Goal: {viewDetail.course.targetGoal}
-              </p>
+              <p className="text-sm font-medium text-[var(--color-primary)]">Goal: {viewDetail.course.targetGoal}</p>
             )}
-
-            <div className="mt-4">
-              <h4 className="text-[13px] font-medium text-[var(--color-text-primary)] mb-2">
-            Exercise rotation ({viewDetail.subjects.length} exercises):
+            <div>
+              <h4 className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">
+                Exercise rotation ({viewDetail.subjects.length} exercises)
               </h4>
-              <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+              <div className="space-y-1.5">
                 {viewDetail.subjects.map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] p-2 text-[12px]"
+                    className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2 text-xs"
                   >
-                    <span className="font-semibold text-[var(--color-primary)]">
-                Session {s.orderIndex}:
-                    </span>
-                    <span className="font-medium text-[var(--color-text-primary)]">
-                      {s.subjectName}
-                    </span>
-                    <span className="text-[var(--color-text-muted)]">
-                {s.durationMinutes} min
-                    </span>
+                    <span className="font-semibold text-[var(--color-primary)]">Session {s.orderIndex}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium text-[var(--color-text-primary)]">{s.subjectName}</span>
+                    <span className="text-[var(--color-text-muted)]">{s.durationMinutes} min</span>
                   </div>
                 ))}
               </div>
             </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setViewDetail(null)}>
-            Close
-              </Button>
-              <Link href={`/trainer/plans/new?courseId=${viewDetail.course.id}`}>
-                <Button variant="primary" size="sm">
-            Enroll a group in this course
-                </Button>
-              </Link>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

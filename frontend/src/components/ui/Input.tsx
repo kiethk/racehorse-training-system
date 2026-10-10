@@ -1,6 +1,6 @@
 'use client';
 
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { controlClassName, useFieldContext } from './FormField';
 import { Icon } from './Icon';
@@ -16,11 +16,11 @@ function useFieldProps(props: { id?: string; required?: boolean; 'aria-invalid'?
   };
 }
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...props }: ComponentProps<'input'>) {
   return <input {...props} {...useFieldProps(props)} className={cn(controlClassName, className)} />;
 }
 
-export function Textarea({ className, rows = 3, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className, rows = 3, ...props }: ComponentProps<'textarea'>) {
   return (
     <textarea
       rows={rows}
@@ -31,7 +31,7 @@ export function Textarea({ className, rows = 3, ...props }: TextareaHTMLAttribut
   );
 }
 
-export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({ className, children, ...props }: ComponentProps<'select'>) {
   return (
     <span className="relative block">
       <select
@@ -57,7 +57,7 @@ export function Checkbox({
   className,
   type = 'checkbox',
   ...props
-}: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
+}: Omit<ComponentProps<'input'>, 'type'> & {
   label: ReactNode;
   description?: ReactNode;
   type?: 'checkbox' | 'radio';
@@ -89,7 +89,7 @@ export function SearchInput({
   label = placeholder,
   className,
   ...props
-}: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
+}: Omit<ComponentProps<'input'>, 'value' | 'onChange' | 'type'> & {
   value: string;
   onChange: (value: string) => void;
   /** Accessible name; defaults to the placeholder. */
@@ -112,5 +112,42 @@ export function SearchInput({
         className={cn(controlClassName, 'pl-9')}
       />
     </span>
+  );
+}
+
+/**
+ * A bare checkbox or radio, for custom option cards where the surrounding
+ * <label> already provides the text. Prefer Checkbox when a plain label is enough.
+ */
+export function ChoiceInput({
+  className,
+  type = 'checkbox',
+  ...props
+}: Omit<ComponentProps<'input'>, 'type'> & { type?: 'checkbox' | 'radio' }) {
+  return (
+    <input
+      type={type}
+      {...props}
+      className={cn(
+        'h-4 w-4 shrink-0 accent-[var(--color-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-1 disabled:cursor-not-allowed',
+        className,
+      )}
+    />
+  );
+}
+
+/** File picker styled like the other controls. */
+export function FileInput({ className, ...props }: Omit<ComponentProps<'input'>, 'type'>) {
+  return (
+    <input
+      type="file"
+      {...props}
+      {...useFieldProps(props)}
+      className={cn(
+        controlClassName,
+        'block min-w-0 p-1.5 text-[var(--color-text-secondary)] file:mr-3 file:h-6 file:cursor-pointer file:rounded-[var(--radius-xs)] file:border-0 file:bg-[var(--color-surface-muted)] file:px-2.5 file:text-xs file:font-medium file:text-[var(--color-text-primary)]',
+        className,
+      )}
+    />
   );
 }

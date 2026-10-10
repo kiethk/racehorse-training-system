@@ -1,5 +1,7 @@
 'use client';
 
+import { FileInput, Input, Textarea } from '@/components/ui/Input';
+import { FormField } from '@/components/ui/FormField';
 import { useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -28,7 +30,6 @@ const FIELDS: { key: keyof CreateOwnerAdmissionRequest; label: string; required?
   { key: 'damName', label: 'Dam name' },
   { key: 'damRegistrationNumber', label: 'Dam UELN', hint: '15 letters or numbers, if known.' },
 ];
-const inputClass = 'w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] aria-invalid:border-[var(--color-danger)] aria-invalid:focus-visible:ring-[var(--color-danger)]';
 type Selection = { file?: File; recordDate: string; note: string };
 type DocumentErrors = Partial<Record<AdmissionDocumentType, string>>;
 type FieldErrors = Partial<Record<keyof CreateOwnerAdmissionRequest, string>>;
@@ -163,7 +164,7 @@ export function OwnerAdmissionForm() {
         <div className="max-w-xs space-y-1">
           <label className="block space-y-1 text-sm">
             <span>Select file</span>
-            <input id={`file-${section.type}`} type="file"
+            <FileInput id={`file-${section.type}`}
               className={`block h-10 w-full min-w-0 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-1.5 text-sm file:mr-3 file:h-6 file:cursor-pointer file:rounded file:border-0 file:bg-[var(--color-surface-muted)] file:px-2 file:text-xs file:font-semibold file:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] aria-invalid:border-[var(--color-danger)] aria-invalid:focus-visible:ring-[var(--color-danger)] ${selection?.file ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)]'}`}
               ref={element => { fileInputs.current[section.type] = element; }}
               accept={section.type === 'HORSE_PHOTO' ? '.jpg,.jpeg,.png,.webp' : '.pdf,.jpg,.jpeg,.png,.webp'}
@@ -195,18 +196,17 @@ export function OwnerAdmissionForm() {
           <div className="mt-3 space-y-3">
             <label className="block space-y-1">
               <span>Record date (optional)</span>
-              <input id={`record-${section.type}`} type="date" className={inputClass} value={selection?.recordDate || ''}
+              <Input id={`record-${section.type}`} type="date" value={selection?.recordDate || ''}
                 ref={element => { recordInputs.current[section.type] = element; }}
                 aria-invalid={Boolean(recordErrors[section.type])} aria-describedby={recordErrors[section.type] ? `record-error-${section.type}` : undefined}
                 onBlur={event => setRecordErrors(current => ({ ...current, [section.type]: event.target.validity.badInput ? 'Enter a valid record date.' : '' }))}
                 onChange={event => { updateSelection(section.type, { recordDate: event.target.value }); setRecordErrors(current => ({ ...current, [section.type]: '' })); setError(''); }} />
               {recordErrors[section.type] && <span id={`record-error-${section.type}`} role="alert" className="block text-sm text-[var(--color-danger)]">{recordErrors[section.type]}</span>}
             </label>
-            <label className="block space-y-1">
-              <span>Note (optional)</span>
-              <textarea rows={2} maxLength={2000} className={inputClass} value={selection?.note || ''}
+            <FormField label="Note (optional)">
+              <Textarea rows={2} maxLength={2000} value={selection?.note || ''}
                 onChange={event => updateSelection(section.type, { note: event.target.value })} />
-            </label>
+            </FormField>
           </div>
         </details>
       </fieldset>
@@ -217,7 +217,7 @@ export function OwnerAdmissionForm() {
     <form noValidate onSubmit={submit} className="space-y-5" aria-busy={busy}>
       <p className="text-sm text-[var(--color-text-secondary)]"><span aria-hidden="true" className="font-semibold text-[var(--color-danger)]">*</span> Required fields</p>
       {error && (
-        <div role="alert" className="rounded-md border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">
+        <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">
           <p className="font-medium">{error}</p>
           <ul className="mt-1 list-inside list-disc">
             {[...FIELDS.map(field => ({ key: field.key, label: field.label })), { key: 'pedigreeNotes' as const, label: 'Pedigree notes' }].filter(field => fieldErrors[field.key]).map(field => (
@@ -238,7 +238,7 @@ export function OwnerAdmissionForm() {
             {FIELDS.map(field => (
               <label key={field.key} className="block space-y-1">
                 <span className="block text-sm font-medium">{field.label}{field.required && <span aria-hidden="true" className="text-[var(--color-danger)]"> *</span>}</span>
-                <input id={`candidate-${field.key}`} className={inputClass} type={field.type || 'text'} value={form[field.key] || ''}
+                <Input id={`candidate-${field.key}`} type={field.type || 'text'} value={form[field.key] || ''}
                   ref={element => { fieldInputs.current[field.key] = element; }}
                   required={field.required}
                   maxLength={field.key.toLowerCase().includes('registration') ? 15 : 255}
@@ -255,7 +255,7 @@ export function OwnerAdmissionForm() {
           </div>
           <label className="block space-y-1">
             <span className="text-sm font-medium">Pedigree notes</span>
-            <textarea id="candidate-pedigreeNotes" className={inputClass} rows={3} maxLength={2000} value={form.pedigreeNotes || ''}
+            <Textarea id="candidate-pedigreeNotes" rows={3} maxLength={2000} value={form.pedigreeNotes || ''}
               ref={element => { fieldInputs.current.pedigreeNotes = element; }}
               aria-invalid={Boolean(fieldErrors.pedigreeNotes)} aria-describedby={fieldErrors.pedigreeNotes ? 'error-pedigreeNotes' : undefined}
               onBlur={event => setFieldErrors(current => ({ ...current, pedigreeNotes: validateField('pedigreeNotes', event.target.value) }))}

@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
-import { Panel, SectionTitle } from '@/components/ui/Panel';
+import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
+import { FilterChips } from '@/components/ui/SegmentedControl';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { trainingApi } from '../services/trainingService';
 import type { PlanSummaryResponse } from '../types';
@@ -68,10 +69,10 @@ export function PlanList() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-[18px] font-semibold tracking-tight text-[var(--color-text-primary)]">
+          <h1 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">
           Training plans
           </h1>
-          <p className="text-[12px] text-[var(--color-text-secondary)]">
+          <p className="text-xs text-[var(--color-text-secondary)]">
           Track each horse’s training progress.
           </p>
         </div>
@@ -80,25 +81,16 @@ export function PlanList() {
         </Link>
       </div>
 
-      <Panel padded>
-        <div className="flex flex-wrap items-center gap-2">
-          <SectionTitle>Filters</SectionTitle>
-          {(['ALL', 'UPCOMING', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as StatusFilter[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setFilter(s)}
-              className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
-                filter === s
-                  ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)]'
-                  : 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]'
-              }`}
-            >
-              {s === 'ALL' ? `All (${plans.length})` : STATUS_LABEL[s]}
-            </button>
-          ))}
-        </div>
-      </Panel>
+      <FilterChips
+        label="Plan status"
+        value={filter}
+        onChange={setFilter}
+        options={(['ALL', 'UPCOMING', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as StatusFilter[]).map((s) => ({
+          value: s,
+          label: s === 'ALL' ? 'All' : STATUS_LABEL[s],
+          count: s === 'ALL' ? plans.length : undefined,
+        }))}
+      />
 
       {filtered.length === 0 ? (
         <Panel padded>
@@ -124,24 +116,24 @@ export function PlanList() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <strong className="text-[14px] text-[var(--color-text-primary)]">
+                      <strong className="text-base text-[var(--color-text-primary)]">
                         {p.horseName}
                       </strong>
                       <Pill tone={STATUS_TONE[p.status]} size="sm">
                         {STATUS_LABEL[p.status]}
                       </Pill>
                     </div>
-                    <div className="mt-0.5 text-[12px] text-[var(--color-text-secondary)]">
+                    <div className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
                       {p.courseName}
                     </div>
-                    <div className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                    <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                       {p.startDate} → {p.endDate}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
                     <div className="w-40">
-                      <div className="flex justify-between text-[11px] text-[var(--color-text-secondary)]">
+                      <div className="flex justify-between text-xs text-[var(--color-text-secondary)]">
                         <span>
           {p.completedSessions}/{denominator} sessions
                         </span>
@@ -154,7 +146,7 @@ export function PlanList() {
                         />
                       </div>
                       {p.cancelledSessions > 0 && (
-                        <div className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
+                        <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">
           {p.cancelledSessions} sessions cancelled
                         </div>
                       )}

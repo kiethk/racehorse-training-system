@@ -1,5 +1,8 @@
 'use client';
 
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { FormField } from '@/components/ui/FormField';
+import { ChoiceInput, Input, Select, Textarea } from '@/components/ui/Input';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
@@ -750,7 +753,7 @@ export function VetReviewForm({
 
   return (
     <>
-      <form onSubmit={handleFormSubmit} className="legacy-controls pb-24 md:pb-0">
+      <form onSubmit={handleFormSubmit} className="pb-24 md:pb-0">
         {/* Gate Warning when SCHEDULED */}
         {scheduleStatus === 'SCHEDULED' && (
           <div
@@ -860,13 +863,9 @@ export function VetReviewForm({
               <Icon name="check" size={12} className="text-[var(--color-success)]" />
               Draft saved at {draftSavedTime}
             </span>
-            <button
-              type="button"
-              onClick={handleClearDraft}
-              className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] font-medium transition-colors"
-            >
+            <Button variant="link" size="sm" onClick={handleClearDraft}>
               Delete draft
-            </button>
+            </Button>
           </div>
         )}
 
@@ -920,7 +919,7 @@ export function VetReviewForm({
                       </div>
 
                       <div className="relative">
-                        <input
+                        <Input
                           id={`metric-${cfg.key}`}
                           type="number"
                           min="0"
@@ -953,47 +952,37 @@ export function VetReviewForm({
               {/* Hydration & Notes inline */}
               <div className="grid gap-3 sm:grid-cols-2 pt-1">
                 <div>
-                  <label
-                    htmlFor="metric-hydration"
-                    className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]"
-                  >
-                    Hydration &amp; Mucous Membranes
-                  </label>
-                  <select
-                    id="metric-hydration"
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
-                    value={metrics.hydrationStatus}
-                    onChange={(e) => setMetrics((curr) => ({ ...curr, hydrationStatus: e.target.value }))}
-                  >
-                    <option value="">Not recorded</option>
-                    <option value="Normal (CRT < 2s, pink)">
-                      Normal (CRT &lt; 2s, pink)
-                    </option>
-                    <option value="Mild dehydration">Mild dehydration</option>
-                    <option value="Moderate dehydration">Moderate dehydration</option>
-                    <option value="Severe dehydration">Severe dehydration</option>
-                    <option value="Abnormal CRT / mucous membranes">
-                      Abnormal mucous membranes / CRT
-                    </option>
-                  </select>
+                  <FormField label="Hydration &amp; Mucous Membranes" htmlFor="metric-hydration">
+                    <Select
+                      id="metric-hydration"
+                      value={metrics.hydrationStatus}
+                      onChange={(e) => setMetrics((curr) => ({ ...curr, hydrationStatus: e.target.value }))}
+                    >
+                      <option value="">Not recorded</option>
+                      <option value="Normal (CRT < 2s, pink)">
+                        Normal (CRT &lt; 2s, pink)
+                      </option>
+                      <option value="Mild dehydration">Mild dehydration</option>
+                      <option value="Moderate dehydration">Moderate dehydration</option>
+                      <option value="Severe dehydration">Severe dehydration</option>
+                      <option value="Abnormal CRT / mucous membranes">
+                        Abnormal mucous membranes / CRT
+                      </option>
+                    </Select>
+                  </FormField>
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="metric-notes"
-                    className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]"
-                  >
-                    Telemetry &amp; Observation Context
-                  </label>
-                  <input
-                    id="metric-notes"
-                    type="text"
-                    maxLength={2000}
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
-                    value={metrics.notes}
-                    onChange={(e) => setMetrics((curr) => ({ ...curr, notes: e.target.value }))}
-                    placeholder="e.g. Calm disposition, post-transport check"
-                  />
+                  <FormField label="Telemetry &amp; Observation Context" htmlFor="metric-notes">
+                    <Input
+                      id="metric-notes"
+                      type="text"
+                      maxLength={2000}
+                      value={metrics.notes}
+                      onChange={(e) => setMetrics((curr) => ({ ...curr, notes: e.target.value }))}
+                      placeholder="e.g. Calm disposition, post-transport check"
+                    />
+                  </FormField>
                 </div>
               </div>
             </fieldset>
@@ -1012,7 +1001,7 @@ export function VetReviewForm({
               {/* Compact Physical Exam Conducted In-Person Toggle */}
               <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-2">
                 <label className="flex cursor-pointer items-center gap-2">
-                  <input
+                  <ChoiceInput
                     type="checkbox"
                     checked={physicalExamConfirmed}
                     onChange={(e) => {
@@ -1021,7 +1010,6 @@ export function VetReviewForm({
                         setFieldErrors((errs) => ({ ...errs, physicalExamConfirmed: '' }));
                       }
                     }}
-                    className="h-4 w-4 rounded accent-[var(--color-primary)]"
                   />
                   <span className="text-xs font-semibold text-[var(--color-text-primary)]">
                     Physical Exam Conducted In-Person
@@ -1041,20 +1029,15 @@ export function VetReviewForm({
               {isUrgent ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label
-                      htmlFor="field-symptoms"
-                      className="mb-1 block text-xs font-medium text-[var(--color-text-primary)]"
-                    >
-                      Urgent Presenting Symptoms <span className="text-[var(--color-danger)]">*</span>
-                    </label>
-                    <textarea
-                      id="field-symptoms"
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs outline-none focus:border-[var(--color-primary)]"
-                      rows={3}
-                      value={symptoms}
-                      onChange={(e) => setSymptoms(e.target.value)}
-                      placeholder="Describe onset, symptoms, and urgency..."
-                    />
+                    <FormField label="Urgent Presenting Symptoms" htmlFor="field-symptoms" required>
+                      <Textarea
+                        id="field-symptoms"
+                        rows={3}
+                        value={symptoms}
+                        onChange={(e) => setSymptoms(e.target.value)}
+                        placeholder="Describe onset, symptoms, and urgency..."
+                      />
+                    </FormField>
                     {fieldErrors.symptoms && (
                       <p className="text-xs font-medium text-[var(--color-danger)]">
                         {fieldErrors.symptoms}
@@ -1062,20 +1045,15 @@ export function VetReviewForm({
                     )}
                   </div>
                   <div>
-                    <label
-                      htmlFor="field-findings"
-                      className="mb-1 block text-xs font-medium text-[var(--color-text-primary)]"
-                    >
-                      Urgent Physical Findings <span className="text-[var(--color-danger)]">*</span>
-                    </label>
-                    <textarea
-                      id="field-findings"
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs outline-none focus:border-[var(--color-primary)]"
-                      rows={3}
-                      value={findings}
-                      onChange={(e) => setFindings(e.target.value)}
-                      placeholder="Document trauma, distress, or acute signs..."
-                    />
+                    <FormField label="Urgent Physical Findings" htmlFor="field-findings" required>
+                      <Textarea
+                        id="field-findings"
+                        rows={3}
+                        value={findings}
+                        onChange={(e) => setFindings(e.target.value)}
+                        placeholder="Document trauma, distress, or acute signs..."
+                      />
+                    </FormField>
                     {fieldErrors.findings && (
                       <p className="text-xs font-medium text-[var(--color-danger)]">
                         {fieldErrors.findings}
@@ -1090,41 +1068,27 @@ export function VetReviewForm({
                     <label className="block text-xs font-semibold text-[var(--color-text-secondary)]">
                       Clinical Status Assessment
                     </label>
-                    <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setExamMode('NORMAL');
-                          setSystemFindings({ ...normalSystemFindings });
-                          setSelectedSymptoms(['No symptoms observed']);
-                          setStructuredDiagnosis('Clinically healthy');
-                          setFieldErrors((errs) => ({ ...errs, systemFindings: '' }));
+                    <div>
+                      <SegmentedControl
+                        label="Clinical status assessment"
+                        value={examMode}
+                        onChange={(mode) => {
+                          setExamMode(mode);
+                          if (mode === 'NORMAL') {
+                            setSystemFindings({ ...normalSystemFindings });
+                            setSelectedSymptoms(['No symptoms observed']);
+                            setStructuredDiagnosis('Clinically healthy');
+                            setFieldErrors((errs) => ({ ...errs, systemFindings: '' }));
+                          } else {
+                            setSelectedSymptoms([]);
+                            setStructuredDiagnosis('Minor clinical condition');
+                          }
                         }}
-                        className={`flex items-center gap-1.5 rounded-[var(--radius-sm)] px-4 py-1.5 text-xs font-bold transition-all ${
-                          examMode === 'NORMAL'
-                            ? 'bg-[var(--color-success)] text-[var(--color-text-inverse)]'
-                            : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                        }`}
-                      >
-                        <Icon name="check" size={14} />
-                        Normal
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setExamMode('ABNORMAL');
-                          setSelectedSymptoms([]);
-                          setStructuredDiagnosis('Minor clinical condition');
-                        }}
-                        className={`flex items-center gap-1.5 rounded-[var(--radius-sm)] px-4 py-1.5 text-xs font-bold transition-all ${
-                          examMode === 'ABNORMAL'
-                            ? 'bg-[var(--color-warning)] text-[var(--color-text-inverse)]'
-                            : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                        }`}
-                      >
-                        <Icon name="alert-triangle" size={14} />
-                        Abnormal
-                      </button>
+                        options={[
+                          { value: 'NORMAL', label: 'Normal', icon: 'check' },
+                          { value: 'ABNORMAL', label: 'Abnormal', icon: 'alert-triangle' },
+                        ]}
+                      />
                     </div>
 
                     {/* Inline Helper Text */}
@@ -1143,13 +1107,9 @@ export function VetReviewForm({
                           <h4 className="text-xs font-bold text-[var(--color-text-primary)]">
                             8 Body Systems Checklist
                           </h4>
-                          <button
-                            type="button"
-                            onClick={() => setSystemFindings({ ...normalSystemFindings })}
-                            className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
-                          >
-                            Reset All to Normal
-                          </button>
+                          <Button variant="link" size="sm" onClick={() => setSystemFindings({ ...normalSystemFindings })}>
+                            Reset all to normal
+                          </Button>
                         </div>
                         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                           {bodySystems.map(({ key, label }) => {
@@ -1159,7 +1119,7 @@ export function VetReviewForm({
                                 <span className="block text-xs font-medium text-[var(--color-text-secondary)]">
                                   {label}
                                 </span>
-                                <select
+                                <Select
                                   value={systemFindings[key]}
                                   onChange={(e) => {
                                     setSystemFindings((curr) => ({
@@ -1181,7 +1141,7 @@ export function VetReviewForm({
                                       </option>
                                     ),
                                   )}
-                                </select>
+                                </Select>
                               </label>
                             );
                           })}
@@ -1202,9 +1162,11 @@ export function VetReviewForm({
                           {symptomOptions.map((symptom) => {
                             const selected = selectedSymptoms.includes(symptom);
                             return (
-                              <button
+                              <Button
                                 key={symptom}
-                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                aria-pressed={selected}
                                 onClick={() =>
                                   setSelectedSymptoms((curr) => {
                                     if (symptom === 'No symptoms observed') {
@@ -1224,7 +1186,7 @@ export function VetReviewForm({
                               >
                                 {selected ? '✓ ' : ''}
                                 {symptom}
-                              </button>
+                              </Button>
                             );
                           })}
                         </div>
@@ -1244,10 +1206,9 @@ export function VetReviewForm({
                     Clinical Assessment &amp; Diagnosis <span className="text-[var(--color-danger)]">*</span>
                   </label>
                   {isUrgent ? (
-                    <input
+                    <Input
                       id="field-assessment-diag"
                       type="text"
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
                       value={diagnosis}
                       onChange={(e) => setDiagnosis(e.target.value)}
                       placeholder="Working diagnosis..."
@@ -1258,9 +1219,8 @@ export function VetReviewForm({
                       Clinically Healthy
                     </div>
                   ) : (
-                    <select
+                    <Select
                       id="field-assessment-diag"
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-2 text-xs outline-none focus:border-[var(--color-primary)]"
                       value={structuredDiagnosis}
                       onChange={(e) => setStructuredDiagnosis(e.target.value)}
                     >
@@ -1271,7 +1231,7 @@ export function VetReviewForm({
                             {opt}
                           </option>
                         ))}
-                    </select>
+                    </Select>
                   )}
                   {fieldErrors.diagnosis && (
                     <p className="mt-1 text-xs font-medium text-[var(--color-danger)]">
@@ -1281,39 +1241,29 @@ export function VetReviewForm({
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="field-treatment"
-                    className="mb-1 block text-xs font-semibold text-[var(--color-text-primary)]"
-                  >
-                    Treatment &amp; Care Protocol (Optional)
-                  </label>
-                  <textarea
-                    id="field-treatment"
-                    rows={2}
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs outline-none focus:border-[var(--color-primary)] resize-y"
-                    value={treatment}
-                    onChange={(e) => setTreatment(e.target.value)}
-                    placeholder="Enter prescribed medications, bandages, or therapy..."
-                  />
+                  <FormField label="Treatment &amp; Care Protocol (Optional)" htmlFor="field-treatment">
+                    <Textarea
+                      id="field-treatment"
+                      rows={2}
+                      value={treatment}
+                      onChange={(e) => setTreatment(e.target.value)}
+                      placeholder="Enter prescribed medications, bandages, or therapy..."
+                    />
+                  </FormField>
                 </div>
               </div>
 
               {/* Internal Clinical Notes */}
               <div>
-                <label
-                  htmlFor="field-notes"
-                  className="mb-1 block text-xs font-semibold text-[var(--color-text-primary)]"
-                >
-                  Veterinarian Notes &amp; Stable Directives (Optional)
-                </label>
-                <textarea
-                  id="field-notes"
-                  rows={2}
-                  className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs outline-none focus:border-[var(--color-primary)] resize-y"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Internal notes, groom handling directives, or dietary recommendations..."
-                />
+                <FormField label="Veterinarian Notes &amp; Stable Directives (Optional)" htmlFor="field-notes">
+                  <Textarea
+                    id="field-notes"
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Internal notes, groom handling directives, or dietary recommendations..."
+                  />
+                </FormField>
               </div>
             </fieldset>
           </div>
@@ -1349,7 +1299,7 @@ export function VetReviewForm({
                           : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-subtle)]'
                       }`}
                     >
-                      <input
+                      <ChoiceInput
                         type="radio"
                         name="trainingDecision"
                         value={opt.value}
@@ -1363,7 +1313,6 @@ export function VetReviewForm({
                             setFieldErrors((errs) => ({ ...errs, restrictionDetails: '' }));
                           }
                         }}
-                        className="mt-0.5 h-4 w-4 accent-[var(--color-primary)]"
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
@@ -1397,18 +1346,16 @@ export function VetReviewForm({
                   Shown to the Head Trainer when planning. The horse rests until the follow-up exam below.
                 </p>
                 {isUrgent ? (
-                  <textarea
+                  <Textarea
                     id="field-restriction-details"
                     rows={2}
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-surface)] p-2 text-xs outline-none focus:border-[var(--color-primary)]"
                     value={restrictionDetails}
                     onChange={(e) => setRestrictionDetails(e.target.value)}
                     placeholder="Describe restriction rules..."
                   />
                 ) : (
-                  <select
+                  <Select
                     id="field-restriction-details"
-                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-surface)] px-2 py-1.5 text-xs outline-none"
                     value={restrictionDetails}
                     onChange={(e) => {
                       setRestrictionDetails(e.target.value);
@@ -1423,7 +1370,7 @@ export function VetReviewForm({
                         {opt}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 )}
                 {fieldErrors.restrictionDetails && (
                   <p className="text-xs font-medium text-[var(--color-danger)]">
@@ -1440,7 +1387,7 @@ export function VetReviewForm({
                   Schedule Follow-up Exam
                   {followUpRequired && <span className="text-[var(--color-danger)]"> *</span>}
                 </span>
-                <input
+                <ChoiceInput
                   type="checkbox"
                   checked={followUpActive}
                   disabled={followUpRequired}
@@ -1451,7 +1398,6 @@ export function VetReviewForm({
                       setFollowUpDate(businessDateFromToday(7));
                     }
                   }}
-                  className="h-4 w-4 rounded accent-[var(--color-primary)]"
                 />
               </label>
               {followUpRequired && (
@@ -1463,37 +1409,27 @@ export function VetReviewForm({
               {followUpActive && (
                 <div className="space-y-2 border-t border-[var(--color-border)] pt-2 animate-in fade-in duration-200">
                   <div>
-                    <label
-                      htmlFor="field-followup-date"
-                      className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]"
-                    >
-                      Target Date <span className="text-[var(--color-danger)]">*</span>
-                    </label>
-                    <input
-                      id="field-followup-date"
-                      type="date"
-                      min={tomorrowBusinessDate()}
-                      value={followUpDate}
-                      onChange={(e) => {
-                        setFollowUpDate(e.target.value);
-                        if (fieldErrors.followUpDate) {
-                          setFieldErrors((errs) => ({ ...errs, followUpDate: '' }));
-                        }
-                      }}
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs font-metric outline-none"
-                    />
+                    <FormField label="Target Date" htmlFor="field-followup-date" required>
+                      <Input
+                        id="field-followup-date"
+                        type="date"
+                        min={tomorrowBusinessDate()}
+                        value={followUpDate}
+                        onChange={(e) => {
+                          setFollowUpDate(e.target.value);
+                          if (fieldErrors.followUpDate) {
+                            setFieldErrors((errs) => ({ ...errs, followUpDate: '' }));
+                          }
+                        }}
+                      />
+                    </FormField>
                     <div className="mt-1 flex gap-1">
                       {[3, 7, 14].map((days) => {
                         const iso = businessDateFromToday(days);
                         return (
-                          <button
-                            key={days}
-                            type="button"
-                            onClick={() => setFollowUpDate(iso)}
-                            className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]"
-                          >
+                          <Button key={days} size="sm" variant="secondary" onClick={() => setFollowUpDate(iso)}>
                             +{days}d
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
@@ -1505,29 +1441,24 @@ export function VetReviewForm({
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="field-followup-desc"
-                      className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]"
-                    >
-                      Care Procedure <span className="text-[var(--color-danger)]">*</span>
-                    </label>
-                    <select
-                      id="field-followup-desc"
-                      value={followUpDescription}
-                      onChange={(e) => {
-                        setFollowUpDescription(e.target.value);
-                        if (fieldErrors.followUpDescription) {
-                          setFieldErrors((errs) => ({ ...errs, followUpDescription: '' }));
-                        }
-                      }}
-                      className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs outline-none"
-                    >
-                      {followUpDescriptionOptions.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                    <FormField label="Care Procedure" htmlFor="field-followup-desc" required>
+                      <Select
+                        id="field-followup-desc"
+                        value={followUpDescription}
+                        onChange={(e) => {
+                          setFollowUpDescription(e.target.value);
+                          if (fieldErrors.followUpDescription) {
+                            setFieldErrors((errs) => ({ ...errs, followUpDescription: '' }));
+                          }
+                        }}
+                      >
+                        {followUpDescriptionOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
                     {fieldErrors.followUpDescription && (
                       <p className="mt-0.5 text-xs font-medium text-[var(--color-danger)]">
                         {fieldErrors.followUpDescription}
@@ -1574,7 +1505,7 @@ export function VetReviewForm({
         </div>
 
         {/* Mobile Fixed Footer Actions (< 768px per R2) */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--color-surface)]/95 backdrop-blur-md border-t border-[var(--color-border)] p-3 shadow-lg space-y-2">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--color-surface)]/95 backdrop-blur-md border-t border-[var(--color-border)] p-3 shadow-[var(--shadow-popover)] space-y-2">
           {formError && <Notice tone="error">{formError}</Notice>}
           <div className="flex items-center justify-between gap-2.5">
             <Button

@@ -1,5 +1,8 @@
 'use client';
 
+import { Notice } from '@/components/ui/Notice';
+import { Input, Select, Textarea } from '@/components/ui/Input';
+import { FormField } from '@/components/ui/FormField';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -156,7 +159,7 @@ export function TrainerRaceForm() {
           <div className="flex items-center gap-2">
             <Link
               href="/trainer/racing"
-              className="text-[12px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition"
+              className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition"
             >
               ← Back to nominations
             </Link>
@@ -166,30 +169,28 @@ export function TrainerRaceForm() {
       </div>
 
       {submitError && (
-        <div className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-4 text-[13px] text-[var(--color-danger)]">
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-4 text-sm text-[var(--color-danger)]">
           <strong>Submission error:</strong> {submitError}
         </div>
       )}
 
       {/* Part 1: nominated horse */}
       <Panel padded>
-        <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-1 flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-1 flex items-center gap-2">
           1. Nominated horse
         </h2>
-        <p className="text-[12px] text-[var(--color-text-secondary)] mb-4">
+        <p className="text-xs text-[var(--color-text-secondary)] mb-4">
           Only eligible horses in your area that are not blocked from training can be nominated.
         </p>
 
         {loadingHorses ? (
           <ListSkeleton rows={2} />
         ) : horseError ? (
-          <div className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-[12px] text-[var(--color-danger)]">
-            {horseError}
-          </div>
+          <Notice tone="error">{horseError}</Notice>
         ) : horses.length === 0 ? (
-          <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-4 text-[13px] text-[var(--color-warning)]">
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-4 text-sm text-[var(--color-warning)]">
             <p className="font-semibold">No horses are currently available for nomination.</p>
-            <p className="mt-1 text-[12px]">
+            <p className="mt-1 text-xs">
               Horses must be assigned to a stall in your area, have ELIGIBLE status, and not be blocked from training.
             </p>
             <div className="mt-3 flex gap-2">
@@ -208,28 +209,26 @@ export function TrainerRaceForm() {
         ) : (
           <div className="space-y-4">
             <div>
-              <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-                Select a horse <span className="text-[var(--color-danger)]">*</span>
-              </label>
-              <select
-                value={horseId}
-                onChange={(e) => setHorseId(e.target.value ? Number(e.target.value) : '')}
-                className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              >
-                <option value="">-- Select an assigned horse --</option>
-                {horses.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.name} {h.registrationNumber ? `(${h.registrationNumber})` : ''} {h.breed ? `• ${h.breed}` : ''}
-                  </option>
-                ))}
-              </select>
+              <FormField label="Select a horse" required>
+                <Select
+                  value={horseId}
+                  onChange={(e) => setHorseId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  <option value="">-- Select an assigned horse --</option>
+                  {horses.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.name} {h.registrationNumber ? `(${h.registrationNumber})` : ''} {h.breed ? `• ${h.breed}` : ''}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
               {errors.horseId && (
-                <p className="mt-1 text-[11px] text-[var(--color-danger)]">{errors.horseId}</p>
+                <p className="mt-1 text-xs text-[var(--color-danger)]">{errors.horseId}</p>
               )}
             </div>
 
             {selectedHorse && (
-              <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-3 text-[12px] text-[var(--color-text-secondary)] border border-[var(--color-border)]">
+              <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-3 text-xs text-[var(--color-text-secondary)] border border-[var(--color-border)]">
                 <div>
                   Selected horse: <strong className="text-[var(--color-text-primary)]">{selectedHorse.name}</strong>
                   {selectedHorse.registrationNumber && (
@@ -241,18 +240,16 @@ export function TrainerRaceForm() {
             )}
 
             <div>
-              <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-                Nomination reason <span className="text-[var(--color-danger)]">*</span>
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Describe the horse’s fitness, preferred distance, current form, and suitability for this event…"
-                value={selectionReason}
-                onChange={(e) => setSelectionReason(e.target.value)}
-                className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
+              <FormField label="Nomination reason" required>
+                <Textarea
+                  rows={3}
+                  placeholder="Describe the horse’s fitness, preferred distance, current form, and suitability for this event…"
+                  value={selectionReason}
+                  onChange={(e) => setSelectionReason(e.target.value)}
+                />
+              </FormField>
               {errors.selectionReason && (
-                <p className="mt-1 text-[11px] text-[var(--color-danger)]">{errors.selectionReason}</p>
+                <p className="mt-1 text-xs text-[var(--color-danger)]">{errors.selectionReason}</p>
               )}
             </div>
           </div>
@@ -261,131 +258,115 @@ export function TrainerRaceForm() {
 
       {/* Part 2: race information */}
       <Panel padded>
-        <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-1 flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-1 flex items-center gap-2">
           2. Race and event details
         </h2>
-        <p className="text-[12px] text-[var(--color-text-secondary)] mb-4">
+        <p className="text-xs text-[var(--color-text-secondary)] mb-4">
           Enter event information based on your external research.
         </p>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Race or event name <span className="text-[var(--color-danger)]">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Autumn Horse Racing Festival 2026"
-              value={raceName}
-              onChange={(e) => setRaceName(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Race or event name" required>
+              <Input
+                type="text"
+                placeholder="e.g. Autumn Horse Racing Festival 2026"
+                value={raceName}
+                onChange={(e) => setRaceName(e.target.value)}
+              />
+            </FormField>
             {errors.raceName && (
-              <p className="mt-1 text-[11px] text-[var(--color-danger)]">{errors.raceName}</p>
+              <p className="mt-1 text-xs text-[var(--color-danger)]">{errors.raceName}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Nomination category / Stage <span className="text-[var(--color-danger)]">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. 3-year-old, 1,200 m or Open Cup"
-              value={raceCategory}
-              onChange={(e) => setRaceCategory(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Nomination category / Stage" required>
+              <Input
+                type="text"
+                placeholder="e.g. 3-year-old, 1,200 m or Open Cup"
+                value={raceCategory}
+                onChange={(e) => setRaceCategory(e.target.value)}
+              />
+            </FormField>
             {errors.raceCategory && (
-              <p className="mt-1 text-[11px] text-[var(--color-danger)]">{errors.raceCategory}</p>
+              <p className="mt-1 text-xs text-[var(--color-danger)]">{errors.raceCategory}</p>
             )}
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Racecourse & Location <span className="text-[var(--color-danger)]">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Soc Son Racecourse, Hanoi"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Racecourse & Location" required>
+              <Input
+                type="text"
+                placeholder="e.g. Soc Son Racecourse, Hanoi"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
+            </FormField>
             {errors.location && (
-              <p className="mt-1 text-[11px] text-[var(--color-danger)]">{errors.location}</p>
+              <p className="mt-1 text-xs text-[var(--color-danger)]">{errors.location}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Event date <span className="text-[var(--color-danger)]">*</span>
-            </label>
-            <input
-              type="date"
-              min={todayStr}
-              value={eventDate}
-              onChange={(e) => setEventDate(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Event date" required>
+              <Input
+                type="date"
+                min={todayStr}
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+              />
+            </FormField>
             {errors.eventDate && (
-              <p className="mt-1 text-[11px] text-[var(--color-danger)]">{errors.eventDate}</p>
+              <p className="mt-1 text-xs text-[var(--color-danger)]">{errors.eventDate}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Expected start time <span className="text-[var(--color-text-muted)]">(optional)</span>
-            </label>
-            <input
-              type="time"
-              value={eventTime}
-              onChange={(e) => setEventTime(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Expected start time (optional)">
+              <Input
+                type="time"
+                value={eventTime}
+                onChange={(e) => setEventTime(e.target.value)}
+              />
+            </FormField>
           </div>
 
           <div>
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Organizer <span className="text-[var(--color-text-muted)]">(optional)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. National Horse Racing Federation…"
-              value={organizer}
-              onChange={(e) => setOrganizer(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Organizer (optional)">
+              <Input
+                type="text"
+                placeholder="e.g. National Horse Racing Federation…"
+                value={organizer}
+                onChange={(e) => setOrganizer(e.target.value)}
+              />
+            </FormField>
           </div>
 
           <div>
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Official nomination deadline <span className="text-[var(--color-text-muted)]">(optional)</span>
-            </label>
-            <input
-              type="date"
-              value={nominationDeadline}
-              onChange={(e) => setNominationDeadline(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Official nomination deadline (optional)">
+              <Input
+                type="date"
+                value={nominationDeadline}
+                onChange={(e) => setNominationDeadline(e.target.value)}
+              />
+            </FormField>
             {errors.nominationDeadline && (
-              <p className="mt-1 text-[11px] text-[var(--color-danger)]">{errors.nominationDeadline}</p>
+              <p className="mt-1 text-xs text-[var(--color-danger)]">{errors.nominationDeadline}</p>
             )}
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Rules or official event URL <span className="text-[var(--color-text-muted)]">(optional, for management verification)</span>
-            </label>
-            <input
-              type="url"
-              placeholder="https://example.org/race-conditions"
-              value={sourceUrl}
-              onChange={(e) => setSourceUrl(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Rules or official event URL (optional, for management verification)">
+              <Input
+                type="url"
+                placeholder="https://example.org/race-conditions"
+                value={sourceUrl}
+                onChange={(e) => setSourceUrl(e.target.value)}
+              />
+            </FormField>
             {errors.sourceUrl && (
-              <p className="mt-1 text-[11px] text-[var(--color-danger)]">{errors.sourceUrl}</p>
+              <p className="mt-1 text-xs text-[var(--color-danger)]">{errors.sourceUrl}</p>
             )}
           </div>
         </div>
@@ -393,77 +374,67 @@ export function TrainerRaceForm() {
 
       {/* Part 3: reference information */}
       <Panel padded>
-        <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-1 flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-1 flex items-center gap-2">
           3. Additional event information
         </h2>
-        <p className="text-[12px] text-[var(--color-text-secondary)] mb-4">
+        <p className="text-xs text-[var(--color-text-secondary)] mb-4">
           Add race details, prize information, or logistics and documentation notes.
         </p>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Distance (metres) <span className="text-[var(--color-text-muted)]">(optional)</span>
-            </label>
-            <input
-              type="number"
-              placeholder="VD: 1200"
-              min={1}
-              value={distanceMeters}
-              onChange={(e) => setDistanceMeters(e.target.value ? Number(e.target.value) : '')}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Distance (metres) (optional)">
+              <Input
+                type="number"
+                placeholder="VD: 1200"
+                min={1}
+                value={distanceMeters}
+                onChange={(e) => setDistanceMeters(e.target.value ? Number(e.target.value) : '')}
+              />
+            </FormField>
             {errors.distanceMeters && (
-              <p className="mt-1 text-[11px] text-[var(--color-danger)]">{errors.distanceMeters}</p>
+              <p className="mt-1 text-xs text-[var(--color-danger)]">{errors.distanceMeters}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Track surface <span className="text-[var(--color-text-muted)]">(optional)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Turf, dirt, synthetic…"
-              value={trackType}
-              onChange={(e) => setTrackType(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Track surface (optional)">
+              <Input
+                type="text"
+                placeholder="e.g. Turf, dirt, synthetic…"
+                value={trackType}
+                onChange={(e) => setTrackType(e.target.value)}
+              />
+            </FormField>
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Prize structure <span className="text-[var(--color-text-muted)]">(optional)</span>
-            </label>
-            <textarea
-              rows={2}
-              placeholder="e.g. 1st: VND 50 million; 2nd: VND 25 million; 3rd: VND 10 million…"
-              value={prizeDetails}
-              onChange={(e) => setPrizeDetails(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Prize structure (optional)">
+              <Textarea
+                rows={2}
+                placeholder="e.g. 1st: VND 50 million; 2nd: VND 25 million; 3rd: VND 10 million…"
+                value={prizeDetails}
+                onChange={(e) => setPrizeDetails(e.target.value)}
+              />
+            </FormField>
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-[13px] font-medium text-[var(--color-text-primary)] mb-1">
-              Trainer notes <span className="text-[var(--color-text-muted)]">(optional)</span>
-            </label>
-            <textarea
-              rows={2}
-              placeholder="Age or gender requirements, handicap, veterinary checks, or transport arrangements…"
-              value={trainerNotes}
-              onChange={(e) => setTrainerNotes(e.target.value)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
+            <FormField label="Trainer notes (optional)">
+              <Textarea
+                rows={2}
+                placeholder="Age or gender requirements, handicap, veterinary checks, or transport arrangements…"
+                value={trainerNotes}
+                onChange={(e) => setTrainerNotes(e.target.value)}
+              />
+            </FormField>
           </div>
         </div>
       </Panel>
 
       {/* Actions */}
       <div className="flex flex-col items-end gap-2 border-t border-[var(--color-border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-[12px] font-medium text-[var(--color-warning)] bg-[var(--color-warning-soft)] px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--color-warning)]">
-          This is an internal nomination and is not a registration with the event organiser.
-        </p>
+        <Notice tone="warning">This is an internal nomination and is not a registration with the event organiser.</Notice>
 
         <div className="flex items-center gap-3">
           <Link href="/trainer/racing">

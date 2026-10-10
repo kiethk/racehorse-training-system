@@ -3,7 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 // Raw HTML controls each have a shared primitive in src/components/ui.
-// "warn" while existing features are being migrated; raise to "error" once they are clean.
+// Feature and page code must use the primitives; add a primitive rather than disabling this rule.
 const rawElementPrimitives = {
   button: "Button, IconButton, LinkButton, SegmentedControl or FilterChips",
   input: "Input, SearchInput or Checkbox (inside FormField)",
@@ -19,7 +19,7 @@ const eslintConfig = defineConfig([
     files: ["src/features/**/*.tsx", "src/app/**/*.tsx"],
     rules: {
       "no-restricted-syntax": [
-        "warn",
+        "error",
         ...Object.entries(rawElementPrimitives).map(([element, primitive]) => ({
           selector: `JSXOpeningElement[name.name='${element}']`,
           message: `Use ${primitive} from '@/components/ui' instead of a raw <${element}>.`,

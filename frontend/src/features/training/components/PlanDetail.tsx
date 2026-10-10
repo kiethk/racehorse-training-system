@@ -95,12 +95,12 @@ export function PlanDetail({ planId }: PlanDetailProps) {
       {/* Progress bar */}
       <Panel padded>
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-[13px]">
+          <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-[var(--color-text-primary)]">
               Progress: {progress.completed}/{progress.total} sessions ({progress.percent}%)
             </span>
             {progress.cancelled > 0 && (
-              <span className="text-[11px] text-[var(--color-text-muted)]">
+              <span className="text-xs text-[var(--color-text-muted)]">
                 ({progress.cancelled} cancelled)
               </span>
             )}
@@ -116,12 +116,12 @@ export function PlanDetail({ planId }: PlanDetailProps) {
 
       {/* Session list */}
       <Panel padded>
-        <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)] mb-4">
+        <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-4">
           Session schedule
         </h2>
 
         {workouts.length === 0 ? (
-          <p className="text-[12px] text-[var(--color-text-muted)] italic">
+          <p className="text-xs text-[var(--color-text-muted)] italic">
             No sessions have been scheduled for this plan yet.
           </p>
         ) : (
@@ -130,10 +130,10 @@ export function PlanDetail({ planId }: PlanDetailProps) {
               <div key={w.workoutId} className="py-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[12px] font-bold text-[var(--color-primary)]">
+                    <span className="text-xs font-bold text-[var(--color-primary)]">
                       #{index + 1}
                     </span>
-                    <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
+                    <span className="text-sm font-semibold text-[var(--color-text-primary)]">
                       {w.subjectName}
                     </span>
                     <Pill
@@ -149,7 +149,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                       {w.status}
                     </Pill>
                   </div>
-                  <div className="mt-1 text-[11px] text-[var(--color-text-secondary)] flex flex-wrap gap-3">
+                  <div className="mt-1 text-xs text-[var(--color-text-secondary)] flex flex-wrap gap-3">
                     <span>Date: <strong>{formatDate(w.lotDate)}</strong></span>
                     <span>Time: <strong>{w.startTime} – {w.endTime}</strong></span>
                     {/*
@@ -186,7 +186,7 @@ export function PlanDetail({ planId }: PlanDetailProps) {
                   </div>
 
                   {w.status === 'COMPLETED' && (
-                    <div className="mt-2 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-2 text-[11px] text-[var(--color-text-secondary)] space-y-0.5">
+                    <div className="mt-2 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-2 text-xs text-[var(--color-text-secondary)] space-y-0.5">
                       <div className="font-medium text-[var(--color-text-primary)]">
                         Rating: {w.performanceRating}/10
                         {w.topSpeedKmh && ` · Max speed: ${w.topSpeedKmh} km/h`}

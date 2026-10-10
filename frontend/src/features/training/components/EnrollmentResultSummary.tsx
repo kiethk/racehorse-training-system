@@ -65,10 +65,10 @@ export function EnrollmentResultSummary({
     <div className="space-y-4">
       <Panel padded>
         <div className="flex items-start gap-3">
-          <span className="text-[22px] leading-none">✅</span>
+          <span className="text-2xl leading-none">✅</span>
           <div>
         <SectionTitle>Created {plans.length} training plans</SectionTitle>
-            <p className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
         Each horse has its own plan for recording metrics and feedback.
             </p>
           </div>
@@ -88,7 +88,7 @@ export function EnrollmentResultSummary({
                 key={lotId}
                 className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3"
               >
-                <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
                   <Pill tone="info" size="sm">Lot #{lotId}</Pill>
                   <strong>{sample.startTime} – {sample.endTime}</strong>
                   <span className="text-[var(--color-text-secondary)]">
@@ -103,7 +103,7 @@ export function EnrollmentResultSummary({
           {sample.lotOccupancy ?? entries.length} horses
                   </Pill>
                 </div>
-                <div className="mt-1.5 text-[11px] text-[var(--color-text-secondary)]">
+                <div className="mt-1.5 text-xs text-[var(--color-text-secondary)]">
                   {entries
                     .map((e) => horseNameById.get(e.horseId) ?? `#${e.horseId}`)
                     .join(' · ')}
@@ -114,7 +114,7 @@ export function EnrollmentResultSummary({
         </div>
 
         {splitIntoMultipleLots && (
-          <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-info-soft)] p-3 text-[11px] text-[var(--color-info)]">
+          <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-info-soft)] p-3 text-xs text-[var(--color-info)]">
         The group was split across {firstSessionByLot.length} workout sessions because each lot holds up to six horses and each groom can lead one horse per session.
           </div>
         )}
@@ -126,7 +126,7 @@ export function EnrollmentResultSummary({
           {plans.map((p) => (
             <li
               key={p.plan.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 text-[12px]"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 text-xs"
             >
               <div>
                 <strong className="text-[var(--color-text-primary)]">

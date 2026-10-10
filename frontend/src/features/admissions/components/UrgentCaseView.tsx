@@ -1,5 +1,8 @@
 'use client';
 
+import { Notice } from '@/components/ui/Notice';
+import { ChoiceInput, Input, Textarea } from '@/components/ui/Input';
+import { FormField } from '@/components/ui/FormField';
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
@@ -292,7 +295,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           )}
 
           {urgentCase.status === 'IN_PROGRESS' && (
-            <form onSubmit={handleSubmit} className="legacy-controls space-y-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+            <form onSubmit={handleSubmit} className="space-y-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
               <div className="border-b border-[var(--color-border)] pb-3">
                 <h3 className="text-lg font-bold text-[var(--color-text-primary)]">
                   Urgent Examination Record
@@ -303,9 +306,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
               </div>
 
               {submitError && (
-                <div role="alert" className="rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">
-                  {submitError}
-                </div>
+                <Notice tone="error">{submitError}</Notice>
               )}
 
               {/* Vitals Telemetry */}
@@ -315,60 +316,52 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 </label>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div>
-                    <label htmlFor="vital-temp" className="block text-xs font-medium text-[var(--color-text-primary)]">
-                      Temperature (°C)
-                    </label>
-                    <input
-                      id="vital-temp"
-                      type="number"
-                      step="0.1"
-                      placeholder="38.0"
-                      value={temperature}
-                      onChange={(e) => setTemperature(e.target.value)}
-                      className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
-                    />
+                    <FormField label="Temperature (°C)" htmlFor="vital-temp">
+                      <Input
+                        id="vital-temp"
+                        type="number"
+                        step="0.1"
+                        placeholder="38.0"
+                        value={temperature}
+                        onChange={(e) => setTemperature(e.target.value)}
+                      />
+                    </FormField>
                   </div>
                   <div>
-                    <label htmlFor="vital-hr" className="block text-xs font-medium text-[var(--color-text-primary)]">
-                      Heart rate (bpm)
-                    </label>
-                    <input
-                      id="vital-hr"
-                      type="number"
-                      step="1"
-                      placeholder="36"
-                      value={heartRate}
-                      onChange={(e) => setHeartRate(e.target.value)}
-                      className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
-                    />
+                    <FormField label="Heart rate (bpm)" htmlFor="vital-hr">
+                      <Input
+                        id="vital-hr"
+                        type="number"
+                        step="1"
+                        placeholder="36"
+                        value={heartRate}
+                        onChange={(e) => setHeartRate(e.target.value)}
+                      />
+                    </FormField>
                   </div>
                   <div>
-                    <label htmlFor="vital-rr" className="block text-xs font-medium text-[var(--color-text-primary)]">
-                      Respiratory rate (rpm)
-                    </label>
-                    <input
-                      id="vital-rr"
-                      type="number"
-                      step="1"
-                      placeholder="12"
-                      value={respiratoryRate}
-                      onChange={(e) => setRespiratoryRate(e.target.value)}
-                      className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
-                    />
+                    <FormField label="Respiratory rate (rpm)" htmlFor="vital-rr">
+                      <Input
+                        id="vital-rr"
+                        type="number"
+                        step="1"
+                        placeholder="12"
+                        value={respiratoryRate}
+                        onChange={(e) => setRespiratoryRate(e.target.value)}
+                      />
+                    </FormField>
                   </div>
                   <div>
-                    <label htmlFor="vital-wt" className="block text-xs font-medium text-[var(--color-text-primary)]">
-                      Weight (kg)
-                    </label>
-                    <input
-                      id="vital-wt"
-                      type="number"
-                      step="0.5"
-                      placeholder="500"
-                      value={weight}
-                      onChange={(e) => setWeight(e.target.value)}
-                      className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
-                    />
+                    <FormField label="Weight (kg)" htmlFor="vital-wt">
+                      <Input
+                        id="vital-wt"
+                        type="number"
+                        step="0.5"
+                        placeholder="500"
+                        value={weight}
+                        onChange={(e) => setWeight(e.target.value)}
+                      />
+                    </FormField>
                   </div>
                 </div>
               </div>
@@ -380,40 +373,36 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 </label>
 
                 <div>
-                  <label htmlFor="urgent-symptoms" className="block text-xs font-semibold text-[var(--color-text-primary)]">
-                  Observed urgent symptoms <span className="text-[var(--color-danger)]">*</span>
-                  </label>
-                  <textarea
-                    id="urgent-symptoms"
-                    rows={2}
-                    value={symptoms}
-                    onChange={(e) => {
-                      setSymptoms(e.target.value);
-                      if (fieldErrors.symptoms) setFieldErrors((prev) => ({ ...prev, symptoms: '' }));
-                    }}
-                  placeholder="Describe the horse’s symptoms or signs of illness or injury…"
-                    className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs outline-none focus:border-[var(--color-primary)]"
-                  />
+                  <FormField label="Observed urgent symptoms" htmlFor="urgent-symptoms" required>
+                    <Textarea
+                      id="urgent-symptoms"
+                      rows={2}
+                      value={symptoms}
+                      onChange={(e) => {
+                        setSymptoms(e.target.value);
+                        if (fieldErrors.symptoms) setFieldErrors((prev) => ({ ...prev, symptoms: '' }));
+                      }}
+                    placeholder="Describe the horse’s symptoms or signs of illness or injury…"
+                    />
+                  </FormField>
                   {fieldErrors.symptoms && (
                     <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.symptoms}</p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="urgent-findings" className="block text-xs font-semibold text-[var(--color-text-primary)]">
-                  Examination findings <span className="text-[var(--color-danger)]">*</span>
-                  </label>
-                  <textarea
-                    id="urgent-findings"
-                    rows={3}
-                    value={findings}
-                    onChange={(e) => {
-                      setFindings(e.target.value);
-                      if (fieldErrors.findings) setFieldErrors((prev) => ({ ...prev, findings: '' }));
-                    }}
-                  placeholder="Describe the horse’s condition, injuries, or areas of pain…"
-                    className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs outline-none focus:border-[var(--color-primary)]"
-                  />
+                  <FormField label="Examination findings" htmlFor="urgent-findings" required>
+                    <Textarea
+                      id="urgent-findings"
+                      rows={3}
+                      value={findings}
+                      onChange={(e) => {
+                        setFindings(e.target.value);
+                        if (fieldErrors.findings) setFieldErrors((prev) => ({ ...prev, findings: '' }));
+                      }}
+                    placeholder="Describe the horse’s condition, injuries, or areas of pain…"
+                    />
+                  </FormField>
                   {fieldErrors.findings && (
                     <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.findings}</p>
                   )}
@@ -421,52 +410,46 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="urgent-diagnosis" className="block text-xs font-semibold text-[var(--color-text-primary)]">
-                  Diagnosis <span className="text-[var(--color-danger)]">*</span>
-                    </label>
-                    <input
-                      id="urgent-diagnosis"
-                      type="text"
-                      value={diagnosis}
-                      onChange={(e) => {
-                        setDiagnosis(e.target.value);
-                        if (fieldErrors.diagnosis) setFieldErrors((prev) => ({ ...prev, diagnosis: '' }));
-                      }}
-                  placeholder="Enter a confirmed or provisional diagnosis…"
-                      className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
-                    />
+                    <FormField label="Diagnosis" htmlFor="urgent-diagnosis" required>
+                      <Input
+                        id="urgent-diagnosis"
+                        type="text"
+                        value={diagnosis}
+                        onChange={(e) => {
+                          setDiagnosis(e.target.value);
+                          if (fieldErrors.diagnosis) setFieldErrors((prev) => ({ ...prev, diagnosis: '' }));
+                        }}
+                    placeholder="Enter a confirmed or provisional diagnosis…"
+                      />
+                    </FormField>
                     {fieldErrors.diagnosis && (
                       <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.diagnosis}</p>
                     )}
                   </div>
 
                   <div>
-                    <label htmlFor="urgent-treatment" className="block text-xs font-semibold text-[var(--color-text-primary)]">
-                  Treatment / First aid
-                    </label>
-                    <input
-                      id="urgent-treatment"
-                      type="text"
-                      value={treatment}
-                      onChange={(e) => setTreatment(e.target.value)}
-                  placeholder="Medication, bandaging, or care instructions…"
-                      className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
-                    />
+                    <FormField label="Treatment / First aid" htmlFor="urgent-treatment">
+                      <Input
+                        id="urgent-treatment"
+                        type="text"
+                        value={treatment}
+                        onChange={(e) => setTreatment(e.target.value)}
+                    placeholder="Medication, bandaging, or care instructions…"
+                      />
+                    </FormField>
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="urgent-notes" className="block text-xs font-semibold text-[var(--color-text-primary)]">
-                  Additional notes
-                  </label>
-                  <textarea
-                    id="urgent-notes"
-                    rows={2}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Care instructions or follow-up observations…"
-                    className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs outline-none focus:border-[var(--color-primary)]"
-                  />
+                  <FormField label="Additional notes" htmlFor="urgent-notes">
+                    <Textarea
+                      id="urgent-notes"
+                      rows={2}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Care instructions or follow-up observations…"
+                    />
+                  </FormField>
                 </div>
               </div>
 
@@ -493,7 +476,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <input
+                        <ChoiceInput
                           type="radio"
                           name="trainingDecision"
                           value={option.value}
@@ -509,7 +492,6 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                               }));
                             }
                           }}
-                          className="accent-[var(--color-primary)]"
                         />
                         <span className="text-xs font-bold">{option.label}</span>
                       </div>
@@ -521,22 +503,20 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 {trainingDecision === 'BLOCKED' && (
                   <div className="mt-3 space-y-3">
                     <div>
-                      <label htmlFor="restriction-details" className="block text-xs font-semibold text-[var(--color-danger)]">
-                        Training restriction / Rest instructions <span className="text-[var(--color-danger)]">*</span>
-                      </label>
-                      <textarea
-                        id="restriction-details"
-                        rows={2}
-                        value={restrictionDetails}
-                        onChange={(e) => {
-                          setRestrictionDetails(e.target.value);
-                          if (fieldErrors.restrictionDetails) {
-                            setFieldErrors((prev) => ({ ...prev, restrictionDetails: '' }));
-                          }
-                        }}
-                        placeholder="Describe the restrictions (for example, 15 minutes of walking only or complete stall rest)…"
-                        className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-surface)] p-2.5 text-xs outline-none focus:ring-1 focus:ring-[var(--color-danger)]"
-                      />
+                      <FormField label="Training restriction / Rest instructions" htmlFor="restriction-details" required>
+                        <Textarea
+                          id="restriction-details"
+                          rows={2}
+                          value={restrictionDetails}
+                          onChange={(e) => {
+                            setRestrictionDetails(e.target.value);
+                            if (fieldErrors.restrictionDetails) {
+                              setFieldErrors((prev) => ({ ...prev, restrictionDetails: '' }));
+                            }
+                          }}
+                          placeholder="Describe the restrictions (for example, 15 minutes of walking only or complete stall rest)…"
+                        />
+                      </FormField>
                       {fieldErrors.restrictionDetails && (
                         <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.restrictionDetails}</p>
                       )}
@@ -544,30 +524,28 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <label htmlFor="follow-up-date" className="block text-xs font-semibold text-[var(--color-danger)]">
-                          Follow-up date <span className="text-[var(--color-danger)]">*</span>
-                        </label>
-                        <input
-                          id="follow-up-date"
-                          type="date"
-                          min={businessDate(1)}
-                          value={followUpDate}
-                          onChange={(e) => {
-                            setFollowUpDate(e.target.value);
-                            if (fieldErrors.followUpDate) setFieldErrors((prev) => ({ ...prev, followUpDate: '' }));
-                          }}
-                          className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none"
-                        />
+                        <FormField label="Follow-up date" htmlFor="follow-up-date" required>
+                          <Input
+                            id="follow-up-date"
+                            type="date"
+                            min={businessDate(1)}
+                            value={followUpDate}
+                            onChange={(e) => {
+                              setFollowUpDate(e.target.value);
+                              if (fieldErrors.followUpDate) setFieldErrors((prev) => ({ ...prev, followUpDate: '' }));
+                            }}
+                          />
+                        </FormField>
                         <div className="mt-1 flex gap-1">
                           {[3, 7, 14].map((days) => (
-                            <button
+                            <Button
                               key={days}
-                              type="button"
+                              size="sm"
+                              variant="secondary"
                               onClick={() => setFollowUpDate(businessDate(days))}
-                              className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-0.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]"
                             >
                               +{days} days
-                            </button>
+                            </Button>
                           ))}
                         </div>
                         {fieldErrors.followUpDate && (
@@ -575,21 +553,19 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                         )}
                       </div>
                       <div>
-                        <label htmlFor="follow-up-desc" className="block text-xs font-semibold text-[var(--color-danger)]">
-                          Follow-up instructions <span className="text-[var(--color-danger)]">*</span>
-                        </label>
-                        <input
-                          id="follow-up-desc"
-                          type="text"
-                          value={followUpDescription}
-                          onChange={(e) => {
-                            setFollowUpDescription(e.target.value);
-                            if (fieldErrors.followUpDescription) {
-                              setFieldErrors((prev) => ({ ...prev, followUpDescription: '' }));
-                            }
-                          }}
-                          className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs outline-none"
-                        />
+                        <FormField label="Follow-up instructions" htmlFor="follow-up-desc" required>
+                          <Input
+                            id="follow-up-desc"
+                            type="text"
+                            value={followUpDescription}
+                            onChange={(e) => {
+                              setFollowUpDescription(e.target.value);
+                              if (fieldErrors.followUpDescription) {
+                                setFieldErrors((prev) => ({ ...prev, followUpDescription: '' }));
+                              }
+                            }}
+                          />
+                        </FormField>
                         {fieldErrors.followUpDescription && (
                           <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUpDescription}</p>
                         )}

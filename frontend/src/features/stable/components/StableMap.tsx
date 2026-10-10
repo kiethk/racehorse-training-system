@@ -135,7 +135,7 @@ export function StableMap() {
             <Panel key={area.id} padded>
               <div className="mb-4 flex items-center justify-between border-b border-[var(--color-border)] pb-3">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
                     Khu {area.code} — {area.name}
                   </h2>
                   <Pill tone="primary" size="sm">
@@ -145,7 +145,7 @@ export function StableMap() {
               </div>
 
               {areaStalls.length === 0 ? (
-                <p className="text-[12px] text-[var(--color-text-muted)]">This area has no stalls yet.</p>
+                <p className="text-xs text-[var(--color-text-muted)]">This area has no stalls yet.</p>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {areaStalls.map((stall) => {
@@ -164,11 +164,11 @@ export function StableMap() {
                       >
                         <div>
                           <div className="flex items-center justify-between">
-                            <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                            <span className="text-sm font-bold text-[var(--color-text-primary)]">
                               Stall {stall.stallCode}
                             </span>
                             <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                                 isOccupied
                                   ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]'
                                   : 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)]'
@@ -178,26 +178,26 @@ export function StableMap() {
                             </span>
                           </div>
 
-                          <div className="mt-2 text-[12px]">
-                            <div className="text-[11px] text-[var(--color-text-muted)]">Horse:</div>
+                          <div className="mt-2 text-xs">
+                            <div className="text-xs text-[var(--color-text-muted)]">Horse:</div>
                             <div className="font-semibold text-[var(--color-text-primary)] truncate">
                               {currentHorse ? currentHorse.name : 'No horse assigned'}
                             </div>
                             {currentHorse?.breed && (
-                              <div className="text-[11px] text-[var(--color-text-secondary)]">
+                              <div className="text-xs text-[var(--color-text-secondary)]">
                                 {currentHorse.breed}
                               </div>
                             )}
                           </div>
 
                           <div className="mt-2">
-                            <div className="text-[11px] text-[var(--color-text-muted)]">Assigned groom:</div>
+                            <div className="text-xs text-[var(--color-text-muted)]">Assigned groom:</div>
                             {stall.groomId ? (
                               <Pill tone="info" size="sm">
                                 {currentGroom ? currentGroom.fullName : `#${stall.groomId}`}
                               </Pill>
                             ) : (
-                              <span className="text-[11px] text-[var(--color-text-muted)] italic">
+                              <span className="text-xs text-[var(--color-text-muted)] italic">
                                 Unassigned
                               </span>
                             )}
@@ -205,29 +205,27 @@ export function StableMap() {
                         </div>
 
                         <div className="mt-4 flex gap-1.5 pt-2 border-t border-[var(--color-border)]">
-                          <button
-                            type="button"
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="flex-1"
                             onClick={() => setAssignHorseStall(stall)}
                             disabled={isOccupied}
-                            className={`flex-1 rounded px-2 py-1 text-[11px] font-medium text-center transition ${
-                              isOccupied
-                                ? 'cursor-not-allowed opacity-40 bg-[var(--color-surface)] text-[var(--color-text-muted)]'
-                                : 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white'
-                            }`}
                           >
                             {isOccupied ? 'Occupied' : 'Assign horse'}
-                          </button>
+                          </Button>
                           {isOccupied && (
-                            <button
-                              type="button"
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="flex-1 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"
                               onClick={() => {
                                 setUnassignError(null);
                                 setUnassignStall(stall);
                               }}
-                              className="flex-1 rounded px-2 py-1 text-[11px] font-medium text-center bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition"
                             >
                               Remove horse
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </div>

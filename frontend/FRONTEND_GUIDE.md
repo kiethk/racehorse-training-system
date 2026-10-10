@@ -11,6 +11,7 @@ Related documents:
 
 | Date | Version | Description | Author |
 |---|---|---|---|
+| 2026-10-10 | 2.1 | Every feature screen is on the shared primitives; the raw-element lint rule is now an error. Added `ChoiceInput`, `FileInput`, `Table bare`, `AuthCard`. Documented modal forms, chart colours and the open clean-up list. | Frontend team |
 | 2026-10-09 | 2.0 | Rewritten in BMAD frontend-architecture format. Vertical sidebar shell, `(app)` route group, shared primitive library, unified admission screens, motion and token rules. Auth section corrected to the access-token + refresh-cookie flow. | Frontend team |
 | — | 1.0 | Initial handover guide (top navigation, per-page shell). | Frontend team |
 
@@ -66,7 +67,7 @@ frontend/
     ├── components/
     │   ├── ui/               # business-agnostic primitives (index.ts is the catalogue)
     │   ├── layout/           # AppShell, Sidebar, SidebarNav, TopBar, UserMenu, NotificationBell, PageContainer
-    │   └── auth/             # AuthGate, RoleGuard, RoleLanding
+    │   └── auth/             # AuthGate, RoleGuard, RoleLanding, AuthCard (sign-in / register frame)
     ├── features/<feature>/   # admissions, training, racing, stable, staff, groom, ...
     │   ├── components/       # domain-aware screens and widgets
     │   ├── services/         # API wrappers for this feature
@@ -76,7 +77,7 @@ frontend/
     ├── context/              # AuthContext
     ├── config/               # navigation.ts (sidebar per role)
     ├── lib/                  # cn, display, toast, roleRoute
-    └── types/                # cross-cutting types (auth, ApiResponse)
+    └── types/                # cross-cutting types: auth.ts (Role, AuthUser), horse.ts (ApiResponse<T> and the reference entity type)
 ```
 
 Import alias: `@/*` maps to `src/*`.
@@ -92,7 +93,7 @@ Import alias: `@/*` maps to `src/*`.
 | Feature | `src/features/<feature>/components` | Yes | primitives, the feature's services and types |
 | Page | `src/app/**/page.tsx` | Route and role only | `RoleGuard`, `PageContainer`, one feature screen |
 
-Feature code must not use raw `<button>`, `<input>`, `<select>`, `<textarea>`, `<table>` or hand-rolled overlays. `npm run lint` reports them. The "need → primitive" table is in `AGENTS.md`, and every primitive is shown live at `/design-test`.
+Feature code must not use raw `<button>`, `<input>`, `<select>`, `<textarea>`, `<table>` or hand-rolled overlays. `npm run lint` fails on them. The "need → primitive" table is in `AGENTS.md`, and every primitive is shown live at `/design-test`.
 
 ### Page template
 
@@ -263,6 +264,10 @@ The token list is in `AGENTS.md` (Data → Tokens).
 - Overlays, menus and tooltips already animate inside their primitives.
 - `prefers-reduced-motion` is handled globally in `globals.css`.
 
+### Charts
+
+Charts are hand-drawn SVG. Series colours come from tokens passed to SVG attributes (`stroke="var(--color-success)"`), and the legend swatch uses the same token. The module accent tokens (`--color-training`, `--color-medical`, `--color-grooming`, `--color-racing`, `--color-finance`) are available when the status colours are not enough.
+
 ### Accessibility
 
 - Every interactive element has a visible focus ring and works from the keyboard.
@@ -278,6 +283,8 @@ Every data screen handles four states explicitly: loading (`ListSkeleton`, `Deta
 ### Forms
 
 - Controlled inputs inside `FormField`. Errors appear next to the field; a form-level error uses `Notice`.
+- A form inside a `Modal` gets an `id`; the submit button lives in the modal `footer` and points at it with `form={id}`.
+- Option cards (a bordered `<label>` wrapping a radio or checkbox plus rich content) use `ChoiceInput` for the control.
 - Disable the submit button while the request is running (`Button loading`), and prevent duplicate submissions.
 - The backend is the final validator. Do not re-implement complex business rules on the client.
 
@@ -362,10 +369,11 @@ npm run dev
 | Combine class names | `cn` from `src/lib/cn.ts` |
 | Call the backend | the feature's `services/` file → `src/services/api.ts` |
 | Build an admission screen | `src/features/admissions/shared/components` |
-| Follow a step-by-step workflow | `AGENTS.md` → Tasks (`*new-feature`, `*new-page`, `*migrate-component`, `*verify`) |
+| Follow a step-by-step workflow | `AGENTS.md` → Tasks (`*new-feature`, `*new-page`, `*add-nav-item`, `*new-primitive`, `*refactor-component`, `*audit`, `*verify`) |
 
 ### Current status
 
-- **Complete:** auth and role routing, application shell with vertical sidebar, design tokens, primitive library, admission screens unified across the five roles.
-- **In progress:** moving the remaining feature screens (training, racing, groom, staff, access control, audit log, stable, login, register) onto the shared primitives. Run `npx eslint src` to see what is left.
+- **Complete:** auth and role routing, application shell with vertical sidebar, design tokens, primitive library, admission screens unified across the five roles, and every feature screen moved onto the shared primitives (the raw-element lint rule is an error).
+- **Open clean-up:** eight feature files still format dates locally instead of using `src/lib/display.ts`; `VetReviewForm` and `VetAdmissionQueue` are far over the 400-line guideline; `AdmissionDocumentPreview` uses a native `<dialog>`. The list is in `AGENTS.md` under the `refactor-component` task.
+- **Placeholders:** the Manager, Veterinarian, Groom and Owner landing pages still render `RoleLanding`; sidebar items without a route show a "Soon" tag; `features/horses`, `features/health` and `features/care` are empty scaffolds.
 - **Not started:** mobile layout below 1024px, dark theme, internationalisation.
