@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
+import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { groomApi } from '../services/groomService';
+import { CompleteTaskDialog } from './CompleteTaskDialog';
 import type { TodayTaskItem } from '../types';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
@@ -14,7 +16,8 @@ export function TodayChecklist() {
   const [tasks, setTasks] = useState<TodayTaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [completingId, setCompletingId] = useState<number | null>(null);
+  /** The task whose completion dialog is open. */
+  const [completingTask, setCompletingTask] = useState<TodayTaskItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadTasks = useCallback(async () => {
@@ -45,18 +48,6 @@ export function TodayChecklist() {
       toast.error(displayError(err, 'Failed to generate routine tasks.'));
     } finally {
       setGenerating(false);
-    }
-  }
-
-  async function handleComplete(refId: number) {
-    setCompletingId(refId);
-    try {
-      await groomApi.completeTask(refId);
-      await loadTasks();
-    } catch (err) {
-      toast.error(displayError(err, 'Failed to complete the task.'));
-    } finally {
-      setCompletingId(null);
     }
   }
 
@@ -181,19 +172,36 @@ export function TodayChecklist() {
                       <span>Horse: <strong>{task.horseName}</strong></span>
                       {task.note && <span>• {task.note}</span>}
                     </div>
+
+                    {/* What the Groom recorded when completing the task. */}
+                    {(task.completionNote || task.completionImageUrl) && (
+                      <div className="mt-2 space-y-2">
+                        {task.completionNote && (
+                          <p className="whitespace-pre-wrap break-words text-xs text-[var(--color-text-primary)]">
+                            <span className="font-medium">Completion note: </span>
+                            {task.completionNote}
+                          </p>
+                        )}
+                        {task.completionImageUrl && (
+                          <div className="w-40">
+                            <ProtectedImage
+                              src={task.completionImageUrl}
+                              alt={`Photo for ${task.title}, ${task.horseName}`}
+                              openOnClick
+                              className="h-24 w-full object-cover"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Actions depend on whether the task is actionable. */}
                 <div className="flex items-center gap-2">
                   {task.actionable && !isCompleted ? (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleComplete(task.refId)}
-                      disabled={completingId === task.refId}
-                    >
-                      {completingId === task.refId ? 'Saving...' : 'Complete'}
+                    <Button variant="primary" size="sm" onClick={() => setCompletingTask(task)}>
+                      Complete
                     </Button>
                   ) : isCompleted ? (
                     <Pill tone="success" size="sm">
@@ -214,6 +222,15 @@ export function TodayChecklist() {
           })}
         </div>
       )}
+
+      <CompleteTaskDialog
+        task={completingTask}
+        onClose={() => setCompletingTask(null)}
+        onCompleted={async () => {
+          toast.success('Task completed');
+          await loadTasks();
+        }}
+      />
     </div>
   );
 }

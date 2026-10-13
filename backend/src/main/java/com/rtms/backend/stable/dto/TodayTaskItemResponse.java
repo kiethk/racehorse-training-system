@@ -31,6 +31,10 @@ public class TodayTaskItemResponse {
 
     /** Chỉ nguồn SOP mới tick được. Workout do Trainer đóng, thú y do Vet đóng. */
     private boolean actionable;
+    /** What the Groom wrote when completing the task. SOP tasks only. */
+    private String completionNote;
+    /** API path of the photo taken on completion, or null. SOP tasks only. */
+    private String completionImageUrl;
 
     public TodayTaskItemResponse(TaskSource source, Long refId, LocalTime startTime,
                                  LocalTime endTime, Long horseId, String horseName,
@@ -57,4 +61,13 @@ public class TodayTaskItemResponse {
     public String getNote() { return note; }
     public String getStatus() { return status; }
     public boolean isActionable() { return actionable; }
+    public String getCompletionNote() { return completionNote; }
+    public String getCompletionImageUrl() { return completionImageUrl; }
+
+    /** Adds what was recorded on completion. Returns this item so it can be chained when building the list. */
+    public TodayTaskItemResponse withCompletion(String note, String imageUrl) {
+        this.completionNote = note;
+        this.completionImageUrl = imageUrl;
+        return this;
+    }
 }
