@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { LinkButton } from '@/components/ui';
 import { HorseProfileView } from '@/features/horses/shared/components/HorseProfileView';
 
 export const metadata: Metadata = {
@@ -27,16 +26,8 @@ export default async function ManagerHorseDetailPage({
       <PageContainer>
         <HorseProfileView
           horseId={horseId}
-          actions={
-            <LinkButton
-              href="/manager/horses"
-              size="sm"
-              variant="secondary"
-              icon="arrow-left"
-            >
-              Back to horses
-            </LinkButton>
-          }
+          returnTo="/manager/horses"
+          backLabel="Back to horses"
         />
       </PageContainer>
     </RoleGuard>

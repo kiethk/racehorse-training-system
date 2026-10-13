@@ -8,11 +8,11 @@ import {
   EmptyState,
   Notice,
   Panel,
-  ScreenLayout,
-  SectionTitle,
   StatusBadge,
 } from '@/components/ui';
 import { horseService } from '@/features/horses/services/horseService';
+import { HorseDetailLayout } from '@/features/horses/shared/components/HorseDetailLayout';
+import { HorseInfoRow, HorseInfoSection } from '@/features/horses/shared/components/HorseInfoSection';
 import { HorseProfileHeader } from '@/features/horses/shared/components/HorseProfileHeader';
 import type { HorseSpecialty } from '@/features/horses/types';
 import type { Horse } from '@/features/stable/types';
@@ -20,10 +20,23 @@ import { displayError, formatDate } from '@/lib/display';
 
 export interface HorseProfileViewProps {
   horseId: number;
-  actions?: ReactNode;
+  /** Href for the back link rendered by HorseDetailLayout. */
+  returnTo?: string;
+  /** Label for the back link. Defaults to 'Back to horses'. */
+  backLabel?: string;
+  /** Optional actions rendered in the top header banner. */
+  headerActions?: ReactNode;
+  /** Optional sidebar column content (e.g. action cards). */
+  sidebar?: ReactNode;
 }
 
-function HorseProfileContent({ horseId, actions }: HorseProfileViewProps) {
+function HorseProfileContent({
+  horseId,
+  returnTo,
+  backLabel,
+  headerActions,
+  sidebar,
+}: HorseProfileViewProps) {
   const [horse, setHorse] = useState<Horse | null>(null);
   const [specialty, setSpecialty] = useState<HorseSpecialty | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +55,8 @@ function HorseProfileContent({ horseId, actions }: HorseProfileViewProps) {
       setLoading(true);
       setError(null);
       setSpecialtyWarning(null);
+      setHorse(null);
+      setSpecialty(null);
 
       try {
         const horsePromise = horseService.getById(horseId);
@@ -75,96 +90,123 @@ function HorseProfileContent({ horseId, actions }: HorseProfileViewProps) {
     };
   }, [horseId, reloadKey]);
 
-  if (loading && !horse) {
+  /* ── Loading ── */
+  if (loading) {
     return (
-      <ScreenLayout variant="detail">
-        <Panel padded>
-          <DetailSkeleton />
-        </Panel>
-      </ScreenLayout>
+      <HorseDetailLayout
+        returnTo={returnTo}
+        backLabel={backLabel}
+        header={null}
+        sidebar={sidebar}
+        content={
+          <Panel padded>
+            <DetailSkeleton />
+          </Panel>
+        }
+      />
     );
   }
 
+  /* ── Error ── */
   if (error || !horse) {
     return (
-      <ScreenLayout variant="detail">
-        <Panel padded>
-          <EmptyState
-            icon="alert-triangle"
-            title="Unable to load horse profile"
-            description={error ?? 'Horse profile could not be loaded.'}
-            action={
-              <div className="flex items-center gap-2">
+      <HorseDetailLayout
+        returnTo={returnTo}
+        backLabel={backLabel}
+        header={null}
+        sidebar={sidebar}
+        content={
+          <Panel padded>
+            <EmptyState
+              icon="alert-triangle"
+              title="Unable to load horse profile"
+              description={error ?? 'Horse profile could not be loaded.'}
+              action={
                 <Button size="sm" icon="refresh" onClick={reload}>
                   Retry
                 </Button>
-                {actions}
-              </div>
-            }
-          />
-        </Panel>
-      </ScreenLayout>
+              }
+            />
+          </Panel>
+        }
+      />
     );
   }
 
+  /* ── Content ── */
   return (
-    <ScreenLayout variant="detail">
-      {specialtyWarning && <Notice tone="warning">{specialtyWarning}</Notice>}
+    <HorseDetailLayout
+      returnTo={returnTo}
+      backLabel={backLabel}
+      header={
+        <HorseProfileHeader
+          horse={horse}
+          horseId={horseId}
+          specialty={specialty}
+          actions={headerActions}
+        />
+      }
+      sidebar={sidebar}
+      content={
+        <div className="space-y-5">
+          {specialtyWarning && (
+            <Notice tone="warning">{specialtyWarning}</Notice>
+          )}
 
-      <HorseProfileHeader
-        horse={horse}
-        horseId={horseId}
-        specialty={specialty}
-        actions={actions}
-      />
+          <HorseInfoSection title="Basic Information">
+            <HorseInfoRow
+              label="Registration Number"
+              value={horse.registrationNumber?.trim() || undefined}
+            />
+            <HorseInfoRow
+              label="Breed"
+              value={horse.breed?.trim() || undefined}
+            />
+            <HorseInfoRow
+              label="Date of Birth"
+              value={horse.dateOfBirth ? formatDate(horse.dateOfBirth) : undefined}
+            />
+            <HorseInfoRow
+              label="Current Status"
+              value={<StatusBadge status={horse.currentStatus} />}
+            />
+          </HorseInfoSection>
 
-      <Panel padded>
-        <SectionTitle>Basic Information</SectionTitle>
-        <div className="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <span className="text-[var(--color-text-secondary)]">Registration Number</span>
-            <p className="mt-1 font-medium text-[var(--color-text-primary)]">
-              {horse.registrationNumber?.trim() || '—'}
-            </p>
-          </div>
-          <div>
-            <span className="text-[var(--color-text-secondary)]">Breed</span>
-            <p className="mt-1 font-medium text-[var(--color-text-primary)]">
-              {horse.breed?.trim() || '—'}
-            </p>
-          </div>
-          <div>
-            <span className="text-[var(--color-text-secondary)]">Date of Birth</span>
-            <p className="mt-1 font-medium text-[var(--color-text-primary)]">
-              {horse.dateOfBirth ? formatDate(horse.dateOfBirth) : '—'}
-            </p>
-          </div>
-          <div>
-            <span className="text-[var(--color-text-secondary)]">Current Status</span>
-            <div className="mt-1">
-              <StatusBadge status={horse.currentStatus} />
-            </div>
-          </div>
-          <div>
-            <span className="text-[var(--color-text-secondary)]">Training Decision</span>
-            <p className="mt-1 font-medium text-[var(--color-text-primary)]">
-              {horse.trainingDecision || '—'}
-            </p>
-          </div>
-          {horse.trainingDecisionReason && (
-            <div>
-              <span className="text-[var(--color-text-secondary)]">Block Reason</span>
-              <p className="mt-1 font-medium text-[var(--color-text-primary)]">
-                {horse.trainingDecisionReason}
-              </p>
-            </div>
+          {(horse.trainingDecision || horse.trainingDecisionReason) && (
+            <HorseInfoSection title="Training Gate">
+              <HorseInfoRow
+                label="Decision"
+                value={horse.trainingDecision || undefined}
+              />
+              {horse.trainingDecisionReason && (
+                <HorseInfoRow
+                  label="Block Reason"
+                  value={horse.trainingDecisionReason}
+                />
+              )}
+            </HorseInfoSection>
           )}
         </div>
-      </Panel>
-    </ScreenLayout>
+      }
+    />
   );
 }
 
-export function HorseProfileView({ horseId, actions }: HorseProfileViewProps) {
-  return <HorseProfileContent key={horseId} horseId={horseId} actions={actions} />;
+export function HorseProfileView({
+  horseId,
+  returnTo,
+  backLabel,
+  headerActions,
+  sidebar,
+}: HorseProfileViewProps) {
+  return (
+    <HorseProfileContent
+      key={horseId}
+      horseId={horseId}
+      returnTo={returnTo}
+      backLabel={backLabel}
+      headerActions={headerActions}
+      sidebar={sidebar}
+    />
+  );
 }
