@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { HorseProfileView } from '@/features/horses/shared/components/HorseProfileView';
+import { ManagerHorseDetailView } from '@/features/horses/components/ManagerHorseDetailView';
 
 export const metadata: Metadata = {
   title: 'Horse Profile | Manager | RTMS',
@@ -24,11 +24,7 @@ export default async function ManagerHorseDetailPage({
   return (
     <RoleGuard allowedRoles={['CLUB_MANAGER']}>
       <PageContainer>
-        <HorseProfileView
-          horseId={horseId}
-          returnTo="/manager/horses"
-          backLabel="Back to horses"
-        />
+        <ManagerHorseDetailView horseId={horseId} />
       </PageContainer>
     </RoleGuard>
   );

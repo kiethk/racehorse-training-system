@@ -63,3 +63,15 @@ horse's photo. Small avatars and the Trainer avatar appearance remain unchanged.
 The source is the `HORSE_PHOTO` document linked through `AdmissionApplication.horseId`.
 A missing file needs restoration from the original upload. A document from an unlinked
 admission cannot serve as another horse's photo.
+
+## Table specialty column
+
+`HorseTable` includes an optional `showSpecialty` prop (defaults to `false`). When enabled,
+it renders a **Specialty** column between **Breed** and **Status**:
+
+- Reuses `HorseSpecialtyBadges` (`size="sm"`).
+- Badges wrap cleanly across multiple lines without overflowing the column.
+- Displays `No specialty yet` when specialty data is available but no distance/surface badges have been earned.
+- Displays `—` when no specialty data is loaded (null/undefined), without fabricating an unearned state.
+- To enable specialty in a list screen, set `includeSpecialty: true` in `useHorses` (or `stableApi.getHorses({ includeSpecialty: true })`) and pass `showSpecialty={true}` to `HorseTable`.
+- The backend evaluates specialties in a single batch query (`HorseSpecialtyService.getSpecialties(ids)`) for the filtered horse IDs.

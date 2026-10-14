@@ -159,7 +159,7 @@ function HorseProfileContent({
       returnTo={returnTo}
       backLabel={backLabel}
       header={
-        <HorseProfileHeader horse={horse} horseId={horseId} actions={headerActions} />
+        <HorseProfileHeader horse={horse} horseId={horseId} specialty={specialty} actions={headerActions} />
       }
       sidebar={sidebar}
       content={

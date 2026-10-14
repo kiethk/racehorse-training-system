@@ -4,17 +4,18 @@ import { StatusBadge } from '@/components/ui';
 import type { HorseSpecialty } from '@/features/horses/types';
 import type { Horse } from '@/features/stable/types';
 import { HorseProfilePhoto } from './HorseProfilePhoto';
+import { HorseSpecialtyBadges } from './HorseSpecialtyBadges';
 import { HorseTrainingClearance } from './HorseTrainingClearance';
 
 /** Shared identity banner. Actions belong to the actor; clearance stays consistent. */
 export function HorseProfileHeader({
   horse,
   horseId,
+  specialty,
   actions,
 }: {
   horse: Horse | null;
   horseId: number;
-  /** Kept for existing callers; detailed specialty evidence now lives in Overview. */
   specialty?: HorseSpecialty | null;
   actions?: ReactNode;
 }) {
@@ -31,6 +32,11 @@ export function HorseProfileHeader({
             {horse && <StatusBadge status={horse.currentStatus} />}
           </div>
           <p className="text-sm text-[var(--color-text-secondary)]">{horse?.breed?.trim() || 'Breed not recorded'}</p>
+          {specialty && (
+            <div>
+              <HorseSpecialtyBadges specialty={specialty} size="sm" />
+            </div>
+          )}
           {actions && <div className="flex flex-wrap items-center gap-2 pt-1">{actions}</div>}
         </div>
       </div>

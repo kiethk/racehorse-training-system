@@ -41,6 +41,55 @@ export interface HorsePedigree {
   pedigreeNotes?: string | null;
 }
 
+export type AdmissionStatus =
+  | 'GROOM_REVIEW'
+  | 'WAITING_FOR_STALL'
+  | 'WAITING_FOR_ARRIVAL'
+  | 'ARRIVAL_EXPIRED'
+  | 'VET_REVIEW'
+  | 'TRAINER_REVIEW'
+  | 'MANAGER_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED';
+
+/** Mirrors HorseAdmissionHistoryResponse — actual stored milestones only. */
+export interface HorseAdmissionHistory {
+  admissionId: number;
+  horseId: number;
+  status: AdmissionStatus;
+  submittedAt: string | null;
+
+  // Groom milestone
+  groomId: number | null;
+  groomName: string | null;
+  groomReviewedAt: string | null;
+  groomDecision: string | null;
+  groomFeedback: string | null;
+
+  // Arrival milestone
+  arrivedAt: string | null;
+
+  // Veterinarian milestone
+  veterinarianId: number | null;
+  vetName: string | null;
+  vetReviewedAt: string | null;
+  vetTrainingDecision: string | null;
+  vetFeedback: string | null;
+
+  // Trainer milestone
+  trainerId: number | null;
+  trainerName: string | null;
+  trainerReviewedAt: string | null;
+  trainerFeedback: string | null;
+
+  // Manager milestone
+  managerId: number | null;
+  managerName: string | null;
+  managerReviewedAt: string | null;
+  managerDecision: string | null;
+  managerFeedback: string | null;
+}
+
 export interface HorseHealthMetric {
   id: number;
   horseId: number;
