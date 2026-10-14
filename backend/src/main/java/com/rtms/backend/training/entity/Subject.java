@@ -19,6 +19,9 @@ public class Subject {
     @Column(name = "category", nullable = false, length = 30)
     private SubjectCategory category;
 
+    @Column(name = "trainer_id")
+    private Long trainerId;
+
     @Column(nullable = false)
     private String name;
 
@@ -63,6 +66,9 @@ public class Subject {
     // Getters & Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public Long getTrainerId() { return trainerId; }
+    public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
 
     public SubjectCategory getCategory() { return category; }
     public void setCategory(SubjectCategory category) { this.category = category; }

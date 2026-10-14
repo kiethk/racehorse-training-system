@@ -7,7 +7,11 @@ public class CreateCourseRequest {
     private String description;
     private String targetGoal;
     private Integer totalSessions;
+    private Long trainerId;
     private List<CourseSubjectItemRequest> subjects;
+
+    public Long getTrainerId() { return trainerId; }
+    public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

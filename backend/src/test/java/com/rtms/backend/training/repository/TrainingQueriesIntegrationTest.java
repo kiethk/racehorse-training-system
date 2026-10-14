@@ -116,6 +116,7 @@ class TrainingQueriesIntegrationTest {
         horse2 = horse("IT Horse Two", otherOwner, stall2);
 
         subject = new Subject();
+        subject.setTrainerId(trainer.getId());
         subject.setCategory(SubjectCategory.SPEED);
         subject.setName("IT Sprint");
         subject.setSurfaceType(SurfaceType.TURF);
@@ -128,6 +129,7 @@ class TrainingQueriesIntegrationTest {
         course.setName("IT Course " + System.nanoTime());
         course.setTotalSessions(4);
         course.setCreatedById(trainer.getId());
+        course.setTrainerId(trainer.getId());
         course = courses.saveAndFlush(course);
 
         CourseSubject link = new CourseSubject();

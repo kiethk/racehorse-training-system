@@ -1,6 +1,7 @@
 package com.rtms.backend.training.service;
 
 import com.rtms.backend.config.FarmSchedulePolicy;
+import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CreateSubjectRequest;
 import com.rtms.backend.training.entity.Subject;
 import com.rtms.backend.training.enums.SubjectCategory;
@@ -24,6 +25,17 @@ public class SubjectService {
     }
 
     public List<Subject> getAllSubjects(SubjectCategory category) {
+        return getAllSubjects(null, category, null);
+    }
+
+    public List<Subject> getAllSubjects(Long trainerId, SubjectCategory category, AuthenticatedUser currentUser) {
+        Long effectiveTrainerId = resolveTrainerId(trainerId, currentUser);
+        if (effectiveTrainerId != null) {
+            if (category != null) {
+                return subjectRepository.findByTrainerIdAndCategory(effectiveTrainerId, category);
+            }
+            return subjectRepository.findByTrainerId(effectiveTrainerId);
+        }
         if (category != null) {
             return subjectRepository.findByCategory(category);
         }
@@ -31,17 +43,48 @@ public class SubjectService {
     }
 
     public Subject getSubjectById(Long id) {
-        return subjectRepository.findById(id)
+        return getSubjectById(id, null);
+    }
+
+    public Subject getSubjectById(Long id, AuthenticatedUser currentUser) {
+        Subject subject = subjectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Subject not found with id: " + id));
+
+        if (currentUser != null && "HEAD_TRAINER".equals(currentUser.getRole())
+                && subject.getTrainerId() != null && !subject.getTrainerId().equals(currentUser.getUserId())) {
+            throw new RuntimeException("Subject not found with id: " + id);
+        }
+
+        return subject;
+    }
+
+    private Long resolveTrainerId(Long trainerId, AuthenticatedUser currentUser) {
+        if (currentUser != null && "HEAD_TRAINER".equals(currentUser.getRole())) {
+            return currentUser.getUserId();
+        }
+        return trainerId;
+    }
+
+    public Subject createSubject(CreateSubjectRequest request) {
+        return createSubject(request, null);
     }
 
     @Transactional
-    public Subject createSubject(CreateSubjectRequest request) {
+    public Subject createSubject(CreateSubjectRequest request, AuthenticatedUser currentUser) {
         if (request.getCategory() == null) {
             throw new IllegalArgumentException("Category is required!");
         }
 
+        Long trainerId = request.getTrainerId() != null
+                ? request.getTrainerId()
+                : (currentUser != null ? currentUser.getUserId() : null);
+
+        if (trainerId != null && subjectRepository.existsByNameAndTrainerId(request.getName(), trainerId)) {
+            throw new IllegalArgumentException("A subject named '" + request.getName() + "' already exists for this trainer!");
+        }
+
         Subject subject = new Subject();
+        subject.setTrainerId(trainerId);
         subject.setCategory(request.getCategory());
         subject.setName(request.getName());
         subject.setDescription(request.getDescription());

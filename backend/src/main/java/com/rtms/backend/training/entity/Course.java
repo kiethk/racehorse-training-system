@@ -25,6 +25,9 @@ public class Course {
     @Column(name = "created_by_id")
     private Long createdById;
 
+    @Column(name = "trainer_id")
+    private Long trainerId;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -60,6 +63,9 @@ public class Course {
 
     public Long getCreatedById() { return createdById; }
     public void setCreatedById(Long createdById) { this.createdById = createdById; }
+
+    public Long getTrainerId() { return trainerId; }
+    public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
 
 
     public LocalDateTime getCreatedAt() { return createdAt; }

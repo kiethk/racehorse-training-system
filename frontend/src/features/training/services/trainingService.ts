@@ -30,15 +30,24 @@ export const trainingService = {
     (await apiGet<ApiResponse<TrainingRules>>('/api/training-rules')).data,
 
   // Subjects
-  getSubjects: async (): Promise<Subject[]> =>
-    (await apiGet<ApiResponse<Subject[]>>('/api/subjects')).data,
+  getSubjects: async (params?: { trainerId?: number; category?: string }): Promise<Subject[]> => {
+    const searchParams = new URLSearchParams();
+    if (params?.trainerId) searchParams.set('trainerId', String(params.trainerId));
+    if (params?.category) searchParams.set('category', params.category);
+    const qs = searchParams.toString();
+    return (await apiGet<ApiResponse<Subject[]>>(`/api/subjects${qs ? `?${qs}` : ''}`)).data;
+  },
 
   createSubject: async (data: CreateSubjectRequest): Promise<Subject> =>
     (await apiPost<ApiResponse<Subject>>('/api/subjects', data)).data,
 
   // Courses
-  getCourses: async (): Promise<Course[]> =>
-    (await apiGet<ApiResponse<Course[]>>('/api/courses')).data,
+  getCourses: async (params?: { trainerId?: number }): Promise<Course[]> => {
+    const searchParams = new URLSearchParams();
+    if (params?.trainerId) searchParams.set('trainerId', String(params.trainerId));
+    const qs = searchParams.toString();
+    return (await apiGet<ApiResponse<Course[]>>(`/api/courses${qs ? `?${qs}` : ''}`)).data;
+  },
 
   getCourse: async (id: number): Promise<CourseDetailResponse> =>
     (await apiGet<ApiResponse<CourseDetailResponse>>(`/api/courses/${id}`)).data,
