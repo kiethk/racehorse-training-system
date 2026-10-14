@@ -99,4 +99,10 @@ public interface AdmissionApplicationRepository
             """)
     List<Object[]> findAssignedHorsePairs(@Param("trainerIds") java.util.Collection<Long> trainerIds,
                                           @Param("status") AdmissionStatus status);
+
+    /**
+     * Batch: the latest (by id desc) application that has a horseId in the given set.
+     * Used to resolve HORSE_PHOTO for a list of horses without N+1 queries.
+     */
+    List<AdmissionApplication> findByHorseIdIn(Collection<Long> horseIds);
 }

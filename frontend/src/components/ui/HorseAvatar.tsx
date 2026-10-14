@@ -21,7 +21,7 @@ export function HorseAvatar({ name, image, size = 36, rounded = 'sm' }: HorseAva
       <span
         role="img"
         aria-label={`${name} profile`}
-        className={`flex shrink-0 items-center justify-center bg-[var(--color-surface-muted)] text-[11px] font-semibold text-[var(--color-text-muted)] ${radius}`}
+        className={`flex shrink-0 items-center justify-center bg-[var(--color-surface-muted)] ${size >= 64 ? 'text-lg font-bold' : 'text-[11px] font-semibold'} text-[var(--color-text-muted)] ${radius}`}
         style={{ width: size, height: size }}
       >
         {name.slice(0, 2).toUpperCase()}

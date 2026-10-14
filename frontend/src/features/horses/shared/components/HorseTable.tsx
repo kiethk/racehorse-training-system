@@ -51,7 +51,7 @@ export function HorseTable({
       sortValue: (h) => h.name,
       render: (h) => (
         <div className="flex items-center gap-2.5">
-          <HorseAvatar name={h.name} size={32} rounded="md" />
+          <HorseAvatar name={h.name} image={h.imageUrl} size={32} rounded="md" />
           <span className="font-medium text-[var(--color-text-primary)]">{h.name}</span>
         </div>
       ),
