@@ -29,10 +29,29 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.rtms.backend.admission.dto.AdmissionDetailResponse;
+import com.rtms.backend.admission.dto.InitialVetExamResponse;
+import com.rtms.backend.identity.entity.User;
+import com.rtms.backend.medical.entity.CareSchedule;
+import com.rtms.backend.medical.entity.HealthRecord;
+import com.rtms.backend.medical.entity.HorseHealthMetric;
+import com.rtms.backend.medical.enums.CareType;
+import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.training.enums.TrainingDecision;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 class AdmissionQueryServiceTest {
     private AdmissionApplicationRepository admissions;
     private CandidateHorseProfileRepository candidates;
     private AdmissionDocumentRepository documents;
+    private HealthRecordRepository healthRecords;
+    private HorseHealthMetricRepository healthMetrics;
+    private UserRepository users;
+    private CareScheduleRepository careSchedules;
+    private StableStallRepository stalls;
     private AdmissionQueryService service;
 
     @BeforeEach
@@ -40,13 +59,22 @@ class AdmissionQueryServiceTest {
         admissions = mock(AdmissionApplicationRepository.class);
         candidates = mock(CandidateHorseProfileRepository.class);
         documents = mock(AdmissionDocumentRepository.class);
-        service = new AdmissionQueryService(admissions,
+        healthRecords = mock(HealthRecordRepository.class);
+        healthMetrics = mock(HorseHealthMetricRepository.class);
+        users = mock(UserRepository.class);
+        careSchedules = mock(CareScheduleRepository.class);
+        stalls = mock(StableStallRepository.class);
+
+        service = new AdmissionQueryService(
+                admissions,
                 candidates,
                 documents,
-                mock(StableStallRepository.class),
-                mock(HealthRecordRepository.class),
+                stalls,
+                healthRecords,
+                healthMetrics,
                 mock(FileStorageService.class),
-                mock(UserRepository.class));
+                users,
+                careSchedules);
     }
 
     @Test
@@ -118,5 +146,97 @@ class AdmissionQueryServiceTest {
         when(candidates.findByAdmissionId(id)).thenReturn(Optional.of(profile));
 
         return a;
+    }
+
+    @Test
+    void getAdmissionDetail_populatesInitialVetExam_usingCareScheduleAndHealthRecordVet() {
+        Long admissionId = 100L;
+        Long assignedVetId = 88L;
+        Long performingVetId = 99L;
+        Long careScheduleId = 200L;
+        Long healthRecordId = 300L;
+
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(admissionId);
+        app.setStatus(AdmissionStatus.MANAGER_REVIEW);
+        app.setVeterinarianId(assignedVetId);
+        app.setSubmittedAt(LocalDateTime.of(2026, 3, 1, 10, 0));
+
+        when(admissions.findById(admissionId)).thenReturn(Optional.of(app));
+
+        CandidateHorseProfile profile = new CandidateHorseProfile();
+        profile.setName("Thunder");
+        profile.setBreed("Thoroughbred");
+        when(candidates.findByAdmissionId(admissionId)).thenReturn(Optional.of(profile));
+        when(documents.findByAdmissionId(admissionId)).thenReturn(List.of());
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(careScheduleId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setVeterinarianId(assignedVetId);
+        when(careSchedules.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admissionId, CareType.INITIAL))
+                .thenReturn(Optional.of(schedule));
+
+        HealthRecord record = new HealthRecord();
+        record.setId(healthRecordId);
+        record.setCareScheduleId(careScheduleId);
+        record.setVeterinarianId(performingVetId); // Vet who actually conducted the exam
+        record.setExaminedAt(LocalDateTime.of(2026, 3, 2, 14, 0));
+        record.setTrainingDecision(TrainingDecision.ALLOWED);
+        record.setSymptoms("None");
+        record.setFindings("Clear lungs, sound gait");
+        when(healthRecords.findByCareScheduleId(careScheduleId)).thenReturn(Optional.of(record));
+
+        User performingVet = new User();
+        performingVet.setId(performingVetId);
+        performingVet.setFullName("Dr. Elena Rostova");
+        when(users.findById(performingVetId)).thenReturn(Optional.of(performingVet));
+
+        HorseHealthMetric metric = new HorseHealthMetric();
+        metric.setHealthRecordId(healthRecordId);
+        metric.setHeartRate(java.math.BigDecimal.valueOf(42));
+        metric.setRecordedAt(LocalDateTime.of(2026, 3, 2, 14, 15));
+        when(healthMetrics.findByHealthRecordIdOrderByRecordedAtAsc(healthRecordId))
+                .thenReturn(List.of(metric));
+
+        AdmissionDetailResponse response = service.getAdmissionDetail(admissionId);
+
+        assertNotNull(response);
+        InitialVetExamResponse exam = response.getInitialVetExam();
+        assertNotNull(exam, "initialVetExam should be populated");
+        assertEquals(healthRecordId, exam.getHealthRecordId());
+        // Verify vet identity is taken from HealthRecord.veterinarianId, NOT admission.veterinarianId
+        assertEquals(performingVetId, exam.getVeterinarianId());
+        assertEquals("Dr. Elena Rostova", exam.getVeterinarianName());
+        assertEquals(TrainingDecision.ALLOWED, exam.getTrainingDecision());
+        assertEquals("Clear lungs, sound gait", exam.getFindings());
+        assertNotNull(exam.getMetrics());
+        assertEquals(1, exam.getMetrics().size());
+        assertEquals(java.math.BigDecimal.valueOf(42), exam.getMetrics().get(0).heartRate());
+    }
+
+    @Test
+    void getAdmissionDetail_whenNoCareSchedule_initialVetExamIsNull() {
+        Long admissionId = 101L;
+
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(admissionId);
+        app.setStatus(AdmissionStatus.VET_REVIEW);
+        app.setSubmittedAt(LocalDateTime.of(2026, 3, 1, 10, 0));
+
+        when(admissions.findById(admissionId)).thenReturn(Optional.of(app));
+
+        CandidateHorseProfile profile = new CandidateHorseProfile();
+        profile.setName("Blaze");
+        when(candidates.findByAdmissionId(admissionId)).thenReturn(Optional.of(profile));
+        when(documents.findByAdmissionId(admissionId)).thenReturn(List.of());
+        when(careSchedules.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admissionId, CareType.INITIAL))
+                .thenReturn(Optional.empty());
+
+        AdmissionDetailResponse response = service.getAdmissionDetail(admissionId);
+
+        assertNotNull(response);
+        assertNull(response.getInitialVetExam(), "initialVetExam should be null when no initial exam schedule exists");
     }
 }

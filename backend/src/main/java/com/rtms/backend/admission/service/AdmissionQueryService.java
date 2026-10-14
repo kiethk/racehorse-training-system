@@ -42,6 +42,7 @@ import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
+import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
@@ -63,6 +64,7 @@ public class AdmissionQueryService {
     private final AdmissionDocumentRepository admissionDocumentRepository;
     private final StableStallRepository stableStallRepository;
     private final HealthRecordRepository healthRecordRepository;
+    private final HorseHealthMetricRepository horseHealthMetricRepository;
     private final FileStorageService fileStorage;
     private final UserRepository userRepository;
     private final CareScheduleRepository careScheduleRepository;
@@ -74,6 +76,7 @@ public class AdmissionQueryService {
             AdmissionDocumentRepository admissionDocumentRepository,
             StableStallRepository stableStallRepository,
             HealthRecordRepository healthRecordRepository,
+            HorseHealthMetricRepository horseHealthMetricRepository,
             FileStorageService fileStorage,
             UserRepository userRepository,
             CareScheduleRepository careScheduleRepository) {
@@ -82,6 +85,7 @@ public class AdmissionQueryService {
         this.admissionDocumentRepository = admissionDocumentRepository;
         this.stableStallRepository = stableStallRepository;
         this.healthRecordRepository = healthRecordRepository;
+        this.horseHealthMetricRepository = horseHealthMetricRepository;
         this.fileStorage = fileStorage;
         this.userRepository = userRepository;
         this.careScheduleRepository = careScheduleRepository;
@@ -96,7 +100,20 @@ public class AdmissionQueryService {
             FileStorageService fileStorage,
             UserRepository userRepository) {
         this(admissionApplicationRepository, candidateHorseProfileRepository, admissionDocumentRepository,
-                stableStallRepository, healthRecordRepository, fileStorage, userRepository, null);
+                stableStallRepository, healthRecordRepository, null, fileStorage, userRepository, null);
+    }
+
+    public AdmissionQueryService(
+            AdmissionApplicationRepository admissionApplicationRepository,
+            CandidateHorseProfileRepository candidateHorseProfileRepository,
+            AdmissionDocumentRepository admissionDocumentRepository,
+            StableStallRepository stableStallRepository,
+            HealthRecordRepository healthRecordRepository,
+            FileStorageService fileStorage,
+            UserRepository userRepository,
+            CareScheduleRepository careScheduleRepository) {
+        this(admissionApplicationRepository, candidateHorseProfileRepository, admissionDocumentRepository,
+                stableStallRepository, healthRecordRepository, null, fileStorage, userRepository, careScheduleRepository);
     }
 
     public List<AdmissionSummaryResponse> getAdmissions(AdmissionStatus status) {
@@ -243,17 +260,50 @@ public class AdmissionQueryService {
                 AdmissionCapacityPolicy.blockingReason(availableQuarantine, availableRegular,
                         occupiedQuarantine)));
 
-        // Health records for the horse created during Vet quarantine review
+        // Initial vet exam schedule and results for this admission application
+        if (careScheduleRepository != null) {
+            careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admission.getId(), com.rtms.backend.medical.enums.CareType.INITIAL)
+                    .ifPresent(schedule -> {
+                        response.setInitialExamSchedule(InitialExamScheduleResponse.from(schedule));
+                        if (response.getVeterinarianId() == null && schedule.getVeterinarianId() != null) {
+                            response.setVeterinarianId(schedule.getVeterinarianId());
+                        }
+                        // Populate typed initialVetExam when the INITIAL schedule has a completed health record
+                        healthRecordRepository.findByCareScheduleId(schedule.getId())
+                                .ifPresent(hr -> {
+                                    com.rtms.backend.admission.dto.InitialVetExamResponse exam =
+                                            new com.rtms.backend.admission.dto.InitialVetExamResponse();
+                                    exam.setHealthRecordId(hr.getId());
+                                    exam.setVeterinarianId(hr.getVeterinarianId());
+                                    exam.setVeterinarianName(
+                                            hr.getVeterinarianId() == null ? null
+                                                    : userRepository.findById(hr.getVeterinarianId())
+                                                            .map(com.rtms.backend.identity.entity.User::getFullName)
+                                                            .orElse(null));
+                                    exam.setExaminedAt(hr.getExaminedAt());
+                                    exam.setTrainingDecision(hr.getTrainingDecision());
+                                    exam.setRestrictionDetails(hr.getRestrictionDetails());
+                                    exam.setSymptoms(hr.getSymptoms());
+                                    exam.setFindings(hr.getFindings());
+                                    exam.setDiagnosis(hr.getDiagnosis());
+                                    exam.setTreatment(hr.getTreatment());
+                                    exam.setNotes(hr.getNotes());
+                                    List<com.rtms.backend.medical.dto.HorseHealthMetricResponse> metrics =
+                                            horseHealthMetricRepository != null
+                                                    ? horseHealthMetricRepository
+                                                            .findByHealthRecordIdOrderByRecordedAtAsc(hr.getId())
+                                                            .stream()
+                                                            .map(com.rtms.backend.medical.dto.HorseHealthMetricResponse::from)
+                                                            .toList()
+                                                    : List.of();
+                                    exam.setMetrics(metrics);
+                                    response.setInitialVetExam(exam);
+                                });
+                    });
+        }
+
+        // All historical health records for the horse (if horse was already created)
         if (admission.getHorseId() != null) {
-            if (careScheduleRepository != null) {
-                careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admission.getId(), com.rtms.backend.medical.enums.CareType.INITIAL)
-                        .ifPresent(schedule -> {
-                            response.setInitialExamSchedule(InitialExamScheduleResponse.from(schedule));
-                            if (response.getVeterinarianId() == null && schedule.getVeterinarianId() != null) {
-                                response.setVeterinarianId(schedule.getVeterinarianId());
-                            }
-                        });
-            }
             List<HealthRecord> healthRecords = healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(
                     admission.getHorseId());
             response.setHealthRecords(healthRecords);

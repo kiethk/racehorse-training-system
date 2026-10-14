@@ -7,7 +7,7 @@ import { Notice } from '@/components/ui/Notice';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
 import { admissionsApi } from '../services/api';
-import { formatDate, formatDateTime, formatEnumLabel } from '@/lib/display';
+import { formatDateTime, formatEnumLabel } from '@/lib/display';
 import type { AdmissionDetailResponse } from '../types';
 
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
@@ -16,11 +16,9 @@ import { AdmissionInfoSection, AdmissionSideCard, InfoGroupTitle, InfoRow } from
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
+import { ManagerTrainerAssessmentTab } from '../shared/components/ManagerTrainerAssessmentTab';
+import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSection';
 import { ManagerFinalReviewPanel } from './ManagerFinalReviewPanel';
-
-function date(value: string | null) {
-  return value ? formatDate(value) : 'Not recorded';
-}
 
 function datetime(value: string | null) {
   return value ? formatDateTime(value) : 'Not recorded';
@@ -74,8 +72,9 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
 
   const candidate = detail.candidate;
   const horsePhoto = detail.documents.find((doc) => doc.documentType === 'HORSE_PHOTO');
+  // Use only this admission's vet decision — never infer from arbitrary health records.
   const currentTrainingDecision =
-    detail.vetTrainingDecision ?? detail.healthRecords?.find((record) => record.trainingDecision)?.trainingDecision ?? null;
+    detail.vetTrainingDecision ?? detail.initialVetExam?.trainingDecision ?? null;
   // The admission passed the vet stage but the system has not found an eligible Trainer to assign yet.
   const trainerUnassigned = detail.status === 'TRAINER_REVIEW' && detail.trainerId == null;
   
@@ -83,6 +82,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
     { id: 'overview', label: 'Overview' },
     { id: 'documents', label: 'Documents', count: detail.documents.length },
     { id: 'medical', label: 'Medical Findings' },
+    { id: 'trainer-assessment', label: 'Trainer Assessment' },
     { id: 'history', label: 'Review History' },
   ];
 
@@ -116,40 +116,27 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
     <AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />
   );
 
-  const renderMedical = () => (
-    <div className="space-y-5">
-      <AdmissionInfoSection title="Health & Veterinary">
-        <InfoRow label="Training Decision" value={currentTrainingDecision} />
-        {detail.vetFeedback && (
-          <div>
-            <span className="text-[var(--color-text-muted)] block mb-1">Feedback:</span>
-            <p className="text-[var(--color-text-primary)]">{detail.vetFeedback}</p>
-          </div>
-        )}
-      </AdmissionInfoSection>
-      
-      <AdmissionInfoSection title="Health Records">
-        {detail.healthRecords && detail.healthRecords.length > 0 ? (
-          <ul className="space-y-3">
-            {detail.healthRecords.map(hr => (
-              <li key={hr.id} className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
-                <div className="flex justify-between mb-2">
-                  <span className="font-semibold text-[var(--color-text-primary)]">{hr.recordType}</span>
-                  <span className="text-xs text-[var(--color-text-muted)]">{date(hr.examinedAt)}</span>
-                </div>
-                {hr.trainingDecision && <div className="text-sm mt-1"><span className="text-[var(--color-text-muted)]">Training:</span> {hr.trainingDecision}</div>}
-                {hr.restrictionDetails && <div className="text-sm mt-1"><span className="text-[var(--color-text-muted)]">Restrictions:</span> {hr.restrictionDetails}</div>}
-                {hr.diagnosis && <div className="text-sm mt-1"><span className="text-[var(--color-text-muted)]">Diagnosis:</span> {hr.diagnosis}</div>}
-                {hr.notes && <div className="text-sm text-[var(--color-text-secondary)] mt-2 italic">{hr.notes}</div>}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <span className="text-[var(--color-text-muted)] italic">No health records available.</span>
-        )}
-      </AdmissionInfoSection>
-    </div>
-  );
+  const renderMedical = () => {
+    if (!detail.initialVetExam) {
+      if (detail.vetReviewedAt) {
+        return (
+          <EmptyState
+            icon="alert-triangle"
+            title="Examination details unavailable"
+            action={<Button size="sm" icon="refresh" onClick={() => void load()}>Retry</Button>}
+          />
+        );
+      }
+      return (
+        <EmptyState
+          icon="stethoscope"
+          title="No examination recorded"
+          description="The veterinarian has not yet completed the initial admission exam for this horse."
+        />
+      );
+    }
+    return <MedicalFindingsSection exam={detail.initialVetExam} />;
+  };
 
   const renderHistory = () => (
     <AdmissionInfoSection title="Review History">
@@ -213,6 +200,12 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
               {activeTab === 'overview' && renderOverview()}
               {activeTab === 'documents' && renderDocuments()}
               {activeTab === 'medical' && renderMedical()}
+              {activeTab === 'trainer-assessment' && (
+                <ManagerTrainerAssessmentTab
+                  admissionId={admissionId}
+                  trainerName={detail.trainerName}
+                />
+              )}
               {activeTab === 'history' && renderHistory()}
             </div>
           </div>
