@@ -5,6 +5,7 @@ import { useCallback, useState, type ReactNode } from 'react';
 import { DataTable, HorseAvatar, StatusBadge } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui/DataTable';
 import type { Horse } from '@/features/stable/types';
+import { HorseSpecialtyBadges } from './HorseSpecialtyBadges';
 
 export interface HorseTableProps {
   horses: Horse[];
@@ -15,11 +16,14 @@ export interface HorseTableProps {
   onSearchChange?: (value: string) => void;
   resetPageKey?: string | number;
   filters?: ReactNode;
+  searchable?: boolean;
+  /** When true, shows the Specialty column between Breed and Status. */
+  showSpecialty?: boolean;
 }
 
 /**
  * Shared horse list table.
- * Columns: Horse (avatar + name), Registration number, Breed, Status, and an optional Actions column.
+ * Columns: Horse (avatar + name), Registration number, Breed, (Specialty), Status, and an optional Actions column.
  * Built-in search (name / registration / breed) and pagination via DataTable; no API calls here.
  */
 export function HorseTable({
@@ -31,6 +35,8 @@ export function HorseTable({
   onSearchChange,
   resetPageKey,
   filters,
+  searchable = true,
+  showSpecialty = false,
 }: HorseTableProps) {
   const [internalSearch, setInternalSearch] = useState('');
   const activeSearch = searchValue !== undefined ? searchValue : internalSearch;
@@ -49,7 +55,7 @@ export function HorseTable({
       sortValue: (h) => h.name,
       render: (h) => (
         <div className="flex items-center gap-2.5">
-          <HorseAvatar name={h.name} size={32} rounded="md" />
+          <HorseAvatar name={h.name} image={h.imageUrl} size={32} rounded="md" />
           <span className="font-medium text-[var(--color-text-primary)]">{h.name}</span>
         </div>
       ),
@@ -74,6 +80,24 @@ export function HorseTable({
         </span>
       ),
     },
+    ...(showSpecialty
+      ? [
+          {
+            id: 'specialty',
+            header: 'Specialty',
+            render: (h: Horse) => {
+              if (h.specialty === undefined || h.specialty === null) {
+                return <span className="text-[var(--color-text-muted)]">—</span>;
+              }
+              return (
+                <div className="flex flex-wrap items-center">
+                  <HorseSpecialtyBadges specialty={h.specialty} size="sm" />
+                </div>
+              );
+            },
+          },
+        ]
+      : []),
     {
       id: 'status',
       header: 'Status',
@@ -105,12 +129,14 @@ export function HorseTable({
       ariaLabel="Horses"
       emptyTitle="No horses found"
       emptyDescription="No horses match the current search."
-      getSearchText={(h) =>
-        [h.name, h.registrationNumber, h.breed].filter(Boolean).join(' ')
+      getSearchText={
+        searchable
+          ? (h) => [h.name, h.registrationNumber, h.breed].filter(Boolean).join(' ')
+          : undefined
       }
-      searchPlaceholder="Search by name, registration or breed…"
-      filterValue={activeSearch}
-      onFilterValueChange={handleSearchChange}
+      searchPlaceholder={searchable ? 'Search by name, registration or breed…' : undefined}
+      filterValue={searchable ? activeSearch : undefined}
+      onFilterValueChange={searchable ? handleSearchChange : undefined}
       toolbarExtras={filters}
     />
   );

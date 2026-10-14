@@ -37,11 +37,13 @@ export const stableApi = {
     mine?: boolean;
     unassigned?: boolean;
     status?: HorseStatus;
+    includeSpecialty?: boolean;
   }): Promise<Horse[]> => {
     const params = new URLSearchParams();
     if (opts?.mine) params.set('mine', 'true');
     if (opts?.unassigned) params.set('unassigned', 'true');
     if (opts?.status) params.set('status', opts.status);
+    if (opts?.includeSpecialty) params.set('includeSpecialty', 'true');
     const qs = params.toString();
     return (await apiGet<ApiResponse<Horse[]>>(`/api/horses${qs ? `?${qs}` : ''}`)).data;
   },

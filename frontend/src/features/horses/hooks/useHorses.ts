@@ -28,6 +28,7 @@ export function useHorses(opts?: GetHorsesOpts) {
   const mine = opts?.mine;
   const unassigned = opts?.unassigned;
   const status = opts?.status;
+  const includeSpecialty = opts?.includeSpecialty;
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +38,7 @@ export function useHorses(opts?: GetHorsesOpts) {
     if (mine !== undefined) currentOpts.mine = mine;
     if (unassigned !== undefined) currentOpts.unassigned = unassigned;
     if (status !== undefined) currentOpts.status = status;
+    if (includeSpecialty !== undefined) currentOpts.includeSpecialty = includeSpecialty;
 
     async function runFetch() {
       setLoading(true);
@@ -56,7 +58,7 @@ export function useHorses(opts?: GetHorsesOpts) {
     return () => {
       cancelled = true;
     };
-  }, [mine, unassigned, status, reloadKey]);
+  }, [mine, unassigned, status, includeSpecialty, reloadKey]);
 
   return { horses, loading, error, reload };
 }

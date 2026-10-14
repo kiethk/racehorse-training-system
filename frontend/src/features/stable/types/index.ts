@@ -35,6 +35,13 @@ export interface Horse {
   /** Why the vet blocked training; null when ALLOWED. */
   trainingDecisionReason?: string | null;
   registrationNumber?: string | null;
+  /** Existing nullable fields returned by the Horse API. */
+  registryName?: string | null;
+  stableLocation?: string | null;
+  /** Protected photo URL path (/api/horses/{id}/photo); null when no photo on file. */
+  imageUrl?: string | null;
+  /** Racing specialty, returned when includeSpecialty=true; null/undefined otherwise. */
+  specialty?: import('@/features/horses/types').HorseSpecialty | null;
 }
 
 export interface UserSummary {

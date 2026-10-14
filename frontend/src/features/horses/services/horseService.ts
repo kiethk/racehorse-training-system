@@ -1,7 +1,7 @@
 import { apiGet } from '@/services/api';
 import type { ApiResponse } from '@/types/horse';
 import type { Horse } from '@/features/stable/types';
-import type { HorseSpecialty, HorsePedigree, HorseHealthMetric } from '../types';
+import type { HorseAdmissionHistory, HorseSpecialty, HorsePedigree, HorseHealthMetric } from '../types';
 
 export const horseService = {
   getById: async (horseId: number): Promise<Horse> =>
@@ -38,12 +38,16 @@ export const horseService = {
   },
 
   /** Get upcoming preventive care for a horse. */
-  getPreventiveCare: async (horseId: number): Promise<any[]> => {
+  getPreventiveCare: async (horseId: number): Promise<unknown[]> => {
     try {
-      return (await apiGet<ApiResponse<any[]>>(`/api/preventive-care-schedules?horseId=${horseId}`)).data;
+      return (await apiGet<ApiResponse<unknown[]>>(`/api/preventive-care-schedules?horseId=${horseId}`)).data;
     } catch {
       return [];
     }
   },
+
+  /** Admission history linked strictly to this horse by horseId. Manager / staff with HORSE_VIEW. */
+  getAdmissionHistory: async (horseId: number): Promise<HorseAdmissionHistory[]> =>
+    (await apiGet<ApiResponse<HorseAdmissionHistory[]>>(`/api/horses/${horseId}/admissions`)).data,
 };
 

@@ -34,7 +34,7 @@ export const horseAsideClassName =
 
 /**
  * Shell layout shared by every horse detail screen.
- * Back link sits outside the card; header is inside the rounded card top.
+ * Identity banner and tab content have independent surfaces, without nested card frames.
  * Sidebar is optional — when omitted the main column takes full width.
  */
 export function HorseDetailLayout({
@@ -74,26 +74,22 @@ export function HorseDetailLayout({
         </LinkButton>
       )}
 
-      {/* No overflow-hidden: would make this the scroll container and break sticky aside. */}
-      <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-panel)]">
-        <div className="overflow-hidden rounded-t-[var(--radius-lg)]">{header}</div>
-
-        <div className="space-y-5 rounded-b-[var(--radius-lg)] bg-[var(--color-surface-subtle)] p-4 sm:p-6">
-          <div className={aside ? horseDetailGridClassName : 'grid min-w-0 grid-cols-1 gap-5'}>
-            <main className="min-w-0 space-y-5">
-              {content ?? (
-                <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
-                  {sections?.map((section, idx) => (
-                    <div key={idx} className="min-w-0">
-                      {section}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </main>
-            {aside && <aside className={cn(horseAsideClassName)}>{aside}</aside>}
-          </div>
+      {header && (
+        <div className="min-w-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-panel)]">
+          {header}
         </div>
+      )}
+      <div className={aside ? horseDetailGridClassName : 'grid min-w-0 grid-cols-1 gap-5'}>
+        <div className="min-w-0 space-y-5">
+          {content ?? (
+            <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
+              {sections?.map((section, idx) => (
+                <div key={idx} className="min-w-0">{section}</div>
+              ))}
+            </div>
+          )}
+        </div>
+        {aside && <aside className={cn(horseAsideClassName)}>{aside}</aside>}
       </div>
     </div>
   );

@@ -8,15 +8,22 @@ import {
   EmptyState,
   Notice,
   Panel,
-  StatusBadge,
 } from '@/components/ui';
 import { horseService } from '@/features/horses/services/horseService';
 import { HorseDetailLayout } from '@/features/horses/shared/components/HorseDetailLayout';
-import { HorseInfoRow, HorseInfoSection } from '@/features/horses/shared/components/HorseInfoSection';
+import { HorseDetailTabs, type HorseDetailTab } from './HorseDetailTabs';
+import { HorseOverview } from './HorseOverview';
 import { HorseProfileHeader } from '@/features/horses/shared/components/HorseProfileHeader';
 import type { HorseSpecialty } from '@/features/horses/types';
 import type { Horse } from '@/features/stable/types';
-import { displayError, formatDate } from '@/lib/display';
+import { displayError } from '@/lib/display';
+
+export interface HorseProfileContext {
+  horse: Horse;
+  specialty: HorseSpecialty | null;
+}
+
+type ProfileContent = ReactNode | ((profile: HorseProfileContext) => ReactNode);
 
 export interface HorseProfileViewProps {
   horseId: number;
@@ -28,6 +35,10 @@ export interface HorseProfileViewProps {
   headerActions?: ReactNode;
   /** Optional sidebar column content (e.g. action cards). */
   sidebar?: ReactNode;
+  /** Extra actor tabs appear after the shared Overview tab; overview is reserved. */
+  extraTabs?: readonly HorseDetailTab[] | ((profile: HorseProfileContext) => readonly HorseDetailTab[]);
+  /** Additional actor context below the common Overview cards. */
+  overviewContent?: ProfileContent;
 }
 
 function HorseProfileContent({
@@ -36,6 +47,8 @@ function HorseProfileContent({
   backLabel,
   headerActions,
   sidebar,
+  extraTabs = [],
+  overviewContent,
 }: HorseProfileViewProps) {
   const [horse, setHorse] = useState<Horse | null>(null);
   const [specialty, setSpecialty] = useState<HorseSpecialty | null>(null);
@@ -133,59 +146,26 @@ function HorseProfileContent({
     );
   }
 
-  /* ── Content ── */
+  const profile: HorseProfileContext = { horse, specialty };
+  const actorTabs = typeof extraTabs === 'function' ? extraTabs(profile) : extraTabs;
+  const overview = typeof overviewContent === 'function' ? overviewContent(profile) : overviewContent;
+  const tabs: HorseDetailTab[] = [
+    { id: 'overview', label: 'Overview', content: <HorseOverview horse={horse} specialty={specialty}>{overview}</HorseOverview> },
+    ...actorTabs.filter((tab) => tab.id !== 'overview'),
+  ];
+
   return (
     <HorseDetailLayout
       returnTo={returnTo}
       backLabel={backLabel}
       header={
-        <HorseProfileHeader
-          horse={horse}
-          horseId={horseId}
-          specialty={specialty}
-          actions={headerActions}
-        />
+        <HorseProfileHeader horse={horse} horseId={horseId} specialty={specialty} actions={headerActions} />
       }
       sidebar={sidebar}
       content={
         <div className="space-y-5">
-          {specialtyWarning && (
-            <Notice tone="warning">{specialtyWarning}</Notice>
-          )}
-
-          <HorseInfoSection title="Basic Information">
-            <HorseInfoRow
-              label="Registration Number"
-              value={horse.registrationNumber?.trim() || undefined}
-            />
-            <HorseInfoRow
-              label="Breed"
-              value={horse.breed?.trim() || undefined}
-            />
-            <HorseInfoRow
-              label="Date of Birth"
-              value={horse.dateOfBirth ? formatDate(horse.dateOfBirth) : undefined}
-            />
-            <HorseInfoRow
-              label="Current Status"
-              value={<StatusBadge status={horse.currentStatus} />}
-            />
-          </HorseInfoSection>
-
-          {(horse.trainingDecision || horse.trainingDecisionReason) && (
-            <HorseInfoSection title="Training Gate">
-              <HorseInfoRow
-                label="Decision"
-                value={horse.trainingDecision || undefined}
-              />
-              {horse.trainingDecisionReason && (
-                <HorseInfoRow
-                  label="Block Reason"
-                  value={horse.trainingDecisionReason}
-                />
-              )}
-            </HorseInfoSection>
-          )}
+          {specialtyWarning && <Notice tone="warning">{specialtyWarning}</Notice>}
+          <HorseDetailTabs tabs={tabs} />
         </div>
       }
     />
@@ -198,6 +178,8 @@ export function HorseProfileView({
   backLabel,
   headerActions,
   sidebar,
+  extraTabs = [],
+  overviewContent,
 }: HorseProfileViewProps) {
   return (
     <HorseProfileContent
@@ -207,6 +189,8 @@ export function HorseProfileView({
       backLabel={backLabel}
       headerActions={headerActions}
       sidebar={sidebar}
+      extraTabs={extraTabs}
+      overviewContent={overviewContent}
     />
   );
 }
