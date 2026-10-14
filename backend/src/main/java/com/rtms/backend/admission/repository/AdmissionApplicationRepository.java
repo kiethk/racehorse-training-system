@@ -105,4 +105,9 @@ public interface AdmissionApplicationRepository
      * Used to resolve HORSE_PHOTO for a list of horses without N+1 queries.
      */
     List<AdmissionApplication> findByHorseIdIn(Collection<Long> horseIds);
+
+    /**
+     * Finds all admission applications linked to a specific horse ID, newest first.
+     */
+    List<AdmissionApplication> findByHorseIdOrderBySubmittedAtDesc(Long horseId);
 }

@@ -19,6 +19,7 @@ export function ManagerHorsesView() {
 
   const { horses, loading, error, reload } = useHorses({
     status: appliedStatus || undefined,
+    includeSpecialty: true,
   });
 
   const handleApply = () => {
@@ -77,6 +78,7 @@ export function ManagerHorsesView() {
         error={error}
         searchable={false}
         resetPageKey={resetPageKey}
+        showSpecialty
         renderAction={(horse) => (
           <LinkButton
             href={`/manager/horses/${horse.id}`}

@@ -25,6 +25,7 @@ import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -39,13 +40,16 @@ public class HorseController {
     private final HorsePerformanceService performanceService;
     private final HorseSpecialtyService specialtyService;
     private final HorsePhotoService photoService;
+    private final com.rtms.backend.horse.service.HorseAdmissionService admissionService;
 
     public HorseController(HorseService horseService, HorsePerformanceService performanceService,
-                           HorseSpecialtyService specialtyService, HorsePhotoService photoService) {
+                           HorseSpecialtyService specialtyService, HorsePhotoService photoService,
+                           com.rtms.backend.horse.service.HorseAdmissionService admissionService) {
         this.horseService = horseService;
         this.performanceService = performanceService;
         this.specialtyService = specialtyService;
         this.photoService = photoService;
+        this.admissionService = admissionService;
     }
 
     @PreAuthorize("hasAuthority('HORSE_VIEW')")
@@ -53,7 +57,8 @@ public class HorseController {
     public ApiResponse<List<HorseResponse>> getAllHorses(
             @RequestParam(required = false) Boolean mine,
             @RequestParam(required = false) Boolean unassigned,
-            @RequestParam(required = false) HorseStatus status) {
+            @RequestParam(required = false) HorseStatus status,
+            @RequestParam(required = false, defaultValue = "false") Boolean includeSpecialty) {
         AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
         List<Horse> horses = horseService.getAllHorses(currentUser, mine, unassigned, status);
@@ -62,8 +67,15 @@ public class HorseController {
         List<Long> ids = horses.stream().map(Horse::getId).collect(Collectors.toList());
         Map<Long, String> imageUrls = photoService.resolveImageUrls(ids, BASE_URL);
 
+        Map<Long, HorseSpecialtyResponse> specialties = Boolean.TRUE.equals(includeSpecialty) && !ids.isEmpty()
+                ? specialtyService.getSpecialties(ids)
+                : Collections.emptyMap();
+
         List<HorseResponse> response = horses.stream()
-                .map(h -> new HorseResponse(h, imageUrls.get(h.getId())))
+                .map(h -> new HorseResponse(
+                        h,
+                        imageUrls.get(h.getId()),
+                        Boolean.TRUE.equals(includeSpecialty) ? specialties.get(h.getId()) : null))
                 .collect(Collectors.toList());
 
         return ApiResponse.success(response);
@@ -146,6 +158,18 @@ public class HorseController {
             @PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(specialtyService.getSpecialty(id, currentUser));
+    }
+
+    /**
+     * Retrieves the admission history linked to this horse by horseId.
+     * Contains actual stored milestone timestamps and review decisions.
+     */
+    @PreAuthorize("hasAuthority('HORSE_VIEW')")
+    @GetMapping("/{id}/admissions")
+    public ApiResponse<List<com.rtms.backend.horse.dto.HorseAdmissionHistoryResponse>> getAdmissions(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(admissionService.getAdmissionsForHorse(id, currentUser));
     }
 
 }
