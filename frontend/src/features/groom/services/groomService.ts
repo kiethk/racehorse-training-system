@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from '@/services/api';
+import { apiGet, apiPost, apiUpload } from '@/services/api';
 import type { TodayTaskItem } from '../types';
 
 interface ApiResponse<T> {
@@ -17,9 +17,15 @@ export const groomApi = {
     return (await apiGet<ApiResponse<TodayTaskItem[]>>(url)).data;
   },
 
-  completeTask: async (id: number): Promise<void> => {
-    // Through the shared client: it sends the access token and refreshes it once on 401.
-    await apiPatch<ApiResponse<unknown>>(`/api/groom-daily-tasks/${id}/complete`);
+  /**
+   * Completes a routine task with what the Groom recorded. The note and the photo are both optional.
+   * Sent as multipart through the shared client, which adds the access token.
+   */
+  completeTask: async (id: number, evidence?: { note?: string; photo?: File | null }): Promise<void> => {
+    const body = new FormData();
+    if (evidence?.note?.trim()) body.append('note', evidence.note.trim());
+    if (evidence?.photo) body.append('file', evidence.photo);
+    await apiUpload<ApiResponse<unknown>>(`/api/groom-daily-tasks/${id}/complete`, body);
   },
 
   generateRoutine: async (date?: string): Promise<void> => {

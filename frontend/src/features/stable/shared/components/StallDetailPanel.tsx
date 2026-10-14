@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { EmptyState, HorseAvatar, Panel, Pill, StatusBadge } from '@/components/ui';
+import { EmptyState, HorseAvatar, Panel, Pill } from '@/components/ui';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import type { HorseSpecialty } from '@/features/horses/types';
 import type { Area, Horse, StableStall } from '../../types';
@@ -58,14 +58,11 @@ export function StallDetailPanel({ stall, area, horse, specialty, children, acti
               <p className="truncate text-xs text-[var(--color-text-secondary)]">{horse.breed ?? 'Breed not recorded'}</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <StatusBadge status={horse.currentStatus} />
-            {horse.trainingDecision && (
-              <Pill size="sm" tone={horse.trainingDecision === 'BLOCKED' ? 'danger' : 'success'}>
-                {horse.trainingDecision === 'BLOCKED' ? 'Training blocked' : 'Training allowed'}
-              </Pill>
-            )}
-          </div>
+          {horse.trainingDecision && (
+            <Pill size="sm" tone={horse.trainingDecision === 'BLOCKED' ? 'danger' : 'success'}>
+              {horse.trainingDecision === 'BLOCKED' ? 'Training blocked' : 'Training allowed'}
+            </Pill>
+          )}
           {horse.trainingDecision === 'BLOCKED' && horse.trainingDecisionReason && (
             <p className="text-xs text-[var(--color-danger)]">{horse.trainingDecisionReason}</p>
           )}

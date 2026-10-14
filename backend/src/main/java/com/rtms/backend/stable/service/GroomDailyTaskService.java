@@ -21,9 +21,15 @@ import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.common.storage.FileStorageService;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,6 +38,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -44,13 +51,18 @@ public class GroomDailyTaskService {
     private final StableStallRepository stableStallRepository;
     private final TrainingWorkoutRepository workoutRepository;
     private final CareScheduleRepository careScheduleRepository;
+    private final FileStorageService fileStorage;
+
+    private static final int MAX_COMPLETION_NOTE_LENGTH = 1000;
 
     public GroomDailyTaskService(GroomDailyTaskRepository taskRepository,
                                  HorseRepository horseRepository,
                                  UserRepository userRepository,
                                  StableStallRepository stableStallRepository,
                                  TrainingWorkoutRepository workoutRepository,
-                                 CareScheduleRepository careScheduleRepository) {
+                                 CareScheduleRepository careScheduleRepository,
+                                 FileStorageService fileStorage) {
+        this.fileStorage = fileStorage;
         this.taskRepository = taskRepository;
         this.horseRepository = horseRepository;
         this.userRepository = userRepository;
@@ -128,6 +140,71 @@ public class GroomDailyTaskService {
         return taskRepository.save(task);
     }
 
+    /**
+     * Completes a task and records what the Groom saw: an optional note and an optional photo.
+     * A task is completed once; its evidence cannot be replaced afterwards.
+     */
+    @Transactional
+    public GroomDailyTask completeTask(Long taskId, String note, MultipartFile image, AuthenticatedUser currentUser) {
+        GroomDailyTask task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found with id: " + taskId));
+
+        if ("GROOM".equalsIgnoreCase(currentUser.getRole()) && !task.getGroomId().equals(currentUser.getUserId())) {
+            throw new AccessDeniedException("You are not authorized to complete a task assigned to another groom");
+        }
+        if (Boolean.TRUE.equals(task.getIsCompleted())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This task is already completed");
+        }
+
+        String cleanNote = note == null || note.isBlank() ? null : note.trim();
+        if (cleanNote != null && cleanNote.length() > MAX_COMPLETION_NOTE_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "The note is too long. The limit is " + MAX_COMPLETION_NOTE_LENGTH + " characters.");
+        }
+
+        boolean hasImage = image != null && !image.isEmpty();
+        if (hasImage) {
+            String mediaType = image.getContentType() == null ? "" : image.getContentType().toLowerCase(Locale.ROOT);
+            if (!mediaType.startsWith("image/")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Task photos must be images (JPEG, PNG, WebP)");
+            }
+        }
+
+        String imageKey = hasImage ? fileStorage.store(image, "rtms/daily-tasks/" + taskId) : null;   // validates size and format
+        try {
+            task.setIsCompleted(true);
+            task.setCompletedAt(LocalDateTime.now());
+            task.setCompletionNote(cleanNote);
+            task.setCompletionImageUrl(imageKey);
+            return taskRepository.save(task);
+        } catch (RuntimeException ex) {
+            fileStorage.delete(imageKey);     // the task was not saved -> do not leave an orphan file
+            throw ex;
+        }
+    }
+
+    /** The task whose completion photo is requested. A Groom may only open the photo of their own task. */
+    private GroomDailyTask taskWithImage(Long taskId, AuthenticatedUser currentUser) {
+        GroomDailyTask task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found with id: " + taskId));
+        if ("GROOM".equalsIgnoreCase(currentUser.getRole()) && !task.getGroomId().equals(currentUser.getUserId())) {
+            throw new AccessDeniedException("You can only view photos of your own tasks");
+        }
+        if (task.getCompletionImageUrl() == null) {
+            throw new RuntimeException("Task #" + taskId + " has no photo attached");
+        }
+        return task;
+    }
+
+    public Resource loadCompletionImage(Long taskId, AuthenticatedUser currentUser) {
+        return fileStorage.load(taskWithImage(taskId, currentUser).getCompletionImageUrl());
+    }
+
+    public MediaType completionImageMediaType(Long taskId, AuthenticatedUser currentUser) {
+        return fileStorage.mediaType(taskWithImage(taskId, currentUser).getCompletionImageUrl());
+    }
+
     @Transactional
     public List<GroomDailyTask> generateDailyRoutineTasks(LocalDate date) {
         LocalDate targetDate = (date != null) ? date : LocalDate.now();
@@ -153,7 +230,7 @@ public class GroomDailyTaskService {
                         horse.getId(),
                         slot.getTaskType(),
                         targetDate.atTime(slot.getTime()),
-                        slot.getNote());
+                        null);    // the task type and time say it all; notes are for ad-hoc tasks
             }
         }
 
@@ -258,7 +335,11 @@ public class GroomDailyTaskService {
                     toVietnamese(task.getTaskType()),
                     task.getNotes(),
                     Boolean.TRUE.equals(task.getIsCompleted()) ? "COMPLETED" : "PENDING",
-                    true));                       // chỉ SOP mới tick được
+                    true)                         // chỉ SOP mới tick được
+                    .withCompletion(task.getCompletionNote(),
+                            // The image endpoint, never the storage key.
+                            task.getCompletionImageUrl() == null ? null
+                                    : "/api/groom-daily-tasks/" + task.getId() + "/completion-image"));
         }
 
         for (GroomWorkoutRow w : workouts) {
