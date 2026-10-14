@@ -16,10 +16,15 @@ import {
 import { stableApi } from '@/features/stable/services/stableService';
 import type { UserSummary } from '@/features/stable/types';
 import { displayError, formatDate, formatTime } from '@/lib/display';
+import { toast } from '@/lib/toast';
 import { planProgress } from '../lib/planProgress';
 import { PLAN_STATUS, WORKOUT_STATUS } from '../lib/status';
 import { trainingService } from '../services/trainingService';
-import type { HorseTrainingPlanDetailResponse, PlanWorkoutItemResponse } from '../types';
+import type {
+  HorseTrainingPlanDetailResponse,
+  PlanWorkoutItemResponse,
+  WorkoutResultPreviewResponse,
+} from '../types';
 import { CompleteWorkoutDialog } from './CompleteWorkoutDialog';
 import { RatingPill } from './RatingPill';
 import { StatusPill } from './StatusPill';
@@ -29,11 +34,13 @@ function WorkoutRow({
   index,
   groomName,
   onRecord,
+  preparingResult,
 }: {
   workout: PlanWorkoutItemResponse;
   index: number;
   groomName: string | undefined;
-  onRecord: () => void;
+  onRecord: () => Promise<void>;
+  preparingResult: boolean;
 }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -73,7 +80,14 @@ function WorkoutRow({
       </div>
 
       {workout.status === 'SCHEDULED' && (
-        <Button variant="primary" size="sm" onClick={onRecord}>Record session results</Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => void onRecord()}
+          loading={preparingResult}
+        >
+          Record session results
+        </Button>
       )}
     </li>
   );
@@ -84,6 +98,8 @@ export function PlanDetail({ planId }: { planId: number }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeWorkout, setActiveWorkout] = useState<PlanWorkoutItemResponse | null>(null);
+  const [resultPreview, setResultPreview] = useState<WorkoutResultPreviewResponse | null>(null);
+  const [preparingWorkoutId, setPreparingWorkoutId] = useState<number | null>(null);
   /** Groom names come from the staff directory endpoint that the stable screen already uses. */
   const [grooms, setGrooms] = useState<UserSummary[]>([]);
 
@@ -116,6 +132,24 @@ export function PlanDetail({ planId }: { planId: number }) {
       workouts.filter((w) => w.status === 'CANCELLED').length,
     );
   }, [detail]);
+
+  async function openResultForm(workout: PlanWorkoutItemResponse) {
+    setPreparingWorkoutId(workout.workoutId);
+    try {
+      const preview = await trainingService.getWorkoutResultPreview(workout.workoutId);
+      setResultPreview(preview);
+      setActiveWorkout(workout);
+    } catch (cause) {
+      toast.error(displayError(cause, 'Unable to prepare workout results.'));
+    } finally {
+      setPreparingWorkoutId(null);
+    }
+  }
+
+  function closeResultForm() {
+    setActiveWorkout(null);
+    setResultPreview(null);
+  }
 
   if (loading && !detail) return <ListSkeleton rows={5} />;
 
@@ -179,7 +213,8 @@ export function PlanDetail({ planId }: { planId: number }) {
                   workout={workout}
                   index={index}
                   groomName={workout.assignedGroomId ? groomNameById.get(workout.assignedGroomId) : undefined}
-                  onRecord={() => setActiveWorkout(workout)}
+                  onRecord={() => openResultForm(workout)}
+                  preparingResult={preparingWorkoutId === workout.workoutId}
                 />
               ))}
             </ul>
@@ -190,8 +225,9 @@ export function PlanDetail({ planId }: { planId: number }) {
       <CompleteWorkoutDialog
         key={activeWorkout?.workoutId ?? 'none'}
         workout={activeWorkout}
-        open={activeWorkout !== null}
-        onClose={() => setActiveWorkout(null)}
+        preview={resultPreview}
+        open={activeWorkout !== null && resultPreview !== null}
+        onClose={closeResultForm}
         onSuccess={load}
       />
     </ScreenLayout>

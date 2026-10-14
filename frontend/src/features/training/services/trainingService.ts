@@ -11,6 +11,7 @@ import type {
   HorseTrainingPlanDetailResponse,
   PlanSummaryResponse,
   CompleteWorkoutRequest,
+  WorkoutResultPreviewResponse,
   TrainingLotResponse,
   RescheduleLotRequest,
   HorseFitnessTrendItem,
@@ -87,6 +88,11 @@ export const trainingService = {
     (await apiPatch<ApiResponse<TrainingLotResponse>>(`/api/lots/${id}/cancel`)).data,
 
   // Workouts
+  getWorkoutResultPreview: async (workoutId: number): Promise<WorkoutResultPreviewResponse> =>
+    (await apiGet<ApiResponse<WorkoutResultPreviewResponse>>(
+      `/api/workouts/${workoutId}/result-preview`,
+    )).data,
+
   completeWorkout: async (workoutId: number, data: CompleteWorkoutRequest): Promise<void> => {
     await apiPatch(`/api/workouts/${workoutId}/complete`, data);
   },

@@ -166,16 +166,26 @@ export interface PlanSummaryResponse {
 }
 
 export interface CompleteWorkoutRequest {
-  actualDistanceMeters?: number | null;
-  actualDurationMinutes?: number | null;
-  topSpeedKmh?: number | null;
-  averageSpeedKmh?: number | null;
-  averageHeartRate?: number | null;
-  maxHeartRate?: number | null;
-  recoveryHeartRate?: number | null;
+  actualDistanceMeters: number;
+  actualDurationMinutes: number;
+  topSpeedKmh: number;
+  averageSpeedKmh: number;
+  averageHeartRate: number;
+  maxHeartRate: number;
+  recoveryHeartRate: number;
   performanceRating: number; // 1-10
   trainerFeedback?: string | null;
-  videoUrl?: string | null;
+}
+
+/** A fresh, non-persistent measurement set returned when the result form is opened. */
+export interface WorkoutResultPreviewResponse {
+  actualDistanceMeters: number;
+  actualDurationMinutes: number;
+  topSpeedKmh: number;
+  averageSpeedKmh: number;
+  averageHeartRate: number;
+  maxHeartRate: number;
+  recoveryHeartRate: number;
 }
 
 export interface TrainingLotResponse {
