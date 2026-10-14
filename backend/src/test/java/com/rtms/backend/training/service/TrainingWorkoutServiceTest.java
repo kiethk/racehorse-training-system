@@ -1,10 +1,12 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.dto.GroomConflictRow;
 import com.rtms.backend.training.dto.PlanWorkoutItemResponse;
+import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
 import com.rtms.backend.training.entity.HorseTrainingPlan;
 import com.rtms.backend.training.entity.Subject;
 import com.rtms.backend.training.entity.TrainingLot;
@@ -61,6 +63,9 @@ class TrainingWorkoutServiceTest {
     @Mock
     private TrainingLotService lotService;
 
+    @Mock
+    private WorkoutResultSimulationService resultSimulationService;
+
     private TrainingWorkoutService workoutService;
 
     private final AuthenticatedUser trainerUser = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
@@ -68,7 +73,8 @@ class TrainingWorkoutServiceTest {
     @BeforeEach
     void setUp() {
         workoutService = new TrainingWorkoutService(
-                workoutRepository, planRepository, lotRepository, subjectRepository, lotService);
+                workoutRepository, planRepository, lotRepository, subjectRepository, lotService,
+                resultSimulationService);
     }
 
     /** Dựng một buổi tập tương lai. (Builds a future workout.) */
@@ -80,6 +86,25 @@ class TrainingWorkoutServiceTest {
         w.setAssignedToId(groomId);
         w.setStatus(WorkoutStatus.SCHEDULED);
         return w;
+    }
+
+    private CompleteWorkoutRequest validCompleteRequest(int rating) {
+        CompleteWorkoutRequest request = new CompleteWorkoutRequest();
+        request.setActualDistanceMeters(BigDecimal.valueOf(1_200));
+        request.setActualDurationMinutes(BigDecimal.valueOf(45));
+        request.setTopSpeedKmh(BigDecimal.valueOf(58.5));
+        request.setAverageSpeedKmh(BigDecimal.valueOf(42.4));
+        request.setAverageHeartRate(140);
+        request.setMaxHeartRate(178);
+        request.setRecoveryHeartRate(88);
+        request.setPerformanceRating(rating);
+        return request;
+    }
+
+    private void setPastSchedule(TrainingLot lot) {
+        lot.setLotDate(LocalDate.now().minusDays(1));
+        lot.setStartTime(LocalTime.of(6, 0));
+        lot.setEndTime(LocalTime.of(7, 0));
     }
 
     // =================================================================
@@ -191,6 +216,72 @@ class TrainingWorkoutServiceTest {
     }
 
     // =================================================================
+    // result preview
+    // =================================================================
+
+    @Test
+    @DisplayName("Result preview is generated after the lot ends without saving anything")
+    void testGenerateResultPreview_PastWorkout_ReturnsFreshSimulation() {
+        TrainingWorkout workout = futureWorkout(300L, 600L, 15L, 11L);
+        workout.setPlanId(50L);
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(50L);
+        plan.setTrainerId(9L);
+
+        TrainingLot lot = new TrainingLot();
+        lot.setId(600L);
+        lot.setSubjectId(77L);
+        setPastSchedule(lot);
+
+        Subject subject = new Subject();
+        subject.setId(77L);
+
+        WorkoutResultPreviewResponse expected = new WorkoutResultPreviewResponse(
+                BigDecimal.valueOf(1_180), BigDecimal.valueOf(44.5),
+                BigDecimal.valueOf(57.2), BigDecimal.valueOf(42.1), 151, 181, 91);
+
+        when(workoutRepository.findById(300L)).thenReturn(Optional.of(workout));
+        when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
+        when(lotRepository.findById(600L)).thenReturn(Optional.of(lot));
+        when(subjectRepository.findById(77L)).thenReturn(Optional.of(subject));
+        when(resultSimulationService.generate(subject)).thenReturn(expected);
+
+        assertSame(expected, workoutService.generateResultPreview(300L, trainerUser));
+        verify(resultSimulationService).generate(subject);
+        verify(workoutRepository, never()).save(any());
+        verify(workoutRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("A future workout cannot generate a result preview")
+    void testGenerateResultPreview_FutureWorkout_ThrowsConflict() {
+        TrainingWorkout workout = futureWorkout(300L, 600L, 15L, 11L);
+        workout.setPlanId(50L);
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(50L);
+        plan.setTrainerId(9L);
+
+        TrainingLot lot = new TrainingLot();
+        lot.setId(600L);
+        lot.setSubjectId(77L);
+        lot.setLotDate(LocalDate.now().plusDays(1));
+        lot.setStartTime(LocalTime.of(6, 0));
+        lot.setEndTime(LocalTime.of(7, 0));
+
+        when(workoutRepository.findById(300L)).thenReturn(Optional.of(workout));
+        when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
+        when(lotRepository.findById(600L)).thenReturn(Optional.of(lot));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> workoutService.generateResultPreview(300L, trainerUser));
+
+        assertEquals("WORKOUT_NOT_ENDED", exception.getErrorCode());
+        verifyNoInteractions(resultSimulationService);
+    }
+
+    // =================================================================
     // completeWorkout
     // =================================================================
 
@@ -198,12 +289,7 @@ class TrainingWorkoutServiceTest {
     @DisplayName("9. Trainer closes a workout: metrics, performance rating and feedback are recorded")
     void testCompleteWorkout_Success() {
         Long workoutId = 300L;
-        CompleteWorkoutRequest req = new CompleteWorkoutRequest();
-        req.setPerformanceRating(9);
-        req.setActualDistanceMeters(BigDecimal.valueOf(1200));
-        req.setActualDurationMinutes(BigDecimal.valueOf(45));
-        req.setTopSpeedKmh(BigDecimal.valueOf(58.5));
-        req.setAverageHeartRate(140);
+        CompleteWorkoutRequest req = validCompleteRequest(9);
         req.setTrainerFeedback("The horse ran very steadily and kept its energy well");
 
         TrainingWorkout workout = new TrainingWorkout();
@@ -225,6 +311,7 @@ class TrainingWorkoutServiceTest {
         TrainingLot lot = new TrainingLot();
         lot.setId(600L);
         lot.setSubjectId(77L);
+        setPastSchedule(lot);
         when(lotRepository.findById(600L)).thenReturn(Optional.of(lot));
 
         Subject subject = new Subject();
@@ -246,8 +333,7 @@ class TrainingWorkoutServiceTest {
     @DisplayName("10. Another trainer may not close a workout of the trainer in charge")
     void testCompleteWorkout_WrongTrainer_ThrowsAccessDenied() {
         Long workoutId = 300L;
-        CompleteWorkoutRequest req = new CompleteWorkoutRequest();
-        req.setPerformanceRating(8);
+        CompleteWorkoutRequest req = validCompleteRequest(8);
 
         TrainingWorkout workout = new TrainingWorkout();
         workout.setId(workoutId);
@@ -266,7 +352,7 @@ class TrainingWorkoutServiceTest {
 
     @Test
     @DisplayName("11. A cancelled workout cannot be closed")
-    void testCompleteWorkout_CancelledWorkout_ThrowsIllegalStateException() {
+    void testCompleteWorkout_CancelledWorkout_ThrowsConflict() {
         Long workoutId = 300L;
 
         TrainingWorkout workout = new TrainingWorkout();
@@ -281,8 +367,9 @@ class TrainingWorkoutServiceTest {
         when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
         when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> workoutService.completeWorkout(workoutId, new CompleteWorkoutRequest(), trainerUser));
+        ApiException ex = assertThrows(ApiException.class,
+                () -> workoutService.completeWorkout(workoutId, validCompleteRequest(8), trainerUser));
+        assertEquals("WORKOUT_CANCELLED", ex.getErrorCode());
         assertTrue(ex.getMessage().contains("was cancelled"));
     }
 
@@ -290,8 +377,7 @@ class TrainingWorkoutServiceTest {
     @DisplayName("12. A performance rating outside 1..10 is rejected")
     void testCompleteWorkout_InvalidRating_ThrowsIllegalArgument() {
         Long workoutId = 300L;
-        CompleteWorkoutRequest req = new CompleteWorkoutRequest();
-        req.setPerformanceRating(15); // > 10
+        CompleteWorkoutRequest req = validCompleteRequest(15); // > 10
 
         TrainingWorkout workout = new TrainingWorkout();
         workout.setId(workoutId);
@@ -305,9 +391,44 @@ class TrainingWorkoutServiceTest {
         when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
         when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
 
+        TrainingLot lot = new TrainingLot();
+        lot.setId(600L);
+        lot.setSubjectId(77L);
+        setPastSchedule(lot);
+        workout.setLotId(600L);
+        when(lotRepository.findById(600L)).thenReturn(Optional.of(lot));
+
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> workoutService.completeWorkout(workoutId, req, trainerUser));
         assertTrue(ex.getMessage().contains("between 1 and 10"));
+    }
+
+    @Test
+    @DisplayName("A future workout cannot be completed even with a valid result payload")
+    void testCompleteWorkout_FutureWorkout_ThrowsConflict() {
+        TrainingWorkout workout = futureWorkout(300L, 600L, 15L, 11L);
+        workout.setPlanId(50L);
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(50L);
+        plan.setTrainerId(9L);
+
+        TrainingLot lot = new TrainingLot();
+        lot.setId(600L);
+        lot.setSubjectId(77L);
+        lot.setLotDate(LocalDate.now().plusDays(1));
+        lot.setStartTime(LocalTime.of(6, 0));
+        lot.setEndTime(LocalTime.of(7, 0));
+
+        when(workoutRepository.findById(300L)).thenReturn(Optional.of(workout));
+        when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
+        when(lotRepository.findById(600L)).thenReturn(Optional.of(lot));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> workoutService.completeWorkout(300L, validCompleteRequest(8), trainerUser));
+
+        assertEquals("WORKOUT_NOT_ENDED", exception.getErrorCode());
+        verify(workoutRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -315,7 +436,7 @@ class TrainingWorkoutServiceTest {
     void testCompleteWorkout_LastWorkout_AutoCompletesPlan() {
         HorseTrainingPlan plan = setUpWorkoutScenario(TrainingPlanStatus.ACTIVE, 0L);
 
-        workoutService.completeWorkout(101L, new CompleteWorkoutRequest(), trainerUser);
+        workoutService.completeWorkout(101L, validCompleteRequest(8), trainerUser);
 
         assertEquals(TrainingPlanStatus.COMPLETED, plan.getStatus(),
                 "The plan must become COMPLETED when its last workout is done");
@@ -330,8 +451,7 @@ class TrainingWorkoutServiceTest {
     @DisplayName("All workouts in the lot done -> the lot becomes COMPLETED")
     void testCompleteWorkout_AllWorkoutsInLotCompleted_AutoCompletesLot() {
         Long workoutId = 301L;
-        CompleteWorkoutRequest req = new CompleteWorkoutRequest();
-        req.setPerformanceRating(9);
+        CompleteWorkoutRequest req = validCompleteRequest(9);
 
         TrainingWorkout workout = new TrainingWorkout();
         workout.setId(workoutId);
@@ -348,6 +468,7 @@ class TrainingWorkoutServiceTest {
         lot.setId(601L);
         lot.setSubjectId(77L);
         lot.setStatus(LotStatus.SCHEDULED);
+        setPastSchedule(lot);
 
         when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
         when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
@@ -367,8 +488,7 @@ class TrainingWorkoutServiceTest {
     @DisplayName("Other workouts still open in the lot -> the lot stays SCHEDULED")
     void testCompleteWorkout_OtherWorkoutsInLotStillRemaining_LotRemainsScheduled() {
         Long workoutId = 302L;
-        CompleteWorkoutRequest req = new CompleteWorkoutRequest();
-        req.setPerformanceRating(7);
+        CompleteWorkoutRequest req = validCompleteRequest(7);
 
         TrainingWorkout workout = new TrainingWorkout();
         workout.setId(workoutId);
@@ -385,6 +505,7 @@ class TrainingWorkoutServiceTest {
         lot.setId(602L);
         lot.setSubjectId(77L);
         lot.setStatus(LotStatus.SCHEDULED);
+        setPastSchedule(lot);
 
         when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
         when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
@@ -422,6 +543,7 @@ class TrainingWorkoutServiceTest {
         TrainingLot lot = new TrainingLot();
         lot.setId(71L);
         lot.setSubjectId(1L);
+        setPastSchedule(lot);
 
         Subject subject = new Subject();
         subject.setId(1L);
@@ -442,7 +564,7 @@ class TrainingWorkoutServiceTest {
     void testCompleteWorkout_UpcomingPlan_StillCompletes() {
         HorseTrainingPlan plan = setUpWorkoutScenario(TrainingPlanStatus.UPCOMING, 0L);
 
-        workoutService.completeWorkout(101L, new CompleteWorkoutRequest(), trainerUser);
+        workoutService.completeWorkout(101L, validCompleteRequest(8), trainerUser);
 
         // Trước đây điều kiện "status == ACTIVE" khiến mọi kế hoạch tạo cho ngày tương lai KHÔNG BAO GIỜ đóng được.
         // (Before, the "status == ACTIVE" condition meant a plan created for a future date could NEVER close.)
@@ -455,7 +577,7 @@ class TrainingWorkoutServiceTest {
     void testCompleteWorkout_ActivePlan_Completes() {
         HorseTrainingPlan plan = setUpWorkoutScenario(TrainingPlanStatus.ACTIVE, 0L);
 
-        workoutService.completeWorkout(101L, new CompleteWorkoutRequest(), trainerUser);
+        workoutService.completeWorkout(101L, validCompleteRequest(8), trainerUser);
 
         assertEquals(TrainingPlanStatus.COMPLETED, plan.getStatus());
     }
@@ -465,7 +587,7 @@ class TrainingWorkoutServiceTest {
     void testCompleteWorkout_StillRemaining_BecomesActiveNotCompleted() {
         HorseTrainingPlan plan = setUpWorkoutScenario(TrainingPlanStatus.UPCOMING, 5L);
 
-        workoutService.completeWorkout(101L, new CompleteWorkoutRequest(), trainerUser);
+        workoutService.completeWorkout(101L, validCompleteRequest(8), trainerUser);
 
         assertEquals(TrainingPlanStatus.ACTIVE, plan.getStatus(),
                 "Closing one workout means the course has started");

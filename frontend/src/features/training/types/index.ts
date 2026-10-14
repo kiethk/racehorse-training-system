@@ -19,6 +19,7 @@ export type SubjectCategory = 'ENDURANCE' | 'SPEED' | 'GATE_START' | 'RECOVERY';
 
 export interface Subject {
   id: number;
+  trainerId?: number;
   category: SubjectCategory;
   name: string;
   description: string | null;
@@ -29,6 +30,7 @@ export interface Subject {
 }
 
 export interface CreateSubjectRequest {
+  trainerId?: number;
   category: SubjectCategory;
   name: string;
   description?: string;
@@ -45,6 +47,7 @@ export interface CourseSubjectItem {
 
 export interface Course {
   id: number;
+  trainerId?: number;
   name: string;
   description: string | null;
   targetGoal: string | null;
@@ -66,6 +69,7 @@ export interface CourseDetailResponse {
 }
 
 export interface CreateCourseRequest {
+  trainerId?: number;
   name: string;
   description?: string;
   targetGoal?: string;
@@ -162,16 +166,26 @@ export interface PlanSummaryResponse {
 }
 
 export interface CompleteWorkoutRequest {
-  actualDistanceMeters?: number | null;
-  actualDurationMinutes?: number | null;
-  topSpeedKmh?: number | null;
-  averageSpeedKmh?: number | null;
-  averageHeartRate?: number | null;
-  maxHeartRate?: number | null;
-  recoveryHeartRate?: number | null;
+  actualDistanceMeters: number;
+  actualDurationMinutes: number;
+  topSpeedKmh: number;
+  averageSpeedKmh: number;
+  averageHeartRate: number;
+  maxHeartRate: number;
+  recoveryHeartRate: number;
   performanceRating: number; // 1-10
   trainerFeedback?: string | null;
-  videoUrl?: string | null;
+}
+
+/** A fresh, non-persistent measurement set returned when the result form is opened. */
+export interface WorkoutResultPreviewResponse {
+  actualDistanceMeters: number;
+  actualDurationMinutes: number;
+  topSpeedKmh: number;
+  averageSpeedKmh: number;
+  averageHeartRate: number;
+  maxHeartRate: number;
+  recoveryHeartRate: number;
 }
 
 export interface TrainingLotResponse {

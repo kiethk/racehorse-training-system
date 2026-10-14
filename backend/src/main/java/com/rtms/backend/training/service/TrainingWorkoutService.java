@@ -1,9 +1,11 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.dto.GroomConflictRow;
 import com.rtms.backend.training.dto.PlanWorkoutItemResponse;
+import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
 import com.rtms.backend.training.entity.HorseTrainingPlan;
 import com.rtms.backend.training.entity.Subject;
 import com.rtms.backend.training.entity.TrainingLot;
@@ -17,10 +19,13 @@ import com.rtms.backend.training.repository.SubjectRepository;
 import com.rtms.backend.training.repository.TrainingLotRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -49,17 +54,20 @@ public class TrainingWorkoutService {
     private final TrainingLotRepository lotRepository;
     private final SubjectRepository subjectRepository;
     private final TrainingLotService lotService;
+    private final WorkoutResultSimulationService resultSimulationService;
 
     public TrainingWorkoutService(TrainingWorkoutRepository workoutRepository,
                                   HorseTrainingPlanRepository planRepository,
                                   TrainingLotRepository lotRepository,
                                   SubjectRepository subjectRepository,
-                                  TrainingLotService lotService) {
+                                  TrainingLotService lotService,
+                                  WorkoutResultSimulationService resultSimulationService) {
         this.workoutRepository = workoutRepository;
         this.planRepository = planRepository;
         this.lotRepository = lotRepository;
         this.subjectRepository = subjectRepository;
         this.lotService = lotService;
+        this.resultSimulationService = resultSimulationService;
     }
 
     // =================================================================
@@ -166,6 +174,25 @@ public class TrainingWorkoutService {
     // =================================================================
 
     /**
+     * Generates a fresh demo measurement set. The result is returned directly and is never persisted.
+     */
+    @Transactional(readOnly = true)
+    public WorkoutResultPreviewResponse generateResultPreview(Long workoutId,
+                                                               AuthenticatedUser currentUser) {
+        TrainingWorkout workout = findWorkout(workoutId);
+        HorseTrainingPlan plan = findPlan(workout);
+        assertTrainerOwnsPlan(plan, currentUser);
+        assertScheduled(workout);
+
+        TrainingLot lot = findLot(workout);
+        assertLotHasEnded(lot);
+
+        Subject subject = subjectRepository.findById(lot.getSubjectId())
+                .orElseThrow(() -> new RuntimeException("Subject of this workout not found"));
+        return resultSimulationService.generate(subject);
+    }
+
+    /**
      * Trainer đóng một buổi tập và ghi nhận chỉ số chuyên môn.
      * (The trainer closes a workout and records professional metrics.)
      *
@@ -178,17 +205,19 @@ public class TrainingWorkoutService {
     public PlanWorkoutItemResponse completeWorkout(Long workoutId,
                                                    CompleteWorkoutRequest request,
                                                    AuthenticatedUser currentUser) {
-        TrainingWorkout workout = workoutRepository.findById(workoutId)
-                .orElseThrow(() -> new RuntimeException("Workout #" + workoutId + " not found"));
-        HorseTrainingPlan plan = planRepository.findById(workout.getPlanId())
-                .orElseThrow(() -> new RuntimeException("Plan of this workout not found"));
+        TrainingWorkout workout = findWorkout(workoutId);
+        HorseTrainingPlan plan = findPlan(workout);
+        assertTrainerOwnsPlan(plan, currentUser);
+        assertScheduled(workout);
 
-        assertCanComplete(workout, plan, request, currentUser);
+        TrainingLot lot = findLot(workout);
+        assertLotHasEnded(lot);
+        validateCompleteRequest(request);
         applyResults(workout, request);
         TrainingWorkout saved = workoutRepository.saveAndFlush(workout);
 
         updatePlanProgress(plan);
-        TrainingLot lot = updateLotProgress(saved);
+        updateLotProgress(lot);
 
         String subjectName = subjectRepository.findById(lot.getSubjectId())
                 .map(Subject::getName)
@@ -196,18 +225,80 @@ public class TrainingWorkoutService {
         return new PlanWorkoutItemResponse(saved, lot, subjectName);
     }
 
-    private void assertCanComplete(TrainingWorkout workout, HorseTrainingPlan plan,
-                                   CompleteWorkoutRequest request, AuthenticatedUser currentUser) {
+    private TrainingWorkout findWorkout(Long workoutId) {
+        return workoutRepository.findById(workoutId)
+                .orElseThrow(() -> new RuntimeException("Workout #" + workoutId + " not found"));
+    }
+
+    private HorseTrainingPlan findPlan(TrainingWorkout workout) {
+        return planRepository.findById(workout.getPlanId())
+                .orElseThrow(() -> new RuntimeException("Plan of this workout not found"));
+    }
+
+    private TrainingLot findLot(TrainingWorkout workout) {
+        return lotRepository.findById(workout.getLotId())
+                .orElseThrow(() -> new RuntimeException("Lot of this workout not found"));
+    }
+
+    private void assertTrainerOwnsPlan(HorseTrainingPlan plan, AuthenticatedUser currentUser) {
         if (!plan.getTrainerId().equals(currentUser.getUserId())) {
             throw new AccessDeniedException(
                     "Only the trainer in charge of this plan can record workout results!");
         }
+    }
+
+    private void assertScheduled(TrainingWorkout workout) {
         if (workout.getStatus() == WorkoutStatus.CANCELLED) {
-            throw new IllegalStateException("This workout was cancelled, so results cannot be recorded!");
+            throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_CANCELLED",
+                    "This workout was cancelled, so results cannot be recorded!");
         }
-        if (request.getPerformanceRating() != null
-                && (request.getPerformanceRating() < 1 || request.getPerformanceRating() > 10)) {
+        if (workout.getStatus() == WorkoutStatus.COMPLETED) {
+            throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_ALREADY_COMPLETED",
+                    "This workout has already been completed!");
+        }
+    }
+
+    private void assertLotHasEnded(TrainingLot lot) {
+        LocalDateTime lotEnd = LocalDateTime.of(lot.getLotDate(), lot.getEndTime());
+        if (LocalDateTime.now().isBefore(lotEnd)) {
+            throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_NOT_ENDED",
+                    "Workout results are available only after the lot has ended!");
+        }
+    }
+
+    private void validateCompleteRequest(CompleteWorkoutRequest request) {
+        if (request.getActualDistanceMeters() == null
+                || request.getActualDurationMinutes() == null
+                || request.getTopSpeedKmh() == null
+                || request.getAverageSpeedKmh() == null
+                || request.getAverageHeartRate() == null
+                || request.getMaxHeartRate() == null
+                || request.getRecoveryHeartRate() == null
+                || request.getPerformanceRating() == null) {
+            throw new IllegalArgumentException("All measured results and the performance rating are required!");
+        }
+        if (request.getActualDistanceMeters().compareTo(BigDecimal.ZERO) <= 0
+                || request.getActualDurationMinutes().compareTo(BigDecimal.ZERO) <= 0
+                || request.getTopSpeedKmh().compareTo(BigDecimal.ZERO) <= 0
+                || request.getAverageSpeedKmh().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Distance, duration and speed values must be greater than 0!");
+        }
+        if (request.getAverageSpeedKmh().compareTo(request.getTopSpeedKmh()) > 0) {
+            throw new IllegalArgumentException("Average speed cannot exceed top speed!");
+        }
+        if (request.getAverageHeartRate() < 30 || request.getAverageHeartRate() > 240
+                || request.getMaxHeartRate() < 30 || request.getMaxHeartRate() > 240
+                || request.getRecoveryHeartRate() < 30 || request.getRecoveryHeartRate() > 240) {
+            throw new IllegalArgumentException("Heart rate values must be between 30 and 240 bpm!");
+        }
+        if (request.getAverageHeartRate() > request.getMaxHeartRate()) {
+            throw new IllegalArgumentException("Average heart rate cannot exceed maximum heart rate!");
+        }
+        if (request.getPerformanceRating() < 1 || request.getPerformanceRating() > 10) {
             throw new IllegalArgumentException("Performance rating must be between 1 and 10!");
+        }
+        if (request.getTrainerFeedback() != null && request.getTrainerFeedback().length() > 2000) {
+            throw new IllegalArgumentException("Trainer feedback cannot exceed 2000 characters!");
         }
     }
 
@@ -221,7 +312,6 @@ public class TrainingWorkoutService {
         workout.setRecoveryHeartRate(request.getRecoveryHeartRate());
         workout.setPerformanceRating(request.getPerformanceRating());
         workout.setTrainerFeedback(request.getTrainerFeedback());
-        workout.setVideoUrl(request.getVideoUrl());
         workout.setStatus(WorkoutStatus.COMPLETED);
     }
 
@@ -253,10 +343,7 @@ public class TrainingWorkoutService {
      * Khi mọi buổi trong lot đã hoàn thành (hoặc bị hủy), lot tự chuyển COMPLETED.
      * (When every workout in the lot is completed or cancelled, the lot becomes COMPLETED.)
      */
-    private TrainingLot updateLotProgress(TrainingWorkout saved) {
-        TrainingLot lot = lotRepository.findById(saved.getLotId())
-                .orElseThrow(() -> new RuntimeException("Lot of this workout not found"));
-
+    private void updateLotProgress(TrainingLot lot) {
         long remainingInLot = workoutRepository.countByLotIdAndStatusNotIn(
                 lot.getId(), List.of(WorkoutStatus.COMPLETED, WorkoutStatus.CANCELLED));
         if (remainingInLot == 0
@@ -265,7 +352,6 @@ public class TrainingWorkoutService {
             lot.setStatus(LotStatus.COMPLETED);
             lotRepository.save(lot);
         }
-        return lot;
     }
 
     // =================================================================

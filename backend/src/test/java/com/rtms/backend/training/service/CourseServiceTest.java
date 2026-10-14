@@ -124,7 +124,7 @@ class CourseServiceTest {
 
         req.setSubjects(List.of(item1, item2));
 
-        when(courseRepository.existsByName("Sprint 1200m course")).thenReturn(false);
+        when(courseRepository.existsByNameAndTrainerId("Sprint 1200m course", 9L)).thenReturn(false);
         when(subjectRepository.existsById(1L)).thenReturn(true);
         when(subjectRepository.existsById(2L)).thenReturn(true);
 
@@ -158,7 +158,7 @@ class CourseServiceTest {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Existing course");
 
-        when(courseRepository.existsByName("Existing course")).thenReturn(true);
+        when(courseRepository.existsByNameAndTrainerId("Existing course", 9L)).thenReturn(true);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> courseService.createCourse(req, trainerUser));
@@ -174,7 +174,7 @@ class CourseServiceTest {
         item.setSubjectId(999L);
         req.setSubjects(List.of(item));
 
-        when(courseRepository.existsByName("Trial course")).thenReturn(false);
+        when(courseRepository.existsByNameAndTrainerId("Trial course", 9L)).thenReturn(false);
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> {
             Course c = inv.getArgument(0);
             c.setId(101L);
@@ -279,5 +279,59 @@ class CourseServiceTest {
         CourseSubjectResponse res = courseService.addSubjectToCourse(courseId, req);
 
         assertEquals(60, res.getDurationMinutes());
+    }
+
+    @Test
+    @DisplayName("Trainer only views courses belonging to them")
+    void testGetAllCourses_TrainerOnlyViewsOwnCourses() {
+        Course c1 = new Course();
+        c1.setId(1L);
+        c1.setName("Trainer 9 Course");
+        c1.setTrainerId(9L);
+
+        when(courseRepository.findByTrainerId(9L)).thenReturn(List.of(c1));
+
+        List<Course> result = courseService.getAllCourses(null, trainerUser);
+
+        assertEquals(1, result.size());
+        assertEquals("Trainer 9 Course", result.get(0).getName());
+        verify(courseRepository).findByTrainerId(9L);
+    }
+
+    @Test
+    @DisplayName("Trainer cannot view another trainer's course detail")
+    void testGetCourseById_OtherTrainer_ThrowsException() {
+        Course otherCourse = new Course();
+        otherCourse.setId(20L);
+        otherCourse.setName("Trainer 10 Course");
+        otherCourse.setTrainerId(10L); // different trainer
+
+        when(courseRepository.findById(20L)).thenReturn(Optional.of(otherCourse));
+
+        assertThrows(RuntimeException.class, () -> courseService.getCourseById(20L, trainerUser));
+    }
+
+    @Test
+    @DisplayName("Cannot add another trainer's subject to course")
+    void testAddSubjectToCourse_DifferentTrainerSubject_ThrowsException() {
+        Course course = new Course();
+        course.setId(5L);
+        course.setTrainerId(9L);
+
+        Subject otherSubject = new Subject();
+        otherSubject.setId(20L);
+        otherSubject.setName("Other Trainer Subject");
+        otherSubject.setTrainerId(10L); // different trainer
+
+        when(courseRepository.existsById(5L)).thenReturn(true);
+        when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
+        when(subjectRepository.findById(20L)).thenReturn(Optional.of(otherSubject));
+
+        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
+        req.setSubjectId(20L);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> courseService.addSubjectToCourse(5L, req));
+        assertTrue(ex.getMessage().contains("does not belong to this course's trainer"));
     }
 }

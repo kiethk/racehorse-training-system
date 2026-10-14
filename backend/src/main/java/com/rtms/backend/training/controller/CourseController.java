@@ -9,11 +9,10 @@ import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.service.CourseService;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/courses")
@@ -27,22 +26,25 @@ public class CourseController {
 
     @PreAuthorize("hasAuthority('COURSE_VIEW')")
     @GetMapping
-    public ApiResponse<List<Course>> getAllCourses() {
-        return ApiResponse.success(courseService.getAllCourses());
+    public ApiResponse<List<Course>> getAllCourses(
+            @RequestParam(required = false) Long trainerId,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(courseService.getAllCourses(trainerId, currentUser));
     }
 
     @PreAuthorize("hasAuthority('COURSE_VIEW')")
     @GetMapping("/{id}")
-    public ApiResponse<CourseDetailResponse> getCourseById(@PathVariable Long id) {
-        return ApiResponse.success(courseService.getCourseById(id));
+    public ApiResponse<CourseDetailResponse> getCourseById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(courseService.getCourseById(id, currentUser));
     }
 
     @PreAuthorize("hasAuthority('COURSE_CREATE')")
     @PostMapping
-    public ApiResponse<CourseDetailResponse> createCourse(@RequestBody CreateCourseRequest request) {
-        AuthenticatedUser currentUser = (AuthenticatedUser) Objects.requireNonNull(SecurityContextHolder.getContext()
-                .getAuthentication()).getPrincipal();
-        assert currentUser != null;
+    public ApiResponse<CourseDetailResponse> createCourse(
+            @RequestBody CreateCourseRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(courseService.createCourse(request, currentUser));
     }
 

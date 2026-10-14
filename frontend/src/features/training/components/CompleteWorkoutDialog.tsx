@@ -5,12 +5,17 @@ import { Button, FormField, Input, Modal, Notice, Textarea } from '@/components/
 import { displayError, formatDate, formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { trainingService } from '../services/trainingService';
-import type { PlanWorkoutItemResponse, CompleteWorkoutRequest } from '../types';
+import type {
+  CompleteWorkoutRequest,
+  PlanWorkoutItemResponse,
+  WorkoutResultPreviewResponse,
+} from '../types';
 
 const FORM_ID = 'complete-workout-form';
 
 interface CompleteWorkoutDialogProps {
   workout: PlanWorkoutItemResponse | null;
+  preview: WorkoutResultPreviewResponse | null;
   open: boolean;
   onClose: () => void;
   onSuccess: () => Promise<void> | void;
@@ -18,24 +23,19 @@ interface CompleteWorkoutDialogProps {
 
 export function CompleteWorkoutDialog({
   workout,
+  preview,
   open,
   onClose,
   onSuccess,
 }: CompleteWorkoutDialogProps) {
-  const [actualDistanceMeters, setActualDistanceMeters] = useState<number | ''>('');
-  const [actualDurationMinutes, setActualDurationMinutes] = useState<number | ''>('');
-  const [topSpeedKmh, setTopSpeedKmh] = useState<number | ''>('');
-  const [averageSpeedKmh, setAverageSpeedKmh] = useState<number | ''>('');
-  const [averageHeartRate, setAverageHeartRate] = useState<number | ''>('');
-  const [maxHeartRate, setMaxHeartRate] = useState<number | ''>('');
-  const [recoveryHeartRate, setRecoveryHeartRate] = useState<number | ''>('');
   const [performanceRating, setPerformanceRating] = useState<number>(8);
   const [trainerFeedback, setTrainerFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!open || !workout) return null;
+  if (!open || !workout || !preview) return null;
   const target = workout;
+  const measurements = preview;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,13 +48,7 @@ export function CompleteWorkoutDialog({
     setSubmitting(true);
     try {
       const payload: CompleteWorkoutRequest = {
-        actualDistanceMeters: actualDistanceMeters !== '' ? Number(actualDistanceMeters) : null,
-        actualDurationMinutes: actualDurationMinutes !== '' ? Number(actualDurationMinutes) : null,
-        topSpeedKmh: topSpeedKmh !== '' ? Number(topSpeedKmh) : null,
-        averageSpeedKmh: averageSpeedKmh !== '' ? Number(averageSpeedKmh) : null,
-        averageHeartRate: averageHeartRate !== '' ? Number(averageHeartRate) : null,
-        maxHeartRate: maxHeartRate !== '' ? Number(maxHeartRate) : null,
-        recoveryHeartRate: recoveryHeartRate !== '' ? Number(recoveryHeartRate) : null,
+        ...measurements,
         performanceRating: Number(performanceRating),
         trainerFeedback: trainerFeedback.trim() || null,
       };
@@ -108,11 +102,9 @@ export function CompleteWorkoutDialog({
               <FormField label="Actual distance (metres)">
                 <Input
                   type="number"
-                  min="0"
                   step="10"
-                  value={actualDistanceMeters}
-                  onChange={(e) => setActualDistanceMeters(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 1200"
+                  value={measurements.actualDistanceMeters}
+                  readOnly
                 />
               </FormField>
             </div>
@@ -121,11 +113,9 @@ export function CompleteWorkoutDialog({
               <FormField label="Actual duration (minutes)">
                 <Input
                   type="number"
-                  min="0"
                   step="0.1"
-                  value={actualDurationMinutes}
-                  onChange={(e) => setActualDurationMinutes(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 4.5"
+                  value={measurements.actualDurationMinutes}
+                  readOnly
                 />
               </FormField>
             </div>
@@ -134,11 +124,9 @@ export function CompleteWorkoutDialog({
               <FormField label="Top speed (km/h)">
                 <Input
                   type="number"
-                  min="0"
                   step="0.1"
-                  value={topSpeedKmh}
-                  onChange={(e) => setTopSpeedKmh(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 58.5"
+                  value={measurements.topSpeedKmh}
+                  readOnly
                 />
               </FormField>
             </div>
@@ -147,11 +135,9 @@ export function CompleteWorkoutDialog({
               <FormField label="Average speed (km/h)">
                 <Input
                   type="number"
-                  min="0"
                   step="0.1"
-                  value={averageSpeedKmh}
-                  onChange={(e) => setAverageSpeedKmh(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 46.2"
+                  value={measurements.averageSpeedKmh}
+                  readOnly
                 />
               </FormField>
             </div>
@@ -160,10 +146,8 @@ export function CompleteWorkoutDialog({
               <FormField label="Average heart rate (bpm)">
                 <Input
                   type="number"
-                  min="0"
-                  value={averageHeartRate}
-                  onChange={(e) => setAverageHeartRate(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 165"
+                  value={measurements.averageHeartRate}
+                  readOnly
                 />
               </FormField>
             </div>
@@ -172,22 +156,18 @@ export function CompleteWorkoutDialog({
               <FormField label="Maximum heart rate (bpm)">
                 <Input
                   type="number"
-                  min="0"
-                  value={maxHeartRate}
-                  onChange={(e) => setMaxHeartRate(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 210"
+                  value={measurements.maxHeartRate}
+                  readOnly
                 />
               </FormField>
             </div>
 
             <div>
-              <FormField label="Recovery heart rate (bpm after 15 min)">
+              <FormField label="Recovery heart rate (bpm)">
                 <Input
                   type="number"
-                  min="0"
-                  value={recoveryHeartRate}
-                  onChange={(e) => setRecoveryHeartRate(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 88"
+                  value={measurements.recoveryHeartRate}
+                  readOnly
                 />
               </FormField>
             </div>

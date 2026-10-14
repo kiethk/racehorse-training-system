@@ -14,6 +14,10 @@ public class CreateSubjectRequest {
     private BigDecimal targetDistanceMeters;
     private IntensityLevel intensityLevel;     // LOW, MEDIUM, HIGH
     private Integer durationMinutes;              // mặc định 60 nếu null (defaults to 60 when null)
+    private Long trainerId;
+
+    public Long getTrainerId() { return trainerId; }
+    public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
 
     public SubjectCategory getCategory() { return category; }
     public void setCategory(SubjectCategory category) { this.category = category; }

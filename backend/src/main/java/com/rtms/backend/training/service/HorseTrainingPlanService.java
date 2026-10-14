@@ -145,6 +145,9 @@ public class HorseTrainingPlanService {
 
         Set<TrainingDay> selectedDays = new LinkedHashSet<>(request.getTrainingDays());
         Course course = findCourse(request.getCourseId());
+        if (course.getTrainerId() != null && !course.getTrainerId().equals(trainerId)) {
+            throw new IllegalArgumentException("You can only enroll horses into your own training courses!");
+        }
         List<Subject> orderedSubjects = loadOrderedSubjects(course);
         List<EnrolledHorse> enrolled = enrollHorses(request.getHorses(), trainerId);
 

@@ -1,5 +1,12 @@
 package com.rtms.backend.training.dto;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
 import java.math.BigDecimal;
 
 /**
@@ -14,16 +21,48 @@ import java.math.BigDecimal;
  */
 public class CompleteWorkoutRequest {
 
+    @NotNull(message = "Actual distance is required")
+    @DecimalMin(value = "0.1", message = "Actual distance must be greater than 0")
+    @DecimalMax(value = "100000", message = "Actual distance is too large")
     private BigDecimal actualDistanceMeters;
+
+    @NotNull(message = "Actual duration is required")
+    @DecimalMin(value = "0.1", message = "Actual duration must be greater than 0")
+    @DecimalMax(value = "1440", message = "Actual duration cannot exceed 1440 minutes")
     private BigDecimal actualDurationMinutes;
+
+    @NotNull(message = "Top speed is required")
+    @DecimalMin(value = "0.1", message = "Top speed must be greater than 0")
+    @DecimalMax(value = "100", message = "Top speed cannot exceed 100 km/h")
     private BigDecimal topSpeedKmh;
+
+    @NotNull(message = "Average speed is required")
+    @DecimalMin(value = "0.1", message = "Average speed must be greater than 0")
+    @DecimalMax(value = "100", message = "Average speed cannot exceed 100 km/h")
     private BigDecimal averageSpeedKmh;
+
+    @NotNull(message = "Average heart rate is required")
+    @Min(value = 30, message = "Average heart rate must be at least 30 bpm")
+    @Max(value = 240, message = "Average heart rate cannot exceed 240 bpm")
     private Integer averageHeartRate;
+
+    @NotNull(message = "Maximum heart rate is required")
+    @Min(value = 30, message = "Maximum heart rate must be at least 30 bpm")
+    @Max(value = 240, message = "Maximum heart rate cannot exceed 240 bpm")
     private Integer maxHeartRate;
+
+    @NotNull(message = "Recovery heart rate is required")
+    @Min(value = 30, message = "Recovery heart rate must be at least 30 bpm")
+    @Max(value = 240, message = "Recovery heart rate cannot exceed 240 bpm")
     private Integer recoveryHeartRate;
+
+    @NotNull(message = "Performance rating is required")
+    @Min(value = 1, message = "Performance rating must be between 1 and 10")
+    @Max(value = 10, message = "Performance rating must be between 1 and 10")
     private Integer performanceRating;   // 1..10
+
+    @Size(max = 2000, message = "Trainer feedback cannot exceed 2000 characters")
     private String trainerFeedback;
-    private String videoUrl;
 
     public BigDecimal getActualDistanceMeters() { return actualDistanceMeters; }
     public void setActualDistanceMeters(BigDecimal v) { this.actualDistanceMeters = v; }
@@ -51,7 +90,4 @@ public class CompleteWorkoutRequest {
 
     public String getTrainerFeedback() { return trainerFeedback; }
     public void setTrainerFeedback(String v) { this.trainerFeedback = v; }
-
-    public String getVideoUrl() { return videoUrl; }
-    public void setVideoUrl(String v) { this.videoUrl = v; }
 }

@@ -169,4 +169,59 @@ class SubjectServiceTest {
                 () -> subjectService.createSubject(req));
         assertTrue(ex.getMessage().contains("between 15 and 240 minutes"));
     }
+
+    @Test
+    @DisplayName("Trainer only views subjects belonging to them")
+    void testGetAllSubjects_TrainerOnlyViewsOwnSubjects() {
+        Subject s1 = new Subject();
+        s1.setId(10L);
+        s1.setName("Trainer 9 Subject");
+        s1.setTrainerId(9L);
+
+        com.rtms.backend.security.AuthenticatedUser trainer =
+                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+
+        when(subjectRepository.findByTrainerId(9L)).thenReturn(List.of(s1));
+
+        List<Subject> result = subjectService.getAllSubjects(null, null, trainer);
+
+        assertEquals(1, result.size());
+        assertEquals("Trainer 9 Subject", result.get(0).getName());
+        verify(subjectRepository).findByTrainerId(9L);
+    }
+
+    @Test
+    @DisplayName("Trainer cannot view another trainer's subject")
+    void testGetSubjectById_OtherTrainer_ThrowsException() {
+        Subject other = new Subject();
+        other.setId(50L);
+        other.setName("Other Subject");
+        other.setTrainerId(10L); // different trainer
+
+        com.rtms.backend.security.AuthenticatedUser trainer =
+                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+
+        when(subjectRepository.findById(50L)).thenReturn(Optional.of(other));
+
+        assertThrows(RuntimeException.class, () -> subjectService.getSubjectById(50L, trainer));
+    }
+
+    @Test
+    @DisplayName("Creates a subject with trainerId from request")
+    void testCreateSubject_WithTrainerId() {
+        CreateSubjectRequest req = validRequest();
+        req.setTrainerId(9L);
+
+        when(subjectRepository.save(any(Subject.class))).thenAnswer(inv -> {
+            Subject s = inv.getArgument(0);
+            s.setId(100L);
+            return s;
+        });
+
+        Subject created = subjectService.createSubject(req);
+
+        assertNotNull(created);
+        assertEquals(9L, created.getTrainerId());
+        verify(subjectRepository).save(any(Subject.class));
+    }
 }

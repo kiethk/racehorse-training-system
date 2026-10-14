@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Button, EmptyState, Icon, LinkButton, ListSkeleton, PageSection, Panel, Pill } from '@/components/ui';
+import { useAuth } from '@/context/AuthContext';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { trainingService } from '../services/trainingService';
@@ -44,6 +45,7 @@ function CourseCard({
 }
 
 export function CourseList() {
+  const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +92,10 @@ export function CourseList() {
     setFormError(null);
     setSubmitting(true);
     try {
-      await trainingService.createCourse(request);
+      await trainingService.createCourse({
+        ...request,
+        trainerId: user?.userId,
+      });
       toast.success('Course created.');
       setShowForm(false);
       await load();
