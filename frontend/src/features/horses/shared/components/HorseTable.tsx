@@ -15,6 +15,7 @@ export interface HorseTableProps {
   onSearchChange?: (value: string) => void;
   resetPageKey?: string | number;
   filters?: ReactNode;
+  searchable?: boolean;
 }
 
 /**
@@ -31,6 +32,7 @@ export function HorseTable({
   onSearchChange,
   resetPageKey,
   filters,
+  searchable = true,
 }: HorseTableProps) {
   const [internalSearch, setInternalSearch] = useState('');
   const activeSearch = searchValue !== undefined ? searchValue : internalSearch;
@@ -49,7 +51,7 @@ export function HorseTable({
       sortValue: (h) => h.name,
       render: (h) => (
         <div className="flex items-center gap-2.5">
-          <HorseAvatar name={h.name} size={32} rounded="md" />
+          <HorseAvatar name={h.name} image={h.imageUrl} size={32} rounded="md" />
           <span className="font-medium text-[var(--color-text-primary)]">{h.name}</span>
         </div>
       ),
@@ -105,12 +107,14 @@ export function HorseTable({
       ariaLabel="Horses"
       emptyTitle="No horses found"
       emptyDescription="No horses match the current search."
-      getSearchText={(h) =>
-        [h.name, h.registrationNumber, h.breed].filter(Boolean).join(' ')
+      getSearchText={
+        searchable
+          ? (h) => [h.name, h.registrationNumber, h.breed].filter(Boolean).join(' ')
+          : undefined
       }
-      searchPlaceholder="Search by name, registration or breed…"
-      filterValue={activeSearch}
-      onFilterValueChange={handleSearchChange}
+      searchPlaceholder={searchable ? 'Search by name, registration or breed…' : undefined}
+      filterValue={searchable ? activeSearch : undefined}
+      onFilterValueChange={searchable ? handleSearchChange : undefined}
       toolbarExtras={filters}
     />
   );
