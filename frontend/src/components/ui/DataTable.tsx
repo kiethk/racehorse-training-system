@@ -38,6 +38,7 @@ export function DataTable<Row>({
   onFilterValueChange,
   getSearchText,
   searchPlaceholder = 'Search records…',
+  toolbarExtras,
   className = '',
 }: {
   rows: Row[];
@@ -56,6 +57,7 @@ export function DataTable<Row>({
   onFilterValueChange?: (value: string) => void;
   getSearchText?: (row: Row) => string;
   searchPlaceholder?: string;
+  toolbarExtras?: ReactNode;
   className?: string;
 }) {
   const [sort, setSort] = useState<{ id: string; direction: 'asc' | 'desc' } | null>(null);
@@ -102,21 +104,26 @@ export function DataTable<Row>({
         <div role="alert" className="p-5 text-sm text-[var(--color-danger)]">{error}</div>
       ) : (
         <>
-          {getSearchText && (
-            <div className="border-b border-[var(--color-border)] p-3">
-              <label className="sr-only" htmlFor={searchId}>Search records</label>
-              <input
-                id={searchId}
-                type="search"
-                value={activeSearch}
-                onChange={(event) => {
-                  if (onFilterValueChange) onFilterValueChange(event.target.value);
-                  else setSearchQuery(event.target.value);
-                  setLocalPage(0);
-                }}
-                placeholder={searchPlaceholder}
-                className="min-h-10 w-full max-w-sm rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-              />
+          {(getSearchText || toolbarExtras) && (
+            <div className={toolbarExtras ? 'flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] p-3' : 'border-b border-[var(--color-border)] p-3'}>
+              {getSearchText && (
+                <>
+                  <label className="sr-only" htmlFor={searchId}>Search records</label>
+                  <input
+                    id={searchId}
+                    type="search"
+                    value={activeSearch}
+                    onChange={(event) => {
+                      if (onFilterValueChange) onFilterValueChange(event.target.value);
+                      else setSearchQuery(event.target.value);
+                      setLocalPage(0);
+                    }}
+                    placeholder={searchPlaceholder}
+                    className="min-h-10 w-full max-w-sm rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                  />
+                </>
+              )}
+              {toolbarExtras}
             </div>
           )}
           <div className="overflow-x-auto">

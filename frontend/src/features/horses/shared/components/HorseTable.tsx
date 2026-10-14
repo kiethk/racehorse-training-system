@@ -1,8 +1,21 @@
-import type { ReactNode } from 'react';
+'use client';
+
+import { useCallback, useState, type ReactNode } from 'react';
 
 import { DataTable, HorseAvatar, StatusBadge } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui/DataTable';
 import type { Horse } from '@/features/stable/types';
+
+export interface HorseTableProps {
+  horses: Horse[];
+  loading?: boolean;
+  error?: ReactNode;
+  renderAction?: (horse: Horse) => ReactNode;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  resetPageKey?: string | number;
+  filters?: ReactNode;
+}
 
 /**
  * Shared horse list table.
@@ -14,12 +27,21 @@ export function HorseTable({
   loading,
   error,
   renderAction,
-}: {
-  horses: Horse[];
-  loading?: boolean;
-  error?: ReactNode;
-  renderAction?: (horse: Horse) => ReactNode;
-}) {
+  searchValue,
+  onSearchChange,
+  resetPageKey,
+  filters,
+}: HorseTableProps) {
+  const [internalSearch, setInternalSearch] = useState('');
+  const activeSearch = searchValue !== undefined ? searchValue : internalSearch;
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      if (searchValue === undefined) setInternalSearch(value);
+      onSearchChange?.(value);
+    },
+    [searchValue, onSearchChange],
+  );
+
   const baseColumns: DataTableColumn<Horse>[] = [
     {
       id: 'horse',
@@ -73,6 +95,7 @@ export function HorseTable({
 
   return (
     <DataTable<Horse>
+      key={resetPageKey != null ? String(resetPageKey) : undefined}
       rows={horses}
       columns={columns}
       getRowKey={(h) => h.id}
@@ -86,6 +109,9 @@ export function HorseTable({
         [h.name, h.registrationNumber, h.breed].filter(Boolean).join(' ')
       }
       searchPlaceholder="Search by name, registration or breed…"
+      filterValue={activeSearch}
+      onFilterValueChange={handleSearchChange}
+      toolbarExtras={filters}
     />
   );
 }
