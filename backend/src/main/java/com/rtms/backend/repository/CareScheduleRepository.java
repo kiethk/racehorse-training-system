@@ -182,4 +182,32 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             """)
     LocalDateTime findNextExamTime(@Param("horseId") Long horseId,
                                    @Param("statuses") Collection<CareScheduleStatus> statuses);
+
+    /**
+     * AD-002 bậc 1: số ca đã xếp giờ của Vet nhưng đã trôi qua mốc hẹn (ít hơn thì ưu tiên).
+     */
+    long countByVeterinarianIdAndStatusInAndScheduledAtBefore(Long veterinarianId,
+            Collection<CareScheduleStatus> statuses, LocalDateTime time);
+
+    /**
+     * AD-002 bậc 2: tổng số phút khám đã tích lũy của Vet (ít hơn thì ưu tiên).
+     * Không tính ca đã hủy vì đó không phải công việc thực tế đã nhận.
+     */
+    @Query("SELECT COALESCE(SUM(cs.durationMinutes), 0) FROM CareSchedule cs "
+            + "WHERE cs.veterinarianId = :vetId AND cs.status <> 'CANCELLED'")
+    long sumAssignedMinutesByVeterinarian(@Param("vetId") Long vetId);
+
+    @Query("""
+        SELECT cs FROM CareSchedule cs
+        WHERE cs.status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS')
+          AND (:careType IS NULL OR cs.careType = :careType)
+          AND (:status IS NULL OR cs.status = :status)
+          AND (:vetId IS NULL OR cs.veterinarianId = :vetId)
+        ORDER BY cs.scheduledAt ASC, cs.id ASC
+    """)
+    List<CareSchedule> findTaskBoard(@Param("careType") CareType careType,
+                                    @Param("status") CareScheduleStatus status,
+                                    @Param("vetId") Long vetId);
+
+    long countByStatusAndCompletedAtGreaterThanEqual(CareScheduleStatus status, LocalDateTime completedAt);
 }

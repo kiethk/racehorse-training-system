@@ -118,4 +118,29 @@ public class CareScheduleController {
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(careScheduleService.createNextSchedule(request, currentUser.getUserId()));
     }
+
+    @GetMapping("/horses/{horseId}/latest-vitals")
+    @PreAuthorize("hasAuthority('VET_EXAM_VIEW') or principal.role == 'VETERINARIAN'")
+    public ApiResponse<LatestVitalsResponse> getLatestVitals(@PathVariable Long horseId) {
+        return ApiResponse.success(careScheduleService.getLatestVitals(horseId));
+    }
+
+    @PostMapping("/batch-complete")
+    @PreAuthorize("hasAuthority('VET_EXAM_MANAGE') or hasAuthority('ROLE_VETERINARIAN') or principal.role == 'VETERINARIAN'")
+    public ApiResponse<BatchCareScheduleResultResponse> batchComplete(
+            @Valid @RequestBody BatchCompleteCareScheduleRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(careScheduleService.batchComplete(request, currentUser.getUserId()));
+    }
+
+    @GetMapping("/tasks")
+    @PreAuthorize("hasAuthority('VET_EXAM_VIEW') or principal.role == 'VETERINARIAN'")
+    public ApiResponse<CareTaskBoardResponse> getTasks(
+            @RequestParam(required = false) CareType type,
+            @RequestParam(required = false) CareScheduleStatus status,
+            @RequestParam(required = false) String search,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        Long vetId = "VETERINARIAN".equals(currentUser.getRole()) ? currentUser.getUserId() : null;
+        return ApiResponse.success(careScheduleService.getTaskBoard(type, status, search, vetId));
+    }
 }

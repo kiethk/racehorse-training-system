@@ -10,8 +10,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import java.math.BigDecimal;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -26,6 +30,10 @@ import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
 
 @Service
 public class CareScheduleService {
+
+    @Lazy
+    @Autowired
+    private CareScheduleService self;
 
     private static final int DEFAULT_DURATION_MINUTES = 30;
     private static final int ASSIGNMENT_BATCH_SIZE = 25;
@@ -350,14 +358,54 @@ public class CareScheduleService {
             eventPublisher.publishEvent(new InitialExamCompletedEvent(schedule.getAdmissionId()));
         }
 
-        if (schedule.getCareType() == CareType.URGENT && schedule.getSourceIncidentId() != null) {
-            incidentReportRepository.findById(schedule.getSourceIncidentId()).ifPresent(incident -> {
-                if (incident.getStatus() == IncidentStatus.IN_REVIEW || incident.getStatus() == IncidentStatus.REPORTED) {
-                    incident.setStatus(IncidentStatus.RESOLVED);
-                    incident.setHandledById(vetId);
-                    incident.setHandledAt(now);
-                    incidentReportRepository.save(incident);
+        if (schedule.getCareType() == CareType.URGENT) {
+            // Mọi báo cáo dồn dập cho cùng một ngựa gom về một ca Urgent: đóng ca thì
+            // resolve TOÀN BỘ báo cáo còn mở của ngựa này, không chỉ báo cáo nguồn.
+            // Cùng transaction với HealthRecord nên lỗi sẽ rollback tất cả.
+            List<GroomIncidentReport> openIncidents = new java.util.ArrayList<>(
+                    incidentReportRepository.findByHorseIdAndStatusIn(horse.getId(),
+                            List.of(IncidentStatus.REPORTED, IncidentStatus.IN_REVIEW)));
+            if (schedule.getSourceIncidentId() != null
+                    && openIncidents.stream().noneMatch(i -> schedule.getSourceIncidentId().equals(i.getId()))) {
+                incidentReportRepository.findById(schedule.getSourceIncidentId())
+                        .filter(i -> i.getStatus() == IncidentStatus.REPORTED || i.getStatus() == IncidentStatus.IN_REVIEW)
+                        .ifPresent(openIncidents::add);
+            }
+            for (GroomIncidentReport incident : openIncidents) {
+                incident.setStatus(IncidentStatus.RESOLVED);
+                incident.setHandledById(vetId);
+                incident.setHandledAt(now);
+            }
+            if (!openIncidents.isEmpty()) {
+                incidentReportRepository.saveAll(openIncidents);
+            }
+
+            // Gửi thông báo URGENT_CASE_CLOSED cho Groom đã báo ca và Trainer quản lý ngựa
+            Set<Long> notifiedGroomIds = new HashSet<>();
+            for (GroomIncidentReport inc : openIncidents) {
+                if (inc.getGroomId() != null && notifiedGroomIds.add(inc.getGroomId())) {
+                    notificationService.sendAssignmentNotification(
+                            inc.getGroomId(),
+                            NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                            schedule.getId(),
+                            horse.getId(),
+                            NotificationTypes.URGENT_CASE_CLOSED,
+                            "Urgent case closed: " + horse.getName(),
+                            "Báo cáo sự cố cho ngựa " + horse.getName() + " đã được thú y khám và đóng ca."
+                    );
                 }
+            }
+
+            horseRepository.findTrainerIdByHorseId(horse.getId()).ifPresent(trainerId -> {
+                notificationService.sendAssignmentNotification(
+                        trainerId,
+                        NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                        schedule.getId(),
+                        horse.getId(),
+                        NotificationTypes.URGENT_CASE_CLOSED,
+                        "Urgent case closed: " + horse.getName(),
+                        "Ca khẩn cấp của ngựa " + horse.getName() + " đã được thú y khám và xử lý xong."
+                );
             });
         }
 
@@ -698,12 +746,27 @@ public class CareScheduleService {
                     Integer::sum);
         }
 
+        // AD-002: hai bậc ưu tiên cao nhất phải xét trước tải trong ngày —
+        // (1) số ca đã để trôi qua mốc hẹn, (2) tổng số phút khám đã tích lũy.
+        LocalDateTime now = LocalDateTime.now();
+        Map<Long, Long> overdueByVet = new HashMap<>();
+        Map<Long, Long> cumulativeMinutesByVet = new HashMap<>();
+        for (User candidate : vets) {
+            overdueByVet.put(candidate.getId(),
+                    careScheduleRepository.countByVeterinarianIdAndStatusInAndScheduledAtBefore(
+                            candidate.getId(), List.of(CareScheduleStatus.SCHEDULED), now));
+            cumulativeMinutesByVet.put(candidate.getId(),
+                    careScheduleRepository.sumAssignedMinutesByVeterinarian(candidate.getId()));
+        }
+
         return vets.stream()
                 .filter(v -> !careScheduleRepository.existsByVeterinarianIdAndStatus(v.getId(), CareScheduleStatus.IN_PROGRESS))
                 .filter(v -> careScheduleRepository.findScheduledForVet(v.getId(), CareScheduleStatus.SCHEDULED)
                         .stream().noneMatch(other -> overlaps(schedule, slot, other)))
                 .sorted(Comparator
-                        .comparingInt((User v) -> horsesByVet.getOrDefault(v.getId(), Set.of()).size())
+                        .comparingLong((User v) -> overdueByVet.getOrDefault(v.getId(), 0L))
+                        .thenComparingLong(v -> cumulativeMinutesByVet.getOrDefault(v.getId(), 0L))
+                        .thenComparingInt(v -> horsesByVet.getOrDefault(v.getId(), Set.of()).size())
                         .thenComparingInt(v -> minutesByVet.getOrDefault(v.getId(), 0))
                         .thenComparing((User v) -> schedule.getCareType() == CareType.URGENT ? false
                                 : !careScheduleRepository.existsByVeterinarianIdAndHorseIdAndStatusIn(
@@ -793,5 +856,178 @@ public class CareScheduleService {
                 schedule.getScheduledAt(),
                 assignedAt
         );
+    }
+
+    @Transactional(readOnly = true)
+    public LatestVitalsResponse getLatestVitals(Long horseId) {
+        LatestVitalsResponse response = new LatestVitalsResponse();
+        response.setHorseId(horseId);
+
+        List<HorseHealthMetric> list = metricRepository.findByHorseIdOrderByRecordedAtDesc(horseId);
+        if (!list.isEmpty()) {
+            HorseHealthMetric latest = list.get(0);
+            response.setHeartRate(latest.getHeartRate());
+            response.setTemperature(latest.getTemperature());
+            response.setRespiratoryRate(latest.getRespiratoryRate());
+            response.setWeight(latest.getWeight());
+            response.setBodyConditionScore(latest.getBodyConditionScore());
+            response.setRecordedAt(latest.getRecordedAt());
+        }
+
+        Map<String, VitalThresholdDto> thresholds = new HashMap<>();
+        thresholds.put("heartRate", new VitalThresholdDto(
+                new BigDecimal("28"), new BigDecimal("44"),
+                new BigDecimal("24"), new BigDecimal("60"), "bpm"));
+        thresholds.put("temperature", new VitalThresholdDto(
+                new BigDecimal("37.2"), new BigDecimal("38.3"),
+                new BigDecimal("36.5"), new BigDecimal("39.0"), "°C"));
+        thresholds.put("respiratoryRate", new VitalThresholdDto(
+                new BigDecimal("8"), new BigDecimal("16"),
+                new BigDecimal("6"), new BigDecimal("24"), "rpm"));
+        thresholds.put("bodyConditionScore", new VitalThresholdDto(
+                new BigDecimal("4"), new BigDecimal("6"),
+                new BigDecimal("2"), new BigDecimal("8"), "score"));
+        response.setThresholds(thresholds);
+
+        return response;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public CareScheduleResponse completeSingleInNewTransaction(BatchCareScheduleRowRequest row, Long vetId) {
+        CareSchedule schedule = careScheduleRepository.findById(row.getScheduleId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "SCHEDULE_NOT_FOUND", "Care schedule not found: " + row.getScheduleId()));
+
+        if (schedule.getStatus() == CareScheduleStatus.SCHEDULED) {
+            startCareSchedule(schedule.getId(), vetId);
+        }
+
+        CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
+        req.setFindings(row.getNotes() != null && !row.getNotes().isBlank() ? row.getNotes() : "Khám định kỳ hoàn tất");
+        req.setDiagnosis("Bình thường");
+        req.setTrainingDecision(row.getTrainingDecision() != null ? row.getTrainingDecision() : TrainingDecision.ALLOWED);
+        req.setRestrictionDetails(row.getRestrictionDetails());
+        req.setNotes(row.getNotes());
+
+        if (row.getHeartRate() != null || row.getTemperature() != null || row.getRespiratoryRate() != null
+                || row.getWeight() != null || row.getBodyConditionScore() != null) {
+            HorseHealthMetricRequest metricReq = new HorseHealthMetricRequest();
+            metricReq.setHeartRate(row.getHeartRate());
+            metricReq.setTemperature(row.getTemperature());
+            metricReq.setRespiratoryRate(row.getRespiratoryRate());
+            metricReq.setWeight(row.getWeight());
+            metricReq.setBodyConditionScore(row.getBodyConditionScore());
+            req.setMetrics(List.of(metricReq));
+        }
+
+        if (row.getTrainingDecision() == TrainingDecision.BLOCKED && row.getNextScheduleDate() != null) {
+            CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+            next.setHorseId(schedule.getHorseId());
+            next.setCareType(CareType.ROUTINE);
+            next.setScheduledDate(row.getNextScheduleDate().toString());
+            next.setDescription("Tái khám sau khám định kỳ khóa tập");
+            req.setNextSchedule(next);
+        }
+
+        return completeCareSchedule(schedule.getId(), req, vetId);
+    }
+
+    public BatchCareScheduleResultResponse batchComplete(BatchCompleteCareScheduleRequest request, Long vetId) {
+        List<BatchCareScheduleRowResult> results = new ArrayList<>();
+        int successCount = 0;
+        int failedCount = 0;
+
+        for (BatchCareScheduleRowRequest item : request.getItems()) {
+            try {
+                CareScheduleResponse resp = (self != null ? self : this).completeSingleInNewTransaction(item, vetId);
+                results.add(BatchCareScheduleRowResult.success(item.getScheduleId(), resp));
+                successCount++;
+            } catch (Exception ex) {
+                results.add(BatchCareScheduleRowResult.failed(item.getScheduleId(), ex.getMessage()));
+                failedCount++;
+            }
+        }
+
+        return new BatchCareScheduleResultResponse(request.getItems().size(), successCount, failedCount, results);
+    }
+
+    @Transactional(readOnly = true)
+    public CareTaskBoardResponse getTaskBoard(CareType careType, CareScheduleStatus status, String search, Long vetId) {
+        List<CareSchedule> schedules = careScheduleRepository.findTaskBoard(careType, status, vetId);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = now.toLocalDate();
+        LocalDate weekEnd = today.plusDays(7);
+
+        Set<Long> horseIds = schedules.stream().map(CareSchedule::getHorseId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, Horse> horses = horseRepository.findAllById(horseIds).stream().collect(Collectors.toMap(Horse::getId, h -> h));
+
+        Set<Long> stallIds = horses.values().stream().map(Horse::getCurrentStallId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, StableStall> stalls = stallRepository.findAllById(stallIds).stream().collect(Collectors.toMap(StableStall::getId, s -> s));
+
+        Set<Long> vetIds = schedules.stream().map(CareSchedule::getVeterinarianId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, User> vets = userRepository.findAllById(vetIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+
+        List<CareTaskItemResponse> items = new ArrayList<>();
+        long overdueCount = 0;
+        long todayCount = 0;
+        long thisWeekCount = 0;
+
+        String searchLower = (search != null && !search.isBlank()) ? search.trim().toLowerCase() : null;
+
+        for (CareSchedule cs : schedules) {
+            Horse h = horses.get(cs.getHorseId());
+            StableStall stall = (h != null && h.getCurrentStallId() != null) ? stalls.get(h.getCurrentStallId()) : null;
+            User vet = cs.getVeterinarianId() != null ? vets.get(cs.getVeterinarianId()) : null;
+
+            String horseName = h != null ? h.getName() : "Ngựa #" + cs.getHorseId();
+            String stallCode = stall != null ? stall.getStallCode() : (h != null ? h.getStableLocation() : null);
+
+            if (searchLower != null) {
+                boolean matchName = horseName.toLowerCase().contains(searchLower);
+                boolean matchStall = stallCode != null && stallCode.toLowerCase().contains(searchLower);
+                if (!matchName && !matchStall) {
+                    continue;
+                }
+            }
+
+            LocalDateTime scheduled = cs.getScheduledAt() != null ? cs.getScheduledAt() : cs.getRequestedAt();
+            String urgency = "UPCOMING";
+            if (scheduled != null) {
+                if (scheduled.isBefore(now)) {
+                    urgency = "OVERDUE";
+                    overdueCount++;
+                } else if (scheduled.toLocalDate().isEqual(today)) {
+                    urgency = "TODAY";
+                    todayCount++;
+                } else if (scheduled.toLocalDate().isAfter(today) && !scheduled.toLocalDate().isAfter(weekEnd)) {
+                    urgency = "UPCOMING";
+                    thisWeekCount++;
+                }
+            }
+
+            CareTaskItemResponse item = new CareTaskItemResponse();
+            item.setId(cs.getId());
+            item.setHorseId(cs.getHorseId());
+            item.setHorseName(horseName);
+            item.setStallCode(stallCode);
+            item.setCareType(cs.getCareType());
+            item.setStatus(cs.getStatus());
+            item.setScheduledDate(scheduled);
+            item.setUrgency(urgency);
+            item.setDescription(cs.getDescription());
+            item.setVeterinarianName(vet != null ? vet.getFullName() : null);
+            item.setVeterinarianId(cs.getVeterinarianId());
+            items.add(item);
+        }
+
+        LocalDateTime thirtyDaysAgo = now.minusDays(30);
+        long completedLast30Days = careScheduleRepository.countByStatusAndCompletedAtGreaterThanEqual(
+                CareScheduleStatus.COMPLETED, thirtyDaysAgo);
+        int complianceRate = 100;
+        if (completedLast30Days + overdueCount > 0) {
+            complianceRate = (int) Math.round((double) completedLast30Days / (completedLast30Days + overdueCount) * 100.0);
+        }
+
+        CareTasksSummaryResponse summary = new CareTasksSummaryResponse(overdueCount, todayCount, thisWeekCount, complianceRate);
+        return new CareTaskBoardResponse(items, summary);
     }
 }

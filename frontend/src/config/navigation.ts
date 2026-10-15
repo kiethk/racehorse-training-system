@@ -40,9 +40,10 @@ export function getNavigationForRole(role: Role): NavItem[] {
     case 'VETERINARIAN':
       return [
         { id: 'dashboard', label: 'Dashboard', href: dashboardHref },
+        { id: 'urgent-cases', label: 'Urgent Cases', href: '/veterinarian/urgent' },
         { id: 'admissions', label: 'Admissions', href: '/veterinarian/admissions' },
-        { id: 'health', label: 'Health' },
-        { id: 'preventive-care', label: 'Preventive Care' },
+        { id: 'routine', label: 'Routine Care', href: '/veterinarian/routine' },
+        { id: 'health', label: 'Health Records', href: '/veterinarian/health' },
       ];
     case 'GROOM':
       return [
