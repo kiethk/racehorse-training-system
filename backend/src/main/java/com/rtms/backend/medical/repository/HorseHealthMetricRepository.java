@@ -8,4 +8,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface HorseHealthMetricRepository extends JpaRepository<HorseHealthMetric, Long> {
     List<HorseHealthMetric> findByHorseIdOrderByRecordedAtDesc(Long horseId);
+
+    List<HorseHealthMetric> findByHealthRecordIdOrderByRecordedAtAsc(Long healthRecordId);
 }

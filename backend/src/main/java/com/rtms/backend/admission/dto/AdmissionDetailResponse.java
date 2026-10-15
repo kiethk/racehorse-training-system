@@ -56,8 +56,17 @@ public class AdmissionDetailResponse {
     private List<HealthRecord> healthRecords;
     private InitialExamScheduleResponse initialExamSchedule;
 
+    /**
+     * Structured, read-only view of the first INITIAL-type exam for this admission.
+     * null when the vet has not yet completed the examination.
+     */
+    private InitialVetExamResponse initialVetExam;
+
     public InitialExamScheduleResponse getInitialExamSchedule() { return initialExamSchedule; }
     public void setInitialExamSchedule(InitialExamScheduleResponse initialExamSchedule) { this.initialExamSchedule = initialExamSchedule; }
+
+    public InitialVetExamResponse getInitialVetExam() { return initialVetExam; }
+    public void setInitialVetExam(InitialVetExamResponse initialVetExam) { this.initialVetExam = initialVetExam; }
 
     public Long getAdmissionId() {
         return admissionId;

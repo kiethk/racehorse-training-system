@@ -121,6 +121,13 @@ export interface AdmissionDetailResponse {
     scheduledDate: string | null;
     scheduledAt: string | null;
   } | null;
+
+  /**
+   * Typed view of the initial vet exam for this admission.
+   * null when the vet has not yet completed the examination.
+   */
+  initialVetExam: InitialVetExamResponse | null;
+
   capacity: {
     availableQuarantineStalls: number;
     availableRegularStalls: number;
@@ -129,6 +136,38 @@ export interface AdmissionDetailResponse {
     blockingReason: 'NO_QUARANTINE_STALL' | 'REGULAR_RESERVE_INSUFFICIENT' | null;
   };
 }
+
+/** Vital-sign measurement recorded during a health exam session. */
+export interface InitialVetExamMetric {
+  id: number;
+  horseId: number;
+  healthRecordId: number;
+  recordedAt: string;
+  heartRate: number | null;
+  temperature: number | null;
+  weight: number | null;
+  respiratoryRate: number | null;
+  hydrationStatus: string | null;
+  bodyConditionScore: number | null;
+  notes: string | null;
+}
+
+/** Read-only view of the initial admission vet exam. */
+export interface InitialVetExamResponse {
+  healthRecordId: number;
+  veterinarianId: number | null;
+  veterinarianName: string | null;
+  examinedAt: string;
+  trainingDecision: TrainingDecision | null;
+  restrictionDetails: string | null;
+  symptoms: string | null;
+  findings: string | null;
+  diagnosis: string | null;
+  treatment: string | null;
+  notes: string | null;
+  metrics: InitialVetExamMetric[];
+}
+
 
 // Care Schedule Types
 export type CareScheduleStatus =
