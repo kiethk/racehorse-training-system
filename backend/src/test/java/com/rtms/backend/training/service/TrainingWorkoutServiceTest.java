@@ -444,6 +444,96 @@ class TrainingWorkoutServiceTest {
     }
 
     // =================================================================
+    // updateWorkoutResult
+    // =================================================================
+
+    @Test
+    @DisplayName("Trainer updates workout results of an already completed workout")
+    void testUpdateWorkoutResult_Success() {
+        Long workoutId = 300L;
+        CompleteWorkoutRequest req = validCompleteRequest(7);
+        req.setTrainerFeedback("Updated performance note after review");
+        req.setTopSpeedKmh(BigDecimal.valueOf(61.2));
+
+        TrainingWorkout workout = new TrainingWorkout();
+        workout.setId(workoutId);
+        workout.setPlanId(50L);
+        workout.setLotId(600L);
+        workout.setStatus(WorkoutStatus.COMPLETED);
+        workout.setPerformanceRating(5);
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(50L);
+        plan.setTrainerId(9L);
+
+        when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
+        when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
+        when(workoutRepository.saveAndFlush(any(TrainingWorkout.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TrainingLot lot = new TrainingLot();
+        lot.setId(600L);
+        lot.setSubjectId(77L);
+        when(lotRepository.findById(600L)).thenReturn(Optional.of(lot));
+
+        Subject subject = new Subject();
+        subject.setId(77L);
+        subject.setName("Acceleration drill");
+        when(subjectRepository.findById(77L)).thenReturn(Optional.of(subject));
+
+        PlanWorkoutItemResponse response = workoutService.updateWorkoutResult(workoutId, req, trainerUser);
+
+        assertNotNull(response);
+        assertEquals(7, workout.getPerformanceRating());
+        assertEquals("Updated performance note after review", workout.getTrainerFeedback());
+        assertEquals(BigDecimal.valueOf(61.2), workout.getTopSpeedKmh());
+        assertEquals(WorkoutStatus.COMPLETED, workout.getStatus());
+        verify(workoutRepository).saveAndFlush(workout);
+    }
+
+    @Test
+    @DisplayName("Editing results of an incomplete workout throws WORKOUT_NOT_COMPLETED")
+    void testUpdateWorkoutResult_NotCompleted_ThrowsConflict() {
+        Long workoutId = 300L;
+        TrainingWorkout workout = new TrainingWorkout();
+        workout.setId(workoutId);
+        workout.setPlanId(50L);
+        workout.setStatus(WorkoutStatus.SCHEDULED);
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(50L);
+        plan.setTrainerId(9L);
+
+        when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
+        when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> workoutService.updateWorkoutResult(workoutId, validCompleteRequest(8), trainerUser));
+
+        assertEquals("WORKOUT_NOT_COMPLETED", ex.getErrorCode());
+        verify(workoutRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("Trainer cannot edit workout results of another trainer's plan")
+    void testUpdateWorkoutResult_WrongTrainer_ThrowsAccessDenied() {
+        Long workoutId = 300L;
+        TrainingWorkout workout = new TrainingWorkout();
+        workout.setId(workoutId);
+        workout.setPlanId(50L);
+
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(50L);
+        plan.setTrainerId(888L); // Not trainerUser 9L
+
+        when(workoutRepository.findById(workoutId)).thenReturn(Optional.of(workout));
+        when(planRepository.findById(50L)).thenReturn(Optional.of(plan));
+
+        assertThrows(AccessDeniedException.class,
+                () -> workoutService.updateWorkoutResult(workoutId, validCompleteRequest(8), trainerUser));
+        verify(workoutRepository, never()).saveAndFlush(any());
+    }
+
+    // =================================================================
     // Lot status when a workout is completed
     // =================================================================
 

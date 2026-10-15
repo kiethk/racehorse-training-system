@@ -14,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -51,5 +52,18 @@ public class TrainingWorkoutController {
             @Valid @RequestBody CompleteWorkoutRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(workoutService.completeWorkout(id, request, currentUser));
+    }
+
+    /**
+     * Trainer chỉnh sửa chỉ số chuyên môn của buổi tập đã hoàn thành.
+     * (The trainer edits professional metrics of an already completed workout.)
+     */
+    @PutMapping("/{id}/result")
+    @PreAuthorize("hasAuthority('TRAINING_WORKOUT_UPDATE')")
+    public ApiResponse<PlanWorkoutItemResponse> updateWorkoutResult(
+            @PathVariable Long id,
+            @Valid @RequestBody CompleteWorkoutRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(workoutService.updateWorkoutResult(id, request, currentUser));
     }
 }

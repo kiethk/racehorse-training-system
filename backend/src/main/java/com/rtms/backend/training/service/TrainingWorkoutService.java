@@ -225,6 +225,34 @@ public class TrainingWorkoutService {
         return new PlanWorkoutItemResponse(saved, lot, subjectName);
     }
 
+    /**
+     * Trainer chỉnh sửa kết quả một buổi tập đã hoàn thành.
+     * (The trainer edits the results of an already completed workout.)
+     */
+    @Transactional
+    public PlanWorkoutItemResponse updateWorkoutResult(Long workoutId,
+                                                       CompleteWorkoutRequest request,
+                                                       AuthenticatedUser currentUser) {
+        TrainingWorkout workout = findWorkout(workoutId);
+        HorseTrainingPlan plan = findPlan(workout);
+        assertTrainerOwnsPlan(plan, currentUser);
+
+        if (workout.getStatus() != WorkoutStatus.COMPLETED) {
+            throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_NOT_COMPLETED",
+                    "Only completed workouts can have their results edited!");
+        }
+
+        validateCompleteRequest(request);
+        applyResults(workout, request);
+        TrainingWorkout saved = workoutRepository.saveAndFlush(workout);
+
+        TrainingLot lot = findLot(workout);
+        String subjectName = subjectRepository.findById(lot.getSubjectId())
+                .map(Subject::getName)
+                .orElse("#" + lot.getSubjectId());
+        return new PlanWorkoutItemResponse(saved, lot, subjectName);
+    }
+
     private TrainingWorkout findWorkout(Long workoutId) {
         return workoutRepository.findById(workoutId)
                 .orElseThrow(() -> new RuntimeException("Workout #" + workoutId + " not found"));

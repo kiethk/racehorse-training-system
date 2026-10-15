@@ -9,10 +9,17 @@ interface ApiResponse<T> {
 
 
 export const incidentApi = {
-  list: async (status?: string): Promise<IncidentReport[]> => {
-    const url = status
-      ? `/api/groom-incident-reports?status=${status}`
-      : '/api/groom-incident-reports';
+  list: async (params?: { horseId?: number; status?: string } | string): Promise<IncidentReport[]> => {
+    let url = '/api/incidents';
+    if (typeof params === 'string') {
+      url += `?status=${encodeURIComponent(params)}`;
+    } else if (params) {
+      const q = new URLSearchParams();
+      if (params.horseId) q.append('horseId', String(params.horseId));
+      if (params.status) q.append('status', params.status);
+      const qs = q.toString();
+      if (qs) url += `?${qs}`;
+    }
     return (await apiGet<ApiResponse<IncidentReport[]>>(url)).data;
   },
 

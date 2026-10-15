@@ -18,20 +18,26 @@ import type { HorseSpecialty } from '@/features/horses/types';
 import type { Horse } from '@/features/stable/types';
 import { displayError, formatDate } from '@/lib/display';
 import { useTrainingRules } from '../hooks/useTrainingRules';
-import { rangeForPreset, rangeLabel, type DatePreset, type DateRange } from '../lib/dateRange';
+import { rangeForPreset, rangeLabel } from '../lib/dateRange';
+import type { DatePreset, DateRange } from '../lib/dateRange';
 import { trainingService } from '../services/trainingService';
-import type { HorseAlert, HorseFitnessTrendItem, ReadinessAssessment } from '../types';
+import type {
+  HorseAlert,
+  HorseFitnessTrendItem,
+  ReadinessAssessment,
+} from '../types';
 import { FitnessTrendChart } from './FitnessTrendChart';
 import { HorseAlertList } from './HorseAlertList';
 import { HorseMetricsRow } from './HorseMetricsRow';
 import { HorseProfileHeader } from './HorseProfileHeader';
+import { ReportIncidentDialog } from './ReportIncidentDialog';
 import { WorkoutHistoryTable } from './WorkoutHistoryTable';
 
 /**
  * Everything about one horse: profile, the period to look at, headline numbers, alerts, charts and the session
  * history. The period bar sits above the numbers so the reader knows what period they describe before reading them.
  */
-export function HorseFitnessTrendView({ horseId }: { horseId: number }) {
+export function HorseFitnessTrendView({ horseId, hideHeader = false }: { horseId: number; hideHeader?: boolean }) {
   const rules = useTrainingRules();
 
   const [horse, setHorse] = useState<Horse | null>(null);
@@ -41,6 +47,7 @@ export function HorseFitnessTrendView({ horseId }: { horseId: number }) {
   const [readiness, setReadiness] = useState<ReadinessAssessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reportingAlert, setReportingAlert] = useState<HorseAlert | null>(null);
 
   const [preset, setPreset] = useState<DatePreset>('30D');
   const [customInputs, setCustomInputs] = useState<DateRange>({});
@@ -83,10 +90,10 @@ export function HorseFitnessTrendView({ horseId }: { horseId: number }) {
   }
 
   return (
-    <ScreenLayout variant="detail">
+    <div className="space-y-6">
       {error && <Notice tone="error">{error}</Notice>}
 
-      <HorseProfileHeader horse={horse} horseId={horseId} specialty={specialty} />
+      {!hideHeader && <HorseProfileHeader horse={horse} horseId={horseId} specialty={specialty} />}
 
       <FilterBar onSubmit={applyCustomRange} aria-label="Date range">
         <div className="space-y-1.5">
@@ -119,7 +126,7 @@ export function HorseFitnessTrendView({ horseId }: { horseId: number }) {
 
       <HorseMetricsRow trend={trend} rules={rules} />
 
-      <HorseAlertList alerts={alerts} />
+      <HorseAlertList alerts={alerts} onReportIncident={setReportingAlert} />
 
       {loading && trend.length === 0 ? (
         <Panel padded>
@@ -130,6 +137,20 @@ export function HorseFitnessTrendView({ horseId }: { horseId: number }) {
       )}
 
       <WorkoutHistoryTable trend={trend} rules={rules} loading={loading} />
-    </ScreenLayout>
+
+      <ReportIncidentDialog
+        horseId={horseId}
+        horseName={horse?.name}
+        initialTitle={reportingAlert ? reportingAlert.title : ''}
+        initialDescription={
+          reportingAlert
+            ? `${reportingAlert.description}\nRecorded value: ${reportingAlert.metricValue} (Threshold: ${reportingAlert.thresholdValue})`
+            : ''
+        }
+        initialSeverity={reportingAlert?.severity === 'DANGER' ? 'CRITICAL' : 'HIGH'}
+        open={reportingAlert !== null}
+        onClose={() => setReportingAlert(null)}
+      />
+    </div>
   );
 }
