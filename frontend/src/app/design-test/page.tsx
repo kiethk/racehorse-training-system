@@ -42,6 +42,7 @@ import { getNavigationForRole } from '@/config/navigation';
 import { ROLE_LABELS } from '@/lib/roleRoute';
 import { toast } from '@/lib/toast';
 import type { Role } from '@/types/auth';
+import { DragDropExample } from './DragDropExample';
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[];
 
@@ -270,6 +271,10 @@ export default function DesignTestPage() {
           onConfirm={() => setConfirmOpen(false)}
           onCancel={() => setConfirmOpen(false)}
         />
+      </Section>
+
+      <Section title="Drag and drop">
+        <DragDropExample />
       </Section>
 
       <Section title="Table">

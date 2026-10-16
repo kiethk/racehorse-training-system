@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Panel, Pill } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { StallCell } from '../shared/components/StallCell';
@@ -7,6 +8,7 @@ import type { StableStall } from '../types';
 import type { AssignmentDraft, AssignmentTarget, DragStaff, StableSnapshot } from '../types/manager';
 import { areaView, horseMap, personName } from '../lib/managerAssignments';
 import { StaffAssignment } from './StaffAssignment';
+import { staffDragDrop } from './staffDragDrop';
 
 interface Props {
   view: ReturnType<typeof areaView>;
@@ -14,10 +16,8 @@ interface Props {
   draft: AssignmentDraft;
   horses: ReturnType<typeof horseMap>;
   disabled: boolean;
-  dragging: DragStaff | null;
   onPick: (target: AssignmentTarget) => void;
   onRemove: (target: AssignmentTarget) => void;
-  onDrag: (staff: DragStaff | null) => void;
   onAssign: (target: AssignmentTarget, staff: DragStaff) => void;
   onSelectStall: (stall: StableStall) => void;
 }
@@ -25,14 +25,14 @@ interface Props {
 export function AreaCard({ view, data, draft, horses, onSelectStall, ...assignment }: Props) {
   const { area, occupied, stalls, blocks, missingTrainer, hasGrooms, attention } = view;
   const trainerId = draft.trainers[area.id];
+  const { dropProps } = staffDragDrop.useDropZone({
+    disabled: assignment.disabled || area.type !== 'REGULAR',
+    accept: staff => staff.kind === 'trainer',
+    onDrop: staff => assignment.onAssign({ kind: 'trainer', areaId: area.id }, staff),
+  });
   return (
     <Panel data-area-card={area.code} tone={attention ? 'warning' : 'default'} className="min-w-0 overflow-hidden"
-      onDragOver={e => { if (!assignment.disabled && assignment.dragging?.kind === 'trainer' && area.type === 'REGULAR') e.preventDefault(); }}
-      onDrop={e => {
-        if (!assignment.disabled && assignment.dragging?.kind === 'trainer' && area.type === 'REGULAR') {
-          e.preventDefault(); assignment.onAssign({ kind: 'trainer', areaId: area.id }, assignment.dragging); assignment.onDrag(null);
-        }
-      }}>
+      {...dropProps}>
       <div className="flex items-center justify-between gap-3 px-4 py-4">
         <div>
           <h2 className="text-lg font-semibold">Area {area.code}</h2>
@@ -46,16 +46,7 @@ export function AreaCard({ view, data, draft, horses, onSelectStall, ...assignme
           warning={missingTrainer} removeReason={hasGrooms ? 'Remove Groom assignments before removing Trainer' : undefined} />}
         <div className="grid grid-cols-2 gap-3">
           {blocks.map(block => (
-            <div key={block.number}
-              onDragOver={e => { if (!assignment.disabled && assignment.dragging?.kind === 'groom' && block.complete) e.preventDefault(); }}
-              onDrop={e => {
-                if (!assignment.disabled && assignment.dragging?.kind === 'groom' && block.complete) {
-                  e.preventDefault(); e.stopPropagation();
-                  assignment.onAssign({ kind: 'groom', areaId: area.id, blockNumber: block.number }, assignment.dragging); assignment.onDrag(null);
-                }
-              }} className={cn('min-w-0 space-y-2 rounded-[var(--radius-md)] border p-2',
-              block.missingGroom ? 'border-[var(--color-warning)]/40 bg-[var(--color-warning-soft)]/40'
-                : 'border-[var(--color-border)] bg-[var(--color-surface-subtle)]')}>
+            <GroomBlock key={block.number} block={block} areaId={area.id} disabled={assignment.disabled} onAssign={assignment.onAssign}>
               <div className="grid grid-cols-3 gap-1.5">
                 {block.stalls.map(stall => <StallCell key={stall.id} stall={stall} horse={horses.get(stall.id)}
                   selected={false} onSelect={onSelectStall} compact />)}
@@ -66,10 +57,28 @@ export function AreaCard({ view, data, draft, horses, onSelectStall, ...assignme
                 mixed={block.mixed} warning={block.missingGroom}
                 removeReason={block.occupied > 0 ? 'Block has horses — swap Groom instead' : undefined} />
               {!block.complete && <p className="text-xs text-[var(--color-danger)]">Incomplete block</p>}
-            </div>
+            </GroomBlock>
           ))}
         </div>
       </div>
     </Panel>
   );
+}
+
+function GroomBlock({ block, areaId, disabled, onAssign, children }: {
+  block: ReturnType<typeof areaView>['blocks'][number];
+  areaId: number;
+  disabled: boolean;
+  onAssign: Props['onAssign'];
+  children: ReactNode;
+}) {
+  const { dropProps, isOver } = staffDragDrop.useDropZone({
+    disabled: disabled || !block.complete,
+    accept: staff => staff.kind === 'groom',
+    onDrop: staff => onAssign({ kind: 'groom', areaId, blockNumber: block.number }, staff),
+  });
+  return <div {...dropProps} className={cn('min-w-0 space-y-2 rounded-[var(--radius-md)] border p-2',
+    block.missingGroom ? 'border-[var(--color-warning)]/40 bg-[var(--color-warning-soft)]/40'
+      : 'border-[var(--color-border)] bg-[var(--color-surface-subtle)]',
+    isOver && 'ring-1 ring-[var(--color-primary)]')}>{children}</div>;
 }

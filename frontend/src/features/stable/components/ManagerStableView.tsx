@@ -10,16 +10,21 @@ import { StallDetailPanel } from '../shared/components/StallDetailPanel';
 import { AreaCard } from './AreaCard';
 import { StableStaffPanel } from './StableStaffPanel';
 import { StaffAssignmentPicker } from './StaffAssignmentPicker';
+import { staffDragDrop } from './staffDragDrop';
 
 type Preview = ReturnType<typeof planAssignment>;
 
 export function ManagerStableView() {
+  return <staffDragDrop.Provider><ManagerStableContent /></staffDragDrop.Provider>;
+}
+
+function ManagerStableContent() {
   const state = useManagerStable();
   const { data, draft, setDraft, loading, saving, creating, loadError, actionError, needsReload,
     reload, discard, save, addArea, setActionError } = state;
   const [activeTab, setActiveTab] = useState<AreaType>('REGULAR');
   const [attentionOnly, setAttentionOnly] = useState(false);
-  const [dragging, setDragging] = useState<DragStaff | null>(null);
+  const { activeItem: dragging, cancel: cancelDrag } = staffDragDrop.useDragDrop();
   const [selectedStaff, setSelectedStaff] = useState<DragStaff | null>(null);
   const [picker, setPicker] = useState<AssignmentTarget | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -50,11 +55,11 @@ export function ManagerStableView() {
     if (!data || !draft || editDisabled) return;
     try {
       const next = planAssignment(data, draft, target, personId, drag);
-      setPicker(null); setDragging(null);
+      setPicker(null); cancelDrag();
       if (next.changes.some(c => c.before !== 'Unassigned')) setPreview(next);
       else stage(next.draft);
     } catch (error) {
-      setActionError((error as Error).message); setDragging(null);
+      setActionError((error as Error).message); cancelDrag();
     }
   };
   const assign = (target: AssignmentTarget, staff: DragStaff) => {
@@ -93,7 +98,7 @@ export function ManagerStableView() {
           { id: 'REGULAR', label: 'Regular', count: data.areas.filter(a => a.type === 'REGULAR').length },
           { id: 'QUARANTINE', label: 'Quarantine', count: data.areas.filter(a => a.type === 'QUARANTINE').length },
         ]} active={activeTab} onChange={id => {
-          setActiveTab(id as AreaType); setAttentionOnly(false); setSelectedStaff(null); setDragging(null);
+          setActiveTab(id as AreaType); setAttentionOnly(false); setSelectedStaff(null); cancelDrag();
         }} />
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
           <div className="flex flex-wrap items-center gap-3 text-[var(--color-text-secondary)]">
@@ -114,13 +119,13 @@ export function ManagerStableView() {
           <div className="min-w-0">
             {displayed.length ? <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {displayed.map(view => <AreaCard key={view.area.id} view={view} data={data} draft={draft} horses={horses}
-                disabled={editDisabled} dragging={dragging} onDrag={setDragging} onPick={pick}
+                disabled={editDisabled} onPick={pick}
                 onAssign={assign} onRemove={target => propose(target, null)} onSelectStall={setSelectedStall} />)}
             </div> : <Panel padded><EmptyState icon="building" title={attentionOnly ? 'No areas need attention' : 'No areas yet'}
               action={attentionOnly ? <Button onClick={() => setAttentionOnly(false)}>Show all areas</Button> : undefined} /></Panel>}
           </div>
           <StableStaffPanel key={activeTab} data={data} draft={draft} activeTab={activeTab} disabled={editDisabled}
-            dragging={dragging} selected={selectedStaff} canReturn={canReturn} onDrag={setDragging} onSelect={setSelectedStaff}
+            selected={selectedStaff} canReturn={canReturn} onSelect={setSelectedStaff}
             onReturn={staff => { if (staff.source) propose(staff.source, null); }} />
         </div>
         {dirty && <Panel className="sticky bottom-4 z-10 flex items-center justify-between gap-3 px-4 py-3 shadow-[var(--shadow-popover)]">
