@@ -4,6 +4,7 @@ import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.stable.dto.CreateGroomDailyTaskRequest;
 import com.rtms.backend.stable.dto.TodayTaskItemResponse;
 import com.rtms.backend.stable.entity.GroomDailyTask;
+import com.rtms.backend.stable.entity.GroomTaskCompletion;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.service.GroomDailyTaskService;
 import org.springframework.core.io.Resource;
@@ -71,16 +72,31 @@ public class GroomDailyTaskController {
         return ApiResponse.success(taskService.completeTask(id, note, file, currentUser));
     }
 
-    /** The photo taken on completion. Served here so the viewer's permission is checked first. */
-    @GetMapping("/{id}/completion-image")
-    @PreAuthorize("hasAuthority('GROOM_DAILY_TASK_VIEW')")
-    public ResponseEntity<Resource> completionImage(
-            @PathVariable Long id,
+    /**
+     * Completes a block of routine tasks in one action: repeated {@code taskIds}, an optional note and up to
+     * five optional photos ({@code files}) shared by every task in the block.
+     */
+    @PostMapping(value = "/complete", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('GROOM_DAILY_TASK_UPDATE')")
+    public ApiResponse<GroomTaskCompletion> completeTasks(
+            @RequestParam List<Long> taskIds,
+            @RequestParam(required = false) String note,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        Resource file = taskService.loadCompletionImage(id, currentUser);
+        return ApiResponse.success(taskService.completeTasks(taskIds, note, files, currentUser));
+    }
+
+    /** One photo of a completion. Served here so the viewer's permission is checked first. */
+    @GetMapping("/completions/{completionId}/photos/{index}")
+    @PreAuthorize("hasAuthority('GROOM_DAILY_TASK_VIEW')")
+    public ResponseEntity<Resource> completionPhoto(
+            @PathVariable Long completionId,
+            @PathVariable int index,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        Resource file = taskService.loadCompletionPhoto(completionId, index, currentUser);
         return ResponseEntity.ok()
-                .contentType(taskService.completionImageMediaType(id, currentUser))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=task-" + id)
+                .contentType(taskService.completionPhotoMediaType(completionId, index, currentUser))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=task-completion-" + completionId + "-" + index)
                 .header("X-Content-Type-Options", "nosniff")
                 .body(file);
     }

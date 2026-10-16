@@ -13,6 +13,7 @@ import com.rtms.backend.training.enums.WorkoutStatus;
 
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.stable.entity.GroomDailyTask;
+import com.rtms.backend.stable.entity.GroomTaskCompletion;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.GroomTaskType;
@@ -64,6 +65,9 @@ class GroomDailyTaskServiceTest {
     @Mock
     private com.rtms.backend.common.storage.FileStorageService fileStorage;
 
+    @Mock
+    private com.rtms.backend.stable.repository.GroomTaskCompletionRepository completionRepository;
+
     private GroomDailyTaskService taskService;
 
     @BeforeEach
@@ -75,7 +79,8 @@ class GroomDailyTaskServiceTest {
                 stableStallRepository,
                 workoutRepository,
                 careScheduleRepository,
-                fileStorage
+                fileStorage,
+                completionRepository
         );
     }
 
@@ -336,72 +341,114 @@ class GroomDailyTaskServiceTest {
     }
 
     @Test
-    @DisplayName("9. Complete with a note and a photo: both are stored on the task")
-    void testCompleteTask_WithNoteAndPhoto() {
-        GroomDailyTask task = new GroomDailyTask(4L, 5L, GroomTaskType.FEEDING, LocalDateTime.now(), "Morning feed");
-        task.setId(20L);
-        when(taskRepository.findById(20L)).thenReturn(Optional.of(task));
-        when(taskRepository.save(any(GroomDailyTask.class))).thenAnswer(inv -> inv.getArgument(0));
-        var photo = new org.springframework.mock.web.MockMultipartFile("file", "feed.jpg", "image/jpeg", new byte[]{1});
-        when(fileStorage.store(photo, "rtms/daily-tasks/20")).thenReturn("local:feed.jpg");
+    @DisplayName("9. Complete a block with a note and two photos: one completion shared by every task")
+    void testCompleteTasks_BlockWithNoteAndPhotos() {
+        GroomDailyTask first = task(20L, 4L);
+        GroomDailyTask second = task(21L, 4L);
+        when(taskRepository.findAllById(List.of(20L, 21L))).thenReturn(List.of(first, second));
+        when(completionRepository.save(any(GroomTaskCompletion.class))).thenAnswer(inv -> {
+            GroomTaskCompletion completion = inv.getArgument(0);
+            completion.setId(7L);
+            return completion;
+        });
+        var photoA = new org.springframework.mock.web.MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
+        var photoB = new org.springframework.mock.web.MockMultipartFile("files", "b.png", "image/png", new byte[]{2});
+        when(fileStorage.store(photoA, "rtms/task-completions/7")).thenReturn("local:a.jpg");
+        when(fileStorage.store(photoB, "rtms/task-completions/7")).thenReturn("local:b.png");
 
-        GroomDailyTask result = taskService.completeTask(20L, "  Ate everything  ", photo,
-                new AuthenticatedUser(4L, "groom@example.com", "GROOM"));
+        GroomTaskCompletion result = taskService.completeTasks(List.of(20L, 21L), "  All ate well  ",
+                List.of(photoA, photoB), groom());
 
-        assertTrue(result.getIsCompleted());
-        assertNotNull(result.getCompletedAt());
-        assertEquals("Ate everything", result.getCompletionNote());
-        assertEquals("local:feed.jpg", result.getCompletionImageUrl());
+        assertEquals("All ate well", result.getNote());
+        assertEquals(List.of("local:a.jpg", "local:b.png"), result.getPhotoKeys());
+        for (GroomDailyTask t : List.of(first, second)) {
+            assertTrue(t.getIsCompleted());
+            assertNotNull(t.getCompletedAt());
+            assertEquals(7L, t.getCompletionId());
+        }
+        verify(taskRepository).saveAll(List.of(first, second));
     }
 
     @Test
-    @DisplayName("10. Complete without a note or a photo still works and stores nothing")
-    void testCompleteTask_WithoutEvidence() {
-        GroomDailyTask task = new GroomDailyTask(4L, 5L, GroomTaskType.FEEDING, LocalDateTime.now(), null);
-        task.setId(21L);
-        when(taskRepository.findById(21L)).thenReturn(Optional.of(task));
-        when(taskRepository.save(any(GroomDailyTask.class))).thenAnswer(inv -> inv.getArgument(0));
+    @DisplayName("10. Complete a block without note or photos still works and stores no file")
+    void testCompleteTasks_WithoutEvidence() {
+        GroomDailyTask only = task(22L, 4L);
+        when(taskRepository.findAllById(List.of(22L))).thenReturn(List.of(only));
+        when(completionRepository.save(any(GroomTaskCompletion.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        GroomDailyTask result = taskService.completeTask(21L, "   ", null,
-                new AuthenticatedUser(4L, "groom@example.com", "GROOM"));
+        GroomTaskCompletion result = taskService.completeTasks(List.of(22L), "   ", null, groom());
 
-        assertTrue(result.getIsCompleted());
-        assertNull(result.getCompletionNote());
-        assertNull(result.getCompletionImageUrl());
+        assertNull(result.getNote());
+        assertTrue(result.getPhotoKeys().isEmpty());
+        assertTrue(only.getIsCompleted());
         verify(fileStorage, never()).store(any(), any());
     }
 
     @Test
-    @DisplayName("11. Evidence is refused for another groom's task, a finished task and a non-image file")
-    void testCompleteTask_Refusals() {
-        GroomDailyTask task = new GroomDailyTask(4L, 5L, GroomTaskType.FEEDING, LocalDateTime.now(), null);
-        task.setId(22L);
-        when(taskRepository.findById(22L)).thenReturn(Optional.of(task));
-        AuthenticatedUser groom = new AuthenticatedUser(4L, "groom@example.com", "GROOM");
-        var pdf = new org.springframework.mock.web.MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
-
+    @DisplayName("11. A block is refused when it holds another groom's task, a finished task, 6 photos or a non-image")
+    void testCompleteTasks_Refusals() {
+        GroomDailyTask mine = task(23L, 4L);
+        GroomDailyTask other = task(24L, 9L);
+        when(taskRepository.findAllById(List.of(23L, 24L))).thenReturn(List.of(mine, other));
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
-                () -> taskService.completeTask(22L, "note", null, new AuthenticatedUser(9L, "other@example.com", "GROOM")));
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> taskService.completeTask(22L, null, pdf, groom));
+                () -> taskService.completeTasks(List.of(23L, 24L), null, null, groom()));
 
-        task.setIsCompleted(true);
+        when(taskRepository.findAllById(List.of(23L))).thenReturn(List.of(mine));
+        var pdf = new org.springframework.mock.web.MockMultipartFile("files", "a.pdf", "application/pdf", new byte[]{1});
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> taskService.completeTask(22L, "again", null, groom));
+                () -> taskService.completeTasks(List.of(23L), null, List.of(pdf), groom()));
+
+        var photo = new org.springframework.mock.web.MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> taskService.completeTasks(List.of(23L), null, List.of(photo, photo, photo, photo, photo, photo), groom()));
+
+        mine.setIsCompleted(true);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> taskService.completeTasks(List.of(23L), "again", null, groom()));
+
         verify(fileStorage, never()).store(any(), any());
-        verify(taskRepository, never()).save(any());
+        verify(completionRepository, never()).save(any());
+        verify(taskRepository, never()).saveAll(any());
     }
 
     @Test
-    @DisplayName("12. A groom cannot open the completion photo of another groom's task")
-    void testCompletionImage_OtherGroomRefused() {
-        GroomDailyTask task = new GroomDailyTask(4L, 5L, GroomTaskType.FEEDING, LocalDateTime.now(), null);
-        task.setId(23L);
-        task.setCompletionImageUrl("local:feed.jpg");
-        when(taskRepository.findById(23L)).thenReturn(Optional.of(task));
+    @DisplayName("12. Photos already stored are removed when saving the tasks fails")
+    void testCompleteTasks_CleansUpStoredPhotosOnFailure() {
+        GroomDailyTask only = task(25L, 4L);
+        when(taskRepository.findAllById(List.of(25L))).thenReturn(List.of(only));
+        when(completionRepository.save(any(GroomTaskCompletion.class))).thenAnswer(inv -> {
+            GroomTaskCompletion completion = inv.getArgument(0);
+            completion.setId(8L);
+            return completion;
+        });
+        var photo = new org.springframework.mock.web.MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
+        when(fileStorage.store(photo, "rtms/task-completions/8")).thenReturn("local:a.jpg");
+        when(taskRepository.saveAll(any())).thenThrow(new RuntimeException("database down"));
+
+        assertThrows(RuntimeException.class, () -> taskService.completeTasks(List.of(25L), null, List.of(photo), groom()));
+        verify(fileStorage).delete("local:a.jpg");
+    }
+
+    @Test
+    @DisplayName("13. A groom cannot open the completion photo of another groom")
+    void testCompletionPhoto_OtherGroomRefused() {
+        GroomTaskCompletion completion = new GroomTaskCompletion(4L, null, LocalDateTime.now());
+        completion.setId(9L);
+        completion.getPhotoKeys().add("local:a.jpg");
+        when(completionRepository.findById(9L)).thenReturn(Optional.of(completion));
 
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
-                () -> taskService.loadCompletionImage(23L, new AuthenticatedUser(9L, "other@example.com", "GROOM")));
+                () -> taskService.loadCompletionPhoto(9L, 0, new AuthenticatedUser(9L, "other@example.com", "GROOM")));
         verify(fileStorage, never()).load(any());
+    }
+
+    private static GroomDailyTask task(Long id, Long groomId) {
+        GroomDailyTask task = new GroomDailyTask(groomId, 5L, GroomTaskType.FEEDING, LocalDateTime.now(), null);
+        task.setId(id);
+        return task;
+    }
+
+    private static AuthenticatedUser groom() {
+        return new AuthenticatedUser(4L, "groom@example.com", "GROOM");
     }
 }

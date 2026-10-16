@@ -18,14 +18,15 @@ export const groomApi = {
   },
 
   /**
-   * Completes a routine task with what the Groom recorded. The note and the photo are both optional.
-   * Sent as multipart through the shared client, which adds the access token.
+   * Completes a block of routine tasks in one action, with an optional note and up to five optional photos
+   * shared by every task in it. Sent as multipart through the shared client, which adds the access token.
    */
-  completeTask: async (id: number, evidence?: { note?: string; photo?: File | null }): Promise<void> => {
+  completeTasks: async (taskIds: number[], evidence?: { note?: string; photos?: File[] }): Promise<void> => {
     const body = new FormData();
+    taskIds.forEach((id) => body.append('taskIds', String(id)));
     if (evidence?.note?.trim()) body.append('note', evidence.note.trim());
-    if (evidence?.photo) body.append('file', evidence.photo);
-    await apiUpload<ApiResponse<unknown>>(`/api/groom-daily-tasks/${id}/complete`, body);
+    evidence?.photos?.forEach((photo) => body.append('files', photo));
+    await apiUpload<ApiResponse<unknown>>('/api/groom-daily-tasks/complete', body);
   },
 
   generateRoutine: async (date?: string): Promise<void> => {

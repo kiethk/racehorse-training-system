@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
-import { Pill } from '@/components/ui/StatusBadge';
-import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { groomApi } from '../services/groomService';
-import { CompleteTaskDialog } from './CompleteTaskDialog';
+import { groupTasks, type TaskBlock as TaskBlockData } from '../lib/groupTasks';
 import type { TodayTaskItem } from '../types';
+import { CompleteTaskDialog } from './CompleteTaskDialog';
+import { TaskBlock } from './TaskBlock';
+import { TaskRow } from './TaskRow';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
 
@@ -16,8 +17,8 @@ export function TodayChecklist() {
   const [tasks, setTasks] = useState<TodayTaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  /** The task whose completion dialog is open. */
-  const [completingTask, setCompletingTask] = useState<TodayTaskItem | null>(null);
+  /** The block whose completion dialog is open. */
+  const [completingBlock, setCompletingBlock] = useState<TaskBlockData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadTasks = useCallback(async () => {
@@ -51,10 +52,8 @@ export function TodayChecklist() {
     }
   }
 
-  // Sort tasks by their time of day.
-  const sortedTasks = useMemo(() => {
-    return [...tasks].sort((a, b) => a.startTime.localeCompare(b.startTime));
-  }, [tasks]);
+  // Routine tasks of one duty at one time become one block; workouts and vet visits stay single rows.
+  const entries = useMemo(() => groupTasks(tasks), [tasks]);
 
   const stats = useMemo(() => {
     const total = tasks.length;
@@ -120,7 +119,7 @@ export function TodayChecklist() {
       </Panel>
 
       {/* Tasks ordered by time */}
-      {sortedTasks.length === 0 ? (
+      {entries.length === 0 ? (
         <Panel padded>
           <EmptyState
             icon="clipboard"
@@ -130,104 +129,19 @@ export function TodayChecklist() {
         </Panel>
       ) : (
         <div className="space-y-2">
-          {sortedTasks.map((task, idx) => {
-            const isCompleted = task.status === 'COMPLETED';
-            return (
-              <div
-                key={`${task.source}-${task.refId}-${idx}`}
-                className={`flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border p-3 text-sm transition ${
-                  isCompleted
-                    ? 'border-[var(--color-border)] bg-[var(--color-surface-muted)] opacity-75'
-                    : 'border-[var(--color-border-strong)] bg-[var(--color-surface)] shadow-[var(--shadow-panel)]'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  {/* Time */}
-                  <div className="font-metric text-xs font-bold text-[var(--color-text-primary)] w-16 pt-0.5">
-                    {task.startTime.substring(0, 5)}
-                    {task.endTime && `–${task.endTime.substring(0, 5)}`}
-                  </div>
-
-                  {/* Task details */}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-[var(--color-text-primary)]">
-                        {task.title}
-                      </span>
-                      <Pill
-                        tone={
-                          task.source === 'SOP'
-                            ? 'primary'
-                            : task.source === 'WORKOUT'
-                            ? 'warning'
-                            : 'info'
-                        }
-                        size="sm"
-                      >
-                        {task.source}
-                      </Pill>
-                    </div>
-
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                      <span>Horse: <strong>{task.horseName}</strong></span>
-                      {task.note && <span>• {task.note}</span>}
-                    </div>
-
-                    {/* What the Groom recorded when completing the task. */}
-                    {(task.completionNote || task.completionImageUrl) && (
-                      <div className="mt-2 space-y-2">
-                        {task.completionNote && (
-                          <p className="whitespace-pre-wrap break-words text-xs text-[var(--color-text-primary)]">
-                            <span className="font-medium">Completion note: </span>
-                            {task.completionNote}
-                          </p>
-                        )}
-                        {task.completionImageUrl && (
-                          <div className="w-40">
-                            <ProtectedImage
-                              src={task.completionImageUrl}
-                              alt={`Photo for ${task.title}, ${task.horseName}`}
-                              openOnClick
-                              className="h-24 w-full object-cover"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Actions depend on whether the task is actionable. */}
-                <div className="flex items-center gap-2">
-                  {task.actionable && !isCompleted ? (
-                    <Button variant="primary" size="sm" onClick={() => setCompletingTask(task)}>
-                      Complete
-                    </Button>
-                  ) : isCompleted ? (
-                    <Pill tone="success" size="sm">
-                      Completed
-                    </Pill>
-                  ) : task.source === 'WORKOUT' ? (
-                    <span className="text-xs text-[var(--color-text-muted)] italic">
-                      (Managed by Trainer)
-                    </span>
-                  ) : (
-                    <span className="text-xs text-[var(--color-text-muted)] italic">
-                      (Managed by Veterinary)
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {entries.map((entry) =>
+            entry.kind === 'block'
+              ? <TaskBlock key={entry.key} block={entry} onComplete={setCompletingBlock} />
+              : <TaskRow key={entry.key} task={entry.task} />,
+          )}
         </div>
       )}
 
       <CompleteTaskDialog
-        task={completingTask}
-        onClose={() => setCompletingTask(null)}
+        block={completingBlock}
+        onClose={() => setCompletingBlock(null)}
         onCompleted={async () => {
-          toast.success('Task completed');
+          toast.success('Tasks completed');
           await loadTasks();
         }}
       />
