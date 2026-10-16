@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from '@/services/api';
+import { apiGet, apiPatch, apiPost, apiPut } from '@/services/api';
 import type { ApiResponse } from '@/types/horse';
 import type {
   Subject,
@@ -95,6 +95,10 @@ export const trainingService = {
 
   completeWorkout: async (workoutId: number, data: CompleteWorkoutRequest): Promise<void> => {
     await apiPatch(`/api/workouts/${workoutId}/complete`, data);
+  },
+
+  updateWorkoutResult: async (workoutId: number, data: CompleteWorkoutRequest): Promise<void> => {
+    await apiPut(`/api/workouts/${workoutId}/result`, data);
   },
 
   // Dashboard, fitness and alerts
