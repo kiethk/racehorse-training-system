@@ -200,6 +200,7 @@ Import from `@/components/ui`.
 | Floating panel on click | `Popover*` |
 | Hint on hover | `Tooltip` |
 | Card picked from a set (stall on a map, slot in a grid) | `SelectableCard` (`selected`, `dimmed`, `empty`) |
+| Drag items between lists or slots | `createDragDrop<T>()` (`Provider`, `useDraggable`, `useDropZone`, `useDragDrop`); see `DRAG_DROP.md` |
 | Card or section container | `Panel` (`tone`, `interactive`), `SectionTitle`, `FieldLabel` |
 | KPI number | `MetricCard` |
 | Progress or distribution bar | `ProgressBar` (`value` / `max`, or stacked `segments`) |

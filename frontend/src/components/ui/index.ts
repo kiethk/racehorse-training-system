@@ -7,6 +7,7 @@ export { BrandLogo } from './BrandLogo';
 export { Button, IconButton, LinkButton, buttonClassName } from './Button';
 export { ConfirmDialog } from './ConfirmDialog';
 export { DataTable } from './DataTable';
+export { createDragDrop } from './DragDrop';
 export {
   DropdownMenu,
   DropdownMenuContent,

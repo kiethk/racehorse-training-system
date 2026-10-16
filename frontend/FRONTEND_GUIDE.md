@@ -362,6 +362,7 @@ npm run dev
 | I need to… | Go to |
 |---|---|
 | Find a primitive | `AGENTS.md` → Primitive lookup, or `/design-test` |
+| Reuse drag and drop | `createDragDrop<T>()` from `@/components/ui`; see `DRAG_DROP.md` and `/design-test` |
 | Add a sidebar item | `src/config/navigation.ts` |
 | Add or look up a token | `src/app/globals.css` |
 | Format a date, enum, number or error | `src/lib/display.ts` |
