@@ -7,14 +7,14 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "groom_incident_reports")
+@Table(name = "horse_incident_reports")
 public class GroomIncidentReport {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "groom_id", nullable = false)
+    @Column(name = "reported_by_id", nullable = false)
     private Long groomId;
 
     @Column(name = "horse_id", nullable = false)

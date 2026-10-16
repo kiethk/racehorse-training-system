@@ -26,8 +26,11 @@ public class PlanWorkoutItemResponse {
     private String status;
 
     private BigDecimal actualDistanceMeters;
+    private BigDecimal actualDurationMinutes;
+    private BigDecimal averageSpeedKmh;
     private Integer averageHeartRate;
     private Integer maxHeartRate;
+    private Integer recoveryHeartRate;
     private BigDecimal topSpeedKmh;
     private Integer performanceRating;
     private String trainerFeedback;
@@ -61,8 +64,11 @@ public class PlanWorkoutItemResponse {
         this.assignedGroomId = w.getAssignedToId();
         this.status = w.getStatus().name();
         this.actualDistanceMeters = w.getActualDistanceMeters();
+        this.actualDurationMinutes = w.getActualDurationMinutes();
+        this.averageSpeedKmh = w.getAverageSpeedKmh();
         this.averageHeartRate = w.getAverageHeartRate();
         this.maxHeartRate = w.getMaxHeartRate();
+        this.recoveryHeartRate = w.getRecoveryHeartRate();
         this.topSpeedKmh = w.getTopSpeedKmh();
         this.performanceRating = w.getPerformanceRating();
         this.trainerFeedback = w.getTrainerFeedback();
@@ -115,8 +121,11 @@ public class PlanWorkoutItemResponse {
     public Long getAssignedGroomId() { return assignedGroomId; }
     public String getStatus() { return status; }
     public BigDecimal getActualDistanceMeters() { return actualDistanceMeters; }
+    public BigDecimal getActualDurationMinutes() { return actualDurationMinutes; }
+    public BigDecimal getAverageSpeedKmh() { return averageSpeedKmh; }
     public Integer getAverageHeartRate() { return averageHeartRate; }
     public Integer getMaxHeartRate() { return maxHeartRate; }
+    public Integer getRecoveryHeartRate() { return recoveryHeartRate; }
     public BigDecimal getTopSpeedKmh() { return topSpeedKmh; }
     public Integer getPerformanceRating() { return performanceRating; }
     public String getTrainerFeedback() { return trainerFeedback; }

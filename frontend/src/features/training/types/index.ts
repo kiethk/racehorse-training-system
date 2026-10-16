@@ -125,8 +125,11 @@ export interface PlanWorkoutItemResponse {
   lotOccupancy: number | null;
   status: WorkoutStatus;
   actualDistanceMeters: number | null;
+  actualDurationMinutes?: number | null;
+  averageSpeedKmh?: number | null;
   averageHeartRate: number | null;
   maxHeartRate: number | null;
+  recoveryHeartRate?: number | null;
   topSpeedKmh: number | null;
   performanceRating: number | null;
   trainerFeedback: string | null;

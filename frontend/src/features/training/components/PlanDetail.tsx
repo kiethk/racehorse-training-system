@@ -34,12 +34,14 @@ function WorkoutRow({
   index,
   groomName,
   onRecord,
+  onEdit,
   preparingResult,
 }: {
   workout: PlanWorkoutItemResponse;
   index: number;
   groomName: string | undefined;
   onRecord: () => Promise<void>;
+  onEdit: () => void;
   preparingResult: boolean;
 }) {
   return (
@@ -79,16 +81,28 @@ function WorkoutRow({
         )}
       </div>
 
-      {workout.status === 'SCHEDULED' && (
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => void onRecord()}
-          loading={preparingResult}
-        >
-          Record session results
-        </Button>
-      )}
+      <div className="flex items-center gap-2">
+        {workout.status === 'SCHEDULED' && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => void onRecord()}
+            loading={preparingResult}
+          >
+            Record Workout Result
+          </Button>
+        )}
+
+        {workout.status === 'COMPLETED' && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onEdit}
+          >
+            Edit workout result
+          </Button>
+        )}
+      </div>
     </li>
   );
 }
@@ -100,6 +114,7 @@ export function PlanDetail({ planId }: { planId: number }) {
   const [activeWorkout, setActiveWorkout] = useState<PlanWorkoutItemResponse | null>(null);
   const [resultPreview, setResultPreview] = useState<WorkoutResultPreviewResponse | null>(null);
   const [preparingWorkoutId, setPreparingWorkoutId] = useState<number | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   /** Groom names come from the staff directory endpoint that the stable screen already uses. */
   const [grooms, setGrooms] = useState<UserSummary[]>([]);
 
@@ -133,7 +148,22 @@ export function PlanDetail({ planId }: { planId: number }) {
     );
   }, [detail]);
 
-  async function openResultForm(workout: PlanWorkoutItemResponse) {
+  async function openResultForm(workout: PlanWorkoutItemResponse, isEdit = false) {
+    setIsEditMode(isEdit);
+    if (isEdit) {
+      setResultPreview({
+        actualDistanceMeters: workout.actualDistanceMeters ?? 1000,
+        actualDurationMinutes: workout.actualDurationMinutes ?? 60,
+        topSpeedKmh: workout.topSpeedKmh ?? 50,
+        averageSpeedKmh: workout.averageSpeedKmh ?? 40,
+        averageHeartRate: workout.averageHeartRate ?? 140,
+        maxHeartRate: workout.maxHeartRate ?? 180,
+        recoveryHeartRate: workout.recoveryHeartRate ?? 90,
+      });
+      setActiveWorkout(workout);
+      return;
+    }
+
     setPreparingWorkoutId(workout.workoutId);
     try {
       const preview = await trainingService.getWorkoutResultPreview(workout.workoutId);
@@ -149,6 +179,7 @@ export function PlanDetail({ planId }: { planId: number }) {
   function closeResultForm() {
     setActiveWorkout(null);
     setResultPreview(null);
+    setIsEditMode(false);
   }
 
   if (loading && !detail) return <ListSkeleton rows={5} />;
@@ -158,9 +189,9 @@ export function PlanDetail({ planId }: { planId: number }) {
       <Panel padded>
         <EmptyState
           icon="alert-triangle"
-          title="Training plan unavailable"
-          description={error ?? 'This training plan could not be found.'}
-          action={<LinkButton href="/trainer/plans" size="sm" icon="arrow-left">Back to plans</LinkButton>}
+          title="Plan not found"
+          description={error ?? 'This plan does not exist.'}
+          action={<LinkButton href="/trainer/plans" variant="secondary" size="sm">Back to plans</LinkButton>}
         />
       </Panel>
     );
@@ -177,14 +208,14 @@ export function PlanDetail({ planId }: { planId: number }) {
           <>
             Course: <strong>{detail.courseName ?? `#${plan.courseId}`}</strong>
             <br />
-            {formatDate(plan.startDate)} – {formatDate(plan.endDate)} · {workouts.length} planned sessions
+            {formatDate(plan.startDate)} – {formatDate(plan.endDate)} · {workouts.length} scheduled sessions
           </>
         }
         breadcrumbs={[{ label: 'Training plans', href: '/trainer/plans' }, { label: horseName }]}
         actions={
           <>
             <Pill tone={PLAN_STATUS[plan.status].tone}>{PLAN_STATUS[plan.status].label}</Pill>
-            <LinkButton href="/trainer/schedule" size="sm" icon="calendar">View lot schedule</LinkButton>
+            <LinkButton href="/trainer/plans" variant="secondary" size="sm" icon="arrow-left">Back to plans</LinkButton>
           </>
         }
       />
@@ -213,7 +244,8 @@ export function PlanDetail({ planId }: { planId: number }) {
                   workout={workout}
                   index={index}
                   groomName={workout.assignedGroomId ? groomNameById.get(workout.assignedGroomId) : undefined}
-                  onRecord={() => openResultForm(workout)}
+                  onRecord={() => openResultForm(workout, false)}
+                  onEdit={() => openResultForm(workout, true)}
                   preparingResult={preparingWorkoutId === workout.workoutId}
                 />
               ))}
@@ -223,9 +255,10 @@ export function PlanDetail({ planId }: { planId: number }) {
       </PageSection>
 
       <CompleteWorkoutDialog
-        key={activeWorkout?.workoutId ?? 'none'}
+        key={`${activeWorkout?.workoutId ?? 'none'}-${isEditMode ? 'edit' : 'new'}`}
         workout={activeWorkout}
         preview={resultPreview}
+        isEdit={isEditMode}
         open={activeWorkout !== null && resultPreview !== null}
         onClose={closeResultForm}
         onSuccess={load}

@@ -1,4 +1,4 @@
-import { Icon, Notice, PageSection, Panel, Pill } from '@/components/ui';
+import { Button, Icon, Notice, PageSection, Panel, Pill } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/display';
 import type { HorseAlert } from '../types';
@@ -7,7 +7,13 @@ import type { HorseAlert } from '../types';
  * Alerts the backend raised from the last 30 days of data, not only the latest session. One abnormal session
  * stays here for up to 30 days even after later sessions are normal, so each card says when it was recorded.
  */
-export function HorseAlertList({ alerts }: { alerts: HorseAlert[] }) {
+export function HorseAlertList({
+  alerts,
+  onReportIncident,
+}: {
+  alerts: HorseAlert[];
+  onReportIncident?: (alert: HorseAlert) => void;
+}) {
   return (
     <PageSection
       title="Fitness and injury risk alerts"
@@ -22,7 +28,7 @@ export function HorseAlertList({ alerts }: { alerts: HorseAlert[] }) {
           {alerts.map((alert, index) => {
             const danger = alert.severity === 'DANGER';
             return (
-              <Panel key={`${alert.ruleCode}-${index}`} padded tone={danger ? 'danger' : 'warning'} className="space-y-2">
+              <Panel key={`${alert.ruleCode}-${index}`} padded tone={danger ? 'danger' : 'warning'} className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className={cn('flex items-center gap-2', danger ? 'text-[var(--color-danger)]' : 'text-[var(--color-warning)]')}>
                     <Icon name="alert-triangle" size={18} />
@@ -37,6 +43,17 @@ export function HorseAlertList({ alerts }: { alerts: HorseAlert[] }) {
                   </span>
                   <span>Recorded on <strong>{formatDate(alert.triggeredAt)}</strong></span>
                 </div>
+                {onReportIncident && (
+                  <div className="flex justify-end pt-1">
+                    <Button
+                      size="sm"
+                      variant={danger ? 'destructive' : 'secondary'}
+                      onClick={() => onReportIncident(alert)}
+                    >
+                      Report to Vet
+                    </Button>
+                  </div>
+                )}
               </Panel>
             );
           })}
