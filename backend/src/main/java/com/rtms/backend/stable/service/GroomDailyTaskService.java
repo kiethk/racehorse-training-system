@@ -6,6 +6,7 @@ import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.stable.dto.CreateGroomDailyTaskRequest;
 import com.rtms.backend.stable.dto.TodayTaskItemResponse;
 import com.rtms.backend.stable.entity.GroomDailyTask;
+import com.rtms.backend.stable.entity.GroomTaskCompletion;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.stable.entity.StableStall;
@@ -15,6 +16,7 @@ import com.rtms.backend.stable.enums.GroomTaskType;
 import com.rtms.backend.stable.enums.SopSlot;
 import com.rtms.backend.stable.enums.TaskSource;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
+import com.rtms.backend.stable.repository.GroomTaskCompletionRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
@@ -40,6 +42,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -52,8 +55,11 @@ public class GroomDailyTaskService {
     private final TrainingWorkoutRepository workoutRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final FileStorageService fileStorage;
+    private final GroomTaskCompletionRepository completionRepository;
 
     private static final int MAX_COMPLETION_NOTE_LENGTH = 1000;
+    private static final int MAX_COMPLETION_PHOTOS = 5;
+    private static final int MAX_TASKS_PER_COMPLETION = 20;
 
     public GroomDailyTaskService(GroomDailyTaskRepository taskRepository,
                                  HorseRepository horseRepository,
@@ -61,8 +67,10 @@ public class GroomDailyTaskService {
                                  StableStallRepository stableStallRepository,
                                  TrainingWorkoutRepository workoutRepository,
                                  CareScheduleRepository careScheduleRepository,
-                                 FileStorageService fileStorage) {
+                                 FileStorageService fileStorage,
+                                 GroomTaskCompletionRepository completionRepository) {
         this.fileStorage = fileStorage;
+        this.completionRepository = completionRepository;
         this.taskRepository = taskRepository;
         this.horseRepository = horseRepository;
         this.userRepository = userRepository;
@@ -141,19 +149,48 @@ public class GroomDailyTaskService {
     }
 
     /**
-     * Completes a task and records what the Groom saw: an optional note and an optional photo.
-     * A task is completed once; its evidence cannot be replaced afterwards.
+     * Completes one task with what the Groom recorded. Kept for callers that complete a single task;
+     * the checklist completes a whole block through {@link #completeTasks}.
      */
     @Transactional
     public GroomDailyTask completeTask(Long taskId, String note, MultipartFile image, AuthenticatedUser currentUser) {
-        GroomDailyTask task = taskRepository.findById(taskId)
+        completeTasks(List.of(taskId), note, image == null ? List.of() : List.of(image), currentUser);
+        return taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found with id: " + taskId));
+    }
 
-        if ("GROOM".equalsIgnoreCase(currentUser.getRole()) && !task.getGroomId().equals(currentUser.getUserId())) {
-            throw new AccessDeniedException("You are not authorized to complete a task assigned to another groom");
+    /**
+     * Completes several routine tasks in one action (the same duty at the same time for several horses) and
+     * records one optional note and up to five optional photos for all of them. A task is completed once;
+     * its evidence cannot be replaced afterwards.
+     */
+    @Transactional
+    public GroomTaskCompletion completeTasks(List<Long> taskIds, String note, List<MultipartFile> photos,
+                                             AuthenticatedUser currentUser) {
+        List<Long> ids = taskIds == null ? List.of()
+                : taskIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty() || ids.size() > MAX_TASKS_PER_COMPLETION) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Select between 1 and " + MAX_TASKS_PER_COMPLETION + " tasks to complete");
         }
-        if (Boolean.TRUE.equals(task.getIsCompleted())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "This task is already completed");
+
+        List<GroomDailyTask> tasks = taskRepository.findAllById(ids);
+        if (tasks.size() != ids.size()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "One or more tasks were not found");
+        }
+        boolean isGroom = "GROOM".equalsIgnoreCase(currentUser.getRole());
+        Long groomId = tasks.get(0).getGroomId();
+        for (GroomDailyTask task : tasks) {
+            if (isGroom && !task.getGroomId().equals(currentUser.getUserId())) {
+                throw new AccessDeniedException("You are not authorized to complete a task assigned to another groom");
+            }
+            if (!task.getGroomId().equals(groomId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Tasks completed together must belong to the same groom");
+            }
+            if (Boolean.TRUE.equals(task.getIsCompleted())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Task #" + task.getId() + " is already completed");
+            }
         }
 
         String cleanNote = note == null || note.isBlank() ? null : note.trim();
@@ -162,47 +199,62 @@ public class GroomDailyTaskService {
                     "The note is too long. The limit is " + MAX_COMPLETION_NOTE_LENGTH + " characters.");
         }
 
-        boolean hasImage = image != null && !image.isEmpty();
-        if (hasImage) {
-            String mediaType = image.getContentType() == null ? "" : image.getContentType().toLowerCase(Locale.ROOT);
+        List<MultipartFile> files = photos == null ? List.of()
+                : photos.stream().filter(file -> file != null && !file.isEmpty()).toList();
+        if (files.size() > MAX_COMPLETION_PHOTOS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Attach at most " + MAX_COMPLETION_PHOTOS + " photos");
+        }
+        for (MultipartFile file : files) {
+            String mediaType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
             if (!mediaType.startsWith("image/")) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Task photos must be images (JPEG, PNG, WebP)");
             }
         }
 
-        String imageKey = hasImage ? fileStorage.store(image, "rtms/daily-tasks/" + taskId) : null;   // validates size and format
+        LocalDateTime now = LocalDateTime.now();
+        GroomTaskCompletion completion = completionRepository.save(new GroomTaskCompletion(groomId, cleanNote, now));
+        List<String> storedKeys = new ArrayList<>();
         try {
-            task.setIsCompleted(true);
-            task.setCompletedAt(LocalDateTime.now());
-            task.setCompletionNote(cleanNote);
-            task.setCompletionImageUrl(imageKey);
-            return taskRepository.save(task);
+            for (MultipartFile file : files) {
+                // validates size and real content
+                storedKeys.add(fileStorage.store(file, "rtms/task-completions/" + completion.getId()));
+            }
+            completion.getPhotoKeys().addAll(storedKeys);
+            GroomTaskCompletion saved = completionRepository.save(completion);
+            for (GroomDailyTask task : tasks) {
+                task.setIsCompleted(true);
+                task.setCompletedAt(now);
+                task.setCompletionId(saved.getId());
+            }
+            taskRepository.saveAll(tasks);
+            return saved;
         } catch (RuntimeException ex) {
-            fileStorage.delete(imageKey);     // the task was not saved -> do not leave an orphan file
+            storedKeys.forEach(fileStorage::delete);   // nothing was saved -> do not leave orphan files
             throw ex;
         }
     }
 
-    /** The task whose completion photo is requested. A Groom may only open the photo of their own task. */
-    private GroomDailyTask taskWithImage(Long taskId, AuthenticatedUser currentUser) {
-        GroomDailyTask task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found with id: " + taskId));
-        if ("GROOM".equalsIgnoreCase(currentUser.getRole()) && !task.getGroomId().equals(currentUser.getUserId())) {
+    /** Storage key of one completion photo. A Groom may only open photos of their own completions. */
+    private String completionPhotoKey(Long completionId, int index, AuthenticatedUser currentUser) {
+        GroomTaskCompletion completion = completionRepository.findById(completionId)
+                .orElseThrow(() -> new RuntimeException("Task completion not found with id: " + completionId));
+        if ("GROOM".equalsIgnoreCase(currentUser.getRole()) && !completion.getGroomId().equals(currentUser.getUserId())) {
             throw new AccessDeniedException("You can only view photos of your own tasks");
         }
-        if (task.getCompletionImageUrl() == null) {
-            throw new RuntimeException("Task #" + taskId + " has no photo attached");
+        if (index < 0 || index >= completion.getPhotoKeys().size()) {
+            throw new RuntimeException("Photo " + index + " of task completion #" + completionId + " not found");
         }
-        return task;
+        return completion.getPhotoKeys().get(index);
     }
 
-    public Resource loadCompletionImage(Long taskId, AuthenticatedUser currentUser) {
-        return fileStorage.load(taskWithImage(taskId, currentUser).getCompletionImageUrl());
+    public Resource loadCompletionPhoto(Long completionId, int index, AuthenticatedUser currentUser) {
+        return fileStorage.load(completionPhotoKey(completionId, index, currentUser));
     }
 
-    public MediaType completionImageMediaType(Long taskId, AuthenticatedUser currentUser) {
-        return fileStorage.mediaType(taskWithImage(taskId, currentUser).getCompletionImageUrl());
+    public MediaType completionPhotoMediaType(Long completionId, int index, AuthenticatedUser currentUser) {
+        return fileStorage.mediaType(completionPhotoKey(completionId, index, currentUser));
     }
 
     @Transactional
@@ -324,7 +376,16 @@ public class GroomDailyTaskService {
         // =============================================================
         List<TodayTaskItemResponse> items = new ArrayList<>();
 
+        // Completions of the day's tasks, loaded once: tasks completed together share one.
+        Set<Long> completionIds = new HashSet<>();
+        sopTasks.forEach(t -> { if (t.getCompletionId() != null) completionIds.add(t.getCompletionId()); });
+        Map<Long, GroomTaskCompletion> completionById = new HashMap<>();
+        if (!completionIds.isEmpty()) {
+            completionRepository.findAllById(completionIds).forEach(c -> completionById.put(c.getId(), c));
+        }
+
         for (GroomDailyTask task : sopTasks) {
+            GroomTaskCompletion completion = completionById.get(task.getCompletionId());
             items.add(new TodayTaskItemResponse(
                     TaskSource.SOP,
                     task.getId(),
@@ -336,10 +397,9 @@ public class GroomDailyTaskService {
                     task.getNotes(),
                     Boolean.TRUE.equals(task.getIsCompleted()) ? "COMPLETED" : "PENDING",
                     true)                         // chỉ SOP mới tick được
-                    .withCompletion(task.getCompletionNote(),
-                            // The image endpoint, never the storage key.
-                            task.getCompletionImageUrl() == null ? null
-                                    : "/api/groom-daily-tasks/" + task.getId() + "/completion-image"));
+                    .withCompletion(task.getCompletionId(),
+                            completion == null ? null : completion.getNote(),
+                            completion == null ? List.of() : completionPhotoUrls(completion)));
         }
 
         for (GroomWorkoutRow w : workouts) {
@@ -378,6 +438,15 @@ public class GroomDailyTaskService {
     }
 
     /** Tra tên từ Map đã nạp sẵn; không khớp thì hiện mã số như cũ. */
+    /** API paths of a completion's photos: the endpoint that checks the viewer, never the storage key. */
+    private static List<String> completionPhotoUrls(GroomTaskCompletion completion) {
+        List<String> urls = new ArrayList<>();
+        for (int index = 0; index < completion.getPhotoKeys().size(); index++) {
+            urls.add("/api/groom-daily-tasks/completions/" + completion.getId() + "/photos/" + index);
+        }
+        return urls;
+    }
+
     private String nameOf(Map<Long, String> nameById, Long id) {
         return nameById.getOrDefault(id, "#" + id);
     }

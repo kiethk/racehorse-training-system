@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "groom_daily_tasks")
@@ -37,14 +36,9 @@ public class GroomDailyTask {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
-    /** What the Groom wrote when completing the task. "notes" above holds the task's instructions. */
-    @Column(name = "completion_note", columnDefinition = "TEXT")
-    private String completionNote;
-
-    /** Storage key of the photo taken on completion. Never sent to clients: they load it from the task's image endpoint. */
-    @JsonIgnore
-    @Column(name = "completion_image_url", length = 500)
-    private String completionImageUrl;
+    /** The completion action that closed this task, with its note and photos. Null until completed. */
+    @Column(name = "completion_id")
+    private Long completionId;
 
     public GroomDailyTask() {
     }
@@ -122,19 +116,11 @@ public class GroomDailyTask {
         this.notes = notes;
     }
 
-    public String getCompletionNote() {
-        return completionNote;
+    public Long getCompletionId() {
+        return completionId;
     }
 
-    public void setCompletionNote(String completionNote) {
-        this.completionNote = completionNote;
-    }
-
-    public String getCompletionImageUrl() {
-        return completionImageUrl;
-    }
-
-    public void setCompletionImageUrl(String completionImageUrl) {
-        this.completionImageUrl = completionImageUrl;
+    public void setCompletionId(Long completionId) {
+        this.completionId = completionId;
     }
 }

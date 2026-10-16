@@ -4,6 +4,7 @@ import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.stable.enums.TaskSource;
 
 import java.time.LocalTime;
+import java.util.List;
 
 /**
  * Một dòng trên màn hình "Today Checklist" của Groom.
@@ -31,10 +32,14 @@ public class TodayTaskItemResponse {
 
     /** Chỉ nguồn SOP mới tick được. Workout do Trainer đóng, thú y do Vet đóng. */
     private boolean actionable;
-    /** What the Groom wrote when completing the task. SOP tasks only. */
+    /**
+     * The completion action that closed this task. Tasks completed together share it, with one note and one
+     * set of photos. SOP tasks only; null while pending.
+     */
+    private Long completionId;
     private String completionNote;
-    /** API path of the photo taken on completion, or null. SOP tasks only. */
-    private String completionImageUrl;
+    /** API paths of the completion photos, in upload order. Empty when none were taken. */
+    private List<String> completionPhotoUrls = List.of();
 
     public TodayTaskItemResponse(TaskSource source, Long refId, LocalTime startTime,
                                  LocalTime endTime, Long horseId, String horseName,
@@ -61,13 +66,15 @@ public class TodayTaskItemResponse {
     public String getNote() { return note; }
     public String getStatus() { return status; }
     public boolean isActionable() { return actionable; }
+    public Long getCompletionId() { return completionId; }
     public String getCompletionNote() { return completionNote; }
-    public String getCompletionImageUrl() { return completionImageUrl; }
+    public List<String> getCompletionPhotoUrls() { return completionPhotoUrls; }
 
     /** Adds what was recorded on completion. Returns this item so it can be chained when building the list. */
-    public TodayTaskItemResponse withCompletion(String note, String imageUrl) {
+    public TodayTaskItemResponse withCompletion(Long completionId, String note, List<String> photoUrls) {
+        this.completionId = completionId;
         this.completionNote = note;
-        this.completionImageUrl = imageUrl;
+        this.completionPhotoUrls = photoUrls == null ? List.of() : photoUrls;
         return this;
     }
 }
