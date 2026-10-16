@@ -6,6 +6,7 @@ import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.service.AreaService;
+import com.rtms.backend.stable.service.AreaLifecycleService;
 import com.rtms.backend.stable.service.StableAssignmentService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,13 +21,27 @@ public class AreaController {
     private final AreaRepository areaRepository;
     private final AreaService areaService;
     private final StableAssignmentService stableAssignmentService;
+    private final AreaLifecycleService lifecycle;
 
     public AreaController(AreaRepository areaRepository,
                           AreaService areaService,
-                          StableAssignmentService stableAssignmentService) {
+                          StableAssignmentService stableAssignmentService, AreaLifecycleService lifecycle) {
         this.areaRepository = areaRepository;
         this.areaService = areaService;
         this.stableAssignmentService = stableAssignmentService;
+        this.lifecycle = lifecycle;
+    }
+
+    @GetMapping("/{id}/deletion-check")
+    @PreAuthorize("hasAuthority('AREA_DELETE')")
+    public ApiResponse<AreaDeletionCheck> checkDeletion(@PathVariable Long id) {
+        return ApiResponse.success(lifecycle.check(id));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('AREA_DELETE')")
+    public ApiResponse<AreaDeletionResult> deleteArea(@PathVariable Long id) {
+        return ApiResponse.success(lifecycle.delete(id));
     }
 
     @PostMapping

@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 public class AreaService {
@@ -24,17 +23,20 @@ public class AreaService {
     private final AreaRepository areaRepository;
     private final StableStallRepository stableStallRepository;
     private final EntityManager entityManager;
+    private final AreaLifecycleService lifecycle;
 
     public AreaService(AreaRepository areaRepository,
                        StableStallRepository stableStallRepository,
-                       EntityManager entityManager) {
+                       EntityManager entityManager, AreaLifecycleService lifecycle) {
         this.areaRepository = areaRepository;
         this.stableStallRepository = stableStallRepository;
         this.entityManager = entityManager;
+        this.lifecycle = lifecycle;
     }
 
     /**
-     * Creates a new Area and atomically creates all 12 stalls with AVAILABLE status.
+     * Restores an eligible archived Area of this type first; otherwise atomically
+     * creates a new Area and all 12 stalls with AVAILABLE status.
      * Thread-safe and cluster-safe using PostgreSQL advisory transaction lock.
      */
     @Transactional
@@ -47,10 +49,10 @@ public class AreaService {
                     .setParameter("key", "AREA_CREATION_" + type.name())
                     .getSingleResult();
 
-        List<Area> existingAreas = areaRepository.findByType(type);
-        List<String> existingCodes = existingAreas.stream()
-                .map(Area::getCode)
-                .collect(Collectors.toList());
+        Long restored = lifecycle.restoreFirst(type);
+        if (restored != null) return areaRepository.findById(restored).orElseThrow();
+        // Include hidden codes too: even an ineligible archived row retains its unique code.
+        List<String> existingCodes = areaRepository.findCodesIncludingDeleted(type.name());
 
         String nextCode = (type == AreaType.REGULAR)
                 ? AreaCodeGenerator.nextRegularCode(existingCodes)

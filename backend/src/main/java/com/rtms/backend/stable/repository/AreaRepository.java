@@ -13,8 +13,11 @@ import java.util.Optional;
 @Repository
 public interface AreaRepository extends JpaRepository<Area, Long> {
 
-    @Query(value = "SELECT * FROM areas ORDER BY id FOR UPDATE", nativeQuery = true)
+    @Query(value = "SELECT * FROM areas WHERE deleted_at IS NULL ORDER BY id FOR UPDATE", nativeQuery = true)
     List<Area> findAllForAssignmentUpdate();
+
+    @Query(value = "SELECT code FROM areas WHERE type=:type", nativeQuery = true)
+    List<String> findCodesIncludingDeleted(@Param("type") String type);
 
     Optional<Area> findByCode(String code);
 

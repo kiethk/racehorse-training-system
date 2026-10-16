@@ -6,6 +6,7 @@ import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.service.AreaService;
+import com.rtms.backend.stable.service.AreaLifecycleService;
 import com.rtms.backend.stable.service.StableAssignmentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,11 +34,13 @@ class AreaControllerTest {
     @Mock
     private StableAssignmentService stableAssignmentService;
 
+    @Mock private AreaLifecycleService lifecycle;
+
     private AreaController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new AreaController(areaRepository, areaService, stableAssignmentService);
+        controller = new AreaController(areaRepository, areaService, stableAssignmentService, lifecycle);
     }
 
     @Test
