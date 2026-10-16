@@ -60,7 +60,7 @@ class HorseServiceTest {
         stall.setStatus(StallStatus.AVAILABLE);
 
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(6L)).thenReturn(Optional.of(stall));
+        when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(stall));
         when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
 
         Horse updated = horseService.assignStall(1L, 6L);
@@ -88,7 +88,7 @@ class HorseServiceTest {
         newStall.setStatus(StallStatus.AVAILABLE);
 
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(6L)).thenReturn(Optional.of(newStall));
+        when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(newStall));
         when(stableStallRepository.findById(5L)).thenReturn(Optional.of(oldStall));
         when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -108,7 +108,7 @@ class HorseServiceTest {
         horse.setId(1L);
 
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(999L)).thenReturn(Optional.empty());
+        when(stableStallRepository.findActiveByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> horseService.assignStall(1L, 999L));
         verify(horseRepository, never()).save(any());
@@ -258,7 +258,7 @@ class HorseServiceTest {
         target.setStatus(StallStatus.OCCUPIED);
 
         when(horseRepository.findById(9L)).thenReturn(Optional.of(moving));
-        when(stableStallRepository.findById(6L)).thenReturn(Optional.of(target));
+        when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(target));
         when(horseRepository.findByCurrentStallId(6L)).thenReturn(Optional.of(occupant));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
@@ -284,7 +284,7 @@ class HorseServiceTest {
         stall.setStatus(StallStatus.OCCUPIED);
 
         when(horseRepository.findById(5L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(6L)).thenReturn(Optional.of(stall));
+        when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(stall));
         when(horseRepository.findByCurrentStallId(6L)).thenReturn(Optional.of(horse));
         when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -314,7 +314,7 @@ class HorseServiceTest {
         newStall.setStatus(StallStatus.AVAILABLE);
 
         when(horseRepository.findById(9L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(22L)).thenReturn(Optional.of(newStall));
+        when(stableStallRepository.findActiveByIdForUpdate(22L)).thenReturn(Optional.of(newStall));
         when(stableStallRepository.findById(18L)).thenReturn(Optional.of(oldStall));
         when(horseRepository.findByCurrentStallId(22L)).thenReturn(Optional.empty());
         when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
@@ -339,7 +339,7 @@ class HorseServiceTest {
         newStall.setGroomId(4L);
 
         when(horseRepository.findById(9L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(6L)).thenReturn(Optional.of(newStall));
+        when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(newStall));
         when(horseRepository.findByCurrentStallId(6L)).thenReturn(Optional.empty());
         doThrow(new IllegalStateException("Groom này đang dắt 'BOOSTER WINNER'"))
                 .when(workoutService).reassignFutureWorkoutsToGroom(9L, 4L);

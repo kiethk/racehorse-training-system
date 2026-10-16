@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button, ConfirmDialog, EmptyState, IconButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, Tabs } from '@/components/ui';
-import type { AreaType, StableStall } from '../types';
+import type { Area, AreaType, StableStall } from '../types';
 import type { AssignmentDraft, AssignmentTarget, DragStaff } from '../types/manager';
 import { useManagerStable } from '../hooks/useManagerStable';
 import { areaView, compareAreas, editCount, horseMap, overlayDraft, personName, planAssignment } from '../lib/managerAssignments';
@@ -11,6 +11,7 @@ import { AreaCard } from './AreaCard';
 import { StableStaffPanel } from './StableStaffPanel';
 import { StaffAssignmentPicker } from './StaffAssignmentPicker';
 import { staffDragDrop } from './staffDragDrop';
+import { DeleteAreaDialog } from './DeleteAreaDialog';
 
 type Preview = ReturnType<typeof planAssignment>;
 
@@ -20,8 +21,8 @@ export function ManagerStableView() {
 
 function ManagerStableContent() {
   const state = useManagerStable();
-  const { data, draft, setDraft, loading, saving, creating, loadError, actionError, needsReload,
-    reload, discard, save, addArea, setActionError } = state;
+  const { data, draft, setDraft, loading, saving, creating, deleting, loadError, actionError, needsReload,
+    reload, discard, save, addArea, deleteArea, setActionError } = state;
   const [activeTab, setActiveTab] = useState<AreaType>('REGULAR');
   const [attentionOnly, setAttentionOnly] = useState(false);
   const { activeItem: dragging, cancel: cancelDrag } = staffDragDrop.useDragDrop();
@@ -30,10 +31,11 @@ function ManagerStableContent() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pendingAction, setPendingAction] = useState<{ run: () => void } | null>(null);
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Area | null>(null);
   const count = data && draft ? editCount(data, draft) : 0;
   const dirty = count > 0;
-  const busy = loading || saving || creating;
-  const editDisabled = busy || needsReload;
+  const busy = loading || saving || creating || deleting;
+  const editDisabled = busy || needsReload || deleteTarget != null;
   const horses = useMemo(() => horseMap(data ?? { horses: [] }), [data]);
   const views = useMemo(() => data && draft ? data.areas.filter(a => a.type === activeTab).sort(compareAreas)
     .map(a => areaView(data, draft, a, horses)) : [], [data, draft, activeTab, horses]);
@@ -120,6 +122,7 @@ function ManagerStableContent() {
             {displayed.length ? <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {displayed.map(view => <AreaCard key={view.area.id} view={view} data={data} draft={draft} horses={horses}
                 disabled={editDisabled} onPick={pick}
+                onDelete={() => guard(() => { cancelDrag(); setSelectedStaff(null); setActionError(null); setDeleteTarget(view.area); })}
                 onAssign={assign} onRemove={target => propose(target, null)} onSelectStall={setSelectedStall} />)}
             </div> : <Panel padded><EmptyState icon="building" title={attentionOnly ? 'No areas need attention' : 'No areas yet'}
               action={attentionOnly ? <Button onClick={() => setAttentionOnly(false)}>Show all areas</Button> : undefined} /></Panel>}
@@ -138,6 +141,12 @@ function ManagerStableContent() {
       </>}
       {picker && data && draft && <StaffAssignmentPicker key={`${picker.kind}:${picker.areaId}:${picker.kind === 'groom' ? picker.blockNumber : ''}`}
         data={data} draft={draft} target={picker} onClose={() => setPicker(null)} onAssign={assign} />}
+      {deleteTarget && <DeleteAreaDialog key={deleteTarget.id} area={deleteTarget} deleting={deleting} actionError={actionError}
+        onClose={() => setDeleteTarget(null)} onDelete={async () => {
+          const deleted = await deleteArea(deleteTarget.id);
+          if (deleted) { setDeleteTarget(null); setSelectedStall(null); }
+          return deleted;
+        }} />}
       <ConfirmDialog open={preview != null} title={preview && preview.changes.length > 1 ? 'Swap assignments?' : 'Change assignment?'}
         confirmLabel="Apply to draft" onCancel={() => setPreview(null)} onConfirm={() => { if (preview) stage(preview.draft); }}
         description={<div className="space-y-3">{preview?.changes.map(change => <div key={change.label}>

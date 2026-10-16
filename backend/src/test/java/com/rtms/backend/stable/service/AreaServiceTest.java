@@ -34,6 +34,8 @@ class AreaServiceTest {
     @Mock
     private EntityManager entityManager;
 
+    @Mock private AreaLifecycleService lifecycle;
+
     @Captor
     private ArgumentCaptor<Area> areaCaptor;
 
@@ -44,7 +46,8 @@ class AreaServiceTest {
 
     @BeforeEach
     void setUp() {
-        areaService = new AreaService(areaRepository, stableStallRepository, entityManager);
+        areaService = new AreaService(areaRepository, stableStallRepository, entityManager, lifecycle);
+        lenient().when(lifecycle.restoreFirst(any())).thenReturn(null);
         jakarta.persistence.Query lock = mock(jakarta.persistence.Query.class);
         lenient().when(entityManager.createNativeQuery(any(String.class))).thenReturn(lock);
         lenient().when(lock.setParameter(any(String.class), any())).thenReturn(lock);
@@ -65,7 +68,7 @@ class AreaServiceTest {
         Area c = new Area(); c.setCode("C"); c.setType(AreaType.REGULAR);
         Area d = new Area(); d.setCode("D"); d.setType(AreaType.REGULAR);
 
-        when(areaRepository.findByType(AreaType.REGULAR)).thenReturn(List.of(a, b, c, d));
+        when(areaRepository.findCodesIncludingDeleted("REGULAR")).thenReturn(List.of("A", "B", "C", "D"));
         when(areaRepository.save(any(Area.class))).thenAnswer(inv -> {
             Area saved = inv.getArgument(0);
             saved.setId(10L);
@@ -99,7 +102,7 @@ class AreaServiceTest {
     void testCreateQuarantineArea() {
         Area qa = new Area(); qa.setCode("Q-A"); qa.setType(AreaType.QUARANTINE);
 
-        when(areaRepository.findByType(AreaType.QUARANTINE)).thenReturn(List.of(qa));
+        when(areaRepository.findCodesIncludingDeleted("QUARANTINE")).thenReturn(List.of("Q-A"));
         when(areaRepository.save(any(Area.class))).thenAnswer(inv -> {
             Area saved = inv.getArgument(0);
             saved.setId(20L);

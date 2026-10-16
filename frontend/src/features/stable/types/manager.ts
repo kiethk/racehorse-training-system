@@ -41,3 +41,17 @@ export interface AssignmentChange {
   after: string;
   note?: string;
 }
+
+export interface AreaDeletionCheck {
+  areaId: number;
+  areaCode: string;
+  stallCount: number;
+  canDelete: boolean;
+  reasons: string[];
+}
+
+export interface AreaDeletionResult {
+  areaId: number;
+  areaCode: string;
+  stallCount: number;
+}

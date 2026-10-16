@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Panel, Pill } from '@/components/ui';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton, Panel, Pill } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { StallCell } from '../shared/components/StallCell';
 import type { StableStall } from '../types';
@@ -20,9 +20,10 @@ interface Props {
   onRemove: (target: AssignmentTarget) => void;
   onAssign: (target: AssignmentTarget, staff: DragStaff) => void;
   onSelectStall: (stall: StableStall) => void;
+  onDelete: () => void;
 }
 
-export function AreaCard({ view, data, draft, horses, onSelectStall, ...assignment }: Props) {
+export function AreaCard({ view, data, draft, horses, onSelectStall, onDelete, ...assignment }: Props) {
   const { area, occupied, stalls, blocks, missingTrainer, hasGrooms, attention } = view;
   const trainerId = draft.trainers[area.id];
   const { dropProps } = staffDragDrop.useDropZone({
@@ -38,7 +39,17 @@ export function AreaCard({ view, data, draft, horses, onSelectStall, ...assignme
           <h2 className="text-lg font-semibold">Area {area.code}</h2>
           <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">{occupied} / {stalls.length} occupied</p>
         </div>
-        {attention > 0 && <Pill tone="warning" size="sm">Needs assignment</Pill>}
+        <div className="flex items-center gap-1.5">
+          {attention > 0 && <Pill tone="warning" size="sm">Needs assignment</Pill>}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton icon="more" label={`Area ${area.code} options`} size="sm" disabled={assignment.disabled} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem tone="danger" onSelect={onDelete}>Delete area</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
       <div className="space-y-3 px-3 pb-3">
         {area.type === 'REGULAR' && <StaffAssignment {...assignment} target={{ kind: 'trainer', areaId: area.id }}

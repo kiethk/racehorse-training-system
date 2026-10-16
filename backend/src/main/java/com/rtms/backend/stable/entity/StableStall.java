@@ -2,10 +2,13 @@ package com.rtms.backend.stable.entity;
 
 import com.rtms.backend.stable.enums.StallStatus;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
 
 @Entity
+@SQLRestriction("deleted_at IS NULL")
 @Table(name = "stable_stalls", uniqueConstraints = {
         @UniqueConstraint(name = "uq_stable_stalls_area_number", columnNames = { "area_id", "stall_number" })
 })
@@ -14,6 +17,14 @@ public class StableStall {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "deleted_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private LocalDateTime deletedAt;
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 
     @Column(name = "area_id", nullable = false)
     private Long areaId;

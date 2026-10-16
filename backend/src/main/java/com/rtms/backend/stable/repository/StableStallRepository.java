@@ -13,8 +13,15 @@ import java.util.Optional;
 @Repository
 public interface StableStallRepository extends JpaRepository<StableStall, Long> {
 
-    @Query(value = "SELECT * FROM stable_stalls ORDER BY id FOR UPDATE", nativeQuery = true)
+    @Query(value = "SELECT * FROM stable_stalls WHERE deleted_at IS NULL ORDER BY id FOR UPDATE", nativeQuery = true)
     List<StableStall> findAllForAssignmentUpdate();
+
+    @Query(value = """
+            SELECT ss.* FROM stable_stalls ss JOIN areas a ON a.id=ss.area_id
+            WHERE ss.id=:id AND ss.deleted_at IS NULL AND a.deleted_at IS NULL
+            FOR UPDATE OF ss
+            """, nativeQuery = true)
+    Optional<StableStall> findActiveByIdForUpdate(@Param("id") Long id);
 
     List<StableStall> findByAreaId(Long areaId);
 
@@ -34,9 +41,9 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             SELECT ss.*
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE a.type IN ('QUARANTINE', 'REGULAR')
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type IN ('QUARANTINE', 'REGULAR')
             ORDER BY ss.id ASC
-            FOR UPDATE
+            FOR UPDATE OF ss
             """, nativeQuery = true)
     List<StableStall> lockAdmissionCapacityStallsForUpdate();
 
@@ -44,7 +51,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             SELECT COUNT(*)
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE a.type = 'QUARANTINE'
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
               AND ss.status = 'AVAILABLE'
             """, nativeQuery = true)
     long countAvailableQuarantineStalls();
@@ -53,7 +60,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             SELECT COUNT(*)
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE a.type = 'QUARANTINE'
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
               AND ss.status IN ('OCCUPIED', 'RESERVED')
             """, nativeQuery = true)
     long countOccupiedQuarantineStalls();
@@ -62,7 +69,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             SELECT COUNT(*)
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE a.type = 'REGULAR'
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'REGULAR'
               AND ss.status = 'AVAILABLE'
             """, nativeQuery = true)
     long countAvailableRegularStalls();
@@ -71,11 +78,11 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             SELECT ss.*
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE a.type = 'QUARANTINE'
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
               AND ss.status = 'AVAILABLE'
             ORDER BY a.code ASC, ss.stall_number ASC
             LIMIT 1
-            FOR UPDATE SKIP LOCKED
+            FOR UPDATE OF ss SKIP LOCKED
             """, nativeQuery = true)
     Optional<StableStall> findFirstAvailableQuarantineStallForUpdate();
 
@@ -83,11 +90,11 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             SELECT ss.*
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE a.type = 'REGULAR'
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'REGULAR'
               AND ss.status = 'AVAILABLE'
             ORDER BY a.code ASC, ss.stall_number ASC
             LIMIT 1
-            FOR UPDATE SKIP LOCKED
+            FOR UPDATE OF ss SKIP LOCKED
             """, nativeQuery = true)
     Optional<StableStall> findFirstAvailableRegularStallForUpdate();
 
@@ -95,10 +102,10 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             SELECT ss.*
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE ss.id = :stallId
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND ss.id = :stallId
               AND a.type = 'REGULAR'
               AND ss.status = 'AVAILABLE'
-            FOR UPDATE
+            FOR UPDATE OF ss
             """, nativeQuery = true)
     Optional<StableStall> findAvailableRegularStallByIdForUpdate(
             @Param("stallId") Long stallId);
@@ -106,7 +113,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
     @Query(value = """
             SELECT ss.* FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE ss.id = :stallId AND a.type = 'QUARANTINE'
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND ss.id = :stallId AND a.type = 'QUARANTINE'
             FOR UPDATE OF ss
             """, nativeQuery = true)
     Optional<StableStall> findQuarantineStallByIdForUpdate(@Param("stallId") Long stallId);
@@ -115,7 +122,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             SELECT ss.*
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE a.type = 'REGULAR'
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'REGULAR'
               AND ss.status = 'AVAILABLE'
             ORDER BY a.code ASC, ss.stall_number ASC
             """, nativeQuery = true)
@@ -139,10 +146,10 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
     @Query(value = """
             SELECT ss.*
             FROM stable_stalls ss
-            WHERE ss.area_id = :areaId
+            WHERE ss.deleted_at IS NULL AND ss.area_id = :areaId
               AND ss.stall_number BETWEEN :fromNumber AND :toNumber
             ORDER BY ss.stall_number ASC
-            FOR UPDATE
+            FOR UPDATE OF ss
             """, nativeQuery = true)
     List<StableStall> findBlockForUpdate(
             @Param("areaId") Long areaId,
@@ -154,7 +161,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             SELECT ss.*
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE ss.area_id IN :areaIds
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND ss.area_id IN :areaIds
             ORDER BY a.code ASC, ss.stall_number ASC
             """, nativeQuery = true)
     List<StableStall> findByAreaIdInOrdered(@Param("areaIds") List<Long> areaIds);

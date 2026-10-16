@@ -160,6 +160,13 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+/** JSON DELETE uses the same authentication, token refresh and error mapping. */
+export async function apiDelete<T>(path: string): Promise<T> {
+  const res = await doFetch(path, { method: 'DELETE', credentials: 'include' });
+  if (!res.ok) throw await responseError(res);
+  return res.json();
+}
+
 /** Multipart upload uses the same Bearer API client as JSON requests. */
 export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
   const res = await doFetch(path, {

@@ -171,7 +171,7 @@ public class HorseService {
             return horseRepository.save(horse);
         }
 
-        StableStall newStall = stableStallRepository.findById(stallId)
+        StableStall newStall = stableStallRepository.findActiveByIdForUpdate(stallId)
                 .orElseThrow(() -> new RuntimeException("Stable stall not found with id: " + stallId));
 
         // ---- BR-07: một chuồng chỉ chứa một chiến mã ----
