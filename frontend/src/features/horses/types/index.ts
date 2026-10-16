@@ -39,6 +39,10 @@ export interface HorsePedigree {
   registrationNumber?: string | null;
   registryName?: string | null;
   pedigreeNotes?: string | null;
+  sireName?: string | null;
+  sireRegistrationNumber?: string | null;
+  damName?: string | null;
+  damRegistrationNumber?: string | null;
 }
 
 export type AdmissionStatus =

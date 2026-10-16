@@ -27,6 +27,10 @@ import org.springframework.stereotype.Repository;
 public interface HorseRepository extends JpaRepository<Horse, Long> {
     List<Horse> findByOwnerId(Long ownerId);
     List<Horse> findByRegistrationNumber(String registrationNumber);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT h FROM Horse h WHERE h.registrationNumber = :ueln")
+    List<Horse> findByRegistrationNumberForUpdate(@Param("ueln") String ueln);
     List<Horse> findByCurrentStallIdIsNotNull();
     List<Horse> findByCurrentStallIdIn(List<Long> stallIds);
 

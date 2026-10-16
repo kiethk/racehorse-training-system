@@ -1,6 +1,10 @@
 package com.rtms.backend.admission.service;
 
 import com.rtms.backend.common.storage.FileStorageService;
+import com.rtms.backend.config.ApiException;
+import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.service.PedigreeBirthDateValidator;
 import com.rtms.backend.admission.dto.AdmissionDocumentMetadataRequest;
 import com.rtms.backend.admission.dto.CreateOwnerAdmissionRequest;
 import com.rtms.backend.admission.entity.AdmissionApplication;
@@ -14,6 +18,7 @@ import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,6 +38,8 @@ class OwnerAdmissionServiceTest {
     private CandidateHorseProfileRepository candidates;
     private AdmissionDocumentRepository documents;
     private FileStorageService files;
+    private AdmissionUelnPolicy uelnPolicy;
+    private HorseRepository horses;
     private OwnerAdmissionService service;
     private AtomicLong sequence;
 
@@ -42,7 +49,10 @@ class OwnerAdmissionServiceTest {
         candidates = mock(CandidateHorseProfileRepository.class);
         documents = mock(AdmissionDocumentRepository.class);
         files = mock(FileStorageService.class);
-        service = new OwnerAdmissionService(admissions, candidates, documents, files);
+        uelnPolicy = mock(AdmissionUelnPolicy.class);
+        horses = mock(HorseRepository.class);
+        service = new OwnerAdmissionService(admissions, candidates, documents, files, uelnPolicy,
+                new PedigreeBirthDateValidator(horses));
         sequence = new AtomicLong(100);
         when(admissions.save(any())).thenAnswer(inv -> {
             AdmissionApplication app = inv.getArgument(0);
@@ -55,7 +65,7 @@ class OwnerAdmissionServiceTest {
     private CreateOwnerAdmissionRequest request() {
         return new CreateOwnerAdmissionRequest(
                 "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
-                "fr1234567890123", "SIRE", "Sire", null,
+                " 250001ab1234567 ", "SIRE", "Sire", null,
                 "Dam", null, "Family notes");
     }
 
@@ -63,7 +73,7 @@ class OwnerAdmissionServiceTest {
     void createsOneApplicationAndOneSnapshotWithoutCreatingHorse() {
         var result = service.create(7L, request());
         assertEquals(AdmissionStatus.GROOM_REVIEW, result.status());
-        assertEquals("FR1234567890123", result.candidate().registrationNumber());
+        assertEquals("250001AB1234567", result.candidate().registrationNumber());
         assertEquals("Family notes", result.candidate().pedigreeNotes());
         assertEquals(101L, result.admissionId());
         assertTrue(result.documents().isEmpty());
@@ -146,6 +156,76 @@ class OwnerAdmissionServiceTest {
     }
 
     @Test
+    void createChecksNormalizedUelnBeforeCreatingAnyRecords() {
+        doThrow(new ApiException(HttpStatus.CONFLICT, AdmissionUelnPolicy.CONFLICT_CODE, "UELN in use"))
+                .when(uelnPolicy).assertAvailableForSubmission("250001AB1234567");
+
+        assertThrows(ApiException.class, () -> service.create(8L, request()));
+        verifyNoInteractions(admissions, candidates, documents, files);
+    }
+
+    @Test
+    void createRejectsChildBornBeforeInternalSireWithoutSavingAdmission() {
+        Horse sire = new Horse();
+        sire.setDateOfBirth(LocalDate.of(2023, 1, 1));
+        when(horses.findByRegistrationNumber("999999SIR000001")).thenReturn(List.of(sire));
+        var candidate = new CreateOwnerAdmissionRequest("Test horse", null, LocalDate.of(2022, 4, 15),
+                "999999BIR000001", null, "Sire", "999999SIR000001", null, null, null);
+
+        var error = assertThrows(ResponseStatusException.class, () -> service.create(7L, candidate));
+
+        assertEquals(400, error.getStatusCode().value());
+        assertTrue(error.getReason().contains("sire"));
+        verifyNoInteractions(admissions, candidates, documents, files, uelnPolicy);
+    }
+
+    @Test
+    void submitRejectsChildBornSameDayAsInternalDamBeforeSavingOrUploading() {
+        Horse dam = new Horse();
+        dam.setDateOfBirth(LocalDate.of(2022, 4, 15));
+        when(horses.findByRegistrationNumber("999999DAM000001")).thenReturn(List.of(dam));
+        var candidate = new CreateOwnerAdmissionRequest("Test horse", null, LocalDate.of(2022, 4, 15),
+                "999999BIR000001", null, null, null, "Dam", "999999DAM000001", null);
+        var metadata = List.of(
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.HORSE_PHOTO, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.REGISTRATION_DOCUMENT, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.PEDIGREE_CERTIFICATE, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.VACCINATION_RECORD, null, null));
+        List<MultipartFile> uploads = List.of(
+                new MockMultipartFile("files", "photo.png", "image/png", new byte[]{1}),
+                new MockMultipartFile("files", "registration.pdf", "application/pdf", new byte[]{2}),
+                new MockMultipartFile("files", "pedigree.pdf", "application/pdf", new byte[]{3}),
+                new MockMultipartFile("files", "vaccination.pdf", "application/pdf", new byte[]{4}));
+
+        var error = assertThrows(ResponseStatusException.class, () -> service.submit(7L, candidate, metadata, uploads));
+
+        assertEquals(400, error.getStatusCode().value());
+        assertTrue(error.getReason().contains("dam"));
+        verifyNoInteractions(admissions, candidates, documents, uelnPolicy);
+        verify(files, never()).store(any(), any());
+    }
+
+    @Test
+    void submitConflictDoesNotSaveRecordsOrUploadFiles() {
+        var metadata = List.of(
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.HORSE_PHOTO, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.REGISTRATION_DOCUMENT, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.PEDIGREE_CERTIFICATE, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.VACCINATION_RECORD, null, null));
+        List<MultipartFile> uploads = List.of(
+                new MockMultipartFile("files", "photo.png", "image/png", new byte[]{1}),
+                new MockMultipartFile("files", "registration.pdf", "application/pdf", new byte[]{2}),
+                new MockMultipartFile("files", "pedigree.pdf", "application/pdf", new byte[]{3}),
+                new MockMultipartFile("files", "vaccination.pdf", "application/pdf", new byte[]{4}));
+        doThrow(new ApiException(HttpStatus.CONFLICT, AdmissionUelnPolicy.CONFLICT_CODE, "UELN in use"))
+                .when(uelnPolicy).assertAvailableForSubmission("250001AB1234567");
+
+        assertThrows(ApiException.class, () -> service.submit(8L, request(), metadata, uploads));
+        verifyNoInteractions(admissions, candidates, documents);
+        verify(files, never()).store(any(), any());
+    }
+
+    @Test
     void ownerCanReadOnlyOwnAdmission() {
         var existing = new AdmissionApplication();
         existing.setId(10L); existing.setOwnerId(7L);
@@ -211,5 +291,49 @@ class OwnerAdmissionServiceTest {
         assertEquals(1, list.size());
         assertEquals("Pegasus", list.getFirst().getCandidateName());
         verify(admissions).findByOwnerIdOrderBySubmittedAtDesc(7L);
+    }
+
+    @Test
+    void createRejectsInvalidUelnFormat() {
+        var invalidRequest = new CreateOwnerAdmissionRequest(
+                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
+                "VNM22SC00000001", "SIRE", "Sire", null,
+                "Dam", null, "Notes");
+        var ex = assertThrows(ResponseStatusException.class, () -> service.create(7L, invalidRequest));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("UELN"));
+    }
+
+    @Test
+    void createRejectsChildSameAsSireUeln() {
+        var conflictingRequest = new CreateOwnerAdmissionRequest(
+                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
+                "250001123456789", "SIRE", "Sire", "250001123456789",
+                "Dam", null, "Notes");
+        var ex = assertThrows(ResponseStatusException.class, () -> service.create(7L, conflictingRequest));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Child UELN and sire UELN cannot be the same"));
+    }
+
+    @Test
+    void createRejectsChildSameAsDamUeln() {
+        var conflictingRequest = new CreateOwnerAdmissionRequest(
+                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
+                "250001123456789", "SIRE", "Sire", null,
+                "Dam", "250001123456789", "Notes");
+        var ex = assertThrows(ResponseStatusException.class, () -> service.create(7L, conflictingRequest));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Child UELN and dam UELN cannot be the same"));
+    }
+
+    @Test
+    void createRejectsSireSameAsDamUeln() {
+        var conflictingRequest = new CreateOwnerAdmissionRequest(
+                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
+                "250001123456789", "SIRE", "Sire", "250001999999999",
+                "Dam", "250001999999999", "Notes");
+        var ex = assertThrows(ResponseStatusException.class, () -> service.create(7L, conflictingRequest));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Sire UELN and dam UELN cannot be the same"));
     }
 }

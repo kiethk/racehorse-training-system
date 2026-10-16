@@ -29,6 +29,23 @@ import java.util.List;
 @Repository
 public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout, Long> {
 
+    @Query(value = """
+           SELECT w.* FROM training_workouts w
+           JOIN training_lots l ON l.id = w.lot_id
+           WHERE w.horse_id IN :horseIds AND w.status = 'SCHEDULED'
+             AND l.lot_date >= :fromDate
+           ORDER BY l.id, w.id FOR UPDATE OF l, w
+           """, nativeQuery = true)
+    List<TrainingWorkout> findFutureScheduledByHorsesForUpdate(
+            @Param("horseIds") Collection<Long> horseIds, @Param("fromDate") LocalDate fromDate);
+
+    @Query(value = """
+           SELECT w.* FROM training_workouts w
+           WHERE w.lot_id IN :lotIds AND w.status <> 'CANCELLED'
+           ORDER BY w.id FOR UPDATE
+           """, nativeQuery = true)
+    List<TrainingWorkout> findNonCancelledByLotsForUpdate(@Param("lotIds") Collection<Long> lotIds);
+
     // BR-02 (Trainer không dạy 2 ngựa cùng lúc) không cần query riêng: thuật toán xếp khe trong
     // TrainingLotService không cho tạo lot đè lên lot khác.
     // (BR-02 needs no query of its own: the slot algorithm in TrainingLotService never creates

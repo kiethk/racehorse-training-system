@@ -2,6 +2,7 @@ package com.rtms.backend.admission.controller;
 import com.rtms.backend.admission.dto.AdmissionDocumentMetadataRequest;
 import com.rtms.backend.admission.dto.AdmissionDocumentResponse;
 import com.rtms.backend.admission.dto.AdmissionSummaryResponse;
+import com.rtms.backend.admission.dto.AdmissionUelnAvailabilityResponse;
 import com.rtms.backend.admission.dto.CreateOwnerAdmissionRequest;
 import com.rtms.backend.admission.dto.OwnerAdmissionDetailResponse;
 import com.rtms.backend.admission.enums.AdmissionDocumentType;
@@ -10,6 +11,7 @@ import com.rtms.backend.common.dto.ApiResponse;
 
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.admission.service.OwnerAdmissionService;
+import com.rtms.backend.admission.service.AdmissionUelnPolicy;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,9 +27,17 @@ import java.util.List;
 @RequestMapping("/api/owner/admissions")
 public class OwnerAdmissionController {
     private final OwnerAdmissionService service;
+    private final AdmissionUelnPolicy uelnPolicy;
 
-    public OwnerAdmissionController(OwnerAdmissionService service) {
+    public OwnerAdmissionController(OwnerAdmissionService service, AdmissionUelnPolicy uelnPolicy) {
         this.service = service;
+        this.uelnPolicy = uelnPolicy;
+    }
+
+    @GetMapping("/ueln-availability")
+    @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_CREATE') and principal.role == 'HORSE_OWNER'")
+    public ApiResponse<AdmissionUelnAvailabilityResponse> uelnAvailability(@RequestParam String ueln) {
+        return ApiResponse.success(uelnPolicy.checkAvailability(ueln));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

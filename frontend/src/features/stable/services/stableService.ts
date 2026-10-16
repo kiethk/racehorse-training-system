@@ -1,5 +1,6 @@
-import { apiGet, apiPut } from '@/services/api';
-import type { Area, Horse, StableStall, UserSummary, HorseStatus } from '../types';
+import { apiGet, apiPost, apiPut } from '@/services/api';
+import type { Area, AreaType, Horse, StableStall, UserSummary, HorseStatus } from '../types';
+import type { AssignmentBatch, AssignmentResponse } from '../types/manager';
 
 interface ApiResponse<T> { success: boolean; data: T; message?: string; }
 
@@ -17,8 +18,15 @@ interface ApiResponse<T> { success: boolean; data: T; message?: string; }
  * @RequestBody, so Spring ignores the body.
  */
 export const stableApi = {
-  getAreas: async (): Promise<Area[]> =>
-    (await apiGet<ApiResponse<Area[]>>('/api/areas')).data,
+  saveAssignments: async (request: AssignmentBatch): Promise<AssignmentResponse> =>
+    (await apiPut<ApiResponse<AssignmentResponse>>('/api/areas/assignments', request)).data,
+  getAreas: async (type?: AreaType): Promise<Area[]> => {
+    const url = type ? `/api/areas?type=${type}` : '/api/areas';
+    return (await apiGet<ApiResponse<Area[]>>(url)).data;
+  },
+
+  createArea: async (type: AreaType): Promise<Area> =>
+    (await apiPost<ApiResponse<Area>>('/api/areas', { type })).data,
 
   getStalls: async (areaCode?: string): Promise<StableStall[]> => {
     const url = areaCode ? `/api/stalls?areaCode=${areaCode}` : '/api/stalls';
@@ -50,6 +58,9 @@ export const stableApi = {
 
   getGrooms: async (): Promise<UserSummary[]> =>
     (await apiGet<ApiResponse<UserSummary[]>>('/api/users?role=GROOM')).data,
+
+  getTrainers: async (): Promise<UserSummary[]> =>
+    (await apiGet<ApiResponse<UserSummary[]>>('/api/users?role=HEAD_TRAINER')).data,
 
   /** NOTE: the backend takes @RequestParam, NOT a body. */
   assignHorseToStall: async (horseId: number, stallId: number): Promise<void> => {
