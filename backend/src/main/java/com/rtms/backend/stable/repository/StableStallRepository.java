@@ -13,6 +13,9 @@ import java.util.Optional;
 @Repository
 public interface StableStallRepository extends JpaRepository<StableStall, Long> {
 
+    @Query(value = "SELECT * FROM stable_stalls ORDER BY id FOR UPDATE", nativeQuery = true)
+    List<StableStall> findAllForAssignmentUpdate();
+
     List<StableStall> findByAreaId(Long areaId);
 
     List<StableStall> findByStatus(StallStatus status);

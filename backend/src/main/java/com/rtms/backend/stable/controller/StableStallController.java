@@ -91,8 +91,8 @@ public class StableStallController {
     @PreAuthorize("hasAuthority('STALL_GROOM_ASSIGN')")
     public ApiResponse<StableStall> assignGroom(
             @PathVariable Long id,
-            @RequestParam(required = false) Long groomId) {
-        return ApiResponse.success(stableStallService.assignGroom(id, groomId));
+            @RequestBody com.rtms.backend.stable.dto.BlockGroomAssignmentDto request) {
+        return ApiResponse.success(stableStallService.assignGroom(id, request));
     }
 
     @GetMapping("/{id}")

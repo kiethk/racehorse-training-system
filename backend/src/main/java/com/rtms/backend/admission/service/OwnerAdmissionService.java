@@ -14,6 +14,7 @@ import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.service.PedigreeBirthDateValidator;
 
 
 import com.rtms.backend.security.AuthenticatedUser;
@@ -56,19 +57,31 @@ public class OwnerAdmissionService {
     private final CandidateHorseProfileRepository candidates;
     private final AdmissionDocumentRepository documents;
     private final FileStorageService fileStorage;
+    private final AdmissionUelnPolicy uelnPolicy;
+    private final PedigreeBirthDateValidator birthDates;
 
     public OwnerAdmissionService(AdmissionApplicationRepository admissions,
             CandidateHorseProfileRepository candidates, AdmissionDocumentRepository documents,
-            FileStorageService fileStorage) {
+            FileStorageService fileStorage, AdmissionUelnPolicy uelnPolicy,
+            PedigreeBirthDateValidator birthDates) {
         this.admissions = admissions;
         this.candidates = candidates;
         this.documents = documents;
         this.fileStorage = fileStorage;
+        this.uelnPolicy = uelnPolicy;
+        this.birthDates = birthDates;
     }
 
     /** The transaction creates exactly one new Application and one new immutable snapshot. */
     @Transactional
     public OwnerAdmissionDetailResponse create(Long ownerId, CreateOwnerAdmissionRequest request) {
+        String childUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.registrationNumber(), "Registration number (UELN)");
+        String sireUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.sireRegistrationNumber(), "Sire UELN");
+        String damUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.damRegistrationNumber(), "Dam UELN");
+        com.rtms.backend.horse.util.UelnUtils.validatePedigreeUelns(childUeln, sireUeln, damUeln);
+        birthDates.validateByUeln(request.dateOfBirth(), sireUeln, damUeln);
+        uelnPolicy.assertAvailableForSubmission(childUeln);
+
         AdmissionApplication application = new AdmissionApplication();
         application.setOwnerId(ownerId);
         application.setStatus(AdmissionStatus.GROOM_REVIEW);
@@ -79,12 +92,12 @@ public class OwnerAdmissionService {
         snapshot.setName(request.name().trim());
         snapshot.setBreed(trimNullable(request.breed()));
         snapshot.setDateOfBirth(request.dateOfBirth());
-        snapshot.setRegistrationNumber(ueln(request.registrationNumber()));
+        snapshot.setRegistrationNumber(childUeln);
         snapshot.setRegistryName(trimNullable(request.registryName()));
         snapshot.setSireName(trimNullable(request.sireName()));
-        snapshot.setSireRegistrationNumber(ueln(request.sireRegistrationNumber()));
+        snapshot.setSireRegistrationNumber(sireUeln);
         snapshot.setDamName(trimNullable(request.damName()));
-        snapshot.setDamRegistrationNumber(ueln(request.damRegistrationNumber()));
+        snapshot.setDamRegistrationNumber(damUeln);
         snapshot.setPedigreeNotes(trimNullable(request.pedigreeNotes()));
         candidates.save(snapshot);
 
@@ -100,6 +113,13 @@ public class OwnerAdmissionService {
         validateDocumentMetadata(metadata, files);
         validateFiles(metadata, files);
 
+        String childUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.registrationNumber(), "Registration number (UELN)");
+        String sireUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.sireRegistrationNumber(), "Sire UELN");
+        String damUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.damRegistrationNumber(), "Dam UELN");
+        com.rtms.backend.horse.util.UelnUtils.validatePedigreeUelns(childUeln, sireUeln, damUeln);
+        birthDates.validateByUeln(request.dateOfBirth(), sireUeln, damUeln);
+        uelnPolicy.assertAvailableForSubmission(childUeln);
+
         List<String> storedKeys = registerFileCleanup();
 
         AdmissionApplication application = new AdmissionApplication();
@@ -112,12 +132,12 @@ public class OwnerAdmissionService {
         snapshot.setName(request.name().trim());
         snapshot.setBreed(trimNullable(request.breed()));
         snapshot.setDateOfBirth(request.dateOfBirth());
-        snapshot.setRegistrationNumber(ueln(request.registrationNumber()));
+        snapshot.setRegistrationNumber(childUeln);
         snapshot.setRegistryName(trimNullable(request.registryName()));
         snapshot.setSireName(trimNullable(request.sireName()));
-        snapshot.setSireRegistrationNumber(ueln(request.sireRegistrationNumber()));
+        snapshot.setSireRegistrationNumber(sireUeln);
         snapshot.setDamName(trimNullable(request.damName()));
-        snapshot.setDamRegistrationNumber(ueln(request.damRegistrationNumber()));
+        snapshot.setDamRegistrationNumber(damUeln);
         snapshot.setPedigreeNotes(trimNullable(request.pedigreeNotes()));
         candidates.save(snapshot);
 

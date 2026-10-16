@@ -452,6 +452,41 @@ public class TrainingWorkoutService {
         return future.size();
     }
 
+    /** Validate the entire final allocation before changing any workout; supports Groom swaps. */
+    @Transactional
+    public int reassignFutureWorkoutsToGrooms(Map<Long, Long> groomByHorse) {
+        if (groomByHorse.isEmpty()) return 0;
+        List<TrainingWorkout> future = workoutRepository.findFutureScheduledByHorsesForUpdate(
+                groomByHorse.keySet(), LocalDate.now());
+        if (future.isEmpty()) return 0;
+        Set<Long> lotIds = future.stream().map(TrainingWorkout::getLotId).collect(Collectors.toSet());
+        List<TrainingWorkout> peers = workoutRepository.findNonCancelledByLotsForUpdate(lotIds);
+        Map<Long, List<TrainingWorkout>> byLot = peers.stream()
+                .collect(Collectors.groupingBy(TrainingWorkout::getLotId));
+        List<TrainingWorkout> changed = new ArrayList<>();
+        for (TrainingWorkout workout : future) {
+            Long target = groomByHorse.get(workout.getHorseId());
+            if (java.util.Objects.equals(target, workout.getAssignedToId())) continue;
+            if (target != null) {
+                for (TrainingWorkout peer : byLot.getOrDefault(workout.getLotId(), List.of())) {
+                    if (peer.getHorseId().equals(workout.getHorseId())) continue;
+                    Long peerGroom = peer.getStatus() == WorkoutStatus.SCHEDULED
+                            && groomByHorse.containsKey(peer.getHorseId())
+                            ? groomByHorse.get(peer.getHorseId()) : peer.getAssignedToId();
+                    if (target.equals(peerGroom)) {
+                        throw new IllegalStateException("BR-09: a Groom cannot lead two horses in lot #"
+                                + workout.getLotId() + ". Choose another Groom or adjust the lot.");
+                    }
+                }
+            }
+            changed.add(workout);
+        }
+        // Completed workouts never enter 'future'; their assignees remain historical.
+        changed.forEach(w -> w.setAssignedToId(groomByHorse.get(w.getHorseId())));
+        workoutRepository.saveAll(changed);
+        return changed.size();
+    }
+
     /**
      * Gom HẾT các lot bị vướng rồi mới báo lỗi, để người dùng thấy đủ trong một lần.
      * (Collects ALL clashing lots before failing, so the user sees them all at once.)

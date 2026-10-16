@@ -29,6 +29,16 @@ public interface AdmissionApplicationRepository
 
     List<AdmissionApplication> findByStatus(AdmissionStatus status);
 
+    @Query("""
+            SELECT COUNT(a) > 0
+            FROM AdmissionApplication a
+            JOIN CandidateHorseProfile c ON c.admissionId = a.id
+            WHERE c.registrationNumber = :ueln
+              AND a.status NOT IN :completedStatuses
+            """)
+    boolean existsOpenAdmissionByUeln(@Param("ueln") String ueln,
+                                     @Param("completedStatuses") Collection<AdmissionStatus> completedStatuses);
+
     List<AdmissionApplication> findByGroomId(Long groomId);
 
     Optional<AdmissionApplication> findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus status);

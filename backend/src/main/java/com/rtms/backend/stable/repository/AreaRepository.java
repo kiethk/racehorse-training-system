@@ -13,11 +13,15 @@ import java.util.Optional;
 @Repository
 public interface AreaRepository extends JpaRepository<Area, Long> {
 
+    @Query(value = "SELECT * FROM areas ORDER BY id FOR UPDATE", nativeQuery = true)
+    List<Area> findAllForAssignmentUpdate();
+
     Optional<Area> findByCode(String code);
 
     List<Area> findByType(AreaType type);
 
     /** REGULAR areas not yet assigned to any trainer, ordered by code ascending (deterministic). */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Area a WHERE a.type = 'REGULAR' AND a.trainerId IS NULL ORDER BY a.code ASC")
     List<Area> findUnassignedRegularAreasOrdered();
 

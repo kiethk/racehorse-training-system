@@ -26,6 +26,10 @@ export type OwnerAdmissionDetail = {
 type ApiResponse<T> = { success: boolean; data: T; message: string };
 
 export const ownerAdmissionApi = {
+  checkUeln: async (ueln: string) =>
+    (await apiGet<ApiResponse<{ available: boolean; message: string | null }>>(
+      `/api/owner/admissions/ueln-availability?${new URLSearchParams({ ueln })}`,
+    )).data,
   list: async () => (await apiGet<ApiResponse<AdmissionSummaryResponse[]>>('/api/owner/admissions')).data,
   detail: async (id: number) =>
     (await apiGet<ApiResponse<OwnerAdmissionDetail>>(`/api/owner/admissions/${id}`)).data,

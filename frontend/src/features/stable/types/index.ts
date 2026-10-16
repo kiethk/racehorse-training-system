@@ -1,4 +1,4 @@
-export type StallStatus = 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE';
+export type StallStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'MAINTENANCE';
 export type AreaType = 'REGULAR' | 'QUARANTINE';
 /** A horse's lifecycle in the club. Health is not tracked here — see trainingDecision. */
 export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED';
@@ -8,7 +8,7 @@ export type TrainingDecision = 'ALLOWED' | 'BLOCKED';
 
 export interface Area {
   id: number;
-  code: string;          // "A", "B", "Q"
+  code: string;          // "A", "B", "Q-A"
   name: string;
   type: AreaType;
   trainerId: number | null;
@@ -19,7 +19,7 @@ export interface StableStall {
   areaId: number;
   groomId: number | null;
   stallNumber: number;
-  stallCode: string;     // "A1", "Q3"
+  stallCode: string;     // "A01", "Q-A03"
   status: StallStatus;
 }
 

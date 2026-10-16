@@ -10,6 +10,7 @@ import com.rtms.backend.horse.entity.HorsePedigree;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorsePedigreeRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.horse.service.PedigreeBirthDateValidator;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
@@ -45,6 +46,7 @@ public class AdmissionGroomReviewService {
     private final CareScheduleRepository careScheduleRepository;
     private final CareScheduleService careScheduleService;
     private final NotificationService notificationService;
+    private final PedigreeBirthDateValidator birthDates;
 
     public AdmissionGroomReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
@@ -54,7 +56,8 @@ public class AdmissionGroomReviewService {
             HorsePedigreeRepository horsePedigreeRepository,
             CareScheduleRepository careScheduleRepository,
             CareScheduleService careScheduleService,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            PedigreeBirthDateValidator birthDates) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.stableStallRepository = stableStallRepository;
@@ -63,6 +66,7 @@ public class AdmissionGroomReviewService {
         this.careScheduleRepository = careScheduleRepository;
         this.careScheduleService = careScheduleService;
         this.notificationService = notificationService;
+        this.birthDates = birthDates;
     }
 
     @Transactional
@@ -139,6 +143,9 @@ public class AdmissionGroomReviewService {
         CandidateHorseProfile candidate = candidateHorseProfileRepository
                 .findByAdmissionId(admissionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Candidate horse profile not found"));
+
+        birthDates.validateByUeln(candidate.getDateOfBirth(),
+                candidate.getSireRegistrationNumber(), candidate.getDamRegistrationNumber());
 
         quarantineStall.setStatus(StallStatus.OCCUPIED);
         stableStallRepository.save(quarantineStall);
@@ -252,13 +259,13 @@ public class AdmissionGroomReviewService {
             return new Horse();
         }
 
-        List<Horse> matches = horseRepository.findByRegistrationNumber(ueln);
+        List<Horse> matches = horseRepository.findByRegistrationNumberForUpdate(ueln);
         if (matches.isEmpty()) {
             return new Horse();
         }
 
         Horse existing = matches.get(0);
-        if (existing.getCurrentStatus() == HorseStatus.REJECTED && admission.getOwnerId().equals(existing.getOwnerId())) {
+        if (existing.getCurrentStatus() == HorseStatus.REJECTED) {
             return existing;
         }
 
@@ -283,10 +290,49 @@ public class AdmissionGroomReviewService {
     private void updatePedigree(Long horseId, CandidateHorseProfile candidate) {
         HorsePedigree pedigree = horsePedigreeRepository.findByHorseId(horseId).orElseGet(HorsePedigree::new);
         pedigree.setHorseId(horseId);
-        pedigree.setSireName(candidate.getSireName());
-        pedigree.setSireRegistrationNumber(candidate.getSireRegistrationNumber());
-        pedigree.setDamName(candidate.getDamName());
-        pedigree.setDamRegistrationNumber(candidate.getDamRegistrationNumber());
+
+        String sireUeln = com.rtms.backend.horse.util.UelnUtils.normalize(candidate.getSireRegistrationNumber());
+        String sireName = candidate.getSireName() != null && !candidate.getSireName().isBlank() ? candidate.getSireName().trim() : null;
+
+        if (sireUeln != null) {
+            List<Horse> matches = horseRepository.findByRegistrationNumber(sireUeln);
+            if (!matches.isEmpty()) {
+                Horse matchedSire = matches.get(0);
+                pedigree.setSireId(matchedSire.getId());
+                pedigree.setSireName(matchedSire.getName());
+                pedigree.setSireRegistrationNumber(matchedSire.getRegistrationNumber());
+            } else {
+                pedigree.setSireId(null);
+                pedigree.setSireName(sireName);
+                pedigree.setSireRegistrationNumber(sireUeln);
+            }
+        } else {
+            pedigree.setSireId(null);
+            pedigree.setSireName(sireName);
+            pedigree.setSireRegistrationNumber(null);
+        }
+
+        String damUeln = com.rtms.backend.horse.util.UelnUtils.normalize(candidate.getDamRegistrationNumber());
+        String damName = candidate.getDamName() != null && !candidate.getDamName().isBlank() ? candidate.getDamName().trim() : null;
+
+        if (damUeln != null) {
+            List<Horse> matches = horseRepository.findByRegistrationNumber(damUeln);
+            if (!matches.isEmpty()) {
+                Horse matchedDam = matches.get(0);
+                pedigree.setDamId(matchedDam.getId());
+                pedigree.setDamName(matchedDam.getName());
+                pedigree.setDamRegistrationNumber(matchedDam.getRegistrationNumber());
+            } else {
+                pedigree.setDamId(null);
+                pedigree.setDamName(damName);
+                pedigree.setDamRegistrationNumber(damUeln);
+            }
+        } else {
+            pedigree.setDamId(null);
+            pedigree.setDamName(damName);
+            pedigree.setDamRegistrationNumber(null);
+        }
+
         pedigree.setPedigreeNotes(candidate.getPedigreeNotes());
         horsePedigreeRepository.save(pedigree);
     }
