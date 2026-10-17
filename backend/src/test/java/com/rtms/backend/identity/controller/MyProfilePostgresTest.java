@@ -86,5 +86,23 @@ class MyProfilePostgresTest {
                 .andExpect(status().isBadRequest());
         assertEquals("Test Owner",jdbc.queryForObject("SELECT full_name FROM users WHERE id=5",String.class));
     }
+    @Test void twentyCharacterPhoneCanBeSaved() throws Exception {
+        var actor=new UsernamePasswordAuthenticationToken(new AuthenticatedUser(5L,"owner@rtms.com","HORSE_OWNER"),null,List.of());
+        String phone="12345678901234567890";
+        mvc.perform(multipart("/api/auth/me/profile").file(profile("{\"fullName\":\"Updated Name\",\"phone\":\""+phone+"\",\"removeAvatar\":false}")).with(authentication(actor)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.phone").value(phone));
+        assertEquals(phone,jdbc.queryForObject("SELECT phone FROM users WHERE id=5",String.class));
+    }
+
+    @ParameterizedTest @ValueSource(ints={21,30})
+    void oversizedPhoneIsRejectedWithoutChangingProfile(int length) throws Exception {
+        var actor=new UsernamePasswordAuthenticationToken(new AuthenticatedUser(5L,"owner@rtms.com","HORSE_OWNER"),null,List.of());
+        String originalPhone=jdbc.queryForObject("SELECT phone FROM users WHERE id=5",String.class);
+        mvc.perform(multipart("/api/auth/me/profile").file(profile("{\"fullName\":\"Changed\",\"phone\":\""+"1".repeat(length)+"\",\"removeAvatar\":false}")).with(authentication(actor)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Phone number must be at most 20 characters"));
+        assertEquals("Test Owner",jdbc.queryForObject("SELECT full_name FROM users WHERE id=5",String.class));
+        assertEquals(originalPhone,jdbc.queryForObject("SELECT phone FROM users WHERE id=5",String.class));
+    }
+
     private static MockMultipartFile profile(String body) { return new MockMultipartFile("profile","","application/json",body.getBytes(StandardCharsets.UTF_8)); }
 }

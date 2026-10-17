@@ -10,7 +10,7 @@ import { profileService } from '../services/profileService';
 
 interface Props {
   profile: AuthUser;
-  onSaved: (profile: AuthUser) => Promise<void>;
+  onSaved: (profile: AuthUser) => void;
   onReset: () => void;
 }
 
@@ -56,7 +56,7 @@ export function ProfileEditor({ profile, onSaved, onReset }: Props) {
       const response = await profileService.update({ fullName: fullName.trim(), phone: phone.trim(), address: address.trim(), removeAvatar }, photo?.file ?? null);
       if (!response.success) throw new Error(response.message || 'Unable to save profile.');
       toast.success('Profile updated');
-      await onSaved(response.data);
+      onSaved(response.data);
     } catch (cause) {
       setError(displayError(cause, 'Unable to save profile.'));
       setSaving(false);
@@ -89,7 +89,7 @@ export function ProfileEditor({ profile, onSaved, onReset }: Props) {
               onChange={event => { setFullName(event.target.value); setNameError(undefined); }} />
           </FormField>
           <FormField label="Phone number" htmlFor="profile-phone">
-            <Input type="tel" value={phone} maxLength={30} autoComplete="tel" disabled={saving} onChange={event => setPhone(event.target.value)} />
+            <Input type="tel" value={phone} maxLength={20} autoComplete="tel" disabled={saving} onChange={event => setPhone(event.target.value)} />
           </FormField>
           <FormField label="Address" htmlFor="profile-address">
             <Textarea value={address} rows={3} maxLength={255} autoComplete="street-address" disabled={saving} onChange={event => setAddress(event.target.value)} />

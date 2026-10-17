@@ -5,7 +5,8 @@ Shared self-service profile for Manager, Owner, Trainer, Vet and Groom.
 ## UI
 
 - Open the account menu at the bottom of the sidebar, then **My profile** (`/profile`).
-- Edit full name, phone and address. Email, role and professional credentials are read-only.
+- Edit full name, phone (up to 20 characters) and address. Email, role and professional credentials are read-only.
+- Saving updates the editor and account menu from the returned profile without a second request to reload the session.
 - Select a JPG/PNG up to 5 MB, preview it, then save. Removing a photo is also pending until Save; Cancel discards the draft.
 - Click the avatar to choose a photo. Hover or keyboard focus reveals a dark lower-half camera overlay; touch devices keep it visible. `AvatarUpload` in `components/ui` is reusable and delegates validation, preview and persistence to its caller.
 - The shared `Avatar` accepts `image` and `size="sm" | "md" | "lg"`. Existing calls without an image retain initials.

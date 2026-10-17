@@ -163,7 +163,7 @@ Files over about 400 lines are split into section components.
 
 ## 5. State Management
 
-- **Session:** `AuthContext` (`useAuth()`) exposes `user`, `loading`, `isAuthenticated`, `login`, `logout`, `refreshUser`.
+- **Session:** `AuthContext` (`useAuth()`) exposes `user`, `loading`, `isAuthenticated`, `login`, `logout`, `refreshUser`, `updateUser`. After a profile save, pass the server response to `updateUser`; it updates only the currently signed-in account without another network request.
 - **Notifications:** `NotificationProvider` (`useNotifications()`) polls every 30 seconds and on window focus.
 - **Screen data:** local `useState` + `useEffect` in the feature screen, loaded through the feature service.
 - **URL as state:** list filters and tabs that should survive a reload or a back navigation live in search params (see the admission lists).

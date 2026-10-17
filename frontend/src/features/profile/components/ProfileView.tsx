@@ -14,7 +14,7 @@ export function ProfileView() {
 }
 
 function ProfileContent() {
-  const { refreshUser } = useAuth();
+  const { updateUser } = useAuth();
   const [profile, setProfile] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +32,11 @@ function ProfileContent() {
     return () => { active = false; };
   }, [attempt]);
 
-  const saved = useCallback(async (updated: AuthUser) => {
+  const saved = useCallback((updated: AuthUser) => {
     setProfile(updated);
     setRevision(value => value + 1);
-    await refreshUser();
-  }, [refreshUser]);
+    updateUser(updated);
+  }, [updateUser]);
 
   return (
     <ScreenLayout variant="form" className="max-w-5xl">
