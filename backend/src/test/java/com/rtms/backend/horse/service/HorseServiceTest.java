@@ -1,5 +1,8 @@
 package com.rtms.backend.horse.service;
 import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.horse.enums.HorseSex;
+import com.rtms.backend.horse.dto.CreateHorseRequest;
+import org.springframework.web.server.ResponseStatusException;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.repository.AreaRepository;
@@ -45,6 +48,28 @@ class HorseServiceTest {
     @BeforeEach
     void setUp() {
         horseService = new HorseService(horseRepository, stableStallRepository, workoutService, areaRepository);
+    }
+
+    @Test
+    void directCreationPersistsSexAndPreservesExistingDefaults() {
+        CreateHorseRequest request = new CreateHorseRequest();
+        request.setName("Pegasus");
+        request.setSex(HorseSex.FEMALE);
+        when(horseRepository.save(any(Horse.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Horse created = horseService.createHorse(request);
+
+        assertEquals(HorseSex.FEMALE, created.getSex());
+        assertEquals(HorseStatus.ELIGIBLE, created.getCurrentStatus());
+        assertTrue(created.canTrain());
+    }
+
+    @Test
+    void directCreationWithoutSexDoesNotWriteToDatabase() {
+        var error = assertThrows(ResponseStatusException.class,
+                () -> horseService.createHorse(new CreateHorseRequest()));
+        assertEquals(400, error.getStatusCode().value());
+        verifyNoInteractions(horseRepository, stableStallRepository, workoutService, areaRepository);
     }
 
     @Test

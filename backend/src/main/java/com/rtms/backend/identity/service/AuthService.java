@@ -88,8 +88,7 @@ public class AuthService {
         refreshToken.setExpiresAt(LocalDateTime.now().plusNanos(refreshExpirationMs * 1000000));
         refreshTokenRepository.save(refreshToken);
 
-        LoginResponse loginResponse = new LoginResponse(user.getId(), user.getFullName(),
-                user.getEmail(), user.getRole().getName());
+        LoginResponse loginResponse = LoginResponse.fromUser(user, null);
         loginResponse.setAccessToken(accessToken);
 
         return new LoginResult(accessToken, rawRefreshToken, loginResponse);
@@ -178,7 +177,7 @@ public class AuthService {
             default -> null; // HORSE_OWNER, ADMIN không có profile
         };
 
-        return new LoginResponse(user.getId(), user.getFullName(), user.getEmail(), role, profile);
+        return LoginResponse.fromUser(user, profile);
     }
 
     public OwnerRegistrationResponse registerOwner(OwnerRegistrationRequest request) {

@@ -76,6 +76,7 @@ export interface AdmissionDetailResponse {
     id: number;
     name: string;
     breed: string;
+    sex: import('@/types/horse').HorseSex | null;
     dateOfBirth: string;
     registrationNumber: string | null;
     registryName: string | null;

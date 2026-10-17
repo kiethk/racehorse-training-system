@@ -12,6 +12,7 @@ import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.horse.dto.HorseResponse;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.horse.enums.HorseSex;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -67,6 +68,20 @@ class HorseResponseJsonTest {
         h.setName(name);
         h.setCurrentStatus(HorseStatus.ELIGIBLE);
         return h;
+    }
+
+    @Test
+    void sexIsAnAdditiveRootFieldAndRemainsNullForLegacyHorses() throws Exception {
+        Horse known = horse(1L, "Known horse");
+        known.setSex(HorseSex.FEMALE);
+        JsonNode json = mapper.readTree(mapper.writeValueAsString(new HorseResponse(known, null)));
+        assertEquals("FEMALE", json.get("sex").asText());
+        assertEquals("ELIGIBLE", json.get("currentStatus").asText());
+        assertFalse(json.has("horse"));
+
+        JsonNode legacy = mapper.readTree(mapper.writeValueAsString(new HorseResponse(horse(2L, "Legacy horse"), null)));
+        assertTrue(legacy.has("sex"));
+        assertTrue(legacy.get("sex").isNull());
     }
 
     private AdmissionApplication admission(Long id, Long horseId) {

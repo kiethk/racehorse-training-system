@@ -7,6 +7,7 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.service.PedigreeBirthDateValidator;
 import com.rtms.backend.admission.dto.AdmissionDocumentMetadataRequest;
 import com.rtms.backend.admission.dto.CreateOwnerAdmissionRequest;
+import com.rtms.backend.horse.enums.HorseSex;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.entity.AdmissionDocument;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
@@ -64,7 +65,7 @@ class OwnerAdmissionServiceTest {
 
     private CreateOwnerAdmissionRequest request() {
         return new CreateOwnerAdmissionRequest(
-                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
+                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2), HorseSex.MALE,
                 " 250001ab1234567 ", "SIRE", "Sire", null,
                 "Dam", null, "Family notes");
     }
@@ -75,6 +76,7 @@ class OwnerAdmissionServiceTest {
         assertEquals(AdmissionStatus.GROOM_REVIEW, result.status());
         assertEquals("250001AB1234567", result.candidate().registrationNumber());
         assertEquals("Family notes", result.candidate().pedigreeNotes());
+        assertEquals(HorseSex.MALE, result.candidate().sex());
         assertEquals(101L, result.admissionId());
         assertTrue(result.documents().isEmpty());
         var admission = ArgumentCaptor.forClass(AdmissionApplication.class);
@@ -85,6 +87,20 @@ class OwnerAdmissionServiceTest {
         var candidate = ArgumentCaptor.forClass(CandidateHorseProfile.class);
         verify(candidates, times(1)).save(candidate.capture());
         assertEquals(101L, candidate.getValue().getAdmissionId());
+        assertEquals(HorseSex.MALE, candidate.getValue().getSex());
+    }
+
+    @Test
+    void missingSexIsRejectedBeforeCreatingAnAdmissionOrUploadingFiles() {
+        var missing = new CreateOwnerAdmissionRequest("Pegasus", null, null, null,
+                null, null, null, null, null, null, null);
+        var createError = assertThrows(ResponseStatusException.class, () -> service.create(7L, missing));
+        var submitError = assertThrows(ResponseStatusException.class,
+                () -> service.submit(7L, missing, List.of(), List.of()));
+        assertEquals(HttpStatus.BAD_REQUEST, createError.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, submitError.getStatusCode());
+        assertTrue(createError.getReason().contains("Sex"));
+        verifyNoInteractions(admissions, candidates, documents, files, uelnPolicy, horses);
     }
 
     @Test
@@ -169,7 +185,7 @@ class OwnerAdmissionServiceTest {
         Horse sire = new Horse();
         sire.setDateOfBirth(LocalDate.of(2023, 1, 1));
         when(horses.findByRegistrationNumber("999999SIR000001")).thenReturn(List.of(sire));
-        var candidate = new CreateOwnerAdmissionRequest("Test horse", null, LocalDate.of(2022, 4, 15),
+        var candidate = new CreateOwnerAdmissionRequest("Test horse", null, LocalDate.of(2022, 4, 15), HorseSex.MALE,
                 "999999BIR000001", null, "Sire", "999999SIR000001", null, null, null);
 
         var error = assertThrows(ResponseStatusException.class, () -> service.create(7L, candidate));
@@ -184,7 +200,7 @@ class OwnerAdmissionServiceTest {
         Horse dam = new Horse();
         dam.setDateOfBirth(LocalDate.of(2022, 4, 15));
         when(horses.findByRegistrationNumber("999999DAM000001")).thenReturn(List.of(dam));
-        var candidate = new CreateOwnerAdmissionRequest("Test horse", null, LocalDate.of(2022, 4, 15),
+        var candidate = new CreateOwnerAdmissionRequest("Test horse", null, LocalDate.of(2022, 4, 15), HorseSex.MALE,
                 "999999BIR000001", null, null, null, "Dam", "999999DAM000001", null);
         var metadata = List.of(
                 new AdmissionDocumentMetadataRequest(AdmissionDocumentType.HORSE_PHOTO, null, null),
@@ -296,7 +312,7 @@ class OwnerAdmissionServiceTest {
     @Test
     void createRejectsInvalidUelnFormat() {
         var invalidRequest = new CreateOwnerAdmissionRequest(
-                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
+                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2), HorseSex.MALE,
                 "VNM22SC00000001", "SIRE", "Sire", null,
                 "Dam", null, "Notes");
         var ex = assertThrows(ResponseStatusException.class, () -> service.create(7L, invalidRequest));
@@ -307,7 +323,7 @@ class OwnerAdmissionServiceTest {
     @Test
     void createRejectsChildSameAsSireUeln() {
         var conflictingRequest = new CreateOwnerAdmissionRequest(
-                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
+                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2), HorseSex.MALE,
                 "250001123456789", "SIRE", "Sire", "250001123456789",
                 "Dam", null, "Notes");
         var ex = assertThrows(ResponseStatusException.class, () -> service.create(7L, conflictingRequest));
@@ -318,7 +334,7 @@ class OwnerAdmissionServiceTest {
     @Test
     void createRejectsChildSameAsDamUeln() {
         var conflictingRequest = new CreateOwnerAdmissionRequest(
-                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
+                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2), HorseSex.MALE,
                 "250001123456789", "SIRE", "Sire", null,
                 "Dam", "250001123456789", "Notes");
         var ex = assertThrows(ResponseStatusException.class, () -> service.create(7L, conflictingRequest));
@@ -329,7 +345,7 @@ class OwnerAdmissionServiceTest {
     @Test
     void createRejectsSireSameAsDamUeln() {
         var conflictingRequest = new CreateOwnerAdmissionRequest(
-                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
+                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2), HorseSex.MALE,
                 "250001123456789", "SIRE", "Sire", "250001999999999",
                 "Dam", "250001999999999", "Notes");
         var ex = assertThrows(ResponseStatusException.class, () -> service.create(7L, conflictingRequest));

@@ -70,7 +70,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Object>> handleMalformedRequest(HttpMessageNotReadableException ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.error("Invalid admission request body or unsupported field", "VALIDATION_ERROR"));
+        return ResponseEntity.badRequest().body(ApiResponse.error("Invalid request body or unsupported field", "VALIDATION_ERROR"));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
