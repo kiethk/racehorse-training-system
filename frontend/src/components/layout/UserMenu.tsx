@@ -37,7 +37,7 @@ export function UserMenu({ collapsed }: { collapsed: boolean }) {
           collapsed && 'justify-center',
         )}
       >
-        <Avatar name={user.fullName} />
+        <Avatar name={user.fullName} image={user.avatarUrl} />
         {!collapsed && (
           <>
             <span className="min-w-0 flex-1 leading-tight">
@@ -60,6 +60,10 @@ export function UserMenu({ collapsed }: { collapsed: boolean }) {
           <p className="mt-1 text-[11px] font-normal text-[var(--color-text-muted)]">{ROLE_LABELS[user.role]}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => router.push('/profile')}>
+          <Icon name="user" size={14} />
+          My profile
+        </DropdownMenuItem>
         <DropdownMenuItem tone="danger" onSelect={() => void handleLogout()}>
           <Icon name="log-out" size={14} />
           Sign out

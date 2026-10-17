@@ -275,6 +275,10 @@ public class AdmissionGroomReviewService {
     private void applyCandidateSnapshot(Horse horse, AdmissionApplication admission, CandidateHorseProfile candidate, StableStall quarantineStall) {
         horse.setName(candidate.getName());
         horse.setBreed(candidate.getBreed());
+        // Legacy snapshots may have no sex; do not erase a known value on readmission.
+        if (candidate.getSex() != null) {
+            horse.setSex(candidate.getSex());
+        }
         horse.setDateOfBirth(candidate.getDateOfBirth());
         horse.setOwnerId(admission.getOwnerId());
         horse.setRegistryName(candidate.getRegistryName());

@@ -13,6 +13,7 @@
   --color-surface: #ffffff;
   --color-surface-subtle: #fafafb;
   --color-surface-muted: #f2f2f5;
+  --color-image-overlay: rgb(0 0 0 / 65%);
 
   /* Text */
   --color-text-primary: #27272a;

@@ -20,7 +20,7 @@ function assign(data: StableSnapshot, area: number, number: number, id: number) 
   blockStalls(data, area, number).forEach(s => { s.groomId = id; });
 }
 function horse(data: StableSnapshot, stallId: number) {
-  data.horses.push({ id: stallId, name: 'Horse', currentStallId: stallId, currentStatus: 'ELIGIBLE', ownerId: null, breed: null, dateOfBirth: null });
+  data.horses.push({ id: stallId, name: 'Horse', currentStallId: stallId, currentStatus: 'ELIGIBLE', ownerId: null, breed: null, sex: null, dateOfBirth: null });
 }
 
 describe('Manager Stable assignment draft', () => {

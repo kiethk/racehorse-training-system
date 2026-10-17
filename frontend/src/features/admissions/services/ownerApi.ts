@@ -4,6 +4,7 @@ import type { CreateOwnerAdmissionRequest, AdmissionDocumentUpload } from '../ty
 
 export type CandidateForm = {
   name: string; breed: string; dateOfBirth: string | null;
+  sex: import('@/types/horse').HorseSex | null;
   registrationNumber: string | null; registryName: string | null;
   sireName: string | null; sireRegistrationNumber: string | null;
   damName: string | null; damRegistrationNumber: string | null;

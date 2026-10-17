@@ -5,6 +5,9 @@ import com.rtms.backend.admission.dto.GroomAdmissionQueueResponse;
 import com.rtms.backend.admission.dto.TrainerAdmissionQueueResponse;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
+import com.rtms.backend.admission.entity.AdmissionDocument;
+import com.rtms.backend.admission.enums.AdmissionDocumentType;
+import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
@@ -75,6 +78,67 @@ class AdmissionQueryServiceTest {
                 mock(FileStorageService.class),
                 users,
                 careSchedules);
+    }
+
+    @Test
+    void managerListBatchesAll54RowsAndPreservesOrderNullStallsAndFirstPhoto() {
+        var rows = new java.util.ArrayList<AdmissionApplication>();
+        var profiles = new java.util.ArrayList<CandidateHorseProfile>();
+        for (long id=1; id<=54; id++) {
+            var row = new AdmissionApplication(); row.setId(id); row.setStatus(AdmissionStatus.APPROVED);
+            row.setTrainerId(7L); row.setSubmittedAt(LocalDateTime.of(2026,3,1,9,0));
+            rows.add(row);
+            var profile = new CandidateHorseProfile(); profile.setAdmissionId(id); profile.setName("Horse "+id);
+            profile.setBreed("Arabian"); profiles.add(profile);
+        }
+        rows.getFirst().setQuarantineStallId(500L);
+        java.util.Collections.reverse(profiles);
+        var stall = new StableStall(); stall.setId(500L); stall.setStallCode("Q-A01");
+        var later = new AdmissionDocument(); later.setId(12L); later.setAdmissionId(1L);
+        var first = new AdmissionDocument(); first.setId(11L); first.setAdmissionId(1L);
+        when(admissions.findAll()).thenReturn(rows);
+        when(candidates.findByAdmissionIdIn(anyCollection())).thenReturn(profiles);
+        when(stalls.findAllById(any())).thenReturn(List.of(stall));
+        when(documents.findByAdmissionIdInAndDocumentType(anyCollection(),eq(AdmissionDocumentType.HORSE_PHOTO)))
+                .thenReturn(List.of(later,first));
+
+        var result=service.getAdmissions(null);
+
+        assertEquals(54,result.size()); assertEquals("Horse 1",result.getFirst().getCandidateName());
+        assertEquals("Horse 54",result.getLast().getCandidateName());
+        assertEquals("Q-A01",result.getFirst().getQuarantineStallCode());
+        assertEquals("/api/admissions/1/documents/11/file",result.getFirst().getImageUrl());
+        assertNull(result.get(1).getQuarantineStallCode()); assertNull(result.get(1).getImageUrl());
+        assertEquals(7L,result.getFirst().getTrainerId());
+        verify(candidates,times(1)).findByAdmissionIdIn(anyCollection());
+        verify(stalls,times(1)).findAllById(any());
+        verify(documents,times(1)).findByAdmissionIdInAndDocumentType(anyCollection(),eq(AdmissionDocumentType.HORSE_PHOTO));
+        verify(candidates,never()).findByAdmissionId(anyLong());
+        verify(stalls,never()).findById(anyLong());
+        verify(documents,never()).findByAdmissionId(anyLong());
+    }
+
+    @Test
+    void emptyManagerStatusFilterDoesNotLoadRelatedTables() {
+        when(admissions.findByStatus(AdmissionStatus.MANAGER_REVIEW)).thenReturn(List.of());
+        assertEquals(List.of(),service.getAdmissions(AdmissionStatus.MANAGER_REVIEW));
+        verify(admissions,never()).findAll();
+        verifyNoInteractions(candidates,stalls,documents);
+    }
+
+    @Test
+    void managerListWithoutAnyStallStillMapsAndMissingSnapshotIsRejected() {
+        var row=new AdmissionApplication(); row.setId(1L); row.setStatus(AdmissionStatus.GROOM_REVIEW);
+        var candidate=new CandidateHorseProfile(); candidate.setAdmissionId(1L); candidate.setName("Candidate");
+        when(admissions.findByStatus(AdmissionStatus.GROOM_REVIEW)).thenReturn(List.of(row));
+        when(candidates.findByAdmissionIdIn(anyCollection())).thenReturn(List.of(candidate));
+        when(documents.findByAdmissionIdInAndDocumentType(anyCollection(),any())).thenReturn(List.of());
+        var result=service.getAdmissions(AdmissionStatus.GROOM_REVIEW);
+        assertEquals("Candidate",result.getFirst().getCandidateName());
+        assertNull(result.getFirst().getQuarantineStallCode());
+        verifyNoInteractions(stalls);
+        when(candidates.findByAdmissionIdIn(anyCollection())).thenReturn(List.of());
+        assertThrows(IllegalStateException.class,()->service.getAdmissions(AdmissionStatus.GROOM_REVIEW));
     }
 
     @Test

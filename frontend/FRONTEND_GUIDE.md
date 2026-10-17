@@ -212,6 +212,7 @@ Rules: do not parse the JWT on the client, and do not store tokens in `localStor
 | Public | `/login`, `/register` | none | none |
 | Showcase | `/design-test` | none | none |
 | Signed-in | `/manager/**`, `/trainer/**`, `/veterinarian/**`, `/groom/**`, `/owner/**` | `(app)/layout.tsx` | `AuthGate` + per-page `RoleGuard` |
+| My profile | `/profile` | `(app)/layout.tsx` | All five signed-in roles; entry in the account menu |
 
 Role landings: `HORSE_OWNER` → `/owner`, `GROOM` → `/groom`, `VETERINARIAN` → `/veterinarian`, `HEAD_TRAINER` → `/trainer`, `CLUB_MANAGER` → `/manager` (`src/lib/roleRoute.ts`).
 
@@ -363,6 +364,7 @@ npm run dev
 |---|---|
 | Find a primitive | `AGENTS.md` → Primitive lookup, or `/design-test` |
 | Reuse drag and drop | `createDragDrop<T>()` from `@/components/ui`; see `DRAG_DROP.md` and `/design-test` |
+| Pick a profile photo | `AvatarUpload` from `@/components/ui`; provide `name`, `image`, `onChange`, optional `disabled`/`describedBy`. The feature owns validation, draft preview and saving. |
 | Add a sidebar item | `src/config/navigation.ts` |
 | Add or look up a token | `src/app/globals.css` |
 | Format a date, enum, number or error | `src/lib/display.ts` |

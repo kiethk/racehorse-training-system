@@ -6,6 +6,7 @@ import { DataTable, HorseAvatar, StatusBadge } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui/DataTable';
 import type { Horse } from '@/features/stable/types';
 import { HorseSpecialtyBadges } from './HorseSpecialtyBadges';
+import { formatHorseSex } from '../../lib/sex';
 
 export interface HorseTableProps {
   horses: Horse[];
@@ -23,7 +24,7 @@ export interface HorseTableProps {
 
 /**
  * Shared horse list table.
- * Columns: Horse (avatar + name), Registration number, Breed, (Specialty), Status, and an optional Actions column.
+ * Columns: Horse (avatar + name), Registration number, Breed, Sex, (Specialty), Status, and optional Actions.
  * Built-in search (name / registration / breed) and pagination via DataTable; no API calls here.
  */
 export function HorseTable({
@@ -79,6 +80,12 @@ export function HorseTable({
           {h.breed?.trim() || '—'}
         </span>
       ),
+    },
+    {
+      id: 'sex',
+      header: 'Sex',
+      sortValue: (h) => h.sex ?? '',
+      render: (h) => <span className="text-[var(--color-text-secondary)]">{formatHorseSex(h.sex)}</span>,
     },
     ...(showSpecialty
       ? [
