@@ -58,6 +58,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             SELECT cs.* FROM care_schedule cs
             LEFT JOIN horse_incident_reports gir ON gir.id = cs.source_incident_id
             WHERE cs.status = 'REQUESTED'
+              AND (cs.care_type IN ('URGENT', 'INITIAL') OR cs.requested_at IS NULL OR cs.requested_at < :horizon)
             ORDER BY CASE cs.care_type WHEN 'URGENT' THEN 0 WHEN 'INITIAL' THEN 1 ELSE 2 END,
                      CASE WHEN cs.care_type = 'URGENT' THEN
                        CASE gir.severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END
@@ -66,7 +67,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             LIMIT :batchSize
             FOR UPDATE OF cs SKIP LOCKED
             """, nativeQuery = true)
-    List<CareSchedule> lockNextRequestedBatch(@Param("batchSize") int batchSize);
+    List<CareSchedule> lockNextRequestedBatch(@Param("batchSize") int batchSize,
+                                              @Param("horizon") LocalDateTime horizon);
 
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.veterinarianId IS NOT NULL "
             + "AND cs.status IN :statuses AND cs.scheduledAt >= :dayStart AND cs.scheduledAt < :dayEnd")
@@ -179,6 +181,9 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
 
     boolean existsByHorseIdAndStatusInAndIdNot(Long horseId, Collection<CareScheduleStatus> statuses, Long id);
 
+    boolean existsByHorseIdAndPurposeAndStatusInAndIdNot(Long horseId, CareSchedulePurpose purpose,
+            Collection<CareScheduleStatus> statuses, Long id);
+
     /** Mốc tiêm phòng đang chờ của ngựa; partial unique index đảm bảo tối đa một. */
     Optional<CareSchedule> findFirstByHorseIdAndPurposeAndStatusIn(Long horseId, CareSchedulePurpose purpose,
             Collection<CareScheduleStatus> statuses);
@@ -186,12 +191,14 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     /**
      * Lần khám sắp tới của ngựa (đã xếp giờ thì lấy giờ xếp, chưa thì lấy giờ
      * yêu cầu). Ngựa đang tạm nghỉ thì đây chính là mốc "tạm nghỉ đến".
+     * Mốc tiêm phòng không tính: nó không phải lần tái khám để mở khóa tập.
      * null nếu không còn lần khám nào đang chờ.
      */
     @Query("""
             SELECT MIN(COALESCE(cs.scheduledAt, cs.requestedAt))
             FROM CareSchedule cs
             WHERE cs.horseId = :horseId AND cs.status IN :statuses
+              AND cs.purpose = com.rtms.backend.medical.enums.CareSchedulePurpose.FOLLOW_UP
             """)
     LocalDateTime findNextExamTime(@Param("horseId") Long horseId,
                                    @Param("statuses") Collection<CareScheduleStatus> statuses);

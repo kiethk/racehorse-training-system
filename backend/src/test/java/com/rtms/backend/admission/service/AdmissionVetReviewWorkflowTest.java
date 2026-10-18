@@ -26,6 +26,7 @@ import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
+import com.rtms.backend.medical.service.PreventiveVaccinationService;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
@@ -117,7 +118,8 @@ class AdmissionVetReviewWorkflowTest {
                 eventPublisher,
                 entityManager,
                 notificationService,
-                new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService)
+                new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
+                org.mockito.Mockito.mock(PreventiveVaccinationService.class)
         );
 
         admissionQueryService = new AdmissionQueryService(

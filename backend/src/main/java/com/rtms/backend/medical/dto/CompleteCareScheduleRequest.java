@@ -32,6 +32,12 @@ public class CompleteCareScheduleRequest {
     /** Lịch khám lại — bắt buộc khi BLOCKED: "tạm nghỉ đến" chính là ngày của lịch này. */
     private CreateNextScheduleRequest nextSchedule;
 
+    /** Mũi tiêm phòng / tẩy giun ghi nhận cùng ca khám; lưu nguyên tử với kết quả khám. */
+    private List<@NotNull @Valid VaccinationRequest> vaccinations;
+
+    public List<VaccinationRequest> getVaccinations() { return vaccinations; }
+    public void setVaccinations(List<VaccinationRequest> vaccinations) { this.vaccinations = vaccinations; }
+
     public String getFindings() { return findings; }
     public void setFindings(String findings) { this.findings = findings; }
 
