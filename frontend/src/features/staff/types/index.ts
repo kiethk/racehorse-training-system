@@ -13,7 +13,7 @@ export interface StaffSummary {
 export interface StaffCreationRequest {
   fullName: string;
   email: string;
-  password?: string;
+  password: string;
   phone?: string;
   address?: string;
   role: 'GROOM' | 'VETERINARIAN' | 'HEAD_TRAINER';
@@ -36,15 +36,16 @@ export interface StaffCreationResponse {
   createdAt: string;
   profileSummary?: string;
   // HEAD_TRAINER assignment
-  assignedAreaIds?: number[];
-  assignedAreaCodes?: string[];
+  assignedAreaIds?: number[] | null;
+  assignedAreaCodes?: string[] | null;
   // GROOM assignment
-  trainerId?: number;
-  trainerName?: string;
-  assignedAreaId?: number;
-  assignedAreaCode?: string;
-  assignedStallIds?: number[];
-  assignedStallCodes?: string[];
+  trainerId?: number | null;
+  trainerName?: string | null;
+  assignedAreaId?: number | null;
+  assignedAreaCode?: string | null;
+  assignedAreaType?: 'REGULAR' | 'QUARANTINE' | null;
+  assignedStallIds?: number[] | null;
+  assignedStallCodes?: string[] | null;
   noStallBlockAvailable?: boolean;
   assignmentStatus?: string;
 }

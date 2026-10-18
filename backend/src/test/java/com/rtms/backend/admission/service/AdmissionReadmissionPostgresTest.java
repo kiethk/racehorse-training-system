@@ -1,6 +1,7 @@
 package com.rtms.backend.admission.service;
 
 import com.rtms.backend.admission.dto.CreateOwnerAdmissionRequest;
+import com.rtms.backend.horse.enums.HorseSex;
 import com.rtms.backend.admission.entity.AdmissionDocument;
 import com.rtms.backend.admission.enums.AdmissionDocumentType;
 import com.rtms.backend.admission.enums.AdmissionStatus;
@@ -206,8 +207,64 @@ class AdmissionReadmissionPostgresTest {
     }
 
     private CreateOwnerAdmissionRequest request(String ueln, String name) {
-        return new CreateOwnerAdmissionRequest(name, "Thoroughbred", null, ueln,
+        return new CreateOwnerAdmissionRequest(name, "Thoroughbred", null, HorseSex.MALE, ueln,
                 "Test Registry", null, null, null, null, null);
+    }
+
+    @Test
+    void sexPersistsThroughAdmissionAndArrivalAndIsVisibleToTheOwner() throws Exception {
+        var request = new CreateOwnerAdmissionRequest("Sex round-trip horse", "Arabian",
+                LocalDate.of(2021, 3, 21), HorseSex.FEMALE, "999999SEX000001",
+                "Test Registry", null, null, null, null, null);
+        var created = owners.create(ownerIds.getFirst(), request);
+        assertEquals(HorseSex.FEMALE, created.candidate().sex());
+        assertEquals("FEMALE", jdbc.queryForObject(
+                "SELECT sex FROM candidate_horse_profiles WHERE admission_id = ?", String.class, created.admissionId()));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE candidate_horse_profiles SET sex = 'OTHER' WHERE admission_id = ?", created.admissionId()));
+        assertEquals("YES", jdbc.queryForObject("""
+                SELECT is_nullable FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'horses' AND column_name = 'sex'
+                """, String.class));
+        assertTrue(horses.findAll().stream().anyMatch(h -> h.getSex() == null),
+                "Pre-migration seed horses must remain readable without an invented sex");
+
+        Long groomId = jdbc.queryForObject("""
+                SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id
+                WHERE r.name = 'GROOM' AND u.is_active = true ORDER BY u.id LIMIT 1
+                """, Long.class);
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            var admission = admissions.findById(created.admissionId()).orElseThrow();
+            var stall = stalls.findFirstAvailableQuarantineStallForUpdate().orElseThrow();
+            stall.setStatus(StallStatus.RESERVED);
+            stalls.saveAndFlush(stall);
+            admission.setGroomId(groomId);
+            admission.setQuarantineStallId(stall.getId());
+            admission.setArrivalDeadlineAt(LocalDateTime.now().plusDays(1));
+            admission.setStatus(AdmissionStatus.WAITING_FOR_ARRIVAL);
+            admissions.saveAndFlush(admission);
+        });
+        var arrived = groom.confirmArrival(created.admissionId(), groomId);
+        Horse horse = horses.findById(arrived.getHorseId()).orElseThrow();
+        assertEquals(HorseSex.FEMALE, horse.getSex());
+        assertEquals(HorseStatus.CANDIDATE, horse.getCurrentStatus());
+
+        var mvc = webAppContextSetup(webContext).apply(springSecurity()).build();
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(ownerIds.getFirst(), "owner@test.invalid", "HORSE_OWNER"), null,
+                List.of(new SimpleGrantedAuthority("HORSE_VIEW"),
+                        new SimpleGrantedAuthority("ADMISSION_APPLICATION_VIEW")));
+        mvc.perform(get("/api/horses/{id}", horse.getId()).with(authentication(auth)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.sex").value("FEMALE"));
+        mvc.perform(get("/api/owner/admissions/{id}", created.admissionId()).with(authentication(auth)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.candidate.sex").value("FEMALE"));
+
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE horses SET sex = 'GELDING' WHERE id = ?", horse.getId()));
+        var locked = assertThrows(org.springframework.dao.DataAccessException.class,
+                () -> jdbc.update("UPDATE candidate_horse_profiles SET sex = 'MALE' WHERE admission_id = ?", created.admissionId()));
+        assertTrue(locked.getMessage().contains("snapshot is locked"));
+        assertEquals(HorseSex.FEMALE, owners.getMyAdmission(ownerIds.getFirst(), created.admissionId()).candidate().sex());
     }
 
     @Test
@@ -271,7 +328,7 @@ class AdmissionReadmissionPostgresTest {
         for (String relation : List.of("sire", "dam")) {
             for (String birthDate : List.of("2022-04-14", "2022-04-15")) {
                 String candidate = """
-                        {"name":"Birth date test child","dateOfBirth":"%s", "registrationNumber":"999999DAT000002",
+                        {"name":"Birth date test child","sex":"MALE","dateOfBirth":"%s", "registrationNumber":"999999DAT000002",
                          "%sRegistrationNumber":"999999DAT000001"}
                         """.formatted(birthDate, relation);
                 mvc.perform(multipart("/api/owner/admissions")
@@ -295,10 +352,10 @@ class AdmissionReadmissionPostgresTest {
             horses.saveAndFlush(parent);
         });
         assertDoesNotThrow(() -> owners.create(ownerIds.getFirst(), new CreateOwnerAdmissionRequest(
-                "Valid internal parent", null, LocalDate.of(2022, 4, 15), "999999DAT000002",
+                "Valid internal parent", null, LocalDate.of(2022, 4, 15), HorseSex.MALE, "999999DAT000002",
                 null, null, parentUeln, null, null, null)));
         assertDoesNotThrow(() -> owners.create(ownerIds.getFirst(), new CreateOwnerAdmissionRequest(
-                "External parent", null, LocalDate.of(2022, 4, 15), "999999DAT000003",
+                "External parent", null, LocalDate.of(2022, 4, 15), HorseSex.MALE, "999999DAT000003",
                 null, "External sire", "999999EXT000001", null, null, null)));
     }
 }

@@ -1,3 +1,5 @@
+import type { HorseSex } from '@/types/horse';
+
 export type StallStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'MAINTENANCE';
 export type AreaType = 'REGULAR' | 'QUARANTINE';
 /** A horse's lifecycle in the club. Health is not tracked here — see trainingDecision. */
@@ -27,6 +29,7 @@ export interface Horse {
   id: number;
   name: string;
   breed: string | null;
+  sex: HorseSex | null;
   dateOfBirth: string | null;
   currentStatus: HorseStatus;
   currentStallId: number | null;

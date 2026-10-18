@@ -1,5 +1,7 @@
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { formatDate } from '@/lib/display';
+import { formatHorseSex } from '@/features/horses/lib/sex';
+import type { HorseSex } from '@/types/horse';
 import { AdmissionStatusBadge } from './AdmissionStatusBadge';
 import type { AdmissionStatus } from '../../types';
 
@@ -9,7 +11,7 @@ interface HeaderDetail {
   submittedAt: string;
   ownerId?: number;
   ownerName?: string | null;
-  candidate: { name: string; breed?: string | null } | null;
+  candidate: { name: string; breed?: string | null; sex?: HorseSex | null } | null;
 }
 
 function HeaderValue({ label, value }: { label: string; value: string }) {
@@ -42,10 +44,11 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus 
           <span className="truncate">{candidate.name}</span>
           <AdmissionStatusBadge status={detail.status} simplified={simplifiedStatus} />
         </h1>
-        <div className="grid min-w-0 grid-cols-1 gap-x-5 gap-y-2 min-[480px]:grid-cols-2 lg:grid-cols-4">
+        <div className="grid min-w-0 grid-cols-1 gap-x-5 gap-y-2 min-[480px]:grid-cols-2 lg:grid-cols-5">
           <HeaderValue label="Admission ID" value={`#${detail.admissionId}`} />
           <HeaderValue label="Owner" value={detail.ownerName ? `${detail.ownerName}${detail.ownerId != null ? ` (#${detail.ownerId})` : ''}` : detail.ownerId != null ? `#${detail.ownerId}` : 'You'} />
           <HeaderValue label="Breed" value={candidate.breed || 'Not provided'} />
+          <HeaderValue label="Sex" value={formatHorseSex(candidate.sex)} />
           <HeaderValue label="Submitted" value={date(detail.submittedAt)} />
         </div>
       </div>

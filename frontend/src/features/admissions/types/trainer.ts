@@ -52,6 +52,7 @@ export interface HorseSummary {
   id: number;
   name: string;
   breed: string | null;
+  sex: import('@/types/horse').HorseSex | null;
   dateOfBirth: string | null;
   currentStatus: string;
   currentStallId: number | null;

@@ -75,6 +75,7 @@ public class OwnerAdmissionService {
     /** The transaction creates exactly one new Application and one new immutable snapshot. */
     @Transactional
     public OwnerAdmissionDetailResponse create(Long ownerId, CreateOwnerAdmissionRequest request) {
+        requireSex(request);
         String childUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.registrationNumber(), "Registration number (UELN)");
         String sireUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.sireRegistrationNumber(), "Sire UELN");
         String damUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.damRegistrationNumber(), "Dam UELN");
@@ -91,6 +92,7 @@ public class OwnerAdmissionService {
         snapshot.setAdmissionId(application.getId());
         snapshot.setName(request.name().trim());
         snapshot.setBreed(trimNullable(request.breed()));
+        snapshot.setSex(request.sex());
         snapshot.setDateOfBirth(request.dateOfBirth());
         snapshot.setRegistrationNumber(childUeln);
         snapshot.setRegistryName(trimNullable(request.registryName()));
@@ -110,6 +112,7 @@ public class OwnerAdmissionService {
             CreateOwnerAdmissionRequest request,
             List<AdmissionDocumentMetadataRequest> metadata,
             List<MultipartFile> files) {
+        requireSex(request);
         validateDocumentMetadata(metadata, files);
         validateFiles(metadata, files);
 
@@ -131,6 +134,7 @@ public class OwnerAdmissionService {
         snapshot.setAdmissionId(application.getId());
         snapshot.setName(request.name().trim());
         snapshot.setBreed(trimNullable(request.breed()));
+        snapshot.setSex(request.sex());
         snapshot.setDateOfBirth(request.dateOfBirth());
         snapshot.setRegistrationNumber(childUeln);
         snapshot.setRegistryName(trimNullable(request.registryName()));
@@ -280,7 +284,7 @@ public class OwnerAdmissionService {
     private OwnerAdmissionDetailResponse toDetail(AdmissionApplication a, CandidateHorseProfile c,
             List<AdmissionDocument> docs) {
         var candidate = new OwnerAdmissionDetailResponse.CandidateSnapshot(c.getName(), c.getBreed(),
-                c.getDateOfBirth(), c.getRegistrationNumber(), c.getRegistryName(),
+                c.getDateOfBirth(), c.getSex(), c.getRegistrationNumber(), c.getRegistryName(),
                 c.getSireName(), c.getSireRegistrationNumber(),
                 c.getDamName(), c.getDamRegistrationNumber(), c.getPedigreeNotes());
         return new OwnerAdmissionDetailResponse(a.getId(), a.getStatus(), a.getSubmittedAt(),
@@ -303,6 +307,12 @@ public class OwnerAdmissionService {
     private void assertOwner(Long ownerId, AdmissionApplication application) {
         if (!application.getOwnerId().equals(ownerId)) {
             throw new AccessDeniedException("This admission belongs to another owner");
+        }
+    }
+
+    private static void requireSex(CreateOwnerAdmissionRequest request) {
+        if (request.sex() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sex is required (MALE or FEMALE)");
         }
     }
 

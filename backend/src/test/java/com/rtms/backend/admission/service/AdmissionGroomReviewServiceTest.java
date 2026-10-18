@@ -15,6 +15,7 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.horse.enums.HorseSex;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.stable.enums.StallStatus;
@@ -223,6 +224,7 @@ class AdmissionGroomReviewServiceTest {
         verify(horseRepository).save(horse.capture());
         assertEquals(5L, horse.getValue().getOwnerId());
         assertEquals("999999TST000001", horse.getValue().getRegistrationNumber());
+        assertEquals(HorseSex.FEMALE, horse.getValue().getSex());
         assertEquals(HorseStatus.CANDIDATE, horse.getValue().getCurrentStatus());
         assertFalse(horse.getValue().canTrain());
         var initial = ArgumentCaptor.forClass(CareSchedule.class);
@@ -329,6 +331,47 @@ class AdmissionGroomReviewServiceTest {
         verify(admissionApplicationRepository, never()).save(any());
     }
 
+    @Test
+    void legacyAdmissionDoesNotEraseKnownSexOnReadmission() {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
+        CandidateHorseProfile legacy = candidate();
+        legacy.setSex(null);
+        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(legacy));
+        Horse existing = new Horse();
+        existing.setId(20L);
+        existing.setCurrentStatus(HorseStatus.REJECTED);
+        existing.setSex(HorseSex.FEMALE);
+        when(horseRepository.findByRegistrationNumberForUpdate("999999TST000001")).thenReturn(List.of(existing));
+        when(horseRepository.save(existing)).thenReturn(existing);
+
+        service.confirmArrival(1L, 7L);
+
+        assertEquals(HorseSex.FEMALE, existing.getSex());
+        assertNull(legacy.getSex());
+        verify(candidateHorseProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void legacyAdmissionCanCreateHorseWithUnknownSex() {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
+        CandidateHorseProfile legacy = candidate();
+        legacy.setSex(null);
+        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(legacy));
+        when(horseRepository.save(any(Horse.class))).thenAnswer(inv -> {
+            Horse horse = inv.getArgument(0);
+            horse.setId(20L);
+            return horse;
+        });
+
+        service.confirmArrival(1L, 7L);
+
+        var saved = ArgumentCaptor.forClass(Horse.class);
+        verify(horseRepository).save(saved.capture());
+        assertNull(saved.getValue().getSex());
+    }
+
     private void assertReadmissionUpdatesCurrentHorseOnly(Long previousOwnerId) {
         AdmissionApplication admission = awaitingArrival();
         mockArrival(admission);
@@ -345,6 +388,7 @@ class AdmissionGroomReviewServiceTest {
 
         assertEquals(20L, result.getHorseId());
         assertEquals(5L, existingHorse.getOwnerId());
+        assertEquals(HorseSex.FEMALE, existingHorse.getSex());
         assertEquals("999999TST000001", existingHorse.getRegistrationNumber());
         assertEquals(HorseStatus.CANDIDATE, existingHorse.getCurrentStatus());
         assertEquals(99L, existingHorse.getCurrentStallId());
@@ -395,6 +439,7 @@ class AdmissionGroomReviewServiceTest {
         candidate.setAdmissionId(1L);
         candidate.setName("QABALAH MERCURY");
         candidate.setBreed("Arabian");
+        candidate.setSex(HorseSex.FEMALE);
         candidate.setDateOfBirth(LocalDate.of(2021, 3, 4));
         candidate.setRegistrationNumber("999999TST000001");
         candidate.setRegistryName("SIRE");

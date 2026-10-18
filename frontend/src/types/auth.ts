@@ -5,6 +5,10 @@ export interface AuthUser {
   fullName: string;
   email: string;
   role: Role;
+  phone?: string | null;
+  address?: string | null;
+  avatarUrl?: string | null;
+  createdAt?: string | null;
   profile?: unknown; // Generic profile for now, can be typed later
 }
 

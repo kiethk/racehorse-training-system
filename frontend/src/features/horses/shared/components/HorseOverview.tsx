@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { HorseSpecialty } from '@/features/horses/types';
 import type { Horse } from '@/features/stable/types';
 import { formatDate } from '@/lib/display';
+import { formatHorseSex } from '../../lib/sex';
 import { HorseInfoRow, HorseInfoSection } from './HorseInfoSection';
 import { HorseSpecialtySection } from './HorseSpecialtySection';
 
@@ -20,6 +21,7 @@ export function HorseOverview({ horse, specialty = null, children }: {
             <HorseInfoRow stacked label="Registration number" value={horse.registrationNumber?.trim()} />
             <HorseInfoRow stacked label="Registry" value={horse.registryName?.trim()} />
             <HorseInfoRow stacked label="Date of birth" value={horse.dateOfBirth ? formatDate(horse.dateOfBirth) : null} />
+            <HorseInfoRow stacked label="Sex" value={formatHorseSex(horse.sex)} />
             <HorseInfoRow stacked label="Location note" value={horse.stableLocation?.trim()} />
           </div>
         </HorseInfoSection>

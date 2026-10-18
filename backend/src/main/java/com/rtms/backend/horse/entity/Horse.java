@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.horse.enums.HorseSex;
 import com.rtms.backend.training.enums.TrainingDecision;
 
 @Entity
@@ -20,6 +21,10 @@ public class Horse {
     private String name;
 
     private String breed;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sex", length = 10)
+    private HorseSex sex;
 
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
@@ -84,6 +89,9 @@ public class Horse {
 
     public String getBreed() { return breed; }
     public void setBreed(String breed) { this.breed = breed; }
+
+    public HorseSex getSex() { return sex; }
+    public void setSex(HorseSex sex) { this.sex = sex; }
 
     public LocalDate getDateOfBirth() { return dateOfBirth; }
     public void setDateOfBirth(LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }

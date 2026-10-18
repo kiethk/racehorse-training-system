@@ -9,10 +9,11 @@ import type { AssignmentDraft, StableSnapshot } from '../types/manager';
 import { assignmentBatch, createDraft } from '../lib/managerAssignments';
 
 async function fetchSnapshot(): Promise<StableSnapshot> {
-  const [areas, stalls, horses, trainers, grooms] = await Promise.all([
+  const [areas, stalls, horses, trainers, grooms, trainerChecks] = await Promise.all([
     stableApi.getAreas(), stableApi.getStalls(), stableApi.getHorses(), stableApi.getTrainers(), stableApi.getGrooms(),
+    stableApi.getTrainerAssignmentChecks(),
   ]);
-  return { areas, stalls, horses, trainers, grooms };
+  return { areas, stalls, horses, trainers, grooms, trainerChecks };
 }
 
 export function useManagerStable() {

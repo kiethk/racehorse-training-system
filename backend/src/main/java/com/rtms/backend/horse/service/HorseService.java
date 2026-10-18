@@ -115,9 +115,14 @@ public class HorseService {
     }
 
     public Horse createHorse(CreateHorseRequest request) {
+        if (request.getSex() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Sex is required (MALE or FEMALE)");
+        }
         Horse horse = new Horse();
         horse.setName(request.getName());
         horse.setBreed(request.getBreed());
+        horse.setSex(request.getSex());
         horse.setDateOfBirth(request.getDateOfBirth());
         horse.setStableLocation(request.getStableLocation());
         horse.setOwnerId(request.getOwnerId());

@@ -2,6 +2,7 @@ package com.rtms.backend.horse.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.horse.dto.CreateHorseRequest;
+import jakarta.validation.Valid;
 import com.rtms.backend.horse.dto.HorseResponse;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
@@ -83,7 +84,7 @@ public class HorseController {
 
     @PreAuthorize("hasAuthority('HORSE_CREATE')")
     @PostMapping
-    public ApiResponse<Horse> createHorse(@RequestBody CreateHorseRequest request) {
+    public ApiResponse<Horse> createHorse(@Valid @RequestBody CreateHorseRequest request) {
         return ApiResponse.success(horseService.createHorse(request));
     }
 

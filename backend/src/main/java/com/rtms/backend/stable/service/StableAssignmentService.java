@@ -35,10 +35,12 @@ public class StableAssignmentService {
     private final HorseRepository horses;
     private final TrainingWorkoutService workouts;
     private final EntityManager em;
+    private final AreaTrainerAssignmentPolicy trainerPolicy;
 
     public StableAssignmentService(AreaRepository areas, StableStallRepository stalls,
                                    UserRepository users, GroomProfileRepository profiles,
-                                   HorseRepository horses, TrainingWorkoutService workouts, EntityManager em) {
+                                   HorseRepository horses, TrainingWorkoutService workouts, EntityManager em,
+                                   AreaTrainerAssignmentPolicy trainerPolicy) {
         this.areas = areas;
         this.stalls = stalls;
         this.users = users;
@@ -46,7 +48,10 @@ public class StableAssignmentService {
         this.horses = horses;
         this.workouts = workouts;
         this.em = em;
+        this.trainerPolicy = trainerPolicy;
     }
+
+    public List<AreaTrainerChangeCheck> getTrainerAssignmentChecks() { return trainerPolicy.checks(); }
 
     @Transactional(rollbackFor = Exception.class)
     public StableAssignmentResponse applyAssignments(BatchStableAssignmentRequest request) {
@@ -117,6 +122,7 @@ public class StableAssignmentService {
                 throw bad("Quarantine areas cannot have an assigned trainer");
             }
             if (!Objects.equals(area.getTrainerId(), edit.getTrainerId())) {
+                trainerPolicy.requireChangeAllowed(area.getId());
                 add(affectedTrainers, area.getTrainerId());
                 add(affectedTrainers, edit.getTrainerId());
                 for (StableStall stall : allStalls) {

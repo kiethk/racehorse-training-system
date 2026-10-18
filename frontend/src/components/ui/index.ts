@@ -3,6 +3,7 @@
  * a control, overlay, table or badge locally. See AGENTS.md for the lookup table.
  */
 export { Avatar } from './Avatar';
+export { AvatarUpload } from './AvatarUpload';
 export { BrandLogo } from './BrandLogo';
 export { Button, IconButton, LinkButton, buttonClassName } from './Button';
 export { ConfirmDialog } from './ConfirmDialog';

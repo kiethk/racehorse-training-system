@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { areaView, assignmentBatch, blockStalls, compareAreas, createDraft, editCount, planAssignment } from '../lib/managerAssignments.ts';
+import { areaView, assignmentBatch, blockStalls, compareAreas, createDraft, editCount, planAssignment, trainerChangeReason } from '../lib/managerAssignments.ts';
 import type { StableSnapshot } from '../types/manager';
 
 function fixture(): StableSnapshot {
@@ -9,7 +9,8 @@ function fixture(): StableSnapshot {
     { id: 2, code: 'B', name: 'Area B', type: 'REGULAR' as const, trainerId: 2 },
     { id: 3, code: 'Q-A', name: 'Quarantine A', type: 'QUARANTINE' as const, trainerId: null },
   ];
-  return { areas, stalls: areas.flatMap(a => Array.from({ length: 12 }, (_, i) => ({ id: a.id * 100 + i + 1,
+  return { areas, trainerChecks: areas.map(a => ({ areaId: a.id, trainerId: a.trainerId, canChange: true, reasons: [] })),
+    stalls: areas.flatMap(a => Array.from({ length: 12 }, (_, i) => ({ id: a.id * 100 + i + 1,
     areaId: a.id, groomId: null, stallNumber: i + 1, stallCode: a.code + String(i + 1).padStart(2, '0'), status: 'AVAILABLE' as const }))),
     horses: [], trainers: [1, 2, 3].map(id => ({ id, fullName: `Trainer ${id}`, email: '', role: 'HEAD_TRAINER' })),
     grooms: [10, 11, 12].map(id => ({ id, fullName: `Groom ${id}`, email: '', role: 'GROOM' })) };
@@ -20,7 +21,7 @@ function assign(data: StableSnapshot, area: number, number: number, id: number) 
   blockStalls(data, area, number).forEach(s => { s.groomId = id; });
 }
 function horse(data: StableSnapshot, stallId: number) {
-  data.horses.push({ id: stallId, name: 'Horse', currentStallId: stallId, currentStatus: 'ELIGIBLE', ownerId: null, breed: null, dateOfBirth: null });
+  data.horses.push({ id: stallId, name: 'Horse', currentStallId: stallId, currentStatus: 'ELIGIBLE', ownerId: null, breed: null, sex: null, dateOfBirth: null });
 }
 
 describe('Manager Stable assignment draft', () => {
@@ -76,6 +77,36 @@ describe('Manager Stable assignment draft', () => {
   it('requires a Trainer before assigning a regular Groom', () => {
     const data = fixture(); data.areas[0].trainerId = null;
     assert.throws(() => planAssignment(data, createDraft(data), groom(1), 10), /Assign a Trainer/);
+  });
+  it('blocks changing or removing Trainer while any horse remains, even with stale stall status', () => {
+    const data = fixture(); horse(data, 102);
+    for (const next of [null, 2]) assert.throws(() => planAssignment(data, createDraft(data), trainer(1), next), /Area has horses/);
+  });
+  it('blocks initial Trainer assignment while a horse remains', () => {
+    const data = fixture(); data.areas[0].trainerId = null; horse(data, 101);
+    assert.throws(() => planAssignment(data, createDraft(data), trainer(1), 1), /Area has horses/);
+  });
+  it('blocks reserved or occupied stalls even when the horse list is empty', () => {
+    for (const status of ['RESERVED', 'OCCUPIED'] as const) {
+      const data = fixture(); data.stalls[0].status = status;
+      assert.throws(() => planAssignment(data, createDraft(data), trainer(1), 2), /occupied or reserved/);
+    }
+  });
+  it('blocks an empty Area when its current Trainer still has unfinished training', () => {
+    const data = fixture(); data.trainerChecks[0] = { ...data.trainerChecks[0], canChange: false, reasons: ['Current Trainer has unfinished training.'] };
+    assert.throws(() => planAssignment(data, createDraft(data), trainer(1), 2), /unfinished training/);
+    assert.equal(trainerChangeReason(data, 1), 'Current Trainer has unfinished training.');
+  });
+  it('checks the drag source as well as the target before staging a Trainer swap', () => {
+    const data = fixture(); horse(data, 101);
+    assert.throws(() => planAssignment(data, createDraft(data), trainer(2), 1,
+      { kind: 'trainer', personId: 1, source: trainer(1) }), /Area has horses/);
+  });
+  it('fails closed when the Trainer check is missing or belongs to an older assignment', () => {
+    const data = fixture(); data.trainerChecks = [];
+    assert.throws(() => planAssignment(data, createDraft(data), trainer(1), 2), /Refresh/);
+    data.trainerChecks = [{ areaId: 1, trainerId: 3, canChange: true, reasons: [] }];
+    assert.throws(() => planAssignment(data, createDraft(data), trainer(1), 2), /Refresh/);
   });
   it('rejects removing a Trainer while Grooms remain', () => {
     const data = fixture(); assign(data, 1, 1, 10);

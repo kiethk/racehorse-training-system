@@ -125,9 +125,28 @@ public class AdmissionQueryService {
             admissions = admissionApplicationRepository.findAll();
         }
 
-        return admissions.stream()
-                .map(this::toSummaryResponse)
-                .toList();
+        if (admissions.isEmpty()) return List.of();
+        // The Manager list reads all intakes: batch its related data rather than
+        // doing three remote database round trips for every row.
+        List<Long> ids = admissions.stream().map(AdmissionApplication::getId).toList();
+        Map<Long, CandidateHorseProfile> candidates = candidateHorseProfileRepository.findByAdmissionIdIn(ids)
+                .stream().collect(Collectors.toMap(CandidateHorseProfile::getAdmissionId, c -> c));
+        Set<Long> stallIds = admissions.stream().map(AdmissionApplication::getQuarantineStallId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, String> stallCodes = stallIds.isEmpty() ? Map.of() : stableStallRepository.findAllById(stallIds)
+                .stream().collect(Collectors.toMap(StableStall::getId, StableStall::getStallCode));
+        Map<Long, AdmissionDocument> photos = admissionDocumentRepository
+                .findByAdmissionIdInAndDocumentType(ids, AdmissionDocumentType.HORSE_PHOTO).stream()
+                .collect(Collectors.toMap(AdmissionDocument::getAdmissionId, d -> d,
+                        (left, right) -> left.getId() <= right.getId() ? left : right));
+        return admissions.stream().map(admission -> {
+            CandidateHorseProfile candidate = candidates.get(admission.getId());
+            if (candidate == null) throw new IllegalStateException("Candidate horse profile not found");
+            AdmissionDocument photo = photos.get(admission.getId());
+            return summaryResponse(admission, candidate, admission.getQuarantineStallId() == null
+                            ? null : stallCodes.get(admission.getQuarantineStallId()),
+                    photo == null ? null : documentUrl(photo));
+        }).toList();
     }
 
     /**
@@ -335,6 +354,11 @@ public class AdmissionQueryService {
                 .map(this::documentUrl)
                 .orElse(null);
 
+        return summaryResponse(admission, candidate, stallCode, imageUrl);
+    }
+
+    private AdmissionSummaryResponse summaryResponse(AdmissionApplication admission,
+            CandidateHorseProfile candidate, String stallCode, String imageUrl) {
         return new AdmissionSummaryResponse(
                 admission.getId(),
                 admission.getStatus(),

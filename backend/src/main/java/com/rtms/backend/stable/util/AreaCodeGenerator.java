@@ -10,6 +10,12 @@ public final class AreaCodeGenerator {
     private AreaCodeGenerator() {
     }
 
+    public static int compareCodes(String left, String right) {
+        String a = left.replaceFirst("^Q-", ""), b = right.replaceFirst("^Q-", "");
+        int length = Integer.compare(a.length(), b.length());
+        return length != 0 ? length : a.compareTo(b);
+    }
+
     /**
      * Converts a 1-based, base-26 bijective letter sequence ("A", "B", ..., "Z", "AA", "AB")
      * into a zero-based integer index.

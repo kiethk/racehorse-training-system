@@ -24,6 +24,12 @@ Thumbs.db
 ui-reference/
 tutorials/
 docs/
+!backend/docs/
+backend/docs/*
+!backend/docs/CLOUD_DEMO_SEED.md
+!backend/docs/HORSE_SEX.md
+!backend/docs/LOCAL_DEMO_SEED.md
+!backend/docs/STABLE_AREA_LIFECYCLE.md
 .codex/
 uploads/
 .agents/

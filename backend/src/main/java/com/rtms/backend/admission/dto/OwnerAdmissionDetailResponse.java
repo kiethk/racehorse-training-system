@@ -1,6 +1,7 @@
 package com.rtms.backend.admission.dto;
 
 import com.rtms.backend.admission.enums.AdmissionStatus;
+import com.rtms.backend.horse.enums.HorseSex;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,7 +19,7 @@ public record OwnerAdmissionDetailResponse(
         String managerFeedback) {
 
     public record CandidateSnapshot(
-            String name, String breed, LocalDate dateOfBirth,
+            String name, String breed, LocalDate dateOfBirth, HorseSex sex,
             String registrationNumber, String registryName,
             String sireName, String sireRegistrationNumber,
             String damName, String damRegistrationNumber, String pedigreeNotes) {}

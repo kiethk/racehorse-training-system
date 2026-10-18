@@ -1,8 +1,10 @@
 package com.rtms.backend.admission.dto;
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.enums.HorseSex;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -13,6 +15,7 @@ public record CreateOwnerAdmissionRequest(
         @NotBlank @Size(max = 255) String name,
         @Size(max = 255) String breed,
         @PastOrPresent LocalDate dateOfBirth,
+        @NotNull(message = "Sex is required (MALE or FEMALE)") HorseSex sex,
         @Pattern(regexp = "^\\s*$|^[0-9]{6}[a-zA-Z0-9]{9}$", message = "UELN must be 15 alphanumeric characters (6 digits followed by 9 alphanumeric)")
         String registrationNumber,
         @Size(max = 255) String registryName,
