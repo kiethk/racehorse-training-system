@@ -30,7 +30,7 @@ import java.util.Set;
 @Service
 public class PreventiveVaccinationService {
 
-    static final String PLAN_NAME = "Tiêm phòng";
+    static final String PLAN_NAME = "Vaccination";
     static final String HISTORICAL_TAG = "[HISTORICAL]";
 
     private final PreventiveProtocolRepository protocols;
@@ -112,7 +112,7 @@ public class PreventiveVaccinationService {
         TreatmentPlan plan = new TreatmentPlan();
         plan.setHealthRecordId(healthRecordId);
         plan.setTreatmentName(PLAN_NAME);
-        plan.setInstructions("Tiêm phòng / tẩy giun theo phác đồ");
+        plan.setInstructions("Vaccination / deworming per preventive protocol");
         plan.setStartDate(vaccinations.stream().map(ValidatedVaccination::administeredOn)
                 .min(Comparator.naturalOrder()).orElse(today));
         plan.setEndDate(today);

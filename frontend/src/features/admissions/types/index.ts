@@ -1,3 +1,4 @@
+import type { VaccinationRequest } from '@/features/care/types/preventive';
 export type AdmissionStatus =
   | 'GROOM_REVIEW'
   | 'WAITING_FOR_STALL'
@@ -224,6 +225,8 @@ export interface CareSchedule {
   notes?: string | null;
   description?: string | null;
   createdAt?: string;
+  purpose?: 'FOLLOW_UP' | 'PREVENTIVE';
+  requestedAt?: string | null;
 }
 
 export interface CareScheduleDetail {
@@ -272,6 +275,9 @@ export interface CompleteCareScheduleRequest {
   notes?: string;
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
+  vaccinations?: VaccinationRequest[];
+  /** 7–10 days; only on a preventive visit without vaccinations. */
+  deferVaccinationDays?: number;
 }
 
 export interface VetAdmissionQueueItem {
@@ -355,6 +361,7 @@ export interface VetReviewRequest {
   notes?: string;
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
+  vaccinations?: VaccinationRequest[];
 }
 
 export interface VetReviewResponse {

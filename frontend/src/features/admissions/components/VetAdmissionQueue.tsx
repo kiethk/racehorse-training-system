@@ -815,6 +815,7 @@ export function VetAdmissionQueue() {
                         careScheduleId={currentActiveSchedule?.id}
                         careType={currentActiveSchedule?.careType}
                         scheduleStatus={currentActiveSchedule?.status}
+                        schedulePurpose={currentActiveSchedule?.purpose}
                         onStartExam={handleStartExam}
                         asideTop={examDetailsCard}
                         onSuccess={handleReviewSuccess}

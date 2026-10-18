@@ -132,9 +132,9 @@ public class CareRescheduleService {
         for (PreventiveProtocolStatus status : preventiveStatus.statusFor(schedule.getHorseId())) {
             if (!status.mandatory()) continue;
             if (status.nextDueOn() == null) {
-                warnings.add("Ngựa chưa có dữ liệu tiêm " + status.name() + ".");
+                warnings.add("The horse has no record for " + status.name() + ".");
             } else if (status.nextDueOn().isBefore(newDate)) {
-                warnings.add("Ngựa sẽ quá hạn tiêm " + status.name() + " từ ngày "
+                warnings.add("The horse will be overdue for " + status.name() + " from "
                         + status.nextDueOn().format(FULL_DATE) + ".");
             }
         }

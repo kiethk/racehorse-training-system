@@ -17,6 +17,10 @@ export interface CareScheduleResponse {
   cancelReason: string | null;
   createdAt: string;
   updatedAt: string;
+  purpose: 'FOLLOW_UP' | 'PREVENTIVE';
+  requestedAt: string | null;
+  rescheduleReason: 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'OTHER' | null;
+  rescheduleNote: string | null;
 }
 
 export interface CareScheduleDetailResponse {
@@ -41,14 +45,6 @@ export interface CareScheduleDetailResponse {
     trainingDecision: TrainingDecision;
     restrictionDetails: string | null;
   } | null;
-}
-
-export interface CreatePreventiveCareScheduleRequest {
-  horseId: number;
-  veterinarianId?: number;
-  careType: 'ROUTINE_EXAM' | 'VACCINATION' | 'DEWORMING';
-  scheduledDate: string; // YYYY-MM-DD
-  description?: string;
 }
 
 export interface CreateNextScheduleRequest {

@@ -1,5 +1,8 @@
 package com.rtms.backend.medical.service;
 
+import com.rtms.backend.admission.entity.AdmissionApplication;
+import com.rtms.backend.admission.enums.AdmissionStatus;
+import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -54,20 +57,23 @@ public class PreventiveStatusService {
     private final PrescriptionRepository prescriptions;
     private final CareScheduleRepository schedules;
     private final HorseRepository horses;
+    private final AdmissionApplicationRepository admissions;
     private final Clock clock;
 
     @Autowired
     public PreventiveStatusService(PreventiveProtocolRepository protocols, PrescriptionRepository prescriptions,
-            CareScheduleRepository schedules, HorseRepository horses) {
-        this(protocols, prescriptions, schedules, horses, Clock.systemDefaultZone());
+            CareScheduleRepository schedules, HorseRepository horses, AdmissionApplicationRepository admissions) {
+        this(protocols, prescriptions, schedules, horses, admissions, Clock.systemDefaultZone());
     }
 
     PreventiveStatusService(PreventiveProtocolRepository protocols, PrescriptionRepository prescriptions,
-            CareScheduleRepository schedules, HorseRepository horses, Clock clock) {
+            CareScheduleRepository schedules, HorseRepository horses, AdmissionApplicationRepository admissions,
+            Clock clock) {
         this.protocols = protocols;
         this.prescriptions = prescriptions;
         this.schedules = schedules;
         this.horses = horses;
+        this.admissions = admissions;
         this.clock = clock;
     }
 
@@ -157,7 +163,7 @@ public class PreventiveStatusService {
                         return existing;
                     }
                     milestone.setStatus(CareScheduleStatus.CANCELLED);
-                    milestone.setCancelReason("Đã tiêm sớm trong ca gộp ngày " + today.format(DAY_MONTH));
+                    milestone.setCancelReason("Vaccinated early in a combined visit on " + today.format(DAY_MONTH));
                     // Flush trước khi tạo mốc mới: Hibernate chạy INSERT trước UPDATE,
                     // mốc cũ còn active sẽ đụng uq_care_schedule_one_active_preventive_per_horse.
                     schedules.saveAndFlush(milestone);
@@ -174,6 +180,7 @@ public class PreventiveStatusService {
 
         CareSchedule milestone = new CareSchedule();
         milestone.setHorseId(horseId);
+        milestone.setAdmissionId(currentAdmissionId(horseId));
         milestone.setCareType(CareType.ROUTINE);
         milestone.setPurpose(CareSchedulePurpose.PREVENTIVE);
         milestone.setStatus(CareScheduleStatus.REQUESTED);
@@ -199,6 +206,18 @@ public class PreventiveStatusService {
         return milestone;
     }
 
+    /**
+     * Màn khám của vet mở lịch qua admission của ngựa, nên mốc gắn với admission gần nhất
+     * chưa bị từ chối. Ngựa không đi qua admission (dữ liệu cũ) thì để trống.
+     */
+    private Long currentAdmissionId(Long horseId) {
+        return admissions.findByHorseIdOrderBySubmittedAtDesc(horseId).stream()
+                .filter(admission -> admission.getStatus() != AdmissionStatus.REJECTED)
+                .map(AdmissionApplication::getId)
+                .findFirst()
+                .orElse(null);
+    }
+
     /** Ngày đến hạn thực tế của từng phác đồ bắt buộc; MISSING chỉ có mặt khi missingDueOn != null. */
     private Map<PreventiveProtocolStatus, LocalDate> mandatoryDueDates(Long horseId, LocalDate missingDueOn) {
         Map<PreventiveProtocolStatus, LocalDate> due = new LinkedHashMap<>();
@@ -210,15 +229,15 @@ public class PreventiveStatusService {
         return due;
     }
 
-    /** "Tiêm phòng định kỳ: Cúm ngựa (hạn 18/04/2027), Tẩy giun định kỳ (chưa có dữ liệu)". */
+    /** "Preventive care: Equine Influenza (due 18/04/2027), Deworming (no record)". */
     private static String describe(Map<PreventiveProtocolStatus, LocalDate> dueByProtocol, LocalDate visitDay) {
         LocalDate windowEnd = visitDay.plusDays(OPPORTUNITY_WINDOW_DAYS);
         String items = dueByProtocol.entrySet().stream()
                 .filter(entry -> !entry.getValue().isAfter(windowEnd))
                 .map(entry -> entry.getKey().name() + (entry.getKey().nextDueOn() == null
-                        ? " (chưa có dữ liệu)"
-                        : " (hạn " + entry.getKey().nextDueOn().format(FULL_DATE) + ")"))
+                        ? " (no record)"
+                        : " (due " + entry.getKey().nextDueOn().format(FULL_DATE) + ")"))
                 .collect(Collectors.joining(", "));
-        return "Tiêm phòng định kỳ: " + items;
+        return "Preventive care: " + items;
     }
 }

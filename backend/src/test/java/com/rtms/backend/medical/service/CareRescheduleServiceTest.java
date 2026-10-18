@@ -145,10 +145,10 @@ class CareRescheduleServiceTest {
 
         var response = service.reschedule(100L, request(TODAY.plusDays(20), RescheduleReason.RACE_CONFLICT, null), manager);
 
-        assertEquals(List.of("Ngựa sẽ quá hạn tiêm Cúm ngựa từ ngày 28/10/2026.",
-                "Ngựa chưa có dữ liệu tiêm Tẩy giun."), response.warnings());
+        assertEquals(List.of("The horse will be overdue for Cúm ngựa from 28/10/2026.",
+                "The horse has no record for Tẩy giun."), response.warnings());
         assertEquals(CareScheduleStatus.REQUESTED, schedule.getStatus());
-        response.warnings().forEach(warning -> assertFalse(warning.toLowerCase().contains("thi đấu")));
+        response.warnings().forEach(warning -> assertFalse(warning.toLowerCase().contains("race")));
     }
 
     @Test

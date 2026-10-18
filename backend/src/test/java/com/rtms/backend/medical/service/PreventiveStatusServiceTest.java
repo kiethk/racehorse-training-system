@@ -51,6 +51,7 @@ class PreventiveStatusServiceTest {
     @Mock PrescriptionRepository prescriptions;
     @Mock CareScheduleRepository schedules;
     @Mock HorseRepository horses;
+    @Mock com.rtms.backend.admission.repository.AdmissionApplicationRepository admissions;
 
     private final PreventiveProtocol ei = protocol(1L, "EI", 180, 14, true);
     private final PreventiveProtocol tetanus = protocol(2L, "TETANUS", 365, 30, true);
@@ -60,7 +61,7 @@ class PreventiveStatusServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PreventiveStatusService(protocols, prescriptions, schedules, horses,
+        service = new PreventiveStatusService(protocols, prescriptions, schedules, horses, admissions,
                 Clock.fixed(TODAY.atTime(9, 0).atZone(ZONE).toInstant(), ZONE));
         when(protocols.findByActiveTrueOrderByCategoryAscIdAsc()).thenReturn(List.of(ei, tetanus, rabies));
         when(prescriptions.findLastPreventiveDoses(anyCollection())).thenReturn(doses);
@@ -158,7 +159,7 @@ class PreventiveStatusServiceTest {
         CareSchedule afterApproval = service.upsertMilestone(HORSE, "preventive:approval:3", ACTOR,
                 TODAY.plusDays(1)).orElseThrow();
         assertEquals(TODAY.plusDays(1).atTime(14, 0), afterApproval.getRequestedAt());
-        assertTrue(afterApproval.getDescription().contains("chưa có dữ liệu"));
+        assertTrue(afterApproval.getDescription().contains("no record"));
     }
 
     @Test
@@ -194,7 +195,7 @@ class PreventiveStatusServiceTest {
         CareSchedule next = service.upsertMilestone(HORSE, "preventive:15", ACTOR, null).orElseThrow();
 
         assertEquals(CareScheduleStatus.CANCELLED, booked.getStatus());
-        assertEquals("Đã tiêm sớm trong ca gộp ngày 18/10", booked.getCancelReason());
+        assertEquals("Vaccinated early in a combined visit on 18/10", booked.getCancelReason());
         assertNotSame(booked, next);
         assertEquals(CareScheduleStatus.REQUESTED, next.getStatus());
         assertEquals(TODAY.plusDays(180).atTime(14, 0), next.getRequestedAt());
@@ -268,6 +269,23 @@ class PreventiveStatusServiceTest {
         verify(schedules).save(saved.capture());
         assertFalse(saved.getValue().getIdempotencyKey().startsWith("completion:"));
         verify(schedules).findByRequestedByIdAndIdempotencyKey(ACTOR, "preventive:20");
+    }
+
+    @Test
+    void newMilestoneIsLinkedToTheHorsesLatestLiveAdmissionSoTheVetQueueCanOpenIt() {
+        var rejected = new com.rtms.backend.admission.entity.AdmissionApplication();
+        rejected.setId(8L);
+        rejected.setStatus(com.rtms.backend.admission.enums.AdmissionStatus.REJECTED);
+        var approved = new com.rtms.backend.admission.entity.AdmissionApplication();
+        approved.setId(5L);
+        approved.setStatus(com.rtms.backend.admission.enums.AdmissionStatus.APPROVED);
+        when(admissions.findByHorseIdOrderBySubmittedAtDesc(HORSE)).thenReturn(List.of(rejected, approved));
+        dose(1L, TODAY);
+        dose(2L, TODAY);
+
+        CareSchedule milestone = service.upsertMilestone(HORSE, "preventive:40", ACTOR, null).orElseThrow();
+
+        assertEquals(5L, milestone.getAdmissionId());
     }
 
     // ---- deferMilestone ----

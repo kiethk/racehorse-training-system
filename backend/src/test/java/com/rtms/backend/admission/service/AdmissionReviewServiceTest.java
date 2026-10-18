@@ -156,6 +156,8 @@ class AdmissionReviewServiceTest {
         request.setFindings("Splint inflammation; horse blocked from training but admitted");
         request.setRestrictionDetails("No track work for 30 days");
         request.setNextSchedule(next);
+        var vaccinations = java.util.List.of(new com.rtms.backend.medical.dto.VaccinationRequest());
+        request.setVaccinations(vaccinations);
 
         var response = service.reviewByVet(1L, request, 5L);
 
@@ -170,6 +172,7 @@ class AdmissionReviewServiceTest {
         assertEquals(TrainingDecision.BLOCKED, completion.getValue().getTrainingDecision());
         assertEquals("No track work for 30 days", completion.getValue().getRestrictionDetails());
         assertSame(next, completion.getValue().getNextSchedule());
+        assertSame(vaccinations, completion.getValue().getVaccinations());
     }
 
     @Test
