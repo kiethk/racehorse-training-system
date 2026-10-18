@@ -3,6 +3,7 @@ import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
 
 import com.rtms.backend.medical.entity.CareSchedule;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.admission.enums.AdmissionStatus;
@@ -177,6 +178,10 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     long countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(Long vetId, Collection<CareScheduleStatus> statuses);
 
     boolean existsByHorseIdAndStatusInAndIdNot(Long horseId, Collection<CareScheduleStatus> statuses, Long id);
+
+    /** Mốc tiêm phòng đang chờ của ngựa; partial unique index đảm bảo tối đa một. */
+    Optional<CareSchedule> findFirstByHorseIdAndPurposeAndStatusIn(Long horseId, CareSchedulePurpose purpose,
+            Collection<CareScheduleStatus> statuses);
 
     /**
      * Lần khám sắp tới của ngựa (đã xếp giờ thì lấy giờ xếp, chưa thì lấy giờ
