@@ -83,6 +83,20 @@ export function CameraRig({ viewMode, focus, width, depth, centerX, locked }: Ca
     invalidate();
   });
 
+  // Keep panning on the barn: the orbit target may not leave its footprint. Camera and target move by the
+  // same amount, so the viewing angle does not change.
+  const clampPan = () => {
+    const control = controls.current;
+    if (!control) return;
+    const { target, object } = control;
+    const x = THREE.MathUtils.clamp(target.x, centerX - width / 2, centerX + width / 2);
+    const z = THREE.MathUtils.clamp(target.z, -depth / 2, depth / 2);
+    if (x === target.x && z === target.z) return;
+    const shift = new THREE.Vector3(x - target.x, 0, z - target.z);
+    target.add(shift);
+    object.position.add(shift);
+  };
+
   const polar = viewMode === 'top' ? [0.02, 0.2] : [0.55, 1.05];
 
   return (
@@ -92,8 +106,11 @@ export function CameraRig({ viewMode, focus, width, depth, centerX, locked }: Ca
       enabled={!locked}
       enableDamping
       dampingFactor={0.1}
-      minZoom={4}
-      maxZoom={120}
+      // Relative to the zoom that fits the whole barn: close enough to read a stall, never inside the walls,
+      // never so far out that the barn becomes a speck. Focusing a stall uses 1.35×, inside this range.
+      minZoom={fitZoom * 0.7}
+      maxZoom={fitZoom * 2.2}
+      onChange={clampPan}
       minPolarAngle={polar[0]}
       maxPolarAngle={polar[1]}
       minAzimuthAngle={-0.95}

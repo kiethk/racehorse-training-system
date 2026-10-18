@@ -63,7 +63,9 @@ export const STAFF_TOKENS = [
  * are the one place in the stable feature with literal colours; everything that carries meaning uses tokens.
  */
 export const MATERIAL_COLORS = {
-  ground: '#cfd8c4',
+  ground: '#dde2d6',
+  gravel: '#d8d2c6',
+  shrub: '#a3b496',
   slab: '#c9c3b8',
   aisle: '#b9b3a8',
   aisleJoint: '#a59f94',
@@ -75,8 +77,6 @@ export const MATERIAL_COLORS = {
   strawDark: '#c2a061',
   hay: '#c9b06a',
   water: '#7fa6b8',
-  foliage: '#7f9c6b',
-  trunk: '#6b4f3a',
   lamp: '#fff3c4',
 } as const;
 
@@ -133,8 +133,8 @@ function createGeometries() {
     lampPost: new THREE.CylinderGeometry(0.05, 0.06, 2.6, 8),
     lamp: new THREE.SphereGeometry(0.16, 12, 10),
     aisleJoint: new THREE.BoxGeometry(0.03, 0.01, AISLE_WIDTH - 0.3),
-    trunk: new THREE.CylinderGeometry(0.12, 0.16, 1.1, 8),
-    crown: new THREE.ConeGeometry(0.9, 2, 9),
+    // Unit shrub, flattened and sized per instance.
+    shrub: new THREE.IcosahedronGeometry(0.5, 1).scale(1, 0.6, 1),
     ring: new THREE.RingGeometry(0.95, 1.2, 40),
     disc: new THREE.CircleGeometry(0.45, 28),
     legs: new THREE.CapsuleGeometry(0.17, 0.5, 4, 10),

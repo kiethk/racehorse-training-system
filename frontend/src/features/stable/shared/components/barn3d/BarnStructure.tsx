@@ -14,8 +14,8 @@ import {
   sharedGeometries,
 } from './sceneResources';
 
-/** Position plus an optional turn around the vertical axis. */
-type Transform = [x: number, y: number, z: number, rotationY?: number];
+/** Position plus an optional turn around the vertical axis and an optional uniform scale. */
+type Transform = [x: number, y: number, z: number, rotationY?: number, scale?: number];
 
 /** Many copies of one mesh in a single draw call. Transforms only change when the area changes. */
 function InstancedParts({ geometry, material, transforms, castShadow = false }: {
@@ -29,9 +29,10 @@ function InstancedParts({ geometry, material, transforms, castShadow = false }: 
     const mesh = ref.current;
     if (!mesh) return;
     const object = new THREE.Object3D();
-    transforms.forEach(([x, y, z, rotationY = 0], index) => {
+    transforms.forEach(([x, y, z, rotationY = 0, scale = 1], index) => {
       object.position.set(x, y, z);
       object.rotation.set(0, rotationY, 0);
+      object.scale.setScalar(scale);
       object.updateMatrix();
       mesh.setMatrixAt(index, object.matrix);
     });
@@ -51,6 +52,9 @@ function InstancedParts({ geometry, material, transforms, castShadow = false }: 
   );
 }
 
+/** Width of the gravel apron around the barn slab. */
+const GRAVEL = 1.2;
+
 /** Deterministic pseudo-random numbers, so the straw lies the same way on every render and every visit. */
 function seeded(seed: number) {
   let value = seed;
@@ -66,8 +70,8 @@ export function aisleEdgeZ(row: 0 | 1) {
 }
 
 /**
- * Everything that does not change with the data: ground, slab, aisle, partitions with bars, gates, bedding,
- * feeders, hay and lamps. Rebuilt only when the number of stalls changes.
+ * Everything that does not change with the data: yard, slab, aisle, partitions with bars, gates, bedding,
+ * feeders, hay, lamps and shrubs. Rebuilt only when the number of stalls changes.
  */
 export function BarnStructure({ columns }: { columns: number }) {
   const geo = sharedGeometries();
@@ -86,8 +90,8 @@ export function BarnStructure({ columns }: { columns: number }) {
     straw: new THREE.MeshStandardMaterial({ color: M.strawDark, roughness: 1 }),
     hay: new THREE.MeshStandardMaterial({ color: M.hay, roughness: 1 }),
     water: new THREE.MeshStandardMaterial({ color: M.water, roughness: 0.3, metalness: 0.3 }),
-    trunk: new THREE.MeshStandardMaterial({ color: M.trunk, roughness: 1 }),
-    foliage: new THREE.MeshStandardMaterial({ color: M.foliage, roughness: 1, flatShading: true }),
+    gravel: new THREE.MeshStandardMaterial({ color: M.gravel, roughness: 1 }),
+    shrub: new THREE.MeshStandardMaterial({ color: M.shrub, roughness: 1, flatShading: true }),
     lamp: new THREE.MeshBasicMaterial({ color: M.lamp }),
   }), []);
   useLayoutEffect(() => () => Object.values(materials).forEach((material) => material.dispose()), [materials]);
@@ -97,7 +101,7 @@ export function BarnStructure({ columns }: { columns: number }) {
       panels: [] as Transform[], bars: [] as Transform[], rails: [] as Transform[], posts: [] as Transform[],
       gates: [] as Transform[], gateBars: [] as Transform[], feeders: [] as Transform[], waters: [] as Transform[],
       straw: [] as Transform[], joints: [] as Transform[], bales: [] as Transform[], lampPosts: [] as Transform[],
-      lamps: [] as Transform[], trunks: [] as Transform[], crowns: [] as Transform[],
+      lamps: [] as Transform[], shrubs: [] as Transform[],
     };
     const random = seeded(columns * 97 + 13);
     for (const row of [0, 1] as const) {
@@ -135,17 +139,19 @@ export function BarnStructure({ columns }: { columns: number }) {
         t.lamps.push([x, 2.65, side * (AISLE_WIDTH / 2 + 0.2)]);
       }
     }
-    // A few trees behind the barn and at its ends; none in front, where they would hide the stalls.
-    const treeRandom = seeded(7);
-    for (let i = 0; i < 9; i += 1) {
-      const x = -width / 2 - 2 + i * ((width + 4) / 8) + (treeRandom() - 0.5) * 1.5;
-      const z = -depth / 2 - 2.2 - treeRandom() * 2.5;
-      t.trunks.push([x, 0.45, z]);
-      t.crowns.push([x, 1.9, z, treeRandom() * Math.PI]);
-    }
-    for (const x of [-width / 2 - ENTRANCE / 2 - 3.5, width / 2 + 1.5]) {
-      t.trunks.push([x, 0.45, 2]);
-      t.crowns.push([x, 1.9, 2, 1]);
+    // Low shrubs in small clumps behind the barn and beside its corners; never in front of the stalls
+    // or across the aisle entrance.
+    const shrubRandom = seeded(columns * 31 + 7);
+    const yardCenterX = -ENTRANCE / 2;
+    const clump = (x: number, z: number) => {
+      for (let k = 0; k < 3; k += 1) {
+        t.shrubs.push([x + (shrubRandom() - 0.5) * 1.1, 0.12, z + (shrubRandom() - 0.5) * 0.7, shrubRandom() * Math.PI,
+          0.7 + shrubRandom() * 0.5]);
+      }
+    };
+    for (let i = 0; i < 4; i += 1) clump(yardCenterX - width / 2 + (i + 0.5) * (width / 4), -depth / 2 - GRAVEL - 0.9);
+    for (const side of [-1, 1]) {
+      for (const z of [-depth / 2 + 1, depth / 2 - 1]) clump(yardCenterX + side * (width / 2 + GRAVEL + 0.9), z);
     }
     return t;
   }, [columns, length, entranceX, width, depth]);
@@ -155,6 +161,10 @@ export function BarnStructure({ columns }: { columns: number }) {
       <mesh position={[-ENTRANCE / 2, -0.14, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow raycast={() => null}>
         <planeGeometry args={[width + 40, depth + 40]} />
         <primitive object={materials.ground} attach="material" />
+      </mesh>
+      <mesh position={[-ENTRANCE / 2, -0.1, 0]} receiveShadow raycast={() => null}>
+        <boxGeometry args={[width + GRAVEL * 2, 0.06, depth + GRAVEL * 2]} />
+        <primitive object={materials.gravel} attach="material" />
       </mesh>
       <mesh position={[-ENTRANCE / 2, -0.06, 0]} receiveShadow raycast={() => null}>
         <boxGeometry args={[width, 0.12, depth]} />
@@ -183,8 +193,7 @@ export function BarnStructure({ columns }: { columns: number }) {
       <InstancedParts geometry={geo.hayBale} material={materials.hay} transforms={parts.bales} castShadow />
       <InstancedParts geometry={geo.lampPost} material={materials.woodDark} transforms={parts.lampPosts} castShadow />
       <InstancedParts geometry={geo.lamp} material={materials.lamp} transforms={parts.lamps} />
-      <InstancedParts geometry={geo.trunk} material={materials.trunk} transforms={parts.trunks} castShadow />
-      <InstancedParts geometry={geo.crown} material={materials.foliage} transforms={parts.crowns} castShadow />
+      <InstancedParts geometry={geo.shrub} material={materials.shrub} transforms={parts.shrubs} castShadow />
     </group>
   );
 }

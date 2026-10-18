@@ -3,7 +3,8 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { EmptyState, IconButton, Notice, Panel, Pill, SegmentedControl, Spinner } from '@/components/ui';
-import type { Horse, StableStall } from '../../types';
+import type { Area, Horse, StableStall } from '../../types';
+import { AreaPicker } from './AreaPicker';
 import type { BarnViewMode } from './barn3d/CameraRig';
 import { OWN_LABEL, StableFloorPlan, orderStableAreas, type StableFloorPlanProps } from './StableFloorPlan';
 import { StableLegend } from './StableLegend';
@@ -68,15 +69,24 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
   const area = orderedAreas.find((item) => item.id === areaId) ?? orderedAreas[0];
   const areaStalls = useMemo(() => stalls.filter((stall) => stall.areaId === area?.id), [stalls, area]);
   const occupied = areaStalls.filter((stall) => horseByStallId.has(stall.id)).length;
+  // Per-area counts for the area picker, from data already on screen.
+  const occupancy = useMemo(() => {
+    const counts = new Map<number, { occupied: number; total: number }>();
+    stalls.forEach((stall) => {
+      const count = counts.get(stall.areaId) ?? { occupied: 0, total: 0 };
+      counts.set(stall.areaId, { occupied: count.occupied + Number(horseByStallId.has(stall.id)), total: count.total + 1 });
+    });
+    return counts;
+  }, [stalls, horseByStallId]);
 
   const handleUnavailable = useCallback(() => {
     setUnavailable(true);
     setView('plan');
   }, []);
 
-  const pickArea = (id: string) => {
-    setPickedAreaId(Number(id));
-    if (selectedAreaId != null && selectedAreaId !== Number(id)) onSelectStall(null);
+  const pickArea = (next: Area) => {
+    setPickedAreaId(next.id);
+    if (selectedAreaId != null && selectedAreaId !== next.id) onSelectStall(null);
   };
 
   const ownNote = ownStallIds ? `${OWN_LABEL[lens]} are shown at full strength; the rest are faded.` : null;
@@ -93,13 +103,8 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
         />
         {is3d && orderedAreas.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            {orderedAreas.length > 1 && (
-              <SegmentedControl<string>
-                label="Area"
-                value={String(area?.id)}
-                onChange={pickArea}
-                options={orderedAreas.map((item) => ({ value: String(item.id), label: item.code }))}
-              />
+            {orderedAreas.length > 1 && area && (
+              <AreaPicker areas={orderedAreas} value={area} onChange={pickArea} occupancy={occupancy} />
             )}
             <SegmentedControl<BarnViewMode>
               label="Camera"
