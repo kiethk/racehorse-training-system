@@ -30,7 +30,7 @@ export function StallDetailPanel({ stall, area, horse, specialty, children, acti
   }
 
   const state = stallState(stall, horse);
-  const occupancy = state.label === 'Training blocked' ? 'Occupied' : state.label;
+  const occupancy = state.tone === 'danger' ? 'Occupied' : state.label;
 
   return (
     <Panel
@@ -44,7 +44,7 @@ export function StallDetailPanel({ stall, area, horse, specialty, children, acti
           <p className="truncate text-xs text-[var(--color-text-muted)]">{area?.name ?? 'Unknown area'}</p>
         </div>
         {/* Occupancy only: whether the horse may train is shown once, with the horse below. */}
-        <Pill size="sm" tone={occupancy === 'Occupied' ? 'success' : occupancy === 'Maintenance' ? 'warning' : 'neutral'}>
+        <Pill size="sm" tone={occupancy === 'Occupied' ? 'success' : occupancy === 'Reserved' ? 'info' : 'neutral'}>
           {occupancy}
         </Pill>
       </div>

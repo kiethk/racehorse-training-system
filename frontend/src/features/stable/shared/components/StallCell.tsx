@@ -17,21 +17,42 @@ interface StallCellProps {
   compact?: boolean;
 }
 
-/** How a stall's state is drawn: one dot colour and one word, the same on every stable screen. */
+export type StallTone = 'success' | 'danger' | 'info' | 'neutral';
+
+/** The colour token behind each tone. The 2D dot and the 3D scene both draw from it. */
+export const STALL_TONE_TOKEN: Record<StallTone, string> = {
+  success: '--color-success',
+  danger: '--color-danger',
+  info: '--color-info',
+  neutral: '--color-border-strong',
+};
+
+const STALL_TONE_DOT: Record<StallTone, string> = {
+  success: 'bg-[var(--color-success)]',
+  danger: 'bg-[var(--color-danger)]',
+  info: 'bg-[var(--color-info)]',
+  neutral: 'bg-[var(--color-border-strong)]',
+};
+
+/** Every state a stall can be drawn in, in legend order. */
+export const STALL_STATES = [
+  { label: 'Occupied', tone: 'success' },
+  { label: 'Training blocked', tone: 'danger' },
+  { label: 'Reserved', tone: 'info' },
+  { label: 'Empty', tone: 'neutral' },
+] as const satisfies ReadonlyArray<{ label: string; tone: StallTone }>;
+
+export function stallToneDot(tone: StallTone) {
+  return STALL_TONE_DOT[tone];
+}
+
+/** How a stall's state is drawn: one colour and one word, the same on every stable screen. */
 export function stallState(stall: StableStall, horse: Horse | undefined) {
-  if (stall.status === 'MAINTENANCE') {
-    return { label: 'Maintenance', dot: 'bg-[var(--color-warning)]' };
-  }
-  if (horse && horse.trainingDecision === 'BLOCKED') {
-    return { label: 'Training blocked', dot: 'bg-[var(--color-danger)]' };
-  }
-  if (horse || stall.status === 'OCCUPIED') {
-    return { label: 'Occupied', dot: 'bg-[var(--color-success)]' };
-  }
-  if (stall.status === 'RESERVED') {
-    return { label: 'Reserved', dot: 'bg-[var(--color-info)]' };
-  }
-  return { label: 'Empty', dot: 'bg-[var(--color-border-strong)]' };
+  const state = horse && horse.trainingDecision === 'BLOCKED' ? STALL_STATES[1]
+    : horse || stall.status === 'OCCUPIED' ? STALL_STATES[0]
+    : stall.status === 'RESERVED' ? STALL_STATES[2]
+    : STALL_STATES[3];
+  return { label: state.label, tone: state.tone as StallTone, dot: STALL_TONE_DOT[state.tone] };
 }
 
 /** One stall on the floor plan. Role-neutral: what a role adds goes through `footer`. */
