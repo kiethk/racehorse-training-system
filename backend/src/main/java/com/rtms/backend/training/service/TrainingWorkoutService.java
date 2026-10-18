@@ -301,9 +301,18 @@ public class TrainingWorkoutService {
                 || request.getAverageSpeedKmh() == null
                 || request.getAverageHeartRate() == null
                 || request.getMaxHeartRate() == null
-                || request.getRecoveryHeartRate() == null
-                || request.getPerformanceRating() == null) {
-            throw new IllegalArgumentException("All measured results and the performance rating are required!");
+                || request.getRecoveryHeartRate() == null) {
+            throw new IllegalArgumentException("All measured results are required!");
+        }
+        if (request.getPerformanceRating() == null) {
+            request.setPerformanceRating(WorkoutPerformanceCalculator.calculate(
+                    request.getActualDistanceMeters(),
+                    request.getActualDurationMinutes(),
+                    request.getTopSpeedKmh(),
+                    request.getAverageSpeedKmh(),
+                    request.getAverageHeartRate(),
+                    request.getMaxHeartRate(),
+                    request.getRecoveryHeartRate()));
         }
         if (request.getActualDistanceMeters().compareTo(BigDecimal.ZERO) <= 0
                 || request.getActualDurationMinutes().compareTo(BigDecimal.ZERO) <= 0
@@ -338,7 +347,16 @@ public class TrainingWorkoutService {
         workout.setAverageHeartRate(request.getAverageHeartRate());
         workout.setMaxHeartRate(request.getMaxHeartRate());
         workout.setRecoveryHeartRate(request.getRecoveryHeartRate());
-        workout.setPerformanceRating(request.getPerformanceRating());
+
+        int calculatedRating = WorkoutPerformanceCalculator.calculate(
+                request.getActualDistanceMeters(),
+                request.getActualDurationMinutes(),
+                request.getTopSpeedKmh(),
+                request.getAverageSpeedKmh(),
+                request.getAverageHeartRate(),
+                request.getMaxHeartRate(),
+                request.getRecoveryHeartRate());
+        workout.setPerformanceRating(calculatedRating);
         workout.setTrainerFeedback(request.getTrainerFeedback());
         workout.setStatus(WorkoutStatus.COMPLETED);
     }

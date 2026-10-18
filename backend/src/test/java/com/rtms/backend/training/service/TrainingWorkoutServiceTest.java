@@ -324,7 +324,7 @@ class TrainingWorkoutServiceTest {
         assertNotNull(response);
         assertEquals("Acceleration drill", response.getSubjectName());
         assertEquals(WorkoutStatus.COMPLETED, workout.getStatus());
-        assertEquals(9, workout.getPerformanceRating());
+        assertEquals(8, workout.getPerformanceRating());
         assertEquals("The horse ran very steadily and kept its energy well", workout.getTrainerFeedback());
         assertEquals(BigDecimal.valueOf(58.5), workout.getTopSpeedKmh());
     }
@@ -483,7 +483,7 @@ class TrainingWorkoutServiceTest {
         PlanWorkoutItemResponse response = workoutService.updateWorkoutResult(workoutId, req, trainerUser);
 
         assertNotNull(response);
-        assertEquals(7, workout.getPerformanceRating());
+        assertEquals(8, workout.getPerformanceRating());
         assertEquals("Updated performance note after review", workout.getTrainerFeedback());
         assertEquals(BigDecimal.valueOf(61.2), workout.getTopSpeedKmh());
         assertEquals(WorkoutStatus.COMPLETED, workout.getStatus());

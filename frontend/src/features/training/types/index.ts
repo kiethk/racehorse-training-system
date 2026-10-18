@@ -189,6 +189,7 @@ export interface WorkoutResultPreviewResponse {
   averageHeartRate: number;
   maxHeartRate: number;
   recoveryHeartRate: number;
+  performanceRating?: number;
 }
 
 export interface TrainingLotResponse {
