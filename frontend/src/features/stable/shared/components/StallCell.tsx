@@ -45,27 +45,30 @@ export function StallCell({ stall, horse, selected, dimmed = false, footer, onSe
       empty={!horse}
       onClick={() => onSelect(stall)}
       aria-label={`Stall ${stall.stallCode}, ${horse ? horse.name : 'no horse'}, ${state.label}`}
-      title={compact ? `${stall.stallCode} · ${horse?.name ?? state.label}` : undefined}
+      title={compact ? `Stall ${stall.stallCode}${horse ? ` · ${horse.name} (Occupied)` : ` · ${state.label}`}` : undefined}
       className={cn('flex flex-col', compact ? [
-        'min-h-16 items-center justify-center gap-1 px-1.5 py-2 text-center',
-        horse && 'border-[var(--color-success)]/20 bg-[var(--color-success-soft)]',
-        !horse && stall.status === 'RESERVED' && 'border-[var(--color-info)]/20 bg-[var(--color-info-soft)]',
+        'h-11 items-center justify-center px-1.5 py-1 text-center',
+        horse && 'border-[var(--color-success)]/30 bg-[var(--color-success-soft)] font-semibold text-[#165a38]',
+        !horse && stall.status === 'RESERVED' && 'border-[var(--color-info)]/30 bg-[var(--color-info-soft)] text-[var(--color-info)]',
       ] : 'min-h-24 animate-in fade-in zoom-in-95 fill-mode-backwards duration-300')}
       style={style}
     >
-      <span className="flex items-center justify-between gap-1">
-        <span className="font-metric text-xs font-bold text-[var(--color-text-primary)]">{stall.stallCode}</span>
+      <span className={cn('flex items-center gap-1', compact ? 'w-full justify-center' : 'justify-between')}>
+        <span className={cn('font-metric text-xs font-bold', compact && horse ? 'text-[#165a38]' : 'text-[var(--color-text-primary)]')}>
+          {stall.stallCode}
+        </span>
         {!compact && <span className={cn('h-2 w-2 shrink-0 rounded-full', state.dot)} title={state.label} />}
       </span>
-      <span
-        className={cn(
-          'break-words text-xs leading-snug',
-          compact ? 'line-clamp-1 w-full' : 'mt-1.5 line-clamp-2',
-          horse ? 'font-semibold text-[var(--color-text-primary)]' : 'italic text-[var(--color-text-muted)]',
-        )}
-      >
-        {horse ? horse.name : compact ? state.label : 'Empty'}
-      </span>
+      {!compact && (
+        <span
+          className={cn(
+            'mt-1.5 line-clamp-2 break-words text-xs leading-snug',
+            horse ? 'font-semibold text-[var(--color-text-primary)]' : 'italic text-[var(--color-text-muted)]',
+          )}
+        >
+          {horse ? horse.name : 'Empty'}
+        </span>
+      )}
       {footer && <span className="mt-auto block min-w-0 pt-2">{footer}</span>}
     </SelectableCard>
   );

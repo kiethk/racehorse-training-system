@@ -6,6 +6,14 @@ export interface StableSnapshot {
   horses: Horse[];
   trainers: UserSummary[];
   grooms: UserSummary[];
+  trainerChecks: AreaTrainerChangeCheck[];
+}
+
+export interface AreaTrainerChangeCheck {
+  areaId: number;
+  trainerId: number | null;
+  canChange: boolean;
+  reasons: string[];
 }
 
 export interface AssignmentDraft {

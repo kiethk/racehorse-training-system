@@ -9,6 +9,8 @@ import com.rtms.backend.training.service.TrainingWorkoutService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -27,6 +29,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
@@ -46,6 +49,8 @@ class StableAssignmentPostgresTest {
     @Autowired HorseRepository horses;
     @Autowired TrainingWorkoutService workouts;
     @Autowired EntityManager em;
+    @Autowired AreaTrainerAssignmentPolicy trainerPolicy;
+    @Autowired com.rtms.backend.identity.service.StaffManagementService staffManagement;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired WebApplicationContext web;
     long trainer1, trainer2, groom1, groom2, area1, area2, quarantine, course;
@@ -120,7 +125,7 @@ class StableAssignmentPostgresTest {
         return jdbc.queryForObject("SELECT groom_id FROM stable_stalls WHERE area_id=? AND stall_number=?", Long.class, area, number);
     }
     StableAssignmentService independentService(GroomProfileRepository profileRepository) {
-        return new StableAssignmentService(areas, stalls, users, profileRepository, horses, workouts, em);
+        return new StableAssignmentService(areas, stalls, users, profileRepository, horses, workouts, em, trainerPolicy);
     }
     String emptyAssignmentJson(long target, long groom) {
         return "{\"groomAssignments\":[{\"areaId\":" + target + ",\"blockNumber\":1,\"groomId\":" + groom
@@ -153,6 +158,130 @@ class StableAssignmentPostgresTest {
                 + ",\"expectedTrainerId\":null,\"expectedTrainerIdSet\":false}]}";
         mvc.perform(put("/api/areas/assignments").with(authentication(auth(true))).contentType("application/json").content(body))
                 .andExpect(status().isConflict());
+    }
+
+    BatchStableAssignmentRequest trainerChange(Long next) {
+        return new BatchStableAssignmentRequest(List.of(new AreaTrainerAssignmentDto(area1, next, trainer1)), null);
+    }
+    Long currentTrainer(long areaId) {
+        return jdbc.queryForObject("SELECT trainer_id FROM areas WHERE id=?", Long.class, areaId);
+    }
+    AreaTrainerChangeCheck trainerCheck(long areaId) {
+        return trainerPolicy.checks().stream().filter(c -> c.areaId()==areaId).findFirst().orElseThrow();
+    }
+
+    @Test void emptyAreaWithoutTrainingCanChangeAndRemoveTrainer() {
+        assertTrue(trainerCheck(area1).canChange());
+        assignments.applyAssignments(trainerChange(trainer2));
+        assertEquals(trainer2, currentTrainer(area1));
+        assignments.applyAssignments(new BatchStableAssignmentRequest(
+                List.of(new AreaTrainerAssignmentDto(area1, null, trainer2)), null));
+        assertNull(currentTrainer(area1));
+    }
+
+    @Test void occupiedAreaRejectsTrainerSwapAndTheWholeMixedBatch() {
+        owner(area1, 1, groom1); long h = horse(area1, 1);
+        // A stale AVAILABLE flag must not hide the real horse reference.
+        jdbc.update("UPDATE stable_stalls SET status='AVAILABLE' WHERE id=?", stall(area1,1));
+        var batch = new BatchStableAssignmentRequest(
+                List.of(new AreaTrainerAssignmentDto(area2, trainer1, trainer2), new AreaTrainerAssignmentDto(area1, trainer2, trainer1)),
+                List.of(edit(area1, 1, groom2, groom1)));
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> assignments.applyAssignments(batch)).getStatusCode().value());
+        assertEquals(trainer1, currentTrainer(area1)); assertEquals(trainer2, currentTrainer(area2));
+        assertEquals(groom1, assigned(area1,1));
+        assertEquals(stall(area1,1), jdbc.queryForObject("SELECT current_stall_id FROM horses WHERE id=?",Long.class,h));
+        assertFalse(trainerCheck(area1).canChange());
+        assertTrue(trainerCheck(area1).reasons().stream().anyMatch(r -> r.contains("Area has horses")));
+    }
+
+    @Test void occupiedAreaRejectsInitialTrainerAssignmentAndRemoval() {
+        horse(area1, 1);
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> assignments.applyAssignments(trainerChange(null))).getStatusCode().value());
+        jdbc.update("UPDATE areas SET trainer_id=NULL WHERE id=?",area1);
+        var initial = new BatchStableAssignmentRequest(List.of(new AreaTrainerAssignmentDto(area1,trainer1,null)),null);
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> assignments.applyAssignments(initial)).getStatusCode().value());
+        assertNull(currentTrainer(area1));
+    }
+
+    @ParameterizedTest @ValueSource(strings={"RESERVED","OCCUPIED"})
+    void occupiedOrReservedFlagBlocksTrainerChangeEvenWithoutHorse(String status) {
+        jdbc.update("UPDATE stable_stalls SET status=? WHERE id=?",status,stall(area1,1));
+        assertFalse(trainerCheck(area1).canChange());
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> assignments.applyAssignments(trainerChange(trainer2))).getStatusCode().value());
+    }
+
+    @ParameterizedTest @ValueSource(strings={"UPCOMING","ACTIVE"})
+    void emptyAreaCannotLeaveTrainerWhoseSharedScheduleStillHasPlans(String status) {
+        long h = horse(area2,1), p = plan(h);
+        jdbc.update("UPDATE horse_training_plans SET status=? WHERE id=?",status,p);
+        assertFalse(trainerCheck(area1).canChange());
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> assignments.applyAssignments(trainerChange(trainer2))).getStatusCode().value());
+        assertEquals(trainer1,currentTrainer(area1));
+    }
+
+    @Test void scheduledLotAloneBlocksEmptyAreaAndCompletedOrCancelledLotsDoNot() {
+        long l = lot();
+        assertFalse(trainerCheck(area1).canChange());
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> assignments.applyAssignments(trainerChange(trainer2))).getStatusCode().value());
+        jdbc.update("UPDATE training_lots SET status='COMPLETED' WHERE id=?",l);
+        long cancelled = lot(); jdbc.update("UPDATE training_lots SET status='CANCELLED' WHERE id=?",cancelled);
+        assertTrue(trainerCheck(area1).canChange());
+        assignments.applyAssignments(trainerChange(trainer2));
+        assertEquals(trainer2,currentTrainer(area1));
+        assertEquals(trainer1,jdbc.queryForObject("SELECT trainer_id FROM training_lots WHERE id=?",Long.class,l));
+    }
+
+    @Test void unfinishedWorkoutBlocksEvenWhenItsPlanAndLotWereMarkedCompleted() {
+        long h = horse(area2,1), l = lot(); workout(h,l,groom1,"SCHEDULED");
+        jdbc.update("UPDATE horse_training_plans SET status='COMPLETED' WHERE horse_id=?",h);
+        jdbc.update("UPDATE training_lots SET status='COMPLETED' WHERE id=?",l);
+        assertFalse(trainerCheck(area1).canChange());
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> assignments.applyAssignments(trainerChange(trainer2))).getStatusCode().value());
+        jdbc.update("UPDATE training_workouts SET status='COMPLETED' WHERE horse_id=?",h);
+        assertTrue(trainerCheck(area1).canChange());
+        assignments.applyAssignments(trainerChange(trainer2));
+        assertEquals(trainer1,jdbc.queryForObject("SELECT trainer_id FROM horse_training_plans WHERE horse_id=?",Long.class,h));
+        assertEquals(groom1,jdbc.queryForObject("SELECT assigned_to_id FROM training_workouts WHERE horse_id=?",Long.class,h));
+    }
+
+    @Test void cancelledTrainingDoesNotBlockEmptyAreaAndIsNotRewritten() {
+        long h = horse(area2,1), l = lot(); workout(h,l,groom1,"CANCELLED");
+        jdbc.update("UPDATE horse_training_plans SET status='CANCELLED' WHERE horse_id=?",h);
+        jdbc.update("UPDATE training_lots SET status='CANCELLED' WHERE id=?",l);
+        assertTrue(trainerCheck(area1).canChange());
+        assignments.applyAssignments(trainerChange(trainer2));
+        assertEquals(trainer1,jdbc.queryForObject("SELECT trainer_id FROM horse_training_plans WHERE horse_id=?",Long.class,h));
+        assertEquals("CANCELLED",jdbc.queryForObject("SELECT status FROM training_workouts WHERE horse_id=?",String.class,h));
+    }
+
+    @Test void eligibilityReadIsAdvisoryAndBothWriteEndpointsRecheckIt() throws Exception {
+        assertTrue(trainerCheck(area1).canChange()); horse(area1,1);
+        var mvc = webAppContextSetup(web).apply(springSecurity()).build();
+        String edit = "{\"areaId\":"+area1+",\"trainerId\":"+trainer2+",\"expectedTrainerId\":"+trainer1+"}";
+        mvc.perform(put("/api/areas/"+area1+"/trainer").with(authentication(auth(true)))
+                .contentType("application/json").content(edit)).andExpect(status().isConflict());
+        mvc.perform(put("/api/areas/assignments").with(authentication(auth(true)))
+                .contentType("application/json").content("{\"trainerAssignments\":["+edit+"]}"))
+                .andExpect(status().isConflict());
+        mvc.perform(get("/api/areas/trainer-assignment-checks").with(authentication(auth(false))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/areas/trainer-assignment-checks").with(authentication(auth(true))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").isArray());
+        assertEquals(trainer1,currentTrainer(area1));
+    }
+
+    @Test void creatingTrainerCannotBypassEmptyAreaPolicy() {
+        jdbc.update("UPDATE areas SET trainer_id=NULL WHERE id IN (?,?)",area1,area2);
+        horse(area1,1);
+        jdbc.update("UPDATE stable_stalls SET status='RESERVED' WHERE id=?",stall(area2,1));
+        var req = new com.rtms.backend.identity.dto.StaffCreationRequest();
+        req.setFullName("Trainer auto-check "+tag); req.setEmail(tag+"new-trainer@test.invalid");
+        req.setPassword("LocalTest@2026"); req.setRole("HEAD_TRAINER"); req.setCertificationNumber("CERT-"+tag);
+        var created = staffManagement.createStaff(req);
+        assertNotNull(created.getUserId());
+        assertFalse(created.getAssignedAreaIds().contains(area1)); assertFalse(created.getAssignedAreaIds().contains(area2));
+        assertNull(currentTrainer(area1)); assertNull(currentTrainer(area2));
+        for (Long id : created.getAssignedAreaIds()) assertTrue(trainerCheck(id).canChange());
     }
 
     @Test void occupiedBlockCannotLoseGroomAndEmptyBlockCan() {

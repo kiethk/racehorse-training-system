@@ -25,6 +25,21 @@ export function horseMap(data: Pick<StableSnapshot, 'horses'>) {
   return new Map(data.horses.filter(h => h.currentStallId != null).map(h => [h.currentStallId!, h]));
 }
 
+export function trainerChangeReason(data: StableSnapshot, areaId: number): string | undefined {
+  const area = data.areas.find(a => a.id === areaId);
+  if (!area || area.type !== 'REGULAR') return 'Quarantine areas do not have a Trainer.';
+  const stallIds = new Set(data.stalls.filter(s => s.areaId === areaId).map(s => s.id));
+  if (data.horses.some(h => h.currentStallId != null && stallIds.has(h.currentStallId))) {
+    return 'Area has horses. Trainer reassignment is unavailable.';
+  }
+  if (data.stalls.some(s => s.areaId === areaId && ['OCCUPIED', 'RESERVED'].includes(s.status))) {
+    return 'Area has occupied or reserved stalls.';
+  }
+  const check = data.trainerChecks.find(c => c.areaId === areaId);
+  if (!check || check.trainerId !== area.trainerId) return 'Trainer assignment status changed. Refresh the board.';
+  if (!check.canChange) return check.reasons.join(' ') || 'Trainer reassignment is unavailable.';
+}
+
 export function areaView(data: StableSnapshot, draft: AssignmentDraft, area: Area, horses = horseMap(data)) {
   const stalls = data.stalls.filter(s => s.areaId === area.id);
   const occupied = stalls.filter(s => horses.has(s.id)).length;
@@ -139,6 +154,10 @@ export function planAssignment(data: StableSnapshot, current: AssignmentDraft, t
     setBlock(target, personId);
   }
   for (const t of touched.values()) {
+    if (t.kind === 'trainer' && current.trainers[t.areaId] !== next.trainers[t.areaId]) {
+      const reason = trainerChangeReason(data, t.areaId);
+      if (reason) throw new Error(reason);
+    }
     const a = data.areas.find(a => a.id === t.areaId)!;
     const groomed = data.stalls.some(s => s.areaId === a.id && next.grooms[s.id] != null);
     if (a.type === 'REGULAR' && groomed && next.trainers[a.id] == null) {

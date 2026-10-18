@@ -13,6 +13,11 @@ import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
+import com.rtms.backend.stable.service.AreaTrainerAssignmentPolicy;
+import com.rtms.backend.stable.util.AreaCodeGenerator;
+import jakarta.persistence.EntityManager;
+import jakarta.validation.Validator;
+import org.springframework.dao.DataIntegrityViolationException;
 
 
 import com.rtms.backend.identity.dto.StaffCreationRequest;
@@ -31,6 +36,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -53,6 +60,9 @@ public class StaffManagementService {
     private final TrainerProfileRepository trainerProfileRepository;
     private final AreaRepository areaRepository;
     private final StableStallRepository stableStallRepository;
+    private final AreaTrainerAssignmentPolicy trainerAssignmentPolicy;
+    private final EntityManager em;
+    private final Validator validator;
 
     private static final List<String> STAFF_ROLES = Arrays.asList("GROOM", "VETERINARIAN", "HEAD_TRAINER");
 
@@ -64,7 +74,8 @@ public class StaffManagementService {
             VeterinarianProfileRepository vetProfileRepository,
             TrainerProfileRepository trainerProfileRepository,
             AreaRepository areaRepository,
-            StableStallRepository stableStallRepository) {
+            StableStallRepository stableStallRepository,
+            AreaTrainerAssignmentPolicy trainerAssignmentPolicy, EntityManager em, Validator validator) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -73,6 +84,9 @@ public class StaffManagementService {
         this.trainerProfileRepository = trainerProfileRepository;
         this.areaRepository = areaRepository;
         this.stableStallRepository = stableStallRepository;
+        this.trainerAssignmentPolicy = trainerAssignmentPolicy;
+        this.em = em;
+        this.validator = validator;
     }
 
     // ── READ ──────────────────────────────────────────────────────────────────
@@ -217,20 +231,34 @@ public class StaffManagementService {
     /**
      * Creates a staff member and performs automatic assignments:
      * <ul>
-     *   <li>HEAD_TRAINER: assigns up to 2 unassigned REGULAR areas (deterministic, code ASC)</li>
-     *   <li>GROOM: automatically selects the best available Trainer (fewest grooms → most free blocks
-     *       → lowest ID) and locks + assigns the first free 3-stall block in that Trainer's REGULAR
-     *       areas. If no Trainer has a free block the Groom is still created with status UNASSIGNED.</li>
+     *   <li>HEAD_TRAINER: assigns up to 2 empty unassigned REGULAR areas in generated code order.</li>
+     *   <li>GROOM: prioritizes horses without a Groom, then balances reporting groups by Groom
+     *       count and free blocks. A REGULAR group belongs to an active Trainer; each Q Area is
+     *       a group without a Trainer. No free block still creates an UNASSIGNED account.</li>
      * </ul>
      * The whole operation is transactional.
      */
     @Transactional
     public StaffCreationResponse createStaff(StaffCreationRequest request) {
+        if (request == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Staff details are required");
         if (request.getRole() == null || !STAFF_ROLES.contains(request.getRole())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or unauthorized role for staff creation");
         }
 
-        String normalizedEmail = request.getEmail().toLowerCase().trim();
+        // Normalize before validating, including callers such as the manual seed workflow.
+        if (request.getEmail() != null) request.setEmail(request.getEmail().trim().toLowerCase(Locale.ROOT));
+        var errors = validator.validate(request);
+        if (!errors.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                errors.stream().sorted(java.util.Comparator.comparing(e -> e.getPropertyPath().toString())).findFirst().orElseThrow().getMessage());
+        if (request.getPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at most 72 UTF-8 bytes");
+        // Take the same lock as Manager Stable BEFORE reading allocation candidates.
+        // Concurrent creations then see the previous committed assignment, not the same free block.
+        if (!"VETERINARIAN".equals(request.getRole())) em.createNativeQuery(
+                "SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(:key,0))")
+                .setParameter("key", "STABLE_ASSIGNMENTS_LOCK").getSingleResult();
+
+        String normalizedEmail = request.getEmail();
         if (userRepository.findByEmail(normalizedEmail).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
         }
@@ -242,11 +270,19 @@ public class StaffManagementService {
         user.setFullName(request.getFullName().trim());
         user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        user.setPhone(request.getPhone());
-        user.setAddress(request.getAddress());
+        user.setPhone(clean(request.getPhone()));
+        user.setAddress(clean(request.getAddress()));
         user.setRole(role);
         user.setActive(true);
-        user = userRepository.save(user);
+        try { user = userRepository.saveAndFlush(user); }
+        catch (DataIntegrityViolationException ex) {
+            for (Throwable cause=ex; cause!=null; cause=cause.getCause()) {
+                if (cause instanceof org.hibernate.exception.ConstraintViolationException constraint
+                        && "users_email_key".equals(constraint.getConstraintName()))
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,"Email already in use",ex);
+            }
+            throw ex;
+        }
 
         StaffCreationResponse response = buildBaseResponse(user);
 
@@ -288,16 +324,19 @@ public class StaffManagementService {
         profile.setCertificationIssuedDate(request.getCertificationIssuedDate());
         trainerProfileRepository.save(profile);
 
-        // Auto-assign up to 2 unassigned REGULAR areas (deterministic: code ASC).
+        // Auto-assign up to 2 unassigned REGULAR areas (A..Z, AA..).
         // Quarantine areas are excluded. Never fail if no area is available.
         List<Area> freeAreas = areaRepository.findUnassignedRegularAreasOrdered();
-        int toAssign = Math.min(freeAreas.size(), MAX_AREAS_PER_TRAINER);
 
         List<Long>   areaIds   = new ArrayList<>();
         List<String> areaCodes = new ArrayList<>();
 
-        for (int i = 0; i < toAssign; i++) {
-            Area area = freeAreas.get(i);
+        for (Area area : freeAreas) {
+            if (areaIds.size() == MAX_AREAS_PER_TRAINER) break;
+            // Area rows are already locked. Lock their stalls before checking so an
+            // arrival/allocation cannot turn an empty Area into an occupied one mid-assignment.
+            var lockedStalls = stableStallRepository.findBlockForUpdate(area.getId(), 1, 12);
+            if (lockedStalls.size() != 12 || !trainerAssignmentPolicy.check(area.getId()).canChange()) continue;
             area.setTrainerId(user.getId());
             areaRepository.save(area);
             areaIds.add(area.getId());
@@ -313,12 +352,15 @@ public class StaffManagementService {
 
     private StaffCreationResponse createGroom(User user, StaffCreationRequest request,
                                               StaffCreationResponse response) {
-        
+        Set<Long> occupiedStalls = ((List<?>) em.createNativeQuery(
+                "SELECT current_stall_id FROM horses WHERE current_stall_id IS NOT NULL").getResultList())
+                .stream().map(id -> ((Number) id).longValue()).collect(Collectors.toSet());
         List<User> activeTrainers = userRepository.findActiveHeadTrainers();
         
         User bestTrainer = null;
         int bestTrainerFreeBlocks = -1;
         long bestTrainerGroomCount = Long.MAX_VALUE;
+        int bestOccupied = -1;
         
         Area bestAreaToAssign = null;
         List<StableStall> bestBlockToAssign = null;
@@ -329,11 +371,12 @@ public class StaffManagementService {
             
             if (trainerAreas.isEmpty()) continue;
             
-            trainerAreas.sort((a, b) -> a.getCode().compareTo(b.getCode())); // deterministic: area code ASC
+            trainerAreas.sort((a, b) -> AreaCodeGenerator.compareCodes(a.getCode(), b.getCode()));
 
             int freeBlocks = 0;
             Area firstFreeArea = null;
             List<StableStall> firstFreeBlock = null;
+            int firstOccupied = -1;
 
             for (Area area : trainerAreas) {
                 for (int blockStart : BLOCK_STARTS) {
@@ -343,9 +386,11 @@ public class StaffManagementService {
 
                     if (block.size() == GROOM_BLOCK_SIZE && block.stream().allMatch(s -> s.getGroomId() == null)) {
                         freeBlocks++;
-                        if (firstFreeBlock == null) {
+                        int occupied = (int) block.stream().filter(s -> occupiedStalls.contains(s.getId())).count();
+                        if (occupied > firstOccupied) {
                             firstFreeBlock = block;
                             firstFreeArea = area;
+                            firstOccupied = occupied;
                         }
                     }
                 }
@@ -355,9 +400,9 @@ public class StaffManagementService {
                 long groomCount = groomProfileRepository.countByTrainerId(trainer.getId());
                 
                 boolean isBetter = false;
-                if (groomCount < bestTrainerGroomCount) {
+                if (firstOccupied > bestOccupied || firstOccupied == bestOccupied && groomCount < bestTrainerGroomCount) {
                     isBetter = true;
-                } else if (groomCount == bestTrainerGroomCount) {
+                } else if (firstOccupied == bestOccupied && groomCount == bestTrainerGroomCount) {
                     if (freeBlocks > bestTrainerFreeBlocks) {
                         isBetter = true;
                     } else if (freeBlocks == bestTrainerFreeBlocks) {
@@ -373,6 +418,30 @@ public class StaffManagementService {
                     bestTrainerFreeBlocks = freeBlocks;
                     bestAreaToAssign = firstFreeArea;
                     bestBlockToAssign = firstFreeBlock;
+                    bestOccupied = firstOccupied;
+                }
+            }
+        }
+
+        // Quarantine is its own allocation group; its Grooms do not report to a Trainer.
+        var quarantineAreas = new ArrayList<>(areaRepository.findByType(AreaType.QUARANTINE));
+        quarantineAreas.sort((a,b) -> AreaCodeGenerator.compareCodes(a.getCode(),b.getCode()));
+        for (Area area : quarantineAreas) {
+            var rows = stableStallRepository.findByAreaId(area.getId());
+            long load = rows.stream().map(StableStall::getGroomId).filter(java.util.Objects::nonNull).distinct().count();
+            var free = new ArrayList<List<StableStall>>();
+            for (int start : BLOCK_STARTS) {
+                int end = start + 2;
+                var block = rows.stream().filter(s -> s.getStallNumber() >= start && s.getStallNumber() <= end)
+                        .sorted(java.util.Comparator.comparing(StableStall::getStallNumber)).toList();
+                if (block.size()==3 && block.stream().allMatch(s -> s.getGroomId()==null)) free.add(block);
+            }
+            for (var block : free) {
+                int occupied = (int) block.stream().filter(s -> occupiedStalls.contains(s.getId())).count();
+                if (occupied > bestOccupied || occupied == bestOccupied && (load < bestTrainerGroomCount
+                        || load == bestTrainerGroomCount && free.size() > bestTrainerFreeBlocks)) {
+                    bestTrainer=null; bestAreaToAssign=area; bestBlockToAssign=block;
+                    bestTrainerGroomCount=load; bestTrainerFreeBlocks=free.size(); bestOccupied=occupied;
                 }
             }
         }
@@ -380,7 +449,7 @@ public class StaffManagementService {
         GroomProfile groom = new GroomProfile();
         groom.setUserId(user.getId());
 
-        if (bestTrainer == null) {
+        if (bestAreaToAssign == null) {
             groom.setTrainerId(null);
             groomProfileRepository.save(groom);
             
@@ -392,7 +461,7 @@ public class StaffManagementService {
             response.setAssignedStallCodes(new ArrayList<>());
             response.setAssignmentStatus("UNASSIGNED");
             response.setNoStallBlockAvailable(true);
-            response.setProfileSummary("Groom created successfully, but no Trainer with an available stall block is currently available.");
+            response.setProfileSummary("No unassigned three-stall block is available.");
             
             return response;
         }
@@ -402,6 +471,13 @@ public class StaffManagementService {
         int blockEnd   = blockStart + GROOM_BLOCK_SIZE - 1;
         List<StableStall> lockedBlock = stableStallRepository.findBlockForUpdate(
                 bestAreaToAssign.getId(), blockStart, blockEnd);
+        em.refresh(bestAreaToAssign);
+        for (StableStall stall : lockedBlock) em.refresh(stall);
+        if (bestTrainer != null) {
+            em.refresh(bestTrainer);
+            if (!bestTrainer.isActive() || !bestTrainer.getId().equals(bestAreaToAssign.getTrainerId()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Trainer assignment changed. Please retry.");
+        }
 
         // Validate the locked snapshot: must still be a complete, unoccupied block
         if (lockedBlock.size() != GROOM_BLOCK_SIZE) {
@@ -420,7 +496,7 @@ public class StaffManagementService {
             }
         }
 
-        groom.setTrainerId(bestTrainer.getId());
+        groom.setTrainerId(bestTrainer == null ? null : bestTrainer.getId());
         groomProfileRepository.save(groom);
 
         List<Long> stallIds = new ArrayList<>();
@@ -433,15 +509,16 @@ public class StaffManagementService {
             stallCodes.add(stall.getStallCode());
         }
 
-        response.setTrainerId(bestTrainer.getId());
-        response.setTrainerName(bestTrainer.getFullName());
+        response.setTrainerId(bestTrainer == null ? null : bestTrainer.getId());
+        response.setTrainerName(bestTrainer == null ? null : bestTrainer.getFullName());
+        response.setAssignedAreaType(bestAreaToAssign.getType());
         response.setAssignedAreaId(bestAreaToAssign.getId());
         response.setAssignedAreaCode(bestAreaToAssign.getCode());
         response.setAssignedStallIds(stallIds);
         response.setAssignedStallCodes(stallCodes);
         response.setAssignmentStatus("ASSIGNED");
         response.setNoStallBlockAvailable(false);
-        response.setProfileSummary("Trainer: " + bestTrainer.getFullName() + " | Area: " + bestAreaToAssign.getCode() + " | Stalls: " + String.join(", ", stallCodes));
+        response.setProfileSummary("Area: " + bestAreaToAssign.getCode() + " | Stalls: " + String.join(", ", stallCodes));
 
         return response;
     }
@@ -462,6 +539,7 @@ public class StaffManagementService {
     }
 
     // ── Mapping helpers ───────────────────────────────────────────────────────
+    private static String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 
     private StaffCreationResponse buildBaseResponse(User user) {
         StaffCreationResponse r = new StaffCreationResponse();

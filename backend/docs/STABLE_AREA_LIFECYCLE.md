@@ -38,7 +38,28 @@ Trainer/Groom UI and daily-task behavior are unchanged. Team regression checks s
 
 ## Manager UI
 
+### Trainer reassignment
+
+- Manager Stable reads `GET /api/areas/trainer-assignment-checks` (`AREA_UPDATE`) for each Area's current Trainer, eligibility and blocking reasons. These checks are advisory; assignment writes revalidate after taking the existing Area/stall locks.
+- Assigning, changing or removing a Trainer requires an empty Regular Area: no horse references and no `OCCUPIED`/`RESERVED` stalls.
+- Automatic Area allocation when creating a Trainer follows the same rule: it locks candidate stalls and skips blocked Areas, while still allowing the Staff account to be created without an Area.
+- The outgoing Trainer must have no `UPCOMING`/`ACTIVE` plans, `SCHEDULED` lots or unfinished workouts in non-cancelled lots. Lots may span several Areas, so this check covers the outgoing Trainer's entire schedule rather than guessing which Area owns a lot. An incoming Trainer may keep their existing work; nothing is transferred.
+- Completed/cancelled history remains unchanged. A no-op Trainer edit does not block Groom changes. Quarantine Areas still have no Trainer.
+- Occupied or busy Trainer slots cannot be dragged, replaced or removed. A lock icon marks unavailable slots; failed writes report blocking reasons. Local draft validation also checks both ends of a drag operation. Direct API calls receive 409, and a blocked Trainer edit rejects the entire assignment batch before any Groom/workout changes.
+
+### Area deletion
+
 Each Area has a top-right options menu with **Delete area**. A confirmation checks the server's eligibility and shows blocking reasons. Pending assignment edits must be saved or explicitly discarded first. Successful deletion removes the card and its stalls locally before refreshing; a failed refresh offers GET retry and cannot repeat the committed deletion. Add area may restore an archived Area, so success wording is **added**.
+
+### Automatic allocation when creating Staff
+
+- Staff creation keeps automatic allocation. Trainer creation takes up to two eligible empty Regular Areas in generated code order (`A..Z, AA..`). Quarantine Areas are excluded.
+- Groom creation considers unassigned consecutive three-stall blocks in both Regular and Quarantine Areas. Regular Areas require an active Trainer. Q Groom profiles always have `trainer_id = null`.
+- Blocks with horses take priority. Remaining ties use the fewest assigned Grooms in the reporting group, then the most free blocks. A Regular reporting group is a Trainer's Areas; each Q Area forms its own group. Regular groups win an exact Regular/Q tie; Trainer ID, generated Area code and stall order keep the result deterministic.
+- Creation takes `STABLE_ASSIGNMENTS_LOCK` before reading candidates, then re-reads locked entities before assigning. Concurrent creations cannot overwrite each other's assignments. No capacity still creates an active Staff account with no allocation.
+- Basic fields and role-specific credentials validate before persistence. Invalid input returns 400; duplicate email, including concurrent submissions, returns 409. Account, role profile and allocation commit or roll back together.
+- The create dialog shows field errors and prevents repeat submissions. Its result reports the actual Area, three stalls and Regular Trainer, or an unassigned state. Q results show the Area type instead of a Trainer. `Open Stable` leads to the existing board.
+- `StaffCreationPostgresTest` runs only with `RTMS_STAFF_TEST_DB_URL=jdbc:postgresql://localhost:5433/rtms_staff_test_<unique-name>`; it commits disposable fixtures and must never target an application DB.
 
 Migration: `V202610162219__soft_delete_stable_areas_and_stalls.sql`. Restart the backend to apply it before using the new UI. Do not edit previously applied migrations.
 

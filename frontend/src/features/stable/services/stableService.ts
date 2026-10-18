@@ -1,6 +1,6 @@
 import { apiDelete, apiGet, apiPost, apiPut } from '@/services/api';
 import type { Area, AreaType, Horse, StableStall, UserSummary, HorseStatus } from '../types';
-import type { AreaDeletionCheck, AreaDeletionResult, AssignmentBatch, AssignmentResponse } from '../types/manager';
+import type { AreaDeletionCheck, AreaDeletionResult, AreaTrainerChangeCheck, AssignmentBatch, AssignmentResponse } from '../types/manager';
 
 interface ApiResponse<T> { success: boolean; data: T; message?: string; }
 
@@ -18,6 +18,9 @@ interface ApiResponse<T> { success: boolean; data: T; message?: string; }
  * @RequestBody, so Spring ignores the body.
  */
 export const stableApi = {
+  getTrainerAssignmentChecks: async (): Promise<AreaTrainerChangeCheck[]> =>
+    (await apiGet<ApiResponse<AreaTrainerChangeCheck[]>>('/api/areas/trainer-assignment-checks')).data,
+
   getDeletionCheck: async (areaId: number): Promise<AreaDeletionCheck> =>
     (await apiGet<ApiResponse<AreaDeletionCheck>>(`/api/areas/${areaId}/deletion-check`)).data,
 
