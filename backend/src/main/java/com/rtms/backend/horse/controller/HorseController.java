@@ -97,10 +97,13 @@ public class HorseController {
         return ApiResponse.success(new HorseResponse(horse, imageUrls.get(id)));
     }
 
-    /** Bỏ trống stallId = gỡ ngựa khỏi chuồng, giống assign-groom bỏ trống groomId. */
-    @PreAuthorize("hasAuthority('STABLE_STALL_UPDATE')")
-    @PutMapping("/{id}/assign-stall")
-    public ApiResponse<Horse> assignStall(
+    /**
+     * Bỏ trống stallId = gỡ ngựa khỏi chuồng, giống assign-groom bỏ trống groomId.
+     * Vô hiệu hóa endpoint đổi chuồng của Trainer theo chỉ đạo quản trị; giữ hàm private để tái sử dụng sau này cho Manager nếu cần.
+     */
+    // @PreAuthorize("hasAuthority('STABLE_STALL_UPDATE')")
+    // @PutMapping("/{id}/assign-stall")
+    private ApiResponse<Horse> assignStall(
             @PathVariable Long id,
             @RequestParam(required = false) Long stallId) {
         return ApiResponse.success(horseService.assignStall(id, stallId));

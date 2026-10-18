@@ -11,6 +11,8 @@ import {
 } from "@/components/ui";
 import { displayError, formatDate, formatTime } from "@/lib/display";
 import { toast } from "@/lib/toast";
+import { calculatePerformanceRating } from "../lib/performanceCalculator";
+import { RatingPill } from "./RatingPill";
 import { trainingService } from "../services/trainingService";
 import type {
   CompleteWorkoutRequest,
@@ -55,24 +57,60 @@ export function CompleteWorkoutDialog({
   useEffect(() => {
     if (!open) return;
     if (isEdit && workout) {
-      setPerformanceRating(workout.performanceRating ?? 8);
-      setActualDistanceMeters(Number(workout.actualDistanceMeters ?? 1000));
-      setActualDurationMinutes(Number(workout.actualDurationMinutes ?? 60));
-      setTopSpeedKmh(Number(workout.topSpeedKmh ?? 50));
-      setAverageSpeedKmh(Number(workout.averageSpeedKmh ?? 40));
-      setAverageHeartRate(Number(workout.averageHeartRate ?? 140));
-      setMaxHeartRate(Number(workout.maxHeartRate ?? 180));
-      setRecoveryHeartRate(Number(workout.recoveryHeartRate ?? 90));
+      const dist = Number(workout.actualDistanceMeters ?? 1000);
+      const dur = Number(workout.actualDurationMinutes ?? 60);
+      const top = Number(workout.topSpeedKmh ?? 50);
+      const avg = Number(workout.averageSpeedKmh ?? 40);
+      const hrAvg = Number(workout.averageHeartRate ?? 140);
+      const hrMax = Number(workout.maxHeartRate ?? 180);
+      const hrRec = Number(workout.recoveryHeartRate ?? 90);
+
+      const calculated = calculatePerformanceRating({
+        actualDistanceMeters: dist,
+        actualDurationMinutes: dur,
+        topSpeedKmh: top,
+        averageSpeedKmh: avg,
+        averageHeartRate: hrAvg,
+        maxHeartRate: hrMax,
+        recoveryHeartRate: hrRec,
+      });
+
+      setActualDistanceMeters(dist);
+      setActualDurationMinutes(dur);
+      setTopSpeedKmh(top);
+      setAverageSpeedKmh(avg);
+      setAverageHeartRate(hrAvg);
+      setMaxHeartRate(hrMax);
+      setRecoveryHeartRate(hrRec);
+      setPerformanceRating(workout.performanceRating ?? calculated);
       setTrainerFeedback(workout.trainerFeedback ?? "");
     } else if (preview) {
-      setPerformanceRating(8);
-      setActualDistanceMeters(Number(preview.actualDistanceMeters ?? 1000));
-      setActualDurationMinutes(Number(preview.actualDurationMinutes ?? 60));
-      setTopSpeedKmh(Number(preview.topSpeedKmh ?? 50));
-      setAverageSpeedKmh(Number(preview.averageSpeedKmh ?? 40));
-      setAverageHeartRate(Number(preview.averageHeartRate ?? 140));
-      setMaxHeartRate(Number(preview.maxHeartRate ?? 180));
-      setRecoveryHeartRate(Number(preview.recoveryHeartRate ?? 90));
+      const dist = Number(preview.actualDistanceMeters ?? 1000);
+      const dur = Number(preview.actualDurationMinutes ?? 60);
+      const top = Number(preview.topSpeedKmh ?? 50);
+      const avg = Number(preview.averageSpeedKmh ?? 40);
+      const hrAvg = Number(preview.averageHeartRate ?? 140);
+      const hrMax = Number(preview.maxHeartRate ?? 180);
+      const hrRec = Number(preview.recoveryHeartRate ?? 90);
+
+      const calculated = preview.performanceRating ?? calculatePerformanceRating({
+        actualDistanceMeters: dist,
+        actualDurationMinutes: dur,
+        topSpeedKmh: top,
+        averageSpeedKmh: avg,
+        averageHeartRate: hrAvg,
+        maxHeartRate: hrMax,
+        recoveryHeartRate: hrRec,
+      });
+
+      setActualDistanceMeters(dist);
+      setActualDurationMinutes(dur);
+      setTopSpeedKmh(top);
+      setAverageSpeedKmh(avg);
+      setAverageHeartRate(hrAvg);
+      setMaxHeartRate(hrMax);
+      setRecoveryHeartRate(hrRec);
+      setPerformanceRating(calculated);
       setTrainerFeedback("");
     }
     setError(null);
@@ -83,19 +121,6 @@ export function CompleteWorkoutDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (performanceRating < 1 || performanceRating > 10) {
-      setError("Performance rating must be between 1 and 10.");
-      return;
-    }
-    if (averageSpeedKmh > topSpeedKmh) {
-      setError("Average speed cannot exceed top speed.");
-      return;
-    }
-    if (averageHeartRate > maxHeartRate) {
-      setError("Average heart rate cannot exceed maximum heart rate.");
-      return;
-    }
-
     setError(null);
     setSubmitting(true);
     try {
@@ -165,123 +190,117 @@ export function CompleteWorkoutDialog({
     >
       <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
         {error && <Notice tone="error">{error}</Notice>}
+
+        {/* Performance Rating Score Banner */}
+        <div className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3.5">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+              Calculated Performance Rating
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-[var(--color-text)]">
+                {performanceRating}
+              </span>
+              <span className="text-xs text-[var(--color-text-muted)]">/ 10</span>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <RatingPill rating={performanceRating} size="md" />
+            <span className="text-[11px] text-[var(--color-text-muted)]">
+              Speed · Cardio · Efficiency
+            </span>
+          </div>
+        </div>
+
+        {/* Telemetry Metrics Grid (Read-only) */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <FormField label="Performance rating (1–10)" required>
+            <FormField label="Actual distance (metres)">
               <Input
                 type="number"
-                min="1"
-                max="10"
-                required
-                value={performanceRating}
-                onChange={(e) => setPerformanceRating(Number(e.target.value))}
-              />
-            </FormField>
-          </div>
-
-          <div>
-            <FormField label="Actual distance (metres)" required>
-              <Input
-                type="number"
-                step="10"
-                min="1"
-                required
+                readOnly
                 value={actualDistanceMeters}
-                onChange={(e) =>
-                  setActualDistanceMeters(Number(e.target.value))
-                }
+                className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
           </div>
 
           <div>
-            <FormField label="Actual duration (minutes)" required>
+            <FormField label="Actual duration (minutes)">
               <Input
                 type="number"
-                step="0.1"
-                min="0.1"
-                required
+                readOnly
                 value={actualDurationMinutes}
-                onChange={(e) =>
-                  setActualDurationMinutes(Number(e.target.value))
-                }
+                className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
           </div>
 
           <div>
-            <FormField label="Top speed (km/h)" required>
+            <FormField label="Top speed (km/h)">
               <Input
                 type="number"
-                step="0.1"
-                min="1"
-                required
+                readOnly
                 value={topSpeedKmh}
-                onChange={(e) => setTopSpeedKmh(Number(e.target.value))}
+                className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
           </div>
 
           <div>
-            <FormField label="Average speed (km/h)" required>
+            <FormField label="Average speed (km/h)">
               <Input
                 type="number"
-                step="0.1"
-                min="1"
-                required
+                readOnly
                 value={averageSpeedKmh}
-                onChange={(e) => setAverageSpeedKmh(Number(e.target.value))}
+                className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
           </div>
 
           <div>
-            <FormField label="Average heart rate (bpm)" required>
+            <FormField label="Average heart rate (bpm)">
               <Input
                 type="number"
-                min="30"
-                max="240"
-                required
+                readOnly
                 value={averageHeartRate}
-                onChange={(e) => setAverageHeartRate(Number(e.target.value))}
+                className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
           </div>
 
           <div>
-            <FormField label="Maximum heart rate (bpm)" required>
+            <FormField label="Maximum heart rate (bpm)">
               <Input
                 type="number"
-                min="30"
-                max="240"
-                required
+                readOnly
                 value={maxHeartRate}
-                onChange={(e) => setMaxHeartRate(Number(e.target.value))}
+                className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
           </div>
 
-          <div>
-            <FormField label="Recovery heart rate (bpm)" required>
+          <div className="sm:col-span-2">
+            <FormField label="Recovery heart rate (bpm)">
               <Input
                 type="number"
-                min="30"
-                max="240"
-                required
+                readOnly
                 value={recoveryHeartRate}
-                onChange={(e) => setRecoveryHeartRate(Number(e.target.value))}
+                className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
           </div>
         </div>
 
+        {/* Trainer Feedback (Only Editable Input) */}
         <div>
           <FormField label="Trainer feedback">
             <Textarea
               rows={3}
               value={trainerFeedback}
               onChange={(e) => setTrainerFeedback(e.target.value)}
-              placeholder="Notes about gait, acceleration, or endurance…"
+              placeholder="Notes about gait, acceleration, endurance, or recovery attitude…"
+              autoFocus
             />
           </FormField>
         </div>
