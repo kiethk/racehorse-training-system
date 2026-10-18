@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { EmptyState, Panel, Pill } from '@/components/ui';
-import { cn } from '@/lib/cn';
 import type { Area, Horse, StableStall } from '../../types';
 import { StallCell } from './StallCell';
 
@@ -11,13 +10,14 @@ import { StallCell } from './StallCell';
  */
 export type StableLens = 'groom' | 'trainer';
 
-interface StableFloorPlanProps {
+export interface StableFloorPlanProps {
   lens: StableLens;
   areas: Area[];
   stalls: StableStall[];
   horseByStallId: ReadonlyMap<number, Horse>;
   selectedStallId: number | null;
-  onSelectStall: (stall: StableStall) => void;
+  /** Null clears the selection (clicking empty space in the 3D view). */
+  onSelectStall: (stall: StableStall | null) => void;
   /** Stalls in the viewer's own scope. When given, every other stall is faded. */
   ownStallIds?: ReadonlySet<number>;
   /** The lens decoration under the horse name. */
@@ -26,17 +26,17 @@ interface StableFloorPlanProps {
   emptyDescription?: string;
 }
 
-const OWN_LABEL: Record<StableLens, string> = {
+export const OWN_LABEL: Record<StableLens, string> = {
   groom: 'Your stalls',
   trainer: 'Your block',
 };
 
-function LegendItem({ dot, children }: { dot: string; children: ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={cn('h-2 w-2 rounded-full', dot)} />
-      {children}
-    </span>
+/** The API returns areas in no particular order: regular before quarantine, then by code (A before B). */
+export function orderStableAreas(areas: readonly Area[]) {
+  return [...areas].sort(
+    (a, b) =>
+      Number(a.type === 'QUARANTINE') - Number(b.type === 'QUARANTINE') ||
+      a.code.localeCompare(b.code, 'en', { numeric: true }),
   );
 }
 
@@ -76,14 +76,8 @@ function StallRow({
  * Regular areas come first, quarantine areas last and visually set apart. Shared by every role.
  */
 export function StableFloorPlan(props: StableFloorPlanProps) {
-  const { lens, areas, stalls, horseByStallId, ownStallIds } = props;
-
-  // The API returns areas in no particular order: regular before quarantine, then by code (A before B).
-  const orderedAreas = [...areas].sort(
-    (a, b) =>
-      Number(a.type === 'QUARANTINE') - Number(b.type === 'QUARANTINE') ||
-      a.code.localeCompare(b.code, 'en', { numeric: true }),
-  );
+  const { areas, stalls, horseByStallId } = props;
+  const orderedAreas = orderStableAreas(areas);
 
   if (orderedAreas.length === 0) {
     return (
@@ -99,18 +93,6 @@ export function StableFloorPlan(props: StableFloorPlanProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--color-text-secondary)]">
-        <LegendItem dot="bg-[var(--color-success)]">Occupied</LegendItem>
-        <LegendItem dot="bg-[var(--color-danger)]">Training blocked</LegendItem>
-        <LegendItem dot="bg-[var(--color-warning)]">Maintenance</LegendItem>
-        <LegendItem dot="bg-[var(--color-border-strong)]">Empty</LegendItem>
-        {ownStallIds && (
-          <span className="text-[var(--color-text-muted)]">
-            {OWN_LABEL[lens]} are shown at full strength; the rest are faded.
-          </span>
-        )}
-      </div>
-
       {orderedAreas.map((area) => {
         const areaStalls = stalls
           .filter((stall) => stall.areaId === area.id)

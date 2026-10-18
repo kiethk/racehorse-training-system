@@ -239,7 +239,9 @@ Every role's stable screen uses the same blocks from `src/features/stable/shared
 
 | Part | Use |
 |---|---|
-| Map | `StableFloorPlan` (`lens`, `ownStallIds` to fade stalls outside the viewer's scope, `cellFooter` for the role's line on each stall) |
+| Map with Plan / 3D switch | `StableMapView` (all `StableFloorPlan` props plus `personName`, `currentUserId`, `onMoveHorse` to allow dragging horses in 3D). The 3D barn in `barn3d/` loads lazily; the plan stays the default and the fallback |
+| Plan only | `StableFloorPlan` (`lens`, `ownStallIds` to fade stalls outside the viewer's scope, `cellFooter` for the role's line on each stall) |
+| Colour key | `StableLegend`; states and tones come from `STALL_STATES` / `stallState()` in `StallCell` |
 | One stall | `StallCell` (drawn by the floor plan; `stallState` gives the shared dot colour and label) |
 | Side panel | `StallDetailPanel` (`children` for what the role sees, `actions` for what it can do) |
 

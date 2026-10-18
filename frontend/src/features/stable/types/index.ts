@@ -1,6 +1,6 @@
 import type { HorseSex } from '@/types/horse';
 
-export type StallStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'MAINTENANCE';
+export type StallStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED';
 export type AreaType = 'REGULAR' | 'QUARANTINE';
 /** A horse's lifecycle in the club. Health is not tracked here — see trainingDecision. */
 export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED';
