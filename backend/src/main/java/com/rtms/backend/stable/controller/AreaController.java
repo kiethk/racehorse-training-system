@@ -38,6 +38,12 @@ public class AreaController {
         return ApiResponse.success(lifecycle.check(id));
     }
 
+    @GetMapping("/trainer-assignment-checks")
+    @PreAuthorize("hasAuthority('AREA_UPDATE')")
+    public ApiResponse<List<AreaTrainerChangeCheck>> trainerAssignmentChecks() {
+        return ApiResponse.success(stableAssignmentService.getTrainerAssignmentChecks());
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('AREA_DELETE')")
     public ApiResponse<AreaDeletionResult> deleteArea(@PathVariable Long id) {

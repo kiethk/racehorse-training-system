@@ -27,6 +27,7 @@ class StableAssignmentServiceTest {
     TrainingWorkoutService workouts;
     EntityManager em;
     StableAssignmentService service;
+    AreaTrainerAssignmentPolicy trainerPolicy;
     List<Area> allAreas;
     List<StableStall> allStalls;
     List<User> staff;
@@ -50,7 +51,8 @@ class StableAssignmentServiceTest {
         when(areas.save(any(Area.class))).thenAnswer(i -> i.getArgument(0));
         when(stalls.save(any(StableStall.class))).thenAnswer(i -> i.getArgument(0));
         when(profiles.findById(anyLong())).thenReturn(Optional.empty());
-        service = new StableAssignmentService(areas, stalls, users, profiles, horses, workouts, em);
+        trainerPolicy = mock(AreaTrainerAssignmentPolicy.class);
+        service = new StableAssignmentService(areas, stalls, users, profiles, horses, workouts, em, trainerPolicy);
     }
 
     Area area(long id, AreaType type, Long trainer) {
@@ -195,6 +197,22 @@ class StableAssignmentServiceTest {
         owner(1, 1, 200L);
         service.applyAssignments(new BatchStableAssignmentRequest(List.of(trainer(1, 101L)), null));
         verify(profiles).save(argThat(p -> p.getUserId() == 200L && p.getTrainerId() == 101L));
+        verify(trainerPolicy).requireChangeAllowed(1L);
+    }
+    @Test void blockedTrainerChangeRejectsTheWholeBatchBeforeChangingGroomWorkouts() {
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Area has horses"))
+                .when(trainerPolicy).requireChangeAllowed(1L);
+        owner(1, 1, 200L);
+        status(HttpStatus.CONFLICT, () -> service.applyAssignments(new BatchStableAssignmentRequest(
+                List.of(trainer(1, 101L)), List.of(groom(1, 1, 201L)))));
+        verify(areas, never()).save(any()); verify(stalls, never()).save(any());
+        verifyNoInteractions(workouts);
+    }
+    @Test void unchangedTrainerDoesNotBlockGroomOnlyChanges() {
+        service.applyAssignments(new BatchStableAssignmentRequest(
+                List.of(trainer(1, 100L)), List.of(groom(1, 1, 200L))));
+        verifyNoInteractions(trainerPolicy);
+        verify(stalls, times(3)).save(any());
     }
     @Test void removeEmptyGroomBlocksAndTrainerTogether() {
         owner(1, 1, 200L);

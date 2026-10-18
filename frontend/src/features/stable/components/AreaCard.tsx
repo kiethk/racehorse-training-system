@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
 import { StallCell } from '../shared/components/StallCell';
 import type { StableStall } from '../types';
 import type { AssignmentDraft, AssignmentTarget, DragStaff, StableSnapshot } from '../types/manager';
-import { areaView, horseMap, personName } from '../lib/managerAssignments';
+import { areaView, horseMap, personName, trainerChangeReason } from '../lib/managerAssignments';
 import { StaffAssignment } from './StaffAssignment';
 import { staffDragDrop } from './staffDragDrop';
 
@@ -26,8 +26,9 @@ interface Props {
 export function AreaCard({ view, data, draft, horses, onSelectStall, onDelete, ...assignment }: Props) {
   const { area, occupied, stalls, blocks, missingTrainer, hasGrooms, attention } = view;
   const trainerId = draft.trainers[area.id];
+  const trainerReason = trainerChangeReason(data, area.id);
   const { dropProps } = staffDragDrop.useDropZone({
-    disabled: assignment.disabled || area.type !== 'REGULAR',
+    disabled: assignment.disabled || !!trainerReason,
     accept: staff => staff.kind === 'trainer',
     onDrop: staff => assignment.onAssign({ kind: 'trainer', areaId: area.id }, staff),
   });
@@ -52,9 +53,10 @@ export function AreaCard({ view, data, draft, horses, onSelectStall, onDelete, .
         </div>
       </div>
       <div className="space-y-3 px-3 pb-3">
-        {area.type === 'REGULAR' && <StaffAssignment {...assignment} target={{ kind: 'trainer', areaId: area.id }}
+        {area.type === 'REGULAR' && <StaffAssignment {...assignment} disabled={assignment.disabled || !!trainerReason}
+          target={{ kind: 'trainer', areaId: area.id }}
           personId={trainerId} name={trainerId == null ? null : personName(data, 'trainer', trainerId)}
-          warning={missingTrainer} removeReason={hasGrooms ? 'Remove Groom assignments before removing Trainer' : undefined} />}
+          warning={missingTrainer} removeReason={trainerReason ?? (hasGrooms ? 'Remove Groom assignments before removing Trainer' : undefined)} />}
         <div className="grid grid-cols-2 gap-3">
           {blocks.map(block => (
             <GroomBlock key={block.number} block={block} areaId={area.id} disabled={assignment.disabled} onAssign={assignment.onAssign}>

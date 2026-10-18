@@ -55,10 +55,10 @@ export function StaffManagementView() {
     setAddLoading(true);
     try {
       const res = await createStaff(req);
+      if (!res.success || !res.data) throw new Error(res.message || 'Unable to create staff.');
       // Refresh the list in the background; dialog shows assignment summary
       void fetchStaff();
-      setSuccessMsg('Staff member created successfully.');
-      setTimeout(() => setSuccessMsg(''), 5000);
+      toast.success('Staff created');
       return res.data ?? null;
     } finally {
       setAddLoading(false);
@@ -166,7 +166,6 @@ export function StaffManagementView() {
         onClose={() => setAddDialogOpen(false)} 
         onSubmit={handleCreateStaff}
         loading={addLoading}
-        headTrainers={headTrainers}
       />
 
       <StaffDetailModal 
