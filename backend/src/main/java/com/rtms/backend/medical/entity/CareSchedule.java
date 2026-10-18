@@ -1,7 +1,9 @@
 package com.rtms.backend.medical.entity;
 
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
+import com.rtms.backend.medical.enums.RescheduleReason;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -45,6 +47,17 @@ public class CareSchedule {
     @Column(nullable = false, length = 50)
     private CareScheduleStatus status = CareScheduleStatus.REQUESTED;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private CareSchedulePurpose purpose = CareSchedulePurpose.FOLLOW_UP;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "reschedule_reason", length = 30)
+    private RescheduleReason rescheduleReason;
+
+    @Column(name = "reschedule_note", columnDefinition = "TEXT")
+    private String rescheduleNote;
+
     @Column(name = "requested_at")
     private LocalDateTime requestedAt;
 
@@ -73,6 +86,7 @@ public class CareSchedule {
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();
         if (status == null) status = CareScheduleStatus.REQUESTED;
+        if (purpose == null) purpose = CareSchedulePurpose.FOLLOW_UP;
         if (durationMinutes <= 0) durationMinutes = 30;
         createdAt = now;
         updatedAt = now;
@@ -116,6 +130,15 @@ public class CareSchedule {
 
     public CareScheduleStatus getStatus() { return status; }
     public void setStatus(CareScheduleStatus status) { this.status = status; }
+
+    public CareSchedulePurpose getPurpose() { return purpose; }
+    public void setPurpose(CareSchedulePurpose purpose) { this.purpose = purpose; }
+
+    public RescheduleReason getRescheduleReason() { return rescheduleReason; }
+    public void setRescheduleReason(RescheduleReason rescheduleReason) { this.rescheduleReason = rescheduleReason; }
+
+    public String getRescheduleNote() { return rescheduleNote; }
+    public void setRescheduleNote(String rescheduleNote) { this.rescheduleNote = rescheduleNote; }
 
     public LocalDateTime getRequestedAt() { return requestedAt; }
     public void setRequestedAt(LocalDateTime requestedAt) { this.requestedAt = requestedAt; }

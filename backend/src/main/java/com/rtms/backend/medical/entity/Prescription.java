@@ -38,6 +38,10 @@ public class Prescription {
     @Column(name = "instructions", columnDefinition = "TEXT")
     private String instructions;
 
+    /** Có giá trị khi đơn này là một mũi tiêm phòng / tẩy giun theo phác đồ. */
+    @Column(name = "preventive_protocol_id")
+    private Long preventiveProtocolId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -125,6 +129,14 @@ public class Prescription {
 
     public void setInstructions(String instructions) {
         this.instructions = instructions;
+    }
+
+    public Long getPreventiveProtocolId() {
+        return preventiveProtocolId;
+    }
+
+    public void setPreventiveProtocolId(Long preventiveProtocolId) {
+        this.preventiveProtocolId = preventiveProtocolId;
     }
 
     public LocalDateTime getCreatedAt() {
