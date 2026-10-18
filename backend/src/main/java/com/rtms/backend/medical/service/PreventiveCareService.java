@@ -21,7 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Set;
 
-/** Legacy route adapter: all work is stored and scheduled through CareSchedule. */
+/**
+ * Legacy route adapter: all work is stored and scheduled through CareSchedule.
+ * @deprecated Dùng {@link PreventiveStatusService} / {@link PreventiveVaccinationService}.
+ */
+@Deprecated
 @Service
 public class PreventiveCareService {
     private static final Set<String> TYPES = Set.of("ROUTINE_EXAM", "VACCINATION", "DEWORMING");

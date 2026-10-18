@@ -147,6 +147,13 @@ public class PreventiveVaccinationService {
         preventiveStatus.upsertMilestone(horseId, "preventive:" + healthRecordId, actorId, missingDueOn);
     }
 
+    /** Hoãn tiêm: mốc PREVENTIVE mới đặt sau {@code days} ngày, lý do UNDER_TREATMENT. */
+    @Transactional
+    public void deferMilestone(Long horseId, Long healthRecordId, Long actorId, int days) {
+        preventiveStatus.deferMilestone(horseId, "preventive:" + healthRecordId, actorId,
+                LocalDate.now(clock).plusDays(days));
+    }
+
     private static String instructions(ValidatedVaccination vaccination) {
         String note = vaccination.request().getInstructions() == null ? "" : vaccination.request().getInstructions().trim();
         if (vaccination.source() != VaccinationSource.HISTORICAL) return note.isEmpty() ? null : note;

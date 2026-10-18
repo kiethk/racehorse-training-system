@@ -26,6 +26,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface HorseRepository extends JpaRepository<Horse, Long> {
     List<Horse> findByOwnerId(Long ownerId);
+    List<Horse> findByCurrentStatusInOrderByNameAsc(java.util.Collection<com.rtms.backend.horse.enums.HorseStatus> statuses);
     List<Horse> findByRegistrationNumber(String registrationNumber);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

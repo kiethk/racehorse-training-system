@@ -300,6 +300,21 @@ public class CareScheduleService {
                 request.getVaccinations() == null || request.getVaccinations().isEmpty()
                         ? List.of()
                         : preventiveVaccinationService.validate(request.getVaccinations(), schedule.getCareType());
+        Integer deferDays = request.getDeferVaccinationDays();
+        if (deferDays != null) {
+            if (schedule.getPurpose() != CareSchedulePurpose.PREVENTIVE) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                        "Vaccination can only be deferred on a preventive care visit");
+            }
+            if (!vaccinations.isEmpty()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                        "Cannot defer vaccination and record vaccinations in the same visit");
+            }
+            if (deferDays < 7 || deferDays > 10) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                        "Vaccination can be deferred by 7 to 10 days");
+            }
+        }
 
         AdmissionApplication linkedAdmission = schedule.getAdmissionId() == null ? null
                 : admissionRepository.findByIdForUpdate(schedule.getAdmissionId())
@@ -398,7 +413,10 @@ public class CareScheduleService {
 
         // Sau khi ca này COMPLETED (không còn là mốc active) mới đặt mốc tiêm kế tiếp.
         // Ca tiêm phòng mà vet hoãn tiêm vẫn phải để lại một mốc mới cho ngựa.
-        if (!vaccinations.isEmpty() || schedule.getPurpose() == CareSchedulePurpose.PREVENTIVE) {
+        if (deferDays != null) {
+            careScheduleRepository.flush();
+            preventiveVaccinationService.deferMilestone(horse.getId(), savedRecord.getId(), vetId, deferDays);
+        } else if (!vaccinations.isEmpty() || schedule.getPurpose() == CareSchedulePurpose.PREVENTIVE) {
             careScheduleRepository.flush();
             preventiveVaccinationService.refreshMilestone(horse.getId(), savedRecord.getId(), vetId,
                     schedule.getCareType());

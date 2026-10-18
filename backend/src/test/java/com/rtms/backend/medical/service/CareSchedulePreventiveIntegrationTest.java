@@ -159,6 +159,44 @@ class CareSchedulePreventiveIntegrationTest {
         verifyNoInteractions(vaccinations);
     }
 
+    // ---- hoãn tiêm ----
+
+    @Test
+    void deferringOnAPreventiveVisitBooksTheMilestoneLaterInsteadOfRefreshingIt() {
+        exam.setPurpose(CareSchedulePurpose.PREVENTIVE);
+        CompleteCareScheduleRequest request = request();
+        request.setDeferVaccinationDays(8);
+
+        service.completeCareSchedule(100L, request, 20L);
+
+        assertEquals(CareScheduleStatus.COMPLETED, exam.getStatus());
+        verify(vaccinations).deferMilestone(10L, 999L, 20L, 8);
+        verify(vaccinations, never()).refreshMilestone(any(), any(), any(), any());
+    }
+
+    @Test
+    void deferralIsOnlyForPreventiveVisitsWithoutVaccinationsAndWithinSevenToTenDays() {
+        CompleteCareScheduleRequest onFollowUp = request();
+        onFollowUp.setDeferVaccinationDays(8);
+        assertThrows(ApiException.class, () -> service.completeCareSchedule(100L, onFollowUp, 20L));
+
+        exam.setPurpose(CareSchedulePurpose.PREVENTIVE);
+        CompleteCareScheduleRequest tooShort = request();
+        tooShort.setDeferVaccinationDays(3);
+        assertThrows(ApiException.class, () -> service.completeCareSchedule(100L, tooShort, 20L));
+
+        CompleteCareScheduleRequest both = request();
+        both.setDeferVaccinationDays(8);
+        both.setVaccinations(List.of(vaccination(1L)));
+        when(vaccinations.validate(any(), any())).thenReturn(List.of(
+                new PreventiveVaccinationService.ValidatedVaccination(new PreventiveProtocol(),
+                        both.getVaccinations().get(0), VaccinationSource.ADMINISTERED, LocalDate.now())));
+        assertThrows(ApiException.class, () -> service.completeCareSchedule(100L, both, 20L));
+
+        assertEquals(CareScheduleStatus.IN_PROGRESS, exam.getStatus());
+        verify(healthRecords, never()).save(any());
+    }
+
     // ---- cửa sổ 14 ngày ----
 
     @Test

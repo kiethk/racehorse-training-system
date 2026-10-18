@@ -270,6 +270,34 @@ class PreventiveStatusServiceTest {
         verify(schedules).findByRequestedByIdAndIdempotencyKey(ACTOR, "preventive:20");
     }
 
+    // ---- deferMilestone ----
+
+    @Test
+    void deferralBooksTheNewMilestoneOnTheDeferredDayWithAReason() {
+        dose(1L, TODAY.minusDays(200));        // EI quá hạn
+        dose(2L, TODAY);
+
+        CareSchedule milestone = service.deferMilestone(HORSE, "preventive:30", ACTOR, TODAY.plusDays(8)).orElseThrow();
+
+        assertEquals(TODAY.plusDays(8).atTime(14, 0), milestone.getRequestedAt());
+        assertEquals(com.rtms.backend.medical.enums.RescheduleReason.UNDER_TREATMENT, milestone.getRescheduleReason());
+        assertEquals(CareScheduleStatus.REQUESTED, milestone.getStatus());
+    }
+
+    @Test
+    void deferralLeavesAnAlreadyBookedMilestoneAlone() {
+        CareSchedule booked = milestone(CareScheduleStatus.SCHEDULED, TODAY.plusDays(2).atTime(9, 0), 21L);
+        when(schedules.findFirstByHorseIdAndPurposeAndStatusIn(eq(HORSE), eq(CareSchedulePurpose.PREVENTIVE), any()))
+                .thenReturn(Optional.of(booked));
+        dose(1L, TODAY.minusDays(200));
+        dose(2L, TODAY);
+
+        service.deferMilestone(HORSE, "preventive:31", ACTOR, TODAY.plusDays(8));
+
+        assertEquals(TODAY.plusDays(2).atTime(9, 0), booked.getScheduledAt());
+        assertNull(booked.getRescheduleReason());
+    }
+
     // ---- helpers ----
 
     private void dose(long protocolId, LocalDate on) {

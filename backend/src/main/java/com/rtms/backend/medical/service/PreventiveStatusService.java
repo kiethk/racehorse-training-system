@@ -10,6 +10,7 @@ import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.PreventiveDueStatus;
+import com.rtms.backend.medical.enums.RescheduleReason;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.PrescriptionRepository;
 import com.rtms.backend.medical.repository.PrescriptionRepository.LastPreventiveDose;
@@ -181,6 +182,21 @@ public class PreventiveStatusService {
         milestone.setIdempotencyKey(operationKey);
         milestone.setDescription(description);
         return Optional.of(schedules.save(milestone));
+    }
+
+    /**
+     * Vet hoãn tiêm vì ngựa chưa đủ khỏe: đặt lại mốc như thường rồi dời nó tới ngày hoãn.
+     * Trạng thái tiêm của ngựa vẫn tính trung thực (có thể là quá hạn).
+     */
+    @Transactional
+    public Optional<CareSchedule> deferMilestone(Long horseId, String operationKey, Long actorId, LocalDate deferredTo) {
+        Optional<CareSchedule> milestone = upsertMilestone(horseId, operationKey, actorId, LocalDate.now(clock));
+        milestone.filter(m -> m.getStatus() == CareScheduleStatus.REQUESTED).ifPresent(m -> {
+            m.setRequestedAt(deferredTo.atTime(MILESTONE_TIME));
+            m.setRescheduleReason(RescheduleReason.UNDER_TREATMENT);
+            schedules.save(m);
+        });
+        return milestone;
     }
 
     /** Ngày đến hạn thực tế của từng phác đồ bắt buộc; MISSING chỉ có mặt khi missingDueOn != null. */
