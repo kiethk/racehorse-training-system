@@ -1,119 +1,112 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  Button,
-  EmptyState,
-  ListSkeleton,
-  Notice,
-  Panel,
-  ScreenLayout,
-  Select,
-} from '@/components/ui';
-import { HorseProfileView } from '@/features/horses/shared/components/HorseProfileView';
-import { useTrainerHorses } from '../hooks/useTrainerHorses';
-import { HorseFitnessTrendView } from './HorseFitnessTrendView';
-import { TrainerHorseIncidentsTab } from './TrainerHorseIncidentsTab';
+import { Button, LinkButton } from '@/components/ui';
+import { useHorses } from '@/features/horses/hooks/useHorses';
+import { HorseFilterBar } from '@/features/horses/shared/components/HorseFilterBar';
+import { HorseListLayout } from '@/features/horses/shared/components/HorseListLayout';
+import { HorseTable } from '@/features/horses/shared/components/HorseTable';
+import type { HorseStatus } from '@/features/stable/types';
 
 /**
- * The Horses page for Trainers:
- * Refactored to use the shared HorseProfileView component as requested for unified UI/UX,
- * with tabs for Overview, Fitness & Trends, and Incident Reports.
+ * Head Trainer's horse list view.
+ * Mirrors ManagerHorsesView: presents the table of assigned horses with search and filters,
+ * where selecting a horse navigates to /trainer/horses/[id].
  */
 export function TrainerHorsesView() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const requestedId = Number(searchParams.get('horseId')) || null;
-  const { horses, loading, error, reload } = useTrainerHorses();
+  const requestedId = searchParams.get('horseId');
 
-  const selectedHorse = horses.find((h) => h.id === requestedId) ?? horses[0] ?? null;
-  const selectedId = selectedHorse?.id ?? null;
+  // Backwards compatibility: redirect /trainer/horses?horseId=X to /trainer/horses/X
+  useEffect(() => {
+    if (requestedId) {
+      router.replace(`/trainer/horses/${encodeURIComponent(requestedId)}`);
+    }
+  }, [requestedId, router]);
 
-  if (loading) {
-    return (
-      <ScreenLayout variant="detail">
-        <Panel padded>
-          <ListSkeleton rows={4} />
-        </Panel>
-      </ScreenLayout>
-    );
-  }
+  const [draftSearch, setDraftSearch] = useState('');
+  const [draftStatus, setDraftStatus] = useState<HorseStatus | ''>('');
 
-  if (error) {
-    return (
-      <ScreenLayout variant="detail">
-        <Panel padded>
-          <EmptyState
-            icon="alert-triangle"
-            title="Unable to load your horses"
-            description={error}
-            action={
-              <Button size="sm" icon="refresh" onClick={reload}>
-                Try again
-              </Button>
-            }
-          />
-        </Panel>
-      </ScreenLayout>
-    );
-  }
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [appliedStatus, setAppliedStatus] = useState<HorseStatus | ''>('');
+  const [resetPageKey, setResetPageKey] = useState(0);
 
-  if (!selectedId || !selectedHorse) {
-    return (
-      <ScreenLayout variant="detail">
-        <Panel padded>
-          <EmptyState
-            icon="horse"
-            title="No horses assigned yet"
-            description="Horses will appear here once they are assigned to a stall in your area."
-          />
-        </Panel>
-      </ScreenLayout>
-    );
-  }
+  const { horses, loading, error, reload } = useHorses({
+    mine: true,
+    status: appliedStatus || undefined,
+    includeSpecialty: true,
+  });
 
-  const horseSwitcher = (
-    <div className="flex items-center gap-2">
-      <span className="text-xs font-medium text-[var(--color-text-secondary)]">Horse:</span>
-      <Select
-        value={selectedId}
-        onChange={(e) => router.replace(`/trainer/horses?horseId=${e.target.value}`)}
-        className="text-xs"
-      >
-        {horses.map((horse) => (
-          <option key={horse.id} value={horse.id}>
-            {horse.name}{horse.breed ? ` · ${horse.breed}` : ''}
-          </option>
-        ))}
-      </Select>
-    </div>
-  );
+  const handleApply = () => {
+    setAppliedSearch(draftSearch.trim());
+    setAppliedStatus(draftStatus);
+    setResetPageKey((k) => k + 1);
+  };
+
+  const handleClear = () => {
+    setDraftSearch('');
+    setDraftStatus('');
+    setAppliedSearch('');
+    setAppliedStatus('');
+    setResetPageKey((k) => k + 1);
+  };
+
+  const filteredHorses = useMemo(() => {
+    const q = appliedSearch.trim().toLowerCase();
+    if (!q) return horses;
+    return horses.filter((h) => {
+      const matchName = h.name.toLowerCase().includes(q);
+      const matchReg = h.registrationNumber?.toLowerCase().includes(q) ?? false;
+      const matchBreed = h.breed?.toLowerCase().includes(q) ?? false;
+      return matchName || matchReg || matchBreed;
+    });
+  }, [horses, appliedSearch]);
 
   return (
-    <div className="space-y-4">
-      {requestedId !== null && requestedId !== selectedId && (
-        <Notice tone="warning">
-          The requested horse is not in your areas, so the first horse is shown instead.
-        </Notice>
-      )}
-
-      <HorseProfileView
-        key={selectedId}
-        horseId={selectedId}
-        headerActions={horseSwitcher}
-        extraTabs={({ horse }) => [
-          {
-            id: 'fitness-trends',
-            label: 'Fitness & Trends',
-            content: <HorseFitnessTrendView horseId={horse.id} hideHeader />,
-          },
-          {
-            id: 'incidents',
-            label: 'Incident Reports',
-            content: <TrainerHorseIncidentsTab horseId={horse.id} horseName={horse.name} />,
-          },
-        ]}
+    <HorseListLayout
+      title="Horses"
+      description="Horses assigned to stalls in your training areas."
+      actions={
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          icon="refresh"
+          onClick={reload}
+          loading={loading}
+        >
+          Refresh
+        </Button>
+      }
+    >
+      <HorseFilterBar
+        search={draftSearch}
+        onSearchChange={setDraftSearch}
+        status={draftStatus}
+        onStatusChange={setDraftStatus}
+        onApply={handleApply}
+        onClear={handleClear}
       />
-    </div>
+
+      <HorseTable
+        horses={filteredHorses}
+        loading={loading}
+        error={error}
+        searchable={false}
+        resetPageKey={resetPageKey}
+        showSpecialty
+        renderAction={(horse) => (
+          <LinkButton
+            href={`/trainer/horses/${horse.id}`}
+            size="sm"
+            variant="secondary"
+          >
+            View
+          </LinkButton>
+        )}
+      />
+    </HorseListLayout>
   );
 }

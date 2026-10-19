@@ -1,7 +1,31 @@
-import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 
-/** Old link format: the Horses page now takes the horse as ?horseId=, so keep old bookmarks working. */
-export default async function LegacyHorsePage({ params }: { params: Promise<{ id: string }> }) {
+import { RoleGuard } from '@/components/auth/RoleGuard';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { TrainerHorseDetailView } from '@/features/training/components/TrainerHorseDetailView';
+
+export const metadata: Metadata = {
+  title: 'Horse Profile | Trainer | RTMS',
+};
+
+export default async function TrainerHorseDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
-  redirect(`/trainer/horses?horseId=${encodeURIComponent(id)}`);
+  const horseId = Number(id);
+
+  if (!Number.isInteger(horseId) || horseId <= 0) {
+    notFound();
+  }
+
+  return (
+    <RoleGuard allowedRoles={['HEAD_TRAINER']}>
+      <PageContainer>
+        <TrainerHorseDetailView horseId={horseId} />
+      </PageContainer>
+    </RoleGuard>
+  );
 }

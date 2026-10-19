@@ -56,10 +56,9 @@ public class CompleteWorkoutRequest {
     @Max(value = 240, message = "Recovery heart rate cannot exceed 240 bpm")
     private Integer recoveryHeartRate;
 
-    @NotNull(message = "Performance rating is required")
     @Min(value = 1, message = "Performance rating must be between 1 and 10")
     @Max(value = 10, message = "Performance rating must be between 1 and 10")
-    private Integer performanceRating;   // 1..10
+    private Integer performanceRating;   // 1..10 (auto-calculated from IoT metrics if omitted)
 
     @Size(max = 2000, message = "Trainer feedback cannot exceed 2000 characters")
     private String trainerFeedback;
