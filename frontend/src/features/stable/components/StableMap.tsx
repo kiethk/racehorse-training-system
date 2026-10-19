@@ -13,12 +13,14 @@ import {
   ScreenLayout,
 } from '@/components/ui';
 import { horseService } from '@/features/horses/services/horseService';
+import { displayError } from '@/lib/display';
 import type { HorseSpecialty } from '@/features/horses/types';
 import { stableApi } from '../services/stableService';
 import type { Area, Horse, StableStall, UserSummary } from '../types';
-import { StableFloorPlan } from '../shared/components/StableFloorPlan';
+import { StableMapView } from '../shared/components/StableMapView';
 import { StallDetailPanel } from '../shared/components/StallDetailPanel';
 import { AssignHorseDialog } from './AssignHorseDialog';
+import { MoveHorseDialog } from './MoveHorseDialog';
 
 /** The Head Trainer's view of the stable: assign horses to stalls and see which groom looks after each. */
 export function StableMap() {
@@ -51,6 +53,24 @@ export function StableMap() {
   const [unassignStall, setUnassignStall] = useState<StableStall | null>(null);
   const [unassigning, setUnassigning] = useState(false);
   const [unassignError, setUnassignError] = useState<string | null>(null);
+  /** Horse being moved; `targetId` is set when it was dropped on a stall in the 3D barn. */
+  const [moveRequest, setMoveRequest] = useState<{ horse: Horse; from: StableStall; targetId: number | null } | null>(null);
+
+  /** After assigning, removing or moving a horse only stalls and horses change; areas and grooms do not. */
+  const reloadPlacement = useCallback(async () => {
+    try {
+      const [stallsRes, horsesRes, unassignedRes] = await Promise.all([
+        stableApi.getStalls(),
+        stableApi.getHorses({ mine: true }),
+        stableApi.getHorses({ unassigned: true }),
+      ]);
+      setStalls(stallsRes);
+      setHorses(horsesRes);
+      setUnassignedHorses(unassignedRes);
+    } catch (err) {
+      setError(displayError(err, 'Unable to refresh the stable map. Please try again.'));
+    }
+  }, []);
 
   const loadAll = useCallback(async () => {
     try {
@@ -117,6 +137,26 @@ export function StableMap() {
     return () => { active = false; };
   }, [selectedHorseId]);
 
+  const myAreaIds = useMemo(() => new Set(myAreas.map((area) => area.id)), [myAreas]);
+  const moveTargets = useMemo(
+    () => stalls.filter((stall) => myAreaIds.has(stall.areaId) && stall.status === 'AVAILABLE' && !horseByStallId.has(stall.id)),
+    [stalls, myAreaIds, horseByStallId],
+  );
+  const groomName = useCallback(
+    (groomId: number | null) => (groomId == null ? 'no groom' : groomById.get(groomId)?.fullName ?? `Groom #${groomId}`),
+    [groomById],
+  );
+  const personName = useCallback(
+    (kind: 'groom' | 'trainer', id: number) =>
+      kind === 'groom' ? groomName(id) : id === user?.userId ? user.fullName : null,
+    [groomName, user],
+  );
+  const selectStall = useCallback((stall: StableStall | null) => setSelectedStallId(stall?.id ?? null), []);
+  const dropHorse = useCallback((horse: Horse, to: StableStall) => {
+    const from = stalls.find((stall) => stall.id === horse.currentStallId);
+    if (from) setMoveRequest({ horse, from, targetId: to.id });
+  }, [stalls]);
+
   if (loading) return <ListSkeleton rows={4} />;
 
   if (error) {
@@ -139,13 +179,16 @@ export function StableMap() {
       />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
-        <StableFloorPlan
+        <StableMapView
           lens="trainer"
           areas={myAreas}
           stalls={stalls}
           horseByStallId={horseByStallId}
           selectedStallId={selectedStallId}
-          onSelectStall={(stall) => setSelectedStallId(stall.id)}
+          onSelectStall={selectStall}
+          personName={personName}
+          currentUserId={user?.userId}
+          onMoveHorse={dropHorse}
           emptyTitle="No training areas assigned"
           emptyDescription="You have not been assigned to manage a regular stable area."
           cellFooter={(stall) => (
@@ -164,16 +207,26 @@ export function StableMap() {
           actions={
             selectedStall && (
               selectedOccupied ? (
-                <Button
-                  variant="destructive"
-                  disabled={!selectedHorse}
-                  onClick={() => {
-                    setUnassignError(null);
-                    setUnassignStall(selectedStall);
-                  }}
-                >
-                  Remove horse
-                </Button>
+                <>
+                  <Button
+                    variant="secondary"
+                    icon="refresh"
+                    disabled={!selectedHorse}
+                    onClick={() => selectedHorse && setMoveRequest({ horse: selectedHorse, from: selectedStall, targetId: null })}
+                  >
+                    Move to another stall
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={!selectedHorse}
+                    onClick={() => {
+                      setUnassignError(null);
+                      setUnassignStall(selectedStall);
+                    }}
+                  >
+                    Remove horse
+                  </Button>
+                </>
               ) : (
                 <Button variant="primary" icon="plus" onClick={() => setAssignHorseStall(selectedStall)}>
                   Assign horse
@@ -201,8 +254,25 @@ export function StableMap() {
         stall={assignHorseStall}
         horses={unassignedHorses}
         onClose={() => setAssignHorseStall(null)}
-        onAssigned={loadAll}
+        onAssigned={reloadPlacement}
       />
+
+      {moveRequest && (
+        <MoveHorseDialog
+          key={`${moveRequest.horse.id}:${moveRequest.targetId ?? ''}`}
+          horse={moveRequest.horse}
+          from={moveRequest.from}
+          targets={moveTargets}
+          areas={myAreas}
+          initialTargetId={moveRequest.targetId}
+          groomName={groomName}
+          onClose={() => setMoveRequest(null)}
+          onMoved={async (to) => {
+            setSelectedStallId(to.id);
+            await reloadPlacement();
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={unassignStall !== null}
@@ -239,7 +309,7 @@ export function StableMap() {
             setUnassignError(null);
             await stableApi.unassignHorseFromStall(horse.id);
             setUnassignStall(null);
-            await loadAll();
+            await reloadPlacement();
           } catch (err) {
             setUnassignError(err instanceof Error ? err.message : 'Unable to remove the horse from this stall.');
           } finally {

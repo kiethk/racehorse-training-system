@@ -22,7 +22,7 @@ import type { HorseSpecialty } from '@/features/horses/types';
 import { displayError } from '@/lib/display';
 import { stableApi } from '../services/stableService';
 import type { Area, Horse, StableStall } from '../types';
-import { StableFloorPlan } from '../shared/components/StableFloorPlan';
+import { StableMapView } from '../shared/components/StableMapView';
 import { StallDetailPanel } from '../shared/components/StallDetailPanel';
 
 const OPEN_INCIDENT_STATUSES: ReadonlyArray<IncidentReport['status']> = ['REPORTED', 'IN_REVIEW'];
@@ -106,6 +106,12 @@ export function GroomStableView() {
     return () => { active = false; };
   }, [selectedHorseId]);
 
+  const selectStall = useCallback((stall: StableStall | null) => setSelectedStallId(stall?.id ?? null), []);
+  const personName = useCallback(
+    (_kind: 'groom' | 'trainer', id: number) => (id === user?.userId ? user.fullName : null),
+    [user],
+  );
+
   if (loading) return <ListSkeleton rows={6} />;
 
   if (error) {
@@ -140,14 +146,17 @@ export function GroomStableView() {
       />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
-        <StableFloorPlan
+        <StableMapView
           lens="groom"
           areas={areas}
           stalls={stalls}
           horseByStallId={horseByStallId}
           ownStallIds={ownStallIds}
           selectedStallId={selectedStallId}
-          onSelectStall={(stall) => setSelectedStallId(stall.id)}
+          onSelectStall={selectStall}
+          // Grooms cannot read the staff directory (USER_VIEW), so only their own figure is named.
+          personName={personName}
+          currentUserId={user?.userId}
           cellFooter={(stall, horse) => {
             if (!horse || !ownStallIds.has(stall.id)) return null;
             const horseTasks = tasksByHorseId.get(horse.id) ?? [];
