@@ -10,6 +10,7 @@ import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
@@ -80,7 +81,8 @@ class UrgentCareCompletionTest {
                 admissionRepository, stallRepository, userRepository, incidentReportRepository,
                 veterinarianProfileRepository, auditLogRepository, eventPublisher, entityManager,
                 notificationService,
-                new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService));
+                new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
+                org.mockito.Mockito.mock(PreventiveVaccinationService.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -260,7 +262,8 @@ class UrgentCareCompletionTest {
         when(careScheduleRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(recheck));
         when(userRepository.findById(1L)).thenReturn(Optional.of(manager()));
         when(horseRepository.findById(horse.getId())).thenReturn(Optional.of(horse));
-        when(careScheduleRepository.existsByHorseIdAndStatusInAndIdNot(eq(10L), anyList(), eq(200L)))
+        when(careScheduleRepository.existsByHorseIdAndPurposeAndStatusInAndIdNot(
+                eq(10L), eq(CareSchedulePurpose.FOLLOW_UP), anyList(), eq(200L)))
                 .thenReturn(false);
 
         CancelCareScheduleRequest req = new CancelCareScheduleRequest();
@@ -287,7 +290,8 @@ class UrgentCareCompletionTest {
         when(careScheduleRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(recheck));
         when(userRepository.findById(1L)).thenReturn(Optional.of(manager()));
         when(horseRepository.findById(horse.getId())).thenReturn(Optional.of(horse));
-        when(careScheduleRepository.existsByHorseIdAndStatusInAndIdNot(eq(10L), anyList(), eq(200L)))
+        when(careScheduleRepository.existsByHorseIdAndPurposeAndStatusInAndIdNot(
+                eq(10L), eq(CareSchedulePurpose.FOLLOW_UP), anyList(), eq(200L)))
                 .thenReturn(true);
 
         CancelCareScheduleRequest req = new CancelCareScheduleRequest();

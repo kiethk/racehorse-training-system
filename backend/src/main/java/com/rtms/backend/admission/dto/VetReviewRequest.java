@@ -1,6 +1,7 @@
 package com.rtms.backend.admission.dto;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
 import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
+import com.rtms.backend.medical.dto.VaccinationRequest;
 import com.rtms.backend.medical.service.CareScheduleService;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -37,6 +38,8 @@ public class VetReviewRequest {
     private String notes;
     private List<@NotNull @Valid HorseHealthMetricRequest> metrics;
     private CreateNextScheduleRequest nextSchedule;
+    /** Mũi tiêm trong ca nhập trại, gồm cả mũi cũ nhập từ sổ tiêm (source = HISTORICAL). */
+    private List<@NotNull @Valid VaccinationRequest> vaccinations;
 
     public Long getCareScheduleId() { return careScheduleId; }
     public void setCareScheduleId(Long careScheduleId) { this.careScheduleId = careScheduleId; }
@@ -63,6 +66,9 @@ public class VetReviewRequest {
     public void setTreatment(String treatment) { this.treatment = treatment; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+    public List<VaccinationRequest> getVaccinations() { return vaccinations; }
+    public void setVaccinations(List<VaccinationRequest> vaccinations) { this.vaccinations = vaccinations; }
+
     public CreateNextScheduleRequest getNextSchedule() { return nextSchedule; }
     public void setNextSchedule(CreateNextScheduleRequest nextSchedule) { this.nextSchedule = nextSchedule; }
 

@@ -19,6 +19,7 @@ import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
@@ -61,6 +62,11 @@ public class CareScheduleService {
 
     private static final int DEFAULT_DURATION_MINUTES = 30;
     private static final int ASSIGNMENT_BATCH_SIZE = 25;
+    /**
+     * Lịch thường chỉ được xếp vet khi còn trong cửa sổ này. Mốc ở xa (tiêm phòng +180 ngày)
+     * nằm REQUESTED, chưa giữ chỗ của vet và không bị tính vào tải hiện tại.
+     */
+    static final int ASSIGNMENT_HORIZON_DAYS = 14;
 
     private final CareScheduleRepository careScheduleRepository;
     private final HorseRepository horseRepository;
@@ -76,6 +82,7 @@ public class CareScheduleService {
     private final EntityManager entityManager;
     private final NotificationService notificationService;
     private final TrainingDecisionService trainingDecisionService;
+    private final PreventiveVaccinationService preventiveVaccinationService;
 
     public CareScheduleService(
             CareScheduleRepository careScheduleRepository,
@@ -91,7 +98,8 @@ public class CareScheduleService {
             ApplicationEventPublisher eventPublisher,
             EntityManager entityManager,
             NotificationService notificationService,
-            TrainingDecisionService trainingDecisionService) {
+            TrainingDecisionService trainingDecisionService,
+            PreventiveVaccinationService preventiveVaccinationService) {
         this.careScheduleRepository = careScheduleRepository;
         this.horseRepository = horseRepository;
         this.healthRecordRepository = healthRecordRepository;
@@ -106,6 +114,7 @@ public class CareScheduleService {
         this.entityManager = entityManager;
         this.notificationService = notificationService;
         this.trainingDecisionService = trainingDecisionService;
+        this.preventiveVaccinationService = preventiveVaccinationService;
     }
 
     @Transactional
@@ -286,6 +295,26 @@ public class CareScheduleService {
         if (!Objects.equals(schedule.getVeterinarianId(), vetId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can complete this schedule");
         }
+        // Kiểm tra mũi tiêm trước mọi thay đổi trạng thái: nhập sai thì từ chối cả ca, không ghi dở.
+        List<PreventiveVaccinationService.ValidatedVaccination> vaccinations =
+                request.getVaccinations() == null || request.getVaccinations().isEmpty()
+                        ? List.of()
+                        : preventiveVaccinationService.validate(request.getVaccinations(), schedule.getCareType());
+        Integer deferDays = request.getDeferVaccinationDays();
+        if (deferDays != null) {
+            if (schedule.getPurpose() != CareSchedulePurpose.PREVENTIVE) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                        "Vaccination can only be deferred on a preventive care visit");
+            }
+            if (!vaccinations.isEmpty()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                        "Cannot defer vaccination and record vaccinations in the same visit");
+            }
+            if (deferDays < 7 || deferDays > 10) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                        "Vaccination can be deferred by 7 to 10 days");
+            }
+        }
 
         AdmissionApplication linkedAdmission = schedule.getAdmissionId() == null ? null
                 : admissionRepository.findByIdForUpdate(schedule.getAdmissionId())
@@ -334,6 +363,9 @@ public class CareScheduleService {
         record.setSymptoms(request.getSymptoms() != null ? request.getSymptoms().trim() : null);
         record.setNotes(request.getNotes() != null ? request.getNotes().trim() : null);
         HealthRecord savedRecord = healthRecordRepository.save(record);
+        if (!vaccinations.isEmpty()) {
+            preventiveVaccinationService.record(savedRecord.getId(), vaccinations);
+        }
 
         // Save metrics if present
         if (request.getMetrics() != null) {
@@ -378,6 +410,17 @@ public class CareScheduleService {
         schedule.setStatus(CareScheduleStatus.COMPLETED);
         schedule.setCompletedAt(now);
         CareSchedule completedSchedule = careScheduleRepository.save(schedule);
+
+        // Sau khi ca này COMPLETED (không còn là mốc active) mới đặt mốc tiêm kế tiếp.
+        // Ca tiêm phòng mà vet hoãn tiêm vẫn phải để lại một mốc mới cho ngựa.
+        if (deferDays != null) {
+            careScheduleRepository.flush();
+            preventiveVaccinationService.deferMilestone(horse.getId(), savedRecord.getId(), vetId, deferDays);
+        } else if (!vaccinations.isEmpty() || schedule.getPurpose() == CareSchedulePurpose.PREVENTIVE) {
+            careScheduleRepository.flush();
+            preventiveVaccinationService.refreshMilestone(horse.getId(), savedRecord.getId(), vetId,
+                    schedule.getCareType());
+        }
 
         // Gán Trainer chạy SAU khi transaction này commit (TrainerAssignmentTriggers):
         // lỗi lúc gán không thể làm rollback kết quả khám của Vet.
@@ -428,9 +471,12 @@ public class CareScheduleService {
 
         // Ngựa đang tạm nghỉ chỉ được mở khóa bởi một lần khám. Hủy nốt lần khám
         // cuối cùng thì ngựa bị khóa vô thời hạn mà không còn ai để mở.
+        // Mốc tiêm phòng (có thể ở +180 ngày) không thay được lần tái khám đó.
         Horse horse = horseRepository.findById(schedule.getHorseId()).orElse(null);
         if (horse != null && horse.getTrainingDecision() == TrainingDecision.BLOCKED
-                && !careScheduleRepository.existsByHorseIdAndStatusInAndIdNot(horse.getId(),
+                && schedule.getPurpose() != CareSchedulePurpose.PREVENTIVE
+                && !careScheduleRepository.existsByHorseIdAndPurposeAndStatusInAndIdNot(horse.getId(),
+                        CareSchedulePurpose.FOLLOW_UP,
                         List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS),
                         schedule.getId())) {
             throw new ApiException(HttpStatus.CONFLICT, "LAST_FOLLOW_UP",
@@ -625,24 +671,29 @@ public class CareScheduleService {
 
     @Transactional
     public void assignRequestedSchedules() {
-        for (CareSchedule schedule : careScheduleRepository.lockNextRequestedBatch(ASSIGNMENT_BATCH_SIZE)) {
+        LocalDateTime horizon = LocalDateTime.now().plusDays(ASSIGNMENT_HORIZON_DAYS);
+        for (CareSchedule schedule : careScheduleRepository.lockNextRequestedBatch(ASSIGNMENT_BATCH_SIZE, horizon)) {
             assignRequestedSchedule(schedule);
         }
     }
 
     void assignRequestedSchedule(CareSchedule schedule) {
         if (schedule.getStatus() != CareScheduleStatus.REQUESTED) return;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime horizon = now.plusDays(ASSIGNMENT_HORIZON_DAYS);
+        if (isBeyondAssignmentHorizon(schedule, horizon)) return;
 
         Horse horse = horseRepository.findByIdForUpdate(schedule.getHorseId()).orElse(null);
         if (horse == null) return;
 
-        LocalDateTime now = LocalDateTime.now();
         Map<Long, Integer> overdueAppointmentsByVet = new HashMap<>();
         Map<Long, Integer> scheduledMinutesByVet = new HashMap<>();
         for (CareSchedule assigned : careScheduleRepository
                 .findByStatusInAndVeterinarianIdIsNotNull(List.of(
                         CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS))) {
             if (assigned.getVeterinarianId() == null) continue;
+            LocalDateTime when = assigned.getScheduledAt() != null ? assigned.getScheduledAt() : assigned.getRequestedAt();
+            if (when != null && !when.isBefore(horizon)) continue;
             scheduledMinutesByVet.merge(assigned.getVeterinarianId(),
                     assigned.getDurationMinutes() > 0 ? assigned.getDurationMinutes() : DEFAULT_DURATION_MINUTES,
                     Integer::sum);
@@ -709,6 +760,11 @@ public class CareScheduleService {
             recordAssignmentAudit(schedule, lockedVet);
             return;
         }
+    }
+
+    static boolean isBeyondAssignmentHorizon(CareSchedule schedule, LocalDateTime horizon) {
+        if (schedule.getCareType() == CareType.URGENT || schedule.getCareType() == CareType.INITIAL) return false;
+        return schedule.getRequestedAt() != null && !schedule.getRequestedAt().isBefore(horizon);
     }
 
     private void assignInitialAdmissionVet(CareSchedule schedule, Long veterinarianId) {

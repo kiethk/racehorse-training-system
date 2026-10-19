@@ -140,6 +140,7 @@ public class AdmissionReviewService {
         compReq.setNotes(request.getNotes() != null ? request.getNotes() : request.getFeedback());
         compReq.setMetrics(request.getMetrics());
         compReq.setNextSchedule(request.getNextSchedule());
+        compReq.setVaccinations(request.getVaccinations());
         compReq.setTrainingDecision(request.getTrainingDecision());
         compReq.setRestrictionDetails(
                 request.getRestrictionDetails() != null && !request.getRestrictionDetails().isBlank()

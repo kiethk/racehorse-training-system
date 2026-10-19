@@ -12,11 +12,13 @@ import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.medical.service.PreventiveStatusService;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -28,18 +30,21 @@ public class AdmissionManagerReviewService {
     private final HorseRepository horseRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final AdmissionGroomReviewService admissionGroomReviewService;
+    private final PreventiveStatusService preventiveStatusService;
 
     public AdmissionManagerReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
             StableStallRepository stableStallRepository,
             HorseRepository horseRepository,
             CareScheduleRepository careScheduleRepository,
-            AdmissionGroomReviewService admissionGroomReviewService) {
+            AdmissionGroomReviewService admissionGroomReviewService,
+            PreventiveStatusService preventiveStatusService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.stableStallRepository = stableStallRepository;
         this.horseRepository = horseRepository;
         this.careScheduleRepository = careScheduleRepository;
         this.admissionGroomReviewService = admissionGroomReviewService;
+        this.preventiveStatusService = preventiveStatusService;
     }
 
     @Transactional
@@ -136,6 +141,11 @@ public class AdmissionManagerReviewService {
         }
 
         admission = admissionApplicationRepository.save(admission);
+
+        // 6. Phác đồ bắt buộc mà khám nhập trại chưa tiêm, cũng chưa có sổ cũ: hẹn tiêm ngay hôm sau.
+        preventiveStatusService.upsertMilestone(horse.getId(), "preventive:approval:" + admission.getId(),
+                managerId, LocalDate.now().plusDays(1));
+
         processNextWaitingAdmission();
         return admission;
     }

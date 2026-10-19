@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.rtms.backend.training.enums.TrainingDecision;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -31,6 +33,23 @@ public class CompleteCareScheduleRequest {
 
     /** Lịch khám lại — bắt buộc khi BLOCKED: "tạm nghỉ đến" chính là ngày của lịch này. */
     private CreateNextScheduleRequest nextSchedule;
+
+    /** Mũi tiêm phòng / tẩy giun ghi nhận cùng ca khám; lưu nguyên tử với kết quả khám. */
+    private List<@NotNull @Valid VaccinationRequest> vaccinations;
+
+    /**
+     * Hoãn tiêm khi hoàn tất mốc tiêm phòng mà ngựa chưa đủ khỏe (sốt, đang điều trị):
+     * mốc mới đặt sau số ngày này, lý do UNDER_TREATMENT. Chỉ dùng khi không gửi vaccinations.
+     */
+    @Min(value = 7, message = "Vaccination can be deferred by 7 to 10 days")
+    @Max(value = 10, message = "Vaccination can be deferred by 7 to 10 days")
+    private Integer deferVaccinationDays;
+
+    public Integer getDeferVaccinationDays() { return deferVaccinationDays; }
+    public void setDeferVaccinationDays(Integer deferVaccinationDays) { this.deferVaccinationDays = deferVaccinationDays; }
+
+    public List<VaccinationRequest> getVaccinations() { return vaccinations; }
+    public void setVaccinations(List<VaccinationRequest> vaccinations) { this.vaccinations = vaccinations; }
 
     public String getFindings() { return findings; }
     public void setFindings(String findings) { this.findings = findings; }

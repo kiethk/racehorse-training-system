@@ -48,6 +48,9 @@ class AdmissionManagerReviewServiceTest {
     @Mock
     private AdmissionGroomReviewService admissionGroomReviewService;
 
+    @Mock
+    private com.rtms.backend.medical.service.PreventiveStatusService preventiveStatusService;
+
     private AdmissionManagerReviewService service;
 
     // ─── Shared helpers ───────────────────────────────────────────────────────
@@ -97,7 +100,8 @@ class AdmissionManagerReviewServiceTest {
                 stableStallRepository,
                 horseRepository,
                 careScheduleRepository,
-                admissionGroomReviewService);
+                admissionGroomReviewService,
+                preventiveStatusService);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -137,6 +141,10 @@ class AdmissionManagerReviewServiceTest {
 
         assertEquals(StallStatus.AVAILABLE, qStall.getStatus());
         verify(stableStallRepository).save(qStall);
+
+        // Phác đồ bắt buộc còn MISSING sau khám nhập trại được hẹn tiêm ngày hôm sau.
+        verify(preventiveStatusService).upsertMilestone(10L, "preventive:approval:1", 5L,
+                java.time.LocalDate.now().plusDays(1));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

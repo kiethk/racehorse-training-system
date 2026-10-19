@@ -8,7 +8,6 @@ import type {
   CompleteCareScheduleRequest,
   CreateNextScheduleRequest,
   CreatePrescriptionRequest,
-  CreatePreventiveCareScheduleRequest,
   CreateTreatmentPlanRequest,
   PageResponse,
   Prescription,
@@ -46,16 +45,6 @@ export const careService = {
 
   getScheduleDetail: async (id: number): Promise<CareScheduleDetailResponse> => {
     const res = await apiGet<ApiResponse<CareScheduleDetailResponse>>(`/api/care-schedules/${id}`);
-    return res.data;
-  },
-
-  createPreventiveCare: async (data: CreatePreventiveCareScheduleRequest): Promise<CareScheduleResponse> => {
-    const res = await apiPost<ApiResponse<CareScheduleResponse>>('/api/preventive-care-schedules', data);
-    return res.data;
-  },
-
-  getUpcomingByHorse: async (horseId: number): Promise<CareScheduleResponse[]> => {
-    const res = await apiGet<ApiResponse<CareScheduleResponse[]>>(`/api/preventive-care-schedules?horseId=${horseId}`);
     return res.data;
   },
 

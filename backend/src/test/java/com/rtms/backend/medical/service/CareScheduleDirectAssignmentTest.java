@@ -74,7 +74,8 @@ class CareScheduleDirectAssignmentTest {
                 events,
                 mock(EntityManager.class),
                 mock(NotificationService.class),
-                new TrainingDecisionService(horses, schedules, workoutService));
+                new TrainingDecisionService(horses, schedules, workoutService),
+                org.mockito.Mockito.mock(PreventiveVaccinationService.class));
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(schedules.findScheduledForHorse(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
         when(schedules.findScheduledForVet(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());

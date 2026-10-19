@@ -12,6 +12,12 @@ import { admissionAsideClassName, admissionDetailGridClassName } from '../shared
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Pill } from '@/components/ui/StatusBadge';
 import { admissionsApi } from '../services/api';
+import {
+  ExamVaccinationSection,
+  toVaccinationRequests,
+  validateVaccinationDrafts,
+  type VaccinationDraft,
+} from '@/features/care/components/preventive/ExamVaccinationSection';
 import type {
   CareType,
   CareSchedule,
@@ -310,6 +316,8 @@ export interface VetReviewFormProps {
   careScheduleId?: number | null;
   careType?: CareType;
   scheduleStatus?: CareScheduleStatus;
+  /** PREVENTIVE: the system-booked vaccination visit; it can defer vaccination instead of giving it. */
+  schedulePurpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   onStartExam?: () => Promise<void>;
   /** Rendered above the decision panel in the side column (e.g. the examination details card). */
   asideTop?: ReactNode;
@@ -325,6 +333,7 @@ export function VetReviewForm({
   careScheduleId,
   careType = 'INITIAL',
   scheduleStatus,
+  schedulePurpose,
   onStartExam,
   asideTop,
   onSuccess,
@@ -365,6 +374,11 @@ export function VetReviewForm({
 
   // Vitals State
   const [metrics, setMetrics] = useState<Record<MetricField, string>>(emptyMetrics);
+
+  // Vaccinations recorded in this exam (not kept in the local draft)
+  const [vaccinationDrafts, setVaccinationDrafts] = useState<VaccinationDraft[]>([]);
+  const [deferVaccinationDays, setDeferVaccinationDays] = useState<number | null>(null);
+  const [vaccinationErrors, setVaccinationErrors] = useState<Record<string, string>>({});
 
   // Status & Validation
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -631,6 +645,12 @@ export function VetReviewForm({
       }
     }
 
+    const doseErrors = validateVaccinationDrafts(vaccinationDrafts);
+    setVaccinationErrors(doseErrors);
+    if (Object.keys(doseErrors).length > 0) {
+      errors.vaccinations = 'Complete or remove the vaccinations before submitting.';
+    }
+
     return errors;
   }
 
@@ -706,6 +726,7 @@ export function VetReviewForm({
           feedback: notes.trim() || undefined,
           nextSchedule: nextScheduleRequest,
           metrics: Object.keys(metricValues).length ? [metricValues] : undefined,
+          vaccinations: vaccinationDrafts.length ? toVaccinationRequests(vaccinationDrafts) : undefined,
         };
         result = await admissionsApi.vetReview(admissionId, request);
         completionKind = 'INITIAL';
@@ -721,6 +742,8 @@ export function VetReviewForm({
           notes: notes.trim() || undefined,
           nextSchedule: nextScheduleRequest,
           metrics: Object.keys(metricValues).length ? [metricValues] : undefined,
+          vaccinations: vaccinationDrafts.length ? toVaccinationRequests(vaccinationDrafts) : undefined,
+          deferVaccinationDays: deferVaccinationDays ?? undefined,
         };
         result = await admissionsApi.completeCareSchedule(careScheduleId, request);
         completionKind = 'CARE_SCHEDULE';
@@ -1266,6 +1289,23 @@ export function VetReviewForm({
                 </FormField>
               </div>
             </fieldset>
+
+            {/* Section 3: Vaccination & deworming given in this exam */}
+            {horseId != null && (
+              <ExamVaccinationSection
+                horseId={horseId}
+                careType={careType}
+                purpose={schedulePurpose}
+                temperature={metrics.temperature}
+                trainingBlocked={trainingDecision === 'BLOCKED'}
+                disabled={isFormDisabled}
+                value={vaccinationDrafts}
+                onChange={setVaccinationDrafts}
+                deferDays={deferVaccinationDays}
+                onDeferChange={setDeferVaccinationDays}
+                errors={vaccinationErrors}
+              />
+            )}
           </div>
 
           {/* RIGHT COLUMN: Sticky Decision Panel (~35% width = lg:col-span-4) */}
