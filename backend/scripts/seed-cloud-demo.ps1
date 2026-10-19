@@ -42,11 +42,17 @@ try {
     $dockerEnvironment=@('run','--rm')
     foreach ($key in @('PGHOST','PGPORT','PGDATABASE','PGUSER','PGPASSWORD','PGSSLMODE','PGCONNECT_TIMEOUT','PGOPTIONS')) { $dockerEnvironment+=@('--env',$key) }
     $backupMount="type=bind,source=$backups,target=/backup"
-    & docker @dockerEnvironment --mount $backupMount postgres:18 pg_dump -w --format=custom "--file=$containerFile" *> (Join-Path $report 'backup.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Cloud backup failed; database has not been seeded. Inspect private target/cloud-seed/backup.log.' }
-    if (-not (Test-Path -LiteralPath $backup)) { throw 'Cloud backup missing; seed not started.' }
-    & docker run --rm --mount $backupMount postgres:18 pg_restore --list $containerFile *> (Join-Path $report 'backup-contents.txt')
-    if ($LASTEXITCODE -ne 0) { throw 'Cloud backup validation failed; seed not started.' }
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & docker @dockerEnvironment --mount $backupMount postgres:18 pg_dump -w --format=custom "--file=$containerFile" *> (Join-Path $report 'backup.log')
+        if ($LASTEXITCODE -ne 0) { throw 'Cloud backup failed; database has not been seeded. Inspect private target/cloud-seed/backup.log.' }
+        if (-not (Test-Path -LiteralPath $backup)) { throw 'Cloud backup missing; seed not started.' }
+        & docker run --rm --mount $backupMount postgres:18 pg_restore --list $containerFile *> (Join-Path $report 'backup-contents.txt')
+        if ($LASTEXITCODE -ne 0) { throw 'Cloud backup validation failed; seed not started.' }
+    } finally {
+        $ErrorActionPreference = $oldEAP
+    }
     $env:RTMS_SEED_BACKUP=$backup
     $env:RTMS_SEED_BACKUP_SHA256=(Get-FileHash -LiteralPath $backup -Algorithm SHA256).Hash.ToLowerInvariant()
     Push-Location $backendRoot
@@ -54,7 +60,9 @@ try {
         $arguments=@('test','-Dtest=CloudDemoSeedToolTest','-Drtms.seed.cloud=true',"-Drtms.seed.assetsRoot=$assets")
         if ($Mode -eq 'Preflight') { $arguments+='-Drtms.seed.cloud.preflightOnly=true' }
         if ($Mode -eq 'Verify') { $arguments+='-Drtms.seed.verifyOnly=true' }
-        & .\mvnw.cmd @arguments *> (Join-Path $report ($Mode.ToLowerInvariant()+'.log'))
+        $runLog = Join-Path $report ($Mode.ToLowerInvariant()+'.log')
+        $argString = $arguments -join ' '
+        cmd /c ".\mvnw.cmd $argString > `"$runLog`" 2>&1"
         if ($LASTEXITCODE -ne 0) { throw "Cloud $Mode stopped. Inspect private target/cloud-seed logs and backup before retrying; never blindly rerun a partial seed." }
     } finally { Pop-Location }
     Write-Output "Cloud $Mode PASS. Backup saved. No credentials printed."
