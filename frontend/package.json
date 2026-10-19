@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test src/features/admissions/components/__tests__/*.test.ts"
+    "test": "node --experimental-strip-types --test src/features/**/__tests__/*.test.ts"
   },
   "dependencies": {
     "next": "16.3.4",
