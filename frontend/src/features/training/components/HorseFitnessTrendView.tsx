@@ -8,6 +8,7 @@ import { FitnessTrendChart } from './FitnessTrendChart';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
+import { TrainerHorseIncidentsTab } from './TrainerHorseIncidentsTab';
 
 interface HorseFitnessTrendViewProps {
   horseId: number;
@@ -465,6 +466,9 @@ export function HorseFitnessTrendView({ horseId }: HorseFitnessTrendViewProps) {
           </div>
         )}
       </Panel>
+
+      {/* Lịch sử sự cố & Báo cáo an toàn từ sân tập */}
+      <TrainerHorseIncidentsTab horseId={horseId} horseName={horse?.name} />
     </div>
   );
 }

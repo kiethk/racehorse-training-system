@@ -128,10 +128,10 @@ public class GroomIncidentReportService {
     /**
      * Tiếp nhận / kết luận một báo cáo sự cố.
      *
-     * PHẠM VI: phần nối sang bệnh án (health_records.source_incident_id) thuộc
-     * module Thú y. Ở đây ta chỉ quản lý VÒNG ĐỜI của báo cáo. Khi đồng đội làm
-     * phần bệnh án, họ gọi API này với status = RESOLVED sau khi lưu bệnh án.
+     * @deprecated Đã khóa theo BR-URG-21 / AD-004: sự cố chỉ chuyển RESOLVED qua
+     *             POST /api/care-schedules/{id}/complete (đóng ca Urgent).
      */
+    @Deprecated
     @Transactional
     public GroomIncidentReport handleReport(Long id,
                                             HandleIncidentRequest request,

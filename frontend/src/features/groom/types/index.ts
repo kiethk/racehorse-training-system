@@ -26,8 +26,11 @@ export interface IncidentReport {
   id: number;
   horseId: number;
   horseName?: string;
-  groomId: number;
+  groomId?: number;
   groomName?: string;
+  reportedById?: number;
+  reportedByName?: string;
+  reportedByRole?: string;
   title: string;
   description: string;
   imageUrl: string | null;

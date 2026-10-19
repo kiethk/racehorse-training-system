@@ -149,9 +149,20 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
 
         const refId = notification.referenceId;
         if (notification.referenceType === 'CARE_SCHEDULE' && refId && user?.role === 'VETERINARIAN') {
-          router.push(`/veterinarian/admissions?scheduleId=${refId}`);
+          const lowerText = `${notification.title || ''} ${notification.message || ''}`.toLowerCase();
+          if (lowerText.includes('khẩn') || lowerText.includes('urgent')) {
+            router.push(`/veterinarian/urgent/${refId}`);
+          } else if (lowerText.includes('định kỳ') || lowerText.includes('routine')) {
+            router.push('/veterinarian/routine');
+          } else {
+            router.push(`/veterinarian/admissions?scheduleId=${refId}`);
+          }
         } else if (notification.notificationType === 'ADMISSION_VET_ASSIGNED' && refId) {
-          router.push(`/veterinarian/admissions?id=${refId}`);
+          if (notification.referenceType === 'CARE_SCHEDULE') {
+            router.push(`/veterinarian/admissions?scheduleId=${refId}`);
+          } else {
+            router.push(`/veterinarian/admissions?id=${refId}`);
+          }
         } else if (notification.notificationType === 'ADMISSION_TRAINER_ASSIGNED' && refId) {
           router.push(`/trainer/admissions/${refId}`);
         } else if (notification.referenceType === 'ADMISSION' && refId) {

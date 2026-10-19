@@ -25,6 +25,8 @@ export function IncidentForm() {
 
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [horses, setHorses] = useState<Horse[]>([]);
+  const [myHorses, setMyHorses] = useState<Horse[]>([]);
+  const [otherHorses, setOtherHorses] = useState<Horse[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
 
   const [horseId, setHorseId] = useState<number | ''>('');
@@ -48,18 +50,26 @@ export function IncidentForm() {
 
         setStalls(stallList);
 
-        // Keep only horses assigned to stalls managed by the current groom.
+        // Ưu tiên ngựa thuộc chuồng do Groom quản lý lên đầu; vẫn cho phép chọn các ngựa khác trong trại khi cấp cứu
         const myStallIds = stallList
           .filter((s) => s.groomId === user?.userId)
           .map((s) => s.id);
 
-        const myHorses = horseList.filter(
+        const assignedHorses = horseList.filter(
           (h) => h.currentStallId && myStallIds.includes(h.currentStallId)
         );
+        const unassignedOrOther = horseList.filter(
+          (h) => !h.currentStallId || !myStallIds.includes(h.currentStallId)
+        );
 
-        setHorses(myHorses);
-        if (myHorses.length > 0) {
-          setHorseId(myHorses[0].id);
+        setMyHorses(assignedHorses);
+        setOtherHorses(unassignedOrOther);
+        setHorses([...assignedHorses, ...unassignedOrOther]);
+
+        if (assignedHorses.length > 0) {
+          setHorseId(assignedHorses[0].id);
+        } else if (unassignedOrOther.length > 0) {
+          setHorseId(unassignedOrOther[0].id);
         }
       } catch (err) {
         console.error('Unable to load horse and stall data:', err);
@@ -187,7 +197,7 @@ export function IncidentForm() {
       {horses.length === 0 ? (
         <Panel padded>
           <div className="py-8 text-center text-sm text-[var(--color-text-secondary)]">
-            You are not currently assigned to any stalls or horses.
+            Không tìm thấy ngựa nào trong hệ thống.
             <div className="mt-4">
               <Link href="/groom/incidents">
                 <Button variant="secondary">Back</Button>
@@ -209,19 +219,37 @@ export function IncidentForm() {
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 required
               >
-                {horses.map((h) => {
-                  const stallLabel = h.currentStallId
-                    ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
-                    : 'No stall assigned';
-                  return (
-                    <option key={h.id} value={h.id}>
-                      {h.name} (#{h.id}) — {stallLabel}
-                    </option>
-                  );
-                })}
+                {myHorses.length > 0 && (
+                  <optgroup label="Ngựa phụ trách tại chuồng">
+                    {myHorses.map((h) => {
+                      const stallLabel = h.currentStallId
+                        ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
+                        : 'Chưa phân chuồng';
+                      return (
+                        <option key={h.id} value={h.id}>
+                          {h.name} (#{h.id}) — {stallLabel}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                )}
+                {otherHorses.length > 0 && (
+                  <optgroup label="Tất cả ngựa khác trong trại (Sân tập / Khu tắm / Bãi thả)">
+                    {otherHorses.map((h) => {
+                      const stallLabel = h.currentStallId
+                        ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
+                        : 'Chưa phân chuồng';
+                      return (
+                        <option key={h.id} value={h.id}>
+                          {h.name} (#{h.id}) — {stallLabel}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                )}
               </select>
               <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                Only horses in your assigned stalls are shown.
+                Ưu tiên hiển thị ngựa chuồng bạn phụ trách lên đầu. Bạn có thể chọn bất kỳ ngựa nào trong trại khi xảy ra sự cố ngoài chuồng (sân tập, bãi thả, khu tắm).
               </p>
             </div>
 
@@ -257,10 +285,14 @@ export function IncidentForm() {
               </div>
 
               {severity === 'CRITICAL' && (
-                <div className="mt-2.5 rounded-[var(--radius-md)] border border-red-300 bg-red-50 p-2.5 text-xs text-red-800">
-                  <div className="font-semibold">Emergency warning:</div>
-                  The system does not send instant notifications. For a <strong>Critical</strong> incident,{' '}
-                  <strong>call the veterinary team directly</strong> or notify a manager immediately after submitting this report.
+                <div className="mt-2.5 rounded-[var(--radius-md)] border border-red-300 bg-red-50 p-3 text-xs text-red-800">
+                  <div className="font-semibold flex items-center gap-1.5 text-red-900">
+                    <Icon name="alert-triangle" size={14} className="text-red-600" />
+                    Cảnh báo cấp cứu khẩn cấp:
+                  </div>
+                  <p className="mt-1 font-medium text-red-800 leading-relaxed">
+                    Hệ thống lập tức kích hoạt khóa an toàn (BLOCKED) và phát cảnh báo realtime trực tiếp tới Bác sĩ Thú y trực ban.
+                  </p>
                 </div>
               )}
             </div>

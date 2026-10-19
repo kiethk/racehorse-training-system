@@ -100,6 +100,7 @@ export const admissionsApi = {
     if (filters.admissionId) params.set('admissionId', String(filters.admissionId));
     const vetId = filters.veterinarianId ?? filters.vetId;
     if (vetId) params.set('veterinarianId', String(vetId));
+    if (filters.date) params.set('date', filters.date);
     params.set('page', String(filters.page ?? 0));
     params.set('size', String(filters.size ?? 50));
     const response = await apiGet<unknown>(`/api/care-schedules?${params}`);
@@ -141,6 +142,16 @@ export const admissionsApi = {
     return response as CareSchedule;
   },
 
+  createPreventiveCareSchedule: async (data: {
+    horseId: number;
+    careType: string;
+    scheduledDate: string;
+    description: string;
+  }): Promise<CareSchedule> => {
+    const res = await apiPost<ApiResponse<CareSchedule>>('/api/preventive-care-schedules', data);
+    return res.data;
+  },
+
   vetReview: async (id: number, request: VetReviewRequest): Promise<VetReviewResponse> => {
     const response = await apiPost<ApiResponse<VetReviewResponse>>(`/api/admissions/${id}/vet-review`, request);
     return response.data;
@@ -156,6 +167,9 @@ export const admissionsApi = {
   retryQuarantineAllocation: async (id: number): Promise<AdmissionDetailResponse> => {
     const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/quarantine-allocation`, {});
     return response.data;
+  },
+  getDocumentBlob: async (pathOrUrl: string): Promise<Blob> => {
+    return apiGetBlob(pathOrUrl);
   },
   assetUrl: (url: string): string => {
     if (/^https?:\/\//i.test(url)) return url;

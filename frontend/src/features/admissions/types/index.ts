@@ -155,6 +155,7 @@ export interface UrgentAssignmentAlert {
   stallCode: string | null;
   reportedById: number;
   reportedByName: string | null;
+  reportedByRole?: string | null;
   reportedAt: string;
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   title: string;
@@ -177,6 +178,7 @@ export interface CareSchedule {
   assignedVetId?: number | null;
   scheduledDate?: string | null;
   scheduledAt?: string | null;
+  durationMinutes?: number | null;
   notes?: string | null;
   description?: string | null;
   createdAt?: string;
@@ -203,6 +205,7 @@ export interface CareScheduleFilters {
   admissionId?: number;
   vetId?: number;
   veterinarianId?: number;
+  date?: string;
   page?: number;
   size?: number;
 }

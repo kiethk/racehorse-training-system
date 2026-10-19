@@ -140,6 +140,86 @@ class UrgentCareCompletionTest {
     }
 
     @Test
+    @DisplayName("Đóng ca Urgent resolve toàn bộ 3 báo cáo mở của ngựa, không đụng báo cáo ngựa khác")
+    void testCompleteUrgentSchedule_resolvesAllOpenIncidentsOfHorse() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        GroomIncidentReport second = incidentOf(31L, IncidentStatus.REPORTED);
+        GroomIncidentReport third = incidentOf(32L, IncidentStatus.IN_REVIEW);
+        GroomIncidentReport otherHorse = incidentOf(99L, IncidentStatus.REPORTED);
+        otherHorse.setHorseId(77L);
+
+        incident.setGroomId(55L);
+        when(horseRepository.findTrainerIdByHorseId(horse.getId())).thenReturn(Optional.of(88L));
+        stubCompletion();
+        when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
+                .thenReturn(java.util.List.of(incident, second, third));
+
+        careScheduleService.completeCareSchedule(urgentSchedule.getId(),
+                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+
+        for (GroomIncidentReport r : java.util.List.of(incident, second, third)) {
+            assertEquals(IncidentStatus.RESOLVED, r.getStatus());
+            assertEquals(vet.getId(), r.getHandledById());
+            assertNotNull(r.getHandledAt());
+        }
+        assertEquals(IncidentStatus.REPORTED, otherHorse.getStatus());
+        verify(incidentReportRepository).saveAll(argThat(list -> {
+            int n = 0;
+            for (Object ignored : list) n++;
+            return n == 3;
+        }));
+        verify(notificationService, atLeastOnce()).sendAssignmentNotification(
+                anyLong(),
+                eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
+                eq(urgentSchedule.getId()),
+                eq(horse.getId()),
+                eq(NotificationTypes.URGENT_CASE_CLOSED),
+                anyString(),
+                anyString()
+        );
+    }
+
+    @Test
+    @DisplayName("Báo nhầm (false alarm) vẫn đóng ca bằng HealthRecord và resolve incident")
+    void testCompleteUrgentSchedule_falseAlarmStillResolvesIncidents() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        stubCompletion();
+        when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
+                .thenReturn(java.util.List.of(incident));
+
+        var response = careScheduleService.completeCareSchedule(urgentSchedule.getId(),
+                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+
+        assertEquals(CareScheduleStatus.COMPLETED, response.status());
+        assertEquals(IncidentStatus.RESOLVED, incident.getStatus());
+        verify(healthRecordRepository, times(1)).save(any(HealthRecord.class));
+    }
+
+    @Test
+    @DisplayName("Incident nguồn ngoài kết quả query vẫn được resolve (không bỏ sót)")
+    void testCompleteUrgentSchedule_resolvesSourceIncidentEvenIfNotInQuery() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        stubCompletion();
+        when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
+                .thenReturn(java.util.List.of());
+        when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+
+        careScheduleService.completeCareSchedule(urgentSchedule.getId(),
+                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+
+        assertEquals(IncidentStatus.RESOLVED, incident.getStatus());
+    }
+
+    private GroomIncidentReport incidentOf(Long id, IncidentStatus status) {
+        GroomIncidentReport r = new GroomIncidentReport();
+        r.setId(id);
+        r.setHorseId(horse.getId());
+        r.setStatus(status);
+        return r;
+    }
+
+    @Test
     @DisplayName("Kết luận BLOCKED mà không có lịch khám lại -> 400 FOLLOW_UP_REQUIRED, không ghi gì")
     void testCompleteUrgentSchedule_blockedWithoutFollowUp_rejected() {
         CompleteCareScheduleRequest req = completeRequest(TrainingDecision.BLOCKED);

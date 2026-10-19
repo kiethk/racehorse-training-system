@@ -17,6 +17,7 @@ public record UrgentAssignmentAlert(
         String stallCode,
         Long reportedById,
         String reportedByName,
+        String reportedByRole,
         LocalDateTime reportedAt,
         IncidentSeverity severity,
         String title,
@@ -26,4 +27,50 @@ public record UrgentAssignmentAlert(
         CareScheduleStatus status,
         LocalDateTime scheduledAt,
         LocalDateTime assignedAt
-) {}
+) {
+    /** Backward compatibility constructor without reportedByRole. */
+    public UrgentAssignmentAlert(
+            Long eventId,
+            Long scheduleId,
+            Long incidentId,
+            Long veterinarianId,
+            Long horseId,
+            String horseName,
+            String stableLocation,
+            String stallCode,
+            Long reportedById,
+            String reportedByName,
+            LocalDateTime reportedAt,
+            IncidentSeverity severity,
+            String title,
+            String description,
+            String imageUrl,
+            TrainingDecision trainingDecision,
+            CareScheduleStatus status,
+            LocalDateTime scheduledAt,
+            LocalDateTime assignedAt
+    ) {
+        this(
+                eventId,
+                scheduleId,
+                incidentId,
+                veterinarianId,
+                horseId,
+                horseName,
+                stableLocation,
+                stallCode,
+                reportedById,
+                reportedByName,
+                null,
+                reportedAt,
+                severity,
+                title,
+                description,
+                imageUrl,
+                trainingDecision,
+                status,
+                scheduledAt,
+                assignedAt
+        );
+    }
+}
