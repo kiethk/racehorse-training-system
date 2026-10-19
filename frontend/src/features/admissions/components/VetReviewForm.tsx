@@ -674,7 +674,7 @@ export function VetReviewForm({
 
     const nextScheduleRequest = followUpActive && followUpDate ? {
       horseId: horseId ?? undefined,
-      admissionId,
+      admissionId: admissionId && admissionId > 0 ? admissionId : undefined,
       careType: 'ROUTINE' as const,
       scheduledDate: followUpDate,
       description: followUpDescription.trim() || 'Follow-up veterinary examination',
@@ -824,7 +824,7 @@ export function VetReviewForm({
             <div className="flex items-center gap-2">
               <Icon name="clipboard" size={14} className="text-[var(--color-primary)] shrink-0" />
               <span>
-                Tìm thấy bản nháp từ <strong>{availableDraft.timestamp}</strong>. Bạn có muốn khôi phục dữ liệu đã lưu không?
+                Draft found from <strong>{availableDraft.timestamp}</strong>. Would you like to restore saved data?
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -834,7 +834,7 @@ export function VetReviewForm({
                 variant="primary"
                 onClick={handleRestoreDraft}
               >
-                Khôi phục
+                Restore
               </Button>
               <Button
                 type="button"
@@ -842,7 +842,7 @@ export function VetReviewForm({
                 variant="secondary"
                 onClick={handleDiscardAvailableDraft}
               >
-                Xóa nháp
+                Discard
               </Button>
             </div>
           </div>
@@ -853,14 +853,14 @@ export function VetReviewForm({
           <div className="mb-4 flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-1.5 text-[11px] text-[var(--color-text-secondary)]">
             <span className="flex items-center gap-1.5 font-medium">
               <Icon name="check" size={12} className="text-[var(--color-success)]" />
-              Đã lưu nháp lúc {draftSavedTime}
+              Draft saved at {draftSavedTime}
             </span>
             <button
               type="button"
               onClick={handleClearDraft}
               className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] font-medium transition-colors"
             >
-              Xóa nháp
+              Discard
             </button>
           </div>
         )}
@@ -1102,7 +1102,7 @@ export function VetReviewForm({
                         }`}
                       >
                         <Icon name="check" size={14} />
-                        Normal (Bình thường)
+                        Normal
                       </button>
                       <button
                         type="button"
@@ -1118,7 +1118,7 @@ export function VetReviewForm({
                         }`}
                       >
                         <Icon name="alert-triangle" size={14} />
-                        Abnormal (Bất thường)
+                        Abnormal
                       </button>
                     </div>
 
@@ -1564,16 +1564,6 @@ export function VetReviewForm({
               >
                 Save Draft Locally
               </button>
-            </div>
-
-            {/* Summary Notice */}
-            <div className="rounded-[var(--radius-sm)] bg-[var(--color-surface-subtle)] p-2.5 text-[11px] text-[var(--color-text-muted)] leading-relaxed">
-              <span className="font-semibold text-[var(--color-text-secondary)]">Outcome:</span>
-              <ul className="mt-1 space-y-0.5 list-disc pl-3.5">
-                <li>Permanently links health examination record.</li>
-                <li>Advances admission to Head Trainer review stage.</li>
-                <li>Quarantine stall stays locked until final manager clearance.</li>
-              </ul>
             </div>
           </div>
         </div>

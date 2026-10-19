@@ -185,6 +185,27 @@ export function VetAdmissionQueue() {
   const [success, setSuccess] = useState('');
   const [scheduleWarning, setScheduleWarning] = useState('');
   const [reload, setReload] = useState(0);
+  const [downloadingDocId, setDownloadingDocId] = useState<number | null>(null);
+
+  const handleDownloadDoc = async (doc: AdmissionDocument) => {
+    try {
+      setDownloadingDocId(doc.id);
+      const blob = await admissionsApi.getDocumentBlob(doc.fileUrl);
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = doc.originalFileName || `document-${doc.id}`;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+    } catch (err) {
+      console.error('Failed to download document', err);
+    } finally {
+      setDownloadingDocId(null);
+    }
+  };
 
   // Deep link support via ?id= query param
   useEffect(() => {
@@ -208,7 +229,17 @@ export function VetAdmissionQueue() {
           .then(({ schedule }) => {
             if (!active) return;
             if (!schedule.admissionId) {
-              setDetailError('This care schedule is not linked to an Admission record.');
+              if (schedule.careType === 'URGENT') {
+                setDrawerOpen(false);
+                router.push(`/veterinarian/urgent/${schedule.id}`);
+                return;
+              }
+              if (schedule.careType === 'ROUTINE') {
+                setDrawerOpen(false);
+                router.push('/veterinarian/routine');
+                return;
+              }
+              setDetailError('This examination schedule is not associated with an admission record.');
               return;
             }
             setDeepLinkedSchedule(schedule);
@@ -237,7 +268,7 @@ export function VetAdmissionQueue() {
         });
       }
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   // Close filter popover on click outside
   useEffect(() => {
@@ -458,7 +489,7 @@ export function VetAdmissionQueue() {
       });
 
     return list.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
-  }, [careSchedules, selectedId, detail]);
+  }, [careSchedules, selectedId]);
 
   const handleOpenAdmission = (id: number, schedule: CareSchedule | null) => {
     setTargetScheduleId(schedule?.id ?? null);
@@ -1014,7 +1045,7 @@ export function VetAdmissionQueue() {
                           icon="activity"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Tiếp tục
+                          Continue
                         </Button>
                       ) : isScheduled ? (
                         <Button
@@ -1023,7 +1054,7 @@ export function VetAdmissionQueue() {
                           icon="stethoscope"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Khám
+                          Examine
                         </Button>
                       ) : isCompleted ? (
                         <Button
@@ -1032,7 +1063,7 @@ export function VetAdmissionQueue() {
                           icon="check"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Xem kết quả
+                          View Results
                         </Button>
                       ) : (
                         <Button
@@ -1041,7 +1072,7 @@ export function VetAdmissionQueue() {
                           icon="chevron-right"
                           onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
                         >
-                          Chi tiết
+                          Details
                         </Button>
                       )}
                     </div>
@@ -1166,7 +1197,7 @@ export function VetAdmissionQueue() {
                       onClick={handleStartExam}
                       icon="activity"
                     >
-                      Bắt đầu khám
+                      Start Examination
                     </Button>
                   )}
                   <button
@@ -1496,14 +1527,15 @@ export function VetAdmissionQueue() {
                                   <Icon name="file-text" size={14} />
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                  <a
-                                    href={doc.fileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-semibold text-[var(--color-primary)] hover:underline truncate block"
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleDownloadDoc(doc)}
+                                    disabled={downloadingDocId === doc.id}
+                                    className="font-semibold text-[var(--color-primary)] hover:underline truncate block text-left"
                                   >
                                     {formatLabel(doc.documentType)}
-                                  </a>
+                                    {downloadingDocId === doc.id ? ' (Downloading...)' : ''}
+                                  </button>
                                   <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--color-text-muted)] font-metric">
                                     {doc.recordDate && <span>Dated: {formatDate(doc.recordDate)}</span>}
                                     <span>Uploaded: {formatDate(doc.uploadedAt)}</span>

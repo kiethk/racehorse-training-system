@@ -45,11 +45,10 @@ export function TrainerRaceForm() {
       try {
         setLoadingHorses(true);
         setHorseError(null);
-        // Lấy ngựa trong khu trainer (mine=true), đủ điều kiện (ELIGIBLE)
+        // Lấy ngựa trong khu trainer (mine=true), đủ điều kiện (ELIGIBLE).
+        // Không lọc theo trainingDecision: Thú y chỉ khóa buổi tập, không khóa đề cử đua.
         const list = await stableApi.getHorses({ mine: true, status: 'ELIGIBLE' });
-        // Khớp Horse.canTrain() ở backend: ELIGIBLE và Thú y không chặn tập.
-        const available = list.filter((h) => h.trainingDecision !== 'BLOCKED');
-        setHorses(available);
+        setHorses(list);
       } catch (err) {
         console.error('Lỗi khi tải danh sách ngựa:', err);
         setHorseError(err instanceof Error ? err.message : 'Không tải được danh sách ngựa.');

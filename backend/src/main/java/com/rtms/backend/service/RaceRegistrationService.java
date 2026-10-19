@@ -188,9 +188,11 @@ public class RaceRegistrationService {
         if (!trainerId.equals(area.getTrainerId())) {
             throw new AccessDeniedException("Ngựa không thuộc khu bạn phụ trách");
         }
-        if (!horse.canTrain()) {
+        // Chỉ xét trạng thái nhập học: trainingDecision của Thú y khóa buổi tập,
+        // không khóa đề cử đua (giải có thể diễn ra trong tương lai, Trainer/Manager quyết định).
+        if (horse.getCurrentStatus() != HorseStatus.ELIGIBLE) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "HORSE_NOT_ELIGIBLE",
-                    "Ngựa hiện không thể được đề cử dự đua");
+                    "Chiến mã chưa được nhận vào câu lạc bộ");
         }
         return horse;
     }

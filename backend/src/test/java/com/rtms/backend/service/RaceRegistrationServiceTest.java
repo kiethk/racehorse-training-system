@@ -183,14 +183,14 @@ class RaceRegistrationServiceTest {
     }
 
     @Test
-    @DisplayName("Nộp đơn cho ngựa bị khoá huấn luyện hoặc không ELIGIBLE -> 400 HORSE_NOT_ELIGIBLE")
-    void testCreate_HorseLockedOrNotEligible_ThrowsException() {
+    @DisplayName("Nộp đơn cho ngựa chưa được nhận vào CLB (không ELIGIBLE) -> 400 HORSE_NOT_ELIGIBLE")
+    void testCreate_HorseNotEligible_ThrowsException() {
         Long horseId = 42L;
         Long stallId = 5L;
         Long areaId = 2L;
 
         Horse horse = createEligibleHorse(horseId, stallId);
-        horse.setTrainingDecision(com.rtms.backend.enums.TrainingDecision.BLOCKED); // Thú y chặn tập
+        horse.setCurrentStatus(HorseStatus.CANDIDATE); // Chưa được duyệt nhập CLB
 
         StableStall stall = new StableStall();
         stall.setId(stallId);
@@ -209,6 +209,36 @@ class RaceRegistrationServiceTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
         assertEquals("HORSE_NOT_ELIGIBLE", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("Ngựa ELIGIBLE bị Thú y chặn tập vẫn được đề cử đua -> tạo đơn PENDING")
+    void testCreate_HorseTrainingBlocked_StillAllowed() {
+        Long horseId = 42L;
+        Long stallId = 5L;
+        Long areaId = 2L;
+
+        Horse horse = createEligibleHorse(horseId, stallId);
+        horse.setTrainingDecision(com.rtms.backend.enums.TrainingDecision.BLOCKED); // Thú y chặn tập
+
+        StableStall stall = new StableStall();
+        stall.setId(stallId);
+        stall.setAreaId(areaId);
+
+        Area area = new Area();
+        area.setId(areaId);
+        area.setTrainerId(10L);
+
+        when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse));
+        when(stableStallRepository.findById(stallId)).thenReturn(Optional.of(stall));
+        when(areaRepository.findById(areaId)).thenReturn(Optional.of(area));
+        when(raceRegistrationRepository.save(any(RaceRegistration.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CreateRaceRegistrationRequest req = createValidRequest(horseId);
+        RaceRegistrationResponse res = raceRegistrationService.create(req, trainerUser);
+
+        assertEquals("PENDING", res.getStatus());
+        verify(raceRegistrationRepository).save(any(RaceRegistration.class));
     }
 
     @Test
