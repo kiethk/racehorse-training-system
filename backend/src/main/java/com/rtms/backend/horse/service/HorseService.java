@@ -24,6 +24,8 @@ import java.util.stream.Collectors;
 @Service
 public class HorseService {
 
+    private static final String GROOM_ROLE = "GROOM";
+
     private final HorseRepository horseRepository;
     private final StableStallRepository stableStallRepository;
     private final TrainingWorkoutService workoutService;
@@ -74,6 +76,17 @@ public class HorseService {
         List<Horse> horses = "HORSE_OWNER".equals(currentUser.getRole())
                 ? horseRepository.findByOwnerId(currentUser.getUserId())
                 : horseRepository.findAll();
+
+        // Groom chỉ thấy ngựa đang ở trong chuồng mình chăm, áp dụng trước mọi bộ lọc khác.
+        // (A groom sees only horses in the stalls they look after, before any other filter.)
+        if (GROOM_ROLE.equals(currentUser.getRole())) {
+            Set<Long> ownStallIds = stableStallRepository.findByGroomId(currentUser.getUserId()).stream()
+                    .map(StableStall::getId)
+                    .collect(Collectors.toSet());
+            horses = horses.stream()
+                    .filter(h -> h.getCurrentStallId() != null && ownStallIds.contains(h.getCurrentStallId()))
+                    .toList();
+        }
 
         if (Boolean.TRUE.equals(unassigned)) {
             horses = horses.stream()
@@ -138,6 +151,11 @@ public class HorseService {
             if (!currentUser.getUserId().equals(horse.getOwnerId())) {
                 throw new AccessDeniedException("You can only view horses you own");
             }
+        }
+        if (GROOM_ROLE.equals(currentUser.getRole())
+                && (horse.getCurrentStallId() == null
+                    || !stableStallRepository.existsByIdAndGroomId(horse.getCurrentStallId(), currentUser.getUserId()))) {
+            throw new AccessDeniedException("You can only view horses in the stalls you look after");
         }
         return horse;
     }

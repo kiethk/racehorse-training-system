@@ -48,6 +48,8 @@ export interface BarnSceneProps {
   onSelectStall: (stall: StableStall | null) => void;
   /** Stalls in the viewer's own scope; everything else is faded. */
   ownStallIds?: ReadonlySet<number>;
+  /** With `ownStallIds`: other stalls are bare frames with no label, groom or interaction. */
+  lockOthers?: boolean;
   /** Display name for a person, or null when the viewer may not read the staff directory. */
   personName: (kind: 'groom' | 'trainer', id: number) => string | null;
   currentUserId?: number | null;
@@ -109,6 +111,17 @@ function BarnContents(props: ContentsProps) {
   const hoveredSlot = hoveredStallId != null ? slotById.get(hoveredStallId) : undefined;
   const highlightedGroomId = focusGroomId ?? hoveredSlot?.stall.groomId ?? selectedSlot?.stall.groomId ?? null;
 
+  // Someone else's stall in a locked view: drawn as a bare frame, with no label, groom or interaction.
+  const { lockOthers } = props;
+  const isLocked = useCallback(
+    (stallId: number) => !!lockOthers && !!ownStallIds && !ownStallIds.has(stallId),
+    [lockOthers, ownStallIds],
+  );
+  const visibleBlocks = useMemo(
+    () => layout.blocks.filter((block) => block.stallIds.some((stallId) => !isLocked(stallId))),
+    [layout, isLocked],
+  );
+
   // The cursor is styled on the canvas wrapper, never on document.body.
   const { setCursor } = props;
   useEffect(() => {
@@ -138,7 +151,7 @@ function BarnContents(props: ContentsProps) {
   const { personName, currentUserId, onLabels } = props;
 
   const labels = useMemo((): SceneLabel[] => {
-    const stallLabels = layout.slots.map((slot): SceneLabel => {
+    const stallLabels = layout.slots.filter((slot) => !isLocked(slot.stall.id)).map((slot): SceneLabel => {
       const [x, z] = stallPosition(slot.column, slot.row, layout.columns);
       const horse = horseByStallId.get(slot.stall.id);
       const selected = slot.stall.id === selectedStallId;
@@ -162,7 +175,7 @@ function BarnContents(props: ContentsProps) {
         dimmed: (ownStallIds ? !ownStallIds.has(slot.stall.id) : false) || !inFocus,
       };
     });
-    const groomLabels = layout.blocks.map((block): SceneLabel => {
+    const groomLabels = visibleBlocks.map((block): SceneLabel => {
       const [x, z] = blockStandPosition(block, layout.columns);
       const badge = block.groomId != null ? groomBadges.get(block.groomId) : undefined;
       const highlighted = block.groomId != null && block.groomId === highlightedGroomId;
@@ -196,7 +209,7 @@ function BarnContents(props: ContentsProps) {
       faded: focusGroomId != null,
     }];
   }, [layout, horseByStallId, selectedStallId, hoveredStallId, ownStallIds, focusGroomId, personName, groomBadges,
-    currentUserId, highlightedGroomId, area, colors.primary, toneColors]);
+    currentUserId, highlightedGroomId, area, colors.primary, toneColors, isLocked, visibleBlocks]);
   useEffect(() => { onLabels(labels); }, [labels, onLabels]);
 
   // Lines from the highlighted groom to each horse they look after.
@@ -239,7 +252,7 @@ function BarnContents(props: ContentsProps) {
       <BarnStructure columns={layout.columns} />
 
       {/* Each groom's spot in the aisle: a mat in their colour along the front of their three stalls. */}
-      {layout.blocks.map((block) => {
+      {visibleBlocks.map((block) => {
         const color = block.groomId != null ? groomColors.get(block.groomId) : undefined;
         if (!color) return null;
         const [x, z] = blockStandPosition(block, layout.columns);
@@ -277,6 +290,7 @@ function BarnContents(props: ContentsProps) {
             selected={slot.stall.id === selectedStallId}
             hovered={slot.stall.id === hoveredStallId}
             dimmed={(ownStallIds ? !ownStallIds.has(slot.stall.id) : false) || !inFocus}
+            locked={isLocked(slot.stall.id)}
             dropState={dropState}
             colors={colors}
             onSelect={select}
@@ -308,7 +322,7 @@ function BarnContents(props: ContentsProps) {
         })}
       </Suspense>
 
-      {layout.blocks.map((block) => {
+      {visibleBlocks.map((block) => {
         const [x, z] = blockStandPosition(block, layout.columns);
         return (
           <StaffFigure
