@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { notificationApi } from '../services/api';
 import type { NotificationItem } from '../types';
+import { getNotificationHref } from '../lib/notificationRoute';
 import { AssignmentNotificationModal } from '../components/AssignmentNotificationModal';
 
 interface NotificationContextValue {
@@ -147,31 +148,8 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
         await markAsRead(notification.id);
         await refreshNotifications();
 
-        const refId = notification.referenceId;
-        if (notification.referenceType === 'CARE_SCHEDULE' && refId && user?.role === 'VETERINARIAN') {
-          const lowerText = `${notification.title || ''} ${notification.message || ''}`.toLowerCase();
-          if (lowerText.includes('khẩn') || lowerText.includes('urgent')) {
-            router.push(`/veterinarian/urgent/${refId}`);
-          } else if (lowerText.includes('định kỳ') || lowerText.includes('routine')) {
-            router.push('/veterinarian/routine');
-          } else {
-            router.push(`/veterinarian/admissions?scheduleId=${refId}`);
-          }
-        } else if (notification.notificationType === 'ADMISSION_VET_ASSIGNED' && refId) {
-          if (notification.referenceType === 'CARE_SCHEDULE') {
-            router.push(`/veterinarian/admissions?scheduleId=${refId}`);
-          } else {
-            router.push(`/veterinarian/admissions?id=${refId}`);
-          }
-        } else if (notification.notificationType === 'ADMISSION_TRAINER_ASSIGNED' && refId) {
-          router.push(`/trainer/admissions/${refId}`);
-        } else if (notification.referenceType === 'ADMISSION' && refId) {
-          if (user?.role === 'VETERINARIAN') {
-            router.push(`/veterinarian/admissions?id=${refId}`);
-          } else if (user?.role === 'HEAD_TRAINER') {
-            router.push(`/trainer/admissions/${refId}`);
-          }
-        }
+        const href = getNotificationHref(notification, user?.role);
+        if (href) router.push(href);
       } catch (cause) {
         setModalActionError(cause instanceof Error ? cause.message : 'Could not mark this notification as read. Please retry.');
       } finally {

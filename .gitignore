@@ -4,7 +4,7 @@ backend/.mvn/wrapper/maven-wrapper.jar
 
 # Frontend (Next.js)
 frontend/node_modules/
-frontend/.next/
+**/.next/
 
 # Environment
 .env
@@ -24,6 +24,12 @@ Thumbs.db
 ui-reference/
 tutorials/
 docs/
+!backend/docs/
+backend/docs/*
+!backend/docs/CLOUD_DEMO_SEED.md
+!backend/docs/HORSE_SEX.md
+!backend/docs/LOCAL_DEMO_SEED.md
+!backend/docs/STABLE_AREA_LIFECYCLE.md
 .codex/
 uploads/
 .agents/
@@ -31,4 +37,5 @@ AGENTS.md
 IDEA.md
 GEMINI.md
 gemini.md
+.claude
 skills-lock.json

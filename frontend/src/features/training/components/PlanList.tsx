@@ -1,175 +1,153 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
-import { Panel, SectionTitle } from '@/components/ui/Panel';
-import { Pill } from '@/components/ui/StatusBadge';
-import { EmptyState, ListSkeleton } from '@/components/ui/states';
-import { trainingApi } from '../services/trainingService';
-import type { PlanSummaryResponse } from '../types';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  Button,
+  EmptyState,
+  FilterChips,
+  FormField,
+  LinkButton,
+  ListSkeleton,
+  PageHeader,
+  Panel,
+  ProgressBar,
+  ScreenLayout,
+  Select,
+} from '@/components/ui';
+import { displayError, formatDate } from '@/lib/display';
+import { useTrainerHorses } from '../hooks/useTrainerHorses';
+import { planProgress } from '../lib/planProgress';
+import { PLAN_STATUS } from '../lib/status';
+import { trainingService } from '../services/trainingService';
+import type { PlanStatus, PlanSummaryResponse } from '../types';
+import { StatusPill } from './StatusPill';
 
-type StatusFilter = 'ALL' | 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+type StatusFilter = 'ALL' | PlanStatus;
 
-const STATUS_LABEL: Record<Exclude<StatusFilter, 'ALL'>, string> = {
-  UPCOMING: 'Sắp bắt đầu',
-  ACTIVE: 'Đang tập',
-  COMPLETED: 'Đã hoàn thành',
-  CANCELLED: 'Đã huỷ',
-};
+const FILTERS: StatusFilter[] = ['ALL', 'UPCOMING', 'ACTIVE', 'COMPLETED', 'CANCELLED'];
 
-const STATUS_TONE: Record<Exclude<StatusFilter, 'ALL'>, 'info' | 'success' | 'neutral'> = {
-  UPCOMING: 'info',
-  ACTIVE: 'success',
-  COMPLETED: 'success',
-  CANCELLED: 'neutral',
-};
+function PlanRow({ plan }: { plan: PlanSummaryResponse }) {
+  const progress = planProgress(plan.completedSessions, plan.totalSessions, plan.cancelledSessions);
+
+  return (
+    <Panel padded>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0 space-y-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <strong className="text-base text-[var(--color-text-primary)]">{plan.horseName}</strong>
+            <StatusPill status={PLAN_STATUS[plan.status]} />
+          </div>
+          <p className="text-xs text-[var(--color-text-secondary)]">{plan.courseName}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {formatDate(plan.startDate)} → {formatDate(plan.endDate)}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="w-44 space-y-1">
+            <div className="flex justify-between text-xs text-[var(--color-text-secondary)]">
+              <span>{progress.completed}/{progress.total} sessions</span>
+              <span>{progress.percent}%</span>
+            </div>
+            <ProgressBar label={`${plan.horseName} plan progress`} value={progress.percent} size="sm" />
+            {progress.cancelled > 0 && (
+              <p className="text-xs text-[var(--color-text-muted)]">{progress.cancelled} sessions cancelled</p>
+            )}
+          </div>
+          <LinkButton href={`/trainer/plans/${plan.planId}`} size="sm">Details</LinkButton>
+        </div>
+      </div>
+    </Panel>
+  );
+}
 
 export function PlanList() {
+  const router = useRouter();
+  // The horse filter lives in the URL, so the horse page can link here with its own horse already chosen.
+  const horseId = Number(useSearchParams().get('horseId')) || null;
+  const { horses } = useTrainerHorses();
   const [plans, setPlans] = useState<PlanSummaryResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<StatusFilter>('ALL');
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      setPlans(await trainingApi.getPlans());
-    } catch (err) {
-      console.error('Lỗi khi nạp danh sách kế hoạch:', err);
-      setError('Không tải được danh sách kế hoạch huấn luyện.');
+      setPlans(await trainingService.getPlans(horseId ?? undefined));
+    } catch (cause) {
+      setError(displayError(cause, 'Unable to load training plans.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [horseId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
-  const filtered = useMemo(
-    () => (filter === 'ALL' ? plans : plans.filter((p) => p.status === filter)),
+  const visible = useMemo(
+    () => (filter === 'ALL' ? plans : plans.filter((plan) => plan.status === filter)),
     [plans, filter],
   );
 
-  if (loading) return <ListSkeleton rows={6} />;
-
-  if (error) {
-    return (
-      <Panel padded>
-        <EmptyState icon="alert-triangle" title="Lỗi tải dữ liệu" description={error} />
-      </Panel>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[18px] font-semibold tracking-tight text-[var(--color-text-primary)]">
-            Kế hoạch huấn luyện
-          </h1>
-          <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Theo dõi tiến độ tập luyện của từng chiến mã.
-          </p>
-        </div>
-        <Link href="/trainer/plans/new">
-          <Button variant="primary" size="sm">+ Ghi danh chiến mã</Button>
-        </Link>
+    <ScreenLayout variant="list">
+      <PageHeader
+        title="Training plans"
+        description="Track each horse’s training progress."
+        actions={<LinkButton href="/trainer/plans/new" variant="primary" size="sm" icon="plus">Enroll horses</LinkButton>}
+      />
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <FilterChips
+          label="Plan status"
+          value={filter}
+          onChange={setFilter}
+          options={FILTERS.map((status) => ({
+            value: status,
+            label: status === 'ALL' ? 'All' : PLAN_STATUS[status].label,
+            count: status === 'ALL' ? plans.length : plans.filter((plan) => plan.status === status).length,
+          }))}
+        />
+        <FormField label="Horse" className="w-56">
+          <Select
+            value={horseId ?? ''}
+            onChange={(e) => router.replace(e.target.value ? `/trainer/plans?horseId=${e.target.value}` : '/trainer/plans')}
+          >
+            <option value="">All horses</option>
+            {horses.map((horse) => <option key={horse.id} value={horse.id}>{horse.name}</option>)}
+          </Select>
+        </FormField>
       </div>
 
-      <Panel padded>
-        <div className="flex flex-wrap items-center gap-2">
-          <SectionTitle>Bộ lọc</SectionTitle>
-          {(['ALL', 'UPCOMING', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as StatusFilter[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setFilter(s)}
-              className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
-                filter === s
-                  ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)]'
-                  : 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]'
-              }`}
-            >
-              {s === 'ALL' ? `Tất cả (${plans.length})` : STATUS_LABEL[s]}
-            </button>
-          ))}
-        </div>
-      </Panel>
-
-      {filtered.length === 0 ? (
+      {loading ? (
+        <Panel padded><ListSkeleton rows={6} /></Panel>
+      ) : error ? (
+        <Panel padded>
+          <EmptyState
+            icon="alert-triangle"
+            title="Unable to load training plans"
+            description={error}
+            action={<Button size="sm" icon="refresh" onClick={load}>Try again</Button>}
+          />
+        </Panel>
+      ) : visible.length === 0 ? (
         <Panel padded>
           <EmptyState
             icon="clipboard"
-            title="Chưa có kế hoạch nào"
-            description="Ghi danh chiến mã vào một khoá huấn luyện để bắt đầu."
+            title={plans.length === 0 ? 'No training plans yet' : 'No plans with this status'}
+            description={plans.length === 0 ? 'Enroll a horse in a training course to get started.' : undefined}
           />
         </Panel>
       ) : (
         <div className="space-y-2">
-          {filtered.map((p) => {
-            // Buổi đã huỷ bị trừ khỏi mẫu số — khoá 12 buổi huỷ 1 sẽ đạt
-            // 100% ở 11 buổi thay vì treo mãi ở 91%.
-            const denominator = Math.max(p.totalSessions - p.cancelledSessions, 1);
-            const percent = Math.min(
-              Math.round((p.completedSessions / denominator) * 100),
-              100,
-            );
-
-            return (
-              <Panel key={p.planId} padded>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <strong className="text-[14px] text-[var(--color-text-primary)]">
-                        {p.horseName}
-                      </strong>
-                      <Pill tone={STATUS_TONE[p.status]} size="sm">
-                        {STATUS_LABEL[p.status]}
-                      </Pill>
-                    </div>
-                    <div className="mt-0.5 text-[12px] text-[var(--color-text-secondary)]">
-                      {p.courseName}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
-                      {p.startDate} → {p.endDate}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="w-40">
-                      <div className="flex justify-between text-[11px] text-[var(--color-text-secondary)]">
-                        <span>
-                          {p.completedSessions}/{denominator} buổi
-                        </span>
-                        <span>{percent}%</span>
-                      </div>
-                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-muted)]">
-                        <div
-                          className="h-full rounded-full bg-[var(--color-primary)]"
-                          style={{ width: `${percent}%` }}
-                        />
-                      </div>
-                      {p.cancelledSessions > 0 && (
-                        <div className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
-                          Đã huỷ {p.cancelledSessions} buổi
-                        </div>
-                      )}
-                    </div>
-
-                    <Link href={`/trainer/plans/${p.planId}`}>
-                      <Button variant="secondary" size="sm">Chi tiết</Button>
-                    </Link>
-                  </div>
-                </div>
-              </Panel>
-            );
-          })}
+          {visible.map((plan) => <PlanRow key={plan.planId} plan={plan} />)}
         </div>
       )}
-    </div>
+    </ScreenLayout>
   );
 }

@@ -171,6 +171,15 @@ export const admissionsApi = {
   getDocumentBlob: async (pathOrUrl: string): Promise<Blob> => {
     return apiGetBlob(pathOrUrl);
   },
+  confirmArrival: async (id: number): Promise<AdmissionDetailResponse> => {
+    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(/api/admissions//arrival-confirmation, {});
+    return response.data;
+  },
+  reopenExpiredArrival: async (id: number): Promise<AdmissionDetailResponse> => {
+    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(/api/admissions//arrival-reopen, {});
+    return response.data;
+  },
+  },
   assetUrl: (url: string): string => {
     if (/^https?:\/\//i.test(url)) return url;
     const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? '';

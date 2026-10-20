@@ -1,9 +1,10 @@
 package com.rtms.backend.config;
 
-import com.rtms.backend.dto.ApiResponse;
+import com.rtms.backend.common.dto.ApiResponse;
 import jakarta.persistence.PersistenceException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -44,10 +45,16 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(message, "VALIDATION_ERROR"));
     }
 
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Object>> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ApiResponse.error("The file is too large. The limit is 10 MB per file.", "VALIDATION_ERROR"));
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiResponse<Object>> handleStatus(ResponseStatusException ex) {
         return ResponseEntity.status(ex.getStatusCode())
-                .body(ApiResponse.error(ex.getStatusCode().is5xxServerError() ? "Unexpected server error" :
+                .body(ApiResponse.error(ex.getStatusCode().is5xxServerError() && !isStorageFailure(ex) ? "Unexpected server error" :
                         ex.getReason() == null ? "Request failed" : ex.getReason(),
                         ex.getStatusCode().value() == 404 ? "RESOURCE_NOT_FOUND" :
                         ex.getStatusCode().value() == 409 ? "INVALID_REVIEW_STATE" :
@@ -56,9 +63,14 @@ public class GlobalExceptionHandler {
                         ex.getStatusCode().is5xxServerError() ? "INTERNAL_ERROR" : "VALIDATION_ERROR"));
     }
 
+    /** A cloud-storage failure carries a message written for the user, unlike other 5xx errors. */
+    private static boolean isStorageFailure(ResponseStatusException ex) {
+        return ex.getStatusCode().value() == HttpStatus.BAD_GATEWAY.value() && ex.getReason() != null;
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Object>> handleMalformedRequest(HttpMessageNotReadableException ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.error("Invalid admission request body or unsupported field", "VALIDATION_ERROR"));
+        return ResponseEntity.badRequest().body(ApiResponse.error("Invalid request body or unsupported field", "VALIDATION_ERROR"));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

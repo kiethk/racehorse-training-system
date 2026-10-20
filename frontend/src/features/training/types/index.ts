@@ -1,3 +1,7 @@
+import type { HorseSpecialty } from '@/features/horses/types';
+
+export type PlanStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+export type WorkoutStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
 export type SurfaceType = 'TURF' | 'DIRT' | 'SYNTHETIC';
 export type IntensityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -10,15 +14,13 @@ export type TrainingDay =
   | 'SATURDAY'
   | 'SUNDAY';
 
-export interface SubjectCategory {
-  id: number;
-  name: string;
-  description: string | null;
-}
+/** Group of a subject. A plain enum like surface type and intensity: it has no table of its own. */
+export type SubjectCategory = 'ENDURANCE' | 'SPEED' | 'GATE_START' | 'RECOVERY';
 
 export interface Subject {
   id: number;
-  categoryId: number;
+  trainerId?: number;
+  category: SubjectCategory;
   name: string;
   description: string | null;
   surfaceType: SurfaceType;
@@ -28,7 +30,8 @@ export interface Subject {
 }
 
 export interface CreateSubjectRequest {
-  categoryId: number;
+  trainerId?: number;
+  category: SubjectCategory;
   name: string;
   description?: string;
   surfaceType: SurfaceType;
@@ -44,6 +47,7 @@ export interface CourseSubjectItem {
 
 export interface Course {
   id: number;
+  trainerId?: number;
   name: string;
   description: string | null;
   targetGoal: string | null;
@@ -65,6 +69,7 @@ export interface CourseDetailResponse {
 }
 
 export interface CreateCourseRequest {
+  trainerId?: number;
   name: string;
   description?: string;
   targetGoal?: string;
@@ -93,14 +98,14 @@ export interface JoinableCohortResponse {
   trainingDays: TrainingDay[];
   horseCount: number;
   /**
-   * Số buổi ĐỒNG PHA — cùng ngày, cùng bài tập.
-   * KHÔNG phải "số buổi chung lot": đồng pha chỉ là điều kiện CẦN.
-   * Nhóm vẫn bị tách lot nếu vượt sức chứa (BR-10) hoặc trùng Groom (BR-09).
+   * Number of IN-PHASE sessions — same day, same subject.
+   * NOT "sessions in the same lot": being in phase is only a NECESSARY condition.
+   * The group is still split across lots if over capacity (BR-10) or sharing a Groom (BR-09).
    */
   sharedSessions: number;
   totalSessions: number;
   waitDays: number;
-  /** Sức chứa một lot, backend trả về để không phải hardcode số 6. */
+  /** Capacity of one lot, returned by the backend so the number 6 is not hardcoded. */
   lotCapacity: number;
   note: string;
 }
@@ -114,14 +119,17 @@ export interface PlanWorkoutItemResponse {
   subjectId: number;
   subjectName: string;
   horseId: number;
-  /** Người dắt RIÊNG con ngựa này — KHÔNG phải "groom của lot". */
+  /** The handler of THIS horse only — NOT "the lot's groom". */
   assignedGroomId: number | null;
-  /** Tổng số chiến mã còn hiệu lực trong lot, để thấy cơ chế ghép nhóm. */
+  /** Total active horses in the lot, to show how group matching works. */
   lotOccupancy: number | null;
-  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+  status: WorkoutStatus;
   actualDistanceMeters: number | null;
+  actualDurationMinutes?: number | null;
+  averageSpeedKmh?: number | null;
   averageHeartRate: number | null;
   maxHeartRate: number | null;
+  recoveryHeartRate?: number | null;
   topSpeedKmh: number | null;
   performanceRating: number | null;
   trainerFeedback: string | null;
@@ -133,7 +141,7 @@ export interface HorseTrainingPlan {
   courseId: number;
   startDate: string;
   endDate: string;
-  status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  status: PlanStatus;
   notes: string | null;
 }
 
@@ -144,7 +152,7 @@ export interface HorseTrainingPlanDetailResponse {
   courseName: string | null;
 }
 
-/** Một dòng trong danh sách kế hoạch huấn luyện. */
+/** One row in the training plan list. */
 export interface PlanSummaryResponse {
   planId: number;
   horseId: number;
@@ -153,24 +161,35 @@ export interface PlanSummaryResponse {
   courseName: string;
   startDate: string;
   endDate: string;
-  status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  status: PlanStatus;
   totalSessions: number;
   completedSessions: number;
-  /** Buổi đã huỷ — bị trừ khỏi mẫu số khi tính tiến độ. */
+  /** Cancelled sessions — removed from the denominator when computing progress. */
   cancelledSessions: number;
 }
 
 export interface CompleteWorkoutRequest {
-  actualDistanceMeters?: number | null;
-  actualDurationMinutes?: number | null;
-  topSpeedKmh?: number | null;
-  averageSpeedKmh?: number | null;
-  averageHeartRate?: number | null;
-  maxHeartRate?: number | null;
-  recoveryHeartRate?: number | null;
+  actualDistanceMeters: number;
+  actualDurationMinutes: number;
+  topSpeedKmh: number;
+  averageSpeedKmh: number;
+  averageHeartRate: number;
+  maxHeartRate: number;
+  recoveryHeartRate: number;
   performanceRating: number; // 1-10
   trainerFeedback?: string | null;
-  videoUrl?: string | null;
+}
+
+/** A fresh, non-persistent measurement set returned when the result form is opened. */
+export interface WorkoutResultPreviewResponse {
+  actualDistanceMeters: number;
+  actualDurationMinutes: number;
+  topSpeedKmh: number;
+  averageSpeedKmh: number;
+  averageHeartRate: number;
+  maxHeartRate: number;
+  recoveryHeartRate: number;
+  performanceRating?: number;
 }
 
 export interface TrainingLotResponse {
@@ -181,7 +200,7 @@ export interface TrainingLotResponse {
   subjectId: number;
   subjectName: string;
   durationMinutes: number;
-  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+  status: WorkoutStatus;
   maxCapacity: number;
   occupied: number;
   remainingSlots: number;
@@ -219,21 +238,36 @@ export interface HorseAlert {
 export interface TrainerDashboardHorse {
   horseId: number;
   horseName: string;
-  breed?: string;
-  stallCode?: string;
+  breed: string | null;
+  stallCode: string | null;
   planId: number | null;
-  courseName: string | null;
-  planStatus: string;
+  courseName: string;
+  /** NONE when the horse has no plan yet. */
+  planStatus: PlanStatus | 'NONE';
   completedSessions: number;
   totalSessions: number;
   progressPercent: number;
   latestPerformanceRating: number | null;
   avgPerformanceRating30d: number | null;
-  alertCount: number;
-  alertsCount?: number;
-  alertTitles?: string[];
-  startDate?: string;
-  endDate?: string;
+  alertsCount: number;
+  alertTitles: string[];
+  startDate: string | null;
+  endDate: string | null;
+  specialty: HorseSpecialty;
+}
+
+/** Training rules the backend enforces, published so the UI does not hard-code them. */
+export interface TrainingRules {
+  goldenHoursStart: string; // "06:00:00"
+  goldenHoursEnd: string;   // "10:00:00"
+  goldenWindowMinutes: number;
+  lotCapacity: number;
+  minSubjectDurationMinutes: number;
+  maxSubjectDurationMinutes: number;
+  /** A maximum heart rate above this raises an alert. */
+  maxHeartRateLimit: number;
+  /** A recovery heart rate above this raises an alert. */
+  recoveryHeartRateLimit: number;
 }
 
 export interface ReadinessAssessment {

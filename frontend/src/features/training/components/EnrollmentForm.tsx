@@ -2,81 +2,62 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { Panel } from '@/components/ui/Panel';
-import { Pill } from '@/components/ui/StatusBadge';
-import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { Button, EmptyState, ListSkeleton, Notice, PageHeader, Panel, ScreenLayout } from '@/components/ui';
 import { stableApi } from '@/features/stable/services/stableService';
 import type { Horse } from '@/features/stable/types';
-import { trainingApi } from '../services/trainingService';
+import { displayError } from '@/lib/display';
+import { tomorrowIso } from '../lib/dateRange';
+import { trainingService } from '../services/trainingService';
 import type {
   Course,
-  JoinableCohortResponse,
-  TrainingDay,
   CreateHorseTrainingPlanRequest,
   HorseTrainingPlanDetailResponse,
+  JoinableCohortResponse,
+  TrainingDay,
 } from '../types';
+import { CourseStep } from './enrollment/CourseStep';
+import { HorseStep } from './enrollment/HorseStep';
+import { ScheduleStep } from './enrollment/ScheduleStep';
 import { EnrollmentResultSummary } from './EnrollmentResultSummary';
 
-const DAYS_OF_WEEK: { value: TrainingDay; label: string }[] = [
-  { value: 'MONDAY', label: 'Thứ 2' },
-  { value: 'TUESDAY', label: 'Thứ 3' },
-  { value: 'WEDNESDAY', label: 'Thứ 4' },
-  { value: 'THURSDAY', label: 'Thứ 5' },
-  { value: 'FRIDAY', label: 'Thứ 6' },
-  { value: 'SATURDAY', label: 'Thứ 7' },
-  { value: 'SUNDAY', label: 'Chủ Nhật' },
-];
+const DEFAULT_DAYS: TrainingDay[] = ['MONDAY', 'WEDNESDAY', 'FRIDAY'];
 
+/** Enrolls a group of horses in a course. The backend decides lots, grooms and capacity; this only collects the request. */
 export function EnrollmentForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialCourseId = searchParams.get('courseId');
+  const initialCourseId = useSearchParams().get('courseId');
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [horses, setHorses] = useState<Horse[]>([]);
   const [cohorts, setCohorts] = useState<JoinableCohortResponse[]>([]);
-  /** Kết quả ghi danh — khác null thì thay form bằng màn tóm tắt. */
+  const [cohortsLoading, setCohortsLoading] = useState(false);
+  /** Enrollment result: when set, the form is replaced by the summary screen. */
   const [result, setResult] = useState<HorseTrainingPlanDetailResponse[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [cohortsLoading, setCohortsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Form inputs
-  const [courseId, setCourseId] = useState<number | ''>(
-    initialCourseId ? Number(initialCourseId) : '',
-  );
+  const [courseId, setCourseId] = useState<number | ''>(initialCourseId ? Number(initialCourseId) : '');
   const [selectedHorseIds, setSelectedHorseIds] = useState<number[]>([]);
-  const [startDate, setStartDate] = useState<string>(
-    // eslint-disable-next-line react-hooks/purity
-    new Date(Date.now() + 86400000).toISOString().split('T')[0], // Mặc định ngày mai
-  );
-  const [trainingDays, setTrainingDays] = useState<TrainingDay[]>([
-    'MONDAY',
-    'WEDNESDAY',
-    'FRIDAY',
-  ]);
+  const [startDate, setStartDate] = useState(() => tomorrowIso());
+  const [trainingDays, setTrainingDays] = useState<TrainingDay[]>(DEFAULT_DAYS);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // 1. Nạp danh sách khóa học và ngựa (chỉ ngựa trong khu của Trainer & trạng thái ELIGIBLE)
+  // Courses, and the horses the trainer can enroll: eligible horses in the trainer's own area.
   const loadInitial = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
-      setLoading(true);
-      setError(null);
-      const [crs, hrs] = await Promise.all([
-        trainingApi.getCourses(),
+      const [courseList, horseList] = await Promise.all([
+        trainingService.getCourses(),
         stableApi.getHorses({ mine: true, status: 'ELIGIBLE' }),
       ]);
-      setCourses(crs);
-      setHorses(hrs);
-      if (!initialCourseId && crs.length > 0) {
-        setCourseId(crs[0].id);
-      }
-    } catch (err) {
-      console.error('Lỗi khi nạp dữ liệu ghi danh:', err);
-      setError('Không tải được danh sách khóa học hoặc chiến mã đủ điều kiện.');
+      setCourses(courseList);
+      setHorses(horseList);
+      if (!initialCourseId && courseList.length > 0) setCourseId(courseList[0].id);
+    } catch (cause) {
+      setLoadError(displayError(cause, 'Unable to load courses or eligible horses.'));
     } finally {
       setLoading(false);
     }
@@ -87,352 +68,135 @@ export function EnrollmentForm() {
     loadInitial();
   }, [loadInitial]);
 
-  // 2. Tự động gọi joinable-cohorts khi chọn xong khóa học
+  // Groups already forming for the chosen course.
   useEffect(() => {
     if (!courseId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setCohorts([]);
       return;
     }
+    let active = true;
     setCohortsLoading(true);
-    trainingApi
-      .getJoinableCohorts(Number(courseId))
-      .then((data) => setCohorts(data))
-      .catch((err) => {
-        console.warn('Không tải được gợi ý nhóm:', err);
-        setCohorts([]);
-      })
-      .finally(() => setCohortsLoading(false));
+    trainingService
+      .getJoinableCohorts(courseId)
+      .then((data) => active && setCohorts(data))
+      .catch(() => active && setCohorts([]))
+      .finally(() => active && setCohortsLoading(false));
+    return () => {
+      active = false;
+    };
   }, [courseId]);
 
-  function toggleHorse(id: number) {
-    setSelectedHorseIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+  function toggleHorse(horseId: number) {
+    setSelectedHorseIds((current) =>
+      current.includes(horseId) ? current.filter((id) => id !== horseId) : [...current, horseId],
     );
   }
 
   function toggleDay(day: TrainingDay) {
-    setTrainingDays((prev) =>
-      prev.includes(day)
-        ? prev.length > 1
-          ? prev.filter((d) => d !== day)
-          : prev
-        : [...prev, day],
-    );
+    setTrainingDays((current) => {
+      if (!current.includes(day)) return [...current, day];
+      return current.length > 1 ? current.filter((d) => d !== day) : current;
+    });
   }
 
-  function applyCohortSuggestion(cohort: JoinableCohortResponse) {
+  function applyCohortSchedule(cohort: JoinableCohortResponse) {
     setStartDate(cohort.suggestedStartDate);
-    setTrainingDays(Array.from(cohort.trainingDays));
+    setTrainingDays([...cohort.trainingDays]);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     if (!courseId) {
-      setSubmitError('Vui lòng chọn khóa học.');
+      setSubmitError('Select a course.');
       return;
     }
     if (selectedHorseIds.length === 0) {
-      setSubmitError('Vui lòng chọn ít nhất 1 chiến mã vào nhóm huấn luyện.');
-      return;
-    }
-    if (trainingDays.length === 0) {
-      setSubmitError('Vui lòng chọn ít nhất 1 ngày tập trong tuần.');
+      setSubmitError('Select at least one horse for the training group.');
       return;
     }
 
     setSubmitError(null);
     setSubmitting(true);
     try {
-      const payload: CreateHorseTrainingPlanRequest = {
-        courseId: Number(courseId),
+      const request: CreateHorseTrainingPlanRequest = {
+        courseId,
         startDate,
         trainingDays,
         notes: notes.trim() || undefined,
         horses: selectedHorseIds.map((horseId) => ({ horseId })),
       };
-
-      const result = await trainingApi.createPlan(payload);
-      if (result && result.length > 0) {
-        // KHÔNG nhảy thẳng tới plan đầu tiên: ghi danh nhóm tạo ra N kế hoạch,
-        // làm vậy là vứt N-1 kết quả. Hiện màn tóm tắt để Trainer thấy nhóm
-        // được xếp vào mấy lot và vì sao.
-        setResult(result);
+      const plans = await trainingService.createPlan(request);
+      if (plans.length > 0) {
+        // Show every plan of the group, not just the first: a group can be split over several lots and the
+        // trainer needs to see how many and why.
+        setResult(plans);
       } else {
         router.push('/trainer/courses');
       }
-    } catch (err) {
-      // 4. Lỗi "hết khe giờ vàng" phải hiện nguyên văn số liệu chi tiết từ backend
-      setSubmitError(err instanceof Error ? err.message : 'Tạo kế hoạch huấn luyện thất bại.');
+    } catch (cause) {
+      // The backend's own message is kept: for example the golden-hour notice carries the exact minutes left.
+      setSubmitError(displayError(cause, 'Unable to create training plans.'));
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (loading) return <ListSkeleton rows={5} />;
+  if (loading) return <Panel padded><ListSkeleton rows={5} /></Panel>;
 
-  if (error) {
+  if (loadError) {
     return (
       <Panel padded>
-        <EmptyState icon="alert-triangle" title="Lỗi dữ liệu" description={error} />
+        <EmptyState
+          icon="alert-triangle"
+          title="Unable to load enrollment data"
+          description={loadError}
+          action={<Button size="sm" icon="refresh" onClick={loadInitial}>Try again</Button>}
+        />
       </Panel>
     );
   }
 
-  // Ghi danh xong -> thay toàn bộ form bằng màn tóm tắt kết quả
   if (result) {
-    return (
-      <EnrollmentResultSummary
-        plans={result}
-        horses={horses}
-        onDone={() => router.push('/trainer/courses')}
-      />
-    );
+    return <EnrollmentResultSummary plans={result} horses={horses} onDone={() => router.push('/trainer/courses')} />;
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-          Ghi danh huấn luyện theo nhóm
-        </h1>
-        <p className="text-[12px] text-[var(--color-text-secondary)]">
-          Chọn nhiều chiến mã cùng lúc để hệ thống tự xếp chung buổi tập.
-        </p>
-      </div>
+    <ScreenLayout variant="form">
+      <PageHeader
+        title="Group training enrollment"
+        description="Select multiple horses and the system will schedule them in shared workouts."
+        breadcrumbs={[{ label: 'Training', href: '/trainer/courses' }, { label: 'Enroll horses' }]}
+      />
 
-      {submitError && (
-        <div className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-4 text-[13px] text-[var(--color-danger)] leading-relaxed">
-          <div className="font-semibold mb-1">⚠️ Không thể lập kế hoạch:</div>
-          <div>{submitError}</div>
-        </div>
-      )}
+      {submitError && <Notice tone="error" title="Unable to create the training plan">{submitError}</Notice>}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Bước 1: Chọn khóa học */}
-        <Panel padded>
-          <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)] mb-3">
-            1. Chọn khóa học mục tiêu
-          </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <select
-                value={courseId}
-                onChange={(e) => setCourseId(e.target.value ? Number(e.target.value) : '')}
-                className="w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              >
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.totalSessions} buổi)
-                  </option>
-                ))}
-              </select>
-            </div>
-            {courseId && (
-              <div className="text-[12px] text-[var(--color-text-secondary)] flex items-center">
-                {courses.find((c) => c.id === courseId)?.targetGoal && (
-                  <span>🎯 {courses.find((c) => c.id === courseId)?.targetGoal}</span>
-                )}
-              </div>
-            )}
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <CourseStep
+          courses={courses}
+          courseId={courseId}
+          onCourseChange={setCourseId}
+          cohorts={cohorts}
+          cohortsLoading={cohortsLoading}
+          onUseCohort={applyCohortSchedule}
+        />
+        <HorseStep horses={horses} selectedIds={selectedHorseIds} onToggle={toggleHorse} onToggleAll={setSelectedHorseIds} />
+        <ScheduleStep
+          startDate={startDate}
+          onStartDateChange={setStartDate}
+          trainingDays={trainingDays}
+          onToggleDay={toggleDay}
+          notes={notes}
+          onNotesChange={setNotes}
+        />
 
-          {/* Gợi ý nhóm đồng bộ (Joinable Cohorts) */}
-          <div className="mt-4 pt-3 border-t border-[var(--color-border)]">
-            <div className="text-[12px] font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
-              <span>💡 Gợi ý nhóm có thể ghép chung (Joinable Cohorts)</span>
-              {cohortsLoading && <span className="text-[11px] text-[var(--color-text-muted)]">(Đang quét...)</span>}
-            </div>
-
-            {cohorts.length === 0 ? (
-              <p className="mt-1 text-[11px] text-[var(--color-text-muted)] italic">
-                Chưa có nhóm nào đang mở cho khóa này. Nhóm bạn tạo sẽ là nhóm khởi đầu.
-              </p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {cohorts.map((cohort, idx) => (
-                  <div
-                    key={idx}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-[12px]"
-                  >
-                    <div>
-                      <div className="font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
-                        <span>Nhóm &quot;{cohort.courseName}&quot;</span>
-                        <Pill tone={cohort.cohortStatus === 'ACTIVE' ? 'success' : 'info'} size="sm">
-                          {cohort.cohortStatus} ({cohort.horseCount} con)
-                        </Pill>
-                      </div>
-                      <div className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
-                        {cohort.note} • Bắt đầu {cohort.suggestedStartDate} (chờ {cohort.waitDays} ngày)
-                      </div>
-                      {/*
-                        Đồng pha KHÔNG bảo đảm chung lot. Nhóm đã đầy thì con
-                        tiếp theo sẽ sang lot thứ hai trong cùng khung giờ vàng,
-                        và khung đó chỉ có 240 phút.
-                      */}
-                      {cohort.horseCount >= cohort.lotCapacity && (
-                        <div className="mt-1 text-[11px] text-[var(--color-warning)]">
-                          ⚠ Nhóm đã đủ {cohort.lotCapacity} chiến mã. Thêm con nữa sẽ
-                          phải tập ở buổi khác trong ngày.
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      type="button"
-                      onClick={() => applyCohortSuggestion(cohort)}
-                    >
-                      Dùng lịch nhóm này
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </Panel>
-
-        {/* Bước 2: Chọn nhiều chiến mã */}
-        <Panel padded>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-                2. Chọn chiến mã tham gia nhóm ({selectedHorseIds.length} con đã chọn)
-              </h2>
-              <p className="text-[11px] text-[var(--color-text-secondary)]">
-                Chỉ hiển thị các chiến mã trong khu vực của bạn và đạt trạng thái ELIGIBLE.
-              </p>
-            </div>
-            {horses.length > 0 && (
-              <Button
-                variant="secondary"
-                size="sm"
-                type="button"
-                onClick={() =>
-                  setSelectedHorseIds(
-                    selectedHorseIds.length === horses.length ? [] : horses.map((h) => h.id),
-                  )
-                }
-              >
-                {selectedHorseIds.length === horses.length ? 'Bỏ chọn hết' : 'Chọn tất cả'}
-              </Button>
-            )}
-          </div>
-
-          {horses.length === 0 ? (
-            <p className="text-[12px] text-[var(--color-text-muted)] italic">
-              Không có chiến mã nào ở trạng thái ELIGIBLE trong khu của bạn. Vui lòng hoàn tất tiếp nhận hoặc xếp chuồng trước.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
-              {horses.map((horse) => {
-                const isSelected = selectedHorseIds.includes(horse.id);
-                return (
-                  <label
-                    key={horse.id}
-                    className={`flex items-center gap-2.5 rounded-[var(--radius-md)] border p-2.5 text-[12px] cursor-pointer transition ${
-                      isSelected
-                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] font-medium text-[var(--color-primary)]'
-                        : 'border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleHorse(horse.id)}
-                      className="rounded text-[var(--color-primary)]"
-                    />
-                    <div className="truncate">
-                      <div className="font-semibold text-[var(--color-text-primary)] truncate">
-                        {horse.name}
-                      </div>
-                      <div className="text-[10px] text-[var(--color-text-muted)]">
-                        {horse.breed || 'Chưa rõ giống'}
-                      </div>
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-          )}
-        </Panel>
-
-        {/* Bước 3: Ngày bắt đầu và các thứ tập trong tuần */}
-        <Panel padded>
-          <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)] mb-3">
-            3. Lịch trình &amp; Các ngày tập trong tuần
-          </h2>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Ngày bắt đầu (Start Date) *
-              </label>
-              <input
-                type="date"
-                required
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
-              <span className="text-[11px] text-[var(--color-text-muted)]">
-                Cả nhóm sẽ bắt đầu buổi học đầu tiên từ ngày này.
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-                Các thứ tập trong tuần (Training Days) *
-              </label>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {DAYS_OF_WEEK.map((d) => {
-                  const isChecked = trainingDays.includes(d.value);
-                  return (
-                    <button
-                      key={d.value}
-                      type="button"
-                      onClick={() => toggleDay(d.value)}
-                      className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
-                        isChecked
-                          ? 'bg-[var(--color-primary)] text-white'
-                          : 'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
-                      }`}
-                    >
-                      {d.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-              Ghi chú kế hoạch
-            </label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ví dụ: Nhóm 3 ngựa chuẩn bị cho giải mùa thu..."
-              className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
-          </div>
-        </Panel>
-
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <Button variant="secondary" type="button" onClick={() => router.back()}>
-            Quay lại
-          </Button>
-          <Button
-            variant="primary"
-            type="submit"
-            disabled={submitting || selectedHorseIds.length === 0}
-          >
-            {submitting ? 'Đang lên lịch lot...' : `Ghi danh ${selectedHorseIds.length} chiến mã`}
+        <div className="flex items-center justify-end gap-3">
+          <Button type="button" onClick={() => router.back()} disabled={submitting}>Back</Button>
+          <Button type="submit" variant="primary" loading={submitting} disabled={selectedHorseIds.length === 0}>
+            {submitting ? 'Scheduling workouts…' : `Enroll ${selectedHorseIds.length} horses`}
           </Button>
         </div>
       </form>
-    </div>
+    </ScreenLayout>
   );
 }

@@ -1,152 +1,102 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { trainingApi } from '../services/trainingService';
-import type { TrainingLotResponse } from '../types';
+import { Button, FormField, Input, Modal, Notice } from '@/components/ui';
+import { displayError, formatTime } from '@/lib/display';
+import { toast } from '@/lib/toast';
+import { minutesOf } from '../lib/timeline';
+import { trainingService } from '../services/trainingService';
+import type { TrainingLotResponse, TrainingRules } from '../types';
 
-interface RescheduleDialogProps {
-  lot: TrainingLotResponse | null;
-  open: boolean;
-  onClose: () => void;
-  onSuccess: () => Promise<void> | void;
+const FORM_ID = 'reschedule-lot-form';
+
+function addMinutes(time: string, minutes: number): string {
+  const total = minutesOf(time) + minutes;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
-const WINDOW_START = 6 * 60; // 06:00
-const WINDOW_END = 10 * 60; // 10:00
-
-function toMinutes(hhmmss: string): number {
-  const [h, m] = hhmmss.split(':').map(Number);
-  return h * 60 + m;
-}
-
-function addMinutes(hhmm: string, mins: number): string {
-  const total = toMinutes(hhmm) + mins;
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
+/**
+ * Moves a whole lot to a new start time. The golden-hour window is shown as a hint (from the backend rules) but
+ * is NOT checked here: the backend validates the move and its message is shown when it refuses.
+ */
 export function RescheduleDialog({
   lot,
   open,
+  rules,
   onClose,
   onSuccess,
-}: RescheduleDialogProps) {
-  const [newStartTime, setNewStartTime] = useState(
-    lot?.startTime ? lot.startTime.substring(0, 5) : '06:00',
-  );
+}: {
+  lot: TrainingLotResponse | null;
+  open: boolean;
+  rules: TrainingRules | null;
+  onClose: () => void;
+  onSuccess: () => Promise<void> | void;
+}) {
+  const [startTime, setStartTime] = useState(lot ? lot.startTime.slice(0, 5) : '');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!open || !lot) return null;
+  const target = lot;
 
-  const duration = lot.durationMinutes || 60;
-  const newEndTime = addMinutes(newStartTime, duration);
+  const duration = target.durationMinutes || 60;
+  const windowHint = rules ? ` Lots run between ${formatTime(rules.goldenHoursStart)} and ${formatTime(rules.goldenHoursEnd)}.` : '';
 
-  async function handleReschedule(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError(null);
-
-    // Chặn trước tại client (BR-03: Khung giờ vàng 06:00 - 10:00)
-    const startMins = toMinutes(newStartTime);
-    const endMins = toMinutes(newEndTime);
-    if (startMins < WINDOW_START || endMins > WINDOW_END) {
-      setError(
-        `Buổi tập chỉ được xếp trong khoảng 06:00 – 10:00. Giờ vừa chọn (${newStartTime} – ${newEndTime}) nằm ngoài khoảng này.`,
-      );
-      return;
-    }
-
     setSubmitting(true);
     try {
-      if (!lot) return;
-      await trainingApi.rescheduleLot(lot.lotId, {
-        newStartTime: `${newStartTime}:00`,
+      await trainingService.rescheduleLot(target.lotId, {
+        newStartTime: `${startTime}:00`,
         reason: reason.trim() || undefined,
       });
+      toast.success(`Lot #${target.lotId} rescheduled.`);
       await onSuccess();
       onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Dời giờ lot thất bại.');
+    } catch (cause) {
+      setError(displayError(cause, 'Unable to reschedule this lot.'));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={() => !submitting && onClose()}
-        aria-hidden="true"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="relative w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl"
-      >
-        <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-          Dời giờ Lot #{lot.lotId} ({lot.subjectName})
-        </h2>
-        <p className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
-          Cả hàng {lot.occupied} chiến mã trong lot sẽ cùng được dời sang khung giờ mới.
-        </p>
+    <Modal
+      open
+      onClose={onClose}
+      size="sm"
+      dismissible={!submitting}
+      title={`Reschedule lot #${target.lotId} (${target.subjectName})`}
+      description={`All ${target.occupied} horses in this lot will move to the new time slot.`}
+      footer={
+        <>
+          <Button onClick={onClose} disabled={submitting}>Cancel</Button>
+          <Button variant="primary" type="submit" form={FORM_ID} loading={submitting}>Confirm reschedule</Button>
+        </>
+      }
+    >
+      <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
+        {error && <Notice tone="error">{error}</Notice>}
 
-        {error && (
-          <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] p-3 text-[12px] text-[var(--color-danger)] leading-relaxed">
-            {error}
-          </div>
-        )}
+        <dl className="space-y-1 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-3 text-xs">
+          <div className="flex gap-1"><dt>Session duration:</dt><dd className="font-semibold">{duration} minutes</dd></div>
+          <div className="flex gap-1"><dt>Current time:</dt><dd className="font-semibold">{formatTime(target.startTime)} – {formatTime(target.endTime)}</dd></div>
+        </dl>
 
-        <form onSubmit={handleReschedule} className="mt-4 space-y-4">
-          <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-3 text-[12px]">
-            <div>Thời lượng bài tập: <strong>{duration} phút</strong></div>
-            <div>Giờ bắt đầu cũ: <strong>{lot.startTime} – {lot.endTime}</strong></div>
-          </div>
+        <FormField
+          label="New start time"
+          required
+          hint={`Estimated end time: ${startTime ? addMinutes(startTime, duration) : '—'}.${windowHint}`}
+        >
+          <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+        </FormField>
 
-          <div>
-            <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-              Giờ bắt đầu mới (06:00 – 10:00) *
-            </label>
-            <input
-              type="time"
-              required
-              min="06:00"
-              max="10:00"
-              value={newStartTime}
-              onChange={(e) => setNewStartTime(e.target.value)}
-              className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
-            <div className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-              Giờ kết thúc dự kiến: <strong>{newEndTime}</strong>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[12px] font-medium text-[var(--color-text-primary)]">
-              Lý do dời giờ
-            </label>
-            <input
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Ví dụ: Điều kiện thời tiết, đường chạy bảo trì..."
-              className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2 border-t border-[var(--color-border)]">
-            <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={submitting}>
-              Huỷ
-            </Button>
-            <Button variant="primary" size="sm" type="submit" disabled={submitting}>
-              {submitting ? 'Đang dời...' : 'Xác nhận dời giờ'}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <FormField label="Reason for rescheduling">
+          <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="For example: weather conditions, track maintenance…" />
+        </FormField>
+      </form>
+    </Modal>
   );
 }

@@ -1,11 +1,17 @@
 'use client';
 
+import { FileInput, Input, Select, Textarea } from '@/components/ui/Input';
+import { FormField } from '@/components/ui/FormField';
 import { useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { AdmissionInfoSection } from '../shared/components/AdmissionInfoSection';
 import { ownerAdmissionApi } from '../services/ownerApi';
+import { useAdmissionUelnCheck } from '../hooks/useAdmissionUelnCheck';
+import { ApiError } from '@/services/api';
 import type { CreateOwnerAdmissionRequest, AdmissionDocumentType, AdmissionDocumentUpload } from '../types/owner';
+import type { HorseSex } from '@/types/horse';
+import { HORSE_SEX_OPTIONS, isHorseSex } from '@/features/horses/lib/sex';
 
 const DOCUMENTS: { type: AdmissionDocumentType; label: string; required: boolean }[] = [
   { type: 'HORSE_PHOTO', label: 'Horse photo', required: true },
@@ -17,27 +23,39 @@ const DOCUMENTS: { type: AdmissionDocumentType; label: string; required: boolean
   { type: 'PREVIOUS_MEDICAL_RECORD', label: 'Previous medical record', required: false },
   { type: 'PREVIOUS_INJURY_RECORD', label: 'Previous injury record', required: false },
 ];
-const FIELDS: { key: keyof CreateOwnerAdmissionRequest; label: string; required?: boolean; type?: string; hint?: string }[] = [
+const FIELDS: { key: Exclude<keyof CreateOwnerAdmissionRequest, 'sex'>; label: string; required?: boolean; type?: string; hint?: string }[] = [
   { key: 'name', label: 'Horse name', required: true },
   { key: 'breed', label: 'Breed' },
   { key: 'dateOfBirth', label: 'Date of birth', type: 'date' },
-  { key: 'registrationNumber', label: 'UELN / registration number', hint: '15 letters or numbers, if known.' },
+  { key: 'registrationNumber', label: 'UELN / registration number', hint: '15 characters: 6 digits followed by 9 letters/numbers, if known.' },
   { key: 'registryName', label: 'Registry name' },
   { key: 'sireName', label: 'Sire name' },
-  { key: 'sireRegistrationNumber', label: 'Sire UELN', hint: '15 letters or numbers, if known.' },
+  { key: 'sireRegistrationNumber', label: 'Sire UELN', hint: '15 characters: 6 digits followed by 9 letters/numbers, if known.' },
   { key: 'damName', label: 'Dam name' },
-  { key: 'damRegistrationNumber', label: 'Dam UELN', hint: '15 letters or numbers, if known.' },
+  { key: 'damRegistrationNumber', label: 'Dam UELN', hint: '15 characters: 6 digits followed by 9 letters/numbers, if known.' },
 ];
-const inputClass = 'w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] aria-invalid:border-[var(--color-danger)] aria-invalid:focus-visible:ring-[var(--color-danger)]';
+const SEX_FIELD = { key: 'sex', label: 'Sex', required: true } as const;
+const FORM_FIELDS = [...FIELDS.slice(0, 2), SEX_FIELD, ...FIELDS.slice(2)];
+type AdmissionFormState = Omit<CreateOwnerAdmissionRequest, 'sex'> & { sex: HorseSex | '' };
 type Selection = { file?: File; recordDate: string; note: string };
 type DocumentErrors = Partial<Record<AdmissionDocumentType, string>>;
 type FieldErrors = Partial<Record<keyof CreateOwnerAdmissionRequest, string>>;
 
-function validateField(key: keyof CreateOwnerAdmissionRequest, raw: string, input?: HTMLInputElement | HTMLTextAreaElement | null) {
+function normalizeUeln(raw?: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  return trimmed ? trimmed.toUpperCase() : null;
+}
+
+function validateField(key: keyof CreateOwnerAdmissionRequest, raw: string, input?: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) {
   const value = raw.trim();
   if (key === 'name' && !value) return 'Enter the horse name.';
-  if (key.toLowerCase().includes('registration') && value && !/^[a-zA-Z0-9]{15}$/.test(value)) {
-    return 'Enter 15 letters or numbers, or leave this field empty.';
+  if (key === 'sex' && !isHorseSex(value)) return 'Select Male or Female.';
+  if (key.toLowerCase().includes('registration') && value) {
+    const normalized = value.toUpperCase();
+    if (!/^[0-9]{6}[A-Z0-9]{9}$/.test(normalized)) {
+      return 'Enter a valid 15-character UELN (6 digits followed by 9 letters/numbers), or leave this field empty.';
+    }
   }
   if (key === 'dateOfBirth' && input?.validity.badInput) return 'Enter a valid date of birth.';
   if (key === 'dateOfBirth' && input?.validity.rangeOverflow) return 'Date of birth must be today or earlier.';
@@ -45,15 +63,34 @@ function validateField(key: keyof CreateOwnerAdmissionRequest, raw: string, inpu
   return value.length > limit ? `Use ${limit} characters or fewer.` : '';
 }
 
+function validatePedigreeRelationships(formData: Omit<CreateOwnerAdmissionRequest, 'sex'>): FieldErrors {
+  const errors: FieldErrors = {};
+  const childUeln = normalizeUeln(formData.registrationNumber);
+  const sireUeln = normalizeUeln(formData.sireRegistrationNumber);
+  const damUeln = normalizeUeln(formData.damRegistrationNumber);
+
+  if (childUeln && sireUeln && childUeln === sireUeln) {
+    errors.sireRegistrationNumber = 'Sire UELN cannot be the same as horse UELN.';
+  }
+  if (childUeln && damUeln && childUeln === damUeln) {
+    errors.damRegistrationNumber = 'Dam UELN cannot be the same as horse UELN.';
+  }
+  if (sireUeln && damUeln && sireUeln === damUeln) {
+    errors.damRegistrationNumber = 'Dam UELN cannot be the same as sire UELN.';
+  }
+  return errors;
+}
+
 export function OwnerAdmissionForm() {
   const router = useRouter();
+  const { result: uelnCheck, check: checkUeln } = useAdmissionUelnCheck();
   const submitting = useRef(false);
   const fileInputs = useRef<Partial<Record<AdmissionDocumentType, HTMLInputElement | null>>>({});
-  const fieldInputs = useRef<Partial<Record<keyof CreateOwnerAdmissionRequest, HTMLInputElement | HTMLTextAreaElement | null>>>({});
+  const fieldInputs = useRef<Partial<Record<keyof CreateOwnerAdmissionRequest, HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>>>({});
   const optionalDocuments = useRef<HTMLDetailsElement>(null);
   const recordInputs = useRef<Partial<Record<AdmissionDocumentType, HTMLInputElement | null>>>({});
   const metadataDetails = useRef<Partial<Record<AdmissionDocumentType, HTMLDetailsElement | null>>>({});
-  const [form, setForm] = useState<CreateOwnerAdmissionRequest>({ name: '' });
+  const [form, setForm] = useState<AdmissionFormState>({ name: '', sex: '' });
   const [selections, setSelections] = useState<Partial<Record<AdmissionDocumentType, Selection>>>({});
   const [documentErrors, setDocumentErrors] = useState<DocumentErrors>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -97,17 +134,31 @@ export function OwnerAdmissionForm() {
   }
 
   function changeField(key: keyof CreateOwnerAdmissionRequest, value: string) {
+    if (key === 'registrationNumber') checkUeln(value);
     setForm(current => ({ ...current, [key]: value }));
     setFieldErrors(current => ({ ...current, [key]: '' }));
     setError('');
   }
 
+  function fieldError(key: keyof CreateOwnerAdmissionRequest) {
+    return fieldErrors[key] || (key === 'registrationNumber' && uelnCheck.status === 'unavailable'
+      ? uelnCheck.message : '');
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (submitting.current) return;
+    if (submitting.current || uelnCheck.status === 'checking') return;
     const nextFields: FieldErrors = {};
-    for (const key of [...FIELDS.map(field => field.key), 'pedigreeNotes' as const]) {
+    const sex = form.sex;
+    for (const key of [...FORM_FIELDS.map(field => field.key), 'pedigreeNotes' as const]) {
       nextFields[key] = validateField(key, form[key] || '', fieldInputs.current[key]);
+    }
+    const pedigreeErrors = validatePedigreeRelationships(form);
+    if (uelnCheck.status === 'unavailable') nextFields.registrationNumber = uelnCheck.message;
+    for (const [key, msg] of Object.entries(pedigreeErrors)) {
+      if (msg && !nextFields[key as keyof FieldErrors]) {
+        nextFields[key as keyof FieldErrors] = msg;
+      }
     }
     const nextDocuments = { ...documentErrors };
     const nextRecords: DocumentErrors = {};
@@ -122,16 +173,21 @@ export function OwnerAdmissionForm() {
     setRecordErrors(nextRecords);
     const firstField = Object.keys(nextFields).find(key => nextFields[key as keyof FieldErrors]) as keyof FieldErrors | undefined;
     const firstDocument = DOCUMENTS.find(section => nextDocuments[section.type] || nextRecords[section.type]);
-    if (firstField || firstDocument) {
+    if (firstField || firstDocument || !isHorseSex(sex)) {
       setError('Please correct the highlighted fields.');
       if (firstField) fieldInputs.current[firstField]?.focus();
       else if (firstDocument) focusDocument(firstDocument.type, !nextDocuments[firstDocument.type] && Boolean(nextRecords[firstDocument.type]));
       return;
     }
-    const candidate: CreateOwnerAdmissionRequest = { name: form.name.trim() };
+    const candidate: CreateOwnerAdmissionRequest = { name: form.name.trim(), sex };
     for (const field of FIELDS) {
-      const value = form[field.key]?.trim();
-      if (value) candidate[field.key] = value;
+      if (field.key.toLowerCase().includes('registration')) {
+        const ueln = normalizeUeln(form[field.key]);
+        if (ueln) candidate[field.key] = ueln;
+      } else {
+        const value = form[field.key]?.trim();
+        if (value) candidate[field.key] = value;
+      }
     }
     if (form.pedigreeNotes?.trim()) candidate.pedigreeNotes = form.pedigreeNotes.trim();
     const uploads: AdmissionDocumentUpload[] = DOCUMENTS.flatMap(section => {
@@ -146,6 +202,11 @@ export function OwnerAdmissionForm() {
       router.push(`/owner/admissions/${created.admissionId}?created=1`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to submit admission.');
+      if (cause instanceof ApiError && cause.errorCode === 'ADMISSION_UELN_CONFLICT') {
+        setFieldErrors(current => ({ ...current, registrationNumber: cause.message }));
+        // Wait for the disabled fieldset to become interactive again before focusing.
+        requestAnimationFrame(() => fieldInputs.current.registrationNumber?.focus());
+      }
       submitting.current = false;
       setBusy(false);
     }
@@ -163,7 +224,7 @@ export function OwnerAdmissionForm() {
         <div className="max-w-xs space-y-1">
           <label className="block space-y-1 text-sm">
             <span>Select file</span>
-            <input id={`file-${section.type}`} type="file"
+            <FileInput id={`file-${section.type}`}
               className={`block h-10 w-full min-w-0 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-1.5 text-sm file:mr-3 file:h-6 file:cursor-pointer file:rounded file:border-0 file:bg-[var(--color-surface-muted)] file:px-2 file:text-xs file:font-semibold file:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] aria-invalid:border-[var(--color-danger)] aria-invalid:focus-visible:ring-[var(--color-danger)] ${selection?.file ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)]'}`}
               ref={element => { fileInputs.current[section.type] = element; }}
               accept={section.type === 'HORSE_PHOTO' ? '.jpg,.jpeg,.png,.webp' : '.pdf,.jpg,.jpeg,.png,.webp'}
@@ -195,18 +256,17 @@ export function OwnerAdmissionForm() {
           <div className="mt-3 space-y-3">
             <label className="block space-y-1">
               <span>Record date (optional)</span>
-              <input id={`record-${section.type}`} type="date" className={inputClass} value={selection?.recordDate || ''}
+              <Input id={`record-${section.type}`} type="date" value={selection?.recordDate || ''}
                 ref={element => { recordInputs.current[section.type] = element; }}
                 aria-invalid={Boolean(recordErrors[section.type])} aria-describedby={recordErrors[section.type] ? `record-error-${section.type}` : undefined}
                 onBlur={event => setRecordErrors(current => ({ ...current, [section.type]: event.target.validity.badInput ? 'Enter a valid record date.' : '' }))}
                 onChange={event => { updateSelection(section.type, { recordDate: event.target.value }); setRecordErrors(current => ({ ...current, [section.type]: '' })); setError(''); }} />
               {recordErrors[section.type] && <span id={`record-error-${section.type}`} role="alert" className="block text-sm text-[var(--color-danger)]">{recordErrors[section.type]}</span>}
             </label>
-            <label className="block space-y-1">
-              <span>Note (optional)</span>
-              <textarea rows={2} maxLength={2000} className={inputClass} value={selection?.note || ''}
+            <FormField label="Note (optional)">
+              <Textarea rows={2} maxLength={2000} value={selection?.note || ''}
                 onChange={event => updateSelection(section.type, { note: event.target.value })} />
-            </label>
+            </FormField>
           </div>
         </details>
       </fieldset>
@@ -217,10 +277,10 @@ export function OwnerAdmissionForm() {
     <form noValidate onSubmit={submit} className="space-y-5" aria-busy={busy}>
       <p className="text-sm text-[var(--color-text-secondary)]"><span aria-hidden="true" className="font-semibold text-[var(--color-danger)]">*</span> Required fields</p>
       {error && (
-        <div role="alert" className="rounded-md border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">
+        <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">
           <p className="font-medium">{error}</p>
           <ul className="mt-1 list-inside list-disc">
-            {[...FIELDS.map(field => ({ key: field.key, label: field.label })), { key: 'pedigreeNotes' as const, label: 'Pedigree notes' }].filter(field => fieldErrors[field.key]).map(field => (
+            {[...FORM_FIELDS.map(field => ({ key: field.key, label: field.label })), { key: 'pedigreeNotes' as const, label: 'Pedigree notes' }].filter(field => fieldErrors[field.key]).map(field => (
               <li key={field.key}><a href={`#candidate-${field.key}`} className="underline" onClick={event => { event.preventDefault(); fieldInputs.current[field.key]?.focus(); }}>{field.label}: {fieldErrors[field.key]}</a></li>
             ))}
             {DOCUMENTS.filter(section => documentErrors[section.type]).map(section => (
@@ -235,27 +295,56 @@ export function OwnerAdmissionForm() {
       <fieldset disabled={busy} className="min-w-0 space-y-5">
         <AdmissionInfoSection title="Candidate horse & pedigree">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {FIELDS.map(field => (
+            {FORM_FIELDS.map(field => field.key === 'sex' ? (
+              <FormField key="sex" htmlFor="candidate-sex" label="Sex" required error={fieldErrors.sex}>
+                <Select value={form.sex} ref={element => { fieldInputs.current.sex = element; }}
+                  onChange={event => changeField('sex', event.target.value)}
+                  onBlur={event => setFieldErrors(current => ({ ...current, sex: validateField('sex', event.target.value) }))}>
+                  <option value="">Select sex</option>
+                  {HORSE_SEX_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </Select>
+              </FormField>
+            ) : (
               <label key={field.key} className="block space-y-1">
                 <span className="block text-sm font-medium">{field.label}{field.required && <span aria-hidden="true" className="text-[var(--color-danger)]"> *</span>}</span>
-                <input id={`candidate-${field.key}`} className={inputClass} type={field.type || 'text'} value={form[field.key] || ''}
+                <Input id={`candidate-${field.key}`} type={field.type || 'text'} value={form[field.key] || ''}
                   ref={element => { fieldInputs.current[field.key] = element; }}
                   required={field.required}
                   maxLength={field.key.toLowerCase().includes('registration') ? 15 : 255}
-                  pattern={field.key.toLowerCase().includes('registration') ? '[a-zA-Z0-9]{15}' : undefined}
+                  pattern={field.key.toLowerCase().includes('registration') ? '[0-9]{6}[a-zA-Z0-9]{9}' : undefined}
                   max={field.type === 'date' ? today : undefined}
-                  aria-invalid={Boolean(fieldErrors[field.key])}
-                  aria-describedby={[field.hint ? `hint-${field.key}` : '', fieldErrors[field.key] ? `error-${field.key}` : ''].filter(Boolean).join(' ') || undefined}
-                  onBlur={event => setFieldErrors(current => ({ ...current, [field.key]: validateField(field.key, event.target.value, event.target) }))}
+                  aria-invalid={Boolean(fieldError(field.key))}
+                  aria-describedby={[field.hint ? `hint-${field.key}` : '', fieldError(field.key) ? `error-${field.key}` : '', field.key === 'registrationNumber' ? 'ueln-check-status' : ''].filter(Boolean).join(' ') || undefined}
+                  onBlur={event => {
+                    let val = event.target.value;
+                    if (field.key.toLowerCase().includes('registration')) {
+                      val = val.trim().toUpperCase();
+                      setForm(curr => ({ ...curr, [field.key]: val }));
+                    }
+                    const fieldErr = validateField(field.key, val, event.target);
+                    const updatedForm = { ...form, [field.key]: val };
+                    const pedErrors = validatePedigreeRelationships(updatedForm);
+                    setFieldErrors(current => ({
+                      ...current,
+                      [field.key]: fieldErr || pedErrors[field.key] || '',
+                      ...(pedErrors.sireRegistrationNumber ? { sireRegistrationNumber: pedErrors.sireRegistrationNumber } : {}),
+                      ...(pedErrors.damRegistrationNumber ? { damRegistrationNumber: pedErrors.damRegistrationNumber } : {}),
+                    }));
+                  }}
                   onChange={event => changeField(field.key, event.target.value)} />
                 {field.hint && <span id={`hint-${field.key}`} className="block text-xs leading-5 text-[var(--color-text-muted)]">{field.hint}</span>}
-                {fieldErrors[field.key] && <span id={`error-${field.key}`} role="alert" className="block text-sm text-[var(--color-danger)]">{fieldErrors[field.key]}</span>}
+                {fieldError(field.key) && <span id={`error-${field.key}`} role="alert" className="block text-sm text-[var(--color-danger)]">{fieldError(field.key)}</span>}
+                {field.key === 'registrationNumber' && (
+                  <span id="ueln-check-status" role="status" className="block text-xs text-[var(--color-text-muted)]">
+                    {uelnCheck.status === 'checking' ? 'Checking UELN…' : uelnCheck.status === 'error' ? uelnCheck.message : ''}
+                  </span>
+                )}
               </label>
             ))}
           </div>
           <label className="block space-y-1">
             <span className="text-sm font-medium">Pedigree notes</span>
-            <textarea id="candidate-pedigreeNotes" className={inputClass} rows={3} maxLength={2000} value={form.pedigreeNotes || ''}
+            <Textarea id="candidate-pedigreeNotes" rows={3} maxLength={2000} value={form.pedigreeNotes || ''}
               ref={element => { fieldInputs.current.pedigreeNotes = element; }}
               aria-invalid={Boolean(fieldErrors.pedigreeNotes)} aria-describedby={fieldErrors.pedigreeNotes ? 'error-pedigreeNotes' : undefined}
               onBlur={event => setFieldErrors(current => ({ ...current, pedigreeNotes: validateField('pedigreeNotes', event.target.value) }))}
@@ -283,7 +372,8 @@ export function OwnerAdmissionForm() {
         </AdmissionInfoSection>
         <div className="flex flex-wrap justify-end gap-3">
           <Button type="button" onClick={() => router.push('/owner/admissions')}>Cancel</Button>
-          <Button variant="primary" type="submit" loading={busy}>Submit admission</Button>
+          <Button variant="primary" type="submit" loading={busy}
+            disabled={uelnCheck.status === 'checking' || uelnCheck.status === 'unavailable'}>Submit admission</Button>
         </div>
       </fieldset>
     </form>

@@ -1,7 +1,7 @@
 package com.rtms.backend.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rtms.backend.dto.ApiResponse;
+import com.rtms.backend.common.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.AuthenticationException;
