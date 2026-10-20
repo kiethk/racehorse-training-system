@@ -1,6 +1,6 @@
 package com.rtms.backend.security;
 
-import com.rtms.backend.repository.RoleRepository;
+import com.rtms.backend.identity.repository.RoleRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

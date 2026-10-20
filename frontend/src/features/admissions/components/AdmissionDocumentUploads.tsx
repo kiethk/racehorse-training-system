@@ -1,5 +1,7 @@
 'use client';
 
+import { FileInput, Input, Select, Textarea } from '@/components/ui/Input';
+import { FormField } from '@/components/ui/FormField';
 import { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ownerAdmissionApi } from '@/features/admissions/services/ownerApi';
@@ -31,8 +33,6 @@ type Props = {
     locked: boolean;
     onUploaded: () => Promise<void>;
 };
-
-const inputClass = 'block min-h-11 w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] aria-invalid:border-[var(--color-danger)] aria-invalid:focus-visible:ring-[var(--color-danger)]';
 
 export function AdmissionDocumentUploads({ admissionId, documents, locked, onUploaded }: Props) {
     const [open, setOpen] = useState(false);
@@ -82,10 +82,8 @@ export function AdmissionDocumentUploads({ admissionId, documents, locked, onUpl
                         Your selected file and optional details are saved in this form. Hiding it will keep this draft.
                     </p>
                 )}
-                <label className="block space-y-1 text-sm font-medium">
-                    <span>Document type</span>
-                    <select
-                        className={inputClass}
+                <FormField label="Document type">
+                  <Select
                         value={selectedType}
                         disabled={locked || draftActive}
                         onChange={event => setSelectedType(event.target.value as AdmissionDocumentType | '')}
@@ -96,8 +94,8 @@ export function AdmissionDocumentUploads({ admissionId, documents, locked, onUpl
                                 {section.label}{section.required ? ' (required at submission)' : ' (optional at submission)'}
                             </option>
                         ))}
-                    </select>
-                </label>
+                    </Select>
+                </FormField>
 
                 {selectedSection && (
                     <DocumentUploadSection
@@ -268,11 +266,9 @@ function DocumentUploadSection({
 
             <label className="block max-w-xs space-y-1 text-sm">
                 <span>Select file <span aria-hidden="true" className="text-[var(--color-danger)]">*</span></span>
-                <input
+                <FileInput
                     key={inputKey}
-                    type="file"
                     accept={imageOnly ? '.jpg,.jpeg,.png,.webp' : '.pdf,.jpg,.jpeg,.png,.webp'}
-                    className="block min-h-11 w-full min-w-0 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-1.5 text-sm text-[var(--color-text-muted)] file:mr-3 file:min-h-8 file:cursor-pointer file:rounded file:border-0 file:bg-[var(--color-surface-muted)] file:px-3 file:text-xs file:font-semibold file:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] aria-invalid:border-[var(--color-danger)] aria-invalid:focus-visible:ring-[var(--color-danger)]"
                     aria-required="true"
                     aria-invalid={Boolean(fileValidationError)}
                     aria-describedby={`${fileHintId}${fileValidationError ? ` ${fileErrorId}` : ''}${error ? ` ${fileErrorId}-server` : ''}`}
@@ -312,11 +308,10 @@ function DocumentUploadSection({
                 <div className="mt-3 space-y-3">
                     <label className="block space-y-1">
                         <span>Record date (optional)</span>
-                        <input
+                        <Input
                             type="date"
                             value={recordDate}
                             ref={recordDateInput}
-                            className={inputClass}
                             aria-invalid={Boolean(dateError)}
                             aria-describedby={dateError ? dateErrorId : undefined}
                             onBlur={event => {
@@ -334,16 +329,14 @@ function DocumentUploadSection({
                             <span id={dateErrorId} role="alert" className="block text-sm text-[var(--color-danger)]">{dateError}</span>
                         )}
                     </label>
-                    <label className="block space-y-1">
-                        <span>Note (optional)</span>
-                        <textarea
+                    <FormField label="Note (optional)">
+                      <Textarea
                             rows={2}
                             maxLength={2000}
                             value={note}
-                            className={inputClass}
                             onChange={event => changeNote(event.target.value)}
                         />
-                    </label>
+                    </FormField>
                 </div>
             </details>
 

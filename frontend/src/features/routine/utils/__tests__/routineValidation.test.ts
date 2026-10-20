@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-// @ts-expect-error Node test runner with strip-types requires explicit .ts extension
 import { validateCreateRoutineForm, filterRoutineSchedules } from '../routineValidation.ts';
 import type { CareSchedule } from '../../../admissions/types/index.ts';
 

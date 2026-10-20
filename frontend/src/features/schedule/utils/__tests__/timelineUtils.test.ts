@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-// @ts-expect-error Node test runner with strip-types requires explicit .ts extension
 import { computeTimelinePosition, getCareTypeTone } from '../timelineUtils.ts';
 
 test('computeTimelinePosition accurately calculates 08:00 - 17:00 coordinates', () => {

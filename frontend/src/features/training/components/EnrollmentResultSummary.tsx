@@ -1,25 +1,17 @@
 'use client';
 
 import { useMemo } from 'react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
-import { Panel, SectionTitle } from '@/components/ui/Panel';
-import { Pill } from '@/components/ui/StatusBadge';
+import { Button, Icon, LinkButton, Notice, PageHeader, PageSection, Panel, Pill, ScreenLayout } from '@/components/ui';
 import type { Horse } from '@/features/stable/types';
+import { formatDate, formatTime } from '@/lib/display';
+import { PLAN_STATUS } from '../lib/status';
 import type { HorseTrainingPlanDetailResponse, PlanWorkoutItemResponse } from '../types';
+import { StatusPill } from './StatusPill';
 
 /**
- * Màn tóm tắt sau khi ghi danh nhóm.
- *
- * VÌ SAO CẦN:
- * Ghi danh 7 con sẽ tạo 7 kế hoạch. Trước đây frontend nhảy thẳng tới
- * kế hoạch đầu tiên, vứt đi 6 kết quả còn lại — trong khi backend đã trả
- * về đầy đủ cả 7 kèm lotId từng buổi.
- *
- * Quan trọng hơn: nhóm có thể bị TÁCH sang nhiều lot vì hai lý do
- * (vượt sức chứa BR-10, hoặc hai con cùng Groom BR-09). Đó là hành vi
- * ĐÚNG, nhưng nếu không nói ra thì Trainer sẽ tưởng cơ chế ghép nhóm hỏng.
- * Màn này chính là chỗ demo cơ chế lot rõ nhất.
+ * Summary shown after a group enrollment. Enrolling 7 horses creates 7 plans, and the group can be split over
+ * several lots (a lot is full, or two horses share a groom). That is correct behaviour, but unless it is spelled
+ * out the trainer will think group matching is broken, so this screen shows where the first session landed.
  */
 export function EnrollmentResultSummary({
   plans,
@@ -30,136 +22,86 @@ export function EnrollmentResultSummary({
   horses: Horse[];
   onDone: () => void;
 }) {
-  const horseNameById = useMemo(
-    () => new Map(horses.map((h) => [h.id, h.name] as const)),
-    [horses],
-  );
+  const horseNameById = useMemo(() => new Map(horses.map((h) => [h.id, h.name] as const)), [horses]);
 
   /**
-   * Gom buổi tập của BUỔI ĐẦU TIÊN theo lot.
-   *
-   * Chỉ lấy buổi đầu vì đó đã đủ để thấy nhóm bị tách hay không — các buổi
-   * sau lặp lại cùng cấu trúc (cùng nhóm, cùng Groom, cùng sức chứa).
-   * Hiện cả 12 buổi sẽ thành một bức tường số liệu không ai đọc.
+   * The FIRST session of each plan, grouped by lot. The first day is enough to see whether the group was split:
+   * later days repeat the same structure, and listing all of them would be a wall of numbers nobody reads.
    */
   const firstSessionByLot = useMemo(() => {
     const byLot = new Map<number, { item: PlanWorkoutItemResponse; horseId: number }[]>();
-
-    plans.forEach((p) => {
-      const first = p.workouts[0];
+    plans.forEach((plan) => {
+      const first = plan.workouts[0];
       if (!first) return;
-      const bucket = byLot.get(first.lotId) ?? [];
-      bucket.push({ item: first, horseId: p.plan.horseId });
-      byLot.set(first.lotId, bucket);
+      byLot.set(first.lotId, [...(byLot.get(first.lotId) ?? []), { item: first, horseId: plan.plan.horseId }]);
     });
-
-    return [...byLot.entries()].sort(
-      (a, b) => (a[1][0].item.startTime > b[1][0].item.startTime ? 1 : -1),
-    );
+    return [...byLot.entries()].sort((a, b) => a[1][0].item.startTime.localeCompare(b[1][0].item.startTime));
   }, [plans]);
 
-  const splitIntoMultipleLots = firstSessionByLot.length > 1;
+  const split = firstSessionByLot.length > 1;
   const firstDate = plans[0]?.workouts[0]?.lotDate;
+  const nameOf = (horseId: number) => horseNameById.get(horseId) ?? `Horse #${horseId}`;
 
   return (
-    <div className="space-y-4">
-      <Panel padded>
-        <div className="flex items-start gap-3">
-          <span className="text-[22px] leading-none">✅</span>
-          <div>
-            <SectionTitle>Đã tạo {plans.length} kế hoạch huấn luyện</SectionTitle>
-            <p className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
-              Mỗi chiến mã có một kế hoạch riêng để ghi nhận chỉ số và nhận xét.
-            </p>
-          </div>
-        </div>
-      </Panel>
+    <ScreenLayout variant="form">
+      <PageHeader
+        title={`Created ${plans.length} training plans`}
+        description="Each horse has its own plan for recording metrics and feedback."
+        eyebrow="Enrollment complete"
+        actions={<Button variant="primary" onClick={onDone}>Back to courses</Button>}
+      />
 
-      <Panel padded>
-        <SectionTitle>
-          Buổi tập đầu tiên{firstDate ? ` — ${firstDate}` : ''}
-        </SectionTitle>
-
-        <div className="mt-3 space-y-2">
+      <PageSection title={`First workout${firstDate ? ` — ${formatDate(firstDate)}` : ''}`}>
+        <Panel padded className="space-y-2">
           {firstSessionByLot.map(([lotId, entries]) => {
             const sample = entries[0].item;
             return (
-              <div
-                key={lotId}
-                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3"
-              >
-                <div className="flex flex-wrap items-center gap-2 text-[12px]">
+              <div key={lotId} className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
                   <Pill tone="info" size="sm">Lot #{lotId}</Pill>
-                  <strong>{sample.startTime} – {sample.endTime}</strong>
-                  <span className="text-[var(--color-text-secondary)]">
-                    {sample.subjectName}
-                  </span>
-                  <Pill
-                    tone={
-                      sample.lotOccupancy && sample.lotOccupancy >= 6 ? 'warning' : 'success'
-                    }
-                    size="sm"
-                  >
-                    {sample.lotOccupancy ?? entries.length} chiến mã
-                  </Pill>
+                  <strong>{formatTime(sample.startTime)} – {formatTime(sample.endTime)}</strong>
+                  <span className="text-[var(--color-text-secondary)]">{sample.subjectName}</span>
+                  <Pill tone="neutral" size="sm" icon="horse">{sample.lotOccupancy ?? entries.length} horses</Pill>
                 </div>
-                <div className="mt-1.5 text-[11px] text-[var(--color-text-secondary)]">
-                  {entries
-                    .map((e) => horseNameById.get(e.horseId) ?? `#${e.horseId}`)
-                    .join(' · ')}
-                </div>
+                <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">
+                  {entries.map((entry) => nameOf(entry.horseId)).join(' · ')}
+                </p>
               </div>
             );
           })}
-        </div>
+          {split && (
+            <Notice tone="info">
+              The group was split across {firstSessionByLot.length} workout sessions because a lot holds a limited number of
+              horses and each groom can lead one horse per session.
+            </Notice>
+          )}
+        </Panel>
+      </PageSection>
 
-        {splitIntoMultipleLots && (
-          <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-info-soft)] p-3 text-[11px] text-[var(--color-info)]">
-            Nhóm được chia thành {firstSessionByLot.length} buổi tập khác giờ, do
-            mỗi buổi chỉ nhận tối đa 6 chiến mã và mỗi Groom chỉ dắt được một con
-            mỗi buổi.
-          </div>
-        )}
-      </Panel>
-
-      <Panel padded>
-        <SectionTitle>Danh sách kế hoạch vừa tạo</SectionTitle>
-        <ul className="mt-2 space-y-1.5">
-          {plans.map((p) => (
-            <li
-              key={p.plan.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 text-[12px]"
-            >
-              <div>
-                <strong className="text-[var(--color-text-primary)]">
-                  {horseNameById.get(p.plan.horseId) ?? `Chiến mã #${p.plan.horseId}`}
-                </strong>
-                <span className="ml-2 text-[var(--color-text-muted)]">
-                  {p.workouts.length} buổi · {p.plan.startDate} → {p.plan.endDate}
-                </span>
-                <Pill
-                  tone={p.plan.status === 'ACTIVE' ? 'success' : 'info'}
-                  size="sm"
-                >
-                  {p.plan.status}
-                </Pill>
-              </div>
-              <Link
-                href={`/trainer/plans/${p.plan.id}`}
-                className="text-[var(--color-primary)] underline"
+      <PageSection title="Newly created plans">
+        <Panel padded>
+          <ul className="space-y-1.5">
+            {plans.map((plan) => (
+              <li
+                key={plan.plan.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 text-xs"
               >
-                Xem chi tiết
-              </Link>
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-4 flex gap-2">
-          <Button variant="primary" onClick={onDone}>
-            Về danh sách khoá học
-          </Button>
-        </div>
-      </Panel>
-    </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong className="text-[var(--color-text-primary)]">{nameOf(plan.plan.horseId)}</strong>
+                  <span className="text-[var(--color-text-muted)]">
+                    {plan.workouts.length} sessions · {formatDate(plan.plan.startDate)} → {formatDate(plan.plan.endDate)}
+                  </span>
+                  <StatusPill status={PLAN_STATUS[plan.plan.status]} />
+                </div>
+                <LinkButton href={`/trainer/plans/${plan.plan.id}`} size="sm" variant="link">
+                  View details
+                  <Icon name="chevron-right" size={12} />
+                </LinkButton>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      </PageSection>
+    </ScreenLayout>
   );
 }

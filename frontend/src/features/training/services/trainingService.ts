@@ -1,79 +1,54 @@
-import { apiGet, apiPost } from '@/services/api';
+import { apiGet, apiPatch, apiPost, apiPut } from '@/services/api';
+import type { ApiResponse } from '@/types/horse';
 import type {
   Subject,
   CreateSubjectRequest,
-  SubjectCategory,
   Course,
   CourseDetailResponse,
   CreateCourseRequest,
-  CourseSubjectItem,
-  CourseSubjectResponse,
   JoinableCohortResponse,
   CreateHorseTrainingPlanRequest,
   HorseTrainingPlanDetailResponse,
   PlanSummaryResponse,
   CompleteWorkoutRequest,
+  WorkoutResultPreviewResponse,
   TrainingLotResponse,
   RescheduleLotRequest,
   HorseFitnessTrendItem,
   HorseAlert,
   TrainerDashboardHorse,
   ReadinessAssessment,
+  TrainingRules,
 } from '../types';
 
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
 /**
- * Giữ nguyên message lỗi chi tiết từ backend (ví dụ: thông báo hết khe giờ vàng kèm số phút cụ thể)
+ * Every call goes through services/api.ts, so it carries the Bearer token, refreshes it once on a 401, and keeps
+ * the backend's detailed error message (for example the notice that a lot is full with the exact minutes).
  */
-async function postWithMessage<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  });
-  const payload = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(payload?.message || `API error: ${res.status}`);
-  }
-  return payload?.data !== undefined ? payload.data : (payload as T);
-}
+export const trainingService = {
+  // Rules the backend enforces, so the UI never hard-codes them
+  getRules: async (): Promise<TrainingRules> =>
+    (await apiGet<ApiResponse<TrainingRules>>('/api/training-rules')).data,
 
-async function patchWithMessage<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  const payload = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(payload?.message || `API error: ${res.status}`);
-  }
-  return payload?.data !== undefined ? payload.data : (payload as T);
-}
-
-export const trainingApi = {
-  // Bài tập (Subjects)
-  getSubjects: async (): Promise<Subject[]> =>
-    (await apiGet<ApiResponse<Subject[]>>('/api/subjects')).data,
+  // Subjects
+  getSubjects: async (params?: { trainerId?: number; category?: string }): Promise<Subject[]> => {
+    const searchParams = new URLSearchParams();
+    if (params?.trainerId) searchParams.set('trainerId', String(params.trainerId));
+    if (params?.category) searchParams.set('category', params.category);
+    const qs = searchParams.toString();
+    return (await apiGet<ApiResponse<Subject[]>>(`/api/subjects${qs ? `?${qs}` : ''}`)).data;
+  },
 
   createSubject: async (data: CreateSubjectRequest): Promise<Subject> =>
     (await apiPost<ApiResponse<Subject>>('/api/subjects', data)).data,
 
-  getCategories: async (): Promise<SubjectCategory[]> =>
-    (await apiGet<ApiResponse<SubjectCategory[]>>('/api/subject-categories')).data,
-
-  // Khóa học (Courses)
-  getCourses: async (): Promise<Course[]> =>
-    (await apiGet<ApiResponse<Course[]>>('/api/courses')).data,
+  // Courses
+  getCourses: async (params?: { trainerId?: number }): Promise<Course[]> => {
+    const searchParams = new URLSearchParams();
+    if (params?.trainerId) searchParams.set('trainerId', String(params.trainerId));
+    const qs = searchParams.toString();
+    return (await apiGet<ApiResponse<Course[]>>(`/api/courses${qs ? `?${qs}` : ''}`)).data;
+  },
 
   getCourse: async (id: number): Promise<CourseDetailResponse> =>
     (await apiGet<ApiResponse<CourseDetailResponse>>(`/api/courses/${id}`)).data,
@@ -81,85 +56,68 @@ export const trainingApi = {
   createCourse: async (data: CreateCourseRequest): Promise<Course> =>
     (await apiPost<ApiResponse<Course>>('/api/courses', data)).data,
 
-  addSubjectToCourse: async (
-    courseId: number,
-    data: CourseSubjectItem,
-  ): Promise<CourseSubjectResponse> =>
-    (await apiPost<ApiResponse<CourseSubjectResponse>>(`/api/courses/${courseId}/subjects`, data)).data,
-
-  // Kế hoạch huấn luyện (Training Plans)
+  // Training plans
   getJoinableCohorts: async (courseId: number): Promise<JoinableCohortResponse[]> =>
     (await apiGet<ApiResponse<JoinableCohortResponse[]>>(
       `/api/training-plans/joinable-cohorts?courseId=${courseId}`,
     )).data,
 
-  createPlan: async (
-    data: CreateHorseTrainingPlanRequest,
-  ): Promise<HorseTrainingPlanDetailResponse[]> =>
-    await postWithMessage<HorseTrainingPlanDetailResponse[]>('/api/training-plans', data),
+  /** Enrols a group; the response holds one plan per horse. */
+  createPlan: async (data: CreateHorseTrainingPlanRequest): Promise<HorseTrainingPlanDetailResponse[]> =>
+    (await apiPost<ApiResponse<HorseTrainingPlanDetailResponse[]>>('/api/training-plans', data)).data,
 
   getPlanById: async (id: number): Promise<HorseTrainingPlanDetailResponse> =>
     (await apiGet<ApiResponse<HorseTrainingPlanDetailResponse>>(`/api/training-plans/${id}`)).data,
 
-  /** Danh sách kế hoạch kèm tên ngựa, tên khoá và tiến độ. */
+  /** Plans with horse name, course name and progress. */
   getPlans: async (horseId?: number): Promise<PlanSummaryResponse[]> => {
     const url = horseId ? `/api/training-plans?horseId=${horseId}` : '/api/training-plans';
     return (await apiGet<ApiResponse<PlanSummaryResponse[]>>(url)).data;
   },
 
-  // Vận hành Lot (Training Lots)
-  getLots: async (from: string, to: string, includeCancelled: boolean = false): Promise<TrainingLotResponse[]> =>
+  // Training lots
+  getLots: async (from: string, to: string, includeCancelled = false): Promise<TrainingLotResponse[]> =>
     (await apiGet<ApiResponse<TrainingLotResponse[]>>(
       `/api/lots?from=${from}&to=${to}&includeCancelled=${includeCancelled}`,
     )).data,
 
-  getLotById: async (id: number): Promise<TrainingLotResponse> =>
-    (await apiGet<ApiResponse<TrainingLotResponse>>(`/api/lots/${id}`)).data,
-
   rescheduleLot: async (id: number, data: RescheduleLotRequest): Promise<TrainingLotResponse> =>
-    await patchWithMessage<TrainingLotResponse>(`/api/lots/${id}/reschedule`, data),
+    (await apiPatch<ApiResponse<TrainingLotResponse>>(`/api/lots/${id}/reschedule`, data)).data,
 
   cancelLot: async (id: number): Promise<TrainingLotResponse> =>
-    await patchWithMessage<TrainingLotResponse>(`/api/lots/${id}/cancel`),
+    (await apiPatch<ApiResponse<TrainingLotResponse>>(`/api/lots/${id}/cancel`)).data,
 
-  // Buổi tập (Workouts)
+  // Workouts
+  getWorkoutResultPreview: async (workoutId: number): Promise<WorkoutResultPreviewResponse> =>
+    (await apiGet<ApiResponse<WorkoutResultPreviewResponse>>(
+      `/api/workouts/${workoutId}/result-preview`,
+    )).data,
+
   completeWorkout: async (workoutId: number, data: CompleteWorkoutRequest): Promise<void> => {
-    await patchWithMessage(`/api/workouts/${workoutId}/complete`, data);
+    await apiPatch(`/api/workouts/${workoutId}/complete`, data);
   },
 
-  // Đợt 7: Dashboard, Thể lực & Cảnh báo
-  getDashboard: async (): Promise<TrainerDashboardHorse[]> => {
-    const res = await apiGet<ApiResponse<TrainerDashboardHorse[]>>('/api/training-plans/dashboard');
-    return res.data;
+  updateWorkoutResult: async (workoutId: number, data: CompleteWorkoutRequest): Promise<void> => {
+    await apiPut(`/api/workouts/${workoutId}/result`, data);
   },
+
+  // Dashboard, fitness and alerts
+  getDashboard: async (): Promise<TrainerDashboardHorse[]> =>
+    (await apiGet<ApiResponse<TrainerDashboardHorse[]>>('/api/training-plans/dashboard')).data,
 
   getFitnessTrend: async (horseId: number, from?: string, to?: string): Promise<HorseFitnessTrendItem[]> => {
     const params = new URLSearchParams();
     if (from) params.append('from', from);
     if (to) params.append('to', to);
     const qs = params.toString() ? `?${params.toString()}` : '';
-    const res = await apiGet<ApiResponse<HorseFitnessTrendItem[]>>(`/api/horses/${horseId}/fitness-trend${qs}`);
-    return res.data;
+    return (await apiGet<ApiResponse<HorseFitnessTrendItem[]>>(`/api/horses/${horseId}/fitness-trend${qs}`)).data;
   },
 
-  getHorseAlerts: async (horseId: number): Promise<HorseAlert[]> => {
-    const res = await apiGet<ApiResponse<HorseAlert[]>>(`/api/horses/${horseId}/alerts`);
-    return res.data;
-  },
+  getHorseAlerts: async (horseId: number): Promise<HorseAlert[]> =>
+    (await apiGet<ApiResponse<HorseAlert[]>>(`/api/horses/${horseId}/alerts`)).data,
 
-  getReadinessHistory: async (horseId: number, includeAdmission = false): Promise<ReadinessAssessment[]> => {
-    const res = await apiGet<ApiResponse<ReadinessAssessment[]>>(
-      `/api/admissions/horses/${horseId}/readiness-history?includeAdmission=${includeAdmission}`
-    );
-    return res.data;
-  },
-
-  getHorseById: async (horseId: number): Promise<{ id: number; name: string; ueln: string; status: string }> => {
-    const res = await apiGet<ApiResponse<{ id: number; name: string; ueln: string; status: string }>>(`/api/horses/${horseId}`);
-    return res.data;
-  },
+  getReadinessHistory: async (horseId: number, includeAdmission = false): Promise<ReadinessAssessment[]> =>
+    (await apiGet<ApiResponse<ReadinessAssessment[]>>(
+      `/api/admissions/horses/${horseId}/readiness-history?includeAdmission=${includeAdmission}`,
+    )).data,
 };
-
-export const trainingService = trainingApi;
-
-

@@ -7,23 +7,23 @@ import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { admissionsApi } from '../services/api';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
 import type { TrainerAdmissionView } from '../types/trainer';
+import { formatDate, formatDateTime } from '@/lib/display';
 
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
-import { AdmissionInfoSection, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
+import { AdmissionInfoSection, InfoGroupTitle, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
+import { Notice } from '@/components/ui/Notice';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { TrainerReviewActionPanel } from './TrainerReviewActionPanel';
 
 function date(value: string | null) {
-  return value
-    ? new Date(value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-    : 'Not recorded';
+  return value ? formatDate(value) : 'Not recorded';
 }
 
 function datetime(value: string | null) {
-  return value
-    ? new Date(value).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })
-    : 'Not recorded';
+  return value ? formatDateTime(value) : 'Not recorded';
 }
 
 interface TrainerAdmissionDetailViewProps {
@@ -138,9 +138,9 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
       {healthMetrics && healthMetrics.length > 0 && (
         <div className="pt-2 border-t border-[var(--color-border)] space-y-1.5">
           <span className="text-[var(--color-text-muted)] block font-medium">
-            Latest Vital Signs ({new Date(healthMetrics[0].recordedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}):
+            Latest Vital Signs ({formatDate(healthMetrics[0].recordedAt)}):
           </span>
-          <div className="grid grid-cols-2 gap-2 text-[11px] bg-[var(--color-surface-muted)] p-2 rounded">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
             <div>Temperature: <strong>{healthMetrics[0].temperature != null ? `${healthMetrics[0].temperature} °C` : '—'}</strong></div>
             <div>Heart Rate: <strong>{healthMetrics[0].heartRate != null ? `${healthMetrics[0].heartRate} bpm` : '—'}</strong></div>
             <div>Respiratory Rate: <strong>{healthMetrics[0].respiratoryRate != null ? `${healthMetrics[0].respiratoryRate} bpm` : '—'}</strong></div>
@@ -157,10 +157,10 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
         {healthRecords && healthRecords.length > 0 ? (
           <ul className="space-y-2">
             {healthRecords.map((hr) => (
-              <li key={hr.id} className="bg-[var(--color-surface-muted)] p-2 rounded text-[11px] space-y-1">
+              <li key={hr.id} className="space-y-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
                 <div className="flex justify-between font-medium">
                   <span>{hr.recordType || 'Admission Exam'}</span>
-                  <span className="text-[10px] text-[var(--color-text-muted)]">{date(hr.examinedAt)}</span>
+                  <span className="text-xs text-[var(--color-text-muted)]">{date(hr.examinedAt)}</span>
                 </div>
                 {hr.trainingDecision && <div className="font-semibold">Training Decision: {hr.trainingDecision}</div>}
                 {hr.restrictionDetails && <div>Medical Restrictions: {hr.restrictionDetails}</div>}
@@ -183,10 +183,8 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
     <AdmissionInfoSection title="Review History">
       <div className="space-y-4">
         {detail.groomReviewedAt ? (
-          <div className="space-y-1">
-            <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Groom
-            </h4>
+          <div className="space-y-2">
+            <InfoGroupTitle>Groom</InfoGroupTitle>
             <InfoRow label="Decision" value={detail.groomDecision} />
             <InfoRow label="Date & Time" value={datetime(detail.groomReviewedAt)} />
             <InfoRow label="Feedback" value={detail.groomFeedback} />
@@ -194,10 +192,8 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
         ) : null}
 
         {detail.vetReviewedAt ? (
-          <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
-            <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Veterinarian
-            </h4>
+          <div className="space-y-2 border-t border-[var(--color-border)] pt-4">
+            <InfoGroupTitle>Veterinarian</InfoGroupTitle>
             <InfoRow
               label="Training Decision"
               value={detail.vetTrainingDecision ?? healthRecords.find((record) => record.trainingDecision)?.trainingDecision}
@@ -208,20 +204,16 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
         ) : null}
 
         {detail.trainerReviewedAt ? (
-          <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
-            <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Head Trainer
-            </h4>
+          <div className="space-y-2 border-t border-[var(--color-border)] pt-4">
+            <InfoGroupTitle>Head Trainer</InfoGroupTitle>
             <InfoRow label="Date & Time" value={datetime(detail.trainerReviewedAt)} />
             <InfoRow label="Feedback" value={detail.trainerFeedback} />
           </div>
         ) : null}
 
         {detail.managerReviewedAt ? (
-          <div className="space-y-1 pt-3 border-t border-[var(--color-border)]">
-            <h4 className="text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Club Manager
-            </h4>
+          <div className="space-y-2 border-t border-[var(--color-border)] pt-4">
+            <InfoGroupTitle>Club Manager</InfoGroupTitle>
             <InfoRow label="Decision" value={detail.managerDecision} />
             <InfoRow label="Date & Time" value={datetime(detail.managerReviewedAt)} />
             <InfoRow label="Feedback" value={detail.managerFeedback} />
@@ -237,33 +229,32 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
 
   return (
     <>
-      {error && (
-        <div role="alert" className="mb-4 border-l-2 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text-primary)]">
-          {error}
-        </div>
-      )}
+      {error && <Notice tone="error" className="mb-4">{error}</Notice>}
       <AdmissionDetailLayout
         returnTo={returnTo}
         header={
           <AdmissionDetailHeader
             detail={detail}
-            horsePhotoUrl={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined}
             simplifiedStatus
+            horsePhotoUrl={horsePhoto ? admissionsApi.assetUrl(horsePhoto.fileUrl) : undefined}
           />
         }
-        // Trainer không cần biết đơn đang chờ ai hay đã qua bước nào — huy
-        // hiệu ở header (In Progress / Approved / Rejected) là đủ.
-        pipeline={null}
-        sections={[
-          candidateSection,
-          healthSection,
-          <AdmissionDocumentsSection
-            key="docs"
-            documents={detail.documents}
-            assetUrl={admissionsApi.assetUrl}
-          />,
-          reviewHistorySection,
-        ]}
+        pipeline={<AdmissionPipeline detail={detail} />}
+        content={(
+          <AdmissionDetailTabs
+            tabs={[
+              { id: 'overview', label: 'Overview', content: candidateSection },
+              {
+                id: 'documents',
+                label: 'Documents',
+                count: detail.documents.length,
+                content: <AdmissionDocumentsSection documents={detail.documents} assetUrl={admissionsApi.assetUrl} />,
+              },
+              { id: 'medical', label: 'Medical Findings', content: healthSection },
+              { id: 'history', label: 'Review History', content: reviewHistorySection },
+            ]}
+          />
+        )}
         actions={<TrainerReviewActionPanel view={view} onSuccess={load} />}
       />
     </>

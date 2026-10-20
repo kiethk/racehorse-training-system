@@ -1,6 +1,9 @@
+import type { VaccinationRequest } from '@/features/care/types/preventive';
 export type AdmissionStatus =
   | 'GROOM_REVIEW'
   | 'WAITING_FOR_STALL'
+  | 'WAITING_FOR_ARRIVAL'
+  | 'ARRIVAL_EXPIRED'
   | 'VET_REVIEW'
   | 'TRAINER_REVIEW'
   | 'MANAGER_REVIEW'
@@ -17,10 +20,10 @@ export interface AdmissionSummaryResponse {
   submittedAt: string; // ISO datetime string
   quarantineStallId: number | null;
   quarantineStallCode: string | null;
-  /** Huấn luyện viên đã đánh giá hồ sơ này. null = chưa ai đánh giá. */
+  /** The trainer who evaluated this admission. null = not evaluated yet. */
   trainerId: number | null;
   trainerName?: string | null;
-  /** Thời điểm đánh giá, dạng ISO. null = chưa đánh giá. */
+  /** When it was evaluated, ISO format. null = not evaluated yet. */
   trainerReviewedAt: string | null;
 }
 
@@ -67,11 +70,14 @@ export interface AdmissionDetailResponse {
   status: AdmissionStatus;
   quarantineStallId: number | null;
   quarantineStallCode: string | null;
+  arrivalDeadlineAt: string | null;
+  arrivedAt: string | null;
   
   candidate: {
     id: number;
     name: string;
     breed: string;
+    sex: import('@/types/horse').HorseSex | null;
     dateOfBirth: string;
     registrationNumber: string | null;
     registryName: string | null;
@@ -88,12 +94,12 @@ export interface AdmissionDetailResponse {
   groomReviewedAt: string | null;
 
   veterinarianId: number | null;
-  /** Kết luận lần khám nhập học. Thú y không duyệt/từ chối đơn. */
+  /** Outcome of the admission exam. The vet does not approve or reject the admission. */
   vetTrainingDecision: TrainingDecision | null;
   vetFeedback: string | null;
   vetReviewedAt: string | null;
 
-  /** Trainer được hệ thống phân công. null ở TRAINER_REVIEW = chưa có Trainer đủ điều kiện. */
+  /** Trainer assigned by the system. null in TRAINER_REVIEW = no eligible Trainer yet. */
   trainerId: number | null;
   trainerName?: string | null;
   trainerFeedback: string | null;
@@ -117,6 +123,13 @@ export interface AdmissionDetailResponse {
     scheduledDate: string | null;
     scheduledAt: string | null;
   } | null;
+
+  /**
+   * Typed view of the initial vet exam for this admission.
+   * null when the vet has not yet completed the examination.
+   */
+  initialVetExam: InitialVetExamResponse | null;
+
   capacity: {
     availableQuarantineStalls: number;
     availableRegularStalls: number;
@@ -125,6 +138,38 @@ export interface AdmissionDetailResponse {
     blockingReason: 'NO_QUARANTINE_STALL' | 'REGULAR_RESERVE_INSUFFICIENT' | null;
   };
 }
+
+/** Vital-sign measurement recorded during a health exam session. */
+export interface InitialVetExamMetric {
+  id: number;
+  horseId: number;
+  healthRecordId: number;
+  recordedAt: string;
+  heartRate: number | null;
+  temperature: number | null;
+  weight: number | null;
+  respiratoryRate: number | null;
+  hydrationStatus: string | null;
+  bodyConditionScore: number | null;
+  notes: string | null;
+}
+
+/** Read-only view of the initial admission vet exam. */
+export interface InitialVetExamResponse {
+  healthRecordId: number;
+  veterinarianId: number | null;
+  veterinarianName: string | null;
+  examinedAt: string;
+  trainingDecision: TrainingDecision | null;
+  restrictionDetails: string | null;
+  symptoms: string | null;
+  findings: string | null;
+  diagnosis: string | null;
+  treatment: string | null;
+  notes: string | null;
+  metrics: InitialVetExamMetric[];
+}
+
 
 // Care Schedule Types
 export type CareScheduleStatus =
@@ -182,6 +227,8 @@ export interface CareSchedule {
   notes?: string | null;
   description?: string | null;
   createdAt?: string;
+  purpose?: 'FOLLOW_UP' | 'PREVENTIVE';
+  requestedAt?: string | null;
 }
 
 export interface CareScheduleDetail {
@@ -231,6 +278,9 @@ export interface CompleteCareScheduleRequest {
   notes?: string;
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
+  vaccinations?: VaccinationRequest[];
+  /** 7–10 days; only on a preventive visit without vaccinations. */
+  deferVaccinationDays?: number;
 }
 
 export interface VetAdmissionQueueItem {
@@ -271,8 +321,8 @@ export interface VetQueueFilters {
 }
 
 /**
- * Ngựa có được tập không. BLOCKED luôn đi kèm lịch khám lại (nextSchedule):
- * "tạm nghỉ đến" chính là ngày của lịch đó.
+ * Whether the horse may train. BLOCKED always comes with a follow-up exam (nextSchedule):
+ * "rest until" is that schedule's date.
  */
 export type TrainingDecision = 'ALLOWED' | 'BLOCKED';
 
@@ -314,6 +364,7 @@ export interface VetReviewRequest {
   notes?: string;
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
+  vaccinations?: VaccinationRequest[];
 }
 
 export interface VetReviewResponse {

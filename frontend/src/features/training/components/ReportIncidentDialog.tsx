@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { Icon } from '@/components/ui/Icon';
+import { Button, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
+import { displayError } from '@/lib/display';
+import { toast } from '@/lib/toast';
 import { incidentApi } from '@/features/groom/services/incidentService';
 import type { IncidentSeverity } from '@/features/groom/types';
 
@@ -18,10 +19,10 @@ interface ReportIncidentDialogProps {
 }
 
 const SEVERITY_OPTIONS: { value: IncidentSeverity; label: string }[] = [
-  { value: 'LOW', label: 'Thấp (Low) — Cần theo dõi, chưa cần can thiệp khẩn cấp' },
-  { value: 'MEDIUM', label: 'Trung bình (Medium) — Cần Bác sĩ Thú y khám trong ngày' },
-  { value: 'HIGH', label: 'Cao (High) — Yêu cầu Bác sĩ Thú y kiểm tra gấp' },
-  { value: 'CRITICAL', label: 'Khẩn cấp (Critical) — Nguy cấp, can thiệp y tế tức thời' },
+  { value: 'LOW', label: 'Low — Monitor, no urgent intervention required' },
+  { value: 'MEDIUM', label: 'Medium — Veterinary review needed today' },
+  { value: 'HIGH', label: 'High — Immediate veterinary review required' },
+  { value: 'CRITICAL', label: 'Critical — Health emergency, immediate intervention' },
 ];
 
 export function ReportIncidentDialog({
@@ -51,29 +52,16 @@ export function ReportIncidentDialog({
     }
   }, [open, initialTitle, initialDescription, initialSeverity]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !submitting) {
-        e.stopImmediatePropagation();
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [open, onClose, submitting]);
-
   if (!open) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) {
-      setError('Vui lòng nhập tiêu đề sự cố.');
+      setError('Title is required.');
       return;
     }
     if (!description.trim()) {
-      setError('Vui lòng nhập mô tả chi tiết sự cố.');
+      setError('Description is required.');
       return;
     }
 
@@ -91,132 +79,89 @@ export function ReportIncidentDialog({
         try {
           await incidentApi.uploadImage(created.id, file);
         } catch (imgErr) {
-          console.error('Không thể tải ảnh đính kèm:', imgErr);
+          console.error('Failed to attach image to incident:', imgErr);
+          toast.warning('Incident reported, but the attached image could not be uploaded.');
         }
       }
 
+      toast.success('Incident reported to veterinary team.');
       onSuccess?.();
       onClose();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể gửi báo cáo sự cố.';
-      setError(msg);
+    } catch (err) {
+      setError(displayError(err, 'Unable to report incident.'));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={() => !submitting && onClose()}
-        aria-hidden="true"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="relative w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-              Báo cáo sự cố sức khỏe cho Bác sĩ Thú y
-            </h2>
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              Gửi báo cáo sự cố cho {horseName ?? `Chiến mã #${horseId}`}. Hệ thống sẽ lập tức kích hoạt khóa an toàn (BLOCKED) và phát cảnh báo realtime trực tiếp tới Bác sĩ Thú y trực ban.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)]"
+    <Modal
+      open
+      onClose={onClose}
+      dismissible={!submitting}
+      title="Report health incident to veterinarian"
+      description={`Submit an urgent incident report for ${horseName ?? `Horse #${horseId}`}. This will notify the veterinary team.`}
+      footer={(
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button variant="destructive" type="submit" form="report-incident-form" loading={submitting}>
+            Send incident report
+          </Button>
+        </>
+      )}
+    >
+      <form id="report-incident-form" onSubmit={handleSubmit} className="space-y-4">
+        {error && <Notice tone="error">{error}</Notice>}
+
+        <FormField label="Incident title" required>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Heart rate exceeded safety threshold during workout"
+            required
+          />
+        </FormField>
+
+        <FormField label="Severity level" required>
+          <Select
+            value={severity}
+            onChange={(e) => setSeverity(e.target.value as IncidentSeverity)}
           >
-            <Icon name="x" size={16} />
-          </button>
-        </div>
+            {SEVERITY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </Select>
+        </FormField>
 
-        <form id="report-incident-form" onSubmit={handleSubmit} className="mt-4 space-y-4">
-          {error && (
-            <div className="rounded-[var(--radius-sm)] border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-              {error}
-            </div>
-          )}
+        <FormField label="Incident description / Observations" required>
+          <Textarea
+            rows={4}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Describe observations, symptoms, heart rate spikes, lameness or unusual behavior during training…"
+            required
+          />
+        </FormField>
 
-          <div>
-            <label className="block text-xs font-semibold text-[var(--color-text-primary)] mb-1">
-              Tiêu đề sự cố <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
-              placeholder="VD: Nhịp tim vượt ngưỡng an toàn trong buổi tập trên sân"
-              required
-              className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[var(--color-text-primary)] mb-1">
-              Mức độ nghiêm trọng <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={severity}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSeverity(e.target.value as IncidentSeverity)}
-              className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-            >
-              {SEVERITY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[var(--color-text-primary)] mb-1">
-              Mô tả chi tiết / Triệu chứng quan sát <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              rows={4}
-              value={description}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
-              placeholder="Mô tả triệu chứng, nhịp tim tăng vọt, dáng đi khập khiễng hoặc hành vi bất thường của ngựa khi tập luyện..."
-              required
-              className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[var(--color-text-primary)] mb-1">
-              Đính kèm hình ảnh / Bằng chứng (tùy chọn)
-            </label>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                const selected = e.target.files?.[0] ?? null;
-                if (selected && selected.size > 10 * 1024 * 1024) {
-                  setError('Hình ảnh không được vượt quá 10 MB.');
-                  return;
-                }
-                setFile(selected);
-              }}
-              className="w-full text-xs text-[var(--color-text-secondary)] file:mr-2 file:rounded file:border-0 file:bg-[var(--color-surface-muted)] file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-[var(--color-text-primary)]"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-[var(--color-border)]">
-            <Button variant="secondary" onClick={onClose} disabled={submitting}>
-              Hủy
-            </Button>
-            <Button variant="destructive" type="submit" loading={submitting}>
-              Gửi báo cáo sự cố
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <FormField label="Attach photo / evidence (optional)">
+          <Input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(e) => {
+              const selected = e.target.files?.[0] ?? null;
+              if (selected && selected.size > 10 * 1024 * 1024) {
+                setError('Image file must not exceed 10 MB.');
+                return;
+              }
+              setFile(selected);
+            }}
+          />
+        </FormField>
+      </form>
+    </Modal>
   );
 }

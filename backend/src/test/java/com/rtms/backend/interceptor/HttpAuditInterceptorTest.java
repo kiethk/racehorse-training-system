@@ -1,7 +1,7 @@
 package com.rtms.backend.interceptor;
 
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.service.AuditLogService;
+import com.rtms.backend.audit.service.AuditLogService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;

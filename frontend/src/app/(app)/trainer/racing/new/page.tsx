@@ -1,0 +1,18 @@
+import { Metadata } from 'next';
+import { RoleGuard } from '@/components/auth/RoleGuard';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { TrainerRaceForm } from '@/features/racing/components/TrainerRaceForm';
+
+export const metadata: Metadata = {
+  title: 'New race nomination | Trainer | RTMS',
+};
+
+export default function TrainerNewRaceNominationPage() {
+  return (
+    <RoleGuard allowedRoles={['HEAD_TRAINER']}>
+      <PageContainer>
+        <TrainerRaceForm />
+      </PageContainer>
+    </RoleGuard>
+  );
+}

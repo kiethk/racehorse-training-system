@@ -5,7 +5,7 @@ import type {
   TrainerReviewRequest,
 } from '../types/trainer';
 
-/** Khớp dto/ApiResponse.java — { success, data, message }. */
+/** Matches dto/ApiResponse.java — { success, data, message }. */
 interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -16,7 +16,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const trainerAdmissionsApi = {
   /**
-   * Hàng chờ của CHÍNH Trainer đang đăng nhập — hai nhóm trong một lời gọi.
+   * The signed-in Trainer's OWN queue — both groups in one call.
    */
   getQueue: async (): Promise<TrainerAdmissionQueue> => {
     const res = await apiGet<ApiResponse<TrainerAdmissionQueue>>(
@@ -25,7 +25,7 @@ export const trainerAdmissionsApi = {
     return res.data;
   },
 
-  /** Hồ sơ ứng viên — gộp mọi thứ Trainer cần vào MỘT lời gọi. */
+  /** Candidate dossier — everything the Trainer needs in ONE call. */
   getView: async (id: number): Promise<TrainerAdmissionView> => {
     const res = await apiGet<ApiResponse<TrainerAdmissionView>>(
       `/api/admissions/${id}/trainer-view`,
@@ -33,7 +33,7 @@ export const trainerAdmissionsApi = {
     return res.data;
   },
 
-  /** Nộp đánh giá -> backend TỰ chuyển đơn sang MANAGER_REVIEW. */
+  /** Submit the evaluation -> the backend moves the admission to MANAGER_REVIEW ITSELF. */
   submitReview: async (id: number, body: TrainerReviewRequest): Promise<void> => {
     await apiPost<ApiResponse<unknown>>(
       `/api/admissions/${id}/trainer-review`,
@@ -41,7 +41,7 @@ export const trainerAdmissionsApi = {
     );
   },
 
-  /** Link tải giấy tờ — mở bằng thẻ <a>, cookie jwt_token tự gửi kèm. */
+  /** Document download link — opened with an <a> tag; the jwt_token cookie is sent automatically. */
   documentFileUrl: (admissionId: number, documentId: number): string =>
     `${API_URL}/api/admissions/${admissionId}/documents/${documentId}/file`,
 };

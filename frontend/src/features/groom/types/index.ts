@@ -12,6 +12,14 @@ export interface TodayTaskItem {
   note: string | null;
   status: TaskStatus;
   actionable: boolean;
+  /**
+   * The completion action that closed this task. Routine tasks completed together share it, with one
+   * note and one set of photos. Null while pending and for workouts and vet visits.
+   */
+  completionId?: number | null;
+  completionNote?: string | null;
+  /** API paths of the completion photos; render them with <ProtectedImage>. */
+  completionPhotoUrls?: string[];
 }
 
 export type IncidentSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
