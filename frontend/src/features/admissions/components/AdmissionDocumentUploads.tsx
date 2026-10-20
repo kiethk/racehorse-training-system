@@ -2,8 +2,10 @@
 
 import { FileInput, Input, Select, Textarea } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { ImageLightbox, ImageThumbnail } from '@/components/ui/ImageLightbox';
+import { isImageFile } from '@/features/admissions/shared/lib/documentKind';
 import { ownerAdmissionApi } from '@/features/admissions/services/ownerApi';
 import type { AdmissionDocumentType } from '@/features/admissions/types/owner';
 
@@ -140,6 +142,10 @@ function DocumentUploadSection({
     onDiscard: () => void;
 }) {
     const [file, setFile] = useState<File | null>(null);
+    // Local preview of a picked image; created and revoked together with the file it shows.
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [viewingPreview, setViewingPreview] = useState(false);
+    const previewRef = useRef<string | null>(null);
     const [recordDate, setRecordDate] = useState('');
     const [note, setNote] = useState('');
     const [busy, setBusy] = useState(false);
@@ -158,6 +164,16 @@ function DocumentUploadSection({
         ? ['image/jpeg', 'image/png', 'image/webp']
         : ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
+    useEffect(() => () => { if (previewRef.current) URL.revokeObjectURL(previewRef.current); }, []);
+
+    function choose(nextFile: File | null) {
+        if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+        previewRef.current = nextFile && isImageFile(nextFile) ? URL.createObjectURL(nextFile) : null;
+        setPreviewUrl(previewRef.current);
+        setViewingPreview(false);
+        setFile(nextFile);
+    }
+
     function updateDraftState(nextFile: File | null, nextDate = recordDate, nextNote = note, nextDateError = Boolean(dateError)) {
         onDraftChange(Boolean(nextFile || nextDate || nextNote || nextDateError));
     }
@@ -166,13 +182,13 @@ function DocumentUploadSection({
         setError('');
         setFileValidationError('');
         if (!candidate) {
-            setFile(null);
+            choose(null);
             updateDraftState(null);
             return;
         }
 
         if (candidate.size === 0 || candidate.size > 10 * 1024 * 1024) {
-            setFile(null);
+            choose(null);
             updateDraftState(null);
             setFileValidationError('File must be between 1 byte and 10 MB.');
             setInputKey(current => current + 1);
@@ -180,7 +196,7 @@ function DocumentUploadSection({
         }
 
         if (!acceptedTypes.includes(candidate.type)) {
-            setFile(null);
+            choose(null);
             updateDraftState(null);
             setFileValidationError(
                 imageOnly
@@ -191,7 +207,7 @@ function DocumentUploadSection({
             return;
         }
 
-        setFile(candidate);
+        choose(candidate);
         updateDraftState(candidate);
     }
 
@@ -237,7 +253,7 @@ function DocumentUploadSection({
             return;
         }
 
-        setFile(null);
+        choose(null);
         setRecordDate('');
         setNote('');
         onDraftChange(false);
@@ -283,13 +299,23 @@ function DocumentUploadSection({
 
             {file && (
                 <div className="flex min-h-11 flex-wrap items-center justify-between gap-2 text-sm">
-                    <span className="min-w-0 break-all text-[var(--color-text-muted)]">{file.name}</span>
+                    <span className="flex min-w-0 items-center gap-3">
+                        {previewUrl && (
+                            <ImageThumbnail
+                                src={previewUrl}
+                                alt={file.name}
+                                onClick={() => setViewingPreview(true)}
+                                className="h-16 w-16 shrink-0"
+                            />
+                        )}
+                        <span className="min-w-0 break-all text-[var(--color-text-muted)]">{file.name}</span>
+                    </span>
                     <Button
                         type="button"
                         className="min-h-11"
                         aria-label={`Remove selected ${section.label.toLowerCase()}`}
                         onClick={() => {
-                            setFile(null);
+                            choose(null);
                             setError('');
                             setFileValidationError('');
                             setInputKey(current => current + 1);
@@ -371,6 +397,14 @@ function DocumentUploadSection({
                     </Button>
                 )}
             </div>
+            {previewUrl && file && (
+                <ImageLightbox
+                    images={[{ src: previewUrl, alt: file.name }]}
+                    index={viewingPreview ? 0 : null}
+                    onIndexChange={() => undefined}
+                    onClose={() => setViewingPreview(false)}
+                />
+            )}
         </fieldset>
     );
 }
