@@ -7,6 +7,7 @@ import { getNavigationForRole, isNavItemActive } from '@/config/navigation';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { useSidebarState } from './useSidebarState';
+import { AiChatWidget } from '@/features/ai';
 
 /** Persistent frame for every signed-in page: left sidebar, top bar, content. */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -35,6 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         />
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</main>
       </div>
+      <AiChatWidget />
     </div>
   );
 }
