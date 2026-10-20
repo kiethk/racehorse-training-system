@@ -10,6 +10,7 @@
 package com.rtms.backend.horse.repository;
 
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.enums.HorseStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -17,13 +18,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface HorseRepository extends JpaRepository<Horse, Long> {
     List<Horse> findByOwnerId(Long ownerId);
-    List<Horse> findByCurrentStatusInOrderByNameAsc(java.util.Collection<com.rtms.backend.horse.enums.HorseStatus> statuses);
+    List<Horse> findByCurrentStatusInOrderByNameAsc(Collection<HorseStatus> statuses);
     List<Horse> findByRegistrationNumber(String registrationNumber);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -72,6 +74,18 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
             WHERE a.trainerId = :trainerId
             """)
     List<Long> findManagedHorseIdsByTrainerId(@Param("trainerId") Long trainerId);
+
+    @Query("""
+            SELECT DISTINCT h
+            FROM Horse h
+            JOIN StableStall ss ON h.currentStallId = ss.id
+            JOIN Area a ON ss.areaId = a.id
+            WHERE a.trainerId = :trainerId
+              AND h.currentStatus IN :statuses
+            ORDER BY h.name ASC
+            """)
+    List<Horse> findManagedHorsesByTrainerIdAndStatusIn(@Param("trainerId") Long trainerId,
+                                                       @Param("statuses") Collection<HorseStatus> statuses);
 
     @Query("SELECT h FROM Horse h WHERE UPPER(h.registrationNumber) = UPPER(:identifier) OR LOWER(h.name) = LOWER(:identifier)")
     List<Horse> findByIdentifierOrName(@Param("identifier") String identifier);

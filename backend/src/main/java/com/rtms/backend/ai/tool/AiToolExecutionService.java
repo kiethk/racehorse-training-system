@@ -8,6 +8,7 @@ import com.rtms.backend.ai.hitl.service.ActionProposalService;
 import com.rtms.backend.ai.rag.service.ClinicalRetrievalService;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
@@ -206,20 +207,31 @@ public class AiToolExecutionService {
 
     // --- HEAD_TRAINER Handlers ---
     private Object handleGetTrainerHorses(AuthenticatedUser currentUser) {
-        List<Horse> horses = horseRepository.findByCurrentStatusInOrderByNameAsc(
-                List.of(com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE, com.rtms.backend.horse.enums.HorseStatus.CANDIDATE)
+        Long trainerId = currentUser != null ? currentUser.getUserId() : null;
+        if (trainerId == null) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Không xác định được danh tính Huấn luyện viên");
+        }
+
+        List<Horse> horses = horseRepository.findManagedHorsesByTrainerIdAndStatusIn(
+                trainerId,
+                List.of(HorseStatus.ELIGIBLE, HorseStatus.CANDIDATE)
         );
         List<Map<String, Object>> list = new ArrayList<>();
         for (Horse h : horses) {
-            list.add(Map.of(
-                    "horseId", h.getId(),
-                    "name", h.getName(),
-                    "status", h.getCurrentStatus(),
-                    "trainingDecision", h.getTrainingDecision(),
-                    "stallId", h.getCurrentStallId() != null ? h.getCurrentStallId() : "Chưa có chuồng"
-            ));
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("horseId", h.getId());
+            item.put("name", h.getName());
+            item.put("status", h.getCurrentStatus());
+            item.put("trainingDecision", h.getTrainingDecision());
+            item.put("trainingDecisionReason", h.getTrainingDecisionReason() != null ? h.getTrainingDecisionReason() : "N/A");
+            item.put("stallId", h.getCurrentStallId() != null ? h.getCurrentStallId() : "Chưa có chuồng");
+            list.add(item);
         }
-        return list;
+        return Map.of(
+                "trainerId", trainerId,
+                "totalManagedHorses", list.size(),
+                "horses", list
+        );
     }
 
     private Object handleGetWorkoutHistory(Map<String, Object> args) {

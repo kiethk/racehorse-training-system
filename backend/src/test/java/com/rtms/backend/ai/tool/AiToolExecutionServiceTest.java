@@ -302,4 +302,34 @@ class AiToolExecutionServiceTest {
         assertEquals(true, resMap.get("isOccupied"));
         assertEquals("NAUSICAA BY NIKA", resMap.get("horseName"));
     }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi getTrainerHorses chỉ lọc danh sách ngựa thuộc khu vực của mình")
+    void testTrainer_GetTrainerHorses_FiltersByTrainerId() {
+        AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer1@rtms.com", "HEAD_TRAINER");
+
+        Horse horse1 = new Horse();
+        horse1.setId(8L);
+        horse1.setName("NAUSICAA");
+        horse1.setCurrentStatus(com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE);
+        horse1.setCurrentStallId(101L);
+
+        when(horseRepository.findManagedHorsesByTrainerIdAndStatusIn(eq(5L), anyCollection()))
+                .thenReturn(List.of(horse1));
+
+        Object result = toolExecutionService.executeTool("getTrainerHorses", Map.of(), trainer);
+
+        assertNotNull(result);
+        assertTrue(result instanceof Map);
+        Map<?, ?> resMap = (Map<?, ?>) result;
+        assertEquals(5L, resMap.get("trainerId"));
+        assertEquals(1, resMap.get("totalManagedHorses"));
+
+        List<?> list = (List<?>) resMap.get("horses");
+        assertEquals(1, list.size());
+        Map<?, ?> horseMap = (Map<?, ?>) list.get(0);
+        assertEquals(8L, horseMap.get("horseId"));
+        assertEquals("NAUSICAA", horseMap.get("name"));
+        assertEquals(101L, horseMap.get("stallId"));
+    }
 }
