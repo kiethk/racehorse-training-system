@@ -208,7 +208,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
           </span>
           <div className="flex gap-2">
             <Button variant="tertiary" onClick={() => setSelected(new Set())}>Clear</Button>
-            <Button variant="primary" icon="pill" onClick={() => setBatchOpen(true)}>Record batch vaccination</Button>
+            <Button variant="primary" icon="pill" onClick={() => setBatchOpen(true)}>Record vaccination</Button>
           </div>
         </div>
       )}

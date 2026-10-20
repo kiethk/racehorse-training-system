@@ -74,8 +74,8 @@ function BatchVaccinationForm({ onClose, horses, protocols, initialProtocolId, o
       open
       onClose={onClose}
       size="md"
-      title="Record batch vaccination"
-      description="One dose of the same protocol for every selected horse. Training status is not changed."
+      title="Record vaccination"
+      // description="One dose of the same protocol for every selected horse. Training status is not changed."
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={submitting}>Cancel</Button>
