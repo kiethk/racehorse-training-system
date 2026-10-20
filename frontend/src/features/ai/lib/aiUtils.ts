@@ -1,11 +1,13 @@
 /**
- * Tiện ích hỗ trợ AI Assistant & HITL Card
+ * Tiện ích hỗ trợ AI Assistant & Quick Prompts
  */
 
+/** @deprecated HITL proposal expiration utility */
 export function isProposalExpired(secondsLeft: number): boolean {
   return secondsLeft <= 0;
 }
 
+/** @deprecated HITL diff keys extraction */
 export function extractDiffKeys(
   current: Record<string, unknown> = {},
   proposed: Record<string, unknown> = {}
@@ -14,6 +16,7 @@ export function extractDiffKeys(
   return Array.from(allKeys).filter((key) => current[key] !== proposed[key]);
 }
 
+/** @deprecated HITL idempotency key generator */
 export function generateIdempotencyKey(actionId: number): string {
   const ts = Date.now();
   const rand = Math.random().toString(36).substring(2, 7);
@@ -22,37 +25,50 @@ export function generateIdempotencyKey(actionId: number): string {
 
 export function getQuickPromptsByRole(role?: string): string[] {
   const norm = role?.toUpperCase();
+  if (norm === 'HEAD_TRAINER' || norm === 'TRAINER') {
+    return [
+      'Lịch tập các ca hôm nay',
+      'Tiến độ các khóa đào tạo',
+      'Cảnh báo nguy cơ chấn thương & nhịp tim',
+      'Phân tích sở trường của ngựa',
+    ];
+  }
   if (norm === 'VETERINARIAN' || norm === 'VET') {
     return [
       'Tra cứu ca viêm gân tương tự qua RAG',
-      'Kiểm tra tiền sử sốt của ngựa',
-      'Gợi ý phác đồ hồi phục sau chấn thương',
-    ];
-  }
-  if (norm === 'HEAD_TRAINER' || norm === 'TRAINER') {
-    return [
-      'Kiểm tra các bài tập workout hôm nay',
-      'Đề xuất giảm cường độ bài tập workout #1',
-      'Tổng hợp khối lượng tập tuần này',
+      'Lịch chăm sóc y tế định kỳ',
+      'Báo cáo sự cố chuồng trại 48h qua',
+      'Danh sách ngựa đang cách ly',
     ];
   }
   if (norm === 'GROOM' || norm === 'STABLE_STAFF') {
     return [
-      'Danh sách nhiệm vụ chăm sóc hôm nay',
-      'Kiểm tra chuồng ngựa khu A',
-      'Ngựa nào cần khẩu phần ăn đặc biệt?',
+      'Checklist công việc hôm nay (3 nguồn)',
+      'Chuồng và ngựa tôi phụ trách',
+      'Cảnh báo ăn uống & vận động của ngựa',
+      'Kiểm tra vật tư chuồng',
     ];
   }
   if (norm === 'CLUB_MANAGER' || norm === 'RACING_MANAGER') {
     return [
-      'Báo cáo tổng quan sức chứa chuồng',
-      'Thống kê tình trạng sức khỏe toàn đàn',
-      'Danh sách ngựa đăng ký nhập đàn mới',
+      'Báo cáo công suất chuồng trại',
+      'Tình hình sức khỏe toàn đàn',
+      'Phân bổ khu vực và huấn luyện viên',
+      'Đơn đăng ký nhập đàn chờ duyệt',
+    ];
+  }
+  if (norm === 'HORSE_OWNER') {
+    return [
+      'Danh sách chiến mã của tôi',
+      'Lịch tập sắp tới của ngựa',
+      'Tóm tắt sức khỏe và lần khám gần nhất',
+      'Tiến độ khóa huấn luyện của ngựa',
     ];
   }
   return [
-    'Hồ sơ sức khỏe tổng quát của ngựa',
-    'Lịch trình tập luyện tuần này',
-    'Thông tin chuồng và người chăm sóc',
+    'Danh sách chiến mã của tôi',
+    'Lịch tập sắp tới của ngựa',
+    'Tóm tắt sức khỏe và lần khám gần nhất',
+    'Tiến độ khóa huấn luyện của ngựa',
   ];
 }

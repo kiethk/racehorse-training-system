@@ -27,6 +27,8 @@ public interface AdmissionApplicationRepository
 
     List<AdmissionApplication> findByOwnerIdOrderBySubmittedAtDesc(Long ownerId);
 
+    List<AdmissionApplication> findByOwnerIdOrderByCreatedAtDesc(Long ownerId);
+
     List<AdmissionApplication> findByStatus(AdmissionStatus status);
 
     @Query("""

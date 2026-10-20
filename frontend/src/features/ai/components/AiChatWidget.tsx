@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useAiChat } from '../context/AiChatContext';
-import { ActionProposalCard } from './ActionProposalCard';
 import { MarkdownMessage } from './MarkdownMessage';
 
 export function AiChatWidget() {
@@ -15,10 +14,7 @@ export function AiChatWidget() {
     setIsOpen,
     messages,
     isLoading,
-    pendingProposalsCount,
     sendMessage,
-    commitProposal,
-    rejectProposal,
     clearConversation,
   } = useAiChat();
 
@@ -58,41 +54,52 @@ export function AiChatWidget() {
   // Quick prompts theo role của user
   const quickPrompts = useMemo(() => {
     const role = user?.role?.toUpperCase();
+    if (role === 'HEAD_TRAINER' || role === 'TRAINER') {
+      return [
+        'Lịch tập các ca hôm nay',
+        'Tiến độ các khóa đào tạo',
+        'Cảnh báo nguy cơ chấn thương & nhịp tim',
+        'Phân tích sở trường của ngựa',
+      ];
+    }
     if (role === 'VETERINARIAN' || role === 'VET') {
       return [
         'Tra cứu ca viêm gân tương tự qua RAG',
-        'Kiểm tra tiền sử sốt của ngựa',
-        'Gợi ý phác đồ hồi phục sau chấn thương',
-      ];
-    }
-    if (role === 'HEAD_TRAINER' || role === 'TRAINER') {
-      return [
-        'Danh sách ngựa tôi đang quản lý',
-        'Kiểm tra các bài tập workout hôm nay',
-        'Đề xuất giảm cường độ bài tập workout #1',
-        'Tổng hợp khối lượng tập tuần này',
+        'Lịch chăm sóc y tế định kỳ',
+        'Báo cáo sự cố chuồng trại 48h qua',
+        'Danh sách ngựa đang cách ly',
       ];
     }
     if (role === 'GROOM' || role === 'STABLE_STAFF') {
       return [
-        'Danh sách ngựa và chuồng tôi phụ trách',
-        'Việc cần làm hôm nay (Checklist 3 nguồn)',
-        'Kiểm tra cảnh báo y tế của ngựa #8',
-        'Tình trạng vật tư chuồng #6',
+        'Checklist công việc hôm nay (3 nguồn)',
+        'Chuồng và ngựa tôi phụ trách',
+        'Cảnh báo ăn uống & vận động của ngựa',
+        'Kiểm tra vật tư chuồng',
       ];
     }
     if (role === 'CLUB_MANAGER' || role === 'RACING_MANAGER') {
       return [
-        'Báo cáo tổng quan sức chứa chuồng',
-        'Thống kê tình trạng sức khỏe toàn đàn',
-        'Danh sách ngựa đăng ký nhập đàn mới',
+        'Báo cáo công suất chuồng trại',
+        'Tình hình sức khỏe toàn đàn',
+        'Phân bổ khu vực và huấn luyện viên',
+        'Đơn đăng ký nhập đàn chờ duyệt',
       ];
     }
-    // Default / HORSE_OWNER (Read-Only)
+    if (role === 'HORSE_OWNER') {
+      return [
+        'Danh sách chiến mã của tôi',
+        'Lịch tập sắp tới của ngựa',
+        'Tóm tắt sức khỏe và lần khám gần nhất',
+        'Tiến độ khóa huấn luyện của ngựa',
+      ];
+    }
+    // Default fallback (Read-Only)
     return [
-      'Hồ sơ sức khỏe tổng quát của ngựa',
-      'Lịch trình tập luyện tuần này',
-      'Thông tin chuồng và người chăm sóc',
+      'Danh sách chiến mã của tôi',
+      'Lịch tập sắp tới của ngựa',
+      'Tóm tắt sức khỏe và lần khám gần nhất',
+      'Tiến độ khóa huấn luyện của ngựa',
     ];
   }, [user?.role]);
 
@@ -110,13 +117,6 @@ export function AiChatWidget() {
             <Icon name="x" size={24} className="transition-transform group-hover:rotate-90" />
           ) : (
             <Icon name="sparkles" size={24} className="animate-pulse" />
-          )}
-
-          {/* Badge số đề xuất cần duyệt nếu có */}
-          {pendingProposalsCount > 0 && !isOpen && (
-            <span className="absolute -top-1 -right-1 flex h-5.5 min-w-5.5 items-center justify-center rounded-full bg-amber-500 px-1 text-[11px] font-bold text-white shadow-md ring-2 ring-white dark:ring-neutral-900">
-              {pendingProposalsCount}
-            </span>
           )}
         </button>
       </div>
@@ -212,21 +212,6 @@ export function AiChatWidget() {
                     )}
                   </div>
 
-                  {/* Nhúng thẻ đề xuất HITL nếu có */}
-                  {msg.pendingProposals && msg.pendingProposals.length > 0 && (
-                    <div className="w-full">
-                      {msg.pendingProposals.map((proposal) => (
-                        <ActionProposalCard
-                          key={proposal.actionId}
-                          proposal={proposal}
-                          onCommit={commitProposal}
-                          onReject={rejectProposal}
-                          disabled={isLoading}
-                        />
-                      ))}
-                    </div>
-                  )}
-
                   <span className="mt-1 px-1 text-[9px] text-[var(--color-text-secondary)]">
                     {new Date(msg.timestamp).toLocaleTimeString([], {
                       hour: '2-digit',
@@ -279,7 +264,7 @@ export function AiChatWidget() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Hỏi AI hoặc yêu cầu điều chỉnh..."
+                placeholder="Hỏi AI hoặc yêu cầu tra cứu..."
                 rows={1}
                 disabled={isLoading}
                 className="max-h-24 min-h-[38px] flex-1 resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"

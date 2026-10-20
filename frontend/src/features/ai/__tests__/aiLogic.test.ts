@@ -7,7 +7,7 @@ import {
   getQuickPromptsByRole,
 } from '../lib/aiUtils.ts';
 
-describe('AI Logic & HITL Proposal Utility Tests', () => {
+describe('AI Logic & Quick Prompts Utility Tests', () => {
   it('correctly detects TTL expiration', () => {
     assert.equal(isProposalExpired(300), false);
     assert.equal(isProposalExpired(1), false);
@@ -37,12 +37,15 @@ describe('AI Logic & HITL Proposal Utility Tests', () => {
     assert.ok(vetPrompts.some((p) => p.includes('RAG') || p.includes('viêm gân')));
 
     const trainerPrompts = getQuickPromptsByRole('HEAD_TRAINER');
-    assert.ok(trainerPrompts.some((p) => p.includes('workout') || p.includes('bài tập')));
+    assert.ok(trainerPrompts.some((p) => p.includes('Lịch tập') || p.includes('đào tạo')));
 
     const groomPrompts = getQuickPromptsByRole('GROOM');
-    assert.ok(groomPrompts.some((p) => p.includes('chăm sóc') || p.includes('chuồng')));
+    assert.ok(groomPrompts.some((p) => p.includes('Checklist') || p.includes('chuồng') || p.includes('Chuồng')));
+
+    const managerPrompts = getQuickPromptsByRole('CLUB_MANAGER');
+    assert.ok(managerPrompts.some((p) => p.includes('chuồng trại') || p.includes('nhập đàn')));
 
     const defaultPrompts = getQuickPromptsByRole('HORSE_OWNER');
-    assert.ok(defaultPrompts.some((p) => p.includes('sức khỏe') || p.includes('ngựa')));
+    assert.ok(defaultPrompts.some((p) => p.includes('sức khỏe') || p.includes('chiến mã') || p.includes('ngựa')));
   });
 });
