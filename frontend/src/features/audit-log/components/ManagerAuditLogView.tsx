@@ -2,6 +2,7 @@
 
 import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/Table';
 import { Notice } from '@/components/ui/Notice';
+import { cn } from '@/lib/cn';
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -13,8 +14,11 @@ import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { auditLogApi } from '../services/api';
 import type { AuditLogItem, AuditLogFilters, PageResponse } from '../types';
 
-const HTTP_METHODS = ['ALL', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
-const STATUS_CODES = ['ALL', '200', '201', '204', '400', '401', '403', '404', '409', '500'] as const;
+const STATUS_OPTIONS = [
+  { label: 'All Results', value: 'ALL' },
+  { label: 'Success', value: '200' },
+  { label: 'Failed / Rejected', value: '400' },
+] as const;
 
 const initialFilters: AuditLogFilters = {
   search: '',
@@ -27,7 +31,7 @@ const initialFilters: AuditLogFilters = {
 };
 
 function formatRole(role: string | null): string {
-  if (!role) return '-';
+  if (!role) return 'System';
   switch (role) {
     case 'CLUB_MANAGER': return 'Club Manager';
     case 'HEAD_TRAINER': return 'Head Trainer';
@@ -38,37 +42,43 @@ function formatRole(role: string | null): string {
   }
 }
 
-function StatusBadge({ code }: { code: number }) {
-  let colorClass = 'bg-[var(--color-surface-muted)] text-[var(--color-text-primary)] border border-[var(--color-border)]';
-  
-  if (code >= 200 && code < 300) {
-    colorClass = 'bg-[var(--color-success-soft)] text-[var(--color-success)] border border-[var(--color-success)]';
-  } else if (code >= 400 && code < 500) {
-    colorClass = 'bg-[var(--color-warning-soft)] text-[var(--color-warning)] border border-[var(--color-warning)]';
-  } else if (code >= 500) {
-    colorClass = 'bg-[var(--color-danger-soft)] text-[var(--color-danger)] border border-[var(--color-danger)]';
+function formatAction(action: string | null): string {
+  if (!action) return 'System Operation';
+  if (action === 'CARE_SCHEDULE_AUTO_ASSIGNED') return 'Care Schedule Auto Assigned';
+  if (action === 'CARE_SCHEDULE_RESCHEDULED') return 'Reschedule Medical Care';
+  if (action.includes('_') && action === action.toUpperCase()) {
+    return action
+      .toLowerCase()
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
   }
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
-      {code}
-    </span>
-  );
+  return action;
 }
 
-function MethodBadge({ method }: { method: string }) {
-  let colorClass = 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)]';
-  
-  switch (method) {
-    case 'POST': colorClass = 'bg-[var(--color-info-soft)] text-[var(--color-info)]'; break;
-    case 'PUT': colorClass = 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]'; break;
-    case 'PATCH': colorClass = 'bg-[var(--color-isolated-soft)] text-[var(--color-isolated)]'; break;
-    case 'DELETE': colorClass = 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'; break;
+function formatDetails(log: AuditLogItem): string {
+  if (log.details && log.details.trim().length > 0) {
+    return log.details;
+  }
+  if (log.action) {
+    const act = formatAction(log.action);
+    return log.entityName ? `${act} on ${log.entityName}` : act;
+  }
+  return 'System processed operation successfully.';
+}
+
+function OutcomeText({ success }: { success: boolean }) {
+  if (success) {
+    return (
+      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+        Success
+      </span>
+    );
   }
 
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${colorClass}`}>
-      {method}
+    <span className="font-semibold text-rose-600 dark:text-rose-400">
+      Failed
     </span>
   );
 }
@@ -106,7 +116,7 @@ export function ManagerAuditLogView() {
         if (active) setData(result);
       } catch (err) {
         console.error('Failed to load audit logs:', err);
-        if (active) setError('Failed to load audit logs. Please try again.');
+        if (active) setError('Failed to load activity logs. Please try again.');
       } finally {
         if (active) setLoading(false);
       }
@@ -135,7 +145,7 @@ export function ManagerAuditLogView() {
   };
 
   const apply = () => {
-    updateUrl({ ...draft, search: draft.search.trim(), page: 0 }); // Reset to page 0 on filter apply
+    updateUrl({ ...draft, search: draft.search.trim(), page: 0 });
   };
 
   const clear = () => {
@@ -157,37 +167,41 @@ export function ManagerAuditLogView() {
 
   return (
     <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">Activity & Audit Logs</h1>
+        <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+          Review historical staff activities, operational decisions, and intake reviews across the club.
+        </p>
+      </div>
+
       <FilterBar
         className="[&_input]:min-h-9 [&_select]:min-h-9"
         onSubmit={(event) => { event.preventDefault(); apply(); }}
       >
-        <FormField label="Search request path" className="min-w-[14rem] flex-[1.4]">
+        <FormField label="Search Activity or User" className="min-w-[15rem] flex-[1.6]">
           <SearchInput
-            label="Search request path"
+            label="Search Activity or User"
             value={draft.search}
             onChange={(search) => setDraft({ ...draft, search })}
-            placeholder="e.g. /api/horses"
+            placeholder="Search by person, action, or target ID..."
           />
         </FormField>
-        <FormField label="Method" className="min-w-[8rem] flex-1">
-          <Select value={draft.httpMethod} onChange={(e) => setDraft({ ...draft, httpMethod: e.target.value })}>
-            {HTTP_METHODS.map((m) => <option key={m} value={m}>{m === 'ALL' ? 'All methods' : m}</option>)}
-          </Select>
-        </FormField>
-        <FormField label="Status" className="min-w-[8rem] flex-1">
+        <FormField label="Result Status" className="min-w-[9rem] flex-1">
           <Select value={draft.statusCode} onChange={(e) => setDraft({ ...draft, statusCode: e.target.value })}>
-            {STATUS_CODES.map((s) => <option key={s} value={s}>{s === 'ALL' ? 'All statuses' : s}</option>)}
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </Select>
         </FormField>
-        <FormField label="From" className="min-w-[9.5rem] flex-1">
+        <FormField label="From Date" className="min-w-[9.5rem] flex-1">
           <Input type="date" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} />
         </FormField>
-        <FormField label="To" className="min-w-[9.5rem] flex-1">
+        <FormField label="To Date" className="min-w-[9.5rem] flex-1">
           <Input type="date" min={draft.from || undefined} value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} />
         </FormField>
         <div className="flex shrink-0 items-center gap-2">
-          <Button type="submit" variant="primary">Apply</Button>
-          <Button type="button" variant="secondary" onClick={clear}>Clear</Button>
+          <Button type="submit" variant="primary">Filter</Button>
+          <Button type="button" variant="secondary" onClick={clear}>Reset</Button>
         </div>
       </FilterBar>
 
@@ -196,65 +210,87 @@ export function ManagerAuditLogView() {
       <Panel className="overflow-hidden">
         {(!data || data.content.length === 0) ? (
           <EmptyState 
-            title="No audit logs found" 
-            description="Change the filters or clear them to see other records." 
+            title="No activity logs found" 
+            description="Try adjusting your search criteria or dates to view past events." 
             action={<Button size="sm" onClick={clear}>Clear filters</Button>} 
           />
         ) : (
           <div className="flex flex-col h-full">
             <Table bare className={loading ? 'whitespace-nowrap opacity-60 transition-opacity' : 'whitespace-nowrap transition-opacity'}>
-                <THead>
-                  <Tr>
-                    <Th className="px-6 py-4">Time</Th>
-                    <Th className="px-6 py-4">Actor</Th>
-                    <Th className="px-6 py-4">Role</Th>
-                    <Th className="px-6 py-4">Method</Th>
-                    <Th className="px-6 py-4">Request</Th>
-                    <Th className="px-6 py-4">Status</Th>
-                  </Tr>
-                </THead>
-                <TBody>
-                  {data.content.map((log) => (
+              <THead>
+                <Tr>
+                  <Th className="px-6 py-4">Timestamp</Th>
+                  <Th className="px-6 py-4">Actor</Th>
+                  <Th className="px-6 py-4">Role</Th>
+                  <Th className="px-6 py-4">Activity</Th>
+                  <Th className="px-6 py-4 min-w-[20rem]">Activity Summary</Th>
+                  <Th className="px-6 py-4 text-center">Outcome</Th>
+                </Tr>
+              </THead>
+              <TBody>
+                {data.content.map((log) => {
+                  const displayAction = formatAction(log.action);
+                  const displayDetails = formatDetails(log);
+
+                  return (
                     <Tr key={log.id} className="hover:bg-[var(--color-surface-muted)] transition-colors">
-                      <Td className="px-6 py-4 text-[var(--color-text-secondary)] whitespace-nowrap">
+                      <Td className="px-6 py-4 text-[var(--color-text-secondary)] whitespace-nowrap text-xs font-mono">
                         {new Date(log.createdAt).toLocaleString('en-GB', { 
                           day: '2-digit', month: 'short', year: 'numeric',
-                          hour: '2-digit', minute: '2-digit', second: '2-digit'
+                          hour: '2-digit', minute: '2-digit'
                         })}
                       </Td>
                       <Td className="px-6 py-4">
                         {log.actorName ? (
                           <div>
-                            <span className="font-semibold block text-[var(--color-text-primary)]">{log.actorName}</span>
+                            <span className="font-semibold block text-[var(--color-text-primary)] text-sm">{log.actorName}</span>
                             {log.actorEmail && <span className="text-xs text-[var(--color-text-muted)]">{log.actorEmail}</span>}
                           </div>
                         ) : (
-                          <span className="text-[var(--color-text-secondary)] italic">System / Unauthenticated</span>
+                          <span className="text-[var(--color-text-secondary)] italic text-sm">System / Guest</span>
                         )}
                       </Td>
                       <Td className="px-6 py-4">
-                        <span className="text-[var(--color-text-secondary)]">{formatRole(log.actorRole)}</span>
-                      </Td>
-                      <Td className="px-6 py-4">
-                        <MethodBadge method={log.httpMethod} />
-                      </Td>
-                      <Td className="px-6 py-4">
-                        <span className="font-metric text-xs text-[var(--color-text-primary)] max-w-xs md:max-w-md lg:max-w-lg truncate block" title={log.requestPath}>
-                          {log.requestPath}
+                        <span className="text-sm text-[var(--color-text-secondary)] font-medium">
+                          {formatRole(log.actorRole)}
                         </span>
                       </Td>
                       <Td className="px-6 py-4">
-                        <StatusBadge code={log.statusCode} />
+                        <span className="font-semibold text-sm text-[var(--color-text-primary)]">
+                          {displayAction}
+                        </span>
+                      </Td>
+                      <Td className="px-6 py-4">
+                        <div className="max-w-md lg:max-w-xl">
+                          <p className="text-sm text-[var(--color-text-primary)] leading-snug line-clamp-2" title={displayDetails}>
+                            {displayDetails}
+                          </p>
+                          {log.entityName && (
+                            <div className="mt-1 flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+                              <span>Target:</span>
+                              <span className="font-medium text-[var(--color-text-secondary)]">{log.entityName}</span>
+                              {log.entityId && (
+                                <span className="bg-[var(--color-surface-muted)] px-1.5 py-0.2 rounded font-mono text-[11px]">
+                                  #{log.entityId}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </Td>
+                      <Td className="px-6 py-4 text-center">
+                        <OutcomeText success={log.success} />
                       </Td>
                     </Tr>
-                  ))}
-                </TBody>
-              </Table>
+                  );
+                })}
+              </TBody>
+            </Table>
             
             {/* Pagination footer */}
             <div className="flex items-center justify-between border-t border-[var(--color-border)] px-6 py-3">
               <div className="text-sm text-[var(--color-text-secondary)]">
-                Showing <span className="font-medium text-[var(--color-text-primary)]">{data.pageable.pageNumber * data.pageable.pageSize + 1}</span> to <span className="font-medium text-[var(--color-text-primary)]">{Math.min((data.pageable.pageNumber + 1) * data.pageable.pageSize, data.totalElements)}</span> of <span className="font-medium text-[var(--color-text-primary)]">{data.totalElements}</span> results
+                Showing <span className="font-medium text-[var(--color-text-primary)]">{data.pageable.pageNumber * data.pageable.pageSize + 1}</span> to <span className="font-medium text-[var(--color-text-primary)]">{Math.min((data.pageable.pageNumber + 1) * data.pageable.pageSize, data.totalElements)}</span> of <span className="font-medium text-[var(--color-text-primary)]">{data.totalElements}</span> activities
               </div>
               <div className="flex items-center gap-2">
                 <Button 

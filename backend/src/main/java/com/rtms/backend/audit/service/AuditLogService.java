@@ -31,10 +31,14 @@ public class AuditLogService {
 
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
+    private final AuditActivityResolver activityResolver;
 
-    public AuditLogService(AuditLogRepository auditLogRepository, UserRepository userRepository) {
+    public AuditLogService(AuditLogRepository auditLogRepository,
+                           UserRepository userRepository,
+                           AuditActivityResolver activityResolver) {
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
+        this.activityResolver = activityResolver;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -50,7 +54,13 @@ public class AuditLogService {
             log.setHttpMethod(httpMethod);
             log.setRequestPath(requestPath);
             log.setStatusCode(statusCode);
-            // action, entityName, entityId left null for baseline HTTP audit
+
+            // Resolve business activity details
+            var activity = activityResolver.resolve(httpMethod, requestPath, statusCode);
+            log.setAction(activity.action());
+            log.setEntityName(activity.entityName());
+            log.setEntityId(activity.entityId());
+            log.setDetails(activity.details());
 
             auditLogRepository.save(log);
         } catch (Exception e) {
@@ -108,13 +118,67 @@ public class AuditLogService {
                 predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), to));
             }
             if (searchTerm != null) {
-                predicates.add(cb.like(cb.lower(root.get("requestPath")), "%" + searchTerm + "%"));
+                var pathLike = cb.like(cb.lower(root.get("requestPath")), "%" + searchTerm + "%");
+                var actionLike = cb.like(cb.lower(root.get("action")), "%" + searchTerm + "%");
+                var detailsLike = cb.like(cb.lower(root.get("details")), "%" + searchTerm + "%");
+                var entityLike = cb.like(cb.lower(root.get("entityName")), "%" + searchTerm + "%");
+                var userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
+                var userNameLike = cb.like(cb.lower(userJoin.get("fullName")), "%" + searchTerm + "%");
+                predicates.add(cb.or(pathLike, actionLike, detailsLike, entityLike, userNameLike));
             }
-            
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         }, boundedPageable);
 
-        return page.map(AuditLogResponse::from);
+        return page.map(log -> {
+            AuditLogResponse dto = AuditLogResponse.from(log);
+            if (dto.getDetails() == null || dto.getDetails().isBlank() || dto.getAction() == null || dto.getAction().isBlank()) {
+                var resolved = activityResolver.resolve(
+                        log.getHttpMethod(),
+                        log.getRequestPath(),
+                        log.getStatusCode() != null ? log.getStatusCode() : 200
+                );
+                if (dto.getAction() == null || dto.getAction().isBlank()) {
+                    dto.setAction(resolved.action());
+                }
+                if (dto.getEntityName() == null || dto.getEntityName().isBlank()) {
+                    dto.setEntityName(resolved.entityName());
+                }
+                if (dto.getEntityId() == null) {
+                    dto.setEntityId(resolved.entityId());
+                }
+                if (dto.getDetails() == null || dto.getDetails().isBlank()) {
+                    dto.setDetails(resolved.details());
+                }
+            }
+            if (dto.getAction() != null) {
+                dto.setAction(formatAction(dto.getAction()));
+            }
+            return dto;
+        });
+    }
+
+    private String formatAction(String action) {
+        if (action == null || action.isBlank()) {
+            return "System Operation";
+        }
+        if ("CARE_SCHEDULE_AUTO_ASSIGNED".equalsIgnoreCase(action)) {
+            return "Care Schedule Auto Assigned";
+        }
+        if ("CARE_SCHEDULE_RESCHEDULED".equalsIgnoreCase(action)) {
+            return "Reschedule Medical Care";
+        }
+        if (action.contains("_") && action.equals(action.toUpperCase())) {
+            String[] parts = action.toLowerCase().split("_");
+            StringBuilder sb = new StringBuilder();
+            for (String part : parts) {
+                if (!part.isEmpty()) {
+                    if (!sb.isEmpty()) sb.append(" ");
+                    sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+                }
+            }
+            return sb.toString();
+        }
+        return action;
     }
 }
 
