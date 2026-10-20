@@ -58,6 +58,18 @@ import com.rtms.backend.training.repository.TrainingLotRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseSpecialtyService;
+import com.rtms.backend.racing.entity.RaceRegistration;
+import com.rtms.backend.racing.repository.RaceRegistrationRepository;
+import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.repository.SubjectRepository;
+import com.rtms.backend.medical.entity.HorseHealthMetric;
+import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.horse.entity.HorsePedigree;
+import com.rtms.backend.horse.repository.HorsePedigreeRepository;
+import com.rtms.backend.incident.entity.HorseIncidentReport;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
+import com.rtms.backend.stable.entity.GroomDailyTask;
+import com.rtms.backend.stable.repository.GroomTaskCompletionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -109,6 +121,12 @@ public class AiToolExecutionService {
     private final CourseRepository courseRepository;
     private final AuditLogRepository auditLogRepository;
     private final CandidateHorseProfileRepository candidateHorseProfileRepository;
+    private final RaceRegistrationRepository raceRegistrationRepository;
+    private final SubjectRepository subjectRepository;
+    private final HorseHealthMetricRepository horseHealthMetricRepository;
+    private final HorsePedigreeRepository horsePedigreeRepository;
+    private final HorseIncidentReportRepository horseIncidentReportRepository;
+    private final GroomTaskCompletionRepository groomTaskCompletionRepository;
 
     @Autowired
     public AiToolExecutionService(DynamicToolRegistryService toolRegistryService,
@@ -131,7 +149,13 @@ public class AiToolExecutionService {
                                   @Autowired(required = false) UserRepository userRepository,
                                   @Autowired(required = false) CourseRepository courseRepository,
                                   @Autowired(required = false) AuditLogRepository auditLogRepository,
-                                  @Autowired(required = false) CandidateHorseProfileRepository candidateHorseProfileRepository) {
+                                  @Autowired(required = false) CandidateHorseProfileRepository candidateHorseProfileRepository,
+                                  @Autowired(required = false) RaceRegistrationRepository raceRegistrationRepository,
+                                  @Autowired(required = false) SubjectRepository subjectRepository,
+                                  @Autowired(required = false) HorseHealthMetricRepository horseHealthMetricRepository,
+                                  @Autowired(required = false) HorsePedigreeRepository horsePedigreeRepository,
+                                  @Autowired(required = false) HorseIncidentReportRepository horseIncidentReportRepository,
+                                  @Autowired(required = false) GroomTaskCompletionRepository groomTaskCompletionRepository) {
         this.toolRegistryService = toolRegistryService;
         this.clinicalRetrievalService = clinicalRetrievalService;
         this.horseRepository = horseRepository;
@@ -153,6 +177,12 @@ public class AiToolExecutionService {
         this.courseRepository = courseRepository;
         this.auditLogRepository = auditLogRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
+        this.raceRegistrationRepository = raceRegistrationRepository;
+        this.subjectRepository = subjectRepository;
+        this.horseHealthMetricRepository = horseHealthMetricRepository;
+        this.horsePedigreeRepository = horsePedigreeRepository;
+        this.horseIncidentReportRepository = horseIncidentReportRepository;
+        this.groomTaskCompletionRepository = groomTaskCompletionRepository;
     }
 
     public AiToolExecutionService(DynamicToolRegistryService toolRegistryService,
@@ -179,7 +209,7 @@ public class AiToolExecutionService {
                 groomDailyTaskService, admissionApplicationRepository, trainingLotRepository,
                 horseTrainingPlanRepository, horseSpecialtyService, horsePerformanceService,
                 racingReadinessAssessmentRepository, groomIncidentReportRepository, areaRepository,
-                userRepository, courseRepository, null, null);
+                userRepository, courseRepository, null, null, null, null, null, null, null, null);
     }
 
     public AiToolExecutionService(DynamicToolRegistryService toolRegistryService,
@@ -207,7 +237,37 @@ public class AiToolExecutionService {
                 groomDailyTaskService, admissionApplicationRepository, trainingLotRepository,
                 horseTrainingPlanRepository, horseSpecialtyService, horsePerformanceService,
                 racingReadinessAssessmentRepository, groomIncidentReportRepository, areaRepository,
-                userRepository, courseRepository, auditLogRepository, null);
+                userRepository, courseRepository, auditLogRepository, null, null, null, null, null, null, null);
+    }
+
+    public AiToolExecutionService(DynamicToolRegistryService toolRegistryService,
+                                  ClinicalRetrievalService clinicalRetrievalService,
+                                  HorseRepository horseRepository,
+                                  TrainingWorkoutRepository trainingWorkoutRepository,
+                                  HealthRecordRepository healthRecordRepository,
+                                  CareScheduleRepository careScheduleRepository,
+                                  StableStallRepository stableStallRepository,
+                                  GroomDailyTaskRepository groomDailyTaskRepository,
+                                  GroomDailyTaskService groomDailyTaskService,
+                                  AdmissionApplicationRepository admissionApplicationRepository,
+                                  TrainingLotRepository trainingLotRepository,
+                                  HorseTrainingPlanRepository horseTrainingPlanRepository,
+                                  HorseSpecialtyService horseSpecialtyService,
+                                  HorsePerformanceService horsePerformanceService,
+                                  RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
+                                  GroomIncidentReportRepository groomIncidentReportRepository,
+                                  AreaRepository areaRepository,
+                                  UserRepository userRepository,
+                                  CourseRepository courseRepository,
+                                  AuditLogRepository auditLogRepository,
+                                  CandidateHorseProfileRepository candidateHorseProfileRepository) {
+        this(toolRegistryService, clinicalRetrievalService, horseRepository, trainingWorkoutRepository,
+                healthRecordRepository, careScheduleRepository, stableStallRepository, groomDailyTaskRepository,
+                groomDailyTaskService, admissionApplicationRepository, trainingLotRepository,
+                horseTrainingPlanRepository, horseSpecialtyService, horsePerformanceService,
+                racingReadinessAssessmentRepository, groomIncidentReportRepository, areaRepository,
+                userRepository, courseRepository, auditLogRepository, candidateHorseProfileRepository,
+                null, null, null, null, null, null);
     }
 
     public AiToolExecutionService(DynamicToolRegistryService toolRegistryService,
@@ -232,7 +292,7 @@ public class AiToolExecutionService {
                 groomDailyTaskService, admissionApplicationRepository, trainingLotRepository,
                 horseTrainingPlanRepository, horseSpecialtyService, horsePerformanceService,
                 racingReadinessAssessmentRepository, groomIncidentReportRepository, areaRepository,
-                null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
     }
 
     /**
@@ -263,6 +323,8 @@ public class AiToolExecutionService {
             case "getMyHorseAdmissions" -> handleGetMyHorseAdmissions(currentUser);
             case "getHorseTrainingSummary" -> handleGetHorseTrainingSummary(args, currentUser);
             case "getHorseCareSchedule" -> handleGetHorseCareSchedule(args, currentUser);
+            case "getMyHorseIncidentHistory" -> handleGetMyHorseIncidentHistory(args, currentUser);
+            case "getMyHorsePedigreeInfo" -> handleGetMyHorsePedigreeInfo(args, currentUser);
 
             // HEAD_TRAINER Tools
             case "getTrainerHorses" -> handleGetTrainerHorses(currentUser);
@@ -275,6 +337,9 @@ public class AiToolExecutionService {
             case "getRacingReadinessAssessment" -> handleGetRacingReadinessAssessment(args);
             case "checkGroomConflictForLot" -> handleCheckGroomConflictForLot(args);
             case "getTrainerAssignedGrooms" -> handleGetTrainerAssignedGrooms(currentUser);
+            case "getMyHorseRaceRegistrations" -> handleGetMyHorseRaceRegistrations(args, currentUser);
+            case "getAssignedAdmissionReviews" -> handleGetAssignedAdmissionReviews(currentUser);
+            case "getCourseCurriculumOverview" -> handleGetCourseCurriculumOverview();
 
             // VETERINARIAN Tools
             case "searchClinicalKnowledge" -> handleSearchClinicalKnowledge(args, currentUser);
@@ -284,6 +349,9 @@ public class AiToolExecutionService {
             case "getPreventiveCareSchedule" -> handleGetPreventiveCareSchedule(args);
             case "getQuarantineStatus" -> handleGetQuarantineStatus();
             case "getRecentIncidentReports" -> handleGetRecentIncidentReports();
+            case "getPendingAdmissionExams" -> handleGetPendingAdmissionExams();
+            case "getUrgentCareAlerts" -> handleGetUrgentCareAlerts();
+            case "getHorseVitalSignsTrend" -> handleGetHorseVitalSignsTrend(args);
 
             // GROOM Tools
             case "getDailyGroomTasks" -> handleGetDailyGroomTasks(currentUser);
@@ -291,6 +359,8 @@ public class AiToolExecutionService {
             case "getTodayAggregatedTasks" -> handleGetTodayAggregatedTasks(args, currentUser);
             case "getHorseDietaryAndCareAlerts" -> handleGetHorseDietaryAndCareAlerts(args);
             case "getHorseStallLocation" -> handleGetHorseStallLocation(args);
+            case "getMyReportedIncidents" -> handleGetMyReportedIncidents(currentUser);
+            case "getGroomTaskCompletionRate" -> handleGetGroomTaskCompletionRate(args, currentUser);
 
             // CLUB_MANAGER Tools
             case "getStableOccupancyMetrics" -> handleGetStableOccupancyMetrics();
@@ -479,6 +549,64 @@ public class AiToolExecutionService {
             item.put("mucDich", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A");
             result.add(item);
         }
+        return result;
+    }
+
+    private Object handleGetMyHorseIncidentHistory(Map<String, Object> args, AuthenticatedUser currentUser) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+        verifyHorseOwnershipIfOwner(horse.getId(), currentUser);
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (horseIncidentReportRepository != null) {
+            List<HorseIncidentReport> reports = horseIncidentReportRepository.findByHorseId(horse.getId());
+            for (HorseIncidentReport r : reports) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("tenNgua", horse.getName());
+                item.put("tieuDe", r.getTitle());
+                item.put("moTa", r.getDescription() != null ? r.getDescription() : "");
+                item.put("thoiGian", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
+                item.put("trangThai", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
+                item.put("actionUrl", "/owner/horses");
+                result.add(item);
+            }
+        }
+        if (result.isEmpty() && groomIncidentReportRepository != null) {
+            List<GroomIncidentReport> gReports = groomIncidentReportRepository.findByHorseId(horse.getId());
+            for (GroomIncidentReport r : gReports) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("tenNgua", horse.getName());
+                item.put("tieuDe", r.getTitle());
+                item.put("moTa", r.getDescription() != null ? r.getDescription() : "");
+                item.put("thoiGian", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
+                item.put("trangThai", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
+                item.put("actionUrl", "/owner/horses");
+                result.add(item);
+            }
+        }
+        return result;
+    }
+
+    private Object handleGetMyHorsePedigreeInfo(Map<String, Object> args, AuthenticatedUser currentUser) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+        verifyHorseOwnershipIfOwner(horse.getId(), currentUser);
+
+        Optional<HorsePedigree> pedigreeOpt = (horsePedigreeRepository != null)
+                ? horsePedigreeRepository.findByHorseId(horse.getId())
+                : Optional.empty();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenNgua", horse.getName());
+        result.put("nguaCha", pedigreeOpt.map(HorsePedigree::getSireName).filter(s -> !s.isBlank()).orElse("Chưa rõ"));
+        result.put("nguaMe", pedigreeOpt.map(HorsePedigree::getDamName).filter(d -> !d.isBlank()).orElse("Chưa rõ"));
+        result.put("xuatXu", pedigreeOpt.map(HorsePedigree::getPedigreeNotes).filter(n -> !n.isBlank()).orElse("Việt Nam"));
+        result.put("theHeGiaPha", pedigreeOpt.map(p -> "Ngựa cha: " + (p.getSireName() != null ? p.getSireName() : "Chưa rõ") + ", Ngựa mẹ: " + (p.getDamName() != null ? p.getDamName() : "Chưa rõ")).orElse("Chưa có hồ sơ phả hệ chi tiết"));
+        result.put("actionUrl", "/owner/horses");
         return result;
     }
 
@@ -861,6 +989,106 @@ public class AiToolExecutionService {
         );
     }
 
+    private Object handleGetMyHorseRaceRegistrations(Map<String, Object> args, AuthenticatedUser currentUser) {
+        if (raceRegistrationRepository == null) {
+            return Collections.emptyList();
+        }
+        Long trainerId = currentUser.getUserId();
+        Horse targetHorse = resolveHorse(args);
+        List<RaceRegistration> regs;
+        if (targetHorse != null) {
+            regs = raceRegistrationRepository.findByTrainerIdAndHorseIdOrderByCreatedAtDesc(trainerId, targetHorse.getId());
+        } else {
+            regs = raceRegistrationRepository.findByTrainerIdOrderByCreatedAtDesc(trainerId);
+        }
+
+        Map<Long, String> horseNames = horseRepository.findAll().stream()
+                .collect(Collectors.toMap(Horse::getId, Horse::getName, (a, b) -> a));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (RaceRegistration r : regs) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("tenNgua", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
+            item.put("tenGiaiDua", r.getRaceName() != null ? r.getRaceName() : "Giải đua");
+            item.put("ngayDangKy", r.getEventDate() != null ? r.getEventDate().toString() : (r.getCreatedAt() != null ? r.getCreatedAt().toString() : "N/A"));
+            item.put("trangThai", r.getStatus() != null ? r.getStatus().name() : "PENDING");
+            item.put("ghiChu", r.getTrainerNotes() != null ? r.getTrainerNotes() : (r.getSelectionReason() != null ? r.getSelectionReason() : ""));
+            item.put("actionUrl", "/trainer/racing");
+            result.add(item);
+        }
+        return result;
+    }
+
+    private Object handleGetAssignedAdmissionReviews(AuthenticatedUser currentUser) {
+        List<AdmissionApplication> apps = admissionApplicationRepository.findAllByOrderBySubmittedAtDesc();
+        Long trainerId = currentUser.getUserId();
+
+        List<AdmissionApplication> pendingTrainerApps = apps.stream()
+                .filter(a -> a.getStatus() == AdmissionStatus.TRAINER_REVIEW
+                        && (a.getTrainerId() == null || Objects.equals(a.getTrainerId(), trainerId)))
+                .toList();
+
+        List<Long> appIds = pendingTrainerApps.stream().map(AdmissionApplication::getId).toList();
+        Map<Long, CandidateHorseProfile> candidates = (candidateHorseProfileRepository != null && !appIds.isEmpty())
+                ? candidateHorseProfileRepository.findByAdmissionIdIn(appIds).stream()
+                        .collect(Collectors.toMap(CandidateHorseProfile::getAdmissionId, c -> c, (a, b) -> a))
+                : Collections.emptyMap();
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (AdmissionApplication a : pendingTrainerApps) {
+            CandidateHorseProfile candidate = candidates.get(a.getId());
+            String horseName = candidate != null ? candidate.getName() : "Chiến mã đăng ký";
+            String breed = candidate != null && candidate.getBreed() != null ? candidate.getBreed() : "Chưa rõ giống";
+            String ownerName = "Chủ sở hữu";
+            if (a.getOwnerId() != null && userRepository != null) {
+                ownerName = userRepository.findById(a.getOwnerId()).map(User::getFullName).orElse(ownerName);
+            }
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("tenNgua", horseName);
+            item.put("giongNgua", breed);
+            item.put("tenChuNgua", ownerName);
+            item.put("ngayNop", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : "N/A"));
+            item.put("trangThai", "Chờ Huấn luyện viên thẩm định");
+            item.put("actionUrl", "/trainer/admissions");
+            result.add(item);
+        }
+        return result;
+    }
+
+    private Object handleGetCourseCurriculumOverview() {
+        List<Course> courses = courseRepository != null ? courseRepository.findAll() : Collections.emptyList();
+        List<Subject> subjects = subjectRepository != null ? subjectRepository.findAll() : Collections.emptyList();
+
+        List<Map<String, Object>> courseList = new ArrayList<>();
+        for (Course c : courses) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("tenKhoaHoc", c.getName());
+            item.put("mucTieu", c.getTargetGoal() != null ? c.getTargetGoal() : "Rèn luyện thể lực");
+            item.put("soBuoiHoc", c.getTotalSessions() != null ? c.getTotalSessions() : 0);
+            item.put("moTa", c.getDescription() != null ? c.getDescription() : "");
+            courseList.add(item);
+        }
+
+        List<Map<String, Object>> subjectList = new ArrayList<>();
+        for (Subject s : subjects) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("tenMonHoc", s.getName());
+            item.put("nhomKyThuat", s.getCategory() != null ? s.getCategory().name() : "N/A");
+            item.put("matSan", s.getSurfaceType() != null ? s.getSurfaceType().name() : "N/A");
+            item.put("cuLyMucTieu", s.getTargetDistanceMeters() != null ? s.getTargetDistanceMeters() + "m" : "N/A");
+            item.put("cuongDo", s.getIntensityLevel() != null ? s.getIntensityLevel().name() : "MEDIUM");
+            item.put("thoiLuongPhut", s.getDurationMinutes() != null ? s.getDurationMinutes() : 60);
+            subjectList.add(item);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("danhMucKhoaHoc", courseList);
+        response.put("danhMucMonHocKyThuat", subjectList);
+        response.put("actionUrl", "/trainer/courses");
+        return response;
+    }
+
     // =================================================================
     // VETERINARIAN Handlers
     // =================================================================
@@ -1087,6 +1315,90 @@ public class AiToolExecutionService {
         );
     }
 
+    private Object handleGetPendingAdmissionExams() {
+        List<AdmissionApplication> apps = admissionApplicationRepository.findAllByOrderBySubmittedAtDesc();
+        List<AdmissionApplication> pendingVetApps = apps.stream()
+                .filter(a -> a.getStatus() == AdmissionStatus.VET_REVIEW)
+                .toList();
+
+        List<Long> appIds = pendingVetApps.stream().map(AdmissionApplication::getId).toList();
+        Map<Long, CandidateHorseProfile> candidates = (candidateHorseProfileRepository != null && !appIds.isEmpty())
+                ? candidateHorseProfileRepository.findByAdmissionIdIn(appIds).stream()
+                        .collect(Collectors.toMap(CandidateHorseProfile::getAdmissionId, c -> c, (a, b) -> a))
+                : Collections.emptyMap();
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (AdmissionApplication a : pendingVetApps) {
+            CandidateHorseProfile candidate = candidates.get(a.getId());
+            String horseName = candidate != null ? candidate.getName() : "Chiến mã đăng ký";
+            String ownerName = "Chủ sở hữu";
+            if (a.getOwnerId() != null && userRepository != null) {
+                ownerName = userRepository.findById(a.getOwnerId()).map(User::getFullName).orElse(ownerName);
+            }
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("tenNgua", horseName);
+            item.put("tenChuNgua", ownerName);
+            item.put("ngayNop", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : "N/A"));
+            item.put("trangThai", "Chờ bác sĩ khám sàng lọc");
+            item.put("actionUrl", "/veterinarian/admissions");
+            result.add(item);
+        }
+        return result;
+    }
+
+    private Object handleGetUrgentCareAlerts() {
+        List<CareSchedule> all = careScheduleRepository.findAll();
+        List<CareSchedule> urgent = all.stream()
+                .filter(cs -> cs.getCareType() == CareType.URGENT && cs.getStatus() != CareScheduleStatus.COMPLETED)
+                .toList();
+
+        Map<Long, Horse> horses = horseRepository.findAll().stream()
+                .collect(Collectors.toMap(Horse::getId, h -> h, (a, b) -> a));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (CareSchedule cs : urgent) {
+            Horse h = horses.get(cs.getHorseId());
+            String horseName = h != null ? h.getName() : "Chiến mã";
+            String stallName = h != null ? resolveStallName(h.getCurrentStallId()) : "Chưa rõ chuồng";
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("tenNgua", horseName);
+            item.put("chuong", stallName);
+            item.put("mucDo", "Khẩn cấp");
+            item.put("trieuChung", cs.getDescription() != null ? cs.getDescription() : "Cần can thiệp y tế khẩn cấp");
+            item.put("thoiGian", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A");
+            item.put("actionUrl", "/veterinarian/urgent");
+            result.add(item);
+        }
+        return result;
+    }
+
+    private Object handleGetHorseVitalSignsTrend(Map<String, Object> args) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+        if (horseHealthMetricRepository == null) {
+            return Collections.emptyList();
+        }
+
+        List<HorseHealthMetric> metrics = horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(horse.getId());
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (HorseHealthMetric m : metrics) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("tenNgua", horse.getName());
+            item.put("ngayDo", m.getRecordedAt() != null ? m.getRecordedAt().toString() : "N/A");
+            item.put("canNang", m.getWeight() != null ? m.getWeight() + " kg" : "N/A");
+            item.put("thanNhiet", m.getTemperature() != null ? m.getTemperature() + " °C" : "N/A");
+            item.put("nhipTim", m.getHeartRate() != null ? m.getHeartRate() + " bpm" : "N/A");
+            item.put("nhipTho", m.getRespiratoryRate() != null ? m.getRespiratoryRate() + " nhịp/phút" : "N/A");
+            item.put("nhanXet", m.getNotes() != null ? m.getNotes() : (m.getHydrationStatus() != null ? m.getHydrationStatus() : "Chỉ số ổn định"));
+            result.add(item);
+        }
+        return result;
+    }
+
     // =================================================================
     // GROOM Handlers
     // =================================================================
@@ -1211,6 +1523,69 @@ public class AiToolExecutionService {
         result.put("viTriChuong", stallName);
         result.put("khuVuc", areaName);
         result.put("groomPhuTrach", groomName);
+        return result;
+    }
+
+    private Object handleGetMyReportedIncidents(AuthenticatedUser currentUser) {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(7);
+        Map<Long, String> horseNames = horseRepository.findAll().stream()
+                .collect(Collectors.toMap(Horse::getId, Horse::getName, (a, b) -> a));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (horseIncidentReportRepository != null) {
+            List<HorseIncidentReport> reports = horseIncidentReportRepository.findByReportedById(currentUser.getUserId());
+            for (HorseIncidentReport r : reports) {
+                if (r.getReportedAt() != null && r.getReportedAt().isBefore(cutoff)) {
+                    continue;
+                }
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("tenNgua", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
+                item.put("tieuDe", r.getTitle());
+                item.put("mucDoNghiemTrong", r.getSeverity() != null ? r.getSeverity().name() : "MEDIUM");
+                item.put("thoiGianBaoCao", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
+                item.put("trangThaiXuLy", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
+                item.put("actionUrl", "/groom/incidents");
+                result.add(item);
+            }
+        }
+        if (result.isEmpty() && groomIncidentReportRepository != null) {
+            List<GroomIncidentReport> gReports = groomIncidentReportRepository.findByGroomId(currentUser.getUserId());
+            for (GroomIncidentReport r : gReports) {
+                if (r.getReportedAt() != null && r.getReportedAt().isBefore(cutoff)) {
+                    continue;
+                }
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("tenNgua", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
+                item.put("tieuDe", r.getTitle());
+                item.put("mucDoNghiemTrong", r.getSeverity() != null ? r.getSeverity().name() : "MEDIUM");
+                item.put("thoiGianBaoCao", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
+                item.put("trangThaiXuLy", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
+                item.put("actionUrl", "/groom/incidents");
+                result.add(item);
+            }
+        }
+        return result;
+    }
+
+    private Object handleGetGroomTaskCompletionRate(Map<String, Object> args, AuthenticatedUser currentUser) {
+        LocalDate targetDate = parseDate(args.get("date"), LocalDate.now());
+        LocalDateTime start = targetDate.atStartOfDay();
+        LocalDateTime end = targetDate.atTime(LocalTime.MAX);
+
+        List<GroomDailyTask> tasks = groomDailyTaskRepository.findByGroomIdAndScheduledTimeBetween(
+                currentUser.getUserId(), start, end);
+
+        int tongSoNhiemVu = tasks.size();
+        long soNhiemVuHoanThanh = tasks.stream().filter(t -> Boolean.TRUE.equals(t.getIsCompleted())).count();
+        double rate = tongSoNhiemVu > 0 ? ((double) soNhiemVuHoanThanh / tongSoNhiemVu) * 100.0 : 100.0;
+        String tyLeHoanThanh = String.format(Locale.US, "%.1f%%", rate);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ngay", targetDate.toString());
+        result.put("tongSoNhiemVu", tongSoNhiemVu);
+        result.put("soNhiemVuHoanThanh", soNhiemVuHoanThanh);
+        result.put("tyLeHoanThanh", tyLeHoanThanh);
+        result.put("actionUrl", "/groom/tasks");
         return result;
     }
 
@@ -1352,6 +1727,7 @@ public class AiToolExecutionService {
             item.put("soDienThoai", (u.getPhone() != null && !u.getPhone().isBlank()) ? u.getPhone() : "Chưa cập nhật");
             item.put("trangThaiHoatDong", u.isActive() ? "Đang hoạt động" : "Đã khóa");
             item.put("thongTinChuyenMon", thongTinChuyenMon);
+            item.put("actionUrl", "/manager/staff");
             result.add(item);
         }
         return result;
@@ -1462,11 +1838,15 @@ public class AiToolExecutionService {
 
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("tenNgua", h.getName());
+            item.put("maDangKy", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
             item.put("maSoNgua", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
             item.put("tenChuNgua", ownerName);
+            item.put("trangThai", statusVi);
             item.put("trangThaiHienTai", statusVi);
+            item.put("quyetDinhTapLuyen", (isQuarantineStall || isBlocked) ? "BLOCKED" : (h.getTrainingDecision() != null ? h.getTrainingDecision().name() : "ALLOWED"));
             item.put("viTriChuong", stallName);
             item.put("huanLuyenVienPhuTrach", trainerName);
+            item.put("actionUrl", "/manager/horses");
             result.add(item);
         }
         return result;
@@ -1522,10 +1902,7 @@ public class AiToolExecutionService {
 
             StringBuilder sb = new StringBuilder();
             if (log.getEntityName() != null && !log.getEntityName().isBlank()) {
-                sb.append("Thực thể: ").append(log.getEntityName());
-                if (log.getEntityId() != null) {
-                    sb.append(" (Bản ghi #").append(log.getEntityId()).append(")");
-                }
+                sb.append("Đối tượng: ").append(log.getEntityName());
             }
             if (log.getRequestPath() != null && !log.getRequestPath().isBlank()) {
                 if (!sb.isEmpty()) sb.append(" | ");
@@ -1533,9 +1910,10 @@ public class AiToolExecutionService {
             }
             if (log.getStatusCode() != null) {
                 if (!sb.isEmpty()) sb.append(" | ");
-                sb.append("Mã HTTP: ").append(log.getStatusCode());
+                sb.append("Mã trạng thái HTTP: ").append(log.getStatusCode());
             }
             item.put("chiTietThayDoi", sb.isEmpty() ? "Không có chi tiết bổ sung" : sb.toString());
+            item.put("actionUrl", "/manager/audit-log");
 
             result.add(item);
         }
@@ -1619,9 +1997,11 @@ public class AiToolExecutionService {
             item.put("tenChuNgua", ownerName);
             item.put("ngayNopDon", ngayNopDon);
             item.put("buocHienTai", buocHienTai);
+            item.put("trangThai", a.getStatus() != null ? a.getStatus().name() : "N/A");
             item.put("bacSiPhuTrach", vetName);
             item.put("huanLuyenVienChiDinh", trainerName);
             item.put("duongDanDieuHuong", duongDanDieuHuong);
+            item.put("actionUrl", "/manager/admissions");
 
             result.add(item);
         }

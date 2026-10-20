@@ -56,6 +56,21 @@ import com.rtms.backend.audit.entity.AuditLog;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
+import com.rtms.backend.racing.entity.RaceRegistration;
+import com.rtms.backend.racing.enums.RaceRegistrationStatus;
+import com.rtms.backend.racing.repository.RaceRegistrationRepository;
+import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.enums.IntensityLevel;
+import com.rtms.backend.training.enums.SubjectCategory;
+import com.rtms.backend.training.repository.SubjectRepository;
+import com.rtms.backend.medical.entity.HorseHealthMetric;
+import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.horse.entity.HorsePedigree;
+import com.rtms.backend.horse.repository.HorsePedigreeRepository;
+import com.rtms.backend.incident.entity.HorseIncidentReport;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
+import com.rtms.backend.stable.entity.GroomDailyTask;
+import com.rtms.backend.stable.repository.GroomTaskCompletionRepository;
 import com.rtms.backend.identity.entity.Role;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -98,6 +113,12 @@ class AiToolExecutionServiceTest {
     private CourseRepository courseRepository;
     private AuditLogRepository auditLogRepository;
     private CandidateHorseProfileRepository candidateHorseProfileRepository;
+    private RaceRegistrationRepository raceRegistrationRepository;
+    private SubjectRepository subjectRepository;
+    private HorseHealthMetricRepository horseHealthMetricRepository;
+    private HorsePedigreeRepository horsePedigreeRepository;
+    private HorseIncidentReportRepository horseIncidentReportRepository;
+    private GroomTaskCompletionRepository groomTaskCompletionRepository;
 
     private AiToolExecutionService toolExecutionService;
 
@@ -124,6 +145,12 @@ class AiToolExecutionServiceTest {
         courseRepository = Mockito.mock(CourseRepository.class);
         auditLogRepository = Mockito.mock(AuditLogRepository.class);
         candidateHorseProfileRepository = Mockito.mock(CandidateHorseProfileRepository.class);
+        raceRegistrationRepository = Mockito.mock(RaceRegistrationRepository.class);
+        subjectRepository = Mockito.mock(SubjectRepository.class);
+        horseHealthMetricRepository = Mockito.mock(HorseHealthMetricRepository.class);
+        horsePedigreeRepository = Mockito.mock(HorsePedigreeRepository.class);
+        horseIncidentReportRepository = Mockito.mock(HorseIncidentReportRepository.class);
+        groomTaskCompletionRepository = Mockito.mock(GroomTaskCompletionRepository.class);
 
         toolExecutionService = new AiToolExecutionService(
                 toolRegistryService,
@@ -146,7 +173,13 @@ class AiToolExecutionServiceTest {
                 userRepository,
                 courseRepository,
                 auditLogRepository,
-                candidateHorseProfileRepository
+                candidateHorseProfileRepository,
+                raceRegistrationRepository,
+                subjectRepository,
+                horseHealthMetricRepository,
+                horsePedigreeRepository,
+                horseIncidentReportRepository,
+                groomTaskCompletionRepository
         );
     }
 
@@ -658,5 +691,307 @@ class AiToolExecutionServiceTest {
         assertEquals("BS Thú Y Hoàng", item.get("bacSiPhuTrach"));
         assertEquals("HLV Park", item.get("huanLuyenVienChiDinh"));
         assertEquals("/manager/admissions/123", item.get("duongDanDieuHuong"));
+        assertEquals("/manager/admissions", item.get("actionUrl"));
+    }
+
+    // =================================================================
+    // New Role Tools Tests
+    // =================================================================
+
+    @Test
+    @DisplayName("HORSE_OWNER gọi getMyHorseIncidentHistory xem lịch sử sự cố của ngựa")
+    void testOwner_GetMyHorseIncidentHistory() {
+        AuthenticatedUser owner = new AuthenticatedUser(100L, "owner@rtms.com", "HORSE_OWNER");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("RED RUM");
+        horse.setOwnerId(100L);
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        HorseIncidentReport rep = new HorseIncidentReport();
+        rep.setId(1L);
+        rep.setHorseId(10L);
+        rep.setTitle("Trầy xước chân trước");
+        rep.setDescription("Bị va chạm nhẹ khi di chuyển");
+        rep.setReportedAt(LocalDateTime.now());
+        when(horseIncidentReportRepository.findByHorseId(10L)).thenReturn(List.of(rep));
+
+        Object result = toolExecutionService.executeTool("getMyHorseIncidentHistory", Map.of("horseId", 10L), owner);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(1, list.size());
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertEquals("RED RUM", item.get("tenNgua"));
+        assertEquals("Trầy xước chân trước", item.get("tieuDe"));
+        assertEquals("/owner/horses", item.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("HORSE_OWNER gọi getMyHorsePedigreeInfo tra cứu phả hệ chiến mã")
+    void testOwner_GetMyHorsePedigreeInfo() {
+        AuthenticatedUser owner = new AuthenticatedUser(100L, "owner@rtms.com", "HORSE_OWNER");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("RED RUM");
+        horse.setOwnerId(100L);
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        HorsePedigree ped = new HorsePedigree();
+        ped.setHorseId(10L);
+        ped.setSireName("Galileo");
+        ped.setDamName("Urban Sea");
+        ped.setPedigreeNotes("Xuất xứ Ireland");
+        when(horsePedigreeRepository.findByHorseId(10L)).thenReturn(Optional.of(ped));
+
+        Object result = toolExecutionService.executeTool("getMyHorsePedigreeInfo", Map.of("horseId", 10L), owner);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("RED RUM", map.get("tenNgua"));
+        assertEquals("Galileo", map.get("nguaCha"));
+        assertEquals("Urban Sea", map.get("nguaMe"));
+        assertEquals("/owner/horses", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi getMyHorseRaceRegistrations tra cứu đăng ký giải đua")
+    void testTrainer_GetMyHorseRaceRegistrations() {
+        AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        RaceRegistration reg = new RaceRegistration();
+        reg.setId(1L);
+        reg.setTrainerId(200L);
+        reg.setHorseId(10L);
+        reg.setRaceName("Cúp Mùa Xuân");
+        reg.setEventDate(LocalDate.of(2026, 11, 1));
+        reg.setStatus(RaceRegistrationStatus.APPROVED);
+        when(raceRegistrationRepository.findByTrainerIdOrderByCreatedAtDesc(200L)).thenReturn(List.of(reg));
+
+        Horse h = new Horse();
+        h.setId(10L);
+        h.setName("THUNDER");
+        when(horseRepository.findAll()).thenReturn(List.of(h));
+
+        Object result = toolExecutionService.executeTool("getMyHorseRaceRegistrations", Map.of(), trainer);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(1, list.size());
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertEquals("THUNDER", item.get("tenNgua"));
+        assertEquals("Cúp Mùa Xuân", item.get("tenGiaiDua"));
+        assertEquals("/trainer/racing", item.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi getAssignedAdmissionReviews tra cứu đơn chờ thẩm định")
+    void testTrainer_GetAssignedAdmissionReviews() {
+        AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(301L);
+        app.setTrainerId(200L);
+        app.setStatus(AdmissionStatus.TRAINER_REVIEW);
+        app.setSubmittedAt(LocalDateTime.of(2026, 10, 15, 9, 0));
+        when(admissionApplicationRepository.findAllByOrderBySubmittedAtDesc()).thenReturn(List.of(app));
+
+        CandidateHorseProfile cand = new CandidateHorseProfile();
+        cand.setAdmissionId(301L);
+        cand.setName("WIND RUNNER");
+        cand.setBreed("Thoroughbred");
+        when(candidateHorseProfileRepository.findByAdmissionIdIn(any())).thenReturn(List.of(cand));
+
+        Object result = toolExecutionService.executeTool("getAssignedAdmissionReviews", Map.of(), trainer);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(1, list.size());
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertEquals("WIND RUNNER", item.get("tenNgua"));
+        assertEquals("Thoroughbred", item.get("giongNgua"));
+        assertEquals("/trainer/admissions", item.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi getCourseCurriculumOverview tra cứu danh mục khóa học và môn học")
+    void testTrainer_GetCourseCurriculumOverview() {
+        AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        Course c = new Course();
+        c.setId(1L);
+        c.setName("Khóa Tốc Độ Cao");
+        c.setTargetGoal("Nâng cao bứt tốc");
+        c.setTotalSessions(12);
+        when(courseRepository.findAll()).thenReturn(List.of(c));
+
+        Subject s = new Subject();
+        s.setId(10L);
+        s.setName("Nước rút 400m");
+        s.setCategory(SubjectCategory.SPEED);
+        s.setSurfaceType(SurfaceType.TURF);
+        s.setTargetDistanceMeters(BigDecimal.valueOf(400));
+        s.setIntensityLevel(IntensityLevel.HIGH);
+        s.setDurationMinutes(45);
+        when(subjectRepository.findAll()).thenReturn(List.of(s));
+
+        Object result = toolExecutionService.executeTool("getCourseCurriculumOverview", Map.of(), trainer);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertTrue(map.containsKey("danhMucKhoaHoc"));
+        assertTrue(map.containsKey("danhMucMonHocKyThuat"));
+        assertEquals("/trainer/courses", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("VETERINARIAN gọi getPendingAdmissionExams tra cứu đơn chờ khám sàng lọc")
+    void testVet_GetPendingAdmissionExams() {
+        AuthenticatedUser vet = new AuthenticatedUser(300L, "vet@rtms.com", "VETERINARIAN");
+
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(401L);
+        app.setStatus(AdmissionStatus.VET_REVIEW);
+        app.setSubmittedAt(LocalDateTime.of(2026, 10, 18, 8, 30));
+        when(admissionApplicationRepository.findAllByOrderBySubmittedAtDesc()).thenReturn(List.of(app));
+
+        CandidateHorseProfile cand = new CandidateHorseProfile();
+        cand.setAdmissionId(401L);
+        cand.setName("SILVER BULLET");
+        when(candidateHorseProfileRepository.findByAdmissionIdIn(any())).thenReturn(List.of(cand));
+
+        Object result = toolExecutionService.executeTool("getPendingAdmissionExams", Map.of(), vet);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(1, list.size());
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertEquals("SILVER BULLET", item.get("tenNgua"));
+        assertEquals("Chờ bác sĩ khám sàng lọc", item.get("trangThai"));
+        assertEquals("/veterinarian/admissions", item.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("VETERINARIAN gọi getUrgentCareAlerts tra cứu ca cấp cứu khẩn cấp")
+    void testVet_GetUrgentCareAlerts() {
+        AuthenticatedUser vet = new AuthenticatedUser(300L, "vet@rtms.com", "VETERINARIAN");
+
+        CareSchedule cs = new CareSchedule();
+        cs.setId(501L);
+        cs.setHorseId(10L);
+        cs.setCareType(CareType.URGENT);
+        cs.setStatus(CareScheduleStatus.SCHEDULED);
+        cs.setDescription("Ngựa sốt cao đột ngột");
+        cs.setScheduledAt(LocalDateTime.of(2026, 10, 20, 14, 0));
+        when(careScheduleRepository.findAll()).thenReturn(List.of(cs));
+
+        Horse h = new Horse();
+        h.setId(10L);
+        h.setName("LIGHTNING");
+        when(horseRepository.findAll()).thenReturn(List.of(h));
+
+        Object result = toolExecutionService.executeTool("getUrgentCareAlerts", Map.of(), vet);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(1, list.size());
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertEquals("LIGHTNING", item.get("tenNgua"));
+        assertEquals("Khẩn cấp", item.get("mucDo"));
+        assertEquals("Ngựa sốt cao đột ngột", item.get("trieuChung"));
+        assertEquals("/veterinarian/urgent", item.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("VETERINARIAN gọi getHorseVitalSignsTrend tra cứu chỉ số sinh hiệu")
+    void testVet_GetHorseVitalSignsTrend() {
+        AuthenticatedUser vet = new AuthenticatedUser(300L, "vet@rtms.com", "VETERINARIAN");
+
+        Horse h = new Horse();
+        h.setId(10L);
+        h.setName("LIGHTNING");
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(h));
+
+        HorseHealthMetric metric = new HorseHealthMetric();
+        metric.setHorseId(10L);
+        metric.setWeight(BigDecimal.valueOf(480));
+        metric.setTemperature(BigDecimal.valueOf(38.2));
+        metric.setHeartRate(BigDecimal.valueOf(36));
+        metric.setRespiratoryRate(BigDecimal.valueOf(12));
+        metric.setRecordedAt(LocalDateTime.of(2026, 10, 20, 7, 0));
+        when(horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(10L)).thenReturn(List.of(metric));
+
+        Object result = toolExecutionService.executeTool("getHorseVitalSignsTrend", Map.of("horseId", 10L), vet);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(1, list.size());
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertEquals("LIGHTNING", item.get("tenNgua"));
+        assertEquals("480 kg", item.get("canNang"));
+        assertEquals("38.2 °C", item.get("thanNhiet"));
+        assertEquals("36 bpm", item.get("nhipTim"));
+        assertEquals("12 nhịp/phút", item.get("nhipTho"));
+    }
+
+    @Test
+    @DisplayName("GROOM gọi getMyReportedIncidents tra cứu sự cố do chính Groom báo cáo")
+    void testGroom_GetMyReportedIncidents() {
+        AuthenticatedUser groom = new AuthenticatedUser(400L, "groom@rtms.com", "GROOM");
+
+        HorseIncidentReport rep = new HorseIncidentReport();
+        rep.setId(601L);
+        rep.setReportedById(400L);
+        rep.setHorseId(10L);
+        rep.setTitle("Móng chân trái sau nứt nhẹ");
+        rep.setSeverity(com.rtms.backend.incident.enums.IncidentSeverity.LOW);
+        rep.setStatus(com.rtms.backend.incident.enums.IncidentStatus.REPORTED);
+        rep.setReportedAt(LocalDateTime.now().minusDays(1));
+        when(horseIncidentReportRepository.findByReportedById(400L)).thenReturn(List.of(rep));
+
+        Horse h = new Horse();
+        h.setId(10L);
+        h.setName("SHADOW");
+        when(horseRepository.findAll()).thenReturn(List.of(h));
+
+        Object result = toolExecutionService.executeTool("getMyReportedIncidents", Map.of(), groom);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(1, list.size());
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertEquals("SHADOW", item.get("tenNgua"));
+        assertEquals("Móng chân trái sau nứt nhẹ", item.get("tieuDe"));
+        assertEquals("/groom/incidents", item.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("GROOM gọi getGroomTaskCompletionRate kiểm tra tiến độ hoàn thành nhiệm vụ")
+    void testGroom_GetGroomTaskCompletionRate() {
+        AuthenticatedUser groom = new AuthenticatedUser(400L, "groom@rtms.com", "GROOM");
+
+        GroomDailyTask t1 = new GroomDailyTask();
+        t1.setId(1L);
+        t1.setGroomId(400L);
+        t1.setIsCompleted(true);
+
+        GroomDailyTask t2 = new GroomDailyTask();
+        t2.setId(2L);
+        t2.setGroomId(400L);
+        t2.setIsCompleted(false);
+
+        when(groomDailyTaskRepository.findByGroomIdAndScheduledTimeBetween(eq(400L), any(), any()))
+                .thenReturn(List.of(t1, t2));
+
+        Object result = toolExecutionService.executeTool("getGroomTaskCompletionRate", Map.of(), groom);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals(2, map.get("tongSoNhiemVu"));
+        assertEquals(1L, map.get("soNhiemVuHoanThanh"));
+        assertEquals("50.0%", map.get("tyLeHoanThanh"));
+        assertEquals("/groom/tasks", map.get("actionUrl"));
     }
 }
