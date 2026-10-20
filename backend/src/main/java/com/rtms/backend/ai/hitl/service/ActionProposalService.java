@@ -1,6 +1,7 @@
 package com.rtms.backend.ai.hitl.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.rtms.backend.ai.dto.ActionProposalDto;
 import com.rtms.backend.ai.hitl.enums.ActionStatus;
 import com.rtms.backend.ai.hitl.model.PendingAgentAction;
@@ -18,10 +19,8 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Base64;
-import java.util.HexFormat;
-import java.util.Map;
-import java.util.UUID;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 
 /**
  * Dịch vụ tạo và ký số bản nháp đề xuất hành động HITL (Phase 1 Propose).
@@ -38,6 +37,7 @@ public class ActionProposalService {
 
     private final PendingAgentActionRepository pendingActionRepository;
     private final ObjectMapper objectMapper;
+    private final ObjectMapper canonicalMapper;
     private final String hmacSecret;
 
     public ActionProposalService(PendingAgentActionRepository pendingActionRepository,
@@ -45,6 +45,7 @@ public class ActionProposalService {
                                  @Value("${app.security.hmac-secret}") String hmacSecret) {
         this.pendingActionRepository = pendingActionRepository;
         this.objectMapper = objectMapper;
+        this.canonicalMapper = new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
         this.hmacSecret = hmacSecret;
     }
 
@@ -71,19 +72,19 @@ public class ActionProposalService {
                                            Map<String, Object> proposedValues,
                                            String reason) {
         try {
-            LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(DEFAULT_TTL_SECONDS);
+            // Chuẩn hóa thời hạn cắt bỏ phần mili/nano giây để tránh lệch múi giờ/rounding DB
+            LocalDateTime expiresAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS).plusSeconds(DEFAULT_TTL_SECONDS);
 
-            // Đóng gói Diff Payload dạng JSON
-            Map<String, Object> diffMap = Map.of(
-                    "title", title != null ? title : "",
-                    "targetEntityId", targetEntityId != null ? targetEntityId : "",
-                    "currentValues", currentValues != null ? currentValues : Map.of(),
-                    "proposedValues", proposedValues != null ? proposedValues : Map.of(),
-                    "reason", reason != null ? reason : ""
-            );
+            // Đóng gói Diff Payload an toàn (tránh NullPointerException của Map.of)
+            Map<String, Object> diffMap = new LinkedHashMap<>();
+            diffMap.put("title", title != null ? title : "");
+            diffMap.put("targetEntityId", targetEntityId != null ? targetEntityId : "");
+            diffMap.put("currentValues", currentValues != null ? currentValues : Collections.emptyMap());
+            diffMap.put("proposedValues", proposedValues != null ? proposedValues : Collections.emptyMap());
+            diffMap.put("reason", reason != null ? reason : "");
             String diffJson = objectMapper.writeValueAsString(diffMap);
 
-            // Sinh chữ ký số HMAC-SHA256
+            // Sinh chữ ký số HMAC-SHA256 chuẩn hóa
             String actionNonce = UUID.randomUUID().toString();
             String signature = generateHmacSignature(userId, toolName, targetEntityId, expiresAt, diffJson, actionNonce);
             String actionToken = actionNonce + "." + signature;
@@ -150,18 +151,35 @@ public class ActionProposalService {
     }
 
     /**
+     * Chuẩn hóa chuỗi JSON để đảm bảo tính xác định (Canonical JSON Scheme):
+     * Sắp xếp khóa theo thứ tự và loại bỏ biến động formatting của PostgreSQL JSONB.
+     */
+    public String canonicalizeJson(String jsonStr) {
+        if (jsonStr == null || jsonStr.isBlank()) {
+            return "{}";
+        }
+        try {
+            Object obj = objectMapper.readValue(jsonStr, Object.class);
+            return canonicalMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            return jsonStr;
+        }
+    }
+
+    /**
      * Thuật toán sinh chữ ký số HMAC-SHA256.
      */
     private String generateHmacSignature(Long userId, String toolName, String targetEntityId,
                                          LocalDateTime expiresAt, String diffJson, String nonce) {
         try {
+            String canonicalDiff = canonicalizeJson(diffJson);
             long epochSecond = expiresAt.toEpochSecond(ZoneOffset.UTC);
             String rawPayload = String.format("%s:%s:%s:%d:%s:%s",
                     userId,
                     toolName,
                     targetEntityId != null ? targetEntityId : "",
                     epochSecond,
-                    diffJson,
+                    canonicalDiff,
                     nonce);
 
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);

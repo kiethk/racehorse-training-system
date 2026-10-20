@@ -229,4 +229,34 @@ class ActionCommitServiceTest {
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         assertEquals("ACTION_ALREADY_COMMITTED", ex.getErrorCode());
     }
+
+    @Test
+    @DisplayName("Hỗ trợ Role Alias: Đề xuất gắn targetRole='VET' vẫn được user có role='VETERINARIAN' duyệt thành công")
+    void testCommitAction_WithRoleAlias_Success() {
+        String token = "vet-alias-token";
+        AuthenticatedUser vetUser = new AuthenticatedUser(8L, "vet@test.com", "VETERINARIAN");
+
+        PendingAgentAction action = new PendingAgentAction(
+                token,
+                8L,
+                "VET", // TargetRole từ AI là VET
+                "proposeUpdateHealthRestriction",
+                "15",
+                "{\"proposedValues\":{}}",
+                LocalDateTime.now().plusMinutes(3)
+        );
+        action.setId(202L);
+
+        when(pendingActionRepository.findByActionToken(token)).thenReturn(Optional.of(action));
+        when(proposalService.verifyTokenSignature(action)).thenReturn(true);
+        when(pendingActionRepository.updateStatusIfStatusIs(202L, ActionStatus.COMMITTED, ActionStatus.PENDING)).thenReturn(1);
+        when(userRepository.findById(8L)).thenReturn(Optional.of(new User()));
+
+        ActionCommitRequestDto request = new ActionCommitRequestDto("idemp-vet-1", token);
+        ActionCommitResponseDto response = commitService.commitAction(request, vetUser);
+
+        assertNotNull(response);
+        assertEquals(202L, response.actionId());
+        assertEquals(ActionStatus.COMMITTED, response.status());
+    }
 }

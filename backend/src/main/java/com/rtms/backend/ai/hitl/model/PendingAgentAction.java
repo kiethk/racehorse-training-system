@@ -2,6 +2,9 @@ package com.rtms.backend.ai.hitl.model;
 
 import com.rtms.backend.ai.hitl.enums.ActionStatus;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -27,6 +30,7 @@ public class PendingAgentAction {
     @Column(name = "target_entity_id", length = 100)
     private String targetEntityId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "diff_payload", nullable = false, columnDefinition = "jsonb")
     private String diffPayload;
 

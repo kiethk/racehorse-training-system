@@ -18,7 +18,7 @@ public interface PendingAgentActionRepository extends JpaRepository<PendingAgent
 
     List<PendingAgentAction> findByUserIdAndStatus(Long userId, ActionStatus status);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE PendingAgentAction a SET a.status = :newStatus WHERE a.id = :id AND a.status = :expectedStatus")
     int updateStatusIfStatusIs(@Param("id") Long id,
                                @Param("newStatus") ActionStatus newStatus,

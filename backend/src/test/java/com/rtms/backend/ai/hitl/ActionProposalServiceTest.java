@@ -15,7 +15,6 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ActionProposalServiceTest {
@@ -106,5 +105,41 @@ class ActionProposalServiceTest {
                 savedAction.getExpiresAt()
         );
         assertFalse(proposalService.verifyTokenSignature(tamperedPayloadAction), "Dữ liệu bị can thiệp payload phải bị từ chối");
+    }
+
+    @Test
+    @DisplayName("Chữ ký HMAC vẫn hợp lệ khi PostgreSQL JSONB chuẩn hóa thay đổi thứ tự key và khoảng trắng")
+    void testVerifyTokenSignature_WithJsonbReorderingAndWhitespace() {
+        ArgumentCaptor<PendingAgentAction> captor = ArgumentCaptor.forClass(PendingAgentAction.class);
+        when(pendingActionRepository.save(captor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ActionProposalDto dto = proposalService.createProposal(
+                5L,
+                "HEAD_TRAINER",
+                "proposeEditWorkoutMetric",
+                "Tiêu đề",
+                "12",
+                Map.of("a", 1, "b", 2),
+                Map.of("a", 10, "b", 20),
+                "Lý do"
+        );
+
+        PendingAgentAction savedAction = captor.getValue();
+
+        // Giả lập PostgreSQL JSONB lưu trữ: key bị đảo lộn và có thêm khoảng trắng ": "
+        String postgresJsonbReordered = "{\"reason\": \"Lý do\", \"title\": \"Tiêu đề\", \"currentValues\": {\"b\": 2, \"a\": 1}, \"proposedValues\": {\"b\": 20, \"a\": 10}, \"targetEntityId\": \"12\"}";
+
+        PendingAgentAction reorderedAction = new PendingAgentAction(
+                savedAction.getActionToken(),
+                savedAction.getUserId(),
+                savedAction.getTargetRole(),
+                savedAction.getToolName(),
+                savedAction.getTargetEntityId(),
+                postgresJsonbReordered,
+                savedAction.getExpiresAt()
+        );
+
+        assertTrue(proposalService.verifyTokenSignature(reorderedAction),
+                "Chữ ký phải khớp 100% dù PostgreSQL JSONB thay đổi thứ tự key hoặc khoảng trắng");
     }
 }

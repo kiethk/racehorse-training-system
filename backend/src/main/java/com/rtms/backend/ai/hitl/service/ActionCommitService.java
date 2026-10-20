@@ -32,7 +32,7 @@ import java.time.LocalDateTime;
  * 2. Xác thực token tồn tại và trạng thái PENDING.
  * 3. Kiểm tra TTL 5 phút.
  * 4. Xác minh chữ ký số HMAC-SHA256 (chống giả mạo payload / user / token).
- * 5. Xác minh quyền sở hữu phiên người dùng và thẩm quyền vai trò.
+ * 5. Xác minh quyền sở hữu phiên người dùng và thẩm quyền vai trò (hỗ trợ alias role).
  * 6. Xử lý nguyên tử Idempotency chống double-commit, cập nhật nghiệp vụ và ghi vết kiểm toán (AuditLog).
  */
 @Service
@@ -116,13 +116,13 @@ public class ActionCommitService {
                     "Chữ ký số không hợp lệ hoặc dữ liệu đề xuất đã bị can thiệp trái phép");
         }
 
-        // 6. Kiểm tra quyền sở hữu phiên người dùng và thẩm quyền vai trò
+        // 6. Kiểm tra quyền sở hữu phiên người dùng và thẩm quyền vai trò (hỗ trợ alias mapping)
         if (!action.getUserId().equals(currentUser.getUserId())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_USER",
                     "Bạn không phải là người khởi tạo hoặc sở hữu đề xuất hành động này");
         }
         if (action.getTargetRole() != null && !action.getTargetRole().isBlank()) {
-            if (!action.getTargetRole().equalsIgnoreCase(currentUser.getRole())) {
+            if (!isRoleMatching(action.getTargetRole(), currentUser.getRole())) {
                 throw new ApiException(HttpStatus.FORBIDDEN, "INSUFFICIENT_ROLE",
                         "Vai trò [" + currentUser.getRole() + "] không có thẩm quyền duyệt đề xuất dành cho [" + action.getTargetRole() + "]");
             }
@@ -152,6 +152,32 @@ public class ActionCommitService {
                 action.getTargetEntityId(),
                 "Phê duyệt và áp dụng hành động thành công"
         );
+    }
+
+    /**
+     * So khớp vai trò người dùng có thẩm quyền với vai trò mục tiêu của đề xuất,
+     * hỗ trợ các alias thông dụng (VET <-> VETERINARIAN, STABLE_STAFF <-> GROOM, RACING_MANAGER <-> CLUB_MANAGER).
+     */
+    private boolean isRoleMatching(String targetRole, String userRole) {
+        if (targetRole == null || targetRole.isBlank()) {
+            return true;
+        }
+        if (userRole == null) {
+            return false;
+        }
+        String normalizedTarget = normalizeRole(targetRole);
+        String normalizedUser = normalizeRole(userRole);
+        return normalizedTarget.equalsIgnoreCase(normalizedUser);
+    }
+
+    private String normalizeRole(String role) {
+        String r = role.trim().toUpperCase();
+        return switch (r) {
+            case "VET" -> "VETERINARIAN";
+            case "STABLE_STAFF" -> "GROOM";
+            case "RACING_MANAGER" -> "CLUB_MANAGER";
+            default -> r;
+        };
     }
 
     /**
