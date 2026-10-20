@@ -122,4 +122,7 @@ public interface AdmissionApplicationRepository
      * Finds all admission applications linked to a specific horse ID, newest first.
      */
     List<AdmissionApplication> findByHorseIdOrderBySubmittedAtDesc(Long horseId);
+
+    List<AdmissionApplication> findAllByOrderBySubmittedAtDesc();
 }
+

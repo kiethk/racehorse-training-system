@@ -36,7 +36,7 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("HEAD_TRAINER có đầy đủ các công cụ phân tích, tra cứu, đánh giá sẵn sàng thi đấu và Groom phụ trách")
+    @DisplayName("HEAD_TRAINER có đầy đủ các công cụ phân tích, tra cứu, đánh giá sẵn sàng thi đấu, Groom phụ trách, giải đua, đơn nhập đàn và chương trình học")
     void testHeadTrainerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("HEAD_TRAINER");
         assertNotNull(tools);
@@ -52,15 +52,21 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("getRacingReadinessAssessment"));
         assertTrue(toolNames.contains("checkGroomConflictForLot"));
         assertTrue(toolNames.contains("getTrainerAssignedGrooms"));
+        assertTrue(toolNames.contains("getMyHorseRaceRegistrations"));
+        assertTrue(toolNames.contains("getAssignedAdmissionReviews"));
+        assertTrue(toolNames.contains("getCourseCurriculumOverview"));
 
         assertTrue(registryService.isToolAllowedForRole("getTrainerSchedule", "HEAD_TRAINER"));
         assertTrue(registryService.isToolAllowedForRole("getHorseSpecialtyAnalysis", "HEAD_TRAINER"));
         assertTrue(registryService.isToolAllowedForRole("getTrainerAssignedGrooms", "HEAD_TRAINER"));
+        assertTrue(registryService.isToolAllowedForRole("getMyHorseRaceRegistrations", "HEAD_TRAINER"));
+        assertTrue(registryService.isToolAllowedForRole("getAssignedAdmissionReviews", "HEAD_TRAINER"));
+        assertTrue(registryService.isToolAllowedForRole("getCourseCurriculumOverview", "HEAD_TRAINER"));
         assertFalse(registryService.isToolAllowedForRole("searchClinicalKnowledge", "HEAD_TRAINER"));
     }
 
     @Test
-    @DisplayName("VETERINARIAN có đầy đủ các công cụ RAG, tổng quan khám bệnh, tiền sử bệnh án, lịch tiêm phòng, cách ly và sự cố")
+    @DisplayName("VETERINARIAN có đầy đủ các công cụ RAG, tổng quan khám bệnh, tiền sử bệnh án, lịch tiêm phòng, cách ly, sự cố, khám nhập đàn, cấp cứu và chỉ số sinh hiệu")
     void testVeterinarianTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("VETERINARIAN");
         assertNotNull(tools);
@@ -73,15 +79,21 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("getPreventiveCareSchedule"));
         assertTrue(toolNames.contains("getQuarantineStatus"));
         assertTrue(toolNames.contains("getRecentIncidentReports"));
+        assertTrue(toolNames.contains("getPendingAdmissionExams"));
+        assertTrue(toolNames.contains("getUrgentCareAlerts"));
+        assertTrue(toolNames.contains("getHorseVitalSignsTrend"));
 
         // Alias VET
         assertTrue(registryService.isToolAllowedForRole("searchClinicalKnowledge", "VET"));
         assertTrue(registryService.isToolAllowedForRole("getVetExaminationOverview", "VET"));
         assertTrue(registryService.isToolAllowedForRole("getQuarantineStatus", "VET"));
+        assertTrue(registryService.isToolAllowedForRole("getPendingAdmissionExams", "VET"));
+        assertTrue(registryService.isToolAllowedForRole("getUrgentCareAlerts", "VETERINARIAN"));
+        assertTrue(registryService.isToolAllowedForRole("getHorseVitalSignsTrend", "VETERINARIAN"));
     }
 
     @Test
-    @DisplayName("HORSE_OWNER là 100% Read-Only và có đầy đủ công cụ theo dõi ngựa của mình")
+    @DisplayName("HORSE_OWNER là 100% Read-Only và có đầy đủ công cụ theo dõi ngựa của mình bao gồm sự cố và phả hệ")
     void testHorseOwnerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("HORSE_OWNER");
         assertNotNull(tools);
@@ -92,14 +104,18 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("getMyHorseTrainingProgress"));
         assertTrue(toolNames.contains("getMyHorseUpcomingSchedule"));
         assertTrue(toolNames.contains("getMyHorseAdmissions"));
+        assertTrue(toolNames.contains("getMyHorseIncidentHistory"));
+        assertTrue(toolNames.contains("getMyHorsePedigreeInfo"));
 
         assertTrue(registryService.isToolAllowedForRole("getMyHorses", "HORSE_OWNER"));
         assertTrue(registryService.isToolAllowedForRole("getMyHorseUpcomingSchedule", "HORSE_OWNER"));
+        assertTrue(registryService.isToolAllowedForRole("getMyHorseIncidentHistory", "HORSE_OWNER"));
+        assertTrue(registryService.isToolAllowedForRole("getMyHorsePedigreeInfo", "HORSE_OWNER"));
         assertFalse(registryService.isToolAllowedForRole("getTrainerHorses", "HORSE_OWNER"));
     }
 
     @Test
-    @DisplayName("GROOM có đầy đủ các công cụ tác vụ và chuồng trại (đã loại bỏ quản lý vật tư)")
+    @DisplayName("GROOM có đầy đủ các công cụ tác vụ và chuồng trại, báo cáo sự cố và tỷ lệ hoàn thành")
     void testGroomTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("GROOM");
         assertNotNull(tools);
@@ -109,27 +125,40 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("getTodayAggregatedTasks"));
         assertTrue(toolNames.contains("getHorseDietaryAndCareAlerts"));
         assertTrue(toolNames.contains("getHorseStallLocation"));
+        assertTrue(toolNames.contains("getMyReportedIncidents"));
+        assertTrue(toolNames.contains("getGroomTaskCompletionRate"));
         assertFalse(toolNames.contains("checkStallSuppliesStatus"), "checkStallSuppliesStatus phải được bỏ");
 
         // Alias STABLE_STAFF
         assertTrue(registryService.isToolAllowedForRole("getMyAssignedHorses", "STABLE_STAFF"));
+        assertTrue(registryService.isToolAllowedForRole("getMyReportedIncidents", "GROOM"));
+        assertTrue(registryService.isToolAllowedForRole("getGroomTaskCompletionRate", "STABLE_STAFF"));
     }
 
     @Test
-    @DisplayName("CLUB_MANAGER có đầy đủ công cụ quản lý toàn trại, phân bổ khu vực và tổng quan sức khỏe (đã bỏ upcoming races)")
+    @DisplayName("CLUB_MANAGER có đầy đủ 8 công cụ quản trị: chuồng trại, đơn nhập đàn, khu vực, sức khỏe, danh bạ nhân sự, danh bạ chiến mã, nhật ký kiểm toán và pipeline nhập đàn")
     void testClubManagerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("CLUB_MANAGER");
         assertNotNull(tools);
+        assertEquals(8, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getStableOccupancyMetrics"));
         assertTrue(toolNames.contains("getAdmissionRequestsOverview"));
         assertTrue(toolNames.contains("getTrainerAreaDistribution"));
         assertTrue(toolNames.contains("getClubHealthOverview"));
+        assertTrue(toolNames.contains("getSystemStaffOverview"));
+        assertTrue(toolNames.contains("getClubHorsesDirectory"));
+        assertTrue(toolNames.contains("getRecentAuditLogs"));
+        assertTrue(toolNames.contains("getAdmissionPipelineDetails"));
         assertFalse(toolNames.contains("getUpcomingRacesAndCompetitions"), "getUpcomingRacesAndCompetitions phải được bỏ");
 
-        // Alias RACING_MANAGER
+        // Alias RACING_MANAGER & ADMIN
         assertTrue(registryService.isToolAllowedForRole("getTrainerAreaDistribution", "RACING_MANAGER"));
+        assertTrue(registryService.isToolAllowedForRole("getSystemStaffOverview", "ADMIN"));
+        assertTrue(registryService.isToolAllowedForRole("getClubHorsesDirectory", "ADMIN"));
+        assertTrue(registryService.isToolAllowedForRole("getRecentAuditLogs", "ADMIN"));
+        assertTrue(registryService.isToolAllowedForRole("getAdmissionPipelineDetails", "ADMIN"));
     }
 
     @Test

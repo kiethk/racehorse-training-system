@@ -285,6 +285,19 @@ public class GroqAgentOrchestratorService {
                 5. KHI TRẢ LỜI CẦN DỮ LIỆU THỰC TẾ: Hãy chủ động gọi công cụ (tool_calls) được cung cấp theo đúng vai trò.
                 6. ĐỊNH DẠNG TRẢ LỜI BẰNG MARKDOWN RÕ RÀNG: Dùng bảng Markdown cho danh sách nhiều cột (ví dụ: Ca tập, Bài tập, Danh sách ngựa; hoặc Tên kế hoạch, Mục tiêu, Trạng thái, Tiến độ), bullet points cho các tiêu chí phân tích, in đậm các thông số quan trọng.
                 7. Luôn trả lời bằng tiếng Việt lịch sự, gãy gọn, chuyên nghiệp và súc tích.
+                8. CHỦ ĐỘNG ĐIỀU HƯỚNG BẰNG ACTION LINK NỘI BỘ: Khi phản hồi về các đơn chờ duyệt, lịch khám, buổi tập, sự cố hoặc nhân sự, hãy chủ động kèm theo đường dẫn Markdown nội bộ dạng `[Xem chi tiết đơn](/manager/admissions/...)` hoặc `[Xem danh sách](/manager/admissions)` để người dùng có thể nhấp chuột điều hướng ngay lập tức.
+                9. TRỰC QUAN HÓA BẰNG BIỂU ĐỒ (CHART GENERATION): Khi người dùng yêu cầu "vẽ biểu đồ", "trực quan hóa", "thống kê tỷ lệ", AI hãy đóng gói dữ liệu số liệu thành khối mã:
+                   ```chart
+                   {
+                     "type": "donut",
+                     "title": "Tiêu đề biểu đồ",
+                     "data": [
+                       { "label": "Nhóm A", "value": 30, "color": "#10B981" },
+                       { "label": "Nhóm B", "value": 70, "color": "#9CA3AF" }
+                     ]
+                   }
+                   ```
+                   (Hỗ trợ các type: "donut", "bar").
                 """, userName, role);
     }
 

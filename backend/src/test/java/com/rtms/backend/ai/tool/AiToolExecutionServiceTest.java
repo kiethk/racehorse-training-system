@@ -52,6 +52,13 @@ import com.rtms.backend.training.repository.TrainingLotRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseSpecialtyService;
+import com.rtms.backend.audit.entity.AuditLog;
+import com.rtms.backend.audit.repository.AuditLogRepository;
+import com.rtms.backend.admission.entity.CandidateHorseProfile;
+import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
+import com.rtms.backend.identity.entity.Role;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -89,6 +96,8 @@ class AiToolExecutionServiceTest {
     private AreaRepository areaRepository;
     private UserRepository userRepository;
     private CourseRepository courseRepository;
+    private AuditLogRepository auditLogRepository;
+    private CandidateHorseProfileRepository candidateHorseProfileRepository;
 
     private AiToolExecutionService toolExecutionService;
 
@@ -113,6 +122,8 @@ class AiToolExecutionServiceTest {
         areaRepository = Mockito.mock(AreaRepository.class);
         userRepository = Mockito.mock(UserRepository.class);
         courseRepository = Mockito.mock(CourseRepository.class);
+        auditLogRepository = Mockito.mock(AuditLogRepository.class);
+        candidateHorseProfileRepository = Mockito.mock(CandidateHorseProfileRepository.class);
 
         toolExecutionService = new AiToolExecutionService(
                 toolRegistryService,
@@ -133,7 +144,9 @@ class AiToolExecutionServiceTest {
                 groomIncidentReportRepository,
                 areaRepository,
                 userRepository,
-                courseRepository
+                courseRepository,
+                auditLogRepository,
+                candidateHorseProfileRepository
         );
     }
 
@@ -447,5 +460,203 @@ class AiToolExecutionServiceTest {
         assertEquals(1L, map.get("soNguaDuocPhepTapLuyen"));
         assertEquals(1L, map.get("soNguaBiCamTapLuyenYTe"));
         assertEquals(1, map.get("soSuCoTrong7NgayQua"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi getSystemStaffOverview tra cứu danh bạ nhân sự")
+    void testManager_GetSystemStaffOverview() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        User u1 = new User();
+        u1.setId(10L);
+        u1.setFullName("Nguyễn Văn HLV");
+        u1.setEmail("trainer@rtms.com");
+        u1.setPhone("0901234567");
+        u1.setActive(true);
+        Role r1 = new Role();
+        r1.setName("HEAD_TRAINER");
+        u1.setRole(r1);
+
+        User u2 = new User();
+        u2.setId(20L);
+        u2.setFullName("Trần Thị Bác Sĩ");
+        u2.setEmail("vet@rtms.com");
+        u2.setPhone("0907654321");
+        u2.setActive(false);
+        Role r2 = new Role();
+        r2.setName("VETERINARIAN");
+        u2.setRole(r2);
+
+        when(userRepository.findAll()).thenReturn(List.of(u1, u2));
+
+        Object result = toolExecutionService.executeTool("getSystemStaffOverview", Map.of(), manager);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(2, list.size());
+
+        Map<?, ?> item1 = (Map<?, ?>) list.get(0);
+        assertEquals("Nguyễn Văn HLV", item1.get("hoTen"));
+        assertEquals("Huấn luyện viên trưởng", item1.get("vaiTro"));
+        assertEquals("trainer@rtms.com", item1.get("email"));
+        assertEquals("0901234567", item1.get("soDienThoai"));
+        assertEquals("Đang hoạt động", item1.get("trangThaiHoatDong"));
+        assertNotNull(item1.get("thongTinChuyenMon"));
+
+        Map<?, ?> item2 = (Map<?, ?>) list.get(1);
+        assertEquals("Đã khóa", item2.get("trangThaiHoatDong"));
+        assertEquals("Bác sĩ thú y", item2.get("vaiTro"));
+
+        // Filter by role & isActive
+        Object filteredResult = toolExecutionService.executeTool(
+                "getSystemStaffOverview",
+                Map.of("role", "HEAD_TRAINER", "isActive", true),
+                manager
+        );
+        assertTrue(filteredResult instanceof List<?>);
+        List<?> filteredList = (List<?>) filteredResult;
+        assertEquals(1, filteredList.size());
+        assertEquals("Nguyễn Văn HLV", ((Map<?, ?>) filteredList.get(0)).get("hoTen"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi getClubHorsesDirectory tra cứu danh bạ chiến mã kèm trạng thái và HLV phụ trách")
+    void testManager_GetClubHorsesDirectory() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        Horse h1 = new Horse();
+        h1.setId(100L);
+        h1.setName("DARK ANGEL");
+        h1.setRegistrationNumber("VN-100");
+        h1.setOwnerId(50L);
+        h1.setCurrentStallId(1L);
+        h1.setCurrentStatus(HorseStatus.ELIGIBLE);
+        h1.setTrainingDecision(TrainingDecision.ALLOWED);
+
+        when(horseRepository.findAll()).thenReturn(List.of(h1));
+
+        User owner = new User();
+        owner.setId(50L);
+        owner.setFullName("Chủ Ngựa Lê Văn");
+        when(userRepository.findById(50L)).thenReturn(Optional.of(owner));
+
+        StableStall stall = new StableStall();
+        stall.setId(1L);
+        stall.setAreaId(10L);
+        stall.setStallCode("A-01");
+        stall.setStallNumber(1);
+        when(stableStallRepository.findById(1L)).thenReturn(Optional.of(stall));
+
+        Area area = new Area();
+        area.setId(10L);
+        area.setTrainerId(5L);
+        when(areaRepository.findById(10L)).thenReturn(Optional.of(area));
+
+        User trainer = new User();
+        trainer.setId(5L);
+        trainer.setFullName("HLV Park");
+        when(userRepository.findById(5L)).thenReturn(Optional.of(trainer));
+
+        Object result = toolExecutionService.executeTool("getClubHorsesDirectory", Map.of(), manager);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(1, list.size());
+
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertEquals("DARK ANGEL", item.get("tenNgua"));
+        assertEquals("VN-100", item.get("maSoNgua"));
+        assertEquals("Chủ Ngựa Lê Văn", item.get("tenChuNgua"));
+        assertTrue(item.get("trangThaiHienTai").toString().contains("ACTIVE"));
+        assertTrue(item.get("viTriChuong").toString().contains("A-01"));
+        assertEquals("HLV Park", item.get("huanLuyenVienPhuTrach"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi getRecentAuditLogs tra cứu nhật ký kiểm toán hệ thống")
+    void testManager_GetRecentAuditLogs() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        AuditLog log = new AuditLog();
+        log.setId(1L);
+        log.setAction("Cập nhật kế hoạch huấn luyện");
+        log.setEntityName("HorseTrainingPlan");
+        log.setEntityId(10L);
+        log.setHttpMethod("PUT");
+        log.setRequestPath("/api/training/plans/10");
+        log.setStatusCode(200);
+
+        User actor = new User();
+        actor.setId(5L);
+        actor.setFullName("HLV Nguyễn Văn B");
+        Role r = new Role();
+        r.setName("HEAD_TRAINER");
+        actor.setRole(r);
+        log.setUser(actor);
+
+        when(auditLogRepository.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(log)));
+
+        Object result = toolExecutionService.executeTool("getRecentAuditLogs", Map.of("limit", 10), manager);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(1, list.size());
+
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertEquals("Cập nhật kế hoạch huấn luyện", item.get("hanhDong"));
+        assertTrue(item.get("nguoiThucHien").toString().contains("HLV Nguyễn Văn B"));
+        assertTrue(item.get("chiTietThayDoi").toString().contains("HorseTrainingPlan"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi getAdmissionPipelineDetails tra cứu chi tiết các đơn đăng ký nhập đàn")
+    void testManager_GetAdmissionPipelineDetails() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(123L);
+        app.setOwnerId(50L);
+        app.setStatus(AdmissionStatus.MANAGER_REVIEW);
+        app.setSubmittedAt(LocalDateTime.of(2026, 10, 20, 10, 0));
+        app.setVeterinarianId(8L);
+        app.setTrainerId(5L);
+
+        when(admissionApplicationRepository.findAll()).thenReturn(List.of(app));
+
+        CandidateHorseProfile profile = new CandidateHorseProfile();
+        profile.setId(1L);
+        profile.setAdmissionId(123L);
+        profile.setName("PEGASUS JUNIOR");
+        when(candidateHorseProfileRepository.findByAdmissionId(123L)).thenReturn(Optional.of(profile));
+
+        User owner = new User();
+        owner.setId(50L);
+        owner.setFullName("Chủ Ngựa Trần C");
+        when(userRepository.findById(50L)).thenReturn(Optional.of(owner));
+
+        User vet = new User();
+        vet.setId(8L);
+        vet.setFullName("BS Thú Y Hoàng");
+        when(userRepository.findById(8L)).thenReturn(Optional.of(vet));
+
+        User trainer = new User();
+        trainer.setId(5L);
+        trainer.setFullName("HLV Park");
+        when(userRepository.findById(5L)).thenReturn(Optional.of(trainer));
+
+        Object result = toolExecutionService.executeTool("getAdmissionPipelineDetails", Map.of("status", "PENDING"), manager);
+        assertNotNull(result);
+        assertTrue(result instanceof List<?>);
+        List<?> list = (List<?>) result;
+        assertEquals(1, list.size());
+
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertEquals("PEGASUS JUNIOR", item.get("tenNgua"));
+        assertEquals("Chủ Ngựa Trần C", item.get("tenChuNgua"));
+        assertTrue(item.get("buocHienTai").toString().contains("MANAGER_REVIEW"));
+        assertEquals("BS Thú Y Hoàng", item.get("bacSiPhuTrach"));
+        assertEquals("HLV Park", item.get("huanLuyenVienChiDinh"));
+        assertEquals("/manager/admissions/123", item.get("duongDanDieuHuong"));
     }
 }

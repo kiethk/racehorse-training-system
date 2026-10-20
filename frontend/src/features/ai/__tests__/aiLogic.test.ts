@@ -43,7 +43,10 @@ describe('AI Logic & Quick Prompts Utility Tests', () => {
     assert.ok(groomPrompts.some((p) => p.includes('Checklist') || p.includes('chuồng') || p.includes('Chuồng')));
 
     const managerPrompts = getQuickPromptsByRole('CLUB_MANAGER');
-    assert.ok(managerPrompts.some((p) => p.includes('chuồng trại') || p.includes('nhập đàn')));
+    assert.ok(managerPrompts.includes('Danh sách nhân sự & bác sĩ'));
+    assert.ok(managerPrompts.includes('Vẽ biểu đồ công suất chuồng trại'));
+    assert.ok(managerPrompts.includes('Các đơn nhập chuồng chờ duyệt'));
+    assert.ok(managerPrompts.includes('Nhật ký kiểm toán gần đây'));
 
     const defaultPrompts = getQuickPromptsByRole('HORSE_OWNER');
     assert.ok(defaultPrompts.some((p) => p.includes('sức khỏe') || p.includes('chiến mã') || p.includes('ngựa')));

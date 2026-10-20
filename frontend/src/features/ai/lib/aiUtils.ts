@@ -51,10 +51,10 @@ export function getQuickPromptsByRole(role?: string): string[] {
   }
   if (norm === 'CLUB_MANAGER' || norm === 'RACING_MANAGER') {
     return [
-      'Báo cáo công suất chuồng trại',
-      'Tình hình sức khỏe toàn đàn',
-      'Phân bổ khu vực và huấn luyện viên',
-      'Đơn đăng ký nhập đàn chờ duyệt',
+      'Danh sách nhân sự & bác sĩ',
+      'Vẽ biểu đồ công suất chuồng trại',
+      'Các đơn nhập chuồng chờ duyệt',
+      'Nhật ký kiểm toán gần đây',
     ];
   }
   if (norm === 'HORSE_OWNER') {
