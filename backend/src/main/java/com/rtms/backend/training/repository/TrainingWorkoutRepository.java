@@ -226,4 +226,5 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
        WHERE w.id = :workoutId AND l.trainerId = :trainerId
        """)
     Optional<TrainingWorkout> findByIdAndTrainerId(@Param("workoutId") Long workoutId, @Param("trainerId") Long trainerId);
+    List<TrainingWorkout> findByHorseIdOrderByCreatedAtDesc(Long horseId);
 }
