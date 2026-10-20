@@ -49,6 +49,7 @@ public class GroqAgentOrchestratorService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
+    @Autowired
     public GroqAgentOrchestratorService(
             @Value("${groq.api.base-url:https://api.groq.com/openai/v1}") String groqBaseUrl,
             @Value("${groq.api.key:}") String groqApiKey,
