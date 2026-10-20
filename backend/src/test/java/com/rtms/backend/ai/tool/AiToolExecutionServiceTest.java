@@ -29,6 +29,7 @@ import com.rtms.backend.stable.enums.IncidentSeverity;
 import com.rtms.backend.stable.enums.IncidentStatus;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.enums.TaskSource;
+import com.rtms.backend.stable.enums.GroomTaskType;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
@@ -993,5 +994,351 @@ class AiToolExecutionServiceTest {
         assertEquals(1L, map.get("soNhiemVuHoanThanh"));
         assertEquals("50.0%", map.get("tyLeHoanThanh"));
         assertEquals("/groom/tasks", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("HORSE_OWNER gọi analyzeHorseInvestmentAndFitnessROI xem tiến độ thể lực và hiệu quả đầu tư")
+    void testOwner_AnalyzeHorseInvestmentAndFitnessROI() {
+        AuthenticatedUser owner = new AuthenticatedUser(100L, "owner@rtms.com", "HORSE_OWNER");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("RED RUM");
+        horse.setRegistrationNumber("VN-HORSE-10");
+        horse.setOwnerId(100L);
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        TrainingWorkout w1 = new TrainingWorkout();
+        w1.setId(1L);
+        w1.setStatus(WorkoutStatus.COMPLETED);
+        w1.setPerformanceRating(8);
+        w1.setTopSpeedKmh(new BigDecimal("58.2"));
+
+        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L))
+                .thenReturn(List.of(w1));
+
+        Object result = toolExecutionService.executeTool("analyzeHorseInvestmentAndFitnessROI", Map.of("horseId", 10L), owner);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("RED RUM", map.get("tenNgua"));
+        assertEquals("VN-HORSE-10", map.get("maDangKy"));
+        assertEquals(1, map.get("tongSoBuoiTap"));
+        assertEquals(1, map.get("tongSoBuoiTapDatYeuCau"));
+        assertNotNull(map.get("tocDoPhatTrienTheLuc"));
+        assertNotNull(map.get("danhGiaTiemNangThiDau"));
+        assertEquals("/owner/horses", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi analyzeWorkoutLoadAndOvertrainingRisk phân tích nguy cơ quá tải 14 ngày qua")
+    void testTrainer_AnalyzeWorkoutLoadAndOvertrainingRisk() {
+        AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("THUNDER");
+        horse.setRegistrationNumber("VN-THUNDER");
+        horse.setTrainingDecision(TrainingDecision.ALLOWED);
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        TrainingWorkout w1 = new TrainingWorkout();
+        w1.setId(1L);
+        w1.setActualDistanceMeters(new BigDecimal("1200"));
+        w1.setAverageHeartRate(98);
+        w1.setMaxHeartRate(112);
+        w1.setRecoveryHeartRate(88);
+        w1.setTopSpeedKmh(new BigDecimal("54.0"));
+        w1.setCreatedAt(LocalDateTime.now().minusDays(2));
+
+        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
+
+        Object result = toolExecutionService.executeTool("analyzeWorkoutLoadAndOvertrainingRisk", Map.of("horseId", 10L), trainer);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("THUNDER", map.get("tenNgua"));
+        assertEquals("VN-THUNDER", map.get("maDangKy"));
+        assertEquals("1.2 km", map.get("tongCuLy14Ngay"));
+        assertEquals(1, map.get("soBuoiTap"));
+        assertEquals("98 bpm", map.get("nhipTimTrungBinh"));
+        assertEquals("Thấp", map.get("danhGiaNguyCo"));
+        assertEquals("/trainer/dashboard", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi recommendOptimalRaceDistanceAndTrack đề xuất cự ly và mặt sân tối ưu")
+    void testTrainer_RecommendOptimalRaceDistanceAndTrack() {
+        AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("THUNDER");
+        horse.setRegistrationNumber("VN-THUNDER");
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        HorseSpecialtyResponse specialty = new HorseSpecialtyResponse(
+                3,
+                List.of(DistanceBand.SPRINT),
+                SurfaceType.TURF,
+                List.of()
+        );
+        when(horseSpecialtyService.getSpecialties(List.of(10L))).thenReturn(Map.of(10L, specialty));
+
+        TrainingWorkout w1 = new TrainingWorkout();
+        w1.setTopSpeedKmh(new BigDecimal("60.5"));
+        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
+
+        Object result = toolExecutionService.executeTool("recommendOptimalRaceDistanceAndTrack", Map.of("horseId", 10L), trainer);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("THUNDER", map.get("tenNgua"));
+        assertTrue(map.get("cuLyDeXuat").toString().contains("Sprint"));
+        assertTrue(map.get("matSanUaThich").toString().contains("Turf"));
+        assertEquals("60.5 km/h", map.get("tocDoToiUu"));
+        assertEquals("/trainer/racing", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi recommendNextWorkoutAdjustment điều chỉnh bài tập kế tiếp")
+    void testTrainer_RecommendNextWorkoutAdjustment() {
+        AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("THUNDER");
+        horse.setRegistrationNumber("VN-THUNDER");
+        horse.setTrainingDecision(TrainingDecision.ALLOWED);
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        TrainingWorkout w1 = new TrainingWorkout();
+        w1.setActualDistanceMeters(new BigDecimal("1000"));
+        w1.setMaxHeartRate(125);
+        w1.setStatus(WorkoutStatus.COMPLETED);
+        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
+
+        Object result = toolExecutionService.executeTool("recommendNextWorkoutAdjustment", Map.of("horseId", 10L), trainer);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("THUNDER", map.get("tenNgua"));
+        assertTrue(map.get("nhanXetTheLuc").toString().contains("vượt ngưỡng an toàn"));
+        assertTrue(map.get("baiTapKeTiepDeXuat").toString().contains("Giảm tải"));
+        assertEquals("/trainer/plans", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi recommendNextWorkoutAdjustment với ngựa bị BLOCKED loại trừ mâu thuẫn dữ liệu")
+    void testTrainer_RecommendNextWorkoutAdjustment_Blocked() {
+        AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("THUNDER");
+        horse.setRegistrationNumber("VN-THUNDER");
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        Object result = toolExecutionService.executeTool("recommendNextWorkoutAdjustment", Map.of("horseId", 10L), trainer);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertTrue(map.get("baiTapKeTiepDeXuat").toString().contains("Nghỉ ngơi"));
+    }
+
+    @Test
+    @DisplayName("VETERINARIAN gọi analyzeIncidentPatternsAndRecurringRisks phân tích nguy cơ mãn tính")
+    void testVet_AnalyzeIncidentPatternsAndRecurringRisks() {
+        AuthenticatedUser vet = new AuthenticatedUser(300L, "vet@rtms.com", "VETERINARIAN");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("LIGHTNING");
+        horse.setRegistrationNumber("VN-LIGHTNING");
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        HorseIncidentReport ir = new HorseIncidentReport();
+        ir.setTitle("Viêm gân nhẹ");
+        when(horseIncidentReportRepository.findByHorseId(10L)).thenReturn(List.of(ir));
+
+        HealthRecord hr = new HealthRecord();
+        hr.setDiagnosis("Viêm khớp cổ chân");
+        when(healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(10L)).thenReturn(List.of(hr));
+
+        Object result = toolExecutionService.executeTool("analyzeIncidentPatternsAndRecurringRisks", Map.of("horseId", 10L), vet);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("LIGHTNING", map.get("tenNgua"));
+        assertEquals(1, map.get("tongSoSuCo"));
+        assertEquals(1, map.get("tongSoLanKhamBenh"));
+        assertTrue(map.get("benhLyPhoBien").toString().contains("Viêm khớp"));
+        assertEquals("/veterinarian/admissions", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("VETERINARIAN gọi recommendClinicalInterventionPlan đề xuất phác đồ từ RAG")
+    void testVet_RecommendClinicalInterventionPlan() {
+        AuthenticatedUser vet = new AuthenticatedUser(300L, "vet@rtms.com", "VETERINARIAN");
+
+        ClinicalChunkResponseDto chunk = new ClinicalChunkResponseDto(
+                1L, "Phác đồ điều trị Colic ở ngựa", "Tiêu hóa",
+                "Đặt ống thông dạ dày, sử dụng Flunixin Meglumine", 0.88, Map.of()
+        );
+        when(clinicalRetrievalService.retrieveSimilarClinicalRecords(anyString(), any(), anyInt()))
+                .thenReturn(List.of(chunk));
+
+        Object result = toolExecutionService.executeTool(
+                "recommendClinicalInterventionPlan",
+                Map.of("symptoms", "Ngựa có biểu hiện cào đất, bỏ ăn, đau quặn bụng"),
+                vet
+        );
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertTrue(map.get("phacDoCanThiepDeXuat").toString().contains("Bước 1"));
+        assertNotNull(map.get("xetNghiemCanLam"));
+        assertNotNull(map.get("thoiGianTheoDoiToiThieu"));
+        assertEquals("/veterinarian/urgent", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("VETERINARIAN gọi evaluateTrainingResumptionReadiness đánh giá sẵn sàng quay lại tập")
+    void testVet_EvaluateTrainingResumptionReadiness() {
+        AuthenticatedUser vet = new AuthenticatedUser(300L, "vet@rtms.com", "VETERINARIAN");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("LIGHTNING");
+        horse.setRegistrationNumber("VN-LIGHTNING");
+        horse.setTrainingDecision(TrainingDecision.ALLOWED);
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        HorseHealthMetric m = new HorseHealthMetric();
+        m.setTemperature(new BigDecimal("37.8"));
+        m.setHeartRate(new BigDecimal("38"));
+        when(horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(10L)).thenReturn(List.of(m));
+
+        Object result = toolExecutionService.executeTool("evaluateTrainingResumptionReadiness", Map.of("horseId", 10L), vet);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("LIGHTNING", map.get("tenNgua"));
+        assertEquals("85/100", map.get("diemSanSang"));
+        assertEquals("Đủ điều kiện tập nhẹ", map.get("khuyenNghiBacSi"));
+        assertEquals("/veterinarian/preventive-care", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("GROOM gọi detectHorseBehavioralAnomaly phát hiện sớm triệu chứng bất thường")
+    void testGroom_DetectHorseBehavioralAnomaly() {
+        AuthenticatedUser groom = new AuthenticatedUser(400L, "groom@rtms.com", "GROOM");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("SHADOW");
+        horse.setRegistrationNumber("VN-SHADOW");
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        HorseIncidentReport rep = new HorseIncidentReport();
+        rep.setTitle("Ngựa bỏ ăn và cào đất liên tục");
+        rep.setDescription("Có dấu hiệu đau bụng không yên");
+        when(horseIncidentReportRepository.findByHorseId(10L)).thenReturn(List.of(rep));
+
+        HorseHealthMetric m = new HorseHealthMetric();
+        m.setHeartRate(new BigDecimal("48"));
+        when(horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(10L)).thenReturn(List.of(m));
+
+        Object result = toolExecutionService.executeTool("detectHorseBehavioralAnomaly", Map.of("horseId", 10L), groom);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("SHADOW", map.get("tenNgua"));
+        assertEquals("Khẩn cấp", map.get("mucDoCanhBao"));
+        assertTrue(map.get("hanhDongCanLamNgay").toString().contains("Báo ngay cho Bác sĩ"));
+        assertEquals("/groom/incidents", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("GROOM gọi recommendDailyCarePriorityOrder đề xuất thứ tự ưu tiên chăm sóc trong ngày")
+    void testGroom_RecommendDailyCarePriorityOrder() {
+        AuthenticatedUser groom = new AuthenticatedUser(400L, "groom@rtms.com", "GROOM");
+
+        GroomDailyTask t1 = new GroomDailyTask(400L, 10L, GroomTaskType.FEEDING, LocalDateTime.now().withHour(8), "Cho ăn");
+        GroomDailyTask t2 = new GroomDailyTask(400L, 10L, GroomTaskType.VET_ASSIST, LocalDateTime.now().withHour(7), "Hỗ trợ tiêm phòng");
+        when(groomDailyTaskRepository.findByGroomIdAndScheduledTimeBetween(eq(400L), any(), any()))
+                .thenReturn(List.of(t1, t2));
+
+        Horse h = new Horse();
+        h.setId(10L);
+        h.setName("SHADOW");
+        when(horseRepository.findAll()).thenReturn(List.of(h));
+
+        Object result = toolExecutionService.executeTool("recommendDailyCarePriorityOrder", Map.of(), groom);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertTrue(map.containsKey("danhSachThuTuUuTien"));
+        assertTrue(map.containsKey("luuYVeSinhPhongDich"));
+        assertEquals("/groom/tasks", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi analyzeStableCapacityAndStallBottlenecks phân tích công suất chuồng trại")
+    void testManager_AnalyzeStableCapacityAndStallBottlenecks() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        when(stableStallRepository.count()).thenReturn(50L);
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(5L);
+        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(2L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(8L);
+
+        AdmissionApplication app = new AdmissionApplication();
+        app.setStatus(AdmissionStatus.VET_REVIEW);
+        when(admissionApplicationRepository.findAll()).thenReturn(List.of(app));
+
+        Object result = toolExecutionService.executeTool("analyzeStableCapacityAndStallBottlenecks", Map.of(), manager);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals(50L, map.get("tongSoChuong"));
+        assertEquals(7L, map.get("soChuongTrong"));
+        assertEquals(8L, map.get("soCaCachLy"));
+        assertNotNull(map.get("duBaoDiemNghen"));
+        assertEquals("/manager/stable", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi recommendGroomWorkloadRebalancing đề xuất tái cân bằng tải Groom")
+    void testManager_RecommendGroomWorkloadRebalancing() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        User g1 = new User();
+        g1.setId(10L);
+        g1.setFullName("Groom Nam");
+        Role r = new Role();
+        r.setName("GROOM");
+        g1.setRole(r);
+        g1.setActive(true);
+
+        User g2 = new User();
+        g2.setId(20L);
+        g2.setFullName("Groom Tuấn");
+        g2.setRole(r);
+        g2.setActive(true);
+
+        when(userRepository.findAll()).thenReturn(List.of(g1, g2));
+        when(stableStallRepository.findByGroomId(10L)).thenReturn(List.of(new StableStall(), new StableStall(), new StableStall(), new StableStall(), new StableStall(), new StableStall()));
+        when(stableStallRepository.findByGroomId(20L)).thenReturn(List.of(new StableStall()));
+
+        Object result = toolExecutionService.executeTool("recommendGroomWorkloadRebalancing", Map.of(), manager);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals(2, map.get("tongSoGroom"));
+        assertTrue(map.containsKey("danhSachGroomKemTaiTrong"));
+        assertNotNull(map.get("deXuatDieuChuyenChuong"));
+        assertEquals("/manager/staff", map.get("actionUrl"));
     }
 }

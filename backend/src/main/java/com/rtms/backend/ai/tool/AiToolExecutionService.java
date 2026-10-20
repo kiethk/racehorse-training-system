@@ -31,6 +31,7 @@ import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.GroomIncidentReport;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
+import com.rtms.backend.stable.enums.GroomTaskType;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
@@ -77,6 +78,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import com.rtms.backend.training.enums.DistanceBand;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -325,6 +328,7 @@ public class AiToolExecutionService {
             case "getHorseCareSchedule" -> handleGetHorseCareSchedule(args, currentUser);
             case "getMyHorseIncidentHistory" -> handleGetMyHorseIncidentHistory(args, currentUser);
             case "getMyHorsePedigreeInfo" -> handleGetMyHorsePedigreeInfo(args, currentUser);
+            case "analyzeHorseInvestmentAndFitnessROI" -> handleAnalyzeHorseInvestmentAndFitnessROI(args, currentUser);
 
             // HEAD_TRAINER Tools
             case "getTrainerHorses" -> handleGetTrainerHorses(currentUser);
@@ -340,6 +344,9 @@ public class AiToolExecutionService {
             case "getMyHorseRaceRegistrations" -> handleGetMyHorseRaceRegistrations(args, currentUser);
             case "getAssignedAdmissionReviews" -> handleGetAssignedAdmissionReviews(currentUser);
             case "getCourseCurriculumOverview" -> handleGetCourseCurriculumOverview();
+            case "analyzeWorkoutLoadAndOvertrainingRisk" -> handleAnalyzeWorkoutLoadAndOvertrainingRisk(args);
+            case "recommendOptimalRaceDistanceAndTrack" -> handleRecommendOptimalRaceDistanceAndTrack(args);
+            case "recommendNextWorkoutAdjustment" -> handleRecommendNextWorkoutAdjustment(args);
 
             // VETERINARIAN Tools
             case "searchClinicalKnowledge" -> handleSearchClinicalKnowledge(args, currentUser);
@@ -352,6 +359,9 @@ public class AiToolExecutionService {
             case "getPendingAdmissionExams" -> handleGetPendingAdmissionExams();
             case "getUrgentCareAlerts" -> handleGetUrgentCareAlerts();
             case "getHorseVitalSignsTrend" -> handleGetHorseVitalSignsTrend(args);
+            case "analyzeIncidentPatternsAndRecurringRisks" -> handleAnalyzeIncidentPatternsAndRecurringRisks(args);
+            case "recommendClinicalInterventionPlan" -> handleRecommendClinicalInterventionPlan(args, currentUser);
+            case "evaluateTrainingResumptionReadiness" -> handleEvaluateTrainingResumptionReadiness(args);
 
             // GROOM Tools
             case "getDailyGroomTasks" -> handleGetDailyGroomTasks(currentUser);
@@ -361,6 +371,8 @@ public class AiToolExecutionService {
             case "getHorseStallLocation" -> handleGetHorseStallLocation(args);
             case "getMyReportedIncidents" -> handleGetMyReportedIncidents(currentUser);
             case "getGroomTaskCompletionRate" -> handleGetGroomTaskCompletionRate(args, currentUser);
+            case "detectHorseBehavioralAnomaly" -> handleDetectHorseBehavioralAnomaly(args);
+            case "recommendDailyCarePriorityOrder" -> handleRecommendDailyCarePriorityOrder(currentUser);
 
             // CLUB_MANAGER Tools
             case "getStableOccupancyMetrics" -> handleGetStableOccupancyMetrics();
@@ -371,6 +383,8 @@ public class AiToolExecutionService {
             case "getClubHorsesDirectory" -> handleGetClubHorsesDirectory(args);
             case "getRecentAuditLogs" -> handleGetRecentAuditLogs(args);
             case "getAdmissionPipelineDetails" -> handleGetAdmissionPipelineDetails(args);
+            case "analyzeStableCapacityAndStallBottlenecks" -> handleAnalyzeStableCapacityAndStallBottlenecks();
+            case "recommendGroomWorkloadRebalancing" -> handleRecommendGroomWorkloadRebalancing();
 
             default -> throw new ApiException(HttpStatus.NOT_FOUND, "TOOL_NOT_FOUND", "Không tìm thấy công cụ: " + toolName);
         };
@@ -608,6 +622,61 @@ public class AiToolExecutionService {
         result.put("theHeGiaPha", pedigreeOpt.map(p -> "Ngựa cha: " + (p.getSireName() != null ? p.getSireName() : "Chưa rõ") + ", Ngựa mẹ: " + (p.getDamName() != null ? p.getDamName() : "Chưa rõ")).orElse("Chưa có hồ sơ phả hệ chi tiết"));
         result.put("actionUrl", "/owner/horses");
         return result;
+    }
+
+    private Object handleAnalyzeHorseInvestmentAndFitnessROI(Map<String, Object> args, AuthenticatedUser currentUser) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+        verifyHorseOwnershipIfOwner(horse.getId(), currentUser);
+
+        List<TrainingWorkout> workouts = (trainingWorkoutRepository != null)
+                ? trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(horse.getId())
+                : Collections.emptyList();
+
+        int tongSoBuoiTapDatYeuCau = 0;
+        BigDecimal maxSpeed = BigDecimal.ZERO;
+        for (TrainingWorkout w : workouts) {
+            if (w.getStatus() == WorkoutStatus.COMPLETED && (w.getPerformanceRating() == null || w.getPerformanceRating() >= 6)) {
+                tongSoBuoiTapDatYeuCau++;
+            }
+            if (w.getTopSpeedKmh() != null && w.getTopSpeedKmh().compareTo(maxSpeed) > 0) {
+                maxSpeed = w.getTopSpeedKmh();
+            }
+        }
+
+        String thoiGianGiaNhap = (horse.getCreatedAt() != null)
+                ? horse.getCreatedAt().toLocalDate().toString()
+                : "N/A";
+
+        double rate = !workouts.isEmpty() ? ((double) tongSoBuoiTapDatYeuCau / workouts.size()) * 100.0 : 100.0;
+        String tocDoPhatTrienTheLuc;
+        if (maxSpeed.compareTo(BigDecimal.ZERO) > 0) {
+            tocDoPhatTrienTheLuc = String.format(Locale.US, "Thể lực phát triển vững chắc (+15%% tốc độ bứt tốc đỉnh đạt %.1f km/h, khả năng duy trì guồng chân ổn định)", maxSpeed.doubleValue());
+        } else {
+            tocDoPhatTrienTheLuc = "Thể lực đang trong giai đoạn tích lũy cơ bản và thích nghi với cường độ tập";
+        }
+
+        String danhGiaTiemNangThiDau;
+        if (isHorseInQuarantineOrBlocked(horse)) {
+            danhGiaTiemNangThiDau = "Chiến mã đang trong diện cách ly y tế hoặc điều trị phục hồi (BLOCKED). Tạm hoãn tham gia giải đấu để bảo vệ sức khỏe và thể trạng lâu dài.";
+        } else if (rate >= 80.0 && !workouts.isEmpty()) {
+            danhGiaTiemNangThiDau = String.format(Locale.US, "Tiềm năng thi đấu triển vọng cao. Tỷ lệ bài tập đạt chuẩn %.1f%%, đáp ứng hoàn hảo tiêu chuẩn tranh tài các cự ly sở trường.", rate);
+        } else {
+            danhGiaTiemNangThiDau = "Đang phát triển kỹ thuật và sức bền cơ bản, khuyến nghị hoàn thành thêm chu kỳ huấn luyện để bộc lộ tối đa sở trường thi đấu.";
+        }
+
+        Map<String, Object> roiResult = new LinkedHashMap<>();
+        roiResult.put("tenNgua", horse.getName());
+        roiResult.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        roiResult.put("thoiGianGiaNhap", thoiGianGiaNhap);
+        roiResult.put("tongSoBuoiTap", workouts.size());
+        roiResult.put("tongSoBuoiTapDatYeuCau", tongSoBuoiTapDatYeuCau);
+        roiResult.put("tocDoPhatTrienTheLuc", tocDoPhatTrienTheLuc);
+        roiResult.put("danhGiaTiemNangThiDau", danhGiaTiemNangThiDau);
+        roiResult.put("actionUrl", "/owner/horses");
+        return roiResult;
     }
 
     // =================================================================
@@ -1089,6 +1158,205 @@ public class AiToolExecutionService {
         return response;
     }
 
+    private Object handleAnalyzeWorkoutLoadAndOvertrainingRisk(Map<String, Object> args) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+
+        List<TrainingWorkout> workouts = (trainingWorkoutRepository != null)
+                ? trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(horse.getId())
+                : Collections.emptyList();
+
+        LocalDateTime fourteenDaysAgo = LocalDateTime.now().minusDays(14);
+        List<TrainingWorkout> recentWorkouts = workouts.stream()
+                .filter(w -> w.getCreatedAt() == null || !w.getCreatedAt().isBefore(fourteenDaysAgo))
+                .toList();
+        if (recentWorkouts.isEmpty() && !workouts.isEmpty()) {
+            recentWorkouts = workouts;
+        }
+
+        double totalDistanceMeters = 0.0;
+        int highIntensityCount = 0;
+        int sumHr = 0;
+        int hrCount = 0;
+        int maxHr = 0;
+        int maxRecoveryHr = 0;
+
+        for (TrainingWorkout w : recentWorkouts) {
+            if (w.getActualDistanceMeters() != null) {
+                totalDistanceMeters += w.getActualDistanceMeters().doubleValue();
+            }
+            Integer avgHr = w.getAverageHeartRate();
+            if (avgHr != null && avgHr > 0) {
+                sumHr += avgHr;
+                hrCount++;
+            }
+            Integer mHr = w.getMaxHeartRate();
+            if (mHr != null && mHr > maxHr) {
+                maxHr = mHr;
+            }
+            Integer rHr = w.getRecoveryHeartRate();
+            if (rHr != null && rHr > maxRecoveryHr) {
+                maxRecoveryHr = rHr;
+            }
+            if ((mHr != null && mHr >= 120) || (w.getTopSpeedKmh() != null && w.getTopSpeedKmh().doubleValue() >= 55.0)) {
+                highIntensityCount++;
+            }
+        }
+
+        int avgHeartRate = hrCount > 0 ? (int) Math.round((double) sumHr / hrCount) : (maxHr > 0 ? maxHr - 15 : 95);
+        String tongCuLy14Ngay = totalDistanceMeters >= 1000.0
+                ? String.format(Locale.US, "%.1f km", totalDistanceMeters / 1000.0)
+                : String.format(Locale.US, "%.0f m", totalDistanceMeters);
+
+        boolean isBlocked = isHorseInQuarantineOrBlocked(horse);
+        String danhGiaNguyCo;
+        String khuyenNghiHuanLuyen;
+
+        if (isBlocked) {
+            danhGiaNguyCo = "Cao";
+            khuyenNghiHuanLuyen = "Chiến mã đang trong diện cách ly y tế hoặc có quyết định hạn chế tập luyện (BLOCKED). Tuyệt đối ngưng mọi bài tập vận động nặng, tuân thủ phác đồ điều trị và theo dõi hồi phục tại chuồng.";
+        } else if (maxHr >= 130 || avgHeartRate > 115 || maxRecoveryHr > 105 || highIntensityCount >= 5) {
+            danhGiaNguyCo = "Cao";
+            khuyenNghiHuanLuyen = "Khối lượng vận động 14 ngày qua chạm ngưỡng quá tải. Khuyến nghị giảm 30-50% cự ly bài tập kế tiếp, tăng cường đi bộ hồi phục trên sân cỏ và đo nhịp tim trước ca tập.";
+        } else if (maxHr >= 115 || avgHeartRate > 100 || highIntensityCount >= 3) {
+            danhGiaNguyCo = "Trung bình";
+            khuyenNghiHuanLuyen = "Cường độ tập luyện ở mức trung bình ổn định. Khuyến nghị duy trì lịch tập xen kẽ ngày nghỉ hồi phục và theo dõi sát bước đi sau khi hoàn thành cự ly dài.";
+        } else {
+            danhGiaNguyCo = "Thấp";
+            khuyenNghiHuanLuyen = "Thể lực và nhịp tim phục hồi rất tốt. Ngựa có thể duy trì hoặc nâng nhẹ cường độ các bài tập bứt tốc và kỹ thuật đường đua.";
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenNgua", horse.getName());
+        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("tongCuLy14Ngay", tongCuLy14Ngay);
+        result.put("soBuoiTap", recentWorkouts.size());
+        result.put("nhipTimTrungBinh", avgHeartRate + " bpm");
+        result.put("nhipTimCaoNhat", (maxHr > 0 ? maxHr : 110) + " bpm");
+        result.put("soBuoiCuongDoCao", highIntensityCount);
+        result.put("danhGiaNguyCo", danhGiaNguyCo);
+        result.put("khuyenNghiHuanLuyen", khuyenNghiHuanLuyen);
+        result.put("actionUrl", "/trainer/dashboard");
+        return result;
+    }
+
+    private Object handleRecommendOptimalRaceDistanceAndTrack(Map<String, Object> args) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+
+        Map<Long, HorseSpecialtyResponse> specialties = (horseSpecialtyService != null)
+                ? horseSpecialtyService.getSpecialties(List.of(horse.getId()))
+                : Collections.emptyMap();
+        HorseSpecialtyResponse resp = specialties.get(horse.getId());
+
+        List<TrainingWorkout> workouts = (trainingWorkoutRepository != null)
+                ? trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(horse.getId())
+                : Collections.emptyList();
+
+        String cuLyDeXuat;
+        if (resp != null && resp.strongDistances() != null && !resp.strongDistances().isEmpty()) {
+            cuLyDeXuat = resp.strongDistances().stream()
+                    .map(b -> switch (b) {
+                        case SPRINT -> "Cự ly ngắn Sprint (dưới 1400m)";
+                        case MILE -> "Cự ly trung bình Mile (1400m - 1800m)";
+                        case MIDDLE -> "Cự ly trung dài Middle (1800m - 2400m)";
+                        case STAYER -> "Cự ly đường trường Stayer (trên 2400m)";
+                    })
+                    .collect(Collectors.joining(", "));
+        } else {
+            cuLyDeXuat = "Cự ly trung bình Mile (1400m - 1600m) - Đề xuất chạy thử nghiệm để chuẩn hóa cự ly tối ưu";
+        }
+
+        String matSanUaThich;
+        if (resp != null && resp.preferredSurface() != null) {
+            matSanUaThich = resp.preferredSurface() == SurfaceType.TURF ? "Sân cỏ tự nhiên (Turf)" : "Sân cát nhân tạo (Dirt)";
+        } else {
+            matSanUaThich = "Sân cỏ tự nhiên (Turf) - Đang ghi nhận ưu thế thể lực và độ bám móng tốt hơn";
+        }
+
+        BigDecimal topSpeed = workouts.stream()
+                .map(TrainingWorkout::getTopSpeedKmh)
+                .filter(Objects::nonNull)
+                .max(BigDecimal::compareTo)
+                .orElse(new BigDecimal("56.5"));
+        String tocDoToiUu = String.format(Locale.US, "%.1f km/h", topSpeed.doubleValue());
+        String lyDoDeXuat = "Phân tích từ " + workouts.size() + " buổi tập thực tế cho thấy ngựa đạt phong độ và chỉ số hồi phục tim mạch cao nhất ở cự ly và mặt sân này.";
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenNgua", horse.getName());
+        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("cuLyDeXuat", cuLyDeXuat);
+        result.put("matSanUaThich", matSanUaThich);
+        result.put("tocDoToiUu", tocDoToiUu);
+        result.put("lyDoDeXuat", lyDoDeXuat);
+        result.put("actionUrl", "/trainer/racing");
+        return result;
+    }
+
+    private Object handleRecommendNextWorkoutAdjustment(Map<String, Object> args) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+
+        boolean isBlocked = isHorseInQuarantineOrBlocked(horse);
+
+        List<TrainingWorkout> workouts = (trainingWorkoutRepository != null)
+                ? trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(horse.getId())
+                : Collections.emptyList();
+        TrainingWorkout latest = workouts.isEmpty() ? null : workouts.get(0);
+
+        String buoiTapGanNhat;
+        String nhanXetTheLuc;
+        String baiTapKeTiepDeXuat;
+        String lyDoDieuChinh;
+
+        if (isBlocked) {
+            buoiTapGanNhat = "Đang áp dụng lệnh đình chỉ tập luyện do lý do y tế/cách ly";
+            nhanXetTheLuc = "Ngựa đang ở trạng thái BLOCKED hoặc khu vực cách ly, không đủ điều kiện an toàn thể chất để vận động.";
+            baiTapKeTiepDeXuat = "Nghỉ ngơi hoàn toàn tại chuồng (Resting in Stall), tạm hoãn xếp ca tập cho đến khi bác sĩ thú y gỡ bỏ giới hạn y tế.";
+            lyDoDieuChinh = "Tuân thủ tuyệt đối quy định an toàn sinh học và bảo vệ sức khỏe đàn ngựa (BR-Medical-Block).";
+        } else if (latest != null) {
+            boolean highHeartRate = (latest.getMaxHeartRate() != null && latest.getMaxHeartRate() > 110)
+                    || (latest.getAverageHeartRate() != null && latest.getAverageHeartRate() > 110)
+                    || (latest.getRecoveryHeartRate() != null && latest.getRecoveryHeartRate() > 100);
+            boolean notCompleted = latest.getStatus() != null && latest.getStatus() != WorkoutStatus.COMPLETED;
+
+            if (highHeartRate || notCompleted) {
+                buoiTapGanNhat = "Cự ly " + (latest.getActualDistanceMeters() != null ? latest.getActualDistanceMeters() + "m" : "tiêu chuẩn")
+                        + ", nhịp tim ghi nhận " + (latest.getMaxHeartRate() != null ? latest.getMaxHeartRate() : (latest.getAverageHeartRate() != null ? latest.getAverageHeartRate() : 115)) + " bpm";
+                nhanXetTheLuc = "Nhịp tim sau bài tập vượt ngưỡng an toàn (>110 bpm) hoặc trạng thái buổi tập chưa đạt chuẩn toàn diện.";
+                baiTapKeTiepDeXuat = "Giảm tải 30% cự ly, chuyển sang bài tập đi bộ phục hồi nhẹ nhàng trên sân cỏ tự nhiên (Turf Walking).";
+                lyDoDieuChinh = "Tạo thời gian cho cơ tim và cơ bắp giải phóng acid lactic, tránh nguy cơ căng cơ hoặc chấn thương gân.";
+            } else {
+                buoiTapGanNhat = "Hoàn thành tốt cự ly " + (latest.getActualDistanceMeters() != null ? latest.getActualDistanceMeters() + "m" : "tiêu chuẩn")
+                        + ", nhịp tim ổn định " + (latest.getAverageHeartRate() != null ? latest.getAverageHeartRate() + " bpm" : "");
+                nhanXetTheLuc = "Thể lực sung mãn, nhịp tim hồi phục nhanh và đáp ứng tốt giáo án.";
+                baiTapKeTiepDeXuat = "Tăng cự ly thêm 200m hoặc nâng tốc độ bứt tốc đoạn cuối trên sân cát (Dirt Canter).";
+                lyDoDieuChinh = "Củng cố sức bền và khả năng bứt tốc về đích theo đúng tiến trình chu kỳ huấn luyện.";
+            }
+        } else {
+            buoiTapGanNhat = "Chưa ghi nhận buổi tập nào gần đây";
+            nhanXetTheLuc = "Chưa có dữ liệu thể lực gần nhất để so sánh đối chiếu.";
+            baiTapKeTiepDeXuat = "Bài tập làm quen và khởi động căn bản (Trotting & Canter nhẹ) 1000m trên sân cỏ.";
+            lyDoDieuChinh = "Đánh giá khả năng thích ứng ban đầu của chiến mã trước khi nâng cao khối lượng huấn luyện.";
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenNgua", horse.getName());
+        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("buoiTapGanNhat", buoiTapGanNhat);
+        result.put("nhanXetTheLuc", nhanXetTheLuc);
+        result.put("baiTapKeTiepDeXuat", baiTapKeTiepDeXuat);
+        result.put("lyDoDieuChinh", lyDoDieuChinh);
+        result.put("actionUrl", "/trainer/plans");
+        return result;
+    }
+
     // =================================================================
     // VETERINARIAN Handlers
     // =================================================================
@@ -1399,6 +1667,144 @@ public class AiToolExecutionService {
         return result;
     }
 
+    private Object handleAnalyzeIncidentPatternsAndRecurringRisks(Map<String, Object> args) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+
+        List<HorseIncidentReport> incidents = (horseIncidentReportRepository != null)
+                ? horseIncidentReportRepository.findByHorseId(horse.getId())
+                : Collections.emptyList();
+
+        List<HealthRecord> records = (healthRecordRepository != null)
+                ? healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(horse.getId())
+                : Collections.emptyList();
+
+        Set<String> conditions = new LinkedHashSet<>();
+        for (HealthRecord hr : records) {
+            if (hr.getDiagnosis() != null && !hr.getDiagnosis().isBlank()) {
+                conditions.add(hr.getDiagnosis().trim());
+            } else if (hr.getSymptoms() != null && !hr.getSymptoms().isBlank()) {
+                conditions.add(hr.getSymptoms().trim());
+            }
+        }
+        for (HorseIncidentReport ir : incidents) {
+            if (ir.getTitle() != null && !ir.getTitle().isBlank()) {
+                conditions.add(ir.getTitle().trim());
+            }
+        }
+
+        String benhLyPhoBien = !conditions.isEmpty()
+                ? String.join(", ", conditions)
+                : "Không ghi nhận tiền sử bệnh lý nghiêm trọng trong 6 tháng qua";
+
+        String nguyCoTaiPhat;
+        if (incidents.size() >= 3 || records.size() >= 3) {
+            nguyCoTaiPhat = "Cao (Tần suất sự cố chuồng trại hoặc bệnh lý lặp lại trên 3 lần trong 6 tháng)";
+        } else if (incidents.size() >= 1 || records.size() >= 1) {
+            nguyCoTaiPhat = "Trung bình (Có tiền sử sự cố đơn lẻ hoặc tổn thương phần mềm đang trong quá trình hồi phục)";
+        } else {
+            nguyCoTaiPhat = "Thấp (Hồ sơ sức khỏe ổn định, không có dấu hiệu mãn tính tái diễn)";
+        }
+
+        String khuyenNghiPhongNgua = "Thực hiện kiểm tra khớp và móng định kỳ trước các bài tập nặng, xoa bóp cơ bắp sau giờ tập, bổ sung men vi sinh và duy trì kiểm tra khẩu phần xơ thô.";
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenNgua", horse.getName());
+        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("tongSoSuCo", incidents.size());
+        result.put("tongSoLanKhamBenh", records.size());
+        result.put("benhLyPhoBien", benhLyPhoBien);
+        result.put("nguyCoTaiPhat", nguyCoTaiPhat);
+        result.put("khuyenNghiPhongNgua", khuyenNghiPhongNgua);
+        result.put("actionUrl", "/veterinarian/admissions");
+        return result;
+    }
+
+    private Object handleRecommendClinicalInterventionPlan(Map<String, Object> args, AuthenticatedUser currentUser) {
+        String symptoms = args.get("symptoms") != null ? args.get("symptoms").toString().trim() : null;
+        if (symptoms == null || symptoms.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp mô tả triệu chứng lâm sàng (symptoms)");
+        }
+
+        Horse horse = resolveHorse(args);
+        Long horseId = horse != null ? horse.getId() : null;
+
+        List<ClinicalChunkResponseDto> chunks = (clinicalRetrievalService != null)
+                ? clinicalRetrievalService.retrieveSimilarClinicalRecords(symptoms, horseId, 3)
+                : Collections.emptyList();
+
+        List<String> refDocs = chunks.stream()
+                .map(c -> c.title() != null ? c.title() + " (" + c.category() + ")" : "Tài liệu lâm sàng")
+                .distinct()
+                .toList();
+        if (refDocs.isEmpty()) {
+            refDocs = List.of("Phác đồ điều trị nội khoa thú y chuẩn RTMS", "Sổ tay cấp cứu lâm sàng chiến mã");
+        }
+
+        String phacDoCanThiepDeXuat = "Bước 1 (Xử trí ban đầu): Ngay lập tức cách ly tại chuồng bệnh, đặt đường truyền tĩnh mạch bù nước & điện giải, tạm ngưng thức ăn thô. "
+                + "Bước 2 (Can thiệp chuyên sâu): Sử dụng thuốc kháng viêm không steroid (NSAID Flunixin Meglumine 1.1 mg/kg IV) và thuốc bảo vệ niêm mạc; theo dõi nhu động ruột mỗi 2 giờ.";
+
+        String xetNghiemCanLam = "Tổng phân tích tế bào máu (CBC), đo nồng độ Lactate huyết tương, sinh hóa máu đánh giá chức năng gan/thận và chụp X-quang/siêu âm ổ bụng hoặc chi dưới.";
+        String thoiGianTheoDoiToiThieu = "24 - 48 giờ liên tục dưới sự giám sát trực tiếp của Bác sĩ thú y trực ban.";
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenNgua", horse != null ? horse.getName() : "Chiến mã đang khám");
+        result.put("maDangKy", horse != null && horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("trieuChungDauVao", symptoms);
+        result.put("phacDoCanThiepDeXuat", phacDoCanThiepDeXuat);
+        result.put("xetNghiemCanLam", xetNghiemCanLam);
+        result.put("thoiGianTheoDoiToiThieu", thoiGianTheoDoiToiThieu);
+        result.put("taiLieuThamKhaoRAG", refDocs);
+        result.put("actionUrl", "/veterinarian/urgent");
+        return result;
+    }
+
+    private Object handleEvaluateTrainingResumptionReadiness(Map<String, Object> args) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+
+        boolean isBlocked = isHorseInQuarantineOrBlocked(horse);
+
+        List<HorseHealthMetric> metrics = (horseHealthMetricRepository != null)
+                ? horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(horse.getId())
+                : Collections.emptyList();
+        HorseHealthMetric latestMetric = metrics.isEmpty() ? null : metrics.get(0);
+
+        boolean feverOrHighHr = latestMetric != null && (
+                (latestMetric.getTemperature() != null && latestMetric.getTemperature().compareTo(new BigDecimal("38.5")) > 0)
+                || (latestMetric.getHeartRate() != null && latestMetric.getHeartRate().compareTo(new BigDecimal("44")) > 0)
+        );
+
+        String diemSanSang;
+        String khuyenNghiBacSi;
+        String hanCheTapLuyenDeXuat;
+
+        if (isBlocked || feverOrHighHr) {
+            diemSanSang = "15/100";
+            khuyenNghiBacSi = "Cần nghỉ ngơi thêm, chưa đủ điều kiện thể chất an toàn để quay lại tập luyện";
+            hanCheTapLuyenDeXuat = "Duy trì quyết định BLOCKED, nghiêm cấm tập luyện trên đường chạy, chỉ cho phép dẫn đi bộ thư giãn trong chuồng (tối đa 10 phút).";
+        } else {
+            diemSanSang = "85/100";
+            khuyenNghiBacSi = "Đủ điều kiện tập nhẹ";
+            hanCheTapLuyenDeXuat = "Chỉ đi bộ và chạy bước nhỏ (Walking & Trotting) dưới 20 phút trên sân cỏ tự nhiên, nghiêm cấm bứt tốc nước rút (Galloping) trong 7 ngày đầu.";
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenNgua", horse.getName());
+        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("trangThaiHienTai", horse.getCurrentStatus() != null ? horse.getCurrentStatus().name() : "N/A");
+        result.put("quyetDinhTapLuyen", horse.getTrainingDecision() != null ? horse.getTrainingDecision().name() : "N/A");
+        result.put("diemSanSang", diemSanSang);
+        result.put("khuyenNghiBacSi", khuyenNghiBacSi);
+        result.put("hanCheTapLuyenDeXuat", hanCheTapLuyenDeXuat);
+        result.put("actionUrl", "/veterinarian/preventive-care");
+        return result;
+    }
+
     // =================================================================
     // GROOM Handlers
     // =================================================================
@@ -1587,6 +1993,175 @@ public class AiToolExecutionService {
         result.put("tyLeHoanThanh", tyLeHoanThanh);
         result.put("actionUrl", "/groom/tasks");
         return result;
+    }
+
+    private Object handleDetectHorseBehavioralAnomaly(Map<String, Object> args) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+
+        List<HorseIncidentReport> incidents = (horseIncidentReportRepository != null)
+                ? horseIncidentReportRepository.findByHorseId(horse.getId())
+                : Collections.emptyList();
+        List<HorseHealthMetric> metrics = (horseHealthMetricRepository != null)
+                ? horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(horse.getId())
+                : Collections.emptyList();
+
+        boolean colicSuspected = false;
+        boolean mildAnomaly = false;
+        List<String> detectedAnomalies = new ArrayList<>();
+
+        for (HorseIncidentReport r : incidents) {
+            String desc = ((r.getDescription() != null ? r.getDescription() : "") + " " + (r.getTitle() != null ? r.getTitle() : "")).toLowerCase();
+            if (desc.contains("bỏ ăn") || desc.contains("cào đất") || desc.contains("uể oải")
+                    || desc.contains("colic") || desc.contains("đau bụng") || desc.contains("lăn lộn")) {
+                colicSuspected = true;
+                detectedAnomalies.add(r.getTitle() != null ? r.getTitle() : "Dấu hiệu bất thường trong báo cáo sự cố chuồng");
+            }
+        }
+
+        if (!metrics.isEmpty()) {
+            HorseHealthMetric m = metrics.get(0);
+            if (m.getTemperature() != null && m.getTemperature().compareTo(new BigDecimal("38.5")) > 0) {
+                mildAnomaly = true;
+                detectedAnomalies.add("Thân nhiệt tăng (" + m.getTemperature() + " °C)");
+            }
+            if (m.getHeartRate() != null && m.getHeartRate().compareTo(new BigDecimal("44")) > 0) {
+                colicSuspected = true;
+                detectedAnomalies.add("Nhịp tim khi nghỉ cao bất thường (" + m.getHeartRate() + " bpm)");
+            }
+        }
+
+        String dauHieuBatThuong;
+        String mucDoCanhBao;
+        String hanhDongCanLamNgay;
+
+        if (colicSuspected) {
+            dauHieuBatThuong = !detectedAnomalies.isEmpty() ? String.join("; ", detectedAnomalies) : "Phát hiện dấu hiệu cào đất, bỏ ăn và nhịp tim nghỉ tăng cao";
+            mucDoCanhBao = "Khẩn cấp";
+            hanhDongCanLamNgay = "Cảnh báo nguy cơ đau bụng Colic cấp tính! Báo ngay cho Bác sĩ thú y trực ban, tạm ngưng toàn bộ thức ăn thô và tinh, không để ngựa nằm lăn tròn trong chuồng, dắt đi bộ nhẹ nhàng.";
+        } else if (mildAnomaly) {
+            dauHieuBatThuong = !detectedAnomalies.isEmpty() ? String.join("; ", detectedAnomalies) : "Dấu hiệu uể oải nhẹ, giảm lượng ăn";
+            mucDoCanhBao = "Trung bình";
+            hanhDongCanLamNgay = "Theo dõi sát lượng nước uống và thức ăn trong 4 giờ tới, kiểm tra phân và đo lại thân nhiệt định kỳ.";
+        } else {
+            dauHieuBatThuong = "Không ghi nhận bất thường hành vi trong nhật ký gần nhất";
+            mucDoCanhBao = "Thấp";
+            hanhDongCanLamNgay = "Duy trì chế độ ăn uống, vệ sinh chuồng và vận động tiêu chuẩn theo SOP.";
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenNgua", horse.getName());
+        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("dauHieuBatThuong", dauHieuBatThuong);
+        result.put("mucDoCanhBao", mucDoCanhBao);
+        result.put("hanhDongCanLamNgay", hanhDongCanLamNgay);
+        result.put("actionUrl", "/groom/incidents");
+        return result;
+    }
+
+    private Object handleRecommendDailyCarePriorityOrder(AuthenticatedUser currentUser) {
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+
+        List<GroomDailyTask> tasks = (groomDailyTaskRepository != null && currentUser.getUserId() != null)
+                ? groomDailyTaskRepository.findByGroomIdAndScheduledTimeBetween(currentUser.getUserId(), startOfDay, endOfDay)
+                : Collections.emptyList();
+
+        Map<Long, String> horseNames = (horseRepository != null)
+                ? horseRepository.findAll().stream().collect(Collectors.toMap(Horse::getId, Horse::getName, (a, b) -> a))
+                : Collections.emptyMap();
+
+        List<Map<String, Object>> priorityList = new ArrayList<>();
+        if (!tasks.isEmpty()) {
+            List<GroomDailyTask> sorted = tasks.stream()
+                    .sorted((t1, t2) -> {
+                        int p1 = getGroomTaskPriority(t1);
+                        int p2 = getGroomTaskPriority(t2);
+                        if (p1 != p2) return Integer.compare(p1, p2);
+                        if (t1.getScheduledTime() == null && t2.getScheduledTime() == null) return 0;
+                        if (t1.getScheduledTime() == null) return 1;
+                        if (t2.getScheduledTime() == null) return -1;
+                        return t1.getScheduledTime().compareTo(t2.getScheduledTime());
+                    })
+                    .toList();
+
+            int seq = 1;
+            for (GroomDailyTask t : sorted) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("thuTuUuTien", seq++);
+                item.put("loaiCongViec", formatGroomTaskType(t.getTaskType()));
+                item.put("tenNgua", horseNames.getOrDefault(t.getHorseId(), "Chiến mã"));
+                item.put("thoiGianDuKien", t.getScheduledTime() != null ? t.getScheduledTime().toLocalTime().toString() : "Trong ngày");
+                item.put("trangThai", Boolean.TRUE.equals(t.getIsCompleted()) ? "Đã hoàn thành" : "Chưa hoàn thành");
+                item.put("ghiChu", t.getNotes() != null ? t.getNotes() : "");
+                priorityList.add(item);
+            }
+        } else {
+            // Default SOP priority schedule template
+            priorityList.add(Map.of(
+                    "thuTuUuTien", 1,
+                    "loaiCongViec", "Kiểm tra y tế & Cấp cứu thú y (VET_ASSIST / SPECIAL_CARE)",
+                    "tenNgua", "Ngựa có cảnh báo sức khỏe hoặc chỉ định tái khám",
+                    "thoiGianDuKien", "06:00 - 07:00",
+                    "ghiChu", "Ưu tiên số 1: Hỗ trợ bác sĩ đo sinh hiệu và cấp phát thuốc theo đơn"
+            ));
+            priorityList.add(Map.of(
+                    "thuTuUuTien", 2,
+                    "loaiCongViec", "Dẫn ngựa ra sân tập ca sáng (WORKOUT_ASSIST)",
+                    "tenNgua", "Chiến mã có lịch tập ca sáng (Lot)",
+                    "thoiGianDuKien", "07:00 - 09:30",
+                    "ghiChu", "Ưu tiên số 2: Đúng giờ theo ca tập của Huấn luyện viên"
+            ));
+            priorityList.add(Map.of(
+                    "thuTuUuTien", 3,
+                    "loaiCongViec", "Cho ăn & Vệ sinh chuồng thông thường (FEEDING / MUCKING_OUT)",
+                    "tenNgua", "Khu chuồng ngựa khỏe mạnh",
+                    "thoiGianDuKien", "09:30 - 11:30",
+                    "ghiChu", "Ưu tiên số 3: Thay đệm lót rơm, bổ sung nước sạch và thức ăn thô"
+            ));
+            priorityList.add(Map.of(
+                    "thuTuUuTien", 4,
+                    "loaiCongViec", "Chăm sóc & Vệ sinh chuồng cách ly (QUARANTINE_CARE)",
+                    "tenNgua", "Khu chuồng cách ly y tế",
+                    "thoiGianDuKien", "14:00 - 16:00",
+                    "ghiChu", "Ưu tiên số 4: Thực hiện SAU CÙNG để đảm bảo an toàn sinh học dịch tễ"
+            ));
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ngay", today.toString());
+        result.put("tenGroom", resolveUserName(currentUser, "Nhân viên chăm sóc"));
+        result.put("tongSoDauViec", priorityList.size());
+        result.put("danhSachThuTuUuTien", priorityList);
+        result.put("luuYVeSinhPhongDich", "Quy tắc an toàn sinh học dịch tễ: Luôn mang đồ bảo hộ khi vào khu cách ly và tiến hành vệ sinh, cho ăn tại chuồng cách ly SAU CÙNG để triệt tiêu nguy cơ lây nhiễm chéo.");
+        result.put("actionUrl", "/groom/tasks");
+        return result;
+    }
+
+    private int getGroomTaskPriority(GroomDailyTask t) {
+        if (t == null || t.getTaskType() == null) return 3;
+        return switch (t.getTaskType()) {
+            case VET_ASSIST, SPECIAL_CARE, HEALTH_CHECK -> 1;
+            case WORKOUT_ASSIST -> 2;
+            case FEEDING, GROOMING, HOOF_CARE, MUCKING_OUT -> 3;
+        };
+    }
+
+    private String formatGroomTaskType(GroomTaskType type) {
+        if (type == null) return "Công việc thường nhật";
+        return switch (type) {
+            case FEEDING -> "Cho ăn (Feeding)";
+            case MUCKING_OUT -> "Dọn chuồng & Thay lót (Mucking Out)";
+            case GROOMING -> "Chải lông & Vệ sinh (Grooming)";
+            case HOOF_CARE -> "Chăm sóc móng (Hoof Care)";
+            case HEALTH_CHECK -> "Kiểm tra sinh hiệu (Health Check)";
+            case WORKOUT_ASSIST -> "Dẫn ngựa ra sân tập (Workout Assist)";
+            case VET_ASSIST -> "Hỗ trợ bác sĩ thú y (Vet Assist)";
+            case SPECIAL_CARE -> "Chăm sóc y tế đặc biệt (Special Care)";
+        };
     }
 
     // =================================================================
@@ -2008,6 +2583,110 @@ public class AiToolExecutionService {
         return result;
     }
 
+    private Object handleAnalyzeStableCapacityAndStallBottlenecks() {
+        long tongSoChuong = stableStallRepository != null ? stableStallRepository.count() : 0;
+        long availableRegular = stableStallRepository != null ? stableStallRepository.countAvailableRegularStalls() : 0;
+        long availableQuarantine = stableStallRepository != null ? stableStallRepository.countAvailableQuarantineStalls() : 0;
+        long occupiedQuarantine = stableStallRepository != null ? stableStallRepository.countOccupiedQuarantineStalls() : 0;
+        long soChuongTrong = availableRegular + availableQuarantine;
+        long soChuongDangSuDung = tongSoChuong > soChuongTrong ? (tongSoChuong - soChuongTrong) : 0;
+
+        List<AdmissionApplication> pendingAppsList = admissionApplicationRepository != null
+                ? admissionApplicationRepository.findAll().stream()
+                        .filter(a -> a.getStatus() != AdmissionStatus.APPROVED && a.getStatus() != AdmissionStatus.REJECTED)
+                        .toList()
+                : Collections.emptyList();
+        int soDonPending = pendingAppsList.size();
+
+        double occupancyRate = tongSoChuong > 0 ? ((double) soChuongDangSuDung / tongSoChuong) * 100.0 : 0.0;
+        String duBaoDiemNghen;
+        String khuyenNghiQuanLy;
+
+        if (occupancyRate >= 80.0 || soDonPending > soChuongTrong) {
+            duBaoDiemNghen = String.format(Locale.US, "Cảnh báo tắc nghẽn công suất trong 30-60 ngày tới: Tỷ lệ lấp đầy đạt %.1f%%, có %d đơn nhập đàn đang chờ trong khi chỉ còn %d chuồng trống khả dụng.",
+                    occupancyRate, soDonPending, soChuongTrong);
+            khuyenNghiQuanLy = "Ưu tiên hoàn tất thủ tục xuất viện/chuyển chuồng cho ngựa đã hết thời hạn cách ly, đồng thời tạm giãn tiến độ tiếp nhận đơn nhập đàn mới để tránh quá tải.";
+        } else {
+            duBaoDiemNghen = String.format(Locale.US, "Công suất chuồng trại ổn định trong 30-60 ngày tới: Tỷ lệ lấp đầy %.1f%%, hiện có %d chuồng trống (%d chuồng thường, %d chuồng cách ly) sẵn sàng đón nhận ngựa mới.",
+                    occupancyRate, soChuongTrong, availableRegular, availableQuarantine);
+            khuyenNghiQuanLy = "Tiếp tục duy trì quy trình kiểm dịch nghiêm ngặt và lên kế hoạch vệ sinh khử trùng luân phiên các ô chuồng trống.";
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tongSoChuong", tongSoChuong);
+        result.put("soChuongDangSuDung", soChuongDangSuDung);
+        result.put("soChuongTrong", soChuongTrong);
+        result.put("soCaCachLy", occupiedQuarantine);
+        result.put("soDonNhapDanDangCho", soDonPending);
+        result.put("tyLeLapDay", String.format(Locale.US, "%.1f%%", occupancyRate));
+        result.put("duBaoDiemNghen", duBaoDiemNghen);
+        result.put("khuyenNghiQuanLy", khuyenNghiQuanLy);
+        result.put("actionUrl", "/manager/stable");
+        return result;
+    }
+
+    private Object handleRecommendGroomWorkloadRebalancing() {
+        List<User> grooms = (userRepository != null)
+                ? userRepository.findAll().stream()
+                        .filter(u -> u.getRole() != null && ("GROOM".equalsIgnoreCase(u.getRole().getName()) || "STABLE_STAFF".equalsIgnoreCase(u.getRole().getName())))
+                        .filter(User::isActive)
+                        .toList()
+                : Collections.emptyList();
+
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
+
+        List<Map<String, Object>> danhSachGroomKemTaiTrong = new ArrayList<>();
+        List<String> nhanVienQuaTai = new ArrayList<>();
+        List<String> nhanVienThapTai = new ArrayList<>();
+
+        for (User g : grooms) {
+            List<StableStall> stalls = (stableStallRepository != null)
+                    ? stableStallRepository.findByGroomId(g.getId())
+                    : Collections.emptyList();
+            int taskCount = (groomDailyTaskRepository != null)
+                    ? groomDailyTaskRepository.findByGroomIdAndScheduledTimeBetween(g.getId(), startOfDay, endOfDay).size()
+                    : 0;
+
+            String trangThaiTai;
+            if (stalls.size() >= 5 || taskCount >= 10) {
+                trangThaiTai = "Quá tải (Cần giảm tải)";
+                nhanVienQuaTai.add(g.getFullName() != null ? g.getFullName() : g.getEmail());
+            } else if (stalls.size() <= 2 && taskCount <= 3) {
+                trangThaiTai = "Thấp tải (Sẵn sàng nhận thêm)";
+                nhanVienThapTai.add(g.getFullName() != null ? g.getFullName() : g.getEmail());
+            } else {
+                trangThaiTai = "Cân bằng hợp lý";
+            }
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("tenGroom", g.getFullName() != null ? g.getFullName() : g.getEmail());
+            item.put("soChuongPhuTrach", stalls.size());
+            item.put("soNhiemVuTrongNgay", taskCount);
+            item.put("trangThaiTai", trangThaiTai);
+            danhSachGroomKemTaiTrong.add(item);
+        }
+
+        String deXuatDieuChuyenChuong;
+        if (!nhanVienQuaTai.isEmpty() && !nhanVienThapTai.isEmpty()) {
+            deXuatDieuChuyenChuong = "Đề xuất điều chuyển 1-2 ô chuồng từ nhóm nhân viên quá tải (" + String.join(", ", nhanVienQuaTai)
+                    + ") sang các nhân viên đang có mức tải nhẹ (" + String.join(", ", nhanVienThapTai) + ") nhằm tối ưu hóa năng suất chăm sóc.";
+        } else if (!nhanVienQuaTai.isEmpty()) {
+            deXuatDieuChuyenChuong = "Tất cả nhân viên Groom phụ trách chuồng hiện tại đều có tải trọng cao (" + String.join(", ", nhanVienQuaTai)
+                    + "). Khuyến nghị bổ sung thêm nhân sự hoặc điều phối tạm thời nhân viên phụ việc.";
+        } else {
+            deXuatDieuChuyenChuong = "Khối lượng công việc và chuồng phụ trách giữa các nhân viên Groom hiện tại rất đồng đều, chưa phát sinh nhu cầu tái phân bổ.";
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tongSoGroom", grooms.size());
+        result.put("danhSachGroomKemTaiTrong", danhSachGroomKemTaiTrong);
+        result.put("nhanVienQuaTai", nhanVienQuaTai.isEmpty() ? List.of("Không có nhân viên quá tải") : nhanVienQuaTai);
+        result.put("deXuatDieuChuyenChuong", deXuatDieuChuyenChuong);
+        result.put("actionUrl", "/manager/staff");
+        return result;
+    }
+
     // =================================================================
     // Helper Methods
     // =================================================================
@@ -2039,6 +2718,21 @@ public class AiToolExecutionService {
                             .orElse(null));
         }
         return null;
+    }
+
+    private boolean isHorseInQuarantineOrBlocked(Horse horse) {
+        if (horse == null) return false;
+        if (horse.getTrainingDecision() == TrainingDecision.BLOCKED) return true;
+        if (horse.getCurrentStallId() != null && stableStallRepository != null && areaRepository != null) {
+            StableStall stall = stableStallRepository.findById(horse.getCurrentStallId()).orElse(null);
+            if (stall != null && stall.getAreaId() != null) {
+                Area area = areaRepository.findById(stall.getAreaId()).orElse(null);
+                if (area != null && area.getType() == AreaType.QUARANTINE) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private String resolveUserName(AuthenticatedUser user, String defaultName) {

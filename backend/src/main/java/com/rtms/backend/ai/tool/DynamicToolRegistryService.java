@@ -121,6 +121,14 @@ public class DynamicToolRegistryService {
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
                         ))
+                ),
+                new AiToolDefinition(
+                        "analyzeHorseInvestmentAndFitnessROI",
+                        "Báo cáo phân tích tổng hợp tiến độ phát triển thể lực và hiệu quả huấn luyện của chiến mã thuộc sở hữu.",
+                        buildParamSchema(Map.of(
+                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
+                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
+                        ))
                 )
         );
         roleToolDefinitions.put("HORSE_OWNER", ownerTools);
@@ -222,6 +230,30 @@ public class DynamicToolRegistryService {
                         "getCourseCurriculumOverview",
                         "Tra cứu danh mục khóa học (Course), môn học (Subject) và các bài tập kỹ thuật có trong hệ thống.",
                         buildParamSchema(Map.of())
+                ),
+                new AiToolDefinition(
+                        "analyzeWorkoutLoadAndOvertrainingRisk",
+                        "Phân tích khối lượng vận động 14 ngày qua (cự ly, cường độ, nhịp tim hồi phục sau bài tập) và đánh giá nguy cơ quá tải/chấn thương của ngựa.",
+                        buildParamSchema(Map.of(
+                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
+                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
+                        ))
+                ),
+                new AiToolDefinition(
+                        "recommendOptimalRaceDistanceAndTrack",
+                        "Đề xuất cự ly thi đấu và loại mặt sân (Turf / Dirt) tối ưu nhất cho ngựa dựa trên phân tích sở trường và dữ liệu thi đấu thực tế.",
+                        buildParamSchema(Map.of(
+                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
+                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
+                        ))
+                ),
+                new AiToolDefinition(
+                        "recommendNextWorkoutAdjustment",
+                        "Đề xuất điều chỉnh bài tập kế tiếp (tăng/giảm cự ly, đổi mặt sân hoặc nghỉ hồi phục) dựa trên kết quả buổi tập gần nhất.",
+                        buildParamSchema(Map.of(
+                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
+                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
+                        ))
                 )
         );
         roleToolDefinitions.put("HEAD_TRAINER", trainerTools);
@@ -296,6 +328,31 @@ public class DynamicToolRegistryService {
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
                         ))
+                ),
+                new AiToolDefinition(
+                        "analyzeIncidentPatternsAndRecurringRisks",
+                        "Phân tích chuỗi sự cố chuồng trại và hồ sơ bệnh án trong 6 tháng qua của ngựa để phát hiện nguy cơ bệnh lý mãn tính tái phát.",
+                        buildParamSchema(Map.of(
+                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
+                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
+                        ))
+                ),
+                new AiToolDefinition(
+                        "recommendClinicalInterventionPlan",
+                        "Đề xuất phác đồ can thiệp lâm sàng bước 1, bước 2 và chỉ định xét nghiệm dựa trên triệu chứng và kho tri thức y khoa RAG.",
+                        buildParamSchema(Map.of(
+                                "symptoms", Map.of("type", "string", "description", "Mô tả triệu chứng lâm sàng (bắt buộc)"),
+                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
+                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
+                        ), "symptoms")
+                ),
+                new AiToolDefinition(
+                        "evaluateTrainingResumptionReadiness",
+                        "Đánh giá mức độ an toàn và sẵn sàng cho phép ngựa quay lại tập luyện (thang điểm 0-100%) sau thời gian cách ly hoặc chấn thương.",
+                        buildParamSchema(Map.of(
+                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
+                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
+                        ))
                 )
         );
         roleToolDefinitions.put("VETERINARIAN", vetTools);
@@ -346,6 +403,19 @@ public class DynamicToolRegistryService {
                         buildParamSchema(Map.of(
                                 "date", Map.of("type", "string", "description", "Ngày cần kiểm tra (YYYY-MM-DD, mặc định hôm nay)")
                         ))
+                ),
+                new AiToolDefinition(
+                        "detectHorseBehavioralAnomaly",
+                        "Phát hiện sớm các bất thường về hành vi (bỏ ăn, cào đất, uể oải) của ngựa qua nhật ký và cảnh báo nguy cơ bệnh cấp tính (Colic).",
+                        buildParamSchema(Map.of(
+                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
+                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
+                        ))
+                ),
+                new AiToolDefinition(
+                        "recommendDailyCarePriorityOrder",
+                        "Đề xuất thứ tự ưu tiên các công việc chăm sóc trong ngày (ngựa cần khám y tế -> ca tập sớm -> vệ sinh chuồng cách ly sau cùng).",
+                        buildParamSchema(Map.of())
                 )
         );
         roleToolDefinitions.put("GROOM", groomTools);
@@ -402,6 +472,16 @@ public class DynamicToolRegistryService {
                         buildParamSchema(Map.of(
                                 "status", Map.of("type", "string", "description", "Lọc theo giai đoạn phê duyệt: PENDING (đang xử lý), APPROVED (đã duyệt), REJECTED (từ chối)")
                         ))
+                ),
+                new AiToolDefinition(
+                        "analyzeStableCapacityAndStallBottlenecks",
+                        "Phân tích công suất chuồng trại và dự báo điểm nghẽn tiếp nhận ngựa trong 30-60 ngày tới.",
+                        buildParamSchema(Map.of())
+                ),
+                new AiToolDefinition(
+                        "recommendGroomWorkloadRebalancing",
+                        "Đề xuất tái cân bằng tải công việc và phân bổ chuồng giữa các nhân viên Groom để tránh quá tải.",
+                        buildParamSchema(Map.of())
                 )
         );
         roleToolDefinitions.put("CLUB_MANAGER", managerTools);

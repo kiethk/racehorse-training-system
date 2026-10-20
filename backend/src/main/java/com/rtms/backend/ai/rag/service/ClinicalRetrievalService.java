@@ -43,6 +43,13 @@ public class ClinicalRetrievalService {
         this.objectMapper = objectMapper;
     }
 
+    @Transactional(readOnly = true)
+    public List<ClinicalChunkResponseDto> retrieveSimilarClinicalRecords(String queryText,
+                                                                         Long horseId,
+                                                                         Integer limit) {
+        return retrieveSimilarClinicalRecords(queryText, horseId, "VETERINARIAN", DEFAULT_SIMILARITY_THRESHOLD, limit);
+    }
+
     /**
      * Tìm kiếm các đoạn tài liệu/bệnh án lâm sàng tương đồng nhất với câu hỏi.
      */
