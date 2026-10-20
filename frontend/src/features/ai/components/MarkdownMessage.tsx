@@ -43,21 +43,33 @@ export function MarkdownMessage({ content }: MarkdownMessageProps) {
           th: ({ children }) => <th className="px-2.5 py-1.5 font-semibold text-[var(--color-text-primary)]">{children}</th>,
           td: ({ children }) => <td className="px-2.5 py-1.5 text-[var(--color-text-secondary)] whitespace-nowrap">{children}</td>,
           hr: () => <hr className="my-2.5 border-[var(--color-border)]" />,
-          code: ({ inline, className, children, ...props }: any) => {
-            if (inline) {
+          pre: ({ children, ...props }: any) => (
+            <pre
+              className="my-2 overflow-x-auto rounded-xl bg-neutral-900 p-3 font-mono text-[11px] text-neutral-100 shadow-inner"
+              {...props}
+            >
+              {children}
+            </pre>
+          ),
+          code: ({ className, children, ...props }: any) => {
+            const isCodeBlock =
+              Boolean(className?.startsWith('language-')) ||
+              (typeof children === 'string' && children.includes('\n'));
+
+            if (isCodeBlock) {
               return (
-                <code
-                  className="rounded bg-neutral-200/60 px-1 py-0.5 font-mono text-[11px] font-medium text-emerald-700 dark:bg-neutral-800 dark:text-emerald-400"
-                  {...props}
-                >
+                <code className={className} {...props}>
                   {children}
                 </code>
               );
             }
             return (
-              <pre className="my-2 overflow-x-auto rounded-xl bg-neutral-900 p-3 font-mono text-[11px] text-neutral-100 shadow-inner">
-                <code {...props}>{children}</code>
-              </pre>
+              <code
+                className="rounded bg-neutral-200/60 px-1 py-0.5 font-mono text-[11px] font-medium text-emerald-700 dark:bg-neutral-800 dark:text-emerald-400"
+                {...props}
+              >
+                {children}
+              </code>
             );
           },
           a: ({ href, children }) => (
