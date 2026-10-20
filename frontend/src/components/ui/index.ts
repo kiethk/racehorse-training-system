@@ -21,6 +21,7 @@ export { FilterBar } from './FilterBar';
 export { FormField } from './FormField';
 export { HorseAvatar } from './HorseAvatar';
 export { Icon, type IconName } from './Icon';
+export { ImageLightbox, ImageThumbnail, type LightboxImage } from './ImageLightbox';
 export { Checkbox, ChoiceInput, FileInput, Input, SearchInput, Select, Textarea } from './Input';
 export { MetricCard } from './MetricCard';
 export { Modal } from './Modal';

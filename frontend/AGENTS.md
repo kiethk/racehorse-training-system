@@ -214,6 +214,7 @@ Import from `@/components/ui`.
 | Nothing to show | `EmptyState` |
 | Person / horse avatar | `Avatar` / `HorseAvatar` (loads the photo with the access token) |
 | Image stored by the backend | `ProtectedImage` (never a plain `<img>`: file endpoints need the access token); `openProtectedFile` from `@/lib/protectedFile` to open any stored file in a new tab |
+| Image thumbnails that open full size | `ImageThumbnail` + `ImageLightbox` (`images`, `index`, `onIndexChange`, `onClose`; zoom, pan, arrows; stacks above a `Modal`). For stored images, pass blob URLs from `useProtectedFileUrl` |
 | Icon | `Icon` (inline SVG set; add missing icons to `Icon.tsx`) |
 | Dates, enums, numbers, errors | `formatDate`, `formatDateTime`, `formatEnumLabel`, `formatNumber`, `displayError` from `@/lib/display` |
 

@@ -13,6 +13,8 @@ import {
   FilterChips,
   FormField,
   IconButton,
+  ImageLightbox,
+  ImageThumbnail,
   Input,
   LinkButton,
   ListSkeleton,
@@ -45,6 +47,11 @@ import type { Role } from '@/types/auth';
 import { DragDropExample } from './DragDropExample';
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[];
+const SAMPLE_IMAGES = [
+  { src: '/logo.png', alt: 'RTMS logo' },
+  { src: '/globe.svg', alt: 'Globe' },
+  { src: '/window.svg', alt: 'Window' },
+];
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -65,6 +72,7 @@ export default function DesignTestPage() {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   return (
     <div className="mx-auto max-w-5xl space-y-10 p-8">
@@ -270,6 +278,22 @@ export default function DesignTestPage() {
           cancelLabel="Keep"
           onConfirm={() => setConfirmOpen(false)}
           onCancel={() => setConfirmOpen(false)}
+        />
+      </Section>
+
+      <Section title="Image thumbnails and lightbox">
+        <ul className="grid max-w-md grid-cols-3 gap-2" aria-label="Sample images">
+          {SAMPLE_IMAGES.map((image, index) => (
+            <li key={image.src}>
+              <ImageThumbnail src={image.src} alt={image.alt} onClick={() => setLightboxIndex(index)} />
+            </li>
+          ))}
+        </ul>
+        <ImageLightbox
+          images={SAMPLE_IMAGES}
+          index={lightboxIndex}
+          onIndexChange={setLightboxIndex}
+          onClose={() => setLightboxIndex(null)}
         />
       </Section>
 

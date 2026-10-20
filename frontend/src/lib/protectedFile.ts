@@ -37,6 +37,44 @@ export function useProtectedFileUrl(source: string | null | undefined): { url: s
 }
 
 /**
+ * `useProtectedFileUrl` for a list of files, e.g. every photo in a gallery. Returns one entry per source:
+ * `url` is null while loading or when loading failed (`failed` tells the two apart). Blob URLs are revoked
+ * when the list changes or the component unmounts.
+ */
+export function useProtectedFileUrls(sources: readonly string[]): Record<string, { url: string | null; failed: boolean }> {
+  const key = sources.join('\n');
+  const [loaded, setLoaded] = useState<{ key: string; urls: Record<string, string | null> }>({ key: '', urls: {} });
+
+  useEffect(() => {
+    const list = key ? key.split('\n') : [];
+    const controller = new AbortController();
+    const objectUrls: string[] = [];
+    list.forEach((source) => {
+      apiGetBlob(source, controller.signal).then((blob) => {
+        if (controller.signal.aborted) return;
+        const url = URL.createObjectURL(blob);
+        objectUrls.push(url);
+        setLoaded((current) => ({ key, urls: { ...(current.key === key ? current.urls : {}), [source]: url } }));
+      }).catch(() => {
+        if (!controller.signal.aborted) {
+          setLoaded((current) => ({ key, urls: { ...(current.key === key ? current.urls : {}), [source]: null } }));
+        }
+      });
+    });
+    return () => {
+      controller.abort();
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [key]);
+
+  const urls = loaded.key === key ? loaded.urls : {};
+  return Object.fromEntries(sources.map((source) => [
+    source,
+    { url: urls[source] ?? null, failed: source in urls && urls[source] === null },
+  ]));
+}
+
+/**
  * Opens a stored file in a new browser tab. The tab is opened first, inside the click, so the
  * browser does not treat it as a pop-up; the file is then loaded with the access token.
  */
