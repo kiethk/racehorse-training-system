@@ -71,17 +71,19 @@ export function AiChatWidget() {
     if (role === 'HEAD_TRAINER' || role === 'TRAINER') {
       return [
         'Lịch tập các ca hôm nay',
-        'Tiến độ các khóa đào tạo',
+        'Tiến độ các kế hoạch huấn luyện',
         'Cảnh báo nguy cơ chấn thương & nhịp tim',
         'Phân tích sở trường của ngựa',
+        'Danh sách Groom làm việc cùng',
       ];
     }
     if (role === 'VETERINARIAN' || role === 'VET') {
       return [
-        'Tra cứu ca viêm gân tương tự qua RAG',
+        'Tổng quan ngựa đang & chờ khám',
+        'Tra cứu ca bệnh lâm sàng qua RAG',
         'Lịch chăm sóc y tế định kỳ',
+        'Danh sách ngựa cách ly y tế',
         'Báo cáo sự cố chuồng trại 48h qua',
-        'Danh sách ngựa đang cách ly',
       ];
     }
     if (role === 'GROOM' || role === 'STABLE_STAFF') {
@@ -89,7 +91,7 @@ export function AiChatWidget() {
         'Checklist công việc hôm nay (3 nguồn)',
         'Chuồng và ngựa tôi phụ trách',
         'Cảnh báo ăn uống & vận động của ngựa',
-        'Kiểm tra vật tư chuồng',
+        'Tra cứu vị trí chuồng & người phụ trách',
       ];
     }
     if (role === 'CLUB_MANAGER' || role === 'RACING_MANAGER') {
@@ -158,8 +160,7 @@ export function AiChatWidget() {
                   showHistory
                     ? 'bg-emerald-600 text-white dark:bg-emerald-500'
                     : 'bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600/20 dark:bg-emerald-400/15 dark:text-emerald-400'
-                }`}
-              >
+                }`}>
                 <Icon name="panel-left" size={16} />
               </button>
 

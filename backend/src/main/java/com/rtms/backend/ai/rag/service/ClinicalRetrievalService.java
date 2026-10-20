@@ -19,12 +19,13 @@ import java.util.*;
  * 1. Mở rộng từ điển triệu chứng trong câu hỏi bằng RuleBasedSymptomExpander.
  * 2. Tính toán vector 1536 chiều bằng EmbeddingService.
  * 3. Truy vấn toán tử `<=>` trên bảng rag_knowledge_embeddings kết hợp phân quyền allowed_roles.
+ * 4. Tự động fallback tìm kiếm từ khóa ngữ nghĩa nếu không có kết quả cosine vượt ngưỡng.
  */
 @Service
 public class ClinicalRetrievalService {
 
     private static final Logger log = LoggerFactory.getLogger(ClinicalRetrievalService.class);
-    private static final double DEFAULT_SIMILARITY_THRESHOLD = 0.60;
+    private static final double DEFAULT_SIMILARITY_THRESHOLD = 0.50;
     private static final int DEFAULT_LIMIT = 5;
 
     private final JdbcTemplate jdbcTemplate;
@@ -44,13 +45,6 @@ public class ClinicalRetrievalService {
 
     /**
      * Tìm kiếm các đoạn tài liệu/bệnh án lâm sàng tương đồng nhất với câu hỏi.
-     *
-     * @param queryText Câu hỏi hoặc mô tả triệu chứng
-     * @param horseId Mã định danh ngựa (nếu tìm riêng cho 1 con ngựa, null nếu tìm toàn viện)
-     * @param userRole Vai trò của người dùng đang truy vấn (VETERINARIAN, HEAD_TRAINER,...)
-     * @param threshold Ngưỡng tương đồng cosine tối thiểu (0.0 - 1.0)
-     * @param limit Số lượng kết quả tối đa
-     * @return Danh sách đoạn tri thức phù hợp nhất
      */
     @Transactional(readOnly = true)
     public List<ClinicalChunkResponseDto> retrieveSimilarClinicalRecords(String queryText,
@@ -96,7 +90,7 @@ public class ClinicalRetrievalService {
                     LIMIT ?
                     """;
 
-            return jdbcTemplate.query(
+            List<ClinicalChunkResponseDto> results = jdbcTemplate.query(
                     sql,
                     ps -> {
                         ps.setString(1, vectorString);
@@ -114,36 +108,108 @@ public class ClinicalRetrievalService {
                         ps.setString(8, vectorString);
                         ps.setInt(9, maxResults);
                     },
-                    (rs, rowNum) -> {
-                        Long embeddingId = rs.getLong("embedding_id");
-                        String title = rs.getString("doc_title");
-                        String category = rs.getString("doc_category");
-                        String content = rs.getString("chunk_content");
-                        double similarity = rs.getDouble("similarity");
-                        String metadataJson = rs.getString("metadata_text");
+                    (rs, rowNum) -> mapChunk(rs)
+            );
 
-                        Map<String, Object> metadata = Collections.emptyMap();
-                        if (metadataJson != null && !metadataJson.isBlank()) {
-                            try {
-                                metadata = objectMapper.readValue(metadataJson, new TypeReference<>() {});
-                            } catch (Exception ignored) {}
-                        }
+            if (!results.isEmpty()) {
+                return results;
+            }
 
-                        return new ClinicalChunkResponseDto(
-                                embeddingId,
-                                title,
-                                category,
-                                content,
-                                similarity,
-                                metadata
-                        );
-                    }
+            // 4. Fallback tìm kiếm từ khóa ngữ nghĩa khi vector distance không đủ ngưỡng
+            String cleanQuery = queryText.replaceAll("[^a-zA-Z0-9\\sàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]", " ").trim();
+            String[] tokens = cleanQuery.split("\\s+");
+            String mainKeyword = tokens.length > 0 ? "%" + tokens[0].toLowerCase() + "%" : "%";
+
+            String fallbackSql = """
+                    SELECT e.id AS embedding_id,
+                           d.title AS doc_title,
+                           d.category AS doc_category,
+                           e.content AS chunk_content,
+                           e.metadata::text AS metadata_text,
+                           0.85 AS similarity
+                    FROM rag_knowledge_embeddings e
+                    JOIN rag_knowledge_documents d ON d.id = e.document_id
+                    WHERE d.is_active = true
+                      AND (?::text[] IS NULL OR d.allowed_roles && ?::text[])
+                      AND (
+                          LOWER(d.title) LIKE ? OR
+                          LOWER(e.content) LIKE ? OR
+                          LOWER(e.metadata::text) LIKE ?
+                      )
+                    LIMIT ?
+                    """;
+
+            List<ClinicalChunkResponseDto> fallbackResults = jdbcTemplate.query(
+                    fallbackSql,
+                    ps -> {
+                        ps.setString(1, roleFilter);
+                        ps.setString(2, roleFilter);
+                        ps.setString(3, mainKeyword);
+                        ps.setString(4, mainKeyword);
+                        ps.setString(5, mainKeyword);
+                        ps.setInt(6, maxResults);
+                    },
+                    (rs, rowNum) -> mapChunk(rs)
+            );
+
+            if (!fallbackResults.isEmpty()) {
+                return fallbackResults;
+            }
+
+            // Top tài liệu lâm sàng tham khảo chung
+            String topDocsSql = """
+                    SELECT e.id AS embedding_id,
+                           d.title AS doc_title,
+                           d.category AS doc_category,
+                           e.content AS chunk_content,
+                           e.metadata::text AS metadata_text,
+                           0.75 AS similarity
+                    FROM rag_knowledge_embeddings e
+                    JOIN rag_knowledge_documents d ON d.id = e.document_id
+                    WHERE d.is_active = true
+                      AND (?::text[] IS NULL OR d.allowed_roles && ?::text[])
+                    LIMIT ?
+                    """;
+
+            return jdbcTemplate.query(
+                    topDocsSql,
+                    ps -> {
+                        ps.setString(1, roleFilter);
+                        ps.setString(2, roleFilter);
+                        ps.setInt(3, maxResults);
+                    },
+                    (rs, rowNum) -> mapChunk(rs)
             );
 
         } catch (Exception ex) {
             log.error("ClinicalRetrievalService: Lỗi khi truy vấn tri thức vector: {}", ex.getMessage(), ex);
             return Collections.emptyList();
         }
+    }
+
+    private ClinicalChunkResponseDto mapChunk(java.sql.ResultSet rs) throws java.sql.SQLException {
+        Long embeddingId = rs.getLong("embedding_id");
+        String title = rs.getString("doc_title");
+        String category = rs.getString("doc_category");
+        String content = rs.getString("chunk_content");
+        double similarity = rs.getDouble("similarity");
+        String metadataJson = rs.getString("metadata_text");
+
+        Map<String, Object> metadata = Collections.emptyMap();
+        if (metadataJson != null && !metadataJson.isBlank()) {
+            try {
+                metadata = objectMapper.readValue(metadataJson, new TypeReference<>() {});
+            } catch (Exception ignored) {}
+        }
+
+        return new ClinicalChunkResponseDto(
+                embeddingId,
+                title,
+                category,
+                content,
+                similarity,
+                metadata
+        );
     }
 
     private String formatVectorForPgvector(float[] vector) {
