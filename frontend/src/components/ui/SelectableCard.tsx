@@ -33,6 +33,8 @@ export function SelectableCard({
         'transition-[border-color,box-shadow,opacity,transform] duration-[var(--duration-fast)]',
         'hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:opacity-100 hover:shadow-[var(--shadow-panel)]',
         'focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]',
+        // A disabled card stays readable but does not invite a click.
+        'disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:border-[var(--color-border)] disabled:hover:shadow-none',
         empty
           ? 'border-dashed border-[var(--color-border)] bg-[var(--color-surface)]'
           : 'border-[var(--color-border)] bg-[var(--color-surface-subtle)]',

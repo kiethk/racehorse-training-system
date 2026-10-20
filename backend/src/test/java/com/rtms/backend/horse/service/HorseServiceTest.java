@@ -374,4 +374,53 @@ class HorseServiceTest {
         verify(horseRepository, never()).save(any());
         assertEquals(18L, horse.getCurrentStallId());
     }
-}
+
+    private static Horse horseIn(long id, Long stallId) {
+        Horse horse = new Horse();
+        horse.setId(id);
+        horse.setCurrentStallId(stallId);
+        return horse;
+    }
+
+    @Test
+    @DisplayName("Groom chỉ thấy ngựa trong chuồng mình chăm")
+    void groomListsOnlyHorsesInTheirStalls() {
+        AuthenticatedUser groom = new AuthenticatedUser(44L, "groom@test.com", "GROOM");
+        StableStall ownStall = new StableStall();
+        ownStall.setId(101L);
+        when(stableStallRepository.findByGroomId(44L)).thenReturn(List.of(ownStall));
+        when(horseRepository.findAll()).thenReturn(List.of(horseIn(1, 101L), horseIn(2, 102L), horseIn(3, null)));
+
+        List<Horse> result = horseService.getAllHorses(groom, null, null, null);
+
+        assertEquals(List.of(1L), result.stream().map(Horse::getId).toList());
+        assertTrue(horseService.getAllHorses(groom, null, true, null).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Groom xem ngựa của người khác bị từ chối, ngựa của mình thì được")
+    void groomMayOpenOnlyTheirOwnHorse() {
+        AuthenticatedUser groom = new AuthenticatedUser(44L, "groom@test.com", "GROOM");
+        when(horseRepository.findById(1L)).thenReturn(Optional.of(horseIn(1, 101L)));
+        when(horseRepository.findById(2L)).thenReturn(Optional.of(horseIn(2, 102L)));
+        when(horseRepository.findById(3L)).thenReturn(Optional.of(horseIn(3, null)));
+        when(stableStallRepository.existsByIdAndGroomId(101L, 44L)).thenReturn(true);
+        when(stableStallRepository.existsByIdAndGroomId(102L, 44L)).thenReturn(false);
+
+        assertEquals(1L, horseService.getHorseById(1L, groom).getId());
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> horseService.getHorseById(2L, groom));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> horseService.getHorseById(3L, groom));
+    }
+
+    @Test
+    @DisplayName("Các vai khác Groom không bị giới hạn theo chuồng")
+    void otherRolesAreNotScopedByStall() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "m@test.com", "CLUB_MANAGER");
+        when(horseRepository.findAll()).thenReturn(List.of(horseIn(1, 101L), horseIn(2, null)));
+        when(horseRepository.findById(2L)).thenReturn(Optional.of(horseIn(2, null)));
+
+        assertEquals(2, horseService.getAllHorses(manager, null, null, null).size());
+        assertEquals(2L, horseService.getHorseById(2L, manager).getId());
+        verify(stableStallRepository, never()).findByGroomId(any());
+    }
+}
