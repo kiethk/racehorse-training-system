@@ -10,15 +10,21 @@ import com.rtms.backend.ai.dto.AiChatResponseDto;
 import com.rtms.backend.ai.tool.AiToolExecutionService;
 import com.rtms.backend.ai.tool.DynamicToolRegistryService;
 import com.rtms.backend.security.AuthenticatedUser;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 
@@ -54,7 +60,7 @@ public class GroqAgentOrchestratorService {
             AiToolExecutionService toolExecutionService,
             ObjectMapper objectMapper) {
         this.groqBaseUrl = groqBaseUrl != null && !groqBaseUrl.isBlank() ? groqBaseUrl.trim() : "https://api.groq.com/openai/v1";
-        this.groqApiKey = groqApiKey != null ? groqApiKey.trim() : "";
+        this.groqApiKey = resolveApiKey(groqApiKey);
         this.groqModel = groqModel != null && !groqModel.isBlank() ? groqModel.trim() : "llama-3.3-70b-versatile";
         this.toolRegistryService = toolRegistryService;
         this.toolExecutionService = toolExecutionService;
@@ -62,6 +68,66 @@ public class GroqAgentOrchestratorService {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(20))
                 .build();
+    }
+
+    @PostConstruct
+    public void init() {
+        if (this.groqApiKey.isBlank()) {
+            log.warn("GroqAgentOrchestratorService: GROQ_API_KEY chưa được cấu hình trong .env hoặc application.properties.");
+        } else {
+            String masked = this.groqApiKey.length() > 8
+                    ? this.groqApiKey.substring(0, 7) + "..." + this.groqApiKey.substring(this.groqApiKey.length() - 4)
+                    : "***";
+            log.info("GroqAgentOrchestratorService: Đã nạp thành công GROQ_API_KEY [{}] với model [{}]", masked, groqModel);
+        }
+    }
+
+    /**
+     * Thuật toán nạp API Key đa tầng chống lỗi môi trường trong IDE:
+     * Tầng 1: Spring @Value
+     * Tầng 2: System Property
+     * Tầng 3: OS Environment Variable
+     * Tầng 4: Trực tiếp quét parse file .env từ đĩa cứng
+     */
+    private static String resolveApiKey(String injectedKey) {
+        if (injectedKey != null && !injectedKey.isBlank()) {
+            return injectedKey.trim();
+        }
+        String sysProp = System.getProperty("GROQ_API_KEY");
+        if (sysProp != null && !sysProp.isBlank()) {
+            return sysProp.trim();
+        }
+        String envVal = System.getenv("GROQ_API_KEY");
+        if (envVal != null && !envVal.isBlank()) {
+            return envVal.trim();
+        }
+
+        File[] candidatePaths = new File[] {
+                new File(".env"),
+                new File("../.env"),
+                new File("backend/.env"),
+                new File("../../.env")
+        };
+        for (File file : candidatePaths) {
+            if (file.exists() && file.isFile()) {
+                try (BufferedReader reader = new BufferedReader(new FileReader(file, StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        line = line.trim();
+                        if (line.startsWith("GROQ_API_KEY=")) {
+                            String val = line.substring("GROQ_API_KEY=".length()).trim();
+                            if ((val.startsWith("\"") && val.endsWith("\"")) || (val.startsWith("'") && val.endsWith("'"))) {
+                                if (val.length() >= 2) val = val.substring(1, val.length() - 1);
+                            }
+                            if (!val.isBlank()) {
+                                return val;
+                            }
+                        }
+                    }
+                } catch (IOException ignored) {}
+            }
+        }
+        return "";
     }
 
     /**
@@ -119,95 +185,83 @@ public class GroqAgentOrchestratorService {
                 break;
             }
 
-            List<?> choices = (List<?>) groqResponse.get("choices");
-            if (choices.isEmpty()) {
-                finalAnswer = "Không nhận được phản hồi từ AI.";
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) groqResponse.get("choices");
+            if (choices == null || choices.isEmpty()) {
+                finalAnswer = "Không nhận được phản hồi hợp lệ từ Groq AI.";
                 break;
             }
 
-            Map<?, ?> firstChoice = (Map<?, ?>) choices.get(0);
-            Map<?, ?> responseMessage = (Map<?, ?>) firstChoice.get("message");
-            if (responseMessage == null) {
+            Map<String, Object> firstChoice = choices.get(0);
+            Map<String, Object> assistantMessage = (Map<String, Object>) firstChoice.get("message");
+            if (assistantMessage == null) {
                 break;
             }
 
-            // Kiểm tra xem LLM có gọi Tool không
-            List<?> toolCalls = (List<?>) responseMessage.get("tool_calls");
+            // Đưa tin nhắn của assistant vào hội thoại để giữ ngữ cảnh ReAct
+            messages.add(assistantMessage);
+
+            // Kiểm tra xem assistant có yêu cầu gọi công cụ (tool_calls) hay không
+            List<Map<String, Object>> toolCalls = (List<Map<String, Object>>) assistantMessage.get("tool_calls");
             if (toolCalls == null || toolCalls.isEmpty()) {
-                // Không có tool call -> Đây là câu trả lời cuối cùng
-                finalAnswer = (String) responseMessage.get("content");
+                // LLM đã hoàn tất suy luận và trả lời tự nhiên
+                finalAnswer = (String) assistantMessage.getOrDefault("content", "");
                 break;
             }
 
-            // Có tool calls -> Đưa assistant message vào lịch sử
-            messages.add(new LinkedHashMap<>((Map<String, Object>) responseMessage));
-
-            // Thực thi từng Tool Call
-            for (Object tcObj : toolCalls) {
-                Map<?, ?> tc = (Map<?, ?>) tcObj;
-                String callId = (String) tc.get("id");
-                Map<?, ?> function = (Map<?, ?>) tc.get("function");
+            // Thực thi từng tool_call
+            for (Map<String, Object> toolCall : toolCalls) {
+                String toolCallId = (String) toolCall.get("id");
+                Map<String, Object> function = (Map<String, Object>) toolCall.get("function");
                 String toolName = (String) function.get("name");
                 String argsString = (String) function.get("arguments");
 
-                Map<String, Object> args = parseArguments(argsString);
-                Object executionResult;
+                Map<String, Object> arguments = parseArguments(argsString);
+                log.info("Agent ReAct: Thực thi tool [{}] với args {}", toolName, arguments);
 
-                try {
-                    executionResult = toolExecutionService.executeTool(toolName, args, currentUser);
+                Object executionResult = toolExecutionService.executeTool(toolName, arguments, currentUser);
 
-                    // Nếu là đề xuất HITL, ghi nhận vào pendingProposals
-                    if (executionResult instanceof Map<?, ?> resMap && "HITL_PROPOSAL_CREATED".equals(resMap.get("actionType"))) {
-                        ActionProposalDto proposal = new ActionProposalDto(
-                                (Long) resMap.get("actionId"),
-                                (String) resMap.get("actionToken"),
-                                toolName,
-                                (String) resMap.get("title"),
-                                (String) args.getOrDefault("targetEntityId", String.valueOf(args.getOrDefault("workoutId", args.get("horseId")))),
-                                Collections.emptyMap(),
-                                (Map<String, Object>) resMap.get("proposedValues"),
-                                (String) args.getOrDefault("reason", ""),
-                                ((Number) resMap.get("expiresInSeconds")).longValue()
-                        );
-                        pendingProposals.add(proposal);
-                    }
-
-                } catch (Exception ex) {
-                    log.error("GroqAgentOrchestratorService: Lỗi khi thực thi tool [{}]: {}", toolName, ex.getMessage());
-                    executionResult = Map.of("error", ex.getMessage());
+                // Nếu kết quả trả về là một đề xuất HITL thì thu thập lại cho UI
+                if (executionResult instanceof ActionProposalDto proposal) {
+                    pendingProposals.add(proposal);
                 }
 
+                // Ghi nhận tool đã thực thi
                 executedTools.add(Map.of(
-                        "toolName", toolName,
-                        "arguments", args,
-                        "result", executionResult
+                        "tool", toolName,
+                        "arguments", arguments,
+                        "result", executionResult != null ? executionResult : "DONE"
                 ));
 
-                // Bơm kết quả tool trở lại lịch sử hội thoại cho LLM
+                // Bơm kết quả tool_result ngược lại cho Groq dưới dạng role = tool
                 try {
-                    String toolResultJson = objectMapper.writeValueAsString(executionResult);
+                    String resultJson = objectMapper.writeValueAsString(executionResult);
                     messages.add(Map.of(
                             "role", "tool",
-                            "tool_call_id", callId,
+                            "tool_call_id", toolCallId != null ? toolCallId : "",
                             "name", toolName,
-                            "content", toolResultJson
+                            "content", resultJson
                     ));
-                } catch (Exception ex) {
+                } catch (Exception e) {
+                    log.error("Lỗi khi serialize kết quả tool result cho Groq: {}", e.getMessage());
                     messages.add(Map.of(
                             "role", "tool",
-                            "tool_call_id", callId,
+                            "tool_call_id", toolCallId != null ? toolCallId : "",
                             "name", toolName,
-                            "content", "{\"status\":\"executed\"}"
+                            "content", "{\"error\": \"Lỗi serialize kết quả\"}"
                     ));
                 }
             }
         }
 
-        return new AiChatResponseDto(
-                finalAnswer != null ? finalAnswer : "Đã hoàn thành xử lý yêu cầu.",
-                executedTools,
-                pendingProposals
-        );
+        if (finalAnswer == null || finalAnswer.isBlank()) {
+            if (!pendingProposals.isEmpty()) {
+                finalAnswer = String.format("Tôi đã tạo %d đề xuất hành động theo yêu cầu của bạn. Vui lòng xem và phê duyệt trên màn hình.", pendingProposals.size());
+            } else {
+                finalAnswer = "Tôi đã xử lý xong các yêu cầu tra cứu của bạn.";
+            }
+        }
+
+        return new AiChatResponseDto(finalAnswer, executedTools, pendingProposals);
     }
 
     private String buildSystemPrompt(AuthenticatedUser user) {
