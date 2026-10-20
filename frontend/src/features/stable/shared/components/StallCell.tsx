@@ -9,6 +9,8 @@ interface StallCellProps {
   selected: boolean;
   /** Outside the viewer's own scope: still visible, but faded. */
   dimmed?: boolean;
+  /** Outside the viewer's scope and not theirs to see: drawn as an empty, unclickable frame. */
+  locked?: boolean;
   /** One line under the horse name, supplied by the screen's lens (task progress, groom name…). */
   footer?: ReactNode;
   onSelect: (stall: StableStall) => void;
@@ -56,8 +58,25 @@ export function stallState(stall: StableStall, horse: Horse | undefined) {
 }
 
 /** One stall on the floor plan. Role-neutral: what a role adds goes through `footer`. */
-export function StallCell({ stall, horse, selected, dimmed = false, footer, onSelect, style, compact = false }: StallCellProps) {
+export function StallCell({ stall, horse, selected, dimmed = false, locked = false, footer, onSelect, style, compact = false }: StallCellProps) {
   const state = stallState(stall, horse);
+
+  if (locked) {
+    // Someone else's stall: only its place in the barn is shown, nothing about it.
+    return (
+      <SelectableCard
+        disabled
+        dimmed
+        empty
+        aria-label={`Stall ${stall.stallCode}, not one of your stalls`}
+        className="flex min-h-24 flex-col bg-[var(--color-surface-muted)]"
+        style={style}
+      >
+        <span className="font-metric text-xs font-bold text-[var(--color-text-muted)]">{stall.stallCode}</span>
+        <span className="mt-1.5 text-xs italic text-[var(--color-text-muted)]">Not your stall</span>
+      </SelectableCard>
+    );
+  }
 
   return (
     <SelectableCard

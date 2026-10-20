@@ -1,6 +1,7 @@
 package com.rtms.backend.stable.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
+import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
@@ -8,7 +9,9 @@ import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.stable.service.StableStallService;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,8 +41,21 @@ public class StableStallController {
             @RequestParam(required = false) StallStatus status,
             @RequestParam(required = false) Long groomId) {
 
+        AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        List<StableStall> stalls = findStalls(areaCode, areaType, status, groomId);
+        // Groom chỉ thấy khu của mình, chuồng của người khác không kèm groomId.
+        // (A groom sees only their own areas, and other grooms' stalls without groomId.)
+        if ("GROOM".equals(currentUser.getRole())) {
+            stalls = StableStallService.scopeForGroom(
+                    stalls, stableStallRepository.findByGroomId(currentUser.getUserId()), currentUser.getUserId());
+        }
+        return ApiResponse.success(stalls);
+    }
+
+    private List<StableStall> findStalls(String areaCode, AreaType areaType, StallStatus status, Long groomId) {
         if (groomId != null) {
-            return ApiResponse.success(stableStallRepository.findByGroomId(groomId));
+            return stableStallRepository.findByGroomId(groomId);
         }
 
         if (areaCode != null) {
@@ -47,12 +63,10 @@ public class StableStallController {
                     .orElseThrow(() -> new RuntimeException("Area not found with code: " + areaCode));
 
             if (status != null) {
-                return ApiResponse.success(
-                        stableStallRepository.findByAreaIdAndStatus(area.getId(), status));
+                return stableStallRepository.findByAreaIdAndStatus(area.getId(), status);
             }
 
-            return ApiResponse.success(
-                    stableStallRepository.findByAreaId(area.getId()));
+            return stableStallRepository.findByAreaId(area.getId());
         }
 
         if (areaType != null) {
@@ -67,16 +81,14 @@ public class StableStallController {
                     .filter(stall -> status == null || stall.getStatus() == status)
                     .toList();
 
-            return ApiResponse.success(stalls);
+            return stalls;
         }
 
         if (status != null) {
-            return ApiResponse.success(
-                    stableStallRepository.findByStatus(status));
+            return stableStallRepository.findByStatus(status);
         }
 
-        return ApiResponse.success(
-                stableStallRepository.findAll());
+        return stableStallRepository.findAll();
     }
 
     /**
@@ -101,6 +113,18 @@ public class StableStallController {
         StableStall stall = stableStallRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Stable stall not found with id: " + id));
 
+        // Cùng luật với danh sách: Groom chỉ xem chuồng trong khu của mình.
+        // (Same rule as the list: a groom only sees stalls in their own areas.)
+        AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        if ("GROOM".equals(currentUser.getRole())) {
+            List<StableStall> scoped = StableStallService.scopeForGroom(
+                    List.of(stall), stableStallRepository.findByGroomId(currentUser.getUserId()), currentUser.getUserId());
+            if (scoped.isEmpty()) {
+                throw new AccessDeniedException("You can only view stalls in the areas you look after");
+            }
+            return ApiResponse.success(scoped.getFirst());
+        }
         return ApiResponse.success(stall);
     }
 }

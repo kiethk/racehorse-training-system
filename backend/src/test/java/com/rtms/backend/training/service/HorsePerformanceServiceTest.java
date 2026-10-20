@@ -53,6 +53,9 @@ class HorsePerformanceServiceTest {
     @Mock
     private HorseSpecialtyService specialtyService;
 
+    @Mock
+    private com.rtms.backend.stable.repository.StableStallRepository stallRepository;
+
     private HorsePerformanceService service;
 
     private final AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@example.com", "CLUB_MANAGER");
@@ -62,7 +65,7 @@ class HorsePerformanceServiceTest {
         // Bộ kiểm quyền chạy thật trên repository giả, nên các test phân quyền cũ giữ nguyên.
         // (The access check runs for real on mocked repositories, so the existing authorization tests stay valid.)
         service = new HorsePerformanceService(workoutRepository, planRepository, incidentReportRepository,
-                new HorseViewAccessService(horseRepository, planRepository), specialtyService);
+                new HorseViewAccessService(horseRepository, planRepository, stallRepository), specialtyService);
     }
 
     private Horse horse(Long id, Long ownerId) {

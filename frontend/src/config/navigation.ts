@@ -74,7 +74,7 @@ export function getNavigationForRole(role: Role): NavSection[] {
           ],
         },
       ];
-    case 'VETERINARIAN':
+        case 'VETERINARIAN':
       return [
         { id: 'overview', items: [dashboard] },
         {
