@@ -16,20 +16,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 
 /**
- * Tác tử AI Điều phối (Agent Orchestrator) tích hợp Groq LLM (llama-3.3-70b-versatile).
+ * Tác tử AI Điều phối (Agent Orchestrator) tích hợp Groq LLM (qwen/qwen3.8-27b).
  *
  * Thực hiện vòng lặp suy luận ReAct và gọi công cụ (Function Calling):
  * 1. Nạp System Prompt theo vai trò người dùng (Dynamic System Prompt).
@@ -55,13 +50,13 @@ public class GroqAgentOrchestratorService {
     public GroqAgentOrchestratorService(
             @Value("${groq.api.base-url:https://api.groq.com/openai/v1}") String groqBaseUrl,
             @Value("${groq.api.key:}") String groqApiKey,
-            @Value("${groq.api.model:llama-3.3-70b-versatile}") String groqModel,
+            @Value("${groq.api.model:qwen/qwen3.8-27b}") String groqModel,
             DynamicToolRegistryService toolRegistryService,
             AiToolExecutionService toolExecutionService,
             ObjectMapper objectMapper) {
         this.groqBaseUrl = groqBaseUrl != null && !groqBaseUrl.isBlank() ? groqBaseUrl.trim() : "https://api.groq.com/openai/v1";
-        this.groqApiKey = resolveApiKey(groqApiKey);
-        this.groqModel = groqModel != null && !groqModel.isBlank() ? groqModel.trim() : "llama-3.3-70b-versatile";
+        this.groqApiKey = groqApiKey != null ? groqApiKey.trim() : "";
+        this.groqModel = groqModel != null && !groqModel.isBlank() ? groqModel.trim() : "qwen/qwen3.8-27b";
         this.toolRegistryService = toolRegistryService;
         this.toolExecutionService = toolExecutionService;
         this.objectMapper = objectMapper;
@@ -73,7 +68,7 @@ public class GroqAgentOrchestratorService {
     @PostConstruct
     public void init() {
         if (this.groqApiKey.isBlank()) {
-            log.warn("GroqAgentOrchestratorService: GROQ_API_KEY chưa được cấu hình trong .env hoặc application.properties.");
+            log.warn("GroqAgentOrchestratorService: GROQ_API_KEY chưa được cấu hình.");
         } else {
             String masked = this.groqApiKey.length() > 8
                     ? this.groqApiKey.substring(0, 7) + "..." + this.groqApiKey.substring(this.groqApiKey.length() - 4)
@@ -83,61 +78,13 @@ public class GroqAgentOrchestratorService {
     }
 
     /**
-     * Thuật toán nạp API Key đa tầng chống lỗi môi trường trong IDE:
-     * Tầng 1: Spring @Value
-     * Tầng 2: System Property
-     * Tầng 3: OS Environment Variable
-     * Tầng 4: Trực tiếp quét parse file .env từ đĩa cứng
-     */
-    private static String resolveApiKey(String injectedKey) {
-        if (injectedKey != null && !injectedKey.isBlank()) {
-            return injectedKey.trim();
-        }
-        String sysProp = System.getProperty("GROQ_API_KEY");
-        if (sysProp != null && !sysProp.isBlank()) {
-            return sysProp.trim();
-        }
-        String envVal = System.getenv("GROQ_API_KEY");
-        if (envVal != null && !envVal.isBlank()) {
-            return envVal.trim();
-        }
-
-        File[] candidatePaths = new File[] {
-                new File(".env"),
-                new File("../.env"),
-                new File("backend/.env"),
-                new File("../../.env")
-        };
-        for (File file : candidatePaths) {
-            if (file.exists() && file.isFile()) {
-                try (BufferedReader reader = new BufferedReader(new FileReader(file, StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        line = line.trim();
-                        if (line.startsWith("GROQ_API_KEY=")) {
-                            String val = line.substring("GROQ_API_KEY=".length()).trim();
-                            if ((val.startsWith("\"") && val.endsWith("\"")) || (val.startsWith("'") && val.endsWith("'"))) {
-                                if (val.length() >= 2) val = val.substring(1, val.length() - 1);
-                            }
-                            if (!val.isBlank()) {
-                                return val;
-                            }
-                        }
-                    }
-                } catch (IOException ignored) {}
-            }
-        }
-        return "";
-    }
-
-    /**
      * Xử lý hội thoại chat với người dùng.
      */
     public AiChatResponseDto processChat(AiChatRequestDto request, AuthenticatedUser currentUser) {
         if (groqApiKey == null || groqApiKey.isBlank()) {
             log.warn("GroqAgentOrchestratorService: GROQ_API_KEY chưa được cấu hình.");
             return new AiChatResponseDto(
-                    "Chưa cấu hình GROQ_API_KEY. Vui lòng thiết lập biến môi trường GROQ_API_KEY trong file .env hoặc application.properties để sử dụng trợ lý AI.",
+                    "Chưa cấu hình GROQ_API_KEY. Vui lòng thiết lập biến môi trường GROQ_API_KEY trong Run Configuration của IDE hoặc application.properties để sử dụng trợ lý AI.",
                     Collections.emptyList(),
                     Collections.emptyList()
             );

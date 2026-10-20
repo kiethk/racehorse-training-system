@@ -3,7 +3,6 @@ package com.rtms.backend.ai.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rtms.backend.ai.dto.AiChatRequestDto;
 import com.rtms.backend.ai.dto.AiChatResponseDto;
-import com.rtms.backend.ai.tool.AiToolDefinition;
 import com.rtms.backend.ai.tool.AiToolExecutionService;
 import com.rtms.backend.ai.tool.DynamicToolRegistryService;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -15,9 +14,8 @@ import org.mockito.Mockito;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 class GroqAgentOrchestratorServiceTest {
@@ -39,7 +37,7 @@ class GroqAgentOrchestratorServiceTest {
         GroqAgentOrchestratorService service = new GroqAgentOrchestratorService(
                 "https://api.groq.com/openai/v1",
                 "", // Không có API key
-                "llama-3.3-70b-versatile",
+                "qwen/qwen3.8-27b",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper
@@ -65,7 +63,7 @@ class GroqAgentOrchestratorServiceTest {
         GroqAgentOrchestratorService service = new GroqAgentOrchestratorService(
                 "https://api.groq.com/openai/v1",
                 "gsk_test_mock_key_12345",
-                "llama-3.3-70b-versatile",
+                "qwen/qwen3.8-27b",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper
