@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { RoleGuard } from '@/components/auth/RoleGuard';
-import { AppShell } from '@/components/layout/AppShell';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Panel } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
@@ -63,8 +62,7 @@ export default function UrgentCasesPage() {
 
   return (
     <RoleGuard allowedRoles={['VETERINARIAN']}>
-      <AppShell>
-        <PageContainer>
+      <PageContainer>
           <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -236,7 +234,6 @@ export default function UrgentCasesPage() {
             )}
           </div>
         </PageContainer>
-      </AppShell>
     </RoleGuard>
   );
 }

@@ -72,7 +72,7 @@ export function TrainerHorseIncidentsTab({ horseId, horseName }: { horseId: numb
 
       {loading ? (
         <Panel padded>
-          <ListSkeleton count={3} />
+          <ListSkeleton rows={3} />
         </Panel>
       ) : reports.length === 0 ? (
         <Panel padded>

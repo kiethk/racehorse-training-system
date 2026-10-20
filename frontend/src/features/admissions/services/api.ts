@@ -172,13 +172,12 @@ export const admissionsApi = {
     return apiGetBlob(pathOrUrl);
   },
   confirmArrival: async (id: number): Promise<AdmissionDetailResponse> => {
-    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(/api/admissions//arrival-confirmation, {});
+    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/arrival-confirmation`, {});
     return response.data;
   },
   reopenExpiredArrival: async (id: number): Promise<AdmissionDetailResponse> => {
-    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(/api/admissions//arrival-reopen, {});
+    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/arrival-reopen`, {});
     return response.data;
-  },
   },
   assetUrl: (url: string): string => {
     if (/^https?:\/\//i.test(url)) return url;

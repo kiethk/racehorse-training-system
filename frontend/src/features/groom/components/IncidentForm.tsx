@@ -73,7 +73,6 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
           const preselected = allHorses.find((h) => h.id === initialHorseId);
           setHorseId((preselected ?? assignedHorses[0] ?? unassignedOrOther[0]).id);
         }
-        }
       } catch (err) {
         console.error('Unable to load horse and stall data:', err);
         setError('Unable to load the horse list. Please reload the page.');

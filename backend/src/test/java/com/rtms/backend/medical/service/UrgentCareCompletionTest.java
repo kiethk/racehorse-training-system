@@ -17,6 +17,7 @@ import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.service.NotificationService;
+import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.stable.entity.GroomIncidentReport;
 import com.rtms.backend.stable.enums.IncidentStatus;
 import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
