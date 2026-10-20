@@ -140,6 +140,7 @@ abstract class DemoSeedWorkflow {
                 for (JsonNode p : data.get("additionalAdmissions")) if (key.equals(text(p, "key"))) seedAdmission(p);
             }
         }
+        postProcessAssignments();
         verifyResult();
     }
 
@@ -344,7 +345,10 @@ abstract class DemoSeedWorkflow {
         List<MultipartFile> files=new ArrayList<>();
         for (String name:List.of("horse-photo.jpg","registration.pdf","pedigree.pdf","vaccination-record.pdf","health-certificate.pdf","deworming-record.pdf"))
             files.add(new MockMultipartFile("files",name,name.endsWith("jpg")?"image/jpeg":"application/pdf",Files.readAllBytes(folder.resolve(name))));
-        Long groomId=staffIds.get(key.startsWith("H") ? (p.get("areaKey").asText().equals("Q-A")?text(p,"groomKey"):"GR21") : "GR23");
+        Long groomId = staffIds.get(
+                "WAITING_FOR_ARRIVAL".equals(target) ? "GR01" :
+                (key.startsWith("H") ? (p.get("areaKey").asText().equals("Q-A") ? text(p, "groomKey") : "GR21") : "GR23")
+        );
         Long id=tx(() -> {
             at(date(p,"submittedDate"),9,0);
             Long owner=ownerIds.isEmpty()?5L:Objects.requireNonNull(ownerIds.get(text(p,"ownerKey")));
@@ -362,7 +366,14 @@ abstract class DemoSeedWorkflow {
             }
             at(date(p,"arrivedDate"),9,0);
             grooms.confirmArrival(created,groomId);
-            if ("VET_REVIEW".equals(target)) return created;
+
+            if ("VET_REVIEW".equals(target)) {
+                Long vet1Id = staffIds.get("VT01");
+                jdbc.update("UPDATE care_schedule SET veterinarian_id = ? WHERE admission_id = ?", vet1Id, created);
+                jdbc.update("UPDATE admission_applications SET veterinarian_id = ? WHERE id = ?", vet1Id, created);
+                return created;
+            }
+
             at(date(p,"arrivedDate"),15,0);
             AdmissionApplication adm=admissions.findById(created).orElseThrow();
             assertNotNull(adm.getVeterinarianId(),"Initial exam must have a real Vet assignment");
@@ -372,10 +383,40 @@ abstract class DemoSeedWorkflow {
             vet.setDiagnosis("No contraindication identified in this simulated intake examination.");
             vet.setNotes("DEMO intake examination after arrival; supplied certificates checked. No treatment indicated.");
             vets.reviewByVet(created,vet,adm.getVeterinarianId());
+
+            // Sau khi reviewByVet hoan tat, chia deu lich su kham cho 3 Vet theo khu vuc
+            Long targetVetId;
+            String stallCode = p.hasNonNull("stallCode") ? text(p, "stallCode") : "";
+            if (stallCode.startsWith("A") || stallCode.startsWith("B") || "H047".equals(key)) {
+                targetVetId = staffIds.get("VT01");
+            } else if (stallCode.startsWith("C") || stallCode.startsWith("D") || "H048".equals(key)) {
+                targetVetId = staffIds.get("VT02");
+            } else {
+                targetVetId = staffIds.get("VT03");
+            }
+            jdbc.update("UPDATE care_schedule SET veterinarian_id = ? WHERE admission_id = ?", targetVetId, created);
+            jdbc.update("UPDATE admission_applications SET veterinarian_id = ? WHERE id = ?", targetVetId, created);
+            jdbc.update("UPDATE health_records SET veterinarian_id = ? WHERE care_schedule_id IN (SELECT id FROM care_schedule WHERE admission_id = ?)", targetVetId, created);
+
             return created;
         });
         if (Set.of("TRAINER_REVIEW","MANAGER_REVIEW","APPROVED").contains(target)) {
             trainerAssignments.assignIfNeeded(id);
+
+            // Reassign trainer:
+            // - If TRAINER_REVIEW (H045, H046): both assigned to trainer1 (TR01)
+            // - If APPROVED / MANAGER_REVIEW: Area A/B -> TR01, Area C/D -> TR02, Area E -> TR03
+            Long desiredTrainerId;
+            String stallCode = p.hasNonNull("stallCode") ? text(p, "stallCode") : "";
+            if ("TRAINER_REVIEW".equals(target) || stallCode.startsWith("A") || stallCode.startsWith("B") || "H047".equals(key)) {
+                desiredTrainerId = staffIds.get("TR01");
+            } else if (stallCode.startsWith("C") || stallCode.startsWith("D") || "H048".equals(key)) {
+                desiredTrainerId = staffIds.get("TR02");
+            } else {
+                desiredTrainerId = staffIds.get("TR03");
+            }
+            jdbc.update("UPDATE admission_applications SET trainer_id = ? WHERE id = ?", desiredTrainerId, id);
+
             if (!"TRAINER_REVIEW".equals(target)) tx(() -> {
                 at(date(p,"arrivedDate").plusDays(1),10,0);
                 AdmissionApplication adm=admissions.findById(id).orElseThrow();
@@ -404,6 +445,38 @@ abstract class DemoSeedWorkflow {
             json.writerWithDefaultPrettyPrinter().writeValue(checkpoint.toFile(),Map.of("staffIds",staffIds,"ownerIds",ownerIds,"admissionIds",admissionIds,"lastCompleted",key));
         }
         System.out.println("SEED: "+key+" "+text(p,"name")+" -> "+target);
+    }
+
+    private void postProcessAssignments() {
+        Long vt01 = staffIds.get("VT01");
+        Long vt02 = staffIds.get("VT02");
+        Long vt03 = staffIds.get("VT03");
+        jdbc.update("""
+            UPDATE admission_applications a
+            SET veterinarian_id = CASE
+                WHEN ar.code IN ('A', 'B') THEN ?
+                WHEN ar.code IN ('C', 'D') THEN ?
+                ELSE ?
+            END
+            FROM horses h
+            JOIN stable_stalls s ON h.current_stall_id = s.id
+            JOIN areas ar ON s.area_id = ar.id
+            WHERE a.horse_id = h.id AND a.status = 'APPROVED'
+        """, vt01, vt02, vt03);
+
+        jdbc.update("""
+            UPDATE care_schedule cs
+            SET veterinarian_id = a.veterinarian_id
+            FROM admission_applications a
+            WHERE cs.admission_id = a.id AND a.status = 'APPROVED'
+        """);
+
+        jdbc.update("""
+            UPDATE health_records hr
+            SET veterinarian_id = cs.veterinarian_id
+            FROM care_schedule cs
+            WHERE hr.care_schedule_id = cs.id
+        """);
     }
 
     private void verifyResult() throws Exception {
