@@ -31,7 +31,7 @@ export function TrainerHorseIncidentsTab({ horseId, horseName }: { horseId: numb
   const [error, setError] = useState<string | null>(null);
   const [isReportOpen, setIsReportOpen] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const fetchReports = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -46,8 +46,8 @@ export function TrainerHorseIncidentsTab({ horseId, horseName }: { horseId: numb
   }, [horseId]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    fetchReports();
+  }, [fetchReports]);
 
   return (
     <div className="space-y-4">
@@ -91,20 +91,23 @@ export function TrainerHorseIncidentsTab({ horseId, horseName }: { horseId: numb
 
             return (
               <Panel key={report.id} padded className="space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--color-border)] pb-2">
-                  <div className="space-y-1">
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--color-border-subtle)] pb-2.5">
+                  <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-[var(--color-text-primary)]">{report.title}</span>
+                      <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">{report.title}</h4>
                       <Pill tone={severityConfig.tone} size="sm">{severityConfig.label}</Pill>
                     </div>
                     <p className="text-xs text-[var(--color-text-muted)]">
                       Reported on {formatDateTime(report.reportedAt)}
+                      {report.reportedByName && (
+                        <span> • Reported by: <strong>{report.reportedByName}</strong></span>
+                      )}
                     </p>
                   </div>
                   <Pill tone={statusConfig.tone} size="sm">{statusConfig.label}</Pill>
                 </div>
 
-                <p className="text-xs leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-line">
+                <p className="text-xs leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-wrap">
                   {report.description}
                 </p>
 
@@ -138,7 +141,7 @@ export function TrainerHorseIncidentsTab({ horseId, horseName }: { horseId: numb
         horseName={horseName}
         open={isReportOpen}
         onClose={() => setIsReportOpen(false)}
-        onSuccess={loadData}
+        onSuccess={fetchReports}
       />
     </div>
   );

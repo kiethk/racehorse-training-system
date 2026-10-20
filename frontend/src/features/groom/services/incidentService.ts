@@ -24,7 +24,7 @@ export const incidentApi = {
   },
 
   create: async (body: CreateIncidentRequest): Promise<IncidentReport> =>
-    (await apiPost<ApiResponse<IncidentReport>>('/api/groom-incident-reports', body)).data,
+    (await apiPost<ApiResponse<IncidentReport>>('/api/incidents', body)).data,
 
   /**
    * Attach an image after create returns the report id.
@@ -35,7 +35,7 @@ export const incidentApi = {
     const body = new FormData();
     body.append('file', file);
     const res = await apiUpload<ApiResponse<IncidentReport>>(
-      `/api/groom-incident-reports/${reportId}/image`,
+      `/api/incidents/${reportId}/image`,
       body,
     );
     return res.data;
@@ -45,6 +45,11 @@ export const incidentApi = {
    * API path of the report's image, or null when it has none. The endpoint checks the viewer,
    * so render it with <ProtectedImage>, never a plain <img>.
    */
-  imageSrc: (report: IncidentReport): string | null =>
-    report.imageUrl ? `/api/groom-incident-reports/${report.id}/image` : null,
+  imageSrc: (report: IncidentReport): string | null => {
+    if (!report.imageUrl) return null;
+    if (report.imageUrl.startsWith('http://') || report.imageUrl.startsWith('https://')) {
+      return report.imageUrl;
+    }
+    return `/api/incidents/${report.id}/image`;
+  },
 };

@@ -105,10 +105,14 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             + "AND (:careType IS NULL OR cs.careType = :careType) "
             + "AND (:horseId IS NULL OR cs.horseId = :horseId) "
             + "AND (:vetId IS NULL OR cs.veterinarianId = :vetId) "
-            + "AND (:admissionId IS NULL OR cs.admissionId = :admissionId)")
+            + "AND (:admissionId IS NULL OR cs.admissionId = :admissionId) "
+            + "AND (cast(:dayStart as timestamp) IS NULL OR cs.scheduledAt >= :dayStart) "
+            + "AND (cast(:dayEnd as timestamp) IS NULL OR cs.scheduledAt < :dayEnd)")
     Page<CareSchedule> findFiltered(@Param("status") CareScheduleStatus status,
             @Param("careType") CareType careType, @Param("horseId") Long horseId,
-            @Param("vetId") Long vetId, @Param("admissionId") Long admissionId, Pageable pageable);
+            @Param("vetId") Long vetId, @Param("admissionId") Long admissionId,
+            @Param("dayStart") LocalDateTime dayStart,
+            @Param("dayEnd") LocalDateTime dayEnd, Pageable pageable);
 
     @Query("SELECT cs FROM CareSchedule cs, AdmissionApplication a WHERE cs.admissionId = a.id "
             + "AND (:status IS NULL OR cs.status = :status) AND (:careType IS NULL OR cs.careType = :careType) "

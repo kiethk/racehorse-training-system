@@ -75,4 +75,13 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
             WHERE a.trainerId = :trainerId
             """)
     List<Long> findManagedHorseIdsByTrainerId(@Param("trainerId") Long trainerId);
+
+    @Query("""
+            SELECT a.trainerId
+            FROM Horse h
+            JOIN StableStall ss ON h.currentStallId = ss.id
+            JOIN Area a ON ss.areaId = a.id
+            WHERE h.id = :horseId
+            """)
+    Optional<Long> findTrainerIdByHorseId(@Param("horseId") Long horseId);
 }

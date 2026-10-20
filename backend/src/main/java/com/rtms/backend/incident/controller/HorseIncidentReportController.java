@@ -46,14 +46,21 @@ public class HorseIncidentReportController {
                 incidentReportService.getReports(horseId, status, currentUser));
     }
 
+    /**
+     * Đã khóa theo BR-URG-21 / AD-004: sự cố chỉ chuyển RESOLVED qua
+     * POST /api/care-schedules/{id}/complete (đóng ca Urgent). Endpoint này không
+     * đổi trạng thái báo cáo nữa.
+     */
     @PatchMapping("/{id}/handle")
     @PreAuthorize("hasAuthority('GROOM_INCIDENT_REPORT_HANDLE')")
     public ApiResponse<HorseIncidentReport> handleReport(
             @PathVariable Long id,
             @RequestBody HandleIncidentRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(
-                incidentReportService.handleReport(id, request, currentUser));
+        throw new com.rtms.backend.config.ApiException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                "INCIDENT_CLOSE_VIA_CARE_SCHEDULE",
+                "Incident reports are resolved only by completing the urgent care schedule");
     }
 
     @GetMapping("/{id}")
