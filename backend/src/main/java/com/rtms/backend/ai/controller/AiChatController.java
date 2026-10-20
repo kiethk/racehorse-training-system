@@ -97,11 +97,11 @@ public class AiChatController {
      */
     @DeleteMapping("/conversations/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> deleteConversation(
+    public ResponseEntity<Map<String, Object>> deleteConversation(
             @PathVariable("id") Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         conversationService.deleteConversation(id, currentUser.getUserId());
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(Map.of("success", true, "id", id));
     }
 
     /**

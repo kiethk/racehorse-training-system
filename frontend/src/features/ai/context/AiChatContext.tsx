@@ -137,31 +137,40 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
 
   const deleteChat = useCallback(
     async (id: number) => {
+      // 1. Cập nhật state UI ngay lập tức (Optimistic Update)
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (currentConversationId === id) {
+        createNewChat();
+      }
+
       try {
         await deleteConversation(id);
-        setConversations((prev) => prev.filter((c) => c.id !== id));
         toast.success('Đã xóa cuộc trò chuyện');
-        if (currentConversationId === id) {
-          createNewChat();
-        }
       } catch (err: unknown) {
+        // Rollback nếu API thất bại
+        void refreshConversations();
         const msg = err instanceof Error ? err.message : 'Lỗi khi xóa cuộc trò chuyện';
         toast.error(msg);
       }
     },
-    [currentConversationId, createNewChat]
+    [currentConversationId, createNewChat, refreshConversations]
   );
 
   const renameChat = useCallback(async (id: number, title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    // Optimistic update
+    setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, title: trimmed } : c)));
     try {
-      const updated = await renameConversation(id, title);
+      const updated = await renameConversation(id, trimmed);
       setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, title: updated.title } : c)));
       toast.success('Đã cập nhật tiêu đề cuộc trò chuyện');
     } catch (err: unknown) {
+      void refreshConversations();
       const msg = err instanceof Error ? err.message : 'Lỗi khi đổi tên cuộc trò chuyện';
       toast.error(msg);
     }
-  }, []);
+  }, [refreshConversations]);
 
   const sendMessage = useCallback(
     async (text: string) => {

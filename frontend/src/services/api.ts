@@ -29,6 +29,21 @@ async function responseError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, msg, payload?.errorCode);
 }
 
+async function parseJsonResponse<T>(res: Response): Promise<T> {
+  if (res.status === 204) {
+    return undefined as unknown as T;
+  }
+  const text = await res.text();
+  if (!text || !text.trim()) {
+    return undefined as unknown as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return undefined as unknown as T;
+  }
+}
+
 let refreshPromise: Promise<boolean> | null = null;
 
 export function createAuthenticatedEventSource(path: string): EventSource {
@@ -115,7 +130,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   if (!res.ok) {
     throw await responseError(res);
   }
-  return res.json();
+  return parseJsonResponse<T>(res);
 }
 
 /** Binary files use Bearer authentication and the same refresh flow as JSON. */
@@ -144,7 +159,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   if (!res.ok) {
     throw await responseError(res);
   }
-  return res.json();
+  return parseJsonResponse<T>(res);
 }
 
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
@@ -157,14 +172,14 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   if (!res.ok) {
     throw await responseError(res);
   }
-  return res.json();
+  return parseJsonResponse<T>(res);
 }
 
 /** JSON DELETE uses the same authentication, token refresh and error mapping. */
 export async function apiDelete<T>(path: string): Promise<T> {
   const res = await doFetch(path, { method: 'DELETE', credentials: 'include' });
   if (!res.ok) throw await responseError(res);
-  return res.json();
+  return parseJsonResponse<T>(res);
 }
 
 /** Multipart upload uses the same Bearer API client as JSON requests. */
@@ -192,5 +207,5 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   if (!res.ok) {
     throw await responseError(res);
   }
-  return res.json();
+  return parseJsonResponse<T>(res);
 }
