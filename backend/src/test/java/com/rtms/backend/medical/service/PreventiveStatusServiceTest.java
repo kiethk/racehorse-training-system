@@ -218,7 +218,11 @@ class PreventiveStatusServiceTest {
         assertSame(booked, result);
         assertEquals(CareScheduleStatus.SCHEDULED, booked.getStatus());
         assertEquals(21L, booked.getVeterinarianId());
-        verify(schedules, never()).save(any());
+        assertEquals(TODAY.plusDays(4).atTime(9, 0), booked.getScheduledAt());
+        // The slot stays; only the list of what is still due is refreshed (EI was just given).
+        assertTrue(booked.getDescription().contains("TETANUS"));
+        assertFalse(booked.getDescription().contains("EI"));
+        verify(schedules).save(booked);
         verify(schedules, never()).saveAndFlush(any());
     }
 

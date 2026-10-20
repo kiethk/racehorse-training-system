@@ -1,13 +1,13 @@
 import { apiGet, apiPatch, apiPost } from '@/services/api';
 import type { CareScheduleResponse } from '../types';
 import type {
-  BatchVaccinationRequest,
-  BatchVaccinationResult,
   HorsePreventiveStatus,
   PreventiveCoverage,
   PreventiveDueItem,
   PreventiveDueStatus,
   PreventiveProtocol,
+  RecordVaccinationRequest,
+  RecordVaccinationResult,
   RescheduleRequest,
   RescheduleResponse,
 } from '../types/preventive';
@@ -39,8 +39,8 @@ export const preventiveCareService = {
   horseStatus: async (horseId: number): Promise<HorsePreventiveStatus> =>
     (await apiGet<ApiResponse<HorsePreventiveStatus>>(`/api/horses/${horseId}/preventive-status`)).data,
 
-  recordBatch: async (data: BatchVaccinationRequest): Promise<BatchVaccinationResult[]> =>
-    (await apiPost<ApiResponse<BatchVaccinationResult[]>>('/api/preventive-care/batch-vaccinations', data)).data,
+  recordVaccination: async (horseId: number, data: RecordVaccinationRequest): Promise<RecordVaccinationResult> =>
+    (await apiPost<ApiResponse<RecordVaccinationResult>>(`/api/horses/${horseId}/vaccinations`, data)).data,
 
   reschedule: async (
     scheduleId: number,

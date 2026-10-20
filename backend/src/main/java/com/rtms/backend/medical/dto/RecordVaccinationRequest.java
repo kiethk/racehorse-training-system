@@ -1,19 +1,13 @@
 package com.rtms.backend.medical.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
-import java.util.List;
 
-/** Tiêm cùng một phác đồ cho nhiều ngựa (ví dụ cả dãy chuồng) trong một lần ghi nhận. */
-public class BatchVaccinationRequest {
-
-    @NotEmpty(message = "horseIds is required")
-    @Size(max = 100, message = "At most 100 horses per batch")
-    private List<@NotNull Long> horseIds;
+/** One dose of one protocol given to one horse outside a care visit. */
+public class RecordVaccinationRequest {
 
     @NotNull(message = "protocolId is required")
     private Long protocolId;
@@ -25,13 +19,10 @@ public class BatchVaccinationRequest {
     @Size(max = 100)
     private String route;
 
-    /** Bỏ trống = hôm nay. Không được ở tương lai. */
+    /** Empty = today. Must not be in the future. */
     private LocalDate administeredOn;
 
     private String instructions;
-
-    public List<Long> getHorseIds() { return horseIds; }
-    public void setHorseIds(List<Long> horseIds) { this.horseIds = horseIds; }
 
     public Long getProtocolId() { return protocolId; }
     public void setProtocolId(Long protocolId) { this.protocolId = protocolId; }

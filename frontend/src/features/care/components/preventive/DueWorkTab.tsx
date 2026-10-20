@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
-  ChoiceInput,
   EmptyState,
   FilterChips,
   FormField,
@@ -21,11 +20,10 @@ import {
   THead,
   Tr,
 } from '@/components/ui';
-import { cn } from '@/lib/cn';
 import { displayError, formatDate } from '@/lib/display';
 import { preventiveCareService } from '../../services/preventiveCareService';
 import type { PreventiveDueItem, PreventiveDueStatus, PreventiveProtocol } from '../../types/preventive';
-import { BatchVaccinationModal } from './BatchVaccinationModal';
+import { RecordVaccinationModal } from './RecordVaccinationModal';
 import { DueStatusPill } from './preventiveDisplay';
 
 type Filter = 'ACTION' | 'OVERDUE' | 'DUE_SOON' | 'OK';
@@ -51,8 +49,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
   const [protocolId, setProtocolId] = useState<number | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [batchOpen, setBatchOpen] = useState(false);
+  const [recording, setRecording] = useState<PreventiveDueItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,7 +61,6 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
       ]);
       setItems(rows);
       setSummary(actionable);
-      setSelected(new Set());
     } catch (cause) {
       setError(displayError(cause, 'Could not load preventive care work.'));
     } finally {
@@ -82,20 +78,6 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
     dueSoon: summary.filter((i) => i.protocol.status === 'DUE_SOON').length,
     horses: new Set(summary.map((i) => i.horseId)).size,
   }), [summary]);
-
-  const selectedItems = items.filter((item) => selected.has(rowKey(item)));
-  const selectedProtocolIds = new Set(selectedItems.map((item) => item.protocol.protocolId));
-  const selectedHorses = [...new Map(selectedItems.map((item) => [item.horseId, { id: item.horseId, name: item.horseName }])).values()];
-  const allSelected = items.length > 0 && selected.size === items.length;
-
-  const toggle = (key: string) => {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
 
   return (
     <div className="space-y-4">
@@ -147,78 +129,56 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
           <Table bare aria-label="Preventive care work">
             <THead>
               <Tr>
-                {canRecord && (
-                  <Th className="w-10">
-                    <ChoiceInput
-                      aria-label="Select all rows"
-                      checked={allSelected}
-                      onChange={() => setSelected(allSelected ? new Set() : new Set(items.map(rowKey)))}
-                    />
-                  </Th>
-                )}
                 <Th>Horse</Th>
                 <Th>Protocol</Th>
                 <Th>Last dose</Th>
                 <Th>Next due</Th>
                 <Th>Status</Th>
+                {canRecord && <Th className="w-px"><span className="sr-only">Actions</span></Th>}
               </Tr>
             </THead>
             <TBody>
-              {items.map((item) => {
-                const key = rowKey(item);
-                return (
-                  <Tr key={key} className={cn(selected.has(key) && 'bg-[var(--color-primary-subtle)]')}>
-                    {canRecord && (
-                      <Td>
-                        <ChoiceInput
-                          aria-label={`Select ${item.horseName} – ${item.protocol.name}`}
-                          checked={selected.has(key)}
-                          onChange={() => toggle(key)}
-                        />
-                      </Td>
-                    )}
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">{item.horseName}</span>
-                        <StatusBadge status={item.horseStatus} size="sm" />
-                      </div>
+              {items.map((item) => (
+                <Tr key={rowKey(item)}>
+                  <Td>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{item.horseName}</span>
+                      <StatusBadge status={item.horseStatus} size="sm" />
+                    </div>
+                  </Td>
+                  <Td>
+                    <div className="flex items-center gap-2">
+                      <span>{item.protocol.name}</span>
+                      {item.protocol.mandatory && <Pill tone="info" size="sm">Mandatory</Pill>}
+                    </div>
+                  </Td>
+                  <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">{formatDate(item.protocol.lastDoseOn)}</Td>
+                  <Td className="whitespace-nowrap">{item.protocol.nextDueOn ? formatDate(item.protocol.nextDueOn) : 'Now'}</Td>
+                  <Td><DueStatusPill status={item.protocol.status} /></Td>
+                  {canRecord && (
+                    <Td className="text-right">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon="pill"
+                        aria-label={`Record ${item.protocol.name} for ${item.horseName}`}
+                        onClick={() => setRecording(item)}
+                      >
+                        Record
+                      </Button>
                     </Td>
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <span>{item.protocol.name}</span>
-                        {item.protocol.mandatory && <Pill tone="info" size="sm">Mandatory</Pill>}
-                      </div>
-                    </Td>
-                    <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">{formatDate(item.protocol.lastDoseOn)}</Td>
-                    <Td className="whitespace-nowrap">{item.protocol.nextDueOn ? formatDate(item.protocol.nextDueOn) : 'Now'}</Td>
-                    <Td><DueStatusPill status={item.protocol.status} /></Td>
-                  </Tr>
-                );
-              })}
+                  )}
+                </Tr>
+              ))}
             </TBody>
           </Table>
         </Panel>
       )}
 
-      {canRecord && selected.size > 0 && (
-        <div className="sticky bottom-4 z-[var(--z-dropdown)] flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-popover)]">
-          <span className="text-sm text-[var(--color-text-secondary)]">
-            <strong className="text-[var(--color-text-primary)]">{selectedHorses.length}</strong> horse{selectedHorses.length === 1 ? '' : 's'} selected
-            {selectedProtocolIds.size > 1 && ' · several protocols selected, pick one in the form'}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="tertiary" onClick={() => setSelected(new Set())}>Clear</Button>
-            <Button variant="primary" icon="pill" onClick={() => setBatchOpen(true)}>Record vaccination</Button>
-          </div>
-        </div>
-      )}
-
-      <BatchVaccinationModal
-        open={batchOpen}
-        onClose={() => setBatchOpen(false)}
-        horses={selectedHorses}
+      <RecordVaccinationModal
+        item={recording}
         protocols={protocols}
-        initialProtocolId={selectedProtocolIds.size === 1 ? [...selectedProtocolIds][0] : undefined}
+        onClose={() => setRecording(null)}
         onRecorded={load}
       />
     </div>

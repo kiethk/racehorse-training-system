@@ -79,8 +79,7 @@ export interface VaccinationRequest {
   source?: VaccinationSource;
 }
 
-export interface BatchVaccinationRequest {
-  horseIds: number[];
+export interface RecordVaccinationRequest {
   protocolId: number;
   dosage: string;
   route?: string;
@@ -88,7 +87,7 @@ export interface BatchVaccinationRequest {
   instructions?: string;
 }
 
-export interface BatchVaccinationResult {
+export interface RecordVaccinationResult {
   horseId: number;
   healthRecordId: number;
 }

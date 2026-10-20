@@ -4,8 +4,8 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
-import com.rtms.backend.medical.dto.BatchVaccinationRequest;
-import com.rtms.backend.medical.dto.BatchVaccinationResult;
+import com.rtms.backend.medical.dto.RecordVaccinationRequest;
+import com.rtms.backend.medical.dto.RecordVaccinationResult;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.PreventiveProtocol;
 import com.rtms.backend.medical.enums.ProtocolCategory;
@@ -16,7 +16,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -26,7 +25,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
@@ -38,7 +36,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class BatchVaccinationServiceTest {
+class VaccinationRecordServiceTest {
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 18);
 
@@ -48,12 +46,12 @@ class BatchVaccinationServiceTest {
     @Mock PreventiveVaccinationService vaccinations;
     @Mock PreventiveStatusService preventiveStatus;
 
-    private BatchVaccinationService service;
+    private VaccinationRecordService service;
     private final Map<Long, Horse> stable = new HashMap<>();
 
     @BeforeEach
     void setUp() {
-        service = new BatchVaccinationService(protocols, horses, healthRecords, vaccinations, preventiveStatus,
+        service = new VaccinationRecordService(protocols, horses, healthRecords, vaccinations, preventiveStatus,
                 Clock.fixed(TODAY.atTime(9, 0).atZone(ZONE).toInstant(), ZONE));
         PreventiveProtocol ei = new PreventiveProtocol();
         ei.setId(1L);
@@ -75,74 +73,63 @@ class BatchVaccinationServiceTest {
     }
 
     @Test
-    void eachHorseGetsAVaccinationRecordWithoutATrainingDecision() {
-        List<BatchVaccinationResult> results = service.record(request(List.of(3L, 1L, 3L)), 20L);
+    void horseGetsAVaccinationRecordWithoutATrainingDecision() {
+        RecordVaccinationResult result = service.record(3L, request(), 20L);
 
-        assertEquals(List.of(new BatchVaccinationResult(1L, 501L), new BatchVaccinationResult(3L, 502L)), results);
+        assertEquals(new RecordVaccinationResult(3L, 501L), result);
         ArgumentCaptor<HealthRecord> saved = ArgumentCaptor.forClass(HealthRecord.class);
-        verify(healthRecords, times(2)).save(saved.capture());
-        for (HealthRecord record : saved.getAllValues()) {
-            assertEquals(BatchVaccinationService.RECORD_TYPE, record.getRecordType());
-            assertNull(record.getCareScheduleId());
-            assertNull(record.getTrainingDecision());
-            assertEquals(20L, record.getVeterinarianId());
-        }
-        assertEquals(TrainingDecision.BLOCKED, stable.get(3L).getTrainingDecision(), "batch must not unblock a horse");
+        verify(healthRecords).save(saved.capture());
+        HealthRecord record = saved.getValue();
+        assertEquals(VaccinationRecordService.RECORD_TYPE, record.getRecordType());
+        assertNull(record.getCareScheduleId());
+        assertNull(record.getTrainingDecision());
+        assertEquals(20L, record.getVeterinarianId());
+        assertEquals(TrainingDecision.BLOCKED, stable.get(3L).getTrainingDecision(), "a dose must not unblock a horse");
         verify(vaccinations).record(eq(501L), argThat(doses -> doses.size() == 1
                 && doses.get(0).administeredOn().equals(TODAY)));
-        verify(preventiveStatus).upsertMilestone(1L, "preventive:501", 20L, TODAY);
-        verify(preventiveStatus).upsertMilestone(3L, "preventive:502", 20L, TODAY);
-    }
-
-    @Test
-    void horsesAreLockedInIdOrder() {
-        service.record(request(List.of(3L, 2L, 1L)), 20L);
-
-        InOrder order = inOrder(horses);
-        order.verify(horses).findByIdForUpdate(1L);
-        order.verify(horses).findByIdForUpdate(2L);
-        order.verify(horses).findByIdForUpdate(3L);
+        verify(preventiveStatus).upsertMilestone(3L, "preventive:501", 20L, TODAY);
     }
 
     @Test
     void candidateInQuarantineDoesNotGetAMissingProtocolBookedYet() {
-        service.record(request(List.of(2L)), 20L);
+        service.record(2L, request(), 20L);
 
         verify(preventiveStatus).upsertMilestone(2L, "preventive:501", 20L, null);
     }
 
     @Test
-    void horseOutsideTheStableFailsTheWholeBatch() {
+    void horseOutsideTheStableIsRejected() {
         horse(4L, HorseStatus.REJECTED, TrainingDecision.ALLOWED);
 
-        ApiException error = assertThrows(ApiException.class, () -> service.record(request(List.of(1L, 4L)), 20L));
+        ApiException error = assertThrows(ApiException.class, () -> service.record(4L, request(), 20L));
         assertEquals("HORSE_NOT_IN_STABLE", error.getErrorCode());
 
-        ApiException missing = assertThrows(ApiException.class, () -> service.record(request(List.of(99L)), 20L));
+        ApiException missing = assertThrows(ApiException.class, () -> service.record(99L, request(), 20L));
         assertEquals("HORSE_NOT_FOUND", missing.getErrorCode());
+        verifyNoInteractions(healthRecords, vaccinations, preventiveStatus);
     }
 
     @Test
     void futureDateOrUnknownProtocolIsRejectedBeforeAnyWrite() {
-        BatchVaccinationRequest future = request(List.of(1L));
+        RecordVaccinationRequest future = request();
         future.setAdministeredOn(TODAY.plusDays(1));
-        assertThrows(ApiException.class, () -> service.record(future, 20L));
+        assertThrows(ApiException.class, () -> service.record(1L, future, 20L));
 
-        BatchVaccinationRequest unknown = request(List.of(1L));
+        RecordVaccinationRequest unknown = request();
         unknown.setProtocolId(404L);
         when(protocols.findById(404L)).thenReturn(Optional.empty());
         assertEquals("PROTOCOL_NOT_FOUND",
-                assertThrows(ApiException.class, () -> service.record(unknown, 20L)).getErrorCode());
+                assertThrows(ApiException.class, () -> service.record(1L, unknown, 20L)).getErrorCode());
 
         verifyNoInteractions(healthRecords, vaccinations, preventiveStatus);
     }
 
     @Test
     void earlierDayCanBeEnteredLater() {
-        BatchVaccinationRequest yesterday = request(List.of(1L));
+        RecordVaccinationRequest yesterday = request();
         yesterday.setAdministeredOn(TODAY.minusDays(1));
 
-        service.record(yesterday, 20L);
+        service.record(1L, yesterday, 20L);
 
         verify(vaccinations).record(eq(501L), argThat(doses -> doses.get(0).administeredOn().equals(TODAY.minusDays(1))));
     }
@@ -156,9 +143,8 @@ class BatchVaccinationServiceTest {
         stable.put(id, horse);
     }
 
-    private static BatchVaccinationRequest request(List<Long> horseIds) {
-        BatchVaccinationRequest request = new BatchVaccinationRequest();
-        request.setHorseIds(horseIds);
+    private static RecordVaccinationRequest request() {
+        RecordVaccinationRequest request = new RecordVaccinationRequest();
         request.setProtocolId(1L);
         request.setDosage("1 liều");
         request.setRoute("IM");

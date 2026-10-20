@@ -1,15 +1,15 @@
 package com.rtms.backend.medical.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
-import com.rtms.backend.medical.dto.BatchVaccinationRequest;
-import com.rtms.backend.medical.dto.BatchVaccinationResult;
 import com.rtms.backend.medical.dto.HorsePreventiveStatusResponse;
 import com.rtms.backend.medical.dto.PreventiveCoverageResponse;
 import com.rtms.backend.medical.dto.PreventiveDueItem;
 import com.rtms.backend.medical.dto.PreventiveProtocolResponse;
+import com.rtms.backend.medical.dto.RecordVaccinationRequest;
+import com.rtms.backend.medical.dto.RecordVaccinationResult;
 import com.rtms.backend.medical.enums.PreventiveDueStatus;
-import com.rtms.backend.medical.service.BatchVaccinationService;
 import com.rtms.backend.medical.service.PreventiveCareQueryService;
+import com.rtms.backend.medical.service.VaccinationRecordService;
 import com.rtms.backend.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Set;
 
-/** Hub Preventive Care: phác đồ, việc cần làm, độ phủ, trạng thái từng ngựa, ghi nhận hàng loạt. */
+/** Preventive Care hub: protocols, due work, coverage, per-horse status and recording a dose. */
 @RestController
 @RequestMapping("/api")
 public class PreventiveCareHubController {
@@ -29,11 +29,12 @@ public class PreventiveCareHubController {
             "hasAuthority('PREVENTIVE_CARE_VIEW') and principal.role != 'HORSE_OWNER'";
 
     private final PreventiveCareQueryService queryService;
-    private final BatchVaccinationService batchService;
+    private final VaccinationRecordService vaccinationService;
 
-    public PreventiveCareHubController(PreventiveCareQueryService queryService, BatchVaccinationService batchService) {
+    public PreventiveCareHubController(PreventiveCareQueryService queryService,
+            VaccinationRecordService vaccinationService) {
         this.queryService = queryService;
-        this.batchService = batchService;
+        this.vaccinationService = vaccinationService;
     }
 
     @GetMapping("/preventive-protocols")
@@ -66,11 +67,12 @@ public class PreventiveCareHubController {
         return ApiResponse.success(queryService.horseStatus(horseId, currentUser));
     }
 
-    @PostMapping("/preventive-care/batch-vaccinations")
+    @PostMapping("/horses/{horseId}/vaccinations")
     @PreAuthorize("hasAuthority('PREVENTIVE_CARE_CREATE') and principal.role == 'VETERINARIAN'")
-    public ApiResponse<List<BatchVaccinationResult>> batchVaccinations(
-            @Valid @RequestBody BatchVaccinationRequest request,
+    public ApiResponse<RecordVaccinationResult> recordVaccination(
+            @PathVariable Long horseId,
+            @Valid @RequestBody RecordVaccinationRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(batchService.record(request, currentUser.getUserId()));
+        return ApiResponse.success(vaccinationService.record(horseId, request, currentUser.getUserId()));
     }
 }

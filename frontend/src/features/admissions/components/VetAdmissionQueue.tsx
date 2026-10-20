@@ -210,7 +210,8 @@ export function VetAdmissionQueue() {
           .then(({ schedule }) => {
             if (!active) return;
             if (!schedule.admissionId) {
-              setDetailError('This care schedule is not linked to an Admission record.');
+              // Visits booked outside an admission (e.g. preventive milestones) have their own workspace.
+              router.replace(`/veterinarian/preventive-care/visits/${schedule.id}`);
               return;
             }
             setDeepLinkedSchedule(schedule);
@@ -239,7 +240,7 @@ export function VetAdmissionQueue() {
         });
       }
     }
-  }, [searchParams]);
+  }, [router, searchParams]);
 
 
   // Server-side filtered queue loading

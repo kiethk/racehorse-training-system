@@ -309,7 +309,8 @@ function getMetricBorderTone(
 }
 
 export interface VetReviewFormProps {
-  admissionId: number;
+  /** Missing for care schedules booked outside an admission (e.g. preventive milestones). */
+  admissionId?: number | null;
   horseId?: number | null;
   candidateName?: string;
   quarantineStallCode?: string | null;
@@ -342,6 +343,8 @@ export function VetReviewForm({
   const draftStorageKey = careScheduleId
     ? `draft:care-schedule:${careScheduleId}`
     : `draft:admission:${admissionId}`;
+  // Drafts written before per-schedule keys existed; only admission exams have one.
+  const legacyDraftKey = !careScheduleId && admissionId != null ? `rtms_vet_draft_${admissionId}` : null;
   // Decision Panel State
   const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>('ALLOWED');
   const [restrictionDetails, setRestrictionDetails] = useState('');
@@ -407,9 +410,7 @@ export function VetReviewForm({
   } | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
-      const storageKey = draftStorageKey;
-      const fallbackKey = careScheduleId ? null : `rtms_vet_draft_${admissionId}`;
-      const saved = localStorage.getItem(storageKey) || (fallbackKey ? localStorage.getItem(fallbackKey) : null);
+      const saved = localStorage.getItem(draftStorageKey) || (legacyDraftKey ? localStorage.getItem(legacyDraftKey) : null);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.timestamp) {
@@ -488,7 +489,7 @@ export function VetReviewForm({
   const handleDiscardAvailableDraft = () => {
     try {
       localStorage.removeItem(draftStorageKey);
-      localStorage.removeItem(`rtms_vet_draft_${admissionId}`);
+      if (legacyDraftKey) localStorage.removeItem(legacyDraftKey);
     } catch {
       // Ignore storage errors in restricted environments
     }
@@ -519,15 +520,14 @@ export function VetReviewForm({
         timestamp,
       };
       localStorage.setItem(storageKey, JSON.stringify(payload));
-      if (!careScheduleId) localStorage.setItem(`rtms_vet_draft_${admissionId}`, JSON.stringify(payload));
+      if (legacyDraftKey) localStorage.setItem(legacyDraftKey, JSON.stringify(payload));
       setDraftSavedTime(timestamp);
     } catch {
       // Storage write error
     }
   }, [
-    admissionId,
-    careScheduleId,
     draftStorageKey,
+    legacyDraftKey,
     metrics,
     examMode,
     systemFindings,
@@ -549,7 +549,7 @@ export function VetReviewForm({
   const handleClearDraft = () => {
     try {
       localStorage.removeItem(draftStorageKey);
-      localStorage.removeItem(`rtms_vet_draft_${admissionId}`);
+      if (legacyDraftKey) localStorage.removeItem(legacyDraftKey);
     } catch {
       // Ignore storage errors in restricted environments
     }
@@ -702,7 +702,7 @@ export function VetReviewForm({
 
     const nextScheduleRequest = followUpActive && followUpDate ? {
       horseId: horseId ?? undefined,
-      admissionId,
+      admissionId: admissionId ?? undefined,
       careType: 'ROUTINE' as const,
       scheduledDate: followUpDate,
       description: followUpDescription.trim() || 'Follow-up veterinary examination',
@@ -713,6 +713,7 @@ export function VetReviewForm({
       let result: VetReviewResponse | CareSchedule;
       let completionKind: 'INITIAL' | 'CARE_SCHEDULE';
       if (careType === 'INITIAL') {
+        if (admissionId == null) throw new Error('The admission identifier is missing. Reload this examination and try again.');
         const request: VetReviewRequest = {
           careScheduleId: careScheduleId ?? undefined,
           trainingDecision,
@@ -752,7 +753,7 @@ export function VetReviewForm({
       // Clear draft on successful submission
       try {
         localStorage.removeItem(draftStorageKey);
-        localStorage.removeItem(`rtms_vet_draft_${admissionId}`);
+        if (legacyDraftKey) localStorage.removeItem(legacyDraftKey);
       } catch {
         // Ignore
       }
@@ -1039,7 +1040,11 @@ export function VetReviewForm({
                   </span>
                 </label>
                 <span className="text-xs text-[var(--color-text-muted)]">
-                  Quarantine facility: {quarantineStallCode || 'Stall verified'}
+                  {admissionId != null
+                    ? `Quarantine facility: ${quarantineStallCode || 'Stall verified'}`
+                    : quarantineStallCode
+                      ? `Stall: ${quarantineStallCode}`
+                      : null}
                 </span>
               </div>
               {fieldErrors.physicalExamConfirmed && (
@@ -1536,8 +1541,17 @@ export function VetReviewForm({
               <span className="font-semibold text-[var(--color-text-secondary)]">Outcome:</span>
               <ul className="mt-1 space-y-0.5 list-disc pl-3.5">
                 <li>Permanently links health examination record.</li>
-                <li>Advances admission to Head Trainer review stage.</li>
-                <li>Quarantine stall stays locked until final manager clearance.</li>
+                {careType === 'INITIAL' ? (
+                  <>
+                    <li>Advances admission to Head Trainer review stage.</li>
+                    <li>Quarantine stall stays locked until final manager clearance.</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Applies the training decision to the horse.</li>
+                    {schedulePurpose === 'PREVENTIVE' && <li>Books the horse&apos;s next vaccination milestone.</li>}
+                  </>
+                )}
               </ul>
             </div>
           </div>
@@ -1580,7 +1594,9 @@ export function VetReviewForm({
             <p className="text-xs text-[var(--color-text-secondary)]">
               {careType === 'INITIAL'
                 ? 'This action writes the official clinical record and advances the admission to trainer review.'
-                : 'This action completes only this care schedule and does not change the admission workflow.'}
+                : admissionId != null
+                  ? 'This action completes only this care schedule and does not change the admission workflow.'
+                  : 'This action completes this care schedule and writes it to the horse health record.'}
             </p>
           </div>
         }

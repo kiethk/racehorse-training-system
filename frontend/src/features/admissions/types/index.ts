@@ -227,6 +227,7 @@ export interface CareSchedule {
   createdAt?: string;
   purpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   requestedAt?: string | null;
+  completedAt?: string | null;
 }
 
 export interface CareScheduleDetail {

@@ -5,6 +5,7 @@ import {
   Button,
   EmptyState,
   IconButton,
+  LinkButton,
   ListSkeleton,
   Notice,
   Panel,
@@ -107,6 +108,10 @@ export function CalendarTab() {
       ? s.status === 'REQUESTED' || s.status === 'SCHEDULED'
       : user?.role === 'VETERINARIAN' && s.status === 'SCHEDULED' && s.veterinarianId === user.userId;
 
+  const canExamine = (s: CareScheduleResponse) =>
+    user?.role === 'VETERINARIAN' && s.veterinarianId === user.userId
+    && (s.status === 'SCHEDULED' || s.status === 'IN_PROGRESS');
+
   return (
     <div className="space-y-4">
       <Panel padded className="flex flex-wrap items-center justify-between gap-3">
@@ -168,6 +173,11 @@ export function CalendarTab() {
                   <div className="flex gap-1.5">
                     {canMove(s) && (
                       <Button variant="secondary" size="sm" icon="calendar" onClick={() => setMoving(s)}>Move</Button>
+                    )}
+                    {canExamine(s) && (
+                      <LinkButton variant="primary" size="sm" icon="stethoscope" href={`/veterinarian/preventive-care/visits/${s.id}`}>
+                        {s.status === 'IN_PROGRESS' ? 'Continue exam' : 'Open exam'}
+                      </LinkButton>
                     )}
                     <Button variant="tertiary" size="sm" onClick={() => setDetailId(s.id)}>Details</Button>
                   </div>
