@@ -346,8 +346,9 @@ abstract class DemoSeedWorkflow {
         for (String name:List.of("horse-photo.jpg","registration.pdf","pedigree.pdf","vaccination-record.pdf","health-certificate.pdf","deworming-record.pdf"))
             files.add(new MockMultipartFile("files",name,name.endsWith("jpg")?"image/jpeg":"application/pdf",Files.readAllBytes(folder.resolve(name))));
         Long groomId = staffIds.get(
-                "WAITING_FOR_ARRIVAL".equals(target) ? "GR01" :
-                (key.startsWith("H") ? (p.get("areaKey").asText().equals("Q-A") ? text(p, "groomKey") : "GR21") : "GR23")
+                p.hasNonNull("groomKey") ? text(p, "groomKey") :
+                ("WAITING_FOR_ARRIVAL".equals(target) ? "GR01" :
+                (key.startsWith("H") ? (p.hasNonNull("areaKey") && p.get("areaKey").asText().equals("Q-A") ? text(p, "groomKey") : "GR01") : "GR23"))
         );
         Long id=tx(() -> {
             at(date(p,"submittedDate"),9,0);
@@ -457,7 +458,8 @@ abstract class DemoSeedWorkflow {
                 WHEN ar.code IN ('A', 'B') THEN ?
                 WHEN ar.code IN ('C', 'D') THEN ?
                 ELSE ?
-            END
+            END,
+            groom_id = s.groom_id
             FROM horses h
             JOIN stable_stalls s ON h.current_stall_id = s.id
             JOIN areas ar ON s.area_id = ar.id
