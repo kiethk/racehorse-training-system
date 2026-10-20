@@ -1,11 +1,6 @@
 package com.rtms.backend.training.repository;
 
-import com.rtms.backend.training.dto.GroomConflictRow;
-import com.rtms.backend.training.dto.GroomWorkoutRow;
-import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
-import com.rtms.backend.training.dto.PlanWorkoutItemResponse;
-import com.rtms.backend.training.dto.RecentWorkoutRow;
-import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
+import com.rtms.backend.training.dto.*;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Truy vấn buổi tập (workout).
@@ -223,4 +219,11 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
              AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
            """)
     boolean existsActiveWorkoutOfOwnerInLot(@Param("lotId") Long lotId, @Param("ownerId") Long ownerId);
+
+    @Query("""
+       SELECT w FROM TrainingWorkout w
+       JOIN TrainingLot l ON w.lotId = l.id
+       WHERE w.id = :workoutId AND l.trainerId = :trainerId
+       """)
+    Optional<TrainingWorkout> findByIdAndTrainerId(@Param("workoutId") Long workoutId, @Param("trainerId") Long trainerId);
 }

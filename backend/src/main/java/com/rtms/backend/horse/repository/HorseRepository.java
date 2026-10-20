@@ -8,20 +8,17 @@
  *  - Thêm custom query bằng method name (findByName, findByStatus...) hoặc @Query nếu phức tạp hơn
  */
 package com.rtms.backend.horse.repository;
-import com.rtms.backend.stable.entity.Area;
-import com.rtms.backend.stable.entity.StableStall;
 
 import com.rtms.backend.horse.entity.Horse;
-
-import java.util.List;
-import java.util.Optional;
-
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface HorseRepository extends JpaRepository<Horse, Long> {
@@ -75,4 +72,7 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
             WHERE a.trainerId = :trainerId
             """)
     List<Long> findManagedHorseIdsByTrainerId(@Param("trainerId") Long trainerId);
+
+    @Query("SELECT h FROM Horse h WHERE UPPER(h.registrationNumber) = UPPER(:identifier) OR LOWER(h.name) = LOWER(:identifier)")
+    List<Horse> findByIdentifierOrName(@Param("identifier") String identifier);
 }

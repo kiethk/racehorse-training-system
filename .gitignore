@@ -5,6 +5,8 @@ backend/.mvn/wrapper/maven-wrapper.jar
 # Frontend (Next.js)
 frontend/node_modules/
 **/.next/
+pnpm-lock.yaml
+pnpm-workspace.yaml
 
 # Environment
 .env
@@ -21,6 +23,8 @@ backend/.env.cloud
 .DS_Store
 Thumbs.db
 
+# Project Docs & Artifacts
+artifacts/
 ui-reference/
 tutorials/
 docs/
