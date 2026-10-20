@@ -9,5 +9,10 @@ import java.util.List;
 public record AiChatRequestDto(
         @NotBlank(message = "Nội dung câu hỏi không được để trống")
         String message,
+        Long conversationId,
         List<AiChatMessageDto> conversationHistory
-) {}
+) {
+    public AiChatRequestDto(String message, List<AiChatMessageDto> conversationHistory) {
+        this(message, null, conversationHistory);
+    }
+}

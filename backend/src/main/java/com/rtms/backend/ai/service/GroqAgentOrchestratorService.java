@@ -1,8 +1,10 @@
 package com.rtms.backend.ai.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rtms.backend.ai.conversation.dto.AiChatMessageDetailDto;
+import com.rtms.backend.ai.conversation.entity.AiConversation;
+import com.rtms.backend.ai.conversation.service.AiConversationService;
 import com.rtms.backend.ai.dto.ActionProposalDto;
 import com.rtms.backend.ai.dto.AiChatMessageDto;
 import com.rtms.backend.ai.dto.AiChatRequestDto;
@@ -13,6 +15,7 @@ import com.rtms.backend.security.AuthenticatedUser;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -24,14 +27,12 @@ import java.time.Duration;
 import java.util.*;
 
 /**
- * Tác tử AI Điều phối (Agent Orchestrator) tích hợp Groq LLM (qwen/qwen3.8-27b).
- *
- * Thực hiện vòng lặp suy luận ReAct và gọi công cụ (Function Calling):
- * 1. Nạp System Prompt theo vai trò người dùng (Dynamic System Prompt).
+ * Điều phối viên chính cho AI Chat Agent sử dụng mô hình LLM từ Groq Cloud API.
+ * 1. Tiếp nhận câu hỏi và quản lý ngữ cảnh hội thoại lưu trữ bền vững (Database Persistence).
  * 2. Cung cấp danh mục công cụ động (Dynamic Tool Scoping) theo vai trò.
  * 3. Tiếp nhận Tool Calls từ Groq, ủy quyền cho AiToolExecutionService thực thi.
  * 4. Bơm kết quả Tool Result ngược lại cho Groq để tổng hợp câu trả lời tự nhiên.
- * 5. Nhận diện các thẻ đề xuất Two-Phase HITL trả về cho UI.
+ * 5. Lưu vết hội thoại và công cụ thực thi vào DB phục vụ Audit Trail.
  */
 @Service
 public class GroqAgentOrchestratorService {
@@ -44,6 +45,7 @@ public class GroqAgentOrchestratorService {
     private final String groqModel;
     private final DynamicToolRegistryService toolRegistryService;
     private final AiToolExecutionService toolExecutionService;
+    private final AiConversationService conversationService;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
@@ -53,16 +55,28 @@ public class GroqAgentOrchestratorService {
             @Value("${groq.api.model:qwen/qwen3.8-27b}") String groqModel,
             DynamicToolRegistryService toolRegistryService,
             AiToolExecutionService toolExecutionService,
+            @Autowired(required = false) AiConversationService conversationService,
             ObjectMapper objectMapper) {
         this.groqBaseUrl = groqBaseUrl != null && !groqBaseUrl.isBlank() ? groqBaseUrl.trim() : "https://api.groq.com/openai/v1";
         this.groqApiKey = groqApiKey != null ? groqApiKey.trim() : "";
         this.groqModel = groqModel != null && !groqModel.isBlank() ? groqModel.trim() : "qwen/qwen3.8-27b";
         this.toolRegistryService = toolRegistryService;
         this.toolExecutionService = toolExecutionService;
+        this.conversationService = conversationService;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(20))
                 .build();
+    }
+
+    public GroqAgentOrchestratorService(
+            String groqBaseUrl,
+            String groqApiKey,
+            String groqModel,
+            DynamicToolRegistryService toolRegistryService,
+            AiToolExecutionService toolExecutionService,
+            ObjectMapper objectMapper) {
+        this(groqBaseUrl, groqApiKey, groqModel, toolRegistryService, toolExecutionService, null, objectMapper);
     }
 
     @PostConstruct
@@ -78,13 +92,35 @@ public class GroqAgentOrchestratorService {
     }
 
     /**
-     * Xử lý hội thoại chat với người dùng.
+     * Xử lý hội thoại chat với người dùng và đồng bộ vào DB.
      */
     public AiChatResponseDto processChat(AiChatRequestDto request, AuthenticatedUser currentUser) {
+        Long conversationId = request.conversationId();
+
+        // 1. Quản lý Conversation Thread bền vững trong Database
+        if (conversationService != null && currentUser != null && currentUser.getUserId() != null) {
+            try {
+                AiConversation conv = conversationService.getOrCreateConversation(
+                        conversationId,
+                        currentUser.getUserId(),
+                        request.message()
+                );
+                conversationId = conv.getId();
+                conversationService.saveMessage(conversationId, "user", request.message(), null);
+            } catch (Exception e) {
+                log.error("Lỗi khi lưu trữ phiên hội thoại vào database: {}", e.getMessage());
+            }
+        }
+
         if (groqApiKey == null || groqApiKey.isBlank()) {
             log.warn("GroqAgentOrchestratorService: GROQ_API_KEY chưa được cấu hình.");
+            String fallbackReply = "Chưa cấu hình GROQ_API_KEY. Vui lòng thiết lập biến môi trường GROQ_API_KEY trong Run Configuration của IDE hoặc application.properties để sử dụng trợ lý AI.";
+            if (conversationService != null && conversationId != null) {
+                conversationService.saveMessage(conversationId, "assistant", fallbackReply, null);
+            }
             return new AiChatResponseDto(
-                    "Chưa cấu hình GROQ_API_KEY. Vui lòng thiết lập biến môi trường GROQ_API_KEY trong Run Configuration của IDE hoặc application.properties để sử dụng trợ lý AI.",
+                    fallbackReply,
+                    conversationId,
                     Collections.emptyList(),
                     Collections.emptyList()
             );
@@ -93,14 +129,15 @@ public class GroqAgentOrchestratorService {
         List<Map<String, Object>> executedTools = new ArrayList<>();
         List<ActionProposalDto> pendingProposals = new ArrayList<>();
 
-        // 1. Xây dựng danh sách tin nhắn hội thoại
+        // 2. Xây dựng danh sách tin nhắn hội thoại
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of(
                 "role", "system",
                 "content", buildSystemPrompt(currentUser)
         ));
 
-        if (request.conversationHistory() != null) {
+        // Nạp lịch sử trò chuyện
+        if (request.conversationHistory() != null && !request.conversationHistory().isEmpty()) {
             for (AiChatMessageDto msg : request.conversationHistory()) {
                 if (msg != null && msg.content() != null && !msg.content().isBlank()) {
                     messages.add(Map.of(
@@ -109,6 +146,23 @@ public class GroqAgentOrchestratorService {
                     ));
                 }
             }
+        } else if (conversationService != null && conversationId != null && currentUser != null && currentUser.getUserId() != null) {
+            // Nạp từ Database nếu client không gửi mảng history thủ công
+            try {
+                List<AiChatMessageDetailDto> dbHistory = conversationService.getConversationMessages(conversationId, currentUser.getUserId());
+                int totalMsgs = dbHistory.size();
+                int startIndex = Math.max(0, totalMsgs - 11);
+                int endIndex = Math.max(0, totalMsgs - 1); // Bỏ qua tin cuối vừa lưu
+                for (int i = startIndex; i < endIndex; i++) {
+                    AiChatMessageDetailDto m = dbHistory.get(i);
+                    messages.add(Map.of(
+                            "role", m.role() != null ? m.role() : "user",
+                            "content", m.content()
+                    ));
+                }
+            } catch (Exception e) {
+                log.warn("Không thể tải lịch sử từ DB cho hội thoại #{}: {}", conversationId, e.getMessage());
+            }
         }
 
         messages.add(Map.of(
@@ -116,10 +170,10 @@ public class GroqAgentOrchestratorService {
                 "content", request.message()
         ));
 
-        // 2. Lấy danh sách công cụ theo vai trò người dùng (Dynamic Tool Scoping)
+        // 3. Lấy danh sách công cụ theo vai trò người dùng (Dynamic Tool Scoping)
         List<Map<String, Object>> tools = toolRegistryService.getFunctionSpecsForRole(currentUser.getRole());
 
-        // 3. Vòng lặp suy luận và gọi công cụ (ReAct Loop)
+        // 4. Vòng lặp suy luận và gọi công cụ (ReAct Loop)
         String finalAnswer = "";
         int iterations = 0;
 
@@ -144,44 +198,40 @@ public class GroqAgentOrchestratorService {
                 break;
             }
 
-            // Đưa tin nhắn của assistant vào hội thoại để giữ ngữ cảnh ReAct
-            messages.add(assistantMessage);
-
-            // Kiểm tra xem assistant có yêu cầu gọi công cụ (tool_calls) hay không
+            // Kiểm tra xem LLM có gọi tool hay không
             List<Map<String, Object>> toolCalls = (List<Map<String, Object>>) assistantMessage.get("tool_calls");
+            String content = (String) assistantMessage.get("content");
+
             if (toolCalls == null || toolCalls.isEmpty()) {
-                // LLM đã hoàn tất suy luận và trả lời tự nhiên
-                finalAnswer = (String) assistantMessage.getOrDefault("content", "");
+                finalAnswer = content != null ? content : "";
                 break;
             }
 
-            // Thực thi từng tool_call
+            // LLM yêu cầu gọi tool: Thêm message trợ lý có chứa tool_calls vào context
+            messages.add(assistantMessage);
+
             for (Map<String, Object> toolCall : toolCalls) {
                 String toolCallId = (String) toolCall.get("id");
                 Map<String, Object> function = (Map<String, Object>) toolCall.get("function");
                 String toolName = (String) function.get("name");
-                String argsString = (String) function.get("arguments");
+                String argumentsJson = (String) function.get("arguments");
 
-                Map<String, Object> arguments = parseArguments(argsString);
-                log.info("Agent ReAct: Thực thi tool [{}] với args {}", toolName, arguments);
+                log.info("Agent ReAct loop [{}]: Thực thi tool [{}] với args [{}]", iterations, toolName, argumentsJson);
 
-                Object executionResult = toolExecutionService.executeTool(toolName, arguments, currentUser);
+                Map<String, Object> arguments = parseArguments(argumentsJson);
 
-                // Nếu kết quả trả về là một đề xuất HITL thì thu thập lại cho UI
-                if (executionResult instanceof ActionProposalDto proposal) {
-                    pendingProposals.add(proposal);
-                }
+                // Thực thi công cụ qua AiToolExecutionService
+                Object result = toolExecutionService.executeTool(toolName, arguments, currentUser);
 
-                // Ghi nhận tool đã thực thi
                 executedTools.add(Map.of(
                         "tool", toolName,
                         "arguments", arguments,
-                        "result", executionResult != null ? executionResult : "DONE"
+                        "result", result != null ? result : Map.of()
                 ));
 
-                // Bơm kết quả tool_result ngược lại cho Groq dưới dạng role = tool
+                // Bơm kết quả tool result lại vào context
                 try {
-                    String resultJson = objectMapper.writeValueAsString(executionResult);
+                    String resultJson = objectMapper.writeValueAsString(result);
                     messages.add(Map.of(
                             "role", "tool",
                             "tool_call_id", toolCallId != null ? toolCallId : "",
@@ -201,14 +251,20 @@ public class GroqAgentOrchestratorService {
         }
 
         if (finalAnswer == null || finalAnswer.isBlank()) {
-            if (!pendingProposals.isEmpty()) {
-                finalAnswer = String.format("Tôi đã tạo %d đề xuất hành động theo yêu cầu của bạn. Vui lòng xem và phê duyệt trên màn hình.", pendingProposals.size());
-            } else {
-                finalAnswer = "Tôi đã xử lý xong các yêu cầu tra cứu của bạn.";
+            finalAnswer = "Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn.";
+        }
+
+        // 5. Lưu phản hồi của trợ lý vào Database
+        if (conversationService != null && conversationId != null) {
+            try {
+                String toolCallsJson = executedTools.isEmpty() ? null : objectMapper.writeValueAsString(executedTools);
+                conversationService.saveMessage(conversationId, "assistant", finalAnswer, toolCallsJson);
+            } catch (Exception e) {
+                log.error("Lỗi khi lưu phản hồi AI vào DB: {}", e.getMessage());
             }
         }
 
-        return new AiChatResponseDto(finalAnswer, executedTools, pendingProposals);
+        return new AiChatResponseDto(finalAnswer, conversationId, executedTools, pendingProposals);
     }
 
     private String buildSystemPrompt(AuthenticatedUser user) {
@@ -220,14 +276,9 @@ public class GroqAgentOrchestratorService {
                 Thông tin người dùng hiện tại: User ID #%s, Vai trò: %s.
                 
                 QUY TẮC BẮT BUỘC:
-                1. Hãy hỗ trợ người dùng theo đúng chuyên môn và thẩm quyền của vai trò:
-                   - Với HORSE_OWNER (Chủ ngựa): Tuyệt đối KHÔNG có quyền thay đổi dữ liệu (100%% Read-Only). Chỉ giải đáp và tra cứu thông tin ngựa của họ.
-                   - Với HEAD_TRAINER: Hỗ trợ xem thông số bài tập, biểu đồ thể lực và đề xuất sửa đổi thông số qua công cụ proposeEditWorkoutMetric (HITL).
-                   - Với VETERINARIAN: Hỗ trợ tra cứu bệnh án y khoa qua RAG Retrieval (searchClinicalKnowledge) và đề xuất hạn chế y tế (HITL).
-                   - Với GROOM: Hỗ trợ xem nhiệm vụ chuồng và vị trí ngựa.
-                   - Với CLUB_MANAGER: Cung cấp số liệu thống kê chuồng trại và quản lý chung.
-                2. Khi người dùng hỏi thông tin cần dữ liệu thật (ngựa, bài tập, bệnh án), hãy chủ động GỌI CÔNG CỤ (tool_calls) được cung cấp. Tuyệt đối KHÔNG tự bịa đặt ID hoặc số liệu.
-                3. Khi thực hiện thay đổi dữ liệu nhạy cảm (Tier 3 Mutation), bạn chỉ được phép tạo đề xuất (proposal) qua công cụ propose... và thông báo cho người dùng biết cần bấm Xác nhận trên giao diện.
+                1. Hệ thống vận hành theo cơ chế 100%% Read-Only / RAG Advisory. Bạn chỉ giải đáp, phân tích và tra cứu thông tin dựa trên quyền hạn của vai trò người dùng.
+                2. Khi người dùng hỏi thông tin cần dữ liệu thực tế (ngựa, lịch tập, chuồng trại, bệnh án), hãy chủ động GỌI CÔNG CỤ (tool_calls) được cung cấp. Tuyệt đối KHÔNG tự bịa đặt ID hoặc số liệu.
+                3. Định dạng câu trả lời bằng Markdown rõ ràng: dùng bảng Markdown cho danh sách dữ liệu, bullet points cho các tiêu chí phân tích, in đậm các thông số quan trọng.
                 4. Luôn trả lời bằng tiếng Việt lịch sự, gãy gọn, chuyên nghiệp và súc tích.
                 """, userId, role);
     }
@@ -237,7 +288,12 @@ public class GroqAgentOrchestratorService {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", groqModel);
             body.put("messages", messages);
-            body.put("temperature", 0.2);
+
+            if (groqModel != null && (groqModel.contains("luna") || groqModel.startsWith("o1") || groqModel.startsWith("o3"))) {
+                body.put("reasoning_effort", "none");
+            } else {
+                body.put("temperature", 0.2);
+            }
 
             if (tools != null && !tools.isEmpty()) {
                 body.put("tools", tools);
@@ -245,41 +301,37 @@ public class GroqAgentOrchestratorService {
             }
 
             String jsonPayload = objectMapper.writeValueAsString(body);
-            String endpoint = groqBaseUrl.endsWith("/")
-                    ? groqBaseUrl + "chat/completions"
-                    : groqBaseUrl + "/chat/completions";
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(endpoint))
-                    .header("Authorization", "Bearer " + groqApiKey)
+                    .uri(URI.create(groqBaseUrl + "/chat/completions"))
                     .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + groqApiKey)
+                    .timeout(Duration.ofSeconds(25))
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
-                    .timeout(Duration.ofSeconds(45))
                     .build();
 
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
-            if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                return objectMapper.readValue(response.body(), new TypeReference<>() {});
+            if (httpResponse.statusCode() >= 200 && httpResponse.statusCode() < 300) {
+                return objectMapper.readValue(httpResponse.body(), new TypeReference<>() {});
             } else {
-                log.error("Groq API trả về mã lỗi {}: {}", response.statusCode(), response.body());
-                return null;
+                log.error("Groq API error HTTP [{}]: {}", httpResponse.statusCode(), httpResponse.body());
+                return Map.of();
             }
-
         } catch (Exception e) {
-            log.error("Lỗi khi gọi Groq API: {}", e.getMessage(), e);
-            return null;
+            log.error("Ngoại lệ khi gọi Groq API: {}", e.getMessage());
+            return Map.of();
         }
     }
 
-    private Map<String, Object> parseArguments(String argsString) {
-        if (argsString == null || argsString.isBlank()) {
+    private Map<String, Object> parseArguments(String argumentsJson) {
+        if (argumentsJson == null || argumentsJson.isBlank()) {
             return Collections.emptyMap();
         }
         try {
-            return objectMapper.readValue(argsString, new TypeReference<>() {});
+            return objectMapper.readValue(argumentsJson, new TypeReference<>() {});
         } catch (Exception e) {
-            log.warn("Không thể parse arguments JSON: {}", argsString);
+            log.warn("Không thể parse arguments JSON: {}", argumentsJson);
             return Collections.emptyMap();
         }
     }
