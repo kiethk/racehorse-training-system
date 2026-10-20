@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { isImageDocument, isImageFile } from '../../shared/lib/documentKind.ts';
+import { isImageDocument, isImageFile, isPdfDocument } from '../../shared/lib/documentKind.ts';
 
 const doc = (documentType: string, originalFileName: string | null, fileUrl = '/api/admissions/1/documents/9/file') =>
   ({ documentType, originalFileName, fileUrl });
@@ -23,6 +23,13 @@ describe('Admission document kind', () => {
 
   it('falls back to the stored path when the original name is missing', () => {
     assert.equal(isImageDocument(doc('REGISTRATION_DOCUMENT', null, '/uploads/x/photo.png?v=2')), true);
+  });
+
+  it('recognises PDFs, but never a horse photo', () => {
+    assert.equal(isPdfDocument(doc('REGISTRATION_DOCUMENT', 'papers.PDF')), true);
+    assert.equal(isPdfDocument(doc('HEALTH_CERTIFICATE', 'scan.png')), false);
+    assert.equal(isPdfDocument(doc('HORSE_PHOTO', 'odd-name.pdf')), false);
+    assert.equal(isPdfDocument(doc('REGISTRATION_DOCUMENT', null)), false);
   });
 
   it('previews only browser-displayable picked files', () => {

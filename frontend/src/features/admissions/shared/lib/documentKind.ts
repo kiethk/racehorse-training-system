@@ -18,6 +18,13 @@ export function isImageDocument(document: DocumentLike): boolean {
   return IMAGE_EXTENSION.test(name);
 }
 
+/** Whether a stored admission document is a PDF, judged by its file name (the API has no content type). */
+export function isPdfDocument(document: DocumentLike): boolean {
+  if (isImageDocument(document)) return false;
+  const name = document.originalFileName ?? document.fileUrl.split('?')[0];
+  return /\.pdf$/i.test(name);
+}
+
 /** Whether a file picked in the browser can be previewed as an image. */
 export function isImageFile(file: { type: string }): boolean {
   return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);

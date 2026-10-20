@@ -4,14 +4,15 @@ import { useMemo, useState } from 'react';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { ImageLightbox } from '@/components/ui/ImageLightbox';
+import { cn } from '@/lib/cn';
 import { displayError, formatDate } from '@/lib/display';
 import { openProtectedFile, useProtectedFileUrls } from '@/lib/protectedFile';
 import { toast } from '@/lib/toast';
 import { Panel, SectionTitle } from '@/components/ui/Panel';
 import type { AdmissionDocument } from '../../types';
-import { isImageDocument } from '../lib/documentKind';
+import { isImageDocument, isPdfDocument } from '../lib/documentKind';
 import { AdmissionDocumentPreview } from './AdmissionDocumentPreview';
-import { AdmissionImageGallery } from './AdmissionImageGallery';
+import { AdmissionImageThumbnail, AdmissionPdfThumbnail } from './AdmissionDocumentThumbnail';
 
 const documentNames: Record<string, string> = {
   HORSE_PHOTO: 'Horse photo',
@@ -40,11 +41,9 @@ export function AdmissionDocumentsSection({ documents, assetUrl }: { documents: 
   const imageSources = useMemo(() => imageDocuments.map((document) => document.fileUrl), [imageDocuments]);
   const loaded = useProtectedFileUrls(imageSources);
   const gallery = imageDocuments.map((document) => ({
-    key: document.id,
     url: loaded[document.fileUrl]?.url ?? null,
     failed: loaded[document.fileUrl]?.failed ?? false,
     alt: `${fileName(document)} · ${typeName(document)}`,
-    caption: typeName(document),
   }));
   // The lightbox shows only loaded images; map gallery positions to lightbox positions and back.
   const viewable = gallery.flatMap((image, index) => (image.url ? [{ index, src: image.url, alt: image.alt }] : []));
@@ -67,36 +66,20 @@ export function AdmissionDocumentsSection({ documents, assetUrl }: { documents: 
           <SectionTitle>Documents</SectionTitle>
           <span className="text-xs text-[var(--color-text-muted)]">{documents.length} files</span>
         </div>
-        <AdmissionImageGallery images={gallery} onOpen={openImage} />
         {documents.length ? (
           <ul className="mt-4 space-y-2 text-sm">
-            {documents.map((document) => (
-              <li key={document.id} className="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 transition-colors hover:bg-[var(--color-surface-muted)]">
-                <Icon name={isImageDocument(document) ? 'image' : 'file-text'} className="mt-0.5 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <Button
-                    variant="link"
-                    aria-haspopup="dialog"
-                    onClick={() => openDocument(document)}
-                    className="block max-w-full truncate text-left"
-                  >
-                    {fileName(document)}
-                  </Button>
-                  <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
-                    {typeName(document)} · Recorded {date(document.recordDate)} · Uploaded {date(document.uploadedAt)}
-                  </p>
-                </div>
-                <IconButton
-                  icon="external-link"
-                  size="sm"
-                  label={`Open ${fileName(document)} in new tab`}
-                  onClick={() => {
-                    openProtectedFile(document.fileUrl).catch((error) => toast.error(displayError(error, 'Unable to open the file.')));
-                  }}
-                  className="shrink-0"
+            {documents.map((document) => {
+              const galleryIndex = imageDocuments.indexOf(document);
+              return (
+                <DocumentRow
+                  key={document.id}
+                  document={document}
+                  image={galleryIndex >= 0 ? gallery[galleryIndex] : null}
+                  onOpen={() => openDocument(document)}
+                  onOpenImage={() => openImage(galleryIndex)}
                 />
-              </li>
-            ))}
+              );
+            })}
           </ul>
         ) : (
           <p className="mt-4 text-sm italic text-[var(--color-text-muted)]">No documents attached.</p>
@@ -118,5 +101,58 @@ export function AdmissionDocumentsSection({ documents, assetUrl }: { documents: 
         onClose={() => setLightboxIndex(null)}
       />
     </>
+  );
+}
+
+/**
+ * One document. Images and PDFs show a picture (the image, or the PDF's first page) in place of the file
+ * name; other files show an icon and their name.
+ */
+function DocumentRow({ document, image, onOpen, onOpenImage }: {
+  document: AdmissionDocument;
+  image: { url: string | null; failed: boolean; alt: string } | null;
+  onOpen: () => void;
+  onOpenImage: () => void;
+}) {
+  const recorded = `Recorded ${date(document.recordDate)} · Uploaded ${date(document.uploadedAt)}`;
+  const pdf = !image && isPdfDocument(document);
+  const pictured = Boolean(image) || pdf;
+  return (
+    <li className={cn(
+      'flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 transition-colors hover:bg-[var(--color-surface-muted)]',
+      // In a narrow column the text drops below the picture instead of being cut to a few letters.
+      pictured && 'flex-wrap',
+    )}>
+      {image ? (
+        <AdmissionImageThumbnail url={image.url} failed={image.failed} alt={image.alt} onOpen={onOpenImage} />
+      ) : pdf ? (
+        <AdmissionPdfThumbnail source={document.fileUrl} alt={`${fileName(document)}, first page`} onOpen={onOpen} />
+      ) : (
+        <Icon name="file-text" className="mt-0.5 shrink-0" />
+      )}
+      <div className={cn('min-w-0 flex-1', pictured && 'min-w-40')}>
+        {pictured && <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{typeName(document)}</p>}
+        <Button
+          variant="link"
+          aria-haspopup="dialog"
+          onClick={onOpen}
+          className={cn('block max-w-full truncate text-left', pictured && 'mt-0.5 text-xs')}
+        >
+          {fileName(document)}
+        </Button>
+        <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+          {pictured ? recorded : `${typeName(document)} · ${recorded}`}
+        </p>
+      </div>
+      <IconButton
+        icon="external-link"
+        size="sm"
+        label={`Open ${fileName(document)} in new tab`}
+        onClick={() => {
+          openProtectedFile(document.fileUrl).catch((error) => toast.error(displayError(error, 'Unable to open the file.')));
+        }}
+        className="shrink-0"
+      />
+    </li>
   );
 }

@@ -290,10 +290,12 @@ interface ImageThumbnailProps {
   onClick: () => void;
   disabled?: boolean;
   className?: string;
+  /** Adjusts the cropped image, e.g. `object-top` to show the top of a page. */
+  imageClassName?: string;
 }
 
 /** A clickable, cropped preview of an image. Pair it with `ImageLightbox` to show the whole image. */
-export function ImageThumbnail({ src, alt, onClick, disabled, className }: ImageThumbnailProps) {
+export function ImageThumbnail({ src, alt, onClick, disabled, className, imageClassName }: ImageThumbnailProps) {
   return (
     <button
       type="button"
@@ -308,7 +310,7 @@ export function ImageThumbnail({ src, alt, onClick, disabled, className }: Image
       )}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- local or blob preview; not served by the optimizer */}
-      <img src={src} alt="" className="h-full w-full object-cover" />
+      <img src={src} alt="" className={cn('h-full w-full object-cover', imageClassName)} />
     </button>
   );
 }
