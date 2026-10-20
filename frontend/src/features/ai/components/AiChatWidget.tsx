@@ -1,10 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useAiChat } from '../context/AiChatContext';
 import { ActionProposalCard } from './ActionProposalCard';
+import { MarkdownMessage } from './MarkdownMessage';
 
 export function AiChatWidget() {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export function AiChatWidget() {
   } = useAiChat();
 
   const [input, setInput] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -30,7 +32,7 @@ export function AiChatWidget() {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isLoading, isOpen]);
+  }, [messages, isLoading, isOpen, isExpanded]);
 
   // Focus vào input khi mở widget
   useEffect(() => {
@@ -65,6 +67,7 @@ export function AiChatWidget() {
     }
     if (role === 'HEAD_TRAINER' || role === 'TRAINER') {
       return [
+        'Danh sách ngựa tôi đang quản lý',
         'Kiểm tra các bài tập workout hôm nay',
         'Đề xuất giảm cường độ bài tập workout #1',
         'Tổng hợp khối lượng tập tuần này',
@@ -72,9 +75,10 @@ export function AiChatWidget() {
     }
     if (role === 'GROOM' || role === 'STABLE_STAFF') {
       return [
-        'Danh sách nhiệm vụ chăm sóc hôm nay',
-        'Kiểm tra chuồng ngựa khu A',
-        'Ngựa nào cần khẩu phần ăn đặc biệt?',
+        'Danh sách ngựa và chuồng tôi phụ trách',
+        'Việc cần làm hôm nay (Checklist 3 nguồn)',
+        'Kiểm tra cảnh báo y tế của ngựa #8',
+        'Tình trạng vật tư chuồng #6',
       ];
     }
     if (role === 'CLUB_MANAGER' || role === 'RACING_MANAGER') {
@@ -117,12 +121,16 @@ export function AiChatWidget() {
         </button>
       </div>
 
-      {/* Cửa sổ chat nổi (Floating Chat Widget 380px x 560px) */}
+      {/* Cửa sổ chat nổi: Chế độ thường (380x560px) hoặc Phóng to (800x720px) */}
       {isOpen && (
         <div
           role="dialog"
           aria-label="Cửa sổ Trợ lý AI"
-          className="fixed bottom-22 right-6 z-50 flex h-[560px] w-[380px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-110px)] flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl shadow-neutral-900/15 backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
+          className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl shadow-neutral-900/15 backdrop-blur-md transition-all duration-300 ease-in-out animate-in fade-in slide-in-from-bottom-4 ${
+            isExpanded
+              ? 'bottom-6 right-6 h-[720px] w-[800px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-48px)]'
+              : 'bottom-22 right-6 h-[560px] w-[380px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-110px)]'
+          }`}
         >
           {/* Header */}
           <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3.5">
@@ -136,6 +144,11 @@ export function AiChatWidget() {
                     RTMS Copilot
                   </span>
                   <span className="flex h-2 w-2 rounded-full bg-emerald-500" title="Online" />
+                  {isExpanded && (
+                    <span className="rounded bg-emerald-600/10 px-1.5 py-0.5 text-[9px] font-medium text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
+                      Mở rộng
+                    </span>
+                  )}
                 </div>
                 <span className="text-[10px] text-[var(--color-text-secondary)]">
                   {user?.role ? `Quyền: ${user.role}` : 'AI Assistant'}
@@ -144,6 +157,17 @@ export function AiChatWidget() {
             </div>
 
             <div className="flex items-center gap-1">
+              {/* Nút Phóng to / Thu nhỏ */}
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                title={isExpanded ? 'Thu nhỏ cửa sổ' : 'Phóng to cửa sổ'}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-neutral-200/60 hover:text-[var(--color-text-primary)] dark:hover:bg-neutral-800"
+              >
+                <Icon name={isExpanded ? 'minimize' : 'maximize'} size={14} />
+              </button>
+
+              {/* Nút Làm mới hội thoại */}
               <button
                 type="button"
                 onClick={clearConversation}
@@ -152,6 +176,8 @@ export function AiChatWidget() {
               >
                 <Icon name="refresh" size={14} />
               </button>
+
+              {/* Nút Ẩn cửa sổ */}
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
@@ -173,13 +199,17 @@ export function AiChatWidget() {
                   className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                 >
                   <div
-                    className={`max-w-[88%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed shadow-xs ${
+                    className={`rounded-2xl px-3.5 py-2 text-xs leading-relaxed shadow-xs ${
                       isUser
-                        ? 'rounded-tr-none bg-emerald-600 text-white dark:bg-emerald-700'
-                        : 'rounded-tl-none border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)]'
+                        ? 'max-w-[85%] rounded-tr-none bg-emerald-600 text-white dark:bg-emerald-700'
+                        : 'max-w-[95%] rounded-tl-none border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)]'
                     }`}
                   >
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    {isUser ? (
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    ) : (
+                      <MarkdownMessage content={msg.content} />
+                    )}
                   </div>
 
                   {/* Nhúng thẻ đề xuất HITL nếu có */}

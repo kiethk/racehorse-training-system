@@ -53,7 +53,9 @@ type IconName =
   | 'layers'
   | 'sparkles'
   | 'bot'
-  | 'send';
+  | 'send'
+  | 'maximize'
+  | 'minimize';
 
 const paths: Record<IconName, ReactElement> = {
   search: (
@@ -225,6 +227,8 @@ const paths: Record<IconName, ReactElement> = {
     </>
   ),
   minus: <path d="M5 12h14" />,
+  maximize: <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />,
+  minimize: <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7" />,
   utensils: (
     <>
       <path d="M4 3v7a2 2 0 0 0 4 0V3M6 10v11" />
