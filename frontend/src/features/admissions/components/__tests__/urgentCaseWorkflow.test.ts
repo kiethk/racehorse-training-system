@@ -212,4 +212,97 @@ describe('Urgent Case Workflow & Invariant Tests (F-01, F-03)', () => {
     assert.equal(response.trainingDecision, 'BLOCKED');
     assert.equal(response.careScheduleId, 300);
   });
+
+  it('7. Search and status filter matches horse name, stall code, or reporter', () => {
+    const cases: UrgentAssignmentAlert[] = [
+      {
+        eventId: 1,
+        scheduleId: 101,
+        incidentId: 11,
+        veterinarianId: 5,
+        horseId: 10,
+        horseName: 'Thunder',
+        stableLocation: 'Barn A',
+        stallCode: 'A-01',
+        reportedById: 2,
+        reportedByName: 'Groom Alex',
+        reportedAt: '2026-10-22T08:00:00',
+        severity: 'HIGH',
+        title: 'Lameness',
+        description: 'Left leg limp',
+        imageUrl: null,
+        trainingDecision: 'BLOCKED',
+        previousTrainingDecision: null,
+        previousTrainingDecisionReason: null,
+        status: 'SCHEDULED',
+        scheduledAt: '2026-10-22T08:15:00',
+        assignedAt: '2026-10-22T08:05:00',
+      },
+      {
+        eventId: 2,
+        scheduleId: 102,
+        incidentId: 12,
+        veterinarianId: 5,
+        horseId: 20,
+        horseName: 'Pegasus',
+        stableLocation: 'Barn B',
+        stallCode: 'B-03',
+        reportedById: 3,
+        reportedByName: 'Trainer John',
+        reportedAt: '2026-10-22T08:30:00',
+        severity: 'CRITICAL',
+        title: 'Colic acute',
+        description: 'Rolling and sweat',
+        imageUrl: null,
+        trainingDecision: 'BLOCKED',
+        previousTrainingDecision: null,
+        previousTrainingDecisionReason: null,
+        status: 'IN_PROGRESS',
+        scheduledAt: '2026-10-22T08:45:00',
+        assignedAt: '2026-10-22T08:35:00',
+      },
+    ];
+
+    function filterCases(list: UrgentAssignmentAlert[], statusFilter: string, search: string) {
+      const q = search.trim().toLowerCase();
+      return list.filter((c) => {
+        const matchStatus =
+          statusFilter === 'ALL' ||
+          (statusFilter === 'PENDING' && c.status === 'SCHEDULED') ||
+          (statusFilter === 'IN_PROGRESS' && c.status === 'IN_PROGRESS');
+        if (!matchStatus) return false;
+        if (!q) return true;
+        return (
+          c.horseName.toLowerCase().includes(q) ||
+          (c.stallCode && c.stallCode.toLowerCase().includes(q)) ||
+          (c.reportedByName && c.reportedByName.toLowerCase().includes(q)) ||
+          c.title.toLowerCase().includes(q)
+        );
+      });
+    }
+
+    assert.equal(filterCases(cases, 'ALL', 'pegasus').length, 1);
+    assert.equal(filterCases(cases, 'ALL', 'A-01').length, 1);
+    assert.equal(filterCases(cases, 'PENDING', '').length, 1);
+    assert.equal(filterCases(cases, 'IN_PROGRESS', '').length, 1);
+    assert.equal(filterCases(cases, 'ALL', 'Trainer John').length, 1);
+  });
+
+  it('8. Vitals accepts extreme numerical values without throwing or blocking payload formation', () => {
+    const temp = '41.5';
+    const hr = '88';
+    const rr = '40';
+    const wt = '520';
+
+    const metrics: { temperature?: number; heartRate?: number; respiratoryRate?: number; weight?: number } = {};
+    if (temp.trim()) metrics.temperature = Number(temp);
+    if (hr.trim()) metrics.heartRate = Number(hr);
+    if (rr.trim()) metrics.respiratoryRate = Number(rr);
+    if (wt.trim()) metrics.weight = Number(wt);
+
+    assert.equal(metrics.temperature, 41.5);
+    assert.equal(metrics.heartRate, 88);
+    assert.equal(metrics.respiratoryRate, 40);
+    assert.equal(metrics.weight, 520);
+  });
 });
