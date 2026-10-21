@@ -225,28 +225,17 @@ export function AiChatWidget() {
             </div>
           </div>
 
-          {/* Body: Bao gồm Sliding Drawer Lịch sử trò chuyện + Khu vực Chat chính */}
+          {/* Body: Bao gồm Sidebar Lịch sử trò chuyện + Khu vực Chat chính */}
           <div className="relative flex flex-1 overflow-hidden">
-            {/* Backdrop overlay khi ở chế độ thu gọn */}
-            {!isExpanded && showHistory && (
+            {/* Sidebar Lịch sử hội thoại (Persistent Threads) */}
+            {showHistory && (
               <div
-                onClick={() => setShowHistory(false)}
-                className="absolute inset-0 z-20 bg-black/30 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
-              />
-            )}
-
-            {/* Sliding Panel Lịch sử hội thoại (Slide Drawer Animation) */}
-            <div
-              className={`flex flex-col border-r border-[var(--color-border)] bg-[var(--color-surface-muted)]/95 backdrop-blur-md transition-all duration-300 ease-in-out ${
-                isExpanded
-                  ? showHistory
-                    ? 'w-64 shrink-0 translate-x-0 opacity-100'
-                    : 'w-0 -translate-x-full overflow-hidden border-r-0 opacity-0 pointer-events-none'
-                  : `absolute inset-y-0 left-0 z-30 w-4/5 max-w-[280px] bg-[var(--color-surface)] shadow-2xl transition-transform duration-300 ease-in-out ${
-                      showHistory ? 'translate-x-0' : '-translate-x-full pointer-events-none'
-                    }`
-              }`}
-            >
+                className={`flex flex-col border-r border-[var(--color-border)] bg-[var(--color-surface-muted)]/80 backdrop-blur-xs transition-all duration-200 ${
+                  isExpanded
+                    ? 'w-60 shrink-0'
+                    : 'absolute inset-0 z-20 bg-[var(--color-surface)]'
+                }`}
+              >
                 <div className="flex items-center justify-between border-b border-[var(--color-border)] p-2.5">
                   <span className="text-[11px] font-semibold text-[var(--color-text-primary)]">
                     Lịch sử hội thoại ({conversations.length})
@@ -327,7 +316,8 @@ export function AiChatWidget() {
                     })
                   )}
                 </div>
-            </div>
+              </div>
+            )}
 
             {/* Main Chat Area */}
             <div className="flex flex-1 flex-col overflow-hidden">
