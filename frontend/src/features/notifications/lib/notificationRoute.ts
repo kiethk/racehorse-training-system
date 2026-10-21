@@ -13,7 +13,11 @@ export function getNotificationHref(item: NotificationItem, role: Role | undefin
     if (item.notificationType === 'ROUTINE_ASSIGNED') {
       return '/veterinarian/routine';
     }
-    // Legacy care-schedule notifications reused ADMISSION_VET_ASSIGNED; that id is not an admission.
+    if (item.notificationType === 'ADMISSION_VET_ASSIGNED') {
+      // Legacy rows reused this type for INITIAL (admission quarantine) exams; the id is a
+      // care-schedule id, so the admission queue - not a schedule detail page - is the target.
+      return '/veterinarian/admissions';
+    }
     return null;
   }
 

@@ -8,6 +8,7 @@ import { admissionsApi } from '../services/api';
 import { UrgentAssignmentModal } from './UrgentAssignmentModal';
 
 const RECONNECT_DELAY_MS = 5000;
+const MAX_RECONNECT_DELAY_MS = 60000;
 
 export function UrgentAssignmentNotifier() {
   const router = useRouter();
@@ -42,6 +43,7 @@ export function UrgentAssignmentNotifier() {
     let cancelled = false;
     let controller: AbortController | null = null;
     let pollInterval: NodeJS.Timeout | null = null;
+    let failures = 0;
 
     const startPolling = () => {
       if (pollInterval) return;
@@ -52,7 +54,9 @@ export function UrgentAssignmentNotifier() {
 
     const connect = async () => {
       for (;;) {
+        if (cancelled) return;
         controller = new AbortController();
+        let delay = RECONNECT_DELAY_MS;
         try {
           // fetch, not EventSource: EventSource cannot send the Authorization header.
           await openAuthenticatedEventStream('/api/care-schedules/urgent-alerts/stream', {
@@ -66,16 +70,18 @@ export function UrgentAssignmentNotifier() {
               }
             },
           });
+          failures = 0;
         } catch {
+          failures += 1;
+          delay = Math.min(RECONNECT_DELAY_MS * 2 ** (failures - 1), MAX_RECONNECT_DELAY_MS);
           if (!cancelled) {
             startPolling();
             void restore();
           }
-          return;
         }
         if (cancelled) return;
-        // The server closes the stream after its timeout: reconnect and keep listening.
-        await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
+        // The server closes the stream after its timeout; a broken stream retries the same way.
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     };
 
