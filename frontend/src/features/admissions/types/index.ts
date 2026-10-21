@@ -207,9 +207,23 @@ export interface UrgentAssignmentAlert {
   description: string;
   imageUrl: string | null;
   trainingDecision: TrainingDecision;
+  previousTrainingDecision: TrainingDecision | null;
+  previousTrainingDecisionReason: string | null;
   status: CareScheduleStatus;
   scheduledAt: string | null;
   assignedAt: string;
+}
+
+export interface UrgentCaseReport {
+  id: number;
+  reportedById: number;
+  reportedByName: string | null;
+  reportedByRole: string | null;
+  reportedAt: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  title: string;
+  description: string;
+  imageUrl: string | null;
 }
 
 export interface CareSchedule {

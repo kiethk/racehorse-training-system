@@ -14,4 +14,8 @@ public interface HealthRecordRepository extends JpaRepository<HealthRecord, Long
 
     Optional<HealthRecord> findByCareScheduleId(Long careScheduleId);
 
+    /** The last exam conclusion that was not itself an urgent case: the state a closing urgent case must restore. */
+    Optional<HealthRecord> findTopByHorseIdAndRecordTypeNotAndTrainingDecisionIsNotNullOrderByExaminedAtDesc(
+            Long horseId, String recordType);
+
 }

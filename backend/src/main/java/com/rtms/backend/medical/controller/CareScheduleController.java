@@ -5,6 +5,7 @@ import com.rtms.backend.medical.dto.CareScheduleDetailResponse;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
+import com.rtms.backend.medical.dto.UrgentCaseReportResponse;
 import com.rtms.backend.notification.dto.UrgentAssignmentAlert;
 
 import com.rtms.backend.medical.enums.CareScheduleStatus;
@@ -49,6 +50,14 @@ public class CareScheduleController {
             @PathVariable Long scheduleId,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(careScheduleService.getUrgentCase(scheduleId, currentUser.getUserId()));
+    }
+
+    @GetMapping("/urgent-alerts/{scheduleId}/reports")
+    @PreAuthorize("principal.role == 'VETERINARIAN'")
+    public ApiResponse<List<UrgentCaseReportResponse>> urgentCaseReports(
+            @PathVariable Long scheduleId,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(careScheduleService.getUrgentCaseReports(scheduleId, currentUser.getUserId()));
     }
 
     @GetMapping(value = "/urgent-alerts/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

@@ -17,6 +17,7 @@ import type {
   HorseHealthMetricRequest,
   TrainingDecision,
   UrgentAssignmentAlert,
+  UrgentCaseReport,
 } from '../types';
 
 /** Date in Vietnam time, plus dayOffset days, as yyyy-MM-dd (matches the backend). */
@@ -42,6 +43,7 @@ function formatDateTime(value: string | null) {
 
 export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [urgentCase, setUrgentCase] = useState<UrgentAssignmentAlert | null>(null);
+  const [reports, setReports] = useState<UrgentCaseReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -69,18 +71,18 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
   useEffect(() => {
     let active = true;
-    admissionsApi
-      .getUrgentCase(scheduleId)
-      .then((data) => {
+    Promise.all([admissionsApi.getUrgentCase(scheduleId), admissionsApi.getUrgentCaseReports(scheduleId)])
+      .then(([data, reportList]) => {
         if (!active) return;
         setUrgentCase(data);
+        setReports(reportList);
         if (data.description) {
           setSymptoms((prev) => prev || data.description);
         }
       })
       .catch((cause: unknown) => {
         if (!active) return;
-      setError(cause instanceof ApiError ? displayError(cause, 'Unable to load the urgent case.') : 'Unable to load the urgent case.');
+        setError(cause instanceof ApiError ? displayError(cause, 'Unable to load the urgent case.') : 'Unable to load the urgent case.');
       })
       .finally(() => active && setLoading(false));
     return () => {
@@ -191,11 +193,13 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   }
   if (!urgentCase) {
     return (
-      <Panel className="border-[var(--color-danger)] p-8 text-sm text-[var(--color-danger)]">
+      <Notice tone="error" className="p-8">
         {error || 'Urgent case not found.'}
-      </Panel>
+      </Notice>
     );
   }
+
+  const additionalReports = reports.filter((report) => report.id !== urgentCase.incidentId);
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-5">
@@ -257,6 +261,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             </div>
           </dl>
 
+          {urgentCase.previousTrainingDecision === 'BLOCKED' && (
+            <Notice tone="warning" title="Pre-existing training hold">
+              This horse was already blocked from training before this incident. An ALLOWED conclusion will keep
+              that hold
+              {urgentCase.previousTrainingDecisionReason ? `: ${urgentCase.previousTrainingDecisionReason}.` : '.'}
+            </Notice>
+          )}
+
           <section className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
           <h2 className="text-sm font-bold text-[var(--color-text-primary)]">Symptoms / Initial description</h2>
             <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-text-secondary)]">
@@ -273,11 +285,44 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             />
           )}
 
-          {error && (
-            <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-              {error}
-            </p>
+          {additionalReports.length > 0 && (
+            <section className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+              <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
+                Additional reports merged into this case ({additionalReports.length})
+              </h2>
+              <ul className="mt-3 space-y-3">
+                {additionalReports.map((report) => (
+                  <li
+                    key={report.id}
+                    className="rounded-[var(--radius-sm)] bg-[var(--color-surface-muted)] p-3"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="text-sm font-bold text-[var(--color-text-primary)]">{report.title}</p>
+                      <Pill tone="danger">{report.severity}</Pill>
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-text-secondary)]">
+                      {report.description}
+                    </p>
+                    <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+                      {[report.reportedByRole, report.reportedByName].filter(Boolean).join(' ') ||
+                        `#${report.reportedById}`}{' '}
+                      · {formatDateTime(report.reportedAt)}
+                    </p>
+                    {report.imageUrl && (
+                      <ProtectedImage
+                        src={report.imageUrl}
+                        alt={`Report: ${report.title}`}
+                        openOnClick
+                        className="mt-2 max-h-64 w-full object-contain"
+                      />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
+
+          {error && <Notice tone="error">{error}</Notice>}
 
           {/* Workflow Transitions */}
           {urgentCase.status === 'SCHEDULED' && (

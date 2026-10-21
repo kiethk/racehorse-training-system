@@ -1,8 +1,8 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.dto.DashboardPlanRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
@@ -45,13 +45,13 @@ public class HorsePerformanceService {
 
     private final TrainingWorkoutRepository workoutRepository;
     private final HorseTrainingPlanRepository planRepository;
-    private final GroomIncidentReportRepository incidentReportRepository;
+    private final HorseIncidentReportRepository incidentReportRepository;
     private final HorseViewAccessService accessService;
     private final HorseSpecialtyService specialtyService;
 
     public HorsePerformanceService(TrainingWorkoutRepository workoutRepository,
                                    HorseTrainingPlanRepository planRepository,
-                                   GroomIncidentReportRepository incidentReportRepository,
+                                   HorseIncidentReportRepository incidentReportRepository,
                                    HorseViewAccessService accessService,
                                    HorseSpecialtyService specialtyService) {
         this.workoutRepository = workoutRepository;

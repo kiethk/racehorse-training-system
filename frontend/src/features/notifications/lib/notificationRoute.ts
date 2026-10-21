@@ -6,6 +6,17 @@ export function getNotificationHref(item: NotificationItem, role: Role | undefin
   const refId = item.referenceId;
   const isUrgent = item.title?.toLowerCase().includes('urgent') || item.message?.toLowerCase().includes('urgent');
 
+  if (role === 'VETERINARIAN' && item.referenceType === 'CARE_SCHEDULE') {
+    if (item.notificationType === 'CARE_SCHEDULE_URGENT_ASSIGNED') {
+      return `/veterinarian/urgent/${refId}`;
+    }
+    if (item.notificationType === 'ROUTINE_ASSIGNED') {
+      return '/veterinarian/routine';
+    }
+    // Legacy care-schedule notifications reused ADMISSION_VET_ASSIGNED; that id is not an admission.
+    return null;
+  }
+
   // 1. Phân công khám nhập chuồng (Admission Assignment)
   if (item.notificationType === 'ADMISSION_VET_ASSIGNED') {
     return `/veterinarian/admissions`;

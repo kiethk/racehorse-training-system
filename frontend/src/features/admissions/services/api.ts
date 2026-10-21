@@ -14,6 +14,7 @@ import {
   ManagerReviewRequest,
   PageResponse,
   UrgentAssignmentAlert,
+  UrgentCaseReport,
   VetAdmissionQueueItem,
   VetQueueSummary,
   VetQueueFilters,
@@ -89,6 +90,11 @@ export const admissionsApi = {
 
   getUrgentCase: async (scheduleId: number): Promise<UrgentAssignmentAlert> => {
     const response = await apiGet<ApiResponse<UrgentAssignmentAlert>>(`/api/care-schedules/urgent-alerts/${scheduleId}`);
+    return response.data;
+  },
+
+  getUrgentCaseReports: async (scheduleId: number): Promise<UrgentCaseReport[]> => {
+    const response = await apiGet<ApiResponse<UrgentCaseReport[]>>(`/api/care-schedules/urgent-alerts/${scheduleId}/reports`);
     return response.data;
   },
 

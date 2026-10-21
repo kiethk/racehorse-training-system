@@ -4,7 +4,7 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.dto.DashboardPlanRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
@@ -45,7 +45,7 @@ class HorsePerformanceServiceTest {
     private HorseTrainingPlanRepository planRepository;
 
     @Mock
-    private GroomIncidentReportRepository incidentReportRepository;
+    private HorseIncidentReportRepository incidentReportRepository;
 
     @Mock
     private HorseRepository horseRepository;

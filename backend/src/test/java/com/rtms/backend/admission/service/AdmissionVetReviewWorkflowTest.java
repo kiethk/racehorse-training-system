@@ -28,7 +28,7 @@ import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.medical.service.PreventiveVaccinationService;
 import com.rtms.backend.notification.service.NotificationService;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingWorkoutService;
@@ -78,7 +78,7 @@ class AdmissionVetReviewWorkflowTest {
     @Mock
     private StableStallRepository stallRepository;
     @Mock
-    private GroomIncidentReportRepository incidentRepository;
+    private HorseIncidentReportRepository incidentRepository;
     @Mock
     private VeterinarianProfileRepository vetProfileRepository;
     @Mock

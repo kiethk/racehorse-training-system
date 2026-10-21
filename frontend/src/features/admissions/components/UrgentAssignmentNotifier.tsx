@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { createAuthenticatedEventSource } from '@/services/api';
+import { openAuthenticatedEventStream } from '@/services/api';
 import type { UrgentAssignmentAlert } from '../types';
 import { admissionsApi } from '../services/api';
 import { UrgentAssignmentModal } from './UrgentAssignmentModal';
+
+const RECONNECT_DELAY_MS = 5000;
 
 export function UrgentAssignmentNotifier() {
   const router = useRouter();
@@ -37,42 +39,47 @@ export function UrgentAssignmentNotifier() {
   useEffect(() => {
     void restore();
 
-    let source: EventSource | null = null;
+    let cancelled = false;
+    let controller: AbortController | null = null;
     let pollInterval: NodeJS.Timeout | null = null;
-    let sseFailed = false;
 
     const startPolling = () => {
       if (pollInterval) return;
       pollInterval = setInterval(() => {
         void restore();
-      }, 20000); // 20s fallback polling
+      }, 20000); // 20s fallback when the stream cannot be kept open
     };
 
-    try {
-      source = createAuthenticatedEventSource('/api/care-schedules/urgent-alerts/stream');
-
-      source.addEventListener('urgent-assigned', (event) => {
+    const connect = async () => {
+      for (;;) {
+        controller = new AbortController();
         try {
-          mergeAlerts([JSON.parse((event as MessageEvent<string>).data) as UrgentAssignmentAlert]);
+          // fetch, not EventSource: EventSource cannot send the Authorization header.
+          await openAuthenticatedEventStream('/api/care-schedules/urgent-alerts/stream', {
+            signal: controller.signal,
+            onEvent: (event, data) => {
+              if (event !== 'urgent-assigned') return;
+              try {
+                mergeAlerts([JSON.parse(data) as UrgentAssignmentAlert]);
+              } catch {
+                void restore();
+              }
+            },
+          });
         } catch {
-          void restore();
+          if (!cancelled) {
+            startPolling();
+            void restore();
+          }
+          return;
         }
-      });
+        if (cancelled) return;
+        // The server closes the stream after its timeout: reconnect and keep listening.
+        await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
+      }
+    };
 
-      source.onerror = () => {
-        // If SSE encounters an error (e.g. 401 due to EventSource lack of custom Authorization header),
-        // close the failing SSE connection to stop browser retry spam and switch to authenticated REST polling.
-        if (!sseFailed) {
-          sseFailed = true;
-          source?.close();
-          source = null;
-          startPolling();
-        }
-        void restore();
-      };
-    } catch {
-      startPolling();
-    }
+    void connect();
 
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
@@ -84,10 +91,11 @@ export function UrgentAssignmentNotifier() {
     window.addEventListener('focus', onVisible);
 
     return () => {
+      cancelled = true;
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
       if (pollInterval) clearInterval(pollInterval);
-      if (source) source.close();
+      controller?.abort();
     };
   }, [mergeAlerts, restore]);
 

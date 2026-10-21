@@ -1,6 +1,6 @@
 package com.rtms.backend.notification.dto;
 
-import com.rtms.backend.stable.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentSeverity;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.training.enums.TrainingDecision;
 
@@ -26,9 +26,11 @@ public record UrgentAssignmentAlert(
         TrainingDecision trainingDecision,
         CareScheduleStatus status,
         LocalDateTime scheduledAt,
-        LocalDateTime assignedAt
+        LocalDateTime assignedAt,
+        TrainingDecision previousTrainingDecision,
+        String previousTrainingDecisionReason
 ) {
-    /** Backward compatibility constructor without reportedByRole. */
+    /** Backward compatibility constructor without reportedByRole and the pre-incident state. */
     public UrgentAssignmentAlert(
             Long eventId,
             Long scheduleId,
@@ -70,7 +72,9 @@ public record UrgentAssignmentAlert(
                 trainingDecision,
                 status,
                 scheduledAt,
-                assignedAt
+                assignedAt,
+                null,
+                null
         );
     }
 }

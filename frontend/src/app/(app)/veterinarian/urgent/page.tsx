@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { FilterChips } from '@/components/ui/SegmentedControl';
+import { Notice } from '@/components/ui/Notice';
 import { admissionsApi } from '@/features/admissions/services/api';
 import type { UrgentAssignmentAlert } from '@/features/admissions/types';
 
@@ -88,50 +90,35 @@ export default function UrgentCasesPage() {
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
-              <button
-                type="button"
-                onClick={() => setFilter('ALL')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] transition-colors ${
-                  filter === 'ALL'
-                    ? 'bg-[var(--color-primary)] text-white'
-                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
-                }`}
-              >
-                All ({urgentCases.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilter('PENDING')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] transition-colors ${
-                  filter === 'PENDING'
-                    ? 'bg-[var(--color-danger)] text-white'
-                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
-                }`}
-              >
-                Pending Intake ({urgentCases.filter((c) => c.status === 'SCHEDULED').length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilter('IN_PROGRESS')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] transition-colors ${
-                  filter === 'IN_PROGRESS'
-                    ? 'bg-amber-600 text-white'
-                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
-                }`}
-              >
-                In Progress ({urgentCases.filter((c) => c.status === 'IN_PROGRESS').length})
-              </button>
-            </div>
+            <FilterChips
+              label="Urgent cases filter"
+              value={filter}
+              onChange={(value) => setFilter(value)}
+              options={[
+                { value: 'ALL', label: 'All', count: urgentCases.length },
+                {
+                  value: 'PENDING',
+                  label: 'Pending Intake',
+                  count: urgentCases.filter((c) => c.status === 'SCHEDULED').length,
+                },
+                {
+                  value: 'IN_PROGRESS',
+                  label: 'In Progress',
+                  count: urgentCases.filter((c) => c.status === 'IN_PROGRESS').length,
+                },
+              ]}
+            />
 
             {/* Error banner */}
             {error && (
-              <div className="rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-4 text-xs text-[var(--color-danger)] flex items-center justify-between">
-                <span>{error}</span>
-                <button type="button" onClick={handleRefresh} className="underline font-semibold ml-2">
-                  Retry
-                </button>
-              </div>
+              <Notice tone="error">
+                <div className="flex items-center justify-between gap-2">
+                  <span>{error}</span>
+                  <Button variant="link" size="sm" onClick={handleRefresh}>
+                    Retry
+                  </Button>
+                </div>
+              </Notice>
             )}
 
             {/* Content List */}
@@ -163,7 +150,7 @@ export default function UrgentCasesPage() {
                     className={`overflow-hidden border-l-4 transition-all hover:shadow-md ${
                       item.status === 'SCHEDULED'
                         ? 'border-l-[var(--color-danger)] border-t border-r border-b border-[var(--color-border)]'
-                        : 'border-l-amber-500 border-t border-r border-b border-[var(--color-border)]'
+                        : 'border-l-[var(--color-warning)] border-t border-r border-b border-[var(--color-border)]'
                     }`}
                   >
                     <div className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">

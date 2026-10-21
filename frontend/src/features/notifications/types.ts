@@ -1,6 +1,9 @@
 export type NotificationType =
   | 'ADMISSION_VET_ASSIGNED'
   | 'ADMISSION_TRAINER_ASSIGNED'
+  | 'CARE_SCHEDULE_URGENT_ASSIGNED'
+  | 'URGENT_CASE_CLOSED'
+  | 'ROUTINE_ASSIGNED'
   | string;
 
 export interface NotificationItem {
