@@ -497,7 +497,10 @@ public class DynamicToolRegistryService {
         return schema;
     }
 
-    private String normalizeRole(String role) {
+    public static String normalizeRole(String role) {
+        if (role == null) {
+            return "";
+        }
         String r = role.trim().toUpperCase();
         return switch (r) {
             case "HEAD_TRAINER", "TRAINER" -> "HEAD_TRAINER";

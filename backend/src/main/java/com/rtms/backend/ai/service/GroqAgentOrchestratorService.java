@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rtms.backend.ai.conversation.dto.AiChatMessageDetailDto;
 import com.rtms.backend.ai.conversation.entity.AiConversation;
 import com.rtms.backend.ai.conversation.service.AiConversationService;
-import com.rtms.backend.ai.dto.ActionProposalDto;
 import com.rtms.backend.ai.dto.AiChatMessageDto;
 import com.rtms.backend.ai.dto.AiChatRequestDto;
 import com.rtms.backend.ai.dto.AiChatResponseDto;
@@ -95,6 +94,7 @@ public class GroqAgentOrchestratorService {
     /**
      * Xử lý hội thoại chat với người dùng và đồng bộ vào DB.
      */
+    @SuppressWarnings("unchecked")
     public AiChatResponseDto processChat(AiChatRequestDto request, AuthenticatedUser currentUser) {
         Long conversationId = request.conversationId();
 
@@ -128,7 +128,6 @@ public class GroqAgentOrchestratorService {
         }
 
         List<Map<String, Object>> executedTools = new ArrayList<>();
-        List<ActionProposalDto> pendingProposals = new ArrayList<>();
 
         // 2. Xây dựng danh sách tin nhắn hội thoại
         List<Map<String, Object>> messages = new ArrayList<>();
@@ -308,7 +307,7 @@ public class GroqAgentOrchestratorService {
             }
         }
 
-        return new AiChatResponseDto(finalAnswer, conversationId, executedTools, pendingProposals);
+        return new AiChatResponseDto(finalAnswer, conversationId, executedTools, Collections.emptyList());
     }
 
     private String buildSystemPrompt(AuthenticatedUser user) {

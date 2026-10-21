@@ -89,6 +89,8 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
 
     @Query("SELECT h FROM Horse h WHERE UPPER(h.registrationNumber) = UPPER(:identifier) OR LOWER(h.name) = LOWER(:identifier)")
     List<Horse> findByIdentifierOrName(@Param("identifier") String identifier);
+
+    @Query("""
             SELECT a.trainerId
             FROM Horse h
             JOIN StableStall ss ON h.currentStallId = ss.id

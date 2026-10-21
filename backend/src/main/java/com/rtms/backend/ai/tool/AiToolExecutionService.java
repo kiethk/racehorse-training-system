@@ -2791,7 +2791,7 @@ public class AiToolExecutionService {
         }
         return stableStallRepository.findById(stallId)
                 .map(s -> "Chuồng " + s.getStallCode() + " (Số " + s.getStallNumber() + ")")
-                .orElse("Chuồng #" + stallId);
+                .orElse("Chưa xác định chuồng");
     }
 
     private String formatCaTap(LocalTime start, LocalTime end) {
@@ -2848,15 +2848,6 @@ public class AiToolExecutionService {
     }
 
     private String normalizeRoleName(String role) {
-        if (role == null) return "";
-        String r = role.trim().toUpperCase();
-        return switch (r) {
-            case "HEAD_TRAINER", "TRAINER" -> "HEAD_TRAINER";
-            case "VETERINARIAN", "VET" -> "VETERINARIAN";
-            case "GROOM", "STABLE_STAFF" -> "GROOM";
-            case "HORSE_OWNER", "OWNER" -> "HORSE_OWNER";
-            case "CLUB_MANAGER", "RACING_MANAGER", "ADMIN" -> "CLUB_MANAGER";
-            default -> r;
-        };
+        return DynamicToolRegistryService.normalizeRole(role);
     }
 }
