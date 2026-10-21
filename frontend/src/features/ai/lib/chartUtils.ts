@@ -110,7 +110,10 @@ export function parseChartConfig(rawText: string): ChartConfig | null {
       return null;
     }
 
-    const rawType = String(obj.type || '').toLowerCase().trim();
+    let rawType = String(obj.type || '').toLowerCase().trim();
+    if (rawType === 'line') {
+      rawType = 'bar';
+    }
     if (rawType !== 'donut' && rawType !== 'pie' && rawType !== 'bar') {
       return null;
     }

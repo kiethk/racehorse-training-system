@@ -78,6 +78,23 @@ describe('AI SVG Chart Parsing and Geometry Tests', () => {
     assert.equal(config.total, 45);
   });
 
+  it('correctly maps line chart type into bar chart', () => {
+    const rawJson = JSON.stringify({
+      type: 'line',
+      title: 'Chỉ số sinh hiệu',
+      data: [
+        { label: 'Thân nhiệt', value: 38.2 },
+        { label: 'Nhịp tim', value: 36 },
+      ],
+    });
+
+    const config = parseChartConfig(rawJson);
+    assert.ok(config !== null);
+    assert.equal(config.type, 'bar');
+    assert.equal(config.title, 'Chỉ số sinh hiệu');
+    assert.equal(config.data.length, 2);
+  });
+
   it('gracefully rejects invalid JSON or unsupported chart types', () => {
     assert.equal(parseChartConfig(''), null);
     assert.equal(parseChartConfig('{ not valid json }'), null);

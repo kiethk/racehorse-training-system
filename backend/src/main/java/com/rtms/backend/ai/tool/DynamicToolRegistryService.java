@@ -210,7 +210,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getTrainerAssignedGrooms",
-                        "Tra cứu danh sách nhân viên Groom phụ trách các khu vực/chuồng thuộc quản lý của huấn luyện viên và các ngựa Groom đang dắt/chăm sóc.",
+                        "Tra cứu danh sách nhân viên Groom phụ trách các khu vực/chuồng thuộc quản lý của huấn luyện viên bao gồm thông tin liên hệ (số điện thoại, email), các chuồng phụ trách và ngựa đang chăm sóc.",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
@@ -323,10 +323,10 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getHorseVitalSignsTrend",
-                        "Tra cứu các chỉ số sinh hiệu gần nhất của ngựa (Thân nhiệt, Nhịp tim khi nghỉ, Cân nặng, Nhịp thở) từ nhật ký kiểm tra sức khỏe.",
+                        "Tra cứu các chỉ số sinh hiệu gần nhất của ngựa (Thân nhiệt, Nhịp tim khi nghỉ, Cân nặng, Nhịp thở) từ nhật ký kiểm tra sức khỏe. Hỗ trợ xem cho từng ngựa hoặc toàn bộ các bản ghi gần nhất nếu không chỉ định ngựa.",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
+                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn. Nếu để trống hoặc 'all'/'tất cả', hệ thống trả về 20 chỉ số sinh hiệu gần nhất của toàn bộ các ngựa)")
                         ))
                 ),
                 new AiToolDefinition(

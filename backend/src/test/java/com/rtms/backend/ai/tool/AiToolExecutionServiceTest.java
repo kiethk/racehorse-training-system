@@ -366,6 +366,12 @@ class AiToolExecutionServiceTest {
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
         assertEquals(1, map.get("tongSoGroomLamViecCung"));
+        List<?> groomList = (List<?>) map.get("danhSachGroom");
+        assertNotNull(groomList);
+        assertEquals(1, groomList.size());
+        Map<?, ?> groomItem = (Map<?, ?>) groomList.get(0);
+        assertEquals("0988123456", groomItem.get("soDienThoai"));
+        assertEquals("Chưa có email", groomItem.get("email"));
     }
 
     // =================================================================
@@ -935,6 +941,52 @@ class AiToolExecutionServiceTest {
         assertEquals("38.2 °C", item.get("thanNhiet"));
         assertEquals("36 bpm", item.get("nhipTim"));
         assertEquals("12 nhịp/phút", item.get("nhipTho"));
+    }
+
+    @Test
+    @DisplayName("VETERINARIAN gọi getHorseVitalSignsTrend không truyền ngựa hoặc truyền tất cả trả về danh sách các bản ghi gần nhất")
+    void testVet_GetHorseVitalSignsTrend_AllHorsesWhenEmptyOrAll() {
+        AuthenticatedUser vet = new AuthenticatedUser(300L, "vet@rtms.com", "VETERINARIAN");
+
+        HorseHealthMetric m1 = new HorseHealthMetric();
+        m1.setHorseId(1L);
+        m1.setRecordedAt(LocalDateTime.of(2026, 10, 20, 8, 0));
+        m1.setTemperature(BigDecimal.valueOf(38.4));
+        m1.setHeartRate(BigDecimal.valueOf(38));
+
+        HorseHealthMetric m2 = new HorseHealthMetric();
+        m2.setHorseId(2L);
+        m2.setRecordedAt(LocalDateTime.of(2026, 10, 20, 9, 0));
+        m2.setTemperature(BigDecimal.valueOf(38.1));
+        m2.setHeartRate(BigDecimal.valueOf(35));
+
+        Horse h1 = new Horse();
+        h1.setId(1L);
+        h1.setName("BELLA");
+
+        Horse h2 = new Horse();
+        h2.setId(2L);
+        h2.setName("LIGHTNING");
+
+        when(horseHealthMetricRepository.findAll()).thenReturn(List.of(m1, m2));
+        when(horseRepository.findById(1L)).thenReturn(Optional.of(h1));
+        when(horseRepository.findById(2L)).thenReturn(Optional.of(h2));
+
+        // 1. Không truyền param
+        Object resultEmpty = toolExecutionService.executeTool("getHorseVitalSignsTrend", Map.of(), vet);
+        assertNotNull(resultEmpty);
+        assertTrue(resultEmpty instanceof List<?>);
+        List<?> listEmpty = (List<?>) resultEmpty;
+        assertEquals(2, listEmpty.size());
+        Map<?, ?> first = (Map<?, ?>) listEmpty.get(0);
+        // m2 có recordedAt lúc 9:00 > 8:00 nên đứng đầu
+        assertEquals("LIGHTNING", first.get("tenNgua"));
+        assertEquals("38.1 °C", first.get("thanNhiet"));
+
+        // 2. Truyền horseName = "tất cả"
+        Object resultAll = toolExecutionService.executeTool("getHorseVitalSignsTrend", Map.of("horseName", "tất cả"), vet);
+        assertNotNull(resultAll);
+        assertEquals(2, ((List<?>) resultAll).size());
     }
 
     @Test

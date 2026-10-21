@@ -1028,9 +1028,12 @@ public class AiToolExecutionService {
         List<Map<String, Object>> groomList = new ArrayList<>();
         for (Long groomId : groomIds) {
             User groomUser = userRepository != null ? userRepository.findById(groomId).orElse(null) : null;
-            String groomName = groomUser != null ? groomUser.getFullName() : "Groom #" + groomId;
-            String groomPhone = groomUser != null && groomUser.getPhone() != null ? groomUser.getPhone() : "N/A";
-            String groomEmail = groomUser != null ? groomUser.getEmail() : "N/A";
+            String groomName = groomUser != null && groomUser.getFullName() != null && !groomUser.getFullName().isBlank()
+                    ? groomUser.getFullName() : "Groom #" + groomId;
+            String groomPhone = groomUser != null && groomUser.getPhone() != null && !groomUser.getPhone().isBlank()
+                    ? groomUser.getPhone().trim() : "Chưa cập nhật SĐT";
+            String groomEmail = groomUser != null && groomUser.getEmail() != null && !groomUser.getEmail().isBlank()
+                    ? groomUser.getEmail().trim() : "Chưa có email";
 
             List<StableStall> groomStalls = stalls.stream()
                     .filter(s -> Objects.equals(s.getGroomId(), groomId))
@@ -1643,12 +1646,51 @@ public class AiToolExecutionService {
     }
 
     private Object handleGetHorseVitalSignsTrend(Map<String, Object> args) {
-        Horse horse = resolveHorse(args);
-        if (horse == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
-        }
         if (horseHealthMetricRepository == null) {
             return Collections.emptyList();
+        }
+
+        boolean isAllRequested = false;
+        if (args != null) {
+            Object nameObj = args.get("horseName");
+            if (nameObj == null) nameObj = args.get("name");
+            if (nameObj != null) {
+                String n = nameObj.toString().trim().toLowerCase();
+                if (n.equals("all") || n.contains("tất cả") || n.contains("tat ca") || n.contains("toàn bộ") || n.contains("toan bo")) {
+                    isAllRequested = true;
+                }
+            }
+        }
+
+        Horse horse = isAllRequested ? null : resolveHorse(args);
+
+        // Nếu không chỉ định ngựa hoặc yêu cầu xem tất cả
+        if (horse == null) {
+            List<HorseHealthMetric> allMetrics = horseHealthMetricRepository.findAll().stream()
+                    .filter(m -> m.getRecordedAt() != null)
+                    .sorted(Comparator.comparing(HorseHealthMetric::getRecordedAt).reversed())
+                    .limit(20)
+                    .toList();
+
+            Map<Long, String> horseNameCache = new HashMap<>();
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (HorseHealthMetric m : allMetrics) {
+                String hName = "N/A";
+                if (m.getHorseId() != null && horseRepository != null) {
+                    hName = horseNameCache.computeIfAbsent(m.getHorseId(), id ->
+                            horseRepository.findById(id).map(Horse::getName).orElse("Ngựa #" + id));
+                }
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("tenNgua", hName);
+                item.put("ngayDo", m.getRecordedAt() != null ? m.getRecordedAt().toString() : "N/A");
+                item.put("canNang", m.getWeight() != null ? m.getWeight() + " kg" : "N/A");
+                item.put("thanNhiet", m.getTemperature() != null ? m.getTemperature() + " °C" : "N/A");
+                item.put("nhipTim", m.getHeartRate() != null ? m.getHeartRate() + " bpm" : "N/A");
+                item.put("nhipTho", m.getRespiratoryRate() != null ? m.getRespiratoryRate() + " nhịp/phút" : "N/A");
+                item.put("nhanXet", m.getNotes() != null ? m.getNotes() : (m.getHydrationStatus() != null ? m.getHydrationStatus() : "Chỉ số ổn định"));
+                result.add(item);
+            }
+            return result;
         }
 
         List<HorseHealthMetric> metrics = horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(horse.getId());
