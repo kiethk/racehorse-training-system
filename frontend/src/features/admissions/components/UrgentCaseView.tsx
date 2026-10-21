@@ -1,15 +1,17 @@
 'use client';
 
+import React, { useEffect, useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { Notice } from '@/components/ui/Notice';
 import { ChoiceInput, Input, Textarea } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
-import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
+import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { admissionsApi } from '../services/api';
 import { displayError } from '@/lib/display';
 import type {
@@ -61,7 +63,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   // Blocking training requires a follow-up exam — "rest until" is that exam's date.
   const [followUpDate, setFollowUpDate] = useState(() => businessDate(3));
   const [followUpDescription, setFollowUpDescription] = useState('Follow-up after the urgent examination');
-  const [followUpKey] = useState(newIdempotencyKey);
+  const [followUpKey, setFollowUpKey] = useState(newIdempotencyKey);
   const [notes, setNotes] = useState('');
   const [temperature, setTemperature] = useState('');
   const [heartRate, setHeartRate] = useState('');
@@ -71,20 +73,58 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
   useEffect(() => {
     let active = true;
-    Promise.all([admissionsApi.getUrgentCase(scheduleId), admissionsApi.getUrgentCaseReports(scheduleId)])
-      .then(([data, reportList]) => {
+    setUrgentCase(null);
+    setLoading(true);
+    setReports([]);
+    setError('');
+    setSubmitError('');
+    setCompletedData(null);
+    setStarting(false);
+    setSubmitting(false);
+    setSymptoms('');
+    setFindings('');
+    setDiagnosis('');
+    setTreatment('');
+    setTrainingDecision('BLOCKED');
+    setRestrictionDetails('');
+    setFollowUpDate(businessDate(3));
+    setFollowUpDescription('Follow-up after the urgent examination');
+    setFollowUpKey(newIdempotencyKey());
+    setNotes('');
+    setTemperature('');
+    setHeartRate('');
+    setRespiratoryRate('');
+    setWeight('');
+    setFieldErrors({});
+
+    admissionsApi
+      .getUrgentCase(scheduleId)
+      .then((data) => {
         if (!active) return;
         setUrgentCase(data);
-        setReports(reportList);
         if (data.description) {
           setSymptoms((prev) => prev || data.description);
         }
+        admissionsApi
+          .getUrgentCaseReports(scheduleId)
+          .then((reportList) => {
+            if (!active) return;
+            setReports(reportList);
+          })
+          .catch(() => {
+            // Keep empty report list if secondary reports fail
+          });
       })
       .catch((cause: unknown) => {
         if (!active) return;
-        setError(cause instanceof ApiError ? displayError(cause, 'Unable to load the urgent case.') : 'Unable to load the urgent case.');
+        setError(
+          cause instanceof ApiError
+            ? displayError(cause, 'Unable to load the urgent case.')
+            : 'Unable to load the urgent case.',
+        );
       })
       .finally(() => active && setLoading(false));
+
     return () => {
       active = false;
     };
@@ -98,7 +138,11 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       const schedule = await admissionsApi.startCareSchedule(urgentCase.scheduleId);
       setUrgentCase((current) => (current ? { ...current, status: schedule.status } : current));
     } catch (cause) {
-      setError(cause instanceof ApiError ? displayError(cause, 'Unable to start the examination.') : 'Unable to start the examination.');
+      setError(
+        cause instanceof ApiError
+          ? displayError(cause, 'Unable to start the examination.')
+          : 'Unable to start the examination.',
+      );
     } finally {
       setStarting(false);
     }
@@ -118,15 +162,15 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     }
     if (trainingDecision === 'BLOCKED') {
       if (!restrictionDetails.trim()) {
-      errors.restrictionDetails = 'Restriction details are required when training is blocked.';
+        errors.restrictionDetails = 'Restriction details are required when training is blocked.';
       }
       if (!followUpDate) {
-      errors.followUpDate = 'Select a follow-up date when training is blocked.';
+        errors.followUpDate = 'Select a follow-up date when training is blocked.';
       } else if (followUpDate < businessDate(1)) {
-      errors.followUpDate = 'The follow-up date must be tomorrow or later.';
+        errors.followUpDate = 'The follow-up date must be tomorrow or later.';
       }
       if (!followUpDescription.trim()) {
-      errors.followUpDescription = 'A follow-up description is required.';
+        errors.followUpDescription = 'A follow-up description is required.';
       }
     }
 
@@ -189,485 +233,718 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   }
 
   if (loading) {
-    return <Panel className="p-8 text-sm text-[var(--color-text-secondary)]">Loading urgent case…</Panel>;
+    return (
+      <Panel className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
+        <Icon name="refresh" size={20} className="animate-spin inline-block mr-2" />
+        Loading urgent case…
+      </Panel>
+    );
   }
+
   if (!urgentCase) {
     return (
-      <Notice tone="error" className="p-8">
-        {error || 'Urgent case not found.'}
-      </Notice>
+      <div className="space-y-4">
+        <Link
+          href="/veterinarian/urgent"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--color-primary)] hover:underline"
+        >
+          <Icon name="arrow-left" size={13} />
+          Back to Urgent Cases
+        </Link>
+        <Notice tone="error">{error || 'Urgent case not found.'}</Notice>
+      </div>
     );
   }
 
   const additionalReports = reports.filter((report) => report.id !== urgentCase.incidentId);
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-5">
-      <Panel className="overflow-hidden border-2 border-[var(--color-danger)] p-0">
-        <header className="flex flex-wrap items-start gap-4 border-b border-[var(--color-danger)]/30 bg-[var(--color-danger-soft)] p-6">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-danger)] text-[var(--color-text-inverse)]">
-            <Icon name="alert-triangle" size={24} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-danger)]">
-            Urgent case #{urgentCase.scheduleId}
-            </p>
-            <h1 className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{urgentCase.title}</h1>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            You have been assigned directly to this case.
-            </p>
+    <div className="space-y-5">
+      {/* Top Breadcrumb Navigation */}
+      <div>
+        <Link
+          href="/veterinarian/urgent"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--color-primary)] hover:underline"
+        >
+          <Icon name="arrow-left" size={13} />
+          Back to Urgent Cases
+        </Link>
+      </div>
+
+      {/* Clinical Case Header */}
+      <Panel className="overflow-hidden border border-[var(--color-border)] p-5 sm:p-6 border-l-4 border-l-[var(--color-medical)] bg-[var(--color-surface)]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <HorseAvatar name={urgentCase.horseName} image={null} size={56} rounded="md" />
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xl font-bold text-[var(--color-text-primary)]">
+                  {urgentCase.horseName}
+                </span>
+                <span className="text-xs font-mono text-[var(--color-text-muted)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 rounded-[var(--radius-xs)] border border-[var(--color-border)]">
+                  #{urgentCase.horseId}
+                </span>
+                <Pill tone={urgentCase.severity === 'CRITICAL' ? 'danger' : 'warning'}>
+                  {urgentCase.severity}
+                </Pill>
+                <Pill tone={urgentCase.status === 'COMPLETED' ? 'success' : urgentCase.status === 'IN_PROGRESS' ? 'info' : 'warning'}>
+                  {urgentCase.status === 'SCHEDULED' ? 'Pending Intake' : urgentCase.status === 'IN_PROGRESS' ? 'In Progress' : 'Completed'}
+                </Pill>
+              </div>
+
+              <h1 className="mt-1 text-base font-semibold text-[var(--color-text-primary)]">
+                {urgentCase.title}
+              </h1>
+
+              <div className="mt-1.5 flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-[var(--color-text-muted)]">
+                {urgentCase.stallCode && (
+                  <span className="flex items-center gap-1 font-medium text-[var(--color-text-secondary)]">
+                    <Icon name="building" size={12} />
+                    <span>Stall {urgentCase.stallCode}</span>
+                    {urgentCase.stableLocation && (
+                      <span className="text-[var(--color-text-muted)]">({urgentCase.stableLocation})</span>
+                    )}
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <Icon name="clock" size={12} />
+                  <span>Reported: {formatDateTime(urgentCase.reportedAt)}</span>
+                </span>
+                <span className="font-mono text-[11px]">
+                  Case #{urgentCase.scheduleId}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Pill tone="danger">{urgentCase.severity}</Pill>
-            <Pill tone={urgentCase.status === 'COMPLETED' ? 'success' : 'info'}>{urgentCase.status}</Pill>
+
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            {urgentCase.status === 'SCHEDULED' && (
+              <Button
+                variant="destructive"
+                icon="activity"
+                loading={starting}
+                onClick={startExam}
+              >
+                Start Examination
+              </Button>
+            )}
           </div>
-        </header>
+        </div>
+      </Panel>
 
-        <div className="space-y-5 p-6">
-          <dl className="grid gap-4 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-4 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Horse</dt>
-              <dd className="mt-1 font-bold">
-                {urgentCase.horseName} · #{urgentCase.horseId}
-              </dd>
+      {/* 2-Column Responsive Clinical Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Main Column (8 / 12) */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Incident Observation & Evidence */}
+          <Panel padded className="space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <Icon name="file-text" size={16} className="text-[var(--color-medical)]" />
+                <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
+                  Reported Incident & Observation
+                </h2>
+              </div>
+              <span className="text-xs text-[var(--color-text-muted)]">
+                Reported by {urgentCase.reportedByName || 'Staff'}
+              </span>
             </div>
-            <div>
-            <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Stall / Location</dt>
-              <dd className="mt-1 font-semibold">
-            {[urgentCase.stallCode, urgentCase.stableLocation].filter(Boolean).join(' · ') || 'Not provided'}
-              </dd>
-            </div>
-            <div>
-            <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Reported by</dt>
-              <dd className="mt-1 font-semibold">
-            {urgentCase.reportedByName || 'Unknown'} · #{urgentCase.reportedById}
-              </dd>
-            </div>
-            <div>
-            <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Reported at</dt>
-              <dd className="mt-1 font-semibold">{formatDateTime(urgentCase.reportedAt)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">
-            Assigned at
-              </dt>
-              <dd className="mt-1 font-semibold">{formatDateTime(urgentCase.assignedAt)}</dd>
-            </div>
-            <div>
-            <dt className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Training decision</dt>
-              <dd className="mt-1 font-bold text-[var(--color-danger)]">
-            {urgentCase.trainingDecision} — Training is paused until the examination is complete.
-              </dd>
-            </div>
-          </dl>
 
-          {urgentCase.previousTrainingDecision === 'BLOCKED' && (
-            <Notice tone="warning" title="Pre-existing training hold">
-              This horse was already blocked from training before this incident. An ALLOWED conclusion will keep
-              that hold
-              {urgentCase.previousTrainingDecisionReason ? `: ${urgentCase.previousTrainingDecisionReason}.` : '.'}
-            </Notice>
-          )}
-
-          <section className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
-          <h2 className="text-sm font-bold text-[var(--color-text-primary)]">Symptoms / Initial description</h2>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-text-secondary)]">
-              {urgentCase.description}
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-secondary)]">
+              {urgentCase.description || 'No detailed clinical description provided by reporter.'}
             </p>
-          </section>
 
-          {urgentCase.imageUrl && (
-            <ProtectedImage
-              src={urgentCase.imageUrl}
-              alt="Urgent case report"
-              openOnClick
-              className="max-h-[28rem] w-full object-contain"
-            />
-          )}
+            {urgentCase.imageUrl && (
+              <div className="pt-2">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-2">
+                  Photo Evidence
+                </label>
+                <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2">
+                  <ProtectedImage
+                    src={urgentCase.imageUrl}
+                    alt="Urgent case report incident photo"
+                    openOnClick
+                    className="max-h-72 w-full object-contain rounded-[var(--radius-sm)]"
+                  />
+                  <p className="mt-1.5 text-center text-[11px] text-[var(--color-text-muted)]">
+                    Click photo to open full resolution view
+                  </p>
+                </div>
+              </div>
+            )}
+          </Panel>
 
+          {/* Merged Secondary Reports (if any) */}
           {additionalReports.length > 0 && (
-            <section className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+            <Panel padded className="space-y-3">
               <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                 Additional reports merged into this case ({additionalReports.length})
               </h2>
-              <ul className="mt-3 space-y-3">
+              <ul className="space-y-3">
                 {additionalReports.map((report) => (
                   <li
                     key={report.id}
-                    className="rounded-[var(--radius-sm)] bg-[var(--color-surface-muted)] p-3"
+                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3.5 space-y-2"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <p className="text-sm font-bold text-[var(--color-text-primary)]">{report.title}</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <strong className="text-sm text-[var(--color-text-primary)]">{report.title}</strong>
                       <Pill tone="danger">{report.severity}</Pill>
                     </div>
-                    <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-text-secondary)]">
+                    <p className="whitespace-pre-wrap break-words text-xs leading-relaxed text-[var(--color-text-secondary)]">
                       {report.description}
                     </p>
-                    <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-                      {[report.reportedByRole, report.reportedByName].filter(Boolean).join(' ') ||
-                        `#${report.reportedById}`}{' '}
-                      · {formatDateTime(report.reportedAt)}
-                    </p>
+                    <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
+                      <span>
+                        {[report.reportedByRole, report.reportedByName].filter(Boolean).join(' ') ||
+                          `#${report.reportedById}`}
+                      </span>
+                      <span>·</span>
+                      <span>{formatDateTime(report.reportedAt)}</span>
+                    </div>
                     {report.imageUrl && (
                       <ProtectedImage
                         src={report.imageUrl}
                         alt={`Report: ${report.title}`}
                         openOnClick
-                        className="mt-2 max-h-64 w-full object-contain"
+                        className="max-h-48 w-full object-contain rounded-[var(--radius-sm)]"
                       />
                     )}
                   </li>
                 ))}
               </ul>
-            </section>
+            </Panel>
           )}
 
-          {error && <Notice tone="error">{error}</Notice>}
-
-          {/* Workflow Transitions */}
+          {/* Workflow: Awaiting Intake Callout */}
           {urgentCase.status === 'SCHEDULED' && (
-            <div className="pt-2">
-              <Button variant="destructive" icon="activity" disabled={starting} onClick={startExam}>
-                {starting ? 'Starting…' : 'Start examination'}
-              </Button>
-            </div>
+            <Panel padded className="border-l-4 border-l-[var(--color-warning)] bg-[var(--color-warning-soft)]/20">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
+                    Awaiting Clinical Intake
+                  </h3>
+                  <p className="text-xs text-[var(--color-text-secondary)]">
+                    This urgent case is currently scheduled and assigned to you. Click Start Examination to begin recording clinical findings.
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  icon="activity"
+                  loading={starting}
+                  onClick={startExam}
+                >
+                  Start Examination
+                </Button>
+              </div>
+            </Panel>
           )}
 
+          {/* Workflow: In Progress Examination Form */}
           {urgentCase.status === 'IN_PROGRESS' && (
-            <form onSubmit={handleSubmit} className="space-y-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+            <Panel padded className="space-y-6">
               <div className="border-b border-[var(--color-border)] pb-3">
-                <h3 className="text-lg font-bold text-[var(--color-text-primary)]">
-                  Urgent Examination Record
+                <h3 className="text-base font-bold text-[var(--color-text-primary)]">
+                  Urgent Clinical Examination Form
                 </h3>
                 <p className="text-xs text-[var(--color-text-secondary)]">
-                  Record clinical findings and the medical training decision for this urgent case.
+                  Record vitals telemetry, clinical diagnosis, and immediate training restriction decision.
                 </p>
               </div>
 
-              {submitError && (
-                <Notice tone="error">{submitError}</Notice>
-              )}
+              {submitError && <Notice tone="error">{submitError}</Notice>}
 
-              {/* Vitals Telemetry */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
-                  1. Clinical Vitals
-                </label>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div>
-                    <FormField label="Temperature (°C)" htmlFor="vital-temp">
-                      <Input
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* 1. Clinical Vitals (Integrated Labels, No Bottom Helper Text, No Out-of-Range Warnings) */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                    <Icon name="heart-pulse" size={14} className="text-[var(--color-medical)]" />
+                    <span>1. Clinical Vitals Telemetry</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {/* Temperature */}
+                    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5 transition-colors focus-within:border-[var(--color-primary)] focus-within:bg-[var(--color-surface)]">
+                      <label
+                        htmlFor="vital-temp"
+                        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]"
+                      >
+                        Temperature (°C)
+                      </label>
+                      <input
                         id="vital-temp"
                         type="number"
                         step="0.1"
                         placeholder="38.0"
                         value={temperature}
                         onChange={(e) => setTemperature(e.target.value)}
+                        className="mt-1 w-full bg-transparent font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
                       />
-                    </FormField>
-                  </div>
-                  <div>
-                    <FormField label="Heart rate (bpm)" htmlFor="vital-hr">
-                      <Input
+                    </div>
+
+                    {/* Heart Rate */}
+                    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5 transition-colors focus-within:border-[var(--color-primary)] focus-within:bg-[var(--color-surface)]">
+                      <label
+                        htmlFor="vital-hr"
+                        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]"
+                      >
+                        Heart Rate (bpm)
+                      </label>
+                      <input
                         id="vital-hr"
                         type="number"
                         step="1"
                         placeholder="36"
                         value={heartRate}
                         onChange={(e) => setHeartRate(e.target.value)}
+                        className="mt-1 w-full bg-transparent font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
                       />
-                    </FormField>
-                  </div>
-                  <div>
-                    <FormField label="Respiratory rate (rpm)" htmlFor="vital-rr">
-                      <Input
+                    </div>
+
+                    {/* Respiratory Rate */}
+                    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5 transition-colors focus-within:border-[var(--color-primary)] focus-within:bg-[var(--color-surface)]">
+                      <label
+                        htmlFor="vital-rr"
+                        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]"
+                      >
+                        Respiration (rpm)
+                      </label>
+                      <input
                         id="vital-rr"
                         type="number"
                         step="1"
                         placeholder="12"
                         value={respiratoryRate}
                         onChange={(e) => setRespiratoryRate(e.target.value)}
+                        className="mt-1 w-full bg-transparent font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
                       />
-                    </FormField>
-                  </div>
-                  <div>
-                    <FormField label="Weight (kg)" htmlFor="vital-wt">
-                      <Input
+                    </div>
+
+                    {/* Weight */}
+                    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5 transition-colors focus-within:border-[var(--color-primary)] focus-within:bg-[var(--color-surface)]">
+                      <label
+                        htmlFor="vital-wt"
+                        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]"
+                      >
+                        Weight (kg)
+                      </label>
+                      <input
                         id="vital-wt"
                         type="number"
                         step="0.5"
                         placeholder="500"
                         value={weight}
                         onChange={(e) => setWeight(e.target.value)}
+                        className="mt-1 w-full bg-transparent font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
                       />
-                    </FormField>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Clinical Details */}
-              <div className="space-y-4">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                  2. Examination & Diagnosis
-                </label>
+                {/* 2. Clinical Findings & Diagnosis */}
+                <div className="space-y-4 border-t border-[var(--color-border)] pt-5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                    <Icon name="stethoscope" size={14} className="text-[var(--color-medical)]" />
+                    <span>2. Examination Findings & Clinical Diagnosis</span>
+                  </div>
 
-                <div>
-                  <FormField label="Observed urgent symptoms" htmlFor="urgent-symptoms" required>
-                    <Textarea
-                      id="urgent-symptoms"
-                      rows={2}
-                      value={symptoms}
-                      onChange={(e) => {
-                        setSymptoms(e.target.value);
-                        if (fieldErrors.symptoms) setFieldErrors((prev) => ({ ...prev, symptoms: '' }));
-                      }}
-                    placeholder="Describe the horse’s symptoms or signs of illness or injury…"
-                    />
-                  </FormField>
-                  {fieldErrors.symptoms && (
-                    <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.symptoms}</p>
-                  )}
-                </div>
-
-                <div>
-                  <FormField label="Examination findings" htmlFor="urgent-findings" required>
-                    <Textarea
-                      id="urgent-findings"
-                      rows={3}
-                      value={findings}
-                      onChange={(e) => {
-                        setFindings(e.target.value);
-                        if (fieldErrors.findings) setFieldErrors((prev) => ({ ...prev, findings: '' }));
-                      }}
-                    placeholder="Describe the horse’s condition, injuries, or areas of pain…"
-                    />
-                  </FormField>
-                  {fieldErrors.findings && (
-                    <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.findings}</p>
-                  )}
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <FormField label="Diagnosis" htmlFor="urgent-diagnosis" required>
-                      <Input
-                        id="urgent-diagnosis"
-                        type="text"
-                        value={diagnosis}
+                    <FormField label="Observed urgent symptoms" htmlFor="urgent-symptoms" required>
+                      <Textarea
+                        id="urgent-symptoms"
+                        rows={2}
+                        value={symptoms}
                         onChange={(e) => {
-                          setDiagnosis(e.target.value);
-                          if (fieldErrors.diagnosis) setFieldErrors((prev) => ({ ...prev, diagnosis: '' }));
+                          setSymptoms(e.target.value);
+                          if (fieldErrors.symptoms) setFieldErrors((prev) => ({ ...prev, symptoms: '' }));
                         }}
-                    placeholder="Enter a confirmed or provisional diagnosis…"
+                        placeholder="Describe the horse's symptoms or signs of distress…"
                       />
                     </FormField>
-                    {fieldErrors.diagnosis && (
-                      <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.diagnosis}</p>
+                    {fieldErrors.symptoms && (
+                      <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.symptoms}</p>
                     )}
                   </div>
 
                   <div>
-                    <FormField label="Treatment / First aid" htmlFor="urgent-treatment">
-                      <Input
-                        id="urgent-treatment"
-                        type="text"
-                        value={treatment}
-                        onChange={(e) => setTreatment(e.target.value)}
-                    placeholder="Medication, bandaging, or care instructions…"
+                    <FormField label="Physical examination findings" htmlFor="urgent-findings" required>
+                      <Textarea
+                        id="urgent-findings"
+                        rows={3}
+                        value={findings}
+                        onChange={(e) => {
+                          setFindings(e.target.value);
+                          if (fieldErrors.findings) setFieldErrors((prev) => ({ ...prev, findings: '' }));
+                        }}
+                        placeholder="Detail physical inspection: palpation, limb flexion, swellings, wounds, pain responses…"
+                      />
+                    </FormField>
+                    {fieldErrors.findings && (
+                      <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.findings}</p>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <FormField label="Clinical diagnosis" htmlFor="urgent-diagnosis" required>
+                        <Input
+                          id="urgent-diagnosis"
+                          type="text"
+                          value={diagnosis}
+                          onChange={(e) => {
+                            setDiagnosis(e.target.value);
+                            if (fieldErrors.diagnosis) setFieldErrors((prev) => ({ ...prev, diagnosis: '' }));
+                          }}
+                          placeholder="e.g. Acute superficial digital flexor tendon strain"
+                        />
+                      </FormField>
+                      {fieldErrors.diagnosis && (
+                        <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.diagnosis}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <FormField label="Immediate treatment / First aid" htmlFor="urgent-treatment">
+                        <Input
+                          id="urgent-treatment"
+                          type="text"
+                          value={treatment}
+                          onChange={(e) => setTreatment(e.target.value)}
+                          placeholder="Medication, cold hose, anti-inflammatory, support bandage…"
+                        />
+                      </FormField>
+                    </div>
+                  </div>
+
+                  <div>
+                    <FormField label="Additional clinical notes" htmlFor="urgent-notes">
+                      <Textarea
+                        id="urgent-notes"
+                        rows={2}
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Observation notes, stable restrictions, or special care instructions…"
                       />
                     </FormField>
                   </div>
                 </div>
 
-                <div>
-                  <FormField label="Additional notes" htmlFor="urgent-notes">
-                    <Textarea
-                      id="urgent-notes"
-                      rows={2}
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Care instructions or follow-up observations…"
-                    />
-                  </FormField>
-                </div>
-              </div>
+                {/* 3. Training Clearance Decision */}
+                <div className="space-y-4 border-t border-[var(--color-border)] pt-5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                    <Icon name="shield" size={14} className="text-[var(--color-primary)]" />
+                    <span>3. Veterinary Training Clearance Decision</span>
+                    <span className="text-[var(--color-danger)]">*</span>
+                  </div>
 
-              {/* Training Clearance Decision */}
-              <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                  3. Training Decision <span className="text-[var(--color-danger)]">*</span>
-                </label>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {[
-                    { value: 'ALLOWED' as const, label: 'ALLOWED', desc: 'Normal training may continue' },
-                    {
-                      value: 'BLOCKED' as const,
-                      label: 'BLOCKED',
-                      desc: 'Rest until the follow-up examination; upcoming workouts will be cancelled',
-                    },
-                  ].map((option) => (
-                    <label
-                      key={option.value}
-                      className={`flex cursor-pointer flex-col rounded-[var(--radius-md)] border p-3 transition-colors ${
-                        trainingDecision === option.value
-                          ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
-                          : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <ChoiceInput
-                          type="radio"
-                          name="trainingDecision"
-                          value={option.value}
-                          checked={trainingDecision === option.value}
-                          onChange={() => {
-                            setTrainingDecision(option.value);
-                            if (option.value === 'ALLOWED') {
-                              setFieldErrors((prev) => ({
-                                ...prev,
-                                restrictionDetails: '',
-                                followUpDate: '',
-                                followUpDescription: '',
-                              }));
-                            }
-                          }}
-                        />
-                        <span className="text-xs font-bold">{option.label}</span>
-                      </div>
-                      <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{option.desc}</p>
-                    </label>
-                  ))}
-                </div>
-
-                {trainingDecision === 'BLOCKED' && (
-                  <div className="mt-3 space-y-3">
-                    <div>
-                      <FormField label="Training restriction / Rest instructions" htmlFor="restriction-details" required>
-                        <Textarea
-                          id="restriction-details"
-                          rows={2}
-                          value={restrictionDetails}
-                          onChange={(e) => {
-                            setRestrictionDetails(e.target.value);
-                            if (fieldErrors.restrictionDetails) {
-                              setFieldErrors((prev) => ({ ...prev, restrictionDetails: '' }));
-                            }
-                          }}
-                          placeholder="Describe the restrictions (for example, 15 minutes of walking only or complete stall rest)…"
-                        />
-                      </FormField>
-                      {fieldErrors.restrictionDetails && (
-                        <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.restrictionDetails}</p>
-                      )}
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <FormField label="Follow-up date" htmlFor="follow-up-date" required>
-                          <Input
-                            id="follow-up-date"
-                            type="date"
-                            min={businessDate(1)}
-                            value={followUpDate}
-                            onChange={(e) => {
-                              setFollowUpDate(e.target.value);
-                              if (fieldErrors.followUpDate) setFieldErrors((prev) => ({ ...prev, followUpDate: '' }));
-                            }}
-                          />
-                        </FormField>
-                        <div className="mt-1 flex gap-1">
-                          {[3, 7, 14].map((days) => (
-                            <Button
-                              key={days}
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => setFollowUpDate(businessDate(days))}
-                            >
-                              +{days} days
-                            </Button>
-                          ))}
-                        </div>
-                        {fieldErrors.followUpDate && (
-                          <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUpDate}</p>
-                        )}
-                      </div>
-                      <div>
-                        <FormField label="Follow-up instructions" htmlFor="follow-up-desc" required>
-                          <Input
-                            id="follow-up-desc"
-                            type="text"
-                            value={followUpDescription}
-                            onChange={(e) => {
-                              setFollowUpDescription(e.target.value);
-                              if (fieldErrors.followUpDescription) {
-                                setFieldErrors((prev) => ({ ...prev, followUpDescription: '' }));
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {[
+                      {
+                        value: 'ALLOWED' as const,
+                        label: 'ALLOWED',
+                        desc: 'Fit for training. Horse may resume normal training schedule.',
+                      },
+                      {
+                        value: 'BLOCKED' as const,
+                        label: 'BLOCKED',
+                        desc: 'Training suspended. Workouts cancelled until follow-up clearance.',
+                      },
+                    ].map((option) => (
+                      <label
+                        key={option.value}
+                        className={`flex cursor-pointer flex-col rounded-[var(--radius-md)] border p-3.5 transition-all ${
+                          trainingDecision === option.value
+                            ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
+                            : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-strong)]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <ChoiceInput
+                            type="radio"
+                            name="trainingDecision"
+                            value={option.value}
+                            checked={trainingDecision === option.value}
+                            onChange={() => {
+                              setTrainingDecision(option.value);
+                              if (option.value === 'ALLOWED') {
+                                setFieldErrors((prev) => ({
+                                  ...prev,
+                                  restrictionDetails: '',
+                                  followUpDate: '',
+                                  followUpDescription: '',
+                                }));
                               }
                             }}
                           />
+                          <span className="text-xs font-bold tracking-wide">{option.label}</span>
+                        </div>
+                        <p className="mt-1.5 text-xs text-[var(--color-text-secondary)] pl-6">
+                          {option.desc}
+                        </p>
+                      </label>
+                    ))}
+                  </div>
+
+                  {trainingDecision === 'BLOCKED' && (
+                    <div className="mt-4 space-y-4 rounded-[var(--radius-md)] border border-[var(--color-warning)]/40 bg-[var(--color-warning-soft)]/20 p-4">
+                      <div>
+                        <FormField label="Training restriction & rest details" htmlFor="restriction-details" required>
+                          <Textarea
+                            id="restriction-details"
+                            rows={2}
+                            value={restrictionDetails}
+                            onChange={(e) => {
+                              setRestrictionDetails(e.target.value);
+                              if (fieldErrors.restrictionDetails) {
+                                setFieldErrors((prev) => ({ ...prev, restrictionDetails: '' }));
+                              }
+                            }}
+                            placeholder="e.g. Strict box rest for 3 days, followed by 15-minute hand walking twice daily…"
+                          />
                         </FormField>
-                        {fieldErrors.followUpDescription && (
-                          <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUpDescription}</p>
+                        {fieldErrors.restrictionDetails && (
+                          <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.restrictionDetails}</p>
                         )}
                       </div>
-                    </div>
-                    <p className="text-xs text-[var(--color-text-secondary)]">
-                      The horse will rest until this follow-up examination. The trainer will see the reason and date when creating a plan.
-                    </p>
-                  </div>
-                )}
-              </div>
 
-              <div className="border-t border-[var(--color-border)] pt-4">
-                <Button type="submit" variant="primary" loading={submitting} icon="check" className="w-full sm:w-auto">
-                  Complete urgent examination
-                </Button>
-              </div>
-            </form>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <FormField label="Follow-up examination date" htmlFor="follow-up-date" required>
+                            <Input
+                              id="follow-up-date"
+                              type="date"
+                              min={businessDate(1)}
+                              value={followUpDate}
+                              onChange={(e) => {
+                                setFollowUpDate(e.target.value);
+                                if (fieldErrors.followUpDate) setFieldErrors((prev) => ({ ...prev, followUpDate: '' }));
+                              }}
+                            />
+                          </FormField>
+                          <div className="mt-1.5 flex gap-1.5">
+                            {[3, 7, 14].map((days) => (
+                              <Button
+                                key={days}
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setFollowUpDate(businessDate(days))}
+                              >
+                                +{days} days
+                              </Button>
+                            ))}
+                          </div>
+                          {fieldErrors.followUpDate && (
+                            <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUpDate}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <FormField label="Follow-up clinical purpose" htmlFor="follow-up-desc" required>
+                            <Input
+                              id="follow-up-desc"
+                              type="text"
+                              value={followUpDescription}
+                              onChange={(e) => {
+                                setFollowUpDescription(e.target.value);
+                                if (fieldErrors.followUpDescription) {
+                                  setFieldErrors((prev) => ({ ...prev, followUpDescription: '' }));
+                                }
+                              }}
+                            />
+                          </FormField>
+                          {fieldErrors.followUpDescription && (
+                            <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUpDescription}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Action */}
+                <div className="border-t border-[var(--color-border)] pt-5">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    loading={submitting}
+                    icon="check"
+                    className="w-full sm:w-auto"
+                  >
+                    Complete Urgent Examination
+                  </Button>
+                </div>
+              </form>
+            </Panel>
           )}
 
+          {/* Workflow: Examination Completed Summary */}
           {urgentCase.status === 'COMPLETED' && (
-            <div className="space-y-4 rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-6">
-              <div className="flex items-center gap-3 text-[var(--color-success)]">
-                <Icon name="check" size={24} />
-                <h3 className="text-base font-bold">Urgent examination completed successfully</h3>
+            <Panel padded className="space-y-4 border-l-4 border-l-[var(--color-success)] bg-[var(--color-surface)]">
+              <div className="flex items-center gap-2.5 text-[var(--color-success)]">
+                <Icon name="check" size={20} />
+                <h3 className="text-base font-bold">Urgent Examination Completed</h3>
               </div>
               <p className="text-xs text-[var(--color-text-secondary)]">
-                The medical record and training decision have been saved.
+                The veterinary clinical record and training decision have been recorded in the medical system.
               </p>
+
               {completedData && (
-                <dl className="grid gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-xs sm:grid-cols-2">
+                <dl className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4 text-xs sm:grid-cols-2">
                   <div>
                     <dt className="font-semibold text-[var(--color-text-muted)]">Diagnosis</dt>
-                    <dd className="mt-1 font-bold text-[var(--color-text-primary)]">{completedData.diagnosis}</dd>
+                    <dd className="mt-1 font-bold text-sm text-[var(--color-text-primary)]">
+                      {completedData.diagnosis}
+                    </dd>
                   </div>
                   <div>
-                    <dt className="font-semibold text-[var(--color-text-muted)]">Training decision</dt>
-                    <dd className="mt-1 font-bold text-[var(--color-danger)]">{completedData.trainingDecision}</dd>
+                    <dt className="font-semibold text-[var(--color-text-muted)]">Training Clearance</dt>
+                    <dd className="mt-1">
+                      <Pill tone={completedData.trainingDecision === 'BLOCKED' ? 'danger' : 'success'}>
+                        {completedData.trainingDecision}
+                      </Pill>
+                    </dd>
                   </div>
                   <div className="sm:col-span-2">
-                    <dt className="font-semibold text-[var(--color-text-muted)]">Examination findings</dt>
-                    <dd className="mt-1 text-[var(--color-text-secondary)]">{completedData.findings}</dd>
+                    <dt className="font-semibold text-[var(--color-text-muted)]">Examination Findings</dt>
+                    <dd className="mt-1 text-[var(--color-text-secondary)] leading-relaxed">
+                      {completedData.findings}
+                    </dd>
                   </div>
                   {completedData.restrictionDetails && (
                     <div className="sm:col-span-2">
-                      <dt className="font-semibold text-[var(--color-text-muted)]">Training restriction</dt>
-                      <dd className="mt-1 text-[var(--color-danger)]">{completedData.restrictionDetails}</dd>
+                      <dt className="font-semibold text-[var(--color-text-muted)]">Restriction Instructions</dt>
+                      <dd className="mt-1 text-[var(--color-danger)] font-medium">
+                        {completedData.restrictionDetails}
+                      </dd>
                     </div>
                   )}
                   {completedData.nextSchedule && (
                     <div className="sm:col-span-2">
-                      <dt className="font-semibold text-[var(--color-text-muted)]">Follow-up</dt>
-                      <dd className="mt-1 text-[var(--color-text-primary)]">
+                      <dt className="font-semibold text-[var(--color-text-muted)]">Scheduled Follow-up</dt>
+                      <dd className="mt-1 text-[var(--color-text-primary)] font-semibold">
                         {completedData.nextSchedule.scheduledDate} — {completedData.nextSchedule.description}
                       </dd>
                     </div>
                   )}
                 </dl>
               )}
-            </div>
+            </Panel>
           )}
         </div>
-      </Panel>
+
+        {/* Side Column (4 / 12) */}
+        <div className="lg:col-span-4 space-y-5">
+          {/* Horse Location & Medical Context */}
+          <Panel padded className="space-y-3">
+            <div className="flex items-center gap-2 border-b border-[var(--color-border)] pb-2.5">
+              <Icon name="building" size={15} className="text-[var(--color-primary)]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-primary)]">
+                Location & Patient Context
+              </h3>
+            </div>
+
+            <dl className="space-y-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <dt className="text-[var(--color-text-muted)]">Horse</dt>
+                <dd className="font-bold text-[var(--color-text-primary)]">
+                  {urgentCase.horseName} (#{urgentCase.horseId})
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-[var(--color-text-muted)]">Stall Location</dt>
+                <dd className="font-semibold text-[var(--color-text-primary)]">
+                  {[urgentCase.stallCode, urgentCase.stableLocation].filter(Boolean).join(' · ') || 'Not assigned'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-[var(--color-text-muted)]">Current Decision</dt>
+                <dd className="font-bold text-[var(--color-danger)]">
+                  {urgentCase.trainingDecision}
+                </dd>
+              </div>
+            </dl>
+
+            {urgentCase.previousTrainingDecision === 'BLOCKED' && (
+              <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)]/30 p-2.5 text-xs text-[var(--color-warning)]">
+                <strong>Pre-existing training hold:</strong> Horse was already blocked prior to this incident
+                {urgentCase.previousTrainingDecisionReason ? `: ${urgentCase.previousTrainingDecisionReason}.` : '.'}
+              </div>
+            )}
+          </Panel>
+
+          {/* Reporter & Assignment Meta */}
+          <Panel padded className="space-y-3">
+            <div className="flex items-center gap-2 border-b border-[var(--color-border)] pb-2.5">
+              <Icon name="user" size={15} className="text-[var(--color-primary)]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-primary)]">
+                Incident Reporting Meta
+              </h3>
+            </div>
+
+            <dl className="space-y-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <dt className="text-[var(--color-text-muted)]">Reported by</dt>
+                <dd className="flex items-center gap-1.5 font-semibold text-[var(--color-text-primary)]">
+                  <span>{urgentCase.reportedByName || 'Staff'}</span>
+                  {urgentCase.reportedByRole && (
+                    <span className="rounded bg-[var(--color-surface-muted)] px-1 py-0.5 text-[9px] font-bold uppercase text-[var(--color-text-secondary)] border border-[var(--color-border)]">
+                      {urgentCase.reportedByRole}
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-[var(--color-text-muted)]">Reported at</dt>
+                <dd className="font-medium text-[var(--color-text-secondary)]">
+                  {formatDateTime(urgentCase.reportedAt)}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-[var(--color-text-muted)]">Assigned at</dt>
+                <dd className="font-medium text-[var(--color-text-secondary)]">
+                  {formatDateTime(urgentCase.assignedAt)}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-[var(--color-text-muted)]">Case Severity</dt>
+                <dd>
+                  <Pill tone={urgentCase.severity === 'CRITICAL' ? 'danger' : 'warning'}>
+                    {urgentCase.severity}
+                  </Pill>
+                </dd>
+              </div>
+            </dl>
+          </Panel>
+
+          {/* Clinical Protocol Checklist */}
+          <Panel padded className="space-y-3 bg-[var(--color-surface-subtle)]">
+            <div className="flex items-center gap-2 border-b border-[var(--color-border)] pb-2.5">
+              <Icon name="clipboard" size={15} className="text-[var(--color-text-muted)]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                Emergency Protocol Checklist
+              </h3>
+            </div>
+
+            <ul className="space-y-2 text-xs text-[var(--color-text-secondary)]">
+              <li className="flex items-start gap-2">
+                <Icon name="check" size={13} className="text-[var(--color-success)] mt-0.5 shrink-0" />
+                <span>Verify horse is securely haltered and handler is positioned safely.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Icon name="check" size={13} className="text-[var(--color-success)] mt-0.5 shrink-0" />
+                <span>Record baseline vitals before administering any sedation or NSAIDs.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Icon name="check" size={13} className="text-[var(--color-success)] mt-0.5 shrink-0" />
+                <span>Palpate distal extremities for heat, digital pulse, or focal swelling.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Icon name="check" size={13} className="text-[var(--color-success)] mt-0.5 shrink-0" />
+                <span>If blocking training, establish a mandatory follow-up reassessment.</span>
+              </li>
+            </ul>
+          </Panel>
+        </div>
+      </div>
     </div>
   );
 }
