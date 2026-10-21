@@ -227,13 +227,15 @@ export function AiChatWidget() {
 
           {/* Body: Bao gồm Sidebar Lịch sử trò chuyện + Khu vực Chat chính */}
           <div className="relative flex flex-1 overflow-hidden">
-            {/* Sidebar Lịch sử hội thoại (Persistent Threads) */}
-            {showHistory && (
+            {/* Panel Lịch sử hội thoại: Giữ nguyên trên giao diện thu nhỏ, Hiệu ứng Slide Mở/Đóng trên giao diện phóng to */}
+            {(isExpanded || showHistory) && (
               <div
-                className={`flex flex-col border-r border-[var(--color-border)] bg-[var(--color-surface-muted)]/80 backdrop-blur-xs transition-all duration-200 ${
+                className={`flex flex-col border-r border-[var(--color-border)] bg-[var(--color-surface-muted)]/85 backdrop-blur-xs transition-all duration-300 ease-in-out ${
                   isExpanded
-                    ? 'w-60 shrink-0'
-                    : 'absolute inset-0 z-20 bg-[var(--color-surface)]'
+                    ? showHistory
+                      ? 'w-64 shrink-0 translate-x-0 opacity-100'
+                      : 'w-0 -translate-x-full overflow-hidden border-r-0 opacity-0 pointer-events-none'
+                    : 'absolute inset-0 z-20 bg-[var(--color-surface)] animate-in fade-in'
                 }`}
               >
                 <div className="flex items-center justify-between border-b border-[var(--color-border)] p-2.5">

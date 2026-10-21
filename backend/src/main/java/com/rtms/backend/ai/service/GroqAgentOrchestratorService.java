@@ -382,9 +382,9 @@ public class GroqAgentOrchestratorService {
                        - Chuồng trại phụ trách: `/groom/stable`
                        - Tuyển nhận: `/groom/admissions`
                      * Horse Owner:
-                       - Ngựa sở hữu: `/owner/horses`
-                       - Sự cố liên quan: `/owner/incidents`
-                       - Sức khỏe y tế: `/owner/health`
+                       - Danh sách ngựa sở hữu: `/owner/horses`
+                       - Chi tiết ngựa & Sức khỏe / Sự cố: `/owner/horses`
+                       - Đơn đăng ký nhập chuồng: `/owner/admissions` (LƯU Ý: KHÔNG DÙNG `/owner/health` hay `/owner/incidents` vì hệ thống quản lý tập trung tại `/owner/horses` và `/owner/admissions`)
 
                 11. THÔNG TIN LIÊN HỆ GROOM CHO HUẤN LUYỆN VIÊN:
                    - Khi Huấn luyện viên hỏi thông tin Groom làm việc cùng, luôn hiển thị rõ ràng Tên Groom, Số điện thoại liên hệ, Email, Số lượng chuồng phụ trách, Mã chuồng và Danh sách ngựa đang chăm sóc.
