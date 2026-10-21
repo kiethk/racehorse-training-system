@@ -50,7 +50,12 @@ type IconName =
   | 'home'
   | 'log-out'
   | 'panel-left'
-  | 'layers';
+  | 'layers'
+  | 'sparkles'
+  | 'bot'
+  | 'send'
+  | 'maximize'
+  | 'minimize';
 
 const paths: Record<IconName, ReactElement> = {
   search: (
@@ -222,6 +227,8 @@ const paths: Record<IconName, ReactElement> = {
     </>
   ),
   minus: <path d="M5 12h14" />,
+  maximize: <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />,
+  minimize: <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7" />,
   utensils: (
     <>
       <path d="M4 3v7a2 2 0 0 0 4 0V3M6 10v11" />
@@ -288,6 +295,25 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <path d="m12 3 9 5-9 5-9-5 9-5Z" />
       <path d="m3 13 9 5 9-5" />
+    </>
+  ),
+  sparkles: (
+    <>
+      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z" />
+      <path d="M5 3v4M3 5h4M19 17v4M17 19h4" />
+    </>
+  ),
+  bot: (
+    <>
+      <path d="M12 8V4H8" />
+      <rect width="16" height="12" x="4" y="8" rx="2" />
+      <path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
+    </>
+  ),
+  send: (
+    <>
+      <path d="m22 2-7 20-4-9-9-4Z" />
+      <path d="M22 2 11 13" />
     </>
   ),
 };
