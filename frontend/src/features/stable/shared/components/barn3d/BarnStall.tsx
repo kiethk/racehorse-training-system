@@ -18,6 +18,8 @@ interface BarnStallProps {
   selected: boolean;
   hovered: boolean;
   dimmed: boolean;
+  /** Not the viewer's to see: a bare grey floor with no plaque, groom colour or interaction. */
+  locked?: boolean;
   dropState: DropState;
   colors: SceneColors;
   onSelect: (stallId: number) => void;
@@ -29,8 +31,22 @@ interface BarnStallProps {
  * the groom's colour, the status plaque, and selection and drop feedback. Static fittings live in `BarnStructure`.
  */
 function BarnStallComponent(props: BarnStallProps) {
-  const { stallId, x, z, row, toneColor, groomColor, selected, hovered, dimmed, dropState, colors } = props;
+  const { stallId, x, z, row, toneColor, groomColor, selected, hovered, dimmed, locked = false, dropState, colors } = props;
   const geo = sharedGeometries();
+
+  if (locked) {
+    return (
+      <group position={[x, 0, z]}>
+        <mesh geometry={geo.stallFloor} position={[0, 0.04, 0]} receiveShadow raycast={() => null}>
+          <meshStandardMaterial color={colors.surfaceMuted} roughness={1} />
+        </mesh>
+        <mesh geometry={geo.gateRail} position={[-STALL_WIDTH / 4, 0.9, row === 0 ? STALL_DEPTH / 2 : -STALL_DEPTH / 2]}
+          raycast={() => null}>
+          <meshStandardMaterial color={MATERIAL_COLORS.woodDark} roughness={0.6} />
+        </mesh>
+      </group>
+    );
+  }
 
   // Material props are updated in place by R3F: a state change recolours the stall without a new shader.
   const dropColor = dropState === 'valid' ? colors.success : dropState === 'invalid' ? colors.danger : null;

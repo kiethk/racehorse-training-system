@@ -36,4 +36,27 @@ class StableStallServiceTest {
         assertThrows(ResponseStatusException.class, () -> new StableStallService(stalls, assignments).assignGroom(9L, new BlockGroomAssignmentDto()));
         verify(stalls, never()).save(org.mockito.ArgumentMatchers.any());
     }
+    private static StableStall stall(long id, long areaId, Long groomId) {
+        var s = new StableStall(); s.setId(id); s.setAreaId(areaId); s.setGroomId(groomId);
+        s.setStallNumber((int) id); s.setStallCode("S" + id); return s;
+    }
+    @Test void groomSeesOnlyTheirAreasAndOtherStallsWithoutGroom() {
+        var own = stall(1, 10, 44L);
+        var neighbour = stall(2, 10, 45L);
+        var otherArea = stall(3, 20, 45L);
+        var scoped = StableStallService.scopeForGroom(List.of(own, neighbour, otherArea), List.of(own), 44L);
+        assertEquals(List.of(1L, 2L), scoped.stream().map(StableStall::getId).toList());
+        assertSame(own, scoped.get(0));
+        assertNull(scoped.get(1).getGroomId());
+        assertEquals(45L, neighbour.getGroomId(), "the managed entity must not be modified");
+    }
+    @Test void groomAreasComeFromTheirOwnStallsNotTheFilteredList() {
+        var neighbour = stall(2, 10, 45L);
+        var scoped = StableStallService.scopeForGroom(List.of(neighbour), List.of(stall(1, 10, 44L)), 44L);
+        assertEquals(1, scoped.size());
+        assertNull(scoped.get(0).getGroomId());
+    }
+    @Test void groomWithoutStallsSeesNothing() {
+        assertTrue(StableStallService.scopeForGroom(List.of(stall(1, 10, 45L)), List.of(), 44L).isEmpty());
+    }
 }

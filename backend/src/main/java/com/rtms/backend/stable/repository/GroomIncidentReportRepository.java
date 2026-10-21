@@ -1,6 +1,7 @@
 package com.rtms.backend.stable.repository;
 
 import com.rtms.backend.stable.entity.GroomIncidentReport;
+import com.rtms.backend.stable.enums.IncidentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Lock;
@@ -20,6 +21,9 @@ public interface GroomIncidentReportRepository extends JpaRepository<GroomIncide
     List<GroomIncidentReport> findByGroomId(Long groomId);
 
     List<GroomIncidentReport> findByHorseId(Long horseId);
+
+    List<GroomIncidentReport> findByHorseIdAndStatusIn(Long horseId,
+                                                       java.util.Collection<IncidentStatus> statuses);
 
     List<GroomIncidentReport> findAllByOrderByReportedAtDesc();
 

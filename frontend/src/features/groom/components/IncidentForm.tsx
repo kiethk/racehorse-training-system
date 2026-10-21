@@ -27,6 +27,8 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
 
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [horses, setHorses] = useState<Horse[]>([]);
+  const [myHorses, setMyHorses] = useState<Horse[]>([]);
+  const [otherHorses, setOtherHorses] = useState<Horse[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
 
   const [horseId, setHorseId] = useState<number | ''>('');
@@ -50,20 +52,26 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
 
         setStalls(stallList);
 
-        // Keep only horses assigned to stalls managed by the current groom.
+        // Ưu tiên ngựa thuộc chuồng do Groom quản lý lên đầu; vẫn cho phép chọn các ngựa khác trong trại khi cấp cứu
         const myStallIds = stallList
           .filter((s) => s.groomId === user?.userId)
           .map((s) => s.id);
 
-        const myHorses = horseList.filter(
+        const assignedHorses = horseList.filter(
           (h) => h.currentStallId && myStallIds.includes(h.currentStallId)
         );
+        const unassignedOrOther = horseList.filter(
+          (h) => !h.currentStallId || !myStallIds.includes(h.currentStallId)
+        );
 
-        setHorses(myHorses);
-        if (myHorses.length > 0) {
-          // Opened from a stall on the Stable screen: start on that horse when it is one of the Groom's own.
-          const preselected = myHorses.find((h) => h.id === initialHorseId);
-          setHorseId((preselected ?? myHorses[0]).id);
+        setMyHorses(assignedHorses);
+        setOtherHorses(unassignedOrOther);
+        const allHorses = [...assignedHorses, ...unassignedOrOther];
+        setHorses(allHorses);
+
+        if (allHorses.length > 0) {
+          const preselected = allHorses.find((h) => h.id === initialHorseId);
+          setHorseId((preselected ?? assignedHorses[0] ?? unassignedOrOther[0]).id);
         }
       } catch (err) {
         console.error('Unable to load horse and stall data:', err);
@@ -191,7 +199,7 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
       {horses.length === 0 ? (
         <Panel padded>
           <div className="py-8 text-center text-sm text-[var(--color-text-secondary)]">
-            You are not currently assigned to any stalls or horses.
+            Không tìm thấy ngựa nào trong hệ thống.
             <div className="mt-4">
               <Link href="/groom/incidents">
                 <Button variant="secondary">Back</Button>
@@ -210,20 +218,38 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
                   onChange={(e) => setHorseId(Number(e.target.value))}
                   required
                 >
-                  {horses.map((h) => {
-                    const stallLabel = h.currentStallId
-                      ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
-                      : 'No stall assigned';
-                    return (
-                      <option key={h.id} value={h.id}>
-                        {h.name} (#{h.id}) — {stallLabel}
-                      </option>
-                    );
-                  })}
+                  {myHorses.length > 0 && (
+                    <optgroup label="Horses in your assigned stalls">
+                      {myHorses.map((h) => {
+                        const stallLabel = h.currentStallId
+                          ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
+                          : 'No stall assigned';
+                        return (
+                          <option key={h.id} value={h.id}>
+                            {h.name} (#{h.id}) — {stallLabel}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+                  {otherHorses.length > 0 && (
+                    <optgroup label="Other horses in facility (Paddocks / Wash bays / Training)">
+                      {otherHorses.map((h) => {
+                        const stallLabel = h.currentStallId
+                          ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
+                          : 'No stall assigned';
+                        return (
+                          <option key={h.id} value={h.id}>
+                            {h.name} (#{h.id}) — {stallLabel}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
                 </Select>
               </FormField>
               <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                Only horses in your assigned stalls are shown.
+                Horses in your assigned stalls are prioritized. You can also select any horse in the facility if an incident occurs outside stalls.
               </p>
             </div>
 
@@ -258,10 +284,14 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
               </div>
 
               {severity === 'CRITICAL' && (
-                <div className="mt-2.5 rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-2.5 text-xs text-[var(--color-danger)]">
-                  <div className="font-semibold">Emergency warning:</div>
-                  The system does not send instant notifications. For a <strong>Critical</strong> incident,{' '}
-                  <strong>call the veterinary team directly</strong> or notify a manager immediately after submitting this report.
+                <div className="mt-2.5 rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-xs text-[var(--color-danger)]">
+                  <div className="font-semibold flex items-center gap-1.5">
+                    <Icon name="alert-triangle" size={14} />
+                    Emergency Urgent Care Alert:
+                  </div>
+                  <p className="mt-1 font-medium leading-relaxed">
+                    The system immediately pauses training clearance (BLOCKED) and triggers a real-time urgent alert directly to the on-duty veterinarian.
+                  </p>
                 </div>
               )}
             </div>

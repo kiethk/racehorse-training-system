@@ -96,6 +96,14 @@ public class GroomIncidentReport {
         this.groomId = groomId;
     }
 
+    public Long getReportedById() {
+        return groomId;
+    }
+
+    public void setReportedById(Long reportedById) {
+        this.groomId = reportedById;
+    }
+
     public Long getHorseId() {
         return horseId;
     }

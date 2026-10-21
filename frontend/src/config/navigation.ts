@@ -74,15 +74,18 @@ export function getNavigationForRole(role: Role): NavSection[] {
           ],
         },
       ];
-    case 'VETERINARIAN':
+        case 'VETERINARIAN':
       return [
         { id: 'overview', items: [dashboard] },
         {
           id: 'clinical',
           label: 'Clinical',
           items: [
+            { id: 'urgent', label: 'Urgent Cases', icon: 'alert-triangle', href: '/veterinarian/urgent' },
+            { id: 'schedule', label: 'Schedule', icon: 'calendar', href: '/veterinarian/schedule' },
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/veterinarian/admissions' },
-            { id: 'health', label: 'Health', icon: 'heart-pulse' },
+            { id: 'health', label: 'Health', icon: 'heart-pulse', href: '/veterinarian/health' },
+            { id: 'routine', label: 'Routine Checks', icon: 'stethoscope', href: '/veterinarian/routine' },
             { id: 'preventive-care', label: 'Preventive Care', icon: 'pill', href: '/veterinarian/preventive-care' },
           ],
         },

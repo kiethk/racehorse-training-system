@@ -45,7 +45,17 @@ export function UrgentAssignmentModal({ alert, onOpenCase }: Props) {
           <Detail label="Stall / location">
             {[alert.stallCode, alert.stableLocation].filter(Boolean).join(' · ') || 'See report'}
           </Detail>
-          <Detail label="Reported by">{alert.reportedByName || 'Unknown'} · #{alert.reportedById}</Detail>
+          <Detail label="Reported by">
+            <span className="flex items-center gap-1.5 flex-wrap">
+              <span>{alert.reportedByName || 'Unknown'}</span>
+              {alert.reportedByRole && (
+                <span className="rounded bg-[var(--color-surface-elevated)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)] border border-[var(--color-border)]">
+                  {alert.reportedByRole}
+                </span>
+              )}
+              <span className="text-xs text-[var(--color-text-muted)]">· #{alert.reportedById}</span>
+            </span>
+          </Detail>
           <Detail label="Reported at" className="sm:col-span-2">{formatDateTime(alert.reportedAt)}</Detail>
         </dl>
 

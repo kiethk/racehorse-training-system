@@ -36,20 +36,58 @@ export function UrgentAssignmentNotifier() {
 
   useEffect(() => {
     void restore();
-    const source = createAuthenticatedEventSource('/api/care-schedules/urgent-alerts/stream');
-    source.addEventListener('urgent-assigned', (event) => {
-      try {
-        mergeAlerts([JSON.parse((event as MessageEvent<string>).data) as UrgentAssignmentAlert]);
-      } catch {
+
+    let source: EventSource | null = null;
+    let pollInterval: NodeJS.Timeout | null = null;
+    let sseFailed = false;
+
+    const startPolling = () => {
+      if (pollInterval) return;
+      pollInterval = setInterval(() => {
+        void restore();
+      }, 20000); // 20s fallback polling
+    };
+
+    try {
+      source = createAuthenticatedEventSource('/api/care-schedules/urgent-alerts/stream');
+
+      source.addEventListener('urgent-assigned', (event) => {
+        try {
+          mergeAlerts([JSON.parse((event as MessageEvent<string>).data) as UrgentAssignmentAlert]);
+        } catch {
+          void restore();
+        }
+      });
+
+      source.onerror = () => {
+        // If SSE encounters an error (e.g. 401 due to EventSource lack of custom Authorization header),
+        // close the failing SSE connection to stop browser retry spam and switch to authenticated REST polling.
+        if (!sseFailed) {
+          sseFailed = true;
+          source?.close();
+          source = null;
+          startPolling();
+        }
+        void restore();
+      };
+    } catch {
+      startPolling();
+    }
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
         void restore();
       }
-    });
-    source.onerror = () => void restore();
-    const onVisible = () => document.visibilityState === 'visible' && void restore();
+    };
+
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
-      source.close();
+      window.removeEventListener('focus', onVisible);
+      if (pollInterval) clearInterval(pollInterval);
+      if (source) source.close();
     };
   }, [mergeAlerts, restore]);
 
