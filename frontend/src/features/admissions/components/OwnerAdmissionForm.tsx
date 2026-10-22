@@ -9,6 +9,7 @@ import { ImageLightbox, ImageThumbnail } from '@/components/ui/ImageLightbox';
 import { AdmissionInfoSection } from '../shared/components/AdmissionInfoSection';
 import { ownerAdmissionApi } from '../services/ownerApi';
 import { useAdmissionUelnCheck } from '../hooks/useAdmissionUelnCheck';
+import { LocalFilePreviewModal } from '../shared/components/LocalFilePreviewModal';
 import { renderPdfFirstPage } from '@/lib/pdfThumbnail';
 import { ApiError } from '@/services/api';
 import type { CreateOwnerAdmissionRequest, AdmissionDocumentType, AdmissionDocumentUpload } from '../types/owner';
@@ -95,6 +96,8 @@ export function OwnerAdmissionForm() {
   const [form, setForm] = useState<AdmissionFormState>({ name: '', sex: '' });
   const [selections, setSelections] = useState<Partial<Record<AdmissionDocumentType, Selection>>>({});
   const [filePreviews, setFilePreviews] = useState<Partial<Record<AdmissionDocumentType, string>>>({});
+  const [rawFileUrls, setRawFileUrls] = useState<Partial<Record<AdmissionDocumentType, string>>>({});
+  const [activePdfPreview, setActivePdfPreview] = useState<{ file: File; url: string } | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
   const [documentErrors, setDocumentErrors] = useState<DocumentErrors>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -108,8 +111,14 @@ export function OwnerAdmissionForm() {
 
   const previewsRef = useRef(filePreviews);
   previewsRef.current = filePreviews;
+  const rawUrlsRef = useRef(rawFileUrls);
+  rawUrlsRef.current = rawFileUrls;
+
   useEffect(() => () => {
     Object.values(previewsRef.current).forEach(url => {
+      if (url) URL.revokeObjectURL(url);
+    });
+    Object.values(rawUrlsRef.current).forEach(url => {
       if (url) URL.revokeObjectURL(url);
     });
   }, []);
@@ -119,10 +128,19 @@ export function OwnerAdmissionForm() {
   }
 
   function selectFile(type: AdmissionDocumentType, file?: File) {
-    const oldUrl = filePreviews[type];
-    if (oldUrl) {
-      URL.revokeObjectURL(oldUrl);
+    const oldThumbUrl = filePreviews[type];
+    if (oldThumbUrl) {
+      URL.revokeObjectURL(oldThumbUrl);
       setFilePreviews(curr => {
+        const next = { ...curr };
+        delete next[type];
+        return next;
+      });
+    }
+    const oldRawUrl = rawFileUrls[type];
+    if (oldRawUrl && oldRawUrl !== oldThumbUrl) {
+      URL.revokeObjectURL(oldRawUrl);
+      setRawFileUrls(curr => {
         const next = { ...curr };
         delete next[type];
         return next;
@@ -148,11 +166,14 @@ export function OwnerAdmissionForm() {
       if (file.type.startsWith('image/')) {
         const previewUrl = URL.createObjectURL(file);
         setFilePreviews(curr => ({ ...curr, [type]: previewUrl }));
+        setRawFileUrls(curr => ({ ...curr, [type]: previewUrl }));
       } else if (file.type === 'application/pdf') {
+        const rawUrl = URL.createObjectURL(file);
+        setRawFileUrls(curr => ({ ...curr, [type]: rawUrl }));
         renderPdfFirstPage(file, 240)
           .then(png => {
-            const previewUrl = URL.createObjectURL(png);
-            setFilePreviews(curr => ({ ...curr, [type]: previewUrl }));
+            const thumbUrl = URL.createObjectURL(png);
+            setFilePreviews(curr => ({ ...curr, [type]: thumbUrl }));
           })
           .catch(() => undefined);
       }
@@ -253,6 +274,17 @@ export function OwnerAdmissionForm() {
     const selection = selections[section.type];
     const message = documentErrors[section.type];
     const previewUrl = filePreviews[section.type];
+    const isPdf = selection?.file ? (selection.file.type === 'application/pdf' || selection.file.name.toLowerCase().endsWith('.pdf')) : false;
+
+    const handleOpenPreview = () => {
+      if (!selection?.file) return;
+      if (isPdf) {
+        const url = rawFileUrls[section.type] || URL.createObjectURL(selection.file);
+        setActivePdfPreview({ file: selection.file, url });
+      } else if (previewUrl) {
+        setLightboxImage({ src: previewUrl, alt: selection.file.name });
+      }
+    };
 
     return (
       <fieldset key={section.type} className="min-w-0 space-y-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
@@ -283,15 +315,28 @@ export function OwnerAdmissionForm() {
                 <ImageThumbnail
                   src={previewUrl}
                   alt={selection.file.name}
-                  onClick={() => setLightboxImage({ src: previewUrl, alt: selection.file!.name })}
+                  onClick={handleOpenPreview}
                   className="h-14 w-14 shrink-0"
                 />
               ) : (
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] text-xs font-semibold text-[var(--color-text-muted)]">
-                  {selection.file.type === 'application/pdf' ? 'PDF' : 'FILE'}
-                </span>
+                <button
+                  type="button"
+                  onClick={handleOpenPreview}
+                  className="flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] text-xs font-semibold text-[var(--color-text-muted)] hover:border-[var(--color-primary)]"
+                >
+                  {isPdf ? 'PDF' : 'FILE'}
+                </button>
               )}
-              <span className="min-w-0 break-all font-medium text-[var(--color-text-primary)]">{selection.file.name}</span>
+              <div className="min-w-0">
+                <span className="block truncate font-medium text-[var(--color-text-primary)]">{selection.file.name}</span>
+                <button
+                  type="button"
+                  onClick={handleOpenPreview}
+                  className="text-xs text-[var(--color-primary)] hover:underline focus-visible:outline-none"
+                >
+                  {isPdf ? 'Preview full PDF' : 'Preview image'}
+                </button>
+              </div>
             </span>
             <Button type="button" size="sm" aria-label={`Remove ${section.label.toLowerCase()}`} onClick={() => {
               selectFile(section.type);
@@ -428,6 +473,13 @@ export function OwnerAdmissionForm() {
           <Button variant="primary" type="submit" loading={busy}
             disabled={uelnCheck.status === 'checking' || uelnCheck.status === 'unavailable'}>Submit admission</Button>
         </div>
+        {activePdfPreview && (
+          <LocalFilePreviewModal
+            file={activePdfPreview.file}
+            previewUrl={activePdfPreview.url}
+            onClose={() => setActivePdfPreview(null)}
+          />
+        )}
         {lightboxImage && (
           <ImageLightbox
             images={[lightboxImage]}
