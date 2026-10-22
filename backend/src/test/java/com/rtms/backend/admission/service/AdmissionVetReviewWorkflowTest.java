@@ -323,6 +323,36 @@ class AdmissionVetReviewWorkflowTest {
         assertEquals(CareScheduleStatus.SCHEDULED, item.careSchedule().status());
     }
 
+
+    @Test
+    @DisplayName("getVetQueueSummary counts active, awaiting, inProgress, and approved")
+    void getVetQueueSummary_countsAllBuckets() {
+        Long vetId = 15L;
+        List<CareScheduleStatus> activeStatuses = List.of(
+                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+
+        when(careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(vetId, activeStatuses))
+                .thenReturn(5L);
+        when(careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses))
+                .thenReturn(3L);
+        when(careScheduleRepository.countActiveVetQueueItems(
+                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED)))
+                .thenReturn(2L);
+        when(careScheduleRepository.countActiveVetQueueItems(
+                vetId, List.of(CareScheduleStatus.IN_PROGRESS)))
+                .thenReturn(1L);
+        when(careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses))
+                .thenReturn(2L);
+
+        var summary = admissionQueryService.getVetQueueSummary(vetId);
+
+        assertEquals(5L, summary.total());
+        assertEquals(3L, summary.active());
+        assertEquals(2L, summary.awaiting());
+        assertEquals(1L, summary.inProgress());
+        assertEquals(2L, summary.approved());
+    }
+
     @Test
     @DisplayName("assertVetAssignedOrManager throws 403 for unassigned veterinarian")
     void assertVetAssignedOrManager_unassigned_throws403() {

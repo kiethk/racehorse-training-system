@@ -161,9 +161,6 @@ export function CalendarTab() {
                         <Pill tone="neutral" size="sm">Moved · {formatEnumLabel(s.rescheduleReason)}</Pill>
                       )}
                     </div>
-                    {s.description && (
-                      <p className="line-clamp-1 pl-14 text-xs text-[var(--color-text-muted)]">{s.description}</p>
-                    )}
                   </div>
                   <div className="flex gap-1.5">
                     {canMove(s) && (

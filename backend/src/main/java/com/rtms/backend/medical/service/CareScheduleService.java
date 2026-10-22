@@ -39,6 +39,7 @@ import com.rtms.backend.training.service.TrainingDecisionService;
 
 
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.config.FarmSchedulePolicy;
 import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -68,6 +69,14 @@ public class CareScheduleService {
      * nằm REQUESTED, chưa giữ chỗ của vet và không bị tính vào tải hiện tại.
      */
     static final int ASSIGNMENT_HORIZON_DAYS = 14;
+
+    /**
+     * AUTO cadence: a routine follow-up that ends without an explicit date continues this many days
+     * after the completed visit. The offset is anchored to the PERSISTED completedAt (never a fresh now),
+     * so a re-submit keeps the same fingerprint and resolves to the same row instead of an idempotency conflict.
+     */
+    static final int ROUTINE_CADENCE_DAYS = 14;
+    static final String ROUTINE_CADENCE_DESCRIPTION = "Routine follow-up recheck examination";
 
     private final CareScheduleRepository careScheduleRepository;
     private final HorseRepository horseRepository;
@@ -284,6 +293,8 @@ public class CareScheduleService {
             if (Objects.equals(schedule.getVeterinarianId(), vetId)) {
                 if (request.getNextSchedule() != null) {
                     createNextSchedule(request.getNextSchedule(), vetId, schedule);
+                } else {
+                    createRoutineCadenceSchedule(vetId, schedule);
                 }
                 return CareScheduleResponse.from(schedule);
             }
@@ -499,6 +510,8 @@ public class CareScheduleService {
         // Atomic next schedule creation if provided
         if (request.getNextSchedule() != null) {
             createNextSchedule(request.getNextSchedule(), vetId, completedSchedule);
+        } else {
+            createRoutineCadenceSchedule(vetId, completedSchedule);
         }
 
         return CareScheduleResponse.from(completedSchedule);
@@ -722,6 +735,26 @@ public class CareScheduleService {
         return CareScheduleResponse.from(saved);
     }
 
+    /**
+     * AUTO cadence: a completed routine follow-up without an explicit date continues ROUTINE_CADENCE_DAYS
+     * after the visit. The offset is anchored to the persisted completedAt so the request fingerprint stays
+     * stable across re-submits and the follow-up row is resolved, not duplicated.
+     */
+    private void createRoutineCadenceSchedule(Long vetId, CareSchedule completed) {
+        if (completed == null || completed.getId() == null) return;
+        if (completed.getCareType() != CareType.ROUTINE) return;
+        // A preventive milestone already books its own next visit (refreshMilestone/deferMilestone).
+        if (completed.getPurpose() != CareSchedulePurpose.FOLLOW_UP) return;
+        LocalDateTime completedAt = completed.getCompletedAt();
+        if (completedAt == null) return;
+
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setScheduledAt(completedAt.plusDays(ROUTINE_CADENCE_DAYS));
+        next.setDescription(ROUTINE_CADENCE_DESCRIPTION);
+        createNextSchedule(next, vetId, completed);
+    }
+
     private static String fingerprint(Long horseId, Long admissionId, LocalDateTime requestedAt, String description) {
         String value = horseId + "|" + admissionId + "|ROUTINE|" + requestedAt + "|" + description;
         try {
@@ -887,13 +920,25 @@ public class CareScheduleService {
                 ? requested : LocalDateTime.now()).toLocalDate();
         for (int dayOffset = 0; dayOffset < 14; dayOffset++) {
             LocalDate day = startDate.plusDays(dayOffset);
-            List<LocalTime> times = new ArrayList<>(List.of(
-                    LocalTime.of(13, 30), LocalTime.of(14, 0),
-                    LocalTime.of(14, 30), LocalTime.of(15, 0)));
-            for (int hour = 8; hour <= 17; hour++) {
-                for (int minute : List.of(0, 30)) {
-                    LocalTime time = LocalTime.of(hour, minute);
-                    if (!times.contains(time)) times.add(time);
+            List<LocalTime> times;
+            if (schedule.getCareType() == CareType.ROUTINE) {
+                // Routine care must strictly remain inside the veterinary window (13:30 - 15:30)
+                times = List.of(
+                        FarmSchedulePolicy.VET_WINDOW_START,
+                        LocalTime.of(14, 0),
+                        LocalTime.of(14, 30),
+                        LocalTime.of(15, 0));
+            } else {
+                times = new ArrayList<>(List.of(
+                        FarmSchedulePolicy.VET_WINDOW_START,
+                        LocalTime.of(14, 0),
+                        LocalTime.of(14, 30),
+                        LocalTime.of(15, 0)));
+                for (int hour = 8; hour <= 17; hour++) {
+                    for (int minute : List.of(0, 30)) {
+                        LocalTime time = LocalTime.of(hour, minute);
+                        if (!times.contains(time)) times.add(time);
+                    }
                 }
             }
             for (LocalTime time : times) {

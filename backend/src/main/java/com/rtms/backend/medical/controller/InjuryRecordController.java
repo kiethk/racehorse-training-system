@@ -3,6 +3,7 @@ package com.rtms.backend.medical.controller;
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.medical.dto.CorrectInjuryRecordRequest;
 import com.rtms.backend.medical.dto.HorseHealthSummaryResponse;
+import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.medical.service.InjuryRecordService;
@@ -27,6 +28,13 @@ public class InjuryRecordController {
     @PreAuthorize("hasAnyRole('VETERINARIAN', 'HEAD_TRAINER', 'CLUB_MANAGER', 'GROOM')")
     public ApiResponse<List<InjuryRecord>> getHorseInjuries(@PathVariable Long horseId) {
         return ApiResponse.success(injuryRecordService.getInjuryRecordsByHorse(horseId));
+    }
+
+    /** Lịch sử khám sức khỏe của một ngựa, dùng cho màn Health của bác sĩ thú y. */
+    @GetMapping("/health-records")
+    @PreAuthorize("hasAnyRole('VETERINARIAN', 'HEAD_TRAINER', 'CLUB_MANAGER', 'GROOM')")
+    public ApiResponse<List<HealthRecord>> getHorseHealthRecords(@PathVariable Long horseId) {
+        return ApiResponse.success(injuryRecordService.getHealthRecordsByHorse(horseId));
     }
 
     @GetMapping("/health-summary")

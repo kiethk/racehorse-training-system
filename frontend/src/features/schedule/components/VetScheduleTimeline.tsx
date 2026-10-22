@@ -1,9 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
+import { Icon } from '@/components/ui/Icon';
+import { FilterChips, Select, Input, PageHeader, MetricCard, Notice } from '@/components/ui';
+import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { admissionsApi } from '@/features/admissions/services/api';
 import { stableApi } from '@/features/stable/services/stableService';
@@ -14,9 +18,9 @@ import {
   getCareTypeTone,
   VET_WINDOW_LEN,
 } from '../utils/timelineUtils';
-import { VetScheduleDrawer } from './VetScheduleDrawer';
 
 export function VetScheduleTimeline() {
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -30,10 +34,6 @@ export function VetScheduleTimeline() {
   // Filters
   const [careTypeFilter, setCareTypeFilter] = useState<CareType | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<CareScheduleStatus | 'ALL'>('ALL');
-
-  // Drawer
-  const [activeSchedule, setActiveSchedule] = useState<CareSchedule | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -98,8 +98,7 @@ export function VetScheduleTimeline() {
   }, [schedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
-    setActiveSchedule(item);
-    setDrawerOpen(true);
+    router.push(`/veterinarian/schedule/${item.id}`);
   };
 
   const handleDateShift = (days: number) => {
@@ -115,93 +114,108 @@ export function VetScheduleTimeline() {
   return (
     <div className="space-y-6">
       {/* Top Header & Date Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
-            Veterinary Schedule & Timeline
-          </h1>
-          <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-            Daily schedule of emergency cases, routine checkups, and admission examinations.
-          </p>
-        </div>
+      <PageHeader
+        eyebrow="Clinical Timeline"
+        title="Veterinary Schedule & Timeline"
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-0.5 shadow-sm">
+              <Button
+                variant="tertiary"
+                size="sm"
+                icon="chevron-left"
+                onClick={() => handleDateShift(-1)}
+                className="transition-all active:scale-[0.98]"
+              >
+                Previous
+              </Button>
+              <Button
+                variant="tertiary"
+                size="sm"
+                onClick={handleJumpToToday}
+                className="transition-all active:scale-[0.98]"
+              >
+                Today
+              </Button>
+              <Button
+                variant="tertiary"
+                size="sm"
+                icon="chevron-right"
+                onClick={() => handleDateShift(1)}
+                className="transition-all active:scale-[0.98]"
+              >
+                Next
+              </Button>
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" size="sm" icon="chevron-left" onClick={() => handleDateShift(-1)}>
-            Previous
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleJumpToToday}>
-            Today
-          </Button>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
-          />
-          <Button variant="secondary" size="sm" icon="chevron-right" onClick={() => handleDateShift(1)}>
-            Next
-          </Button>
-          <Button variant="secondary" size="sm" icon="refresh" onClick={loadData} disabled={loading}>
-            Refresh
-          </Button>
-        </div>
+            <Input
+              type="date"
+              aria-label="Schedule date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-auto text-xs"
+            />
+
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="refresh"
+              onClick={loadData}
+              disabled={loading}
+              className="transition-all active:scale-[0.98]"
+            >
+              Refresh
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Metric Cards Banner */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <MetricCard
+          label="Total Scheduled"
+          value={stats.total}
+          icon="calendar"
+          tone={stats.total > 0 ? 'default' : 'neutral'}
+        />
+        <MetricCard
+          label="Urgent Priority"
+          value={stats.urgent}
+          icon="alert-triangle"
+          tone={stats.urgent > 0 ? 'danger' : 'neutral'}
+        />
+        <MetricCard
+          label="Quarantine Initial"
+          value={stats.initial}
+          icon="stethoscope"
+          tone={stats.initial > 0 ? 'info' : 'neutral'}
+        />
+        <MetricCard
+          label="Routine & Preventive"
+          value={stats.routine}
+          icon="clock"
+          tone={stats.routine > 0 ? 'warning' : 'neutral'}
+        />
       </div>
 
       {error && (
-        <div className="p-4 rounded-lg bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-900/50 text-sm">
-          {error}
-        </div>
+        <Notice tone="error">
+          <div className="flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <Button variant="link" size="sm" onClick={loadData}>
+              Retry
+            </Button>
+          </div>
+        </Notice>
       )}
 
-      {/* Summary Metrics Chips */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Panel padded className="flex flex-col py-3">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
-            Total Cases
-          </span>
-          <span className="mt-1 text-lg font-bold text-[var(--color-text-primary)] font-metric">
-            {stats.total}
-          </span>
-        </Panel>
-        <Panel padded className="flex flex-col py-3">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-danger)]">
-            Urgent Cases
-          </span>
-          <span className="mt-1 text-lg font-bold text-[var(--color-danger)] font-metric">
-            {stats.urgent}
-          </span>
-        </Panel>
-        <Panel padded className="flex flex-col py-3">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-info)]">
-            Initial Admission
-          </span>
-          <span className="mt-1 text-lg font-bold text-[var(--color-info)] font-metric">
-            {stats.initial}
-          </span>
-        </Panel>
-        <Panel padded className="flex flex-col py-3">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Routine Care
-          </span>
-          <span className="mt-1 text-lg font-bold text-[var(--color-text-primary)] font-metric">
-            {stats.routine}
-          </span>
-        </Panel>
-        <Panel padded className="flex flex-col py-3">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
-            Scheduled Time
-          </span>
-          <span className="mt-1 text-lg font-bold text-[var(--color-text-primary)] font-metric">
-            {stats.totalMinutes} min
-          </span>
-        </Panel>
-      </div>
 
-      {/* Visual Timeline Bar (08:00 - 17:00) */}
+
+      {/* Visual Timeline Bar (13:30 - 15:30) */}
       <Panel padded className="space-y-3">
-        <div className="flex items-center justify-between text-xs font-semibold">
+        <div className="flex items-center justify-between text-sm font-semibold">
           <span className="text-[var(--color-text-primary)]">
-            Daily Timeline: 08:00 – 17:00 ({selectedDate})
+            Daily Timeline: 13:30 – 15:30 ({selectedDate})
           </span>
           <span className="text-[var(--color-text-secondary)]">
             Scheduled: <strong>{stats.totalMinutes} min</strong> / {VET_WINDOW_LEN} min
@@ -209,13 +223,12 @@ export function VetScheduleTimeline() {
         </div>
 
         {/* Ruler */}
-        <div className="relative h-5 border-b border-[var(--color-border)] text-[10px] font-mono text-[var(--color-text-muted)]">
-          <span className="absolute left-0">08:00</span>
-          <span className="absolute left-[22.2%] -translate-x-1/2">10:00</span>
-          <span className="absolute left-[44.4%] -translate-x-1/2">12:00</span>
-          <span className="absolute left-[66.6%] -translate-x-1/2">14:00</span>
-          <span className="absolute left-[88.8%] -translate-x-1/2">16:00</span>
-          <span className="absolute right-0">17:00</span>
+        <div className="relative h-5 border-b border-[var(--color-border)] text-xs font-mono text-[var(--color-text-muted)]">
+          <span className="absolute left-0">13:30</span>
+          <span className="absolute left-[25%] -translate-x-1/2">14:00</span>
+          <span className="absolute left-[50%] -translate-x-1/2">14:30</span>
+          <span className="absolute left-[75%] -translate-x-1/2">15:00</span>
+          <span className="absolute right-0">15:30</span>
         </div>
 
         {/* Timeline track with blocks */}
@@ -238,11 +251,11 @@ export function VetScheduleTimeline() {
                 className={`absolute top-1 bottom-1 flex flex-col justify-center rounded border px-2 py-0.5 cursor-pointer shadow-sm transition-transform hover:scale-[1.02] ${tone.bg} ${tone.border} ${tone.text}`}
                 title={`#${cs.id} · ${tone.label} - ${horseName} (${new Date(cs.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}
               >
-                <div className="truncate text-[10px] font-bold">
-                  {cs.careType === 'URGENT' ? '🚨 ' : cs.careType === 'INITIAL' ? '🩺 ' : '🕒 '}
+                <div className="flex items-center gap-1 truncate text-xs font-bold">
+                  <Icon name={tone.icon} size={12} className="shrink-0" />
                   {horseName}
                 </div>
-                <div className="truncate text-[9px] opacity-80">
+                <div className="truncate text-xs opacity-80">
                   {new Date(cs.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {cs.durationMinutes || 30}m
                 </div>
               </div>
@@ -253,64 +266,29 @@ export function VetScheduleTimeline() {
 
       {/* Filter Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setCareTypeFilter('ALL')}
-            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-              careTypeFilter === 'ALL'
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
-            }`}
-          >
-            All ({schedules.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setCareTypeFilter('URGENT')}
-            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-              careTypeFilter === 'URGENT'
-                ? 'bg-[var(--color-danger)] text-white'
-                : 'text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]'
-            }`}
-          >
-            🚨 Urgent ({stats.urgent})
-          </button>
-          <button
-            type="button"
-            onClick={() => setCareTypeFilter('INITIAL')}
-            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-              careTypeFilter === 'INITIAL'
-                ? 'bg-[var(--color-info)] text-white'
-                : 'text-[var(--color-info)] hover:bg-[var(--color-info-soft)]'
-            }`}
-          >
-            🩺 Initial ({stats.initial})
-          </button>
-          <button
-            type="button"
-            onClick={() => setCareTypeFilter('ROUTINE')}
-            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-              careTypeFilter === 'ROUTINE'
-                ? 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] border border-[var(--color-border-strong)]'
-                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)]'
-            }`}
-          >
-            🕒 Routine ({stats.routine})
-          </button>
-        </div>
+        <FilterChips
+          label="Care type"
+          value={careTypeFilter}
+          onChange={(v) => setCareTypeFilter(v as CareType | 'ALL')}
+          options={[
+            { value: 'ALL', label: 'All', count: schedules.length },
+            { value: 'URGENT', label: 'Urgent', count: stats.urgent },
+            { value: 'INITIAL', label: 'Initial', count: stats.initial },
+            { value: 'ROUTINE', label: 'Routine', count: stats.routine },
+          ]}
+        />
 
         <div>
-          <select
+          <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as CareScheduleStatus | 'ALL')}
-            className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-xs text-[var(--color-text-primary)]"
+            aria-label="Status"
           >
             <option value="ALL">All Statuses</option>
             <option value="SCHEDULED">Scheduled</option>
             <option value="IN_PROGRESS">In Progress</option>
             <option value="COMPLETED">Completed</option>
-          </select>
+          </Select>
         </div>
       </div>
 
@@ -341,27 +319,48 @@ export function VetScheduleTimeline() {
               ? new Date(cs.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               : 'Unscheduled';
 
+            const isCompleted = cs.status === 'COMPLETED';
+
             return (
-              <Panel key={cs.id} padded className="flex flex-col justify-between transition-shadow hover:shadow-md">
+              <Panel
+                key={cs.id}
+                padded
+                className="flex flex-col justify-between border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]"
+              >
                 <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-base font-bold text-[var(--color-text-primary)]">
-                          {horseName}
-                        </span>
-                        {horse?.breed && (
-                          <span className="text-xs text-[var(--color-text-muted)]">({horse.breed})</span>
-                        )}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                        <span>⏰ <strong>{timeStr}</strong> ({cs.durationMinutes || 30} min)</span>
-                        <span>·</span>
-                        <span>Stall: <strong>{stallCode}</strong></span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <HorseAvatar name={horseName} image={null} size={42} rounded="md" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                            {horseName}
+                          </span>
+                          <span className="text-[11px] font-mono text-[var(--color-text-muted)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 rounded-[var(--radius-xs)] border border-[var(--color-border)]">
+                            #{cs.horseId}
+                          </span>
+                          {horse?.breed && (
+                            <span className="text-xs text-[var(--color-text-muted)] truncate">
+                              ({horse.breed})
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="clock" size={12} className="text-[var(--color-primary)]" />
+                            <strong>{timeStr}</strong>
+                            <span className="text-[var(--color-text-muted)]">({cs.durationMinutes || 30}m)</span>
+                          </span>
+                          <span>·</span>
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="building" size={12} />
+                            <span>Stall: <strong>{stallCode}</strong></span>
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="flex flex-col items-end gap-1 shrink-0">
                       <Pill tone={tone.pillTone} icon={tone.icon} size="sm">
                         {tone.label}
                       </Pill>
@@ -375,25 +374,40 @@ export function VetScheduleTimeline() {
                         }
                         size="sm"
                       >
-                        {cs.status}
+                        {cs.status === 'SCHEDULED'
+                          ? 'Scheduled'
+                          : cs.status === 'IN_PROGRESS'
+                          ? 'In Progress'
+                          : 'Completed'}
                       </Pill>
                     </div>
                   </div>
-
-                  <p className="mt-3 text-xs text-[var(--color-text-secondary)] line-clamp-2">
-                    {cs.description || 'No clinical notes provided.'}
-                  </p>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-3">
-                  <span className="text-[11px] text-[var(--color-text-muted)]">Schedule #{cs.id}</span>
+                  <span className="text-[11px] font-mono text-[var(--color-text-muted)]">
+                    Schedule #{cs.id}
+                  </span>
                   <Button
-                    variant={cs.careType === 'URGENT' ? 'destructive' : 'primary'}
+                    variant={
+                      isCompleted
+                        ? 'secondary'
+                        : cs.careType === 'URGENT'
+                        ? 'destructive'
+                        : 'primary'
+                    }
                     size="sm"
-                    icon={cs.status === 'COMPLETED' ? 'check' : 'chevron-right'}
+                    icon={
+                      isCompleted
+                        ? 'file-text'
+                        : cs.status === 'IN_PROGRESS'
+                        ? 'activity'
+                        : 'chevron-right'
+                    }
                     onClick={() => handleOpenSchedule(cs)}
+                    className="transition-all active:scale-[0.97]"
                   >
-                    {cs.status === 'COMPLETED'
+                    {isCompleted
                       ? 'View Record'
                       : cs.status === 'IN_PROGRESS'
                       ? 'Continue Exam'
@@ -406,13 +420,6 @@ export function VetScheduleTimeline() {
         </div>
       )}
 
-      {/* Slide-out Examination Drawer */}
-      <VetScheduleDrawer
-        schedule={activeSchedule}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onSuccess={loadData}
-      />
     </div>
   );
 }

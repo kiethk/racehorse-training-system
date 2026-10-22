@@ -99,6 +99,8 @@ class CareSchedulePreventiveIntegrationTest {
             return record;
         });
         when(schedules.save(any(CareSchedule.class))).thenAnswer(call -> call.getArgument(0));
+        // Lịch khám lại tự động (AUTO cadence) cũng đi qua saveAndFlush.
+        when(schedules.saveAndFlush(any(CareSchedule.class))).thenAnswer(call -> call.getArgument(0));
     }
 
     // ---- completeCareSchedule + vaccinations[] ----

@@ -324,6 +324,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 icon="activity"
                 loading={starting}
                 onClick={startExam}
+                className="transition-all active:scale-[0.97]"
               >
                 Start Examination
               </Button>
@@ -432,6 +433,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   icon="activity"
                   loading={starting}
                   onClick={startExam}
+                  className="transition-all active:scale-[0.97]"
                 >
                   Start Examination
                 </Button>
@@ -727,6 +729,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                                 size="sm"
                                 variant="secondary"
                                 onClick={() => setFollowUpDate(businessDate(days))}
+                                className="transition-all active:scale-[0.97]"
                               >
                                 +{days} days
                               </Button>
@@ -767,7 +770,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                     variant="primary"
                     loading={submitting}
                     icon="check"
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto transition-all active:scale-[0.97]"
                   >
                     Complete Urgent Examination
                   </Button>

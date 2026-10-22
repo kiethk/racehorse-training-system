@@ -49,6 +49,12 @@ public class InjuryRecordService {
         return injuryRecordRepository.findByHorseIdOrderByDiagnosedAtDesc(horseId);
     }
 
+    /** Lịch sử khám của một ngựa, mới nhất trước (health history trong Health tab). */
+    @Transactional(readOnly = true)
+    public List<HealthRecord> getHealthRecordsByHorse(Long horseId) {
+        return healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(horseId);
+    }
+
     @Transactional(readOnly = true)
     public HorseHealthSummaryResponse getHealthSummary(Long horseId) {
         Horse horse = horseRepository.findById(horseId)

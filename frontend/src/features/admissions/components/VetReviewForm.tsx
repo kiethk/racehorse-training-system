@@ -112,7 +112,6 @@ const followUpDescriptionOptions = [
 interface TrainingDecisionOption {
   value: TrainingDecision;
   title: string;
-  subtitle: string;
   icon: IconName;
   tone: 'success' | 'danger';
   activeBorder: string;
@@ -123,7 +122,6 @@ const trainingDecisions: TrainingDecisionOption[] = [
   {
     value: 'ALLOWED',
     title: 'Training Allowed',
-    subtitle: 'Medically cleared for athletic conditioning',
     icon: 'check',
     tone: 'success',
     activeBorder: 'border-[var(--color-success)] ring-1 ring-[var(--color-success)]',
@@ -132,7 +130,6 @@ const trainingDecisions: TrainingDecisionOption[] = [
   {
     value: 'BLOCKED',
     title: 'Training Blocked',
-    subtitle: 'No training until the follow-up exam; future workouts are cancelled',
     icon: 'lock',
     tone: 'danger',
     activeBorder: 'border-[var(--color-danger)] ring-1 ring-[var(--color-danger)]',
@@ -150,7 +147,6 @@ interface MetricConfig {
   normalMax: number;
   criticalMin: number;
   criticalMax: number;
-  normalLabel: string;
 }
 
 const metricConfigs: MetricConfig[] = [
@@ -164,7 +160,6 @@ const metricConfigs: MetricConfig[] = [
     normalMax: 38.3,
     criticalMin: 36.5,
     criticalMax: 38.8,
-    normalLabel: '37.2 – 38.3 °C',
   },
   {
     key: 'heartRate',
@@ -176,7 +171,6 @@ const metricConfigs: MetricConfig[] = [
     normalMax: 44,
     criticalMin: 24,
     criticalMax: 55,
-    normalLabel: '28 – 44 bpm',
   },
   {
     key: 'respiratoryRate',
@@ -188,7 +182,6 @@ const metricConfigs: MetricConfig[] = [
     normalMax: 16,
     criticalMin: 6,
     criticalMax: 24,
-    normalLabel: '8 – 16 rpm',
   },
   {
     key: 'weight',
@@ -200,7 +193,6 @@ const metricConfigs: MetricConfig[] = [
     normalMax: 600,
     criticalMin: 350,
     criticalMax: 650,
-    normalLabel: '400 – 600 kg',
   },
   {
     key: 'bodyConditionScore',
@@ -212,7 +204,6 @@ const metricConfigs: MetricConfig[] = [
     normalMax: 6.0,
     criticalMin: 3.0,
     criticalMax: 7.0,
-    normalLabel: '4.0 – 6.0',
   },
 ];
 
@@ -785,14 +776,9 @@ export function VetReviewForm({
           >
             <div className="flex items-center gap-2">
               <Icon name="alert-triangle" size={18} className="shrink-0 text-[var(--color-warning)]" />
-              <div>
-                <strong className="block text-sm font-bold">
-                  Care schedule is SCHEDULED
-                </strong>
-                <p className="text-xs opacity-90">
-                  Physical examination must be started before clinical findings and decisions can be recorded.
-                </p>
-              </div>
+              <strong className="block text-sm font-bold">
+                Care schedule is SCHEDULED
+              </strong>
             </div>
             {onStartExam && !asideTop && (
               <Button
@@ -823,14 +809,9 @@ export function VetReviewForm({
           >
             <div className="flex items-center gap-2">
               <Icon name="clock" size={18} className="shrink-0 text-[var(--color-info)]" />
-              <div>
-                <strong className="block text-sm font-bold">
-                  Care schedule is REQUESTED
-                </strong>
-                <p className="text-xs opacity-90">
-                  This examination schedule is waiting for slot scheduling and assignment before it can be started.
-                </p>
-              </div>
+              <strong className="block text-sm font-bold">
+                Care schedule is REQUESTED
+              </strong>
             </div>
           </div>
         )}
@@ -902,9 +883,6 @@ export function VetReviewForm({
                 <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
                   1. Patient Vitals &amp; Telemetry
                 </h3>
-                <span className="text-xs text-[var(--color-text-muted)]">
-                  Standard equine reference ranges
-                </span>
               </div>
 
               {/* Vitals Grid without heavy card wrappers */}
@@ -959,9 +937,6 @@ export function VetReviewForm({
                         </span>
                       </div>
 
-                      <span className="block text-xs text-[var(--color-text-muted)]">
-                        {cfg.normalLabel}
-                      </span>
                       {fieldErrors[cfg.key] && (
                         <span className="block text-xs font-medium text-[var(--color-danger)]">
                           {fieldErrors[cfg.key]}
@@ -1113,13 +1088,6 @@ export function VetReviewForm({
                         ]}
                       />
                     </div>
-
-                    {/* Inline Helper Text */}
-                    <p className="text-xs text-[var(--color-text-muted)]">
-                      {examMode === 'NORMAL'
-                        ? 'All 8 body systems are recorded as normal. Findings and symptoms will be generated automatically.'
-                        : 'Abnormal findings detected. Specify affected body systems and observed symptoms below.'}
-                    </p>
                   </div>
 
                   {/* Progressive Disclosure Checklist for the 8 Body Systems (Only when Abnormal) */}
@@ -1316,9 +1284,6 @@ export function VetReviewForm({
               <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
                 Veterinary Decision Panel
               </h3>
-              <p className="text-xs text-[var(--color-text-muted)]">
-                Authorizes or restricts athletic activity for {candidateName}.
-              </p>
             </div>
 
             {/* Streamlined Training Decision Options */}
@@ -1363,9 +1328,6 @@ export function VetReviewForm({
                             {opt.value}
                           </Pill>
                         </div>
-                        <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-                          {opt.subtitle}
-                        </p>
                       </div>
                     </label>
                   );
@@ -1443,6 +1405,12 @@ export function VetReviewForm({
               {followUpRequired && (
                 <p className="text-xs text-[var(--color-text-secondary)]">
                   Required when training is blocked: the horse stays off training until this exam.
+                </p>
+              )}
+              {careType === 'ROUTINE' && !followUpRequired && schedulePurpose !== 'PREVENTIVE' && (
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  Without a follow-up date the system books the next visit automatically — routine
+                  rechecks repeat every 14 days.
                 </p>
               )}
 
@@ -1530,16 +1498,6 @@ export function VetReviewForm({
                 Save draft locally
               </Button>
             </div>
-
-            {/* Summary Notice */}
-            <div className="rounded-[var(--radius-sm)] bg-[var(--color-surface-subtle)] p-2.5 text-xs text-[var(--color-text-muted)] leading-relaxed">
-              <span className="font-semibold text-[var(--color-text-secondary)]">Outcome:</span>
-              <ul className="mt-1 space-y-0.5 list-disc pl-3.5">
-                <li>Permanently links health examination record.</li>
-                <li>Advances admission to Head Trainer review stage.</li>
-                <li>Quarantine stall stays locked until final manager clearance.</li>
-              </ul>
-            </div>
           </div>
           </div>
         </div>
@@ -1574,7 +1532,7 @@ export function VetReviewForm({
             </p>
             {followUpActive && (
               <div className="rounded-[var(--radius-sm)] bg-[var(--color-warning-soft)] p-2 text-xs text-[var(--color-warning)] font-medium">
-                📅 Follow-up scheduled for <strong>{followUpDate}</strong>: {followUpDescription}.
+                Follow-up scheduled for <strong>{followUpDate}</strong>: {followUpDescription}.
               </div>
             )}
             <p className="text-xs text-[var(--color-text-secondary)]">

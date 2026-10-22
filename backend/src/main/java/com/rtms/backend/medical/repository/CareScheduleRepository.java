@@ -137,19 +137,30 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     """)
     List<CareSchedule> findVetAdmissionSchedules(@Param("vetId") Long vetId);
 
+    /**
+     * Hàng đợi khám của bác sĩ thú y. Mặc định (scheduleStatus = null) ẩn các ca
+     * COMPLETED và CANCELLED; khi người dùng chọn một trạng thái cụ thể thì bộ lọc
+     * đó được ưu tiên, nên ca đã hoàn thành vẫn xem được qua bộ lọc Completed.
+     * Bộ lọc pill (Awaiting / In exam) chỉ mô tả ca đang chờ nên bị bỏ qua khi
+     * đã chọn trạng thái cụ thể.
+     */
     @Query(value = """
         SELECT cs FROM CareSchedule cs, AdmissionApplication a, CandidateHorseProfile c
         WHERE cs.admissionId = a.id AND c.admissionId = a.id
-          AND cs.veterinarianId = :vetId AND cs.status NOT IN ('COMPLETED','CANCELLED')
+          AND cs.veterinarianId = :vetId
+          AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
+               OR (:scheduleStatus IS NULL AND cs.status NOT IN ('COMPLETED','CANCELLED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
           AND (:admissionStatus IS NULL OR a.status = :admissionStatus)
-          AND (:scheduleStatus IS NULL OR cs.status = :scheduleStatus)
           AND (:careType IS NULL OR cs.careType = :careType)
-          AND (:pill = ''
-               OR (:pill = 'AWAITING' AND cs.status IN ('REQUESTED','SCHEDULED'))
-               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS'))
+          AND (:scheduleStatus IS NOT NULL
+               OR :pill = '' OR :pill = 'ALL'
+               OR (:pill = 'ACTIVE' AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
+               OR (:pill = 'AWAITING' AND cs.status IN ('REQUESTED','SCHEDULED') AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
+               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS' AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
+               OR (:pill = 'APPROVED' AND a.status = com.rtms.backend.admission.enums.AdmissionStatus.APPROVED))
           AND (:priority = ''
                OR (:priority = 'URGENT' AND cs.careType = 'URGENT')
                OR (:priority = 'NORMAL' AND cs.careType <> 'URGENT'))
@@ -159,16 +170,20 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
         countQuery = """
         SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a, CandidateHorseProfile c
         WHERE cs.admissionId = a.id AND c.admissionId = a.id
-          AND cs.veterinarianId = :vetId AND cs.status NOT IN ('COMPLETED','CANCELLED')
+          AND cs.veterinarianId = :vetId
+          AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
+               OR (:scheduleStatus IS NULL AND cs.status NOT IN ('COMPLETED','CANCELLED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
           AND (:admissionStatus IS NULL OR a.status = :admissionStatus)
-          AND (:scheduleStatus IS NULL OR cs.status = :scheduleStatus)
           AND (:careType IS NULL OR cs.careType = :careType)
-          AND (:pill = ''
-               OR (:pill = 'AWAITING' AND cs.status IN ('REQUESTED','SCHEDULED'))
-               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS'))
+          AND (:scheduleStatus IS NOT NULL
+               OR :pill = '' OR :pill = 'ALL'
+               OR (:pill = 'ACTIVE' AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
+               OR (:pill = 'AWAITING' AND cs.status IN ('REQUESTED','SCHEDULED') AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
+               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS' AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
+               OR (:pill = 'APPROVED' AND a.status = com.rtms.backend.admission.enums.AdmissionStatus.APPROVED))
           AND (:priority = ''
                OR (:priority = 'URGENT' AND cs.careType = 'URGENT')
                OR (:priority = 'NORMAL' AND cs.careType <> 'URGENT'))
@@ -182,6 +197,23 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             Pageable pageable);
 
     long countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(Long vetId, Collection<CareScheduleStatus> statuses);
+
+    @Query("""
+        SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a
+        WHERE cs.admissionId = a.id AND cs.veterinarianId = :vetId
+          AND cs.status IN :statuses
+          AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED
+    """)
+    long countActiveVetQueueItems(@Param("vetId") Long vetId, @Param("statuses") Collection<CareScheduleStatus> statuses);
+
+    @Query("""
+        SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a
+        WHERE cs.admissionId = a.id AND cs.veterinarianId = :vetId
+          AND cs.status IN :statuses
+          AND a.status = com.rtms.backend.admission.enums.AdmissionStatus.APPROVED
+    """)
+    long countApprovedVetQueueItems(@Param("vetId") Long vetId, @Param("statuses") Collection<CareScheduleStatus> statuses);
+
 
     boolean existsByHorseIdAndStatusInAndIdNot(Long horseId, Collection<CareScheduleStatus> statuses, Long id);
 

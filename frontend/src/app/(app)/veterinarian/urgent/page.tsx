@@ -94,7 +94,6 @@ export default function UrgentCasesPage() {
           <PageHeader
             eyebrow="Clinical Emergency Operations"
             title="Urgent Cases"
-            description="High-priority clinical incidents reported by grooms and assigned emergency cases."
             actions={
               <div className="flex items-center gap-2">
                 {urgentCases.length > 0 && (
@@ -114,28 +113,24 @@ export default function UrgentCasesPage() {
               value={urgentCases.length}
               icon="heart-pulse"
               tone={urgentCases.length > 0 ? 'default' : 'neutral'}
-              hint="Active assigned cases"
             />
             <MetricCard
               label="Pending Intake"
               value={pendingCount}
               icon="clock"
               tone={pendingCount > 0 ? 'warning' : 'neutral'}
-              hint="Awaiting initial exam"
             />
             <MetricCard
               label="In Examination"
               value={inProgressCount}
               icon="activity"
               tone={inProgressCount > 0 ? 'info' : 'neutral'}
-              hint="Under clinical check"
             />
             <MetricCard
               label="Critical Priority"
               value={criticalCount}
               icon="alert-triangle"
               tone={criticalCount > 0 ? 'danger' : 'neutral'}
-              hint="High/critical severity"
             />
           </div>
 
@@ -218,7 +213,7 @@ export default function UrgentCasesPage() {
               {filteredCases.map((item) => (
                 <Panel
                   key={item.scheduleId}
-                  className={`overflow-hidden border border-[var(--color-border)] transition-all hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-panel)] ${
+                  className={`overflow-hidden border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)] ${
                     item.status === 'SCHEDULED'
                       ? 'border-l-4 border-l-[var(--color-danger)]'
                       : 'border-l-4 border-l-[var(--color-warning)]'
@@ -302,6 +297,7 @@ export default function UrgentCasesPage() {
                         <Button
                           variant={item.status === 'SCHEDULED' ? 'destructive' : 'primary'}
                           icon="chevron-right"
+                          className="transition-all active:scale-[0.97]"
                         >
                           {item.status === 'SCHEDULED' ? 'Intake Case' : 'Examine'}
                         </Button>

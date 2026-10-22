@@ -245,6 +245,8 @@ export interface CareSchedule {
   requestedAt?: string | null;
 }
 
+export type CareScheduleResponse = CareSchedule;
+
 export interface CareScheduleDetail {
   schedule: CareSchedule;
   horse: HorseSummary | null;
@@ -317,15 +319,17 @@ export interface VetAdmissionQueueItem {
 
 export interface VetQueueSummary {
   total: number;
+  active?: number;
   awaiting: number;
   inProgress: number;
+  approved?: number;
 }
 
 export type VetQueueSummaryResponse = VetQueueSummary;
 
 export interface VetQueueFilters {
   search?: string;
-  pill?: 'ALL' | 'AWAITING' | 'IN_PROGRESS';
+  pill?: 'ALL' | 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'APPROVED';
   admissionStatus?: AdmissionStatus | 'ALL';
   scheduleStatus?: CareScheduleStatus | 'ALL';
   careType?: CareType | 'ALL';
