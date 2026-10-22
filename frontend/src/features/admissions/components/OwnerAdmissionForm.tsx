@@ -5,9 +5,11 @@ import { FormField } from '@/components/ui/FormField';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { Notice } from '@/components/ui/Notice';
+import { Icon } from '@/components/ui/Icon';
 import { ImageLightbox, ImageThumbnail } from '@/components/ui/ImageLightbox';
 import { AdmissionInfoSection } from '../shared/components/AdmissionInfoSection';
-import { ownerAdmissionApi } from '../services/ownerApi';
+import { ownerAdmissionApi, type OcrExtractionData } from '../services/ownerApi';
 import { useAdmissionUelnCheck } from '../hooks/useAdmissionUelnCheck';
 import { LocalFilePreviewModal } from '../shared/components/LocalFilePreviewModal';
 import { renderPdfFirstPage } from '@/lib/pdfThumbnail';
@@ -104,6 +106,12 @@ export function OwnerAdmissionForm() {
   const [recordErrors, setRecordErrors] = useState<DocumentErrors>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  // OCR state
+  const [scanningDocType, setScanningDocType] = useState<AdmissionDocumentType | null>(null);
+  const [ocrNotice, setOcrNotice] = useState<{ tone: 'success' | 'warning' | 'info'; message: string } | null>(null);
+  const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
+
   const completed = DOCUMENTS.filter(section => section.required && selections[section.type]?.file).length;
   const optionalSelected = DOCUMENTS.filter(section => !section.required && selections[section.type]?.file).length;
   const now = new Date();
@@ -125,6 +133,89 @@ export function OwnerAdmissionForm() {
 
   function updateSelection(type: AdmissionDocumentType, update: Partial<Selection>) {
     setSelections(current => ({ ...current, [type]: { recordDate: '', note: '', ...current[type], ...update } }));
+  }
+
+  async function triggerOcrScan(file: File, type: AdmissionDocumentType) {
+    if (type !== 'REGISTRATION_DOCUMENT' && type !== 'PEDIGREE_CERTIFICATE') return;
+    setScanningDocType(type);
+    setOcrNotice({ tone: 'info', message: `AI đang quét và trích xuất dữ liệu từ ${type === 'REGISTRATION_DOCUMENT' ? 'Giấy đăng ký' : 'Giấy phả hệ'}...` });
+    try {
+      const res = await ownerAdmissionApi.scanOcr(file, type);
+      const data: OcrExtractionData = res.data;
+      if (!data) {
+        setOcrNotice({ tone: 'warning', message: 'Không thể trích xuất tự động từ tài liệu này. Vui lòng rà soát và điền tay.' });
+        return;
+      }
+
+      const updatedKeys: string[] = [];
+      const newForm = { ...form };
+
+      // Non-destructive Auto-fill rules
+      if (data.name && (!newForm.name || newForm.name.trim() === '')) {
+        newForm.name = data.name;
+        updatedKeys.push('name');
+      }
+      if (data.sex && !newForm.sex) {
+        newForm.sex = data.sex;
+        updatedKeys.push('sex');
+      }
+      if (data.breed && (!newForm.breed || newForm.breed.trim() === '')) {
+        newForm.breed = data.breed;
+        updatedKeys.push('breed');
+      }
+      if (data.dateOfBirth && (!newForm.dateOfBirth || newForm.dateOfBirth.trim() === '')) {
+        newForm.dateOfBirth = data.dateOfBirth;
+        updatedKeys.push('dateOfBirth');
+      }
+      if (data.registrationNumber && (!newForm.registrationNumber || newForm.registrationNumber.trim() === '')) {
+        newForm.registrationNumber = data.registrationNumber;
+        updatedKeys.push('registrationNumber');
+        checkUeln(data.registrationNumber);
+      }
+      if (data.registryName && (!newForm.registryName || newForm.registryName.trim() === '')) {
+        newForm.registryName = data.registryName;
+        updatedKeys.push('registryName');
+      }
+      if (data.sireName && (!newForm.sireName || newForm.sireName.trim() === '')) {
+        newForm.sireName = data.sireName;
+        updatedKeys.push('sireName');
+      }
+      if (data.sireRegistrationNumber && (!newForm.sireRegistrationNumber || newForm.sireRegistrationNumber.trim() === '')) {
+        newForm.sireRegistrationNumber = data.sireRegistrationNumber;
+        updatedKeys.push('sireRegistrationNumber');
+      }
+      if (data.damName && (!newForm.damName || newForm.damName.trim() === '')) {
+        newForm.damName = data.damName;
+        updatedKeys.push('damName');
+      }
+      if (data.damRegistrationNumber && (!newForm.damRegistrationNumber || newForm.damRegistrationNumber.trim() === '')) {
+        newForm.damRegistrationNumber = data.damRegistrationNumber;
+        updatedKeys.push('damRegistrationNumber');
+      }
+
+      setForm(newForm);
+      setHighlightedFields(new Set(updatedKeys));
+      setTimeout(() => setHighlightedFields(new Set()), 5000);
+
+      if (updatedKeys.length > 0) {
+        setOcrNotice({
+          tone: 'success',
+          message: `AI đã tự động trích xuất và điền ${updatedKeys.length} trường thông tin. Vui lòng rà soát lại trước khi nộp đơn.`,
+        });
+      } else {
+        setOcrNotice({
+          tone: 'info',
+          message: 'Quét tài liệu hoàn tất. Các trường thông tin đã có sẵn dữ liệu được bảo vệ và giữ nguyên.',
+        });
+      }
+    } catch {
+      setOcrNotice({
+        tone: 'warning',
+        message: 'Dịch vụ AI OCR tạm thời gián đoạn. Tệp đã được lưu, bạn có thể tự kiểm tra và nhập thông tin.',
+      });
+    } finally {
+      setScanningDocType(null);
+    }
   }
 
   function selectFile(type: AdmissionDocumentType, file?: File) {
@@ -176,6 +267,11 @@ export function OwnerAdmissionForm() {
             setFilePreviews(curr => ({ ...curr, [type]: thumbUrl }));
           })
           .catch(() => undefined);
+      }
+
+      // Automatically trigger smart OCR scan for registration and pedigree certificates
+      if (type === 'REGISTRATION_DOCUMENT' || type === 'PEDIGREE_CERTIFICATE') {
+        triggerOcrScan(file, type);
       }
     }
   }
@@ -275,6 +371,8 @@ export function OwnerAdmissionForm() {
     const message = documentErrors[section.type];
     const previewUrl = filePreviews[section.type];
     const isPdf = selection?.file ? (selection.file.type === 'application/pdf' || selection.file.name.toLowerCase().endsWith('.pdf')) : false;
+    const isScanning = scanningDocType === section.type;
+    const isOcrEligible = section.type === 'REGISTRATION_DOCUMENT' || section.type === 'PEDIGREE_CERTIFICATE';
 
     const handleOpenPreview = () => {
       if (!selection?.file) return;
@@ -288,10 +386,18 @@ export function OwnerAdmissionForm() {
 
     return (
       <fieldset key={section.type} className="min-w-0 space-y-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
-        <legend className="px-1 text-sm font-semibold">
-          {section.label}{' '}
-          {section.required ? <span aria-hidden="true" className="text-[var(--color-danger)]">*</span> : <span className="font-normal text-[var(--color-text-muted)]">(Optional)</span>}
-        </legend>
+        <div className="flex items-center justify-between">
+          <legend className="px-1 text-sm font-semibold">
+            {section.label}{' '}
+            {section.required ? <span aria-hidden="true" className="text-[var(--color-danger)]">*</span> : <span className="font-normal text-[var(--color-text-muted)]">(Optional)</span>}
+          </legend>
+          {isOcrEligible && (
+            <span className="inline-flex items-center gap-1 rounded bg-[var(--color-primary-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--color-primary)]">
+              <Icon name="sparkles" size={12} />
+              AI OCR
+            </span>
+          )}
+        </div>
         <div className="max-w-xs space-y-1">
           <label className="block space-y-1 text-sm">
             <span>Select file</span>
@@ -308,6 +414,12 @@ export function OwnerAdmissionForm() {
           </p>
           {message && <p id={`error-${section.type}`} role="alert" className="text-sm text-[var(--color-danger)]">{message}</p>}
         </div>
+        {isScanning && (
+          <div className="flex items-center gap-2 rounded bg-[var(--color-surface-muted)] p-2 text-xs text-[var(--color-text-muted)]">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
+            <span>AI đang quét và trích xuất dữ liệu tự động...</span>
+          </div>
+        )}
         {selection?.file ? (
           <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 text-sm">
             <span className="flex min-w-0 items-center gap-3">
@@ -338,11 +450,23 @@ export function OwnerAdmissionForm() {
                 </button>
               </div>
             </span>
-            <Button type="button" size="sm" aria-label={`Remove ${section.label.toLowerCase()}`} onClick={() => {
-              selectFile(section.type);
-              const input = fileInputs.current[section.type];
-              if (input) input.value = '';
-            }}>Remove</Button>
+            <div className="flex items-center gap-2">
+              {isOcrEligible && !isScanning && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => triggerOcrScan(selection.file!, section.type)}
+                >
+                  Re-scan
+                </Button>
+              )}
+              <Button type="button" size="sm" aria-label={`Remove ${section.label.toLowerCase()}`} onClick={() => {
+                selectFile(section.type);
+                const input = fileInputs.current[section.type];
+                if (input) input.value = '';
+              }}>Remove</Button>
+            </div>
           </div>
         ) : message && !section.required ? (
           <Button type="button" size="sm" variant="tertiary" onClick={() => selectFile(section.type)}>Clear file error</Button>
@@ -372,11 +496,19 @@ export function OwnerAdmissionForm() {
   }
 
   return (
-    <form noValidate onSubmit={submit} className="space-y-5" aria-busy={busy}>
-      <p className="text-sm text-[var(--color-text-secondary)]"><span aria-hidden="true" className="font-semibold text-[var(--color-danger)]">*</span> Required fields</p>
+    <form onSubmit={submit} className="space-y-6">
+      {ocrNotice && (
+        <Notice
+          tone={ocrNotice.tone}
+          title="Trợ lý OCR Nhập đàn"
+          onDismiss={() => setOcrNotice(null)}
+        >
+          {ocrNotice.message}
+        </Notice>
+      )}
       {error && (
-        <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">
-          <p className="font-medium">{error}</p>
+        <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-4 text-sm text-[var(--color-danger)]">
+          <p className="font-semibold">{error}</p>
           <ul className="mt-1 list-inside list-disc">
             {[...FORM_FIELDS.map(field => ({ key: field.key, label: field.label })), { key: 'pedigreeNotes' as const, label: 'Pedigree notes' }].filter(field => fieldErrors[field.key]).map(field => (
               <li key={field.key}><a href={`#candidate-${field.key}`} className="underline" onClick={event => { event.preventDefault(); fieldInputs.current[field.key]?.focus(); }}>{field.label}: {fieldErrors[field.key]}</a></li>
@@ -393,52 +525,72 @@ export function OwnerAdmissionForm() {
       <fieldset disabled={busy} className="min-w-0 space-y-5">
         <AdmissionInfoSection title="Candidate horse & pedigree">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {FORM_FIELDS.map(field => field.key === 'sex' ? (
-              <FormField key="sex" htmlFor="candidate-sex" label="Sex" required error={fieldErrors.sex}>
-                <Select value={form.sex} ref={element => { fieldInputs.current.sex = element; }}
-                  onChange={event => changeField('sex', event.target.value)}
-                  onBlur={event => setFieldErrors(current => ({ ...current, sex: validateField('sex', event.target.value) }))}>
-                  <option value="">Select sex</option>
-                  {HORSE_SEX_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </Select>
-              </FormField>
-            ) : (
-              <label key={field.key} className="block space-y-1">
-                <span className="block text-sm font-medium">{field.label}{field.required && <span aria-hidden="true" className="text-[var(--color-danger)]"> *</span>}</span>
-                <Input id={`candidate-${field.key}`} type={field.type || 'text'} value={form[field.key] || ''}
-                  ref={element => { fieldInputs.current[field.key] = element; }}
-                  required={field.required}
-                  maxLength={field.key.toLowerCase().includes('registration') ? 15 : 255}
-                  pattern={field.key.toLowerCase().includes('registration') ? '[0-9]{6}[a-zA-Z0-9]{9}' : undefined}
-                  max={field.type === 'date' ? today : undefined}
-                  aria-invalid={Boolean(fieldError(field.key))}
-                  aria-describedby={[field.hint ? `hint-${field.key}` : '', fieldError(field.key) ? `error-${field.key}` : '', field.key === 'registrationNumber' ? 'ueln-check-status' : ''].filter(Boolean).join(' ') || undefined}
-                  onBlur={event => {
-                    let val = event.target.value;
-                    if (field.key.toLowerCase().includes('registration')) {
-                      val = val.trim().toUpperCase();
-                      setForm(curr => ({ ...curr, [field.key]: val }));
-                    }
-                    const fieldErr = validateField(field.key, val, event.target);
-                    const updatedForm = { ...form, [field.key]: val };
-                    const pedErrors = validatePedigreeRelationships(updatedForm);
-                    setFieldErrors(current => ({
-                      ...current,
-                      [field.key]: fieldErr || pedErrors[field.key] || '',
-                      ...(pedErrors.sireRegistrationNumber ? { sireRegistrationNumber: pedErrors.sireRegistrationNumber } : {}),
-                      ...(pedErrors.damRegistrationNumber ? { damRegistrationNumber: pedErrors.damRegistrationNumber } : {}),
-                    }));
-                  }}
-                  onChange={event => changeField(field.key, event.target.value)} />
-                {field.hint && <span id={`hint-${field.key}`} className="block text-xs leading-5 text-[var(--color-text-muted)]">{field.hint}</span>}
-                {fieldError(field.key) && <span id={`error-${field.key}`} role="alert" className="block text-sm text-[var(--color-danger)]">{fieldError(field.key)}</span>}
-                {field.key === 'registrationNumber' && (
-                  <span id="ueln-check-status" role="status" className="block text-xs text-[var(--color-text-muted)]">
-                    {uelnCheck.status === 'checking' ? 'Checking UELN…' : uelnCheck.status === 'error' ? uelnCheck.message : ''}
-                  </span>
-                )}
-              </label>
-            ))}
+            {FORM_FIELDS.map(field => {
+              const isHighlighted = highlightedFields.has(field.key);
+              return field.key === 'sex' ? (
+                <FormField
+                  key="sex"
+                  htmlFor="candidate-sex"
+                  label="Sex"
+                  required
+                  error={fieldErrors.sex}
+                  className={isHighlighted ? 'ring-2 ring-[var(--color-primary)] rounded p-1 transition-all duration-500' : ''}
+                >
+                  <Select value={form.sex} ref={element => { fieldInputs.current.sex = element; }}
+                    onChange={event => changeField('sex', event.target.value)}
+                    onBlur={event => setFieldErrors(current => ({ ...current, sex: validateField('sex', event.target.value) }))}>
+                    <option value="">Select sex</option>
+                    {HORSE_SEX_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </Select>
+                </FormField>
+              ) : (
+                <label
+                  key={field.key}
+                  className={`block space-y-1 ${isHighlighted ? 'ring-2 ring-[var(--color-primary)] rounded p-1 transition-all duration-500' : ''}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="block text-sm font-medium">{field.label}{field.required && <span aria-hidden="true" className="text-[var(--color-danger)]"> *</span>}</span>
+                    {isHighlighted && (
+                      <span className="text-[10px] font-semibold text-[var(--color-primary)] uppercase">
+                        AI Filled
+                      </span>
+                    )}
+                  </div>
+                  <Input id={`candidate-${field.key}`} type={field.type || 'text'} value={form[field.key] || ''}
+                    ref={element => { fieldInputs.current[field.key] = element; }}
+                    required={field.required}
+                    maxLength={field.key.toLowerCase().includes('registration') ? 15 : 255}
+                    pattern={field.key.toLowerCase().includes('registration') ? '[0-9]{6}[a-zA-Z0-9]{9}' : undefined}
+                    max={field.type === 'date' ? today : undefined}
+                    aria-invalid={Boolean(fieldError(field.key))}
+                    aria-describedby={[field.hint ? `hint-${field.key}` : '', fieldError(field.key) ? `error-${field.key}` : '', field.key === 'registrationNumber' ? 'ueln-check-status' : ''].filter(Boolean).join(' ') || undefined}
+                    onBlur={event => {
+                      let val = event.target.value;
+                      if (field.key.toLowerCase().includes('registration')) {
+                        val = val.trim().toUpperCase();
+                        setForm(curr => ({ ...curr, [field.key]: val }));
+                      }
+                      const fieldErr = validateField(field.key, val, event.target);
+                      const updatedForm = { ...form, [field.key]: val };
+                      const pedErrors = validatePedigreeRelationships(updatedForm);
+                      setFieldErrors(current => ({
+                        ...current,
+                        [field.key]: fieldErr || pedErrors[field.key] || '',
+                        ...(pedErrors.sireRegistrationNumber ? { sireRegistrationNumber: pedErrors.sireRegistrationNumber } : {}),
+                        ...(pedErrors.damRegistrationNumber ? { damRegistrationNumber: pedErrors.damRegistrationNumber } : {}),
+                      }));
+                    }}
+                    onChange={event => changeField(field.key, event.target.value)} />
+                  {field.hint && <span id={`hint-${field.key}`} className="block text-xs leading-5 text-[var(--color-text-muted)]">{field.hint}</span>}
+                  {fieldError(field.key) && <span id={`error-${field.key}`} role="alert" className="block text-sm text-[var(--color-danger)]">{fieldError(field.key)}</span>}
+                  {field.key === 'registrationNumber' && (
+                    <span id="ueln-check-status" role="status" className="block text-xs text-[var(--color-text-muted)]">
+                      {uelnCheck.status === 'checking' ? 'Checking UELN…' : uelnCheck.status === 'error' ? uelnCheck.message : ''}
+                    </span>
+                  )}
+                </label>
+              );
+            })}
           </div>
           <label className="block space-y-1">
             <span className="text-sm font-medium">Pedigree notes</span>
