@@ -79,6 +79,8 @@ async def extract_document_info(
             data=extracted
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OCR extraction failed: {str(e)}")
 

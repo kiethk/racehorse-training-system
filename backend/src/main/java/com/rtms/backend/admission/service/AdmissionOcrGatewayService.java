@@ -16,7 +16,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -48,6 +47,7 @@ public class AdmissionOcrGatewayService {
         this.connectTimeout = Duration.ofSeconds(connectTimeoutSeconds);
         this.readTimeout = Duration.ofSeconds(readTimeoutSeconds);
         this.httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(this.connectTimeout)
                 .build();
     }
@@ -57,13 +57,29 @@ public class AdmissionOcrGatewayService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is required for OCR scanning");
         }
 
-        // 1. Validate file (size, content type, magic bytes) via FileStorageService
+        // 1. Read raw bytes up-front to prevent stream closed / stream exhaustion issues
+        byte[] fileBytes;
+        try {
+            fileBytes = file.getBytes();
+        } catch (IOException e) {
+            log.error("Failed to read uploaded file bytes for OCR: {}", e.getMessage(), e);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot read uploaded file content");
+        }
+
+        // 2. Validate file (size, content type, magic bytes) via FileStorageService
         fileStorage.validate(file);
 
-        // 2. Store file immediately on local disk / Cloudinary to guarantee Zero Duplicate Upload
-        String tempFolder = "rtms/admissions/temp/" + UUID.randomUUID();
-        String storedKey = fileStorage.store(file, tempFolder);
+        // 3. Store file immediately on local disk / Cloudinary to guarantee Zero Duplicate Upload
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "document";
+        String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
+        String tempFolder = "rtms/admissions/temp/" + UUID.randomUUID();
+        String storedKey;
+        try {
+            storedKey = fileStorage.store(file, tempFolder);
+        } catch (Exception ex) {
+            log.warn("File storage store operation failed: {}. Preserving local temporary marker.", ex.getMessage());
+            storedKey = "temp:" + UUID.randomUUID() + "_" + originalFilename;
+        }
 
         OcrExtractionResponse.FileReference fileReference = new OcrExtractionResponse.FileReference(
                 storedKey,
@@ -71,9 +87,9 @@ public class AdmissionOcrGatewayService {
                 originalFilename
         );
 
-        // 3. Delegate to AI Worker service
+        // 4. Delegate to AI Worker service
         try {
-            return callAiWorker(file, documentType, fileReference);
+            return callAiWorker(fileBytes, originalFilename, contentType, documentType, fileReference);
         } catch (Exception ex) {
             log.warn("AI OCR Worker call failed or unavailable ({}: {}). Returning safe fallback with stored file.",
                     aiServiceUrl, ex.getMessage());
@@ -82,11 +98,13 @@ public class AdmissionOcrGatewayService {
     }
 
     private OcrExtractionResponse callAiWorker(
-            MultipartFile file,
+            byte[] fileBytes,
+            String filename,
+            String contentType,
             AdmissionDocumentType documentType,
             OcrExtractionResponse.FileReference fileReference) throws IOException, InterruptedException {
-        String boundary = "Boundary-" + UUID.randomUUID();
-        byte[] multipartBody = buildMultipartBody(boundary, file, documentType);
+        String boundary = "----WebKitFormBoundary" + UUID.randomUUID().toString().replace("-", "");
+        byte[] multipartBody = buildMultipartBody(boundary, fileBytes, filename, contentType, documentType);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(aiServiceUrl + "/internal/v1/ocr/extract"))
@@ -161,24 +179,29 @@ public class AdmissionOcrGatewayService {
         );
     }
 
-    private byte[] buildMultipartBody(String boundary, MultipartFile file, AdmissionDocumentType documentType) throws IOException {
+    private byte[] buildMultipartBody(
+            String boundary,
+            byte[] fileBytes,
+            String filename,
+            String contentType,
+            AdmissionDocumentType documentType) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         String lineBreak = "\r\n";
 
-        // Field: documentType
-        out.write(("--" + boundary + lineBreak).getBytes(StandardCharsets.UTF_8));
-        out.write(("Content-Disposition: form-data; name=\"documentType\"" + lineBreak + lineBreak).getBytes(StandardCharsets.UTF_8));
-        out.write(((documentType != null ? documentType.name() : "") + lineBreak).getBytes(StandardCharsets.UTF_8));
+        // Field: documentType (optional)
+        if (documentType != null) {
+            out.write(("--" + boundary + lineBreak).getBytes(StandardCharsets.UTF_8));
+            out.write(("Content-Disposition: form-data; name=\"documentType\"" + lineBreak + lineBreak).getBytes(StandardCharsets.UTF_8));
+            out.write((documentType.name() + lineBreak).getBytes(StandardCharsets.UTF_8));
+        }
 
         // Field: file
-        String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "document";
-        String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
+        String safeFilename = (filename != null && !filename.isBlank()) ? filename : "document";
+        String safeContentType = (contentType != null && !contentType.isBlank()) ? contentType : "application/octet-stream";
         out.write(("--" + boundary + lineBreak).getBytes(StandardCharsets.UTF_8));
-        out.write(("Content-Disposition: form-data; name=\"file\"; filename=\"" + filename + "\"" + lineBreak).getBytes(StandardCharsets.UTF_8));
-        out.write(("Content-Type: " + contentType + lineBreak + lineBreak).getBytes(StandardCharsets.UTF_8));
-        try (InputStream in = file.getInputStream()) {
-            in.transferTo(out);
-        }
+        out.write(("Content-Disposition: form-data; name=\"file\"; filename=\"" + safeFilename + "\"" + lineBreak).getBytes(StandardCharsets.UTF_8));
+        out.write(("Content-Type: " + safeContentType + lineBreak + lineBreak).getBytes(StandardCharsets.UTF_8));
+        out.write(fileBytes);
         out.write(lineBreak.getBytes(StandardCharsets.UTF_8));
 
         // End of multipart
