@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { cn } from '@/lib/cn';
-import { openProtectedFile, useProtectedFileUrl } from '@/lib/protectedFile';
+import { useProtectedFileUrl } from '@/lib/protectedFile';
+import { ImageLightbox } from './ImageLightbox';
 import { Skeleton } from './Skeleton';
 
 interface ProtectedImageProps {
@@ -9,13 +11,14 @@ interface ProtectedImageProps {
   src: string;
   alt: string;
   className?: string;
-  /** Wraps the image in a control that opens it full size in a new tab. */
+  /** Wraps the image in a control that opens it full size directly in a lightbox preview. */
   openOnClick?: boolean;
 }
 
 /** An image stored by the backend. Use this instead of <img> for any file served by a protected endpoint. */
 export function ProtectedImage({ src, alt, className, openOnClick = false }: ProtectedImageProps) {
   const { url, failed } = useProtectedFileUrl(src);
+  const [viewing, setViewing] = useState(false);
 
   if (failed) {
     return <p className="text-xs italic text-[var(--color-text-muted)]">The image could not be loaded.</p>;
@@ -29,13 +32,23 @@ export function ProtectedImage({ src, alt, className, openOnClick = false }: Pro
   if (!openOnClick) return image;
 
   return (
-    <button
-      type="button"
-      onClick={() => { openProtectedFile(src).catch(() => undefined); }}
-      aria-label={`Open full size: ${alt}`}
-      className="block w-full cursor-zoom-in overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-    >
-      {image}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => setViewing(true)}
+        aria-label={`Preview full size: ${alt}`}
+        className="block w-full cursor-zoom-in overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+      >
+        {image}
+      </button>
+      {viewing && (
+        <ImageLightbox
+          images={[{ src: url, alt }]}
+          index={0}
+          onIndexChange={() => undefined}
+          onClose={() => setViewing(false)}
+        />
+      )}
+    </>
   );
 }

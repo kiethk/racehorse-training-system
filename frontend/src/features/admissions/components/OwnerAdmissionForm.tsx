@@ -2,12 +2,14 @@
 
 import { FileInput, Input, Select, Textarea } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { ImageLightbox, ImageThumbnail } from '@/components/ui/ImageLightbox';
 import { AdmissionInfoSection } from '../shared/components/AdmissionInfoSection';
 import { ownerAdmissionApi } from '../services/ownerApi';
 import { useAdmissionUelnCheck } from '../hooks/useAdmissionUelnCheck';
+import { renderPdfFirstPage } from '@/lib/pdfThumbnail';
 import { ApiError } from '@/services/api';
 import type { CreateOwnerAdmissionRequest, AdmissionDocumentType, AdmissionDocumentUpload } from '../types/owner';
 import type { HorseSex } from '@/types/horse';
@@ -92,6 +94,8 @@ export function OwnerAdmissionForm() {
   const metadataDetails = useRef<Partial<Record<AdmissionDocumentType, HTMLDetailsElement | null>>>({});
   const [form, setForm] = useState<AdmissionFormState>({ name: '', sex: '' });
   const [selections, setSelections] = useState<Partial<Record<AdmissionDocumentType, Selection>>>({});
+  const [filePreviews, setFilePreviews] = useState<Partial<Record<AdmissionDocumentType, string>>>({});
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
   const [documentErrors, setDocumentErrors] = useState<DocumentErrors>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [recordErrors, setRecordErrors] = useState<DocumentErrors>({});
@@ -102,11 +106,29 @@ export function OwnerAdmissionForm() {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+  const previewsRef = useRef(filePreviews);
+  previewsRef.current = filePreviews;
+  useEffect(() => () => {
+    Object.values(previewsRef.current).forEach(url => {
+      if (url) URL.revokeObjectURL(url);
+    });
+  }, []);
+
   function updateSelection(type: AdmissionDocumentType, update: Partial<Selection>) {
     setSelections(current => ({ ...current, [type]: { recordDate: '', note: '', ...current[type], ...update } }));
   }
 
   function selectFile(type: AdmissionDocumentType, file?: File) {
+    const oldUrl = filePreviews[type];
+    if (oldUrl) {
+      URL.revokeObjectURL(oldUrl);
+      setFilePreviews(curr => {
+        const next = { ...curr };
+        delete next[type];
+        return next;
+      });
+    }
+
     const imageOnly = type === 'HORSE_PHOTO';
     const allowed = ['image/jpeg', 'image/png', 'image/webp', ...(imageOnly ? [] : ['application/pdf'])];
     let message = '';
@@ -115,11 +137,26 @@ export function OwnerAdmissionForm() {
     } else if (file && !allowed.includes(file.type)) {
       message = imageOnly ? 'Select a JPEG, PNG or WebP image.' : 'Select a PDF, JPEG, PNG or WebP file.';
     }
+
     updateSelection(type, { file: message ? undefined : file });
     setDocumentErrors(current => ({ ...current, [type]: message }));
     setError('');
     const input = fileInputs.current[type];
-    if (message && input) input.value = '';
+    if (message && input) {
+      input.value = '';
+    } else if (file) {
+      if (file.type.startsWith('image/')) {
+        const previewUrl = URL.createObjectURL(file);
+        setFilePreviews(curr => ({ ...curr, [type]: previewUrl }));
+      } else if (file.type === 'application/pdf') {
+        renderPdfFirstPage(file, 240)
+          .then(png => {
+            const previewUrl = URL.createObjectURL(png);
+            setFilePreviews(curr => ({ ...curr, [type]: previewUrl }));
+          })
+          .catch(() => undefined);
+      }
+    }
   }
 
   function focusDocument(type: AdmissionDocumentType, recordDate = false) {
@@ -215,6 +252,8 @@ export function OwnerAdmissionForm() {
   function renderDocument(section: typeof DOCUMENTS[number]) {
     const selection = selections[section.type];
     const message = documentErrors[section.type];
+    const previewUrl = filePreviews[section.type];
+
     return (
       <fieldset key={section.type} className="min-w-0 space-y-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
         <legend className="px-1 text-sm font-semibold">
@@ -238,8 +277,22 @@ export function OwnerAdmissionForm() {
           {message && <p id={`error-${section.type}`} role="alert" className="text-sm text-[var(--color-danger)]">{message}</p>}
         </div>
         {selection?.file ? (
-          <div className="flex items-center justify-between gap-2 text-sm">
-            <span className="min-w-0 break-all">{selection.file.name}</span>
+          <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="flex min-w-0 items-center gap-3">
+              {previewUrl ? (
+                <ImageThumbnail
+                  src={previewUrl}
+                  alt={selection.file.name}
+                  onClick={() => setLightboxImage({ src: previewUrl, alt: selection.file!.name })}
+                  className="h-14 w-14 shrink-0"
+                />
+              ) : (
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] text-xs font-semibold text-[var(--color-text-muted)]">
+                  {selection.file.type === 'application/pdf' ? 'PDF' : 'FILE'}
+                </span>
+              )}
+              <span className="min-w-0 break-all font-medium text-[var(--color-text-primary)]">{selection.file.name}</span>
+            </span>
             <Button type="button" size="sm" aria-label={`Remove ${section.label.toLowerCase()}`} onClick={() => {
               selectFile(section.type);
               const input = fileInputs.current[section.type];
@@ -375,6 +428,14 @@ export function OwnerAdmissionForm() {
           <Button variant="primary" type="submit" loading={busy}
             disabled={uelnCheck.status === 'checking' || uelnCheck.status === 'unavailable'}>Submit admission</Button>
         </div>
+        {lightboxImage && (
+          <ImageLightbox
+            images={[lightboxImage]}
+            index={0}
+            onIndexChange={() => undefined}
+            onClose={() => setLightboxImage(null)}
+          />
+        )}
       </fieldset>
     </form>
   );

@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
+import { ImageLightbox } from '@/components/ui/ImageLightbox';
 import { incidentApi } from '../services/incidentService';
 import { stableApi } from '@/features/stable/services/stableService';
 import type { Horse, StableStall } from '@/features/stable/types';
@@ -37,9 +38,14 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
   const [severity, setSeverity] = useState<IncidentSeverity>('MEDIUM');
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [viewingPreview, setViewingPreview] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   useEffect(() => {
     async function loadData() {
@@ -93,10 +99,12 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
         setError('The image must not exceed 10 MB.');
         return;
       }
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setFile(f);
       const url = URL.createObjectURL(f);
       setPreviewUrl(url);
     } else {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setFile(null);
       setPreviewUrl(null);
     }
@@ -338,13 +346,35 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
 
                 {previewUrl && (
                   <div className="relative mt-2 inline-block max-w-xs">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={previewUrl}
-                      alt="Image preview"
-                      className="max-h-48 rounded-[var(--radius-md)] border border-[var(--color-border)] object-cover"
+                    <button
+                      type="button"
+                      onClick={() => setViewingPreview(true)}
+                      aria-label="Preview full size image"
+                      className="group block cursor-zoom-in overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={previewUrl}
+                        alt="Image preview"
+                        className="max-h-48 object-cover transition-transform group-hover:scale-105"
+                      />
+                    </button>
+                    <IconButton
+                      icon="x"
+                      size="sm"
+                      variant="secondary"
+                      label="Remove image"
+                      className="absolute right-2 top-2 rounded-full shadow-sm"
+                      onClick={handleRemoveFile}
                     />
-                    <IconButton icon="x" size="sm" variant="secondary" label="Remove image" className="absolute right-2 top-2 rounded-full" onClick={handleRemoveFile} />
+                    {viewingPreview && (
+                      <ImageLightbox
+                        images={[{ src: previewUrl, alt: 'Incident preview' }]}
+                        index={0}
+                        onIndexChange={() => undefined}
+                        onClose={() => setViewingPreview(false)}
+                      />
+                    )}
                   </div>
                 )}
               </div>
