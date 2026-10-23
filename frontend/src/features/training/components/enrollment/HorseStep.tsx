@@ -44,25 +44,43 @@ export function HorseStep({
             const blocked = horse.trainingDecision === 'BLOCKED';
             const selected = selectedIds.includes(horse.id);
             return (
-              <li key={horse.id}>
+              <li key={horse.id} className="h-full">
                 <label
+                  title={blocked ? `Training blocked: ${horse.trainingDecisionReason || 'Medically restricted'}` : undefined}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-[var(--radius-md)] border p-2.5 text-xs transition-colors duration-[var(--duration-fast)]',
-                    blocked && 'cursor-not-allowed opacity-70',
+                    'flex h-full min-h-[60px] items-center gap-2.5 rounded-[var(--radius-md)] border p-2.5 text-xs transition-colors duration-[var(--duration-fast)]',
+                    blocked && 'cursor-not-allowed bg-[var(--color-surface-muted)]/40 opacity-75',
                     !blocked && 'cursor-pointer hover:bg-[var(--color-surface-muted)]',
                     selected ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]' : 'border-[var(--color-border)]',
                   )}
                 >
                   <ChoiceInput type="checkbox" checked={selected} disabled={blocked} onChange={() => onToggle(horse.id)} />
-                  <div className="min-w-0 space-y-0.5">
-                    <div className="truncate font-semibold text-[var(--color-text-primary)]">{horse.name}</div>
-                    <div className="text-[var(--color-text-muted)]">{horse.breed || 'Breed unknown'}</div>
-                    {blocked && (
-                      <Pill tone="danger" size="sm" icon="lock">Training blocked</Pill>
-                    )}
-                    {blocked && horse.trainingDecisionReason && (
-                      <div className="text-[var(--color-danger)]">{horse.trainingDecisionReason}</div>
-                    )}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center justify-between gap-1.5 min-w-0">
+                      <span className="truncate font-semibold text-[var(--color-text-primary)]" title={horse.name}>
+                        {horse.name}
+                      </span>
+                      {blocked && (
+                        <span className="shrink-0">
+                          <Pill tone="danger" size="sm" icon="lock">
+                            <span className="hidden sm:inline">Training </span>blocked
+                          </Pill>
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-1.5 min-w-0 text-[11px]">
+                      <span className="truncate text-[var(--color-text-muted)] shrink-0">
+                        {horse.breed || 'Breed unknown'}
+                      </span>
+                      {blocked && horse.trainingDecisionReason && (
+                        <span
+                          className="truncate text-[var(--color-danger)] font-medium text-right"
+                          title={horse.trainingDecisionReason}
+                        >
+                          {horse.trainingDecisionReason}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </label>
               </li>
