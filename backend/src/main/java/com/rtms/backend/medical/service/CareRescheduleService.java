@@ -42,20 +42,33 @@ public class CareRescheduleService {
     private final UserRepository users;
     private final AuditLogRepository auditLogs;
     private final PreventiveStatusService preventiveStatus;
+    private final CareScheduleService careScheduleService;
     private final Clock clock;
 
     @Autowired
     public CareRescheduleService(CareScheduleRepository schedules, UserRepository users,
+            AuditLogRepository auditLogs, PreventiveStatusService preventiveStatus,
+            CareScheduleService careScheduleService) {
+        this(schedules, users, auditLogs, preventiveStatus, careScheduleService, Clock.systemDefaultZone());
+    }
+
+    public CareRescheduleService(CareScheduleRepository schedules, UserRepository users,
             AuditLogRepository auditLogs, PreventiveStatusService preventiveStatus) {
-        this(schedules, users, auditLogs, preventiveStatus, Clock.systemDefaultZone());
+        this(schedules, users, auditLogs, preventiveStatus, null, Clock.systemDefaultZone());
     }
 
     CareRescheduleService(CareScheduleRepository schedules, UserRepository users, AuditLogRepository auditLogs,
             PreventiveStatusService preventiveStatus, Clock clock) {
+        this(schedules, users, auditLogs, preventiveStatus, null, clock);
+    }
+
+    CareRescheduleService(CareScheduleRepository schedules, UserRepository users, AuditLogRepository auditLogs,
+            PreventiveStatusService preventiveStatus, CareScheduleService careScheduleService, Clock clock) {
         this.schedules = schedules;
         this.users = users;
         this.auditLogs = auditLogs;
         this.preventiveStatus = preventiveStatus;
+        this.careScheduleService = careScheduleService;
         this.clock = clock;
     }
 
@@ -90,6 +103,9 @@ public class CareRescheduleService {
         schedule.setRescheduleReason(request.getReason());
         schedule.setRescheduleNote(request.getNote() == null || request.getNote().isBlank() ? null : request.getNote().trim());
         CareSchedule saved = schedules.save(schedule);
+        if (careScheduleService != null) {
+            careScheduleService.assignRequestedSchedule(saved);
+        }
 
         AuditLog audit = new AuditLog();
         audit.setAction(AUDIT_ACTION);

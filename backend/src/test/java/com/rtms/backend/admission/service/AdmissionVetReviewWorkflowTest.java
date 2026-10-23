@@ -28,7 +28,7 @@ import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.medical.service.PreventiveVaccinationService;
 import com.rtms.backend.notification.service.NotificationService;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingWorkoutService;
@@ -78,7 +78,7 @@ class AdmissionVetReviewWorkflowTest {
     @Mock
     private StableStallRepository stallRepository;
     @Mock
-    private GroomIncidentReportRepository incidentRepository;
+    private HorseIncidentReportRepository incidentRepository;
     @Mock
     private VeterinarianProfileRepository vetProfileRepository;
     @Mock
@@ -321,6 +321,36 @@ class AdmissionVetReviewWorkflowTest {
         assertEquals("Desert Star", item.candidateName());
         assertEquals("Trainer Mike", item.trainerName());
         assertEquals(CareScheduleStatus.SCHEDULED, item.careSchedule().status());
+    }
+
+
+    @Test
+    @DisplayName("getVetQueueSummary counts active, awaiting, inProgress, and approved")
+    void getVetQueueSummary_countsAllBuckets() {
+        Long vetId = 15L;
+        List<CareScheduleStatus> activeStatuses = List.of(
+                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+
+        when(careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(vetId, activeStatuses))
+                .thenReturn(5L);
+        when(careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses))
+                .thenReturn(3L);
+        when(careScheduleRepository.countActiveVetQueueItems(
+                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED)))
+                .thenReturn(2L);
+        when(careScheduleRepository.countActiveVetQueueItems(
+                vetId, List.of(CareScheduleStatus.IN_PROGRESS)))
+                .thenReturn(1L);
+        when(careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses))
+                .thenReturn(2L);
+
+        var summary = admissionQueryService.getVetQueueSummary(vetId);
+
+        assertEquals(5L, summary.total());
+        assertEquals(3L, summary.active());
+        assertEquals(2L, summary.awaiting());
+        assertEquals(1L, summary.inProgress());
+        assertEquals(2L, summary.approved());
     }
 
     @Test

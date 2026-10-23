@@ -21,7 +21,7 @@ import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.service.NotificationService;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingDecisionService;
@@ -58,7 +58,7 @@ class CareSchedulePreventiveIntegrationTest {
     @Mock AdmissionApplicationRepository admissions;
     @Mock StableStallRepository stalls;
     @Mock UserRepository users;
-    @Mock GroomIncidentReportRepository incidents;
+    @Mock HorseIncidentReportRepository incidents;
     @Mock VeterinarianProfileRepository profiles;
     @Mock AuditLogRepository audits;
     @Mock ApplicationEventPublisher events;
@@ -99,6 +99,8 @@ class CareSchedulePreventiveIntegrationTest {
             return record;
         });
         when(schedules.save(any(CareSchedule.class))).thenAnswer(call -> call.getArgument(0));
+        // Lịch khám lại tự động (AUTO cadence) cũng đi qua saveAndFlush.
+        when(schedules.saveAndFlush(any(CareSchedule.class))).thenAnswer(call -> call.getArgument(0));
     }
 
     // ---- completeCareSchedule + vaccinations[] ----

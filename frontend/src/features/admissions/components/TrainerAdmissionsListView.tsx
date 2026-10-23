@@ -155,7 +155,7 @@ export function TrainerAdmissionsListView() {
     return s ? `?${s}` : '';
   }, [urlFilters]);
 
-  if (loading) return <AdmissionListLayout title="Admissions" description="Assess racing potential and readiness of candidate horses in the quarantine facility."><ListSkeleton rows={6} /></AdmissionListLayout>;
+  if (loading) return <AdmissionListLayout title="Admissions"><ListSkeleton rows={6} /></AdmissionListLayout>;
 
   type Row = TrainerAdmissionQueue['pending'][number];
   const extraColumns: DataTableColumn<Row>[] = [
@@ -176,7 +176,7 @@ export function TrainerAdmissionsListView() {
   ];
 
   return (
-    <AdmissionListLayout title="Admissions" description="Assess racing potential and readiness of candidate horses in the quarantine facility.">
+    <AdmissionListLayout title="Admissions">
       <FilterChips
         label="Application type"
         value={urlFilters.tab}

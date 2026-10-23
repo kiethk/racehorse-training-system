@@ -63,6 +63,13 @@ export function UrgentAssignmentModal({ alert, onOpenCase }: Props) {
           Training is paused until the examination is complete.
         </Notice>
 
+        {alert.previousTrainingDecision === 'BLOCKED' && (
+          <Notice tone="warning" title="Pre-existing training hold">
+            This horse was already blocked from training before this incident. An ALLOWED conclusion keeps that
+            hold{alert.previousTrainingDecisionReason ? `: ${alert.previousTrainingDecisionReason}.` : ' in place.'}
+          </Notice>
+        )}
+
         <section className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
           <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{alert.title}</h3>
           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-secondary)]">

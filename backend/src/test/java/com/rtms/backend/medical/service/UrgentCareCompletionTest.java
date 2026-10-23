@@ -18,9 +18,9 @@ import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
-import com.rtms.backend.stable.entity.GroomIncidentReport;
-import com.rtms.backend.stable.enums.IncidentStatus;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
+import com.rtms.backend.incident.entity.HorseIncidentReport;
+import com.rtms.backend.incident.enums.IncidentStatus;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingWorkoutService;
@@ -59,7 +59,7 @@ class UrgentCareCompletionTest {
     @Mock private AdmissionApplicationRepository admissionRepository;
     @Mock private StableStallRepository stallRepository;
     @Mock private UserRepository userRepository;
-    @Mock private GroomIncidentReportRepository incidentReportRepository;
+    @Mock private HorseIncidentReportRepository incidentReportRepository;
     @Mock private VeterinarianProfileRepository veterinarianProfileRepository;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
@@ -72,7 +72,7 @@ class UrgentCareCompletionTest {
     private Horse horse;
     private User vet;
     private CareSchedule urgentSchedule;
-    private GroomIncidentReport incident;
+    private HorseIncidentReport incident;
 
     @BeforeEach
     void setUp() {
@@ -100,7 +100,7 @@ class UrgentCareCompletionTest {
         role.setName("VETERINARIAN");
         vet.setRole(role);
 
-        incident = new GroomIncidentReport();
+        incident = new HorseIncidentReport();
         incident.setId(30L);
         incident.setStatus(IncidentStatus.IN_REVIEW);
 
@@ -168,13 +168,58 @@ class UrgentCareCompletionTest {
     }
 
     @Test
+    @DisplayName("Trạng thái khóa cũ được giữ lại: đóng ca khẩn cấp cuối vẫn BLOCKED vì lý do trước đó")
+    void testCompleteUrgentSchedule_restoresPreviousBlock() {
+        HealthRecord previous = new HealthRecord();
+        previous.setTrainingDecision(TrainingDecision.BLOCKED);
+        previous.setRestrictionDetails("Injury rest");
+        when(healthRecordRepository.findTopByHorseIdAndRecordTypeNotAndTrainingDecisionIsNotNullOrderByExaminedAtDesc(
+                horse.getId(), CareType.URGENT.name())).thenReturn(Optional.of(previous));
+
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        stubCompletion();
+        incident.setGroomId(55L);
+        when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
+                .thenReturn(java.util.List.of(incident));
+
+        careScheduleService.completeCareSchedule(urgentSchedule.getId(),
+                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
+        assertEquals("Injury rest", horse.getTrainingDecisionReason());
+        assertFalse(horse.canTrain());
+        // Groom and Trainer must be told the effective state, not the raw ALLOWED conclusion.
+        assertTrue(incident.getHandlerNote().contains("Training: blocked"));
+        assertTrue(incident.getHandlerNote().contains("Injury rest"));
+        verify(notificationService).sendAssignmentNotification(
+                eq(55L),
+                eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
+                eq(urgentSchedule.getId()),
+                eq(horse.getId()),
+                eq(NotificationTypes.URGENT_CASE_CLOSED),
+                anyString(),
+                contains("BLOCKED")
+        );
+        verify(notificationService).sendAssignmentNotification(
+                eq(55L),
+                eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
+                eq(urgentSchedule.getId()),
+                eq(horse.getId()),
+                eq(NotificationTypes.URGENT_CASE_CLOSED),
+                anyString(),
+                contains("Injury rest")
+        );
+    }
+
+    @Test
     @DisplayName("Đóng ca Urgent resolve toàn bộ 3 báo cáo mở của ngựa, không đụng báo cáo ngựa khác")
     void testCompleteUrgentSchedule_resolvesAllOpenIncidentsOfHorse() {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         horse.setTrainingDecision(TrainingDecision.BLOCKED);
-        GroomIncidentReport second = incidentOf(31L, IncidentStatus.REPORTED);
-        GroomIncidentReport third = incidentOf(32L, IncidentStatus.IN_REVIEW);
-        GroomIncidentReport otherHorse = incidentOf(99L, IncidentStatus.REPORTED);
+        HorseIncidentReport second = incidentOf(31L, IncidentStatus.REPORTED);
+        HorseIncidentReport third = incidentOf(32L, IncidentStatus.IN_REVIEW);
+        HorseIncidentReport otherHorse = incidentOf(99L, IncidentStatus.REPORTED);
         otherHorse.setHorseId(77L);
 
         incident.setGroomId(55L);
@@ -186,7 +231,7 @@ class UrgentCareCompletionTest {
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequest(TrainingDecision.ALLOWED), vet.getId());
 
-        for (GroomIncidentReport r : java.util.List.of(incident, second, third)) {
+        for (HorseIncidentReport r : java.util.List.of(incident, second, third)) {
             assertEquals(IncidentStatus.RESOLVED, r.getStatus());
             assertEquals(vet.getId(), r.getHandledById());
             assertNotNull(r.getHandledAt());
@@ -239,8 +284,70 @@ class UrgentCareCompletionTest {
         assertEquals(IncidentStatus.RESOLVED, incident.getStatus());
     }
 
-    private GroomIncidentReport incidentOf(Long id, IncidentStatus status) {
-        GroomIncidentReport r = new GroomIncidentReport();
+    @Test
+    @DisplayName("BR-URG-13: alert trả trạng thái tập trước ca khẩn cấp để Vet thấy cảnh báo báo nhầm")
+    void testGetUrgentCase_exposesPreviousTrainingDecision() {
+        HealthRecord previous = new HealthRecord();
+        previous.setTrainingDecision(TrainingDecision.BLOCKED);
+        previous.setRestrictionDetails("Injury rest");
+        when(healthRecordRepository.findTopByHorseIdAndRecordTypeNotAndTrainingDecisionIsNotNullOrderByExaminedAtDesc(
+                horse.getId(), CareType.URGENT.name())).thenReturn(Optional.of(previous));
+        when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(horseRepository.findById(horse.getId())).thenReturn(Optional.of(horse));
+
+        var alert = careScheduleService.getUrgentCase(urgentSchedule.getId(), vet.getId());
+
+        assertEquals(TrainingDecision.BLOCKED, alert.previousTrainingDecision());
+        assertEquals("Injury rest", alert.previousTrainingDecisionReason());
+    }
+
+    @Test
+    @DisplayName("Báo cáo gộp vào ca khẩn cấp hiển thị đủ cho Thú y được giao, kể cả báo cáo nguồn")
+    void testGetUrgentCaseReports_includesMergedReports() {
+        incident.setCareScheduleId(urgentSchedule.getId());
+        incident.setReportedAt(LocalDateTime.now().minusHours(1));
+        HorseIncidentReport merged = incidentOf(31L, IncidentStatus.REPORTED);
+        merged.setCareScheduleId(urgentSchedule.getId());
+        merged.setReportedAt(LocalDateTime.now());
+
+        when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(urgentSchedule.getId()))
+                .thenReturn(java.util.List.of(incident, merged));
+
+        var reports = careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), vet.getId());
+
+        assertEquals(java.util.List.of(30L, 31L), reports.stream().map(r -> r.id()).toList());
+    }
+
+    @Test
+    @DisplayName("Báo cáo nguồn cũ chưa gắn care_schedule_id vẫn được trả về")
+    void testGetUrgentCaseReports_fallsBackToSourceIncident() {
+        incident.setReportedAt(LocalDateTime.now());
+        when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(urgentSchedule.getId()))
+                .thenReturn(java.util.List.of());
+        when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+
+        var reports = careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), vet.getId());
+
+        assertEquals(1, reports.size());
+        assertEquals(incident.getId(), reports.get(0).id());
+    }
+
+    @Test
+    @DisplayName("Thú y không được giao ca không xem được báo cáo của ca")
+    void testGetUrgentCaseReports_rejectsOtherVeterinarian() {
+        when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), 999L));
+
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
+        verify(incidentReportRepository, never()).findByCareScheduleIdOrderByReportedAtAsc(anyLong());
+    }
+
+    private HorseIncidentReport incidentOf(Long id, IncidentStatus status) {
+        HorseIncidentReport r = new HorseIncidentReport();
         r.setId(id);
         r.setHorseId(horse.getId());
         r.setStatus(status);
@@ -302,6 +409,9 @@ class UrgentCareCompletionTest {
         stubCompletion();
         when(careScheduleRepository.existsByHorseIdAndCareTypeAndStatusInAndIdNot(
                 eq(10L), eq(CareType.URGENT), anyList(), eq(100L))).thenReturn(true);
+        incident.setGroomId(55L);
+        when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
+                .thenReturn(java.util.List.of(incident));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequest(TrainingDecision.ALLOWED), vet.getId());
@@ -312,6 +422,18 @@ class UrgentCareCompletionTest {
         ArgumentCaptor<HealthRecord> record = ArgumentCaptor.forClass(HealthRecord.class);
         verify(healthRecordRepository).save(record.capture());
         assertEquals(TrainingDecision.ALLOWED, record.getValue().getTrainingDecision());
+        // Groom được báo đúng trạng thái hiệu lực: ngựa vẫn bị khóa vì ca khác còn mở.
+        assertTrue(incident.getHandlerNote().contains("Training: blocked"));
+        assertTrue(incident.getHandlerNote().contains("Urgent veterinary care pending"));
+        verify(notificationService).sendAssignmentNotification(
+                eq(55L),
+                eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
+                eq(urgentSchedule.getId()),
+                eq(horse.getId()),
+                eq(NotificationTypes.URGENT_CASE_CLOSED),
+                anyString(),
+                contains("BLOCKED")
+        );
     }
 
     @Test

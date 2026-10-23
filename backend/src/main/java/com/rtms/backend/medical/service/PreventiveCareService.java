@@ -1,4 +1,5 @@
 package com.rtms.backend.medical.service;
+
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
@@ -7,9 +8,9 @@ import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
 import com.rtms.backend.medical.dto.CreatePreventiveCareScheduleRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
-
 
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.medical.enums.CareType;
@@ -18,7 +19,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -46,20 +55,104 @@ public class PreventiveCareService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
                     "Only ROUTINE_EXAM, VACCINATION and DEWORMING can be created here; INITIAL_EXAM is created by the Groom/admission flow");
         }
-        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
-        next.setHorseId(request.getHorseId());
+        if (request.getHorseId() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "horseId is required");
+        }
+
+        // 1. Look for completed schedule examined by the current veterinarian
         CareSchedule source = schedules
                 .findFirstByVeterinarianIdAndHorseIdAndStatusOrderByCompletedAtDesc(
-                        user.getUserId(), request.getHorseId(), com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED)
-                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
-                        "A veterinarian may only schedule preventive care for a horse they previously examined"));
-        next.setSourceScheduleId(source.getId());
-        next.setCareType(CareType.ROUTINE);
-        next.setScheduledDate(request.getScheduledDate() == null ? null : request.getScheduledDate().toString());
-        next.setDescription(request.getCareType() + ": " + (request.getDescription() == null ? "" : request.getDescription()));
-        next.setIdempotencyKey("preventive:" + request.getCareType() + ":" + request.getHorseId() + ":" + request.getScheduledDate());
-        CareScheduleResponse created = care.createNextSchedule(next, user.getUserId());
-        return schedules.findById(created.id()).orElseThrow();
+                        user.getUserId(), request.getHorseId(), CareScheduleStatus.COMPLETED)
+                .orElse(null);
+
+        // 2. If none by current vet, find the most recent completed schedule for this horse regardless of vet
+        if (source == null) {
+            List<CareSchedule> completed = schedules.findByHorseIdAndStatusIn(
+                    request.getHorseId(), List.of(CareScheduleStatus.COMPLETED));
+            if (!completed.isEmpty()) {
+                source = completed.stream()
+                        .filter(s -> s.getCompletedAt() != null)
+                        .max(Comparator.comparing(CareSchedule::getCompletedAt))
+                        .orElse(completed.get(completed.size() - 1));
+            }
+        }
+
+        // 3. Verify horse exists (if source is null, verify via horses repository)
+        if (source == null && horses.findById(request.getHorseId()).isEmpty()) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found");
+        }
+
+        String scheduledDateStr = request.getScheduledDate() == null ? null : request.getScheduledDate().toString();
+        String description = request.getCareType() + ": " + (request.getDescription() == null ? "" : request.getDescription().trim());
+        String idempotencyKey = "preventive:" + request.getCareType() + ":" + request.getHorseId() + ":" + request.getScheduledDate();
+
+        // 4. If current veterinarian completed the source schedule, use unified createNextSchedule flow
+        if (source != null && Objects.equals(source.getVeterinarianId(), user.getUserId())) {
+            try {
+                CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+                next.setHorseId(request.getHorseId());
+                next.setSourceScheduleId(source.getId());
+                next.setCareType(CareType.ROUTINE);
+                next.setScheduledDate(scheduledDateStr);
+                next.setDescription(description);
+                next.setIdempotencyKey(idempotencyKey);
+                CareScheduleResponse created = care.createNextSchedule(next, user.getUserId());
+                return schedules.findById(created.id()).orElseThrow();
+            } catch (ApiException e) {
+                if (e.getStatus() != HttpStatus.FORBIDDEN) {
+                    throw e;
+                }
+                // Fallback to standalone routine care creation if rejected with FORBIDDEN
+            }
+        }
+
+        // 5. Standalone routine care request (no completed schedule yet, or examined by a different vet)
+        LocalDateTime requestedAt = null;
+        if (request.getScheduledDate() != null) {
+            requestedAt = request.getScheduledDate().atTime(14, 0);
+        }
+        if (requestedAt == null || !requestedAt.isAfter(LocalDateTime.now())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "Requested schedule time must be in the future");
+        }
+
+        Long admissionId = source != null ? source.getAdmissionId() : null;
+        String fingerprint = fingerprint(request.getHorseId(), admissionId, requestedAt, description);
+
+        Optional<CareSchedule> existing = schedules.findByRequestedByIdAndIdempotencyKey(user.getUserId(), idempotencyKey);
+        if (existing.isPresent()) {
+            if (!Objects.equals(existing.get().getRequestFingerprint(), fingerprint)) {
+                throw new ApiException(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT", "Idempotency key was already used with a different payload");
+            }
+            return existing.get();
+        }
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setHorseId(request.getHorseId());
+        schedule.setAdmissionId(admissionId);
+        schedule.setSourceScheduleId(null);
+        schedule.setRequestedById(user.getUserId());
+        schedule.setIdempotencyKey(idempotencyKey);
+        schedule.setRequestFingerprint(fingerprint);
+        schedule.setCareType(CareType.ROUTINE);
+        schedule.setPurpose(CareSchedulePurpose.PREVENTIVE);
+        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setDurationMinutes(30);
+        schedule.setDescription(description);
+        schedule.setRequestedAt(requestedAt);
+
+        CareSchedule saved = schedules.save(schedule);
+        care.assignRequestedSchedule(saved);
+        return saved;
+    }
+
+    private static String fingerprint(Long horseId, Long admissionId, LocalDateTime requestedAt, String description) {
+        String value = horseId + "|" + admissionId + "|ROUTINE|" + requestedAt + "|" + description;
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     public List<CareSchedule> getSchedulesByHorse(Long horseId, AuthenticatedUser user) {

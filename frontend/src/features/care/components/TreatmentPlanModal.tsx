@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
 import { careService } from '../services/careService';
-import { displayError } from '@/lib/display';
+import { displayError, formatLocalDateIso } from '@/lib/display';
 
 interface TreatmentPlanModalProps {
   open: boolean;
@@ -22,11 +22,11 @@ export function TreatmentPlanModal({
 }: TreatmentPlanModalProps) {
   const [treatmentName, setTreatmentName] = useState('');
   const [instructions, setInstructions] = useState('');
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(() => formatLocalDateIso());
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 14);
-    return d.toISOString().slice(0, 10);
+    return formatLocalDateIso(d);
   });
 
   // Initial Prescription
@@ -50,31 +50,45 @@ export function TreatmentPlanModal({
       setError('Clinical instructions are required.');
       return;
     }
+    if (endDate && startDate && endDate < startDate) {
+      setError('Target end date cannot be earlier than start date.');
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
+
       const plan = await careService.createTreatmentPlan(healthRecordId, {
         treatmentName: treatmentName.trim(),
         instructions: instructions.trim(),
         startDate,
-        endDate,
+        endDate: endDate || undefined,
       });
 
       if (includePrescription && medicationName.trim() && dosage.trim()) {
-        await careService.createPrescription(plan.id, {
-          medicationName: medicationName.trim(),
-          dosage: dosage.trim(),
-          frequency,
-          route,
-          startDate,
-          endDate,
-          instructions: prescriptionInstructions.trim(),
-        });
+        try {
+          await careService.createPrescription(plan.id, {
+            medicationName: medicationName.trim(),
+            dosage: dosage.trim(),
+            frequency: frequency.trim(),
+            route: route.trim(),
+            startDate,
+            endDate: endDate || undefined,
+            instructions: prescriptionInstructions.trim() || undefined,
+          });
+        } catch (rxErr) {
+          setError(
+            displayError(
+              rxErr,
+              'Treatment plan was created, but initial prescription failed. Please add the prescription manually.',
+            ),
+          );
+          return;
+        }
       }
 
       onSuccess();
-      onClose();
     } catch (err) {
       setError(displayError(err, 'Failed to create treatment plan.'));
     } finally {
@@ -87,30 +101,25 @@ export function TreatmentPlanModal({
       open={open}
       onClose={onClose}
       title="Create Treatment Plan"
-      description={horseName ? `Formulating clinical plan for ${horseName}` : 'Formulate a clinical treatment plan'}
+      description={horseName ? `Design care protocol for ${horseName}` : 'Design medical care protocol'}
       size="lg"
-      dismissible={!loading}
       footer={
-        <div className="flex justify-end gap-2.5">
+        <div className="flex items-center justify-end gap-2">
           <Button variant="secondary" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSubmit} loading={loading}>
-            Create Plan
+          <Button variant="primary" onClick={handleSubmit} disabled={loading}>
+            {loading ? 'Saving...' : 'Create Plan'}
           </Button>
         </div>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <Notice tone="error" title="Submission Error" onDismiss={() => setError(null)}>
-            {error}
-          </Notice>
-        )}
+        {error && <Notice tone="error">{error}</Notice>}
 
         <FormField label="Treatment Plan Name" required>
           <Input
-            placeholder="e.g. Superficial Digital Flexor Tendon Rehabilitation"
+            placeholder="e.g. Left Forelimb Desmitis Rehabilitation"
             value={treatmentName}
             onChange={(e) => setTreatmentName(e.target.value)}
             disabled={loading}
@@ -118,7 +127,7 @@ export function TreatmentPlanModal({
         </FormField>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Plan Start Date" required>
+          <FormField label="Start Date" required>
             <Input
               type="date"
               value={startDate}
@@ -126,8 +135,7 @@ export function TreatmentPlanModal({
               disabled={loading}
             />
           </FormField>
-
-          <FormField label="Target End Date" required>
+          <FormField label="Target End Date">
             <Input
               type="date"
               value={endDate}
@@ -137,33 +145,42 @@ export function TreatmentPlanModal({
           </FormField>
         </div>
 
-        <FormField label="Treatment Protocol & Instructions" required>
+        <FormField label="Clinical Instructions & Regimen" required>
           <Textarea
-            placeholder="Specify therapeutic modalities, bandage changes, stall rest, hand-walking schedule..."
+            rows={3}
+            placeholder="e.g. Hand walking 15 mins daily, cold hosing 2x/day for 20 mins, stall rest."
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
             disabled={loading}
-            rows={3}
           />
         </FormField>
 
-        {/* Initial Prescription Toggle */}
-        <div className="pt-2 border-t border-[var(--color-border-subtle)]">
-          <label className="flex items-center gap-2 cursor-pointer text-[13px] font-medium text-[var(--color-text-primary)]">
+        {/* Optional quick prescription */}
+        <div className="rounded-lg border border-[var(--color-border)] p-4 bg-[var(--color-surface-subtle)] space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                Attach Initial Prescription
+              </span>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Optionally add the primary medication immediately.
+              </p>
+            </div>
             <input
               type="checkbox"
+              id="includePrescription"
               checked={includePrescription}
               onChange={(e) => setIncludePrescription(e.target.checked)}
-              className="rounded border-[var(--color-border-strong)] text-[var(--color-primary)] focus:ring-[var(--color-focus)]"
+              className="h-4 w-4 rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+              disabled={loading}
             />
-            Attach initial prescription / medication
-          </label>
+          </div>
 
           {includePrescription && (
-            <div className="mt-3 p-3.5 bg-[var(--color-surface-muted)] rounded-[var(--radius-sm)] space-y-3">
-              <FormField label="Medication Name" required={includePrescription}>
+            <div className="space-y-3 pt-3 border-t border-[var(--color-border)]">
+              <FormField label="Medication Name" required>
                 <Input
-                  placeholder="e.g. Meloxicam, Omeprazole"
+                  placeholder="e.g. Phenylbutazone Paste"
                   value={medicationName}
                   onChange={(e) => setMedicationName(e.target.value)}
                   disabled={loading}
@@ -171,7 +188,7 @@ export function TreatmentPlanModal({
               </FormField>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <FormField label="Dosage" required={includePrescription}>
+                <FormField label="Dosage" required>
                   <Input
                     placeholder="e.g. 0.6 mg/kg"
                     value={dosage}

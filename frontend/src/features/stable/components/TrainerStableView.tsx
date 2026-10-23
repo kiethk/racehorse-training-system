@@ -180,7 +180,6 @@ export function TrainerStableView() {
     <ScreenLayout variant="dashboard">
       <PageHeader
         title="Stable"
-        description="View your assigned training areas, stalls, horses, and caring grooms."
         actions={
           <Button
             size="sm"
