@@ -395,25 +395,25 @@ public class GroqAgentOrchestratorService {
                    - Khi Huấn luyện viên hỏi thông tin Groom làm việc cùng, luôn hiển thị rõ ràng Tên Groom, Số điện thoại liên hệ, Email, Số lượng chuồng phụ trách, Mã chuồng và Danh sách ngựa đang chăm sóc.
 
                 12. PHÂN BIỆT RÕ RÀNG GIỮA SỐ LƯỢNG NGỰA VÀ SỐ LƯỢNG CHUỒNG TRẠI (STALLS):
-                   - "Ngựa / Chiến mã" (Horses) và "Chuồng trại" (Stalls) là hai thực thể hoàn toàn khác biệt. Chuồng trại là số lượng ô chuồng vật lý (`tongSoChuongTrangTrai`), TUYỆT ĐỐI KHÔNG đánh đồng hoặc lấy số lượng chuồng trại để trả lời thay cho số lượng ngựa.
+                   - "Ngựa / Chiến mã" (Horses) và "Chuồng trại" (Stalls) là hai thực thể hoàn toàn khác biệt. Chuồng trại là số lượng ô chuồng vật lý (`totalStalls`), TUYỆT ĐỐI KHÔNG đánh đồng hoặc lấy số lượng chuồng trại để trả lời thay cho số lượng ngựa.
                    - Khi người dùng hỏi "Có bao nhiêu ngựa trong câu lạc bộ / trang trại?" hoặc hỏi quy mô đàn ngựa:
-                     + BẮT BUỘC ưu tiên gọi `getClubHealthOverview` (chứa `tongSoNguaTrongTrangTrai`) hoặc xem `tongSoNguaCauLacBo` trong `getClubHorsesDirectory`.
+                     + BẮT BUỘC ưu tiên gọi `getClubHealthOverview` (chứa `totalClubHorses`) hoặc xem `totalClubHorses` trong `getClubHorsesDirectory`.
                      + TUYỆT ĐỐI KHÔNG lấy kết quả của `getStableOccupancyMetrics` (vốn là số lượng chuồng) để báo là số lượng ngựa.
 
                 13. THỐNG KÊ ĐƠN ĐĂNG KÝ NHẬP ĐÀN (ADMISSION APPLICATIONS):
                    - Khi người dùng hỏi tổng số đơn đăng ký nhập đàn/nhập chuồng trong hệ thống hoặc tình hình tuyển sinh:
-                     + Báo cáo rõ TỔNG SỐ ĐƠN (`tongSoDonTrongHeThong`, ví dụ 56 đơn) và giải thích chi tiết cơ cấu:
-                       * Số đơn đang trong tiến trình xử lý liên phòng ban (`tongSoDonDangTrongTienTrinhXuLy`, ví dụ 12 đơn): bao gồm Groom kiểm tra sơ bộ, chờ khám thú y, HLV tiếp nhận và chờ Club Manager phê duyệt cuối.
-                       * Số đơn đã hoàn tất phê duyệt nhập đàn (`soDonDaHoanTatNhapDan`, ví dụ 42 đơn).
-                       * Số đơn từ chối hoặc quá hạn (`soDonTuChoiHoacQuaHan`, ví dụ 2 đơn).
-                     + Phân biệt rõ ràng giữa "Tổng số đơn trong hệ thống" và "Số đơn đang chờ riêng Club Manager duyệt" (`soDonChoClubManagerPheDuyet`). Tuyệt đối không nhầm lẫn số đơn chờ riêng bước của Manager với tổng số đơn của toàn bộ hệ thống.
+                     + Báo cáo rõ TỔNG SỐ ĐƠN (`totalApplications`, ví dụ 56 đơn) và giải thích chi tiết cơ cấu:
+                       * Số đơn đang trong tiến trình xử lý liên phòng ban (`inProgressApplications`, ví dụ 12 đơn): bao gồm Groom kiểm tra sơ bộ, chờ khám thú y, HLV tiếp nhận và chờ Club Manager phê duyệt cuối.
+                       * Số đơn đã hoàn tất phê duyệt nhập đàn (`approvedApplications`, ví dụ 42 đơn).
+                       * Số đơn từ chối hoặc quá hạn (`rejectedOrExpiredApplications`, ví dụ 2 đơn).
+                     + Phân biệt rõ ràng giữa "Tổng số đơn trong hệ thống" và "Số đơn đang chờ riêng Club Manager duyệt" (`pendingManagerReviewCount`). Tuyệt đối không nhầm lẫn số đơn chờ riêng bước của Manager với tổng số đơn của toàn bộ hệ thống.
 
                 14. THỐNG KÊ NHÂN SỰ TOÀN HỆ THỐNG:
                    - Khi người dùng hỏi tổng số nhân sự hoặc số lượng theo từng vị trí (Huấn luyện viên, Bác sĩ thú y, Groom, Quản lý):
                      + BẮT BUỘC gọi `getSystemStaffOverview`.
                      + ĐỌC VÀ BÁO CÁO CHÍNH XÁC các con số đã được hệ thống tính toán sẵn:
-                       * Tổng số nhân sự: trường `tongSoNhanSu`
-                       * Cơ cấu theo vai trò: trường `phanLoaiTheoVaiTro` (ví dụ: Huấn luyện viên trưởng, Bác sĩ thú y, Nhân viên chăm sóc (Groom), Quản lý)
+                       * Tổng số nhân sự: trường `totalStaff`
+                       * Cơ cấu theo vai trò: trường `roleBreakdown` (ví dụ: Huấn luyện viên trưởng, Bác sĩ thú y, Nhân viên chăm sóc (Groom), Quản lý)
                      + TUYỆT ĐỐI KHÔNG tự đếm thủ công các phần tử trong danh sách JSON. TUYỆT ĐỐI KHÔNG làm tròn hoặc bịa đặt số lượng nhân sự (ví dụ: không được báo 30 hay 36 khi dữ liệu trả về ghi rõ 24 Groom).
                 """, userName, role) + "\n" + buildRoleDomainOntology(role);
     }
@@ -429,11 +429,11 @@ public class GroqAgentOrchestratorService {
                      + Chiến mã [Horse] được ghi danh vào Khóa huấn luyện [Training Plan] -> gồm nhiều Buổi tập [Workout Session] -> chia thành các Lượt tập [Training Lot].
                      + Chiến mã có thành tích tốt được Huấn luyện viên đăng ký tham gia các Giải đua [Race Registration].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
-                     + Tra cứu lịch tập & ca tập: Dùng `getTrainerSchedule` (đọc `tongSoCaTap` và `danhSachCaTap`).
+                     + Tra cứu lịch tập & ca tập: Dùng `getTrainerSchedule` (đọc `totalSessions` và `sessionList`).
                      + Tra cứu ngựa thuộc quyền huấn luyện: Dùng `getTrainerHorses` -> để lấy danh sách tên và ID ngựa.
                      + Tra cứu kế hoạch huấn luyện: Dùng `getTrainerPlansSummary`.
-                     + Đăng ký giải đua: Dùng `getMyHorseRaceRegistrations` (đọc `tongSoGiaiDuaDangKy`).
-                     + Đơn tuyển nhận nhập đàn chờ thẩm định: Dùng `getAssignedAdmissionReviews` (đọc `tongSoDonChoThamDinh`).
+                     + Đăng ký giải đua: Dùng `getMyHorseRaceRegistrations` (đọc `totalRaceRegistrations`).
+                     + Đơn tuyển nhận nhập đàn chờ thẩm định: Dùng `getAssignedAdmissionReviews` (đọc `pendingReviewCount`).
                 """;
             case "VETERINARIAN", "VET" -> """
                 15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO BÁC SĨ THÚ Y (VETERINARIAN DOMAIN ONTOLOGY):
@@ -443,9 +443,9 @@ public class GroqAgentOrchestratorService {
                      + Ngựa bị chấn thương/truyền nhiễm hoặc mới nhập đàn -> Chuyển vào Khu cách ly [Quarantine Area] và BAN HÀNH LỆNH CẤM TẬP (BLOCKED/RESTRICTED).
                      + Tiếp nhận ngựa mới vào đàn: Bác sĩ thực hiện Khám sàng lọc nhập đàn [Admission Vet Exam].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
-                     + Cảnh báo cấp cứu khẩn cấp: Dùng `getUrgentCareAlerts` (đọc `tongSoCanhBaoKhan`).
-                     + Đơn khám sàng lọc nhập đàn chờ xử lý: Dùng `getPendingAdmissionExams` (đọc `tongSoCaKhamNhapDanDangCho`).
-                     + Đơn thuốc và phác đồ điều trị đang thực hiện: Dùng `getActivePrescriptions` (đọc `tongSoDonThuocVaDieuTri`).
+                     + Cảnh báo cấp cứu khẩn cấp: Dùng `getUrgentCareAlerts` (đọc `totalUrgentAlerts`).
+                     + Đơn khám sàng lọc nhập đàn chờ xử lý: Dùng `getPendingAdmissionExams` (đọc `pendingExamCount`).
+                     + Đơn thuốc và phác đồ điều trị đang thực hiện: Dùng `getActivePrescriptions` (đọc `totalPrescriptions`).
                      + Kiểm tra tình trạng cách ly: Dùng `getQuarantineStatus`.
                 """;
             case "GROOM", "STABLE_STAFF" -> """
@@ -456,9 +456,9 @@ public class GroqAgentOrchestratorService {
                      + Nếu phát hiện ngựa có dấu hiệu bất thường (bỏ ăn, cào đất, sốt, đau bụng Colic, trầy xước) -> Groom tạo Báo cáo sự cố [Incident Report].
                      + Khi có xe chở ngựa mới đến cổng -> Groom tiến hành Kiểm tra sơ bộ thể trạng [Admission Groom Review].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
-                     + Chuồng và ngựa phụ trách: Dùng `getMyAssignedHorses` (đọc `tongSoChuongPhuTrach`, `soChuongCoNgua`).
+                     + Chuồng và ngựa phụ trách: Dùng `getMyAssignedHorses` (đọc `assignedStallsCount`, `stallsWithHorsesCount`).
                      + Nhiệm vụ trong ngày: Dùng `getDailyGroomTasks` hoặc `getTodayAggregatedTasks`.
-                     + Sự cố đã báo cáo: Dùng `getMyReportedIncidents` (đọc `tongSoSuCoDaBaoCao`).
+                     + Sự cố đã báo cáo: Dùng `getMyReportedIncidents` (đọc `totalReportedIncidents`).
                      + Tra cứu vị trí chuồng ngựa: Dùng `getHorseStallLocation`.
                 """;
             case "HORSE_OWNER", "OWNER" -> """
@@ -468,9 +468,9 @@ public class GroqAgentOrchestratorService {
                      + Sau khi được duyệt, Chiến mã [Horse] lưu trú tại Ô chuồng [Stall] của câu lạc bộ, được chăm sóc bởi Groom và huấn luyện bởi HLV trưởng.
                      + Chủ ngựa có quyền tra cứu minh bạch: Tiến độ tập luyện, Lịch chăm sóc thú y, Lịch thi đấu và Lịch sử sự cố của chính các chiến mã mình sở hữu.
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
-                     + Ngựa thuộc sở hữu: Dùng `getMyHorses` (đọc `tongSoNguaSoHuu`, `soNguaDuocPhepTapLuyen`, `soNguaCamTapHoacHanChe`).
-                     + Đơn đăng ký nhập chuồng: Dùng `getMyHorseAdmissions` (đọc `tongSoDonDaNop`, `soDonDaPheDuyet`, `soDonDangXuLy`).
-                     + Lịch tập sắp tới: Dùng `getMyHorseUpcomingSchedule` (đọc `tongSoBuoiTapSapToi`).
+                     + Ngựa thuộc sở hữu: Dùng `getMyHorses` (đọc `totalOwnedHorses`, `allowedTrainingHorses`, `restrictedHorses`).
+                     + Đơn đăng ký nhập chuồng: Dùng `getMyHorseAdmissions` (đọc `totalSubmittedApplications`, `approvedApplicationCount`, `pendingApplicationCount`).
+                     + Lịch tập sắp tới: Dùng `getMyHorseUpcomingSchedule` (đọc `totalUpcomingWorkouts`).
                      + Phả hệ / huyết thống: Dùng `getMyHorsePedigreeInfo`.
                 """;
             case "CLUB_MANAGER", "ADMIN" -> """
@@ -478,11 +478,11 @@ public class GroqAgentOrchestratorService {
                    - QUAN HỆ THỰC THỂ:
                      + Quản lý câu lạc bộ [Club Manager] giám sát toàn diện mọi mặt hoạt động: Quy mô đàn ngựa, Công suất chuồng trại, Đội ngũ nhân sự, Tiến trình tuyển nhận nhập đàn và Nhật ký kiểm toán bảo mật [Audit Trail].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
-                     + Quy mô đàn ngựa & Sức khỏe toàn đàn: BẮT BUỘC dùng `getClubHealthOverview` (đọc `tongSoNguaTrongTrangTrai`) hoặc `getClubHorsesDirectory` (đọc `tongSoNguaCauLacBo`).
-                     + Công suất chuồng trại: Dùng `getStableOccupancyMetrics` (đọc `tongSoChuongTrangTrai`, `soChuongDangSuDung`, `tyLeLapDay`).
-                     + Đội ngũ nhân sự: Dùng `getSystemStaffOverview` (đọc `tongSoNhanSu` và `phanLoaiTheoVaiTro`).
-                     + Tiến trình tuyển nhận nhập đàn: Dùng `getAdmissionRequestsOverview` (đọc `tongSoDonTrongHeThong`) và `getAdmissionPipelineDetails`.
-                     + Nhật ký kiểm toán: Dùng `getRecentAuditLogs` (đọc `tongSoNhatKyGhiNhan`).
+                     + Quy mô đàn ngựa & Sức khỏe toàn đàn: BẮT BUỘC dùng `getClubHealthOverview` (đọc `totalClubHorses`) hoặc `getClubHorsesDirectory` (đọc `totalClubHorses`).
+                     + Công suất chuồng trại: Dùng `getStableOccupancyMetrics` (đọc `totalStalls`, `occupiedStalls`, `occupancyRate`).
+                     + Đội ngũ nhân sự: Dùng `getSystemStaffOverview` (đọc `totalStaff` và `roleBreakdown`).
+                     + Tiến trình tuyển nhận nhập đàn: Dùng `getAdmissionRequestsOverview` (đọc `totalApplications`) và `getAdmissionPipelineDetails`.
+                     + Nhật ký kiểm toán: Dùng `getRecentAuditLogs` (đọc `totalAuditLogs`).
                 """;
             default -> "";
         };

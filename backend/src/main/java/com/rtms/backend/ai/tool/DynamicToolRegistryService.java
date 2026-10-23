@@ -58,7 +58,7 @@ public class DynamicToolRegistryService {
         List<AiToolDefinition> ownerTools = List.of(
                 new AiToolDefinition(
                         "getMyHorses",
-                        "Lấy danh sách các ngựa mà chủ ngựa hiện tại đang sở hữu (tổng số ngựa sở hữu tongSoNguaSoHuu, số ngựa được phép tập luyện soNguaDuocPhepTapLuyen, số ngựa cấm tập y tế soNguaCamTapHoacHanChe, danh sách chi tiết danhSachNgua). Bắt buộc dùng khi hỏi chủ ngựa có bao nhiêu ngựa.",
+                        "Lấy danh sách các ngựa mà chủ ngựa hiện tại đang sở hữu (tổng số ngựa sở hữu totalOwnedHorses, số ngựa được phép tập luyện allowedTrainingHorses, số ngựa cấm tập y tế restrictedHorses, danh sách chi tiết danhSachNgua). Bắt buộc dùng khi hỏi chủ ngựa có bao nhiêu ngựa.",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
@@ -444,7 +444,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getSystemStaffOverview",
-                        "Tra cứu danh bạ nhân sự và thống kê số lượng nhân sự trong hệ thống (tổng số nhân sự 'tongSoNhanSu', phân loại theo vai trò 'phanLoaiTheoVaiTro': Huấn luyện viên trưởng, Bác sĩ thú y, Nhân viên chăm sóc Groom, Quản lý). Có thể lọc theo vai trò (role), trạng thái (isActive) hoặc từ khóa tìm kiếm. Bắt buộc dùng công cụ này khi người dùng hỏi có bao nhiêu nhân sự, bao nhiêu groom, bao nhiêu huấn luyện viên hoặc bác sĩ trong câu lạc bộ.",
+                        "Tra cứu danh bạ nhân sự và thống kê số lượng nhân sự trong hệ thống (tổng số nhân sự 'totalStaff', phân loại theo vai trò 'roleBreakdown': Huấn luyện viên trưởng, Bác sĩ thú y, Nhân viên chăm sóc Groom, Quản lý). Có thể lọc theo vai trò (role), trạng thái (isActive) hoặc từ khóa tìm kiếm. Bắt buộc dùng công cụ này khi người dùng hỏi có bao nhiêu nhân sự, bao nhiêu groom, bao nhiêu huấn luyện viên hoặc bác sĩ trong câu lạc bộ.",
                         buildParamSchema(Map.of(
                                 "role", Map.of("type", "string", "description", "Vai trò nhân sự cần lọc (HEAD_TRAINER, VETERINARIAN, GROOM, CLUB_MANAGER)"),
                                 "isActive", Map.of("type", "boolean", "description", "Trạng thái hoạt động (true: đang hoạt động, false: đã khóa)"),
@@ -461,7 +461,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getRecentAuditLogs",
-                        "Tra cứu nhật ký kiểm toán hệ thống (Audit Trail) các thao tác nhạy cảm gần đây (tổng số nhật ký tongSoNhatKyGhiNhan, danh sách chi tiết danhSachNhatKy).",
+                        "Tra cứu nhật ký kiểm toán hệ thống (Audit Trail) các thao tác nhạy cảm gần đây (tổng số nhật ký totalAuditLogs, danh sách chi tiết danhSachNhatKy).",
                         buildParamSchema(Map.of(
                                 "limit", Map.of("type", "integer", "description", "Số lượng bản ghi nhật ký kiểm toán (mặc định 10)")
                         ))

@@ -401,11 +401,11 @@ public class AiToolExecutionService {
         int camTapLuyen = 0;
         for (Horse h : horses) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", h.getName());
-            item.put("maDangKy", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
-            item.put("trangThai", h.getCurrentStatus());
-            item.put("quyetDinhTapLuyen", h.getTrainingDecision());
-            item.put("viTriChuong", resolveStallName(h.getCurrentStallId()));
+            item.put("horseName", h.getName());
+            item.put("registrationNumber", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
+            item.put("status", h.getCurrentStatus());
+            item.put("trainingDecision", h.getTrainingDecision());
+            item.put("stallLocation", resolveStallName(h.getCurrentStallId()));
             result.add(item);
 
             String dec = h.getTrainingDecision() != null ? h.getTrainingDecision().name().toUpperCase() : "";
@@ -416,10 +416,10 @@ public class AiToolExecutionService {
             }
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoNguaSoHuu", result.size());
-        response.put("soNguaDuocPhepTapLuyen", duocTapLuyen);
-        response.put("soNguaCamTapHoacHanChe", camTapLuyen);
-        response.put("danhSachNgua", result);
+        response.put("totalOwnedHorses", result.size());
+        response.put("allowedTrainingHorses", duocTapLuyen);
+        response.put("restrictedHorses", camTapLuyen);
+        response.put("horseList", result);
         return response;
     }
 
@@ -431,32 +431,30 @@ public class AiToolExecutionService {
         verifyHorseOwnershipIfOwner(horse.getId(), currentUser);
 
         Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("tenNgua", horse.getName());
-        summary.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        summary.put("trangThaiHienTai", horse.getCurrentStatus());
-        summary.put("quyetDinhTapLuyen", horse.getTrainingDecision());
-        summary.put("lyDoQuyetDinh", horse.getTrainingDecisionReason() != null ? horse.getTrainingDecisionReason() : "Bình thường");
-        summary.put("viTriChuong", resolveStallName(horse.getCurrentStallId()));
+        summary.put("horseName", horse.getName());
+        summary.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        summary.put("currentStatus", horse.getCurrentStatus());
+        summary.put("trainingDecision", horse.getTrainingDecision());
+        summary.put("decisionReason", horse.getTrainingDecisionReason() != null ? horse.getTrainingDecisionReason() : "Bình thường");
+        summary.put("stallLocation", resolveStallName(horse.getCurrentStallId()));
 
         List<HealthRecord> records = healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(horse.getId());
         if (!records.isEmpty()) {
             HealthRecord latest = records.get(0);
-            summary.put("chanDoanMoiNhat", latest.getDiagnosis());
-            summary.put("phacDoDieuTri", latest.getTreatment());
-            summary.put("ghiChuHanCheYTe", latest.getRestrictionDetails());
-            summary.put("ngayKhamGanNhat", latest.getExaminedAt());
+            summary.put("latestDiagnosis", latest.getDiagnosis());
+            summary.put("treatmentPlan", latest.getTreatment());
+            summary.put("medicalRestrictionNotes", latest.getRestrictionDetails());
+            summary.put("lastExamDate", latest.getExaminedAt());
         } else {
-            summary.put("chanDoanMoiNhat", "Chưa có bệnh án ghi nhận");
+            summary.put("latestDiagnosis", "Chưa có bệnh án ghi nhận");
         }
 
         List<CareSchedule> activeSchedules = careScheduleRepository.findByHorseIdAndStatusIn(
                 horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
         List<Map<String, Object>> careList = activeSchedules.stream().map(cs -> Map.<String, Object>of(
-                "loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám tổng quát",
-                "thoiGianHen", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A",
-                "mucDich", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A"
+                "loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám tổng quát", "scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A", "purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A"
         )).toList();
-        summary.put("lichChamSocSapToi", careList);
+        summary.put("upcomingCareSchedule", careList);
 
         return summary;
     }
@@ -470,18 +468,18 @@ public class AiToolExecutionService {
 
         List<PlanSummaryResponse> summaries = horseTrainingPlanRepository.findPlanSummaries(null, horse.getId());
         if (summaries == null || summaries.isEmpty()) {
-            return Map.of("thongBao", "Chiến mã " + horse.getName() + " hiện chưa có kế hoạch huấn luyện nào.");
+            return Map.of("message", "Chiến mã " + horse.getName() + " hiện chưa có kế hoạch huấn luyện nào.");
         }
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (PlanSummaryResponse p : summaries) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenKeHoach", p.getCourseName() != null ? p.getCourseName() : "Khóa huấn luyện");
-            item.put("tenNgua", horse.getName());
-            item.put("trangThai", p.getStatus() != null ? p.getStatus().name() : "N/A");
-            item.put("tienDo", p.getCompletedSessions() + "/" + p.getTotalSessions() + " buổi");
-            item.put("ngayBatDau", p.getStartDate() != null ? p.getStartDate().toString() : "N/A");
-            item.put("ngayKetThuc", p.getEndDate() != null ? p.getEndDate().toString() : "N/A");
+            item.put("planName", p.getCourseName() != null ? p.getCourseName() : "Khóa huấn luyện");
+            item.put("horseName", horse.getName());
+            item.put("status", p.getStatus() != null ? p.getStatus().name() : "N/A");
+            item.put("progress", p.getCompletedSessions() + "/" + p.getTotalSessions() + " buổi");
+            item.put("startDate", p.getStartDate() != null ? p.getStartDate().toString() : "N/A");
+            item.put("endDate", p.getEndDate() != null ? p.getEndDate().toString() : "N/A");
             result.add(item);
         }
         return result;
@@ -506,17 +504,17 @@ public class AiToolExecutionService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (TrainingLotRow lot : lotRows) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("caTap", formatCaTap(lot.startTime(), lot.endTime()));
-            item.put("ngayTap", lot.lotDate() != null ? lot.lotDate().toString() : "N/A");
-            item.put("gioBatDau", lot.startTime() != null ? lot.startTime().toString() : "N/A");
-            item.put("gioKetThuc", lot.endTime() != null ? lot.endTime().toString() : "N/A");
-            item.put("tenBaiTap", lot.subjectName());
-            item.put("danhSachNguaCuaBan", namesByLot.getOrDefault(lot.lotId(), Collections.emptyList()));
+            item.put("sessionTime", formatCaTap(lot.startTime(), lot.endTime()));
+            item.put("workoutDate", lot.lotDate() != null ? lot.lotDate().toString() : "N/A");
+            item.put("startTime", lot.startTime() != null ? lot.startTime().toString() : "N/A");
+            item.put("endTime", lot.endTime() != null ? lot.endTime().toString() : "N/A");
+            item.put("subjectName", lot.subjectName());
+            item.put("myHorseList", namesByLot.getOrDefault(lot.lotId(), Collections.emptyList()));
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoBuoiTapSapToi", result.size());
-        response.put("danhSachLichTap", result);
+        response.put("totalUpcomingWorkouts", result.size());
+        response.put("workoutScheduleList", result);
         return response;
     }
 
@@ -530,12 +528,12 @@ public class AiToolExecutionService {
             if (a.getHorseId() != null) {
                 horseName = horseRepository.findById(a.getHorseId()).map(Horse::getName).orElse("Ngựa đăng ký");
             }
-            item.put("tenNgua", horseName);
-            item.put("trangThaiDon", a.getStatus() != null ? a.getStatus().name() : "PENDING");
-            item.put("ketQuaGroomKiemTra", a.getGroomDecision() != null ? a.getGroomDecision().name() : "Chờ đánh giá");
-            item.put("ketQuaVetKham", a.getVetTrainingDecision() != null ? a.getVetTrainingDecision().name() : "Chờ đánh giá");
-            item.put("quanLyPheDuyet", a.getManagerDecision() != null ? a.getManagerDecision().name() : "Chờ phê duyệt");
-            item.put("ngayNopDon", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : "N/A");
+            item.put("horseName", horseName);
+            item.put("applicationStatus", a.getStatus() != null ? a.getStatus().name() : "PENDING");
+            item.put("groomCheckResult", a.getGroomDecision() != null ? a.getGroomDecision().name() : "Chờ đánh giá");
+            item.put("vetExamResult", a.getVetTrainingDecision() != null ? a.getVetTrainingDecision().name() : "Chờ đánh giá");
+            item.put("managerApprovalResult", a.getManagerDecision() != null ? a.getManagerDecision().name() : "Chờ phê duyệt");
+            item.put("submittedDate", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : "N/A");
             result.add(item);
         }
         int daDuyet = 0;
@@ -548,10 +546,10 @@ public class AiToolExecutionService {
             }
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoDonDaNop", result.size());
-        response.put("soDonDaPheDuyet", daDuyet);
-        response.put("soDonDangXuLy", dangXuLy);
-        response.put("danhSachDon", result);
+        response.put("totalSubmittedApplications", result.size());
+        response.put("approvedApplicationCount", daDuyet);
+        response.put("pendingApplicationCount", dangXuLy);
+        response.put("applicationList", result);
         return response;
     }
 
@@ -567,12 +565,12 @@ public class AiToolExecutionService {
         long completedSessions = workouts.stream().filter(w -> w.getStatus() == WorkoutStatus.COMPLETED).count();
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("quyetDinhTapLuyen", horse.getTrainingDecision() != null ? horse.getTrainingDecision().name() : "N/A");
-        result.put("lyDoQuyetDinh", horse.getTrainingDecisionReason() != null ? horse.getTrainingDecisionReason() : "Bình thường");
-        result.put("tongSoBuoiTap", totalSessions);
-        result.put("soBuoiHoanThanh", completedSessions);
+        result.put("horseName", horse.getName());
+        result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("trainingDecision", horse.getTrainingDecision() != null ? horse.getTrainingDecision().name() : "N/A");
+        result.put("decisionReason", horse.getTrainingDecisionReason() != null ? horse.getTrainingDecisionReason() : "Bình thường");
+        result.put("totalWorkouts", totalSessions);
+        result.put("completedSessions", completedSessions);
         return result;
     }
 
@@ -587,11 +585,11 @@ public class AiToolExecutionService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (CareSchedule cs : schedules) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horse.getName());
-            item.put("loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám thú y");
-            item.put("thoiGianHen", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A");
-            item.put("trangThai", cs.getStatus() != null ? cs.getStatus().name() : "N/A");
-            item.put("mucDich", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A");
+            item.put("horseName", horse.getName());
+            item.put("careType", cs.getCareType() != null ? cs.getCareType().name() : "Khám thú y");
+            item.put("scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A");
+            item.put("status", cs.getStatus() != null ? cs.getStatus().name() : "N/A");
+            item.put("purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A");
             result.add(item);
         }
         return result;
@@ -609,11 +607,11 @@ public class AiToolExecutionService {
             List<HorseIncidentReport> reports = horseIncidentReportRepository.findByHorseId(horse.getId());
             for (HorseIncidentReport r : reports) {
                 Map<String, Object> item = new LinkedHashMap<>();
-                item.put("tenNgua", horse.getName());
-                item.put("tieuDe", r.getTitle());
-                item.put("moTa", r.getDescription() != null ? r.getDescription() : "");
-                item.put("thoiGian", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
-                item.put("trangThai", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
+                item.put("horseName", horse.getName());
+                item.put("title", r.getTitle());
+                item.put("description", r.getDescription() != null ? r.getDescription() : "");
+                item.put("timestamp", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
+                item.put("status", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
                 item.put("actionUrl", "/owner/horses");
                 result.add(item);
             }
@@ -622,11 +620,11 @@ public class AiToolExecutionService {
             List<GroomIncidentReport> gReports = groomIncidentReportRepository.findByHorseId(horse.getId());
             for (GroomIncidentReport r : gReports) {
                 Map<String, Object> item = new LinkedHashMap<>();
-                item.put("tenNgua", horse.getName());
-                item.put("tieuDe", r.getTitle());
-                item.put("moTa", r.getDescription() != null ? r.getDescription() : "");
-                item.put("thoiGian", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
-                item.put("trangThai", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
+                item.put("horseName", horse.getName());
+                item.put("title", r.getTitle());
+                item.put("description", r.getDescription() != null ? r.getDescription() : "");
+                item.put("timestamp", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
+                item.put("status", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
                 item.put("actionUrl", "/owner/horses");
                 result.add(item);
             }
@@ -646,11 +644,11 @@ public class AiToolExecutionService {
                 : Optional.empty();
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("nguaCha", pedigreeOpt.map(HorsePedigree::getSireName).filter(s -> !s.isBlank()).orElse("Chưa rõ"));
-        result.put("nguaMe", pedigreeOpt.map(HorsePedigree::getDamName).filter(d -> !d.isBlank()).orElse("Chưa rõ"));
-        result.put("xuatXu", pedigreeOpt.map(HorsePedigree::getPedigreeNotes).filter(n -> !n.isBlank()).orElse("Việt Nam"));
-        result.put("theHeGiaPha", pedigreeOpt.map(p -> "Ngựa cha: " + (p.getSireName() != null ? p.getSireName() : "Chưa rõ") + ", Ngựa mẹ: " + (p.getDamName() != null ? p.getDamName() : "Chưa rõ")).orElse("Chưa có hồ sơ phả hệ chi tiết"));
+        result.put("horseName", horse.getName());
+        result.put("sire", pedigreeOpt.map(HorsePedigree::getSireName).filter(s -> !s.isBlank()).orElse("Chưa rõ"));
+        result.put("dam", pedigreeOpt.map(HorsePedigree::getDamName).filter(d -> !d.isBlank()).orElse("Chưa rõ"));
+        result.put("origin", pedigreeOpt.map(HorsePedigree::getPedigreeNotes).filter(n -> !n.isBlank()).orElse("Việt Nam"));
+        result.put("pedigreeGeneration", pedigreeOpt.map(p -> "Ngựa cha: " + (p.getSireName() != null ? p.getSireName() : "Chưa rõ") + ", Ngựa mẹ: " + (p.getDamName() != null ? p.getDamName() : "Chưa rõ")).orElse("Chưa có hồ sơ phả hệ chi tiết"));
         result.put("actionUrl", "/owner/horses");
         return result;
     }
@@ -699,13 +697,13 @@ public class AiToolExecutionService {
         }
 
         Map<String, Object> roiResult = new LinkedHashMap<>();
-        roiResult.put("tenNgua", horse.getName());
-        roiResult.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        roiResult.put("thoiGianGiaNhap", thoiGianGiaNhap);
-        roiResult.put("tongSoBuoiTap", workouts.size());
-        roiResult.put("tongSoBuoiTapDatYeuCau", tongSoBuoiTapDatYeuCau);
-        roiResult.put("tocDoPhatTrienTheLuc", tocDoPhatTrienTheLuc);
-        roiResult.put("danhGiaTiemNangThiDau", danhGiaTiemNangThiDau);
+        roiResult.put("horseName", horse.getName());
+        roiResult.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        roiResult.put("joinedAt", thoiGianGiaNhap);
+        roiResult.put("totalWorkouts", workouts.size());
+        roiResult.put("qualifiedWorkoutsCount", tongSoBuoiTapDatYeuCau);
+        roiResult.put("fitnessProgressionRate", tocDoPhatTrienTheLuc);
+        roiResult.put("racingPotentialEvaluation", danhGiaTiemNangThiDau);
         roiResult.put("actionUrl", "/owner/horses");
         return roiResult;
     }
@@ -728,11 +726,11 @@ public class AiToolExecutionService {
         List<Map<String, Object>> list = new ArrayList<>();
         for (Horse h : horses) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", h.getName());
-            item.put("maDangKy", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
-            item.put("trangThai", h.getCurrentStatus());
-            item.put("quyetDinhTapLuyen", h.getTrainingDecision());
-            item.put("lyDoQuyetDinh", h.getTrainingDecisionReason() != null ? h.getTrainingDecisionReason() : "Bình thường");
+            item.put("horseName", h.getName());
+            item.put("registrationNumber", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
+            item.put("status", h.getCurrentStatus());
+            item.put("trainingDecision", h.getTrainingDecision());
+            item.put("decisionReason", h.getTrainingDecisionReason() != null ? h.getTrainingDecisionReason() : "Bình thường");
 
             StableStall stall = h.getCurrentStallId() != null ? stableStallRepository.findById(h.getCurrentStallId()).orElse(null) : null;
             String stallName = stall != null ? ("Chuồng " + stall.getStallCode() + " (Số " + stall.getStallNumber() + ")") : "Chưa xếp chuồng";
@@ -747,15 +745,12 @@ public class AiToolExecutionService {
                     }
                 }
             }
-            item.put("viTriChuong", stallName);
-            item.put("tenGroomPhuTrach", groomName);
-            item.put("soDienThoaiGroom", groomPhone);
+            item.put("stallLocation", stallName);
+            item.put("assignedGroomName", groomName);
+            item.put("groomPhone", groomPhone);
             list.add(item);
         }
-        return Map.of(
-                "huanLuyenVien", resolveUserName(currentUser, "Huấn luyện viên trưởng"),
-                "tongSoNguaQuanLy", list.size(),
-                "danhSachNgua", list
+        return Map.of("trainerName", resolveUserName(currentUser, "Huấn luyện viên trưởng"), "totalManagedHorses", list.size(), "horseList", list
         );
     }
 
@@ -768,13 +763,13 @@ public class AiToolExecutionService {
         List<Map<String, Object>> list = new ArrayList<>();
         for (TrainingWorkout w : workouts) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horse.getName());
-            item.put("trangThai", w.getStatus());
-            item.put("cuLyThucTeMet", w.getActualDistanceMeters());
-            item.put("tocDoDinhKmh", w.getTopSpeedKmh());
-            item.put("nhipTimTrungBinh", w.getAverageHeartRate());
-            item.put("diemDanhGia", w.getPerformanceRating());
-            item.put("nhanXetCuaHLV", w.getTrainerFeedback());
+            item.put("horseName", horse.getName());
+            item.put("status", w.getStatus());
+            item.put("actualDistanceMeters", w.getActualDistanceMeters());
+            item.put("topSpeedKmh", w.getTopSpeedKmh());
+            item.put("avgHeartRate", w.getAverageHeartRate());
+            item.put("evaluationScore", w.getPerformanceRating());
+            item.put("trainerNotes", w.getTrainerFeedback());
             list.add(item);
         }
         return list;
@@ -788,9 +783,7 @@ public class AiToolExecutionService {
         List<HorseFitnessTrendItemResponse> trends = trainingWorkoutRepository.findFitnessTrend(
                 horse.getId(), LocalDate.now().minusDays(30), LocalDate.now()
         );
-        return Map.of(
-                "tenNgua", horse.getName(),
-                "xuHuongTheLuc", trends != null ? trends : Collections.emptyList()
+        return Map.of("horseName", horse.getName(), "fitnessTrends", trends != null ? trends : Collections.emptyList()
         );
     }
 
@@ -810,8 +803,8 @@ public class AiToolExecutionService {
         List<TrainingLotRow> lotRows = trainingLotRepository.findTrainerLotRows(trainerId, from, to, false);
         if (lotRows.isEmpty()) {
             Map<String, Object> emptyResp = new LinkedHashMap<>();
-            emptyResp.put("tongSoCaTap", 0);
-            emptyResp.put("danhSachCaTap", Collections.emptyList());
+            emptyResp.put("totalSessions", 0);
+            emptyResp.put("sessionList", Collections.emptyList());
             return emptyResp;
         }
 
@@ -824,18 +817,18 @@ public class AiToolExecutionService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (TrainingLotRow lot : lotRows) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("caTap", formatCaTap(lot.startTime(), lot.endTime()));
-            item.put("ngayTap", lot.lotDate() != null ? lot.lotDate().toString() : "Hôm nay");
-            item.put("gioBatDau", lot.startTime() != null ? lot.startTime().toString() : "N/A");
-            item.put("gioKetThuc", lot.endTime() != null ? lot.endTime().toString() : "N/A");
-            item.put("tenBaiTap", lot.subjectName() != null ? lot.subjectName() : "Bài tập thể lực");
-            item.put("soLuongNgua", lot.occupied());
-            item.put("danhSachNgua", namesByLot.getOrDefault(lot.lotId(), Collections.emptyList()));
+            item.put("sessionTime", formatCaTap(lot.startTime(), lot.endTime()));
+            item.put("workoutDate", lot.lotDate() != null ? lot.lotDate().toString() : "Hôm nay");
+            item.put("startTime", lot.startTime() != null ? lot.startTime().toString() : "N/A");
+            item.put("endTime", lot.endTime() != null ? lot.endTime().toString() : "N/A");
+            item.put("subjectName", lot.subjectName() != null ? lot.subjectName() : "Bài tập thể lực");
+            item.put("horseCount", lot.occupied());
+            item.put("horseList", namesByLot.getOrDefault(lot.lotId(), Collections.emptyList()));
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoCaTap", result.size());
-        response.put("danhSachCaTap", result);
+        response.put("totalSessions", result.size());
+        response.put("sessionList", result);
         return response;
     }
 
@@ -878,16 +871,16 @@ public class AiToolExecutionService {
             }
 
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenKeHoach", p.getCourseName() != null ? p.getCourseName() : "Kế hoạch huấn luyện");
-            item.put("tenNgua", p.getHorseName() != null ? p.getHorseName() : "Ngựa thi đấu");
-            item.put("mucTieu", targetGoal);
-            item.put("trangThai", trangThai);
-            item.put("tienDo", (p.getCompletedSessions() != null ? p.getCompletedSessions() : 0) + "/"
+            item.put("planName", p.getCourseName() != null ? p.getCourseName() : "Kế hoạch huấn luyện");
+            item.put("horseName", p.getHorseName() != null ? p.getHorseName() : "Ngựa thi đấu");
+            item.put("targetGoal", targetGoal);
+            item.put("status", trangThai);
+            item.put("progress", (p.getCompletedSessions() != null ? p.getCompletedSessions() : 0) + "/"
                     + (p.getTotalSessions() != null ? p.getTotalSessions() : 0) + " buổi hoàn thành");
-            item.put("soBuoiHoanThanh", p.getCompletedSessions());
-            item.put("tongSoBuoi", p.getTotalSessions());
-            item.put("ngayBatDau", p.getStartDate() != null ? p.getStartDate().toString() : "N/A");
-            item.put("ngayKetThuc", p.getEndDate() != null ? p.getEndDate().toString() : "N/A");
+            item.put("completedSessions", p.getCompletedSessions());
+            item.put("totalSessions", p.getTotalSessions());
+            item.put("startDate", p.getStartDate() != null ? p.getStartDate().toString() : "N/A");
+            item.put("endDate", p.getEndDate() != null ? p.getEndDate().toString() : "N/A");
             result.add(item);
         }
         return result;
@@ -930,11 +923,11 @@ public class AiToolExecutionService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("cuLyToiUu", (resp != null && !resp.strongDistances().isEmpty()) ? resp.strongDistances() : List.of("Đang phân tích thêm cự ly"));
-        result.put("matSanUaThich", matSanUaThich);
-        result.put("thongKeCuLy", resp != null ? resp.distanceStats() : Collections.emptyList());
+        result.put("horseName", horse.getName());
+        result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("optimalDistance", (resp != null && !resp.strongDistances().isEmpty()) ? resp.strongDistances() : List.of("Đang phân tích thêm cự ly"));
+        result.put("preferredSurface", matSanUaThich);
+        result.put("distanceStats", resp != null ? resp.distanceStats() : Collections.emptyList());
         return result;
     }
 
@@ -946,10 +939,7 @@ public class AiToolExecutionService {
             Horse h = targetHorse != null ? targetHorse : horseRepository.findById(horseId).orElse(null);
             String hName = h != null ? h.getName() : "Ngựa #" + horseId;
             List<HorseAlertResponse> alerts = horsePerformanceService.getHorseAlerts(horseId, currentUser);
-            return Map.of(
-                    "tenNgua", hName,
-                    "soLuongCanhBao", alerts.size(),
-                    "danhSachCanhBao", alerts
+            return Map.of("horseName", hName, "alertCount", alerts.size(), "alertList", alerts
             );
         }
 
@@ -964,17 +954,14 @@ public class AiToolExecutionService {
             List<HorseAlertResponse> alerts = horsePerformanceService.getHorseAlerts(h.getId(), currentUser);
             if (!alerts.isEmpty()) {
                 Map<String, Object> item = new LinkedHashMap<>();
-                item.put("tenNgua", h.getName());
-                item.put("soLuongCanhBao", alerts.size());
-                item.put("danhSachCanhBao", alerts);
+                item.put("horseName", h.getName());
+                item.put("alertCount", alerts.size());
+                item.put("alertList", alerts);
                 aggregated.add(item);
             }
         }
 
-        return Map.of(
-                "huanLuyenVien", resolveUserName(currentUser, "Huấn luyện viên"),
-                "soNguaCoNguyCo", aggregated.size(),
-                "chiTietCanhBao", aggregated
+        return Map.of("trainerName", resolveUserName(currentUser, "Huấn luyện viên"), "horsesAtRiskCount", aggregated.size(), "alertDetails", aggregated
         );
     }
 
@@ -987,24 +974,22 @@ public class AiToolExecutionService {
 
         Optional<RacingReadinessAssessment> opt = racingReadinessAssessmentRepository.findTopByHorseIdOrderByCreatedAtDesc(horseId);
         if (opt.isEmpty()) {
-            return Map.of(
-                    "tenNgua", horse.getName(),
-                    "thongBao", "Chưa có bản đánh giá sẵn sàng thi đấu nào cho chiến mã này."
+            return Map.of("horseName", horse.getName(), "message", "Chưa có bản đánh giá sẵn sàng thi đấu nào cho chiến mã này."
             );
         }
 
         RacingReadinessAssessment r = opt.get();
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("trangThaiSanSang", r.getReadinessStatus());
-        result.put("diemTheLuc", r.getFitnessScore());
-        result.put("diemNgoaiHinh", r.getConformationScore());
-        result.put("diemTinhKhi", r.getTemperamentScore());
-        result.put("diemDangChay", r.getGaitQualityScore());
-        result.put("soThangUocTinhCoTheThiDau", r.getEstimatedMonthsToRace());
-        result.put("ngayDanhGia", r.getAssessmentDate());
-        result.put("giaTriDenNgay", r.getValidUntil());
-        result.put("nhanXetChuyenMon", r.getRemarks());
+        result.put("horseName", horse.getName());
+        result.put("readinessStatus", r.getReadinessStatus());
+        result.put("fitnessScore", r.getFitnessScore());
+        result.put("conformationScore", r.getConformationScore());
+        result.put("temperamentScore", r.getTemperamentScore());
+        result.put("racingFormScore", r.getGaitQualityScore());
+        result.put("estimatedMonthsToRace", r.getEstimatedMonthsToRace());
+        result.put("assessmentDate", r.getAssessmentDate());
+        result.put("evaluatedUpToDate", r.getValidUntil());
+        result.put("expertReview", r.getRemarks());
         return result;
     }
 
@@ -1027,12 +1012,12 @@ public class AiToolExecutionService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horseName);
-        result.put("tenGroom", groomName);
-        result.put("ngayKiemTra", fromDate.toString());
-        result.put("coXungDotLich", !conflicts.isEmpty());
-        result.put("soCaXungDot", conflicts.size());
-        result.put("chiTietXungDot", conflicts);
+        result.put("horseName", horseName);
+        result.put("groomName", groomName);
+        result.put("inspectionDate", fromDate.toString());
+        result.put("hasScheduleConflict", !conflicts.isEmpty());
+        result.put("conflictShiftCount", conflicts.size());
+        result.put("conflictDetails", conflicts);
         return result;
     }
 
@@ -1043,9 +1028,7 @@ public class AiToolExecutionService {
                 .toList();
 
         if (areas.isEmpty()) {
-            return Map.of(
-                    "thongBao", "Huấn luyện viên hiện chưa được phân công quản lý khu vực chuồng trại nào.",
-                    "danhSachGroom", Collections.emptyList()
+            return Map.of("message", "Huấn luyện viên hiện chưa được phân công quản lý khu vực chuồng trại nào.", "groomList", Collections.emptyList()
             );
         }
 
@@ -1082,27 +1065,24 @@ public class AiToolExecutionService {
                     .toList();
 
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenGroom", groomName);
-            item.put("soDienThoai", groomPhone);
+            item.put("groomName", groomName);
+            item.put("phone", groomPhone);
             item.put("email", groomEmail);
-            item.put("soChuongPhuTrach", groomStalls.size());
-            item.put("danhSachMaChuong", stallCodes);
-            item.put("danhSachNguaDangChamSoc", horsesTakingCareOf);
+            item.put("assignedStallCount", groomStalls.size());
+            item.put("stallCodeList", stallCodes);
+            item.put("caredHorseList", horsesTakingCareOf);
             groomList.add(item);
         }
 
-        return Map.of(
-                "tenHuanLuyenVien", resolveUserName(currentUser, "Huấn luyện viên"),
-                "tongSoGroomLamViecCung", groomList.size(),
-                "danhSachGroom", groomList
+        return Map.of("trainerName", resolveUserName(currentUser, "Huấn luyện viên"), "totalCollaboratingGrooms", groomList.size(), "groomList", groomList
         );
     }
 
     private Object handleGetMyHorseRaceRegistrations(Map<String, Object> args, AuthenticatedUser currentUser) {
         if (raceRegistrationRepository == null) {
             Map<String, Object> emptyResp = new LinkedHashMap<>();
-            emptyResp.put("tongSoGiaiDuaDangKy", 0);
-            emptyResp.put("danhSachGiaiDua", Collections.emptyList());
+            emptyResp.put("totalRaceRegistrations", 0);
+            emptyResp.put("raceList", Collections.emptyList());
             return emptyResp;
         }
         Long trainerId = currentUser.getUserId();
@@ -1120,17 +1100,17 @@ public class AiToolExecutionService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (RaceRegistration r : regs) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
-            item.put("tenGiaiDua", r.getRaceName() != null ? r.getRaceName() : "Giải đua");
-            item.put("ngayDangKy", r.getEventDate() != null ? r.getEventDate().toString() : (r.getCreatedAt() != null ? r.getCreatedAt().toString() : "N/A"));
-            item.put("trangThai", r.getStatus() != null ? r.getStatus().name() : "PENDING");
-            item.put("ghiChu", r.getTrainerNotes() != null ? r.getTrainerNotes() : (r.getSelectionReason() != null ? r.getSelectionReason() : ""));
+            item.put("horseName", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
+            item.put("raceName", r.getRaceName() != null ? r.getRaceName() : "Giải đua");
+            item.put("registrationDate", r.getEventDate() != null ? r.getEventDate().toString() : (r.getCreatedAt() != null ? r.getCreatedAt().toString() : "N/A"));
+            item.put("status", r.getStatus() != null ? r.getStatus().name() : "PENDING");
+            item.put("notes", r.getTrainerNotes() != null ? r.getTrainerNotes() : (r.getSelectionReason() != null ? r.getSelectionReason() : ""));
             item.put("actionUrl", "/trainer/racing");
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoGiaiDuaDangKy", result.size());
-        response.put("danhSachGiaiDua", result);
+        response.put("totalRaceRegistrations", result.size());
+        response.put("raceList", result);
         return response;
     }
 
@@ -1160,17 +1140,17 @@ public class AiToolExecutionService {
             }
 
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horseName);
-            item.put("giongNgua", breed);
-            item.put("tenChuNgua", ownerName);
-            item.put("ngayNop", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : "N/A"));
-            item.put("trangThai", "Chờ Huấn luyện viên thẩm định");
+            item.put("horseName", horseName);
+            item.put("breed", breed);
+            item.put("ownerName", ownerName);
+            item.put("submittedDate", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : "N/A"));
+            item.put("status", "Chờ Huấn luyện viên thẩm định");
             item.put("actionUrl", "/trainer/admissions");
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoDonChoThamDinh", result.size());
-        response.put("danhSachDon", result);
+        response.put("pendingReviewCount", result.size());
+        response.put("applicationList", result);
         return response;
     }
 
@@ -1181,28 +1161,28 @@ public class AiToolExecutionService {
         List<Map<String, Object>> courseList = new ArrayList<>();
         for (Course c : courses) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenKhoaHoc", c.getName());
-            item.put("mucTieu", c.getTargetGoal() != null ? c.getTargetGoal() : "Rèn luyện thể lực");
-            item.put("soBuoiHoc", c.getTotalSessions() != null ? c.getTotalSessions() : 0);
-            item.put("moTa", c.getDescription() != null ? c.getDescription() : "");
+            item.put("courseName", c.getName());
+            item.put("targetGoal", c.getTargetGoal() != null ? c.getTargetGoal() : "Rèn luyện thể lực");
+            item.put("totalSessions", c.getTotalSessions() != null ? c.getTotalSessions() : 0);
+            item.put("description", c.getDescription() != null ? c.getDescription() : "");
             courseList.add(item);
         }
 
         List<Map<String, Object>> subjectList = new ArrayList<>();
         for (Subject s : subjects) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenMonHoc", s.getName());
-            item.put("nhomKyThuat", s.getCategory() != null ? s.getCategory().name() : "N/A");
-            item.put("matSan", s.getSurfaceType() != null ? s.getSurfaceType().name() : "N/A");
-            item.put("cuLyMucTieu", s.getTargetDistanceMeters() != null ? s.getTargetDistanceMeters() + "m" : "N/A");
-            item.put("cuongDo", s.getIntensityLevel() != null ? s.getIntensityLevel().name() : "MEDIUM");
-            item.put("thoiLuongPhut", s.getDurationMinutes() != null ? s.getDurationMinutes() : 60);
+            item.put("subjectName", s.getName());
+            item.put("technicalGroup", s.getCategory() != null ? s.getCategory().name() : "N/A");
+            item.put("surface", s.getSurfaceType() != null ? s.getSurfaceType().name() : "N/A");
+            item.put("targetDistance", s.getTargetDistanceMeters() != null ? s.getTargetDistanceMeters() + "m" : "N/A");
+            item.put("intensity", s.getIntensityLevel() != null ? s.getIntensityLevel().name() : "MEDIUM");
+            item.put("durationMinutes", s.getDurationMinutes() != null ? s.getDurationMinutes() : 60);
             subjectList.add(item);
         }
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("danhMucKhoaHoc", courseList);
-        response.put("danhMucMonHocKyThuat", subjectList);
+        response.put("courseCurriculumList", courseList);
+        response.put("technicalSubjectList", subjectList);
         response.put("actionUrl", "/trainer/courses");
         return response;
     }
@@ -1278,15 +1258,15 @@ public class AiToolExecutionService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("tongCuLy14Ngay", tongCuLy14Ngay);
-        result.put("soBuoiTap", recentWorkouts.size());
-        result.put("nhipTimTrungBinh", avgHeartRate + " bpm");
-        result.put("nhipTimCaoNhat", (maxHr > 0 ? maxHr : 110) + " bpm");
-        result.put("soBuoiCuongDoCao", highIntensityCount);
-        result.put("danhGiaNguyCo", danhGiaNguyCo);
-        result.put("khuyenNghiHuanLuyen", khuyenNghiHuanLuyen);
+        result.put("horseName", horse.getName());
+        result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("totalDistance14Days", tongCuLy14Ngay);
+        result.put("workoutCount", recentWorkouts.size());
+        result.put("avgHeartRate", avgHeartRate + " bpm");
+        result.put("maxHeartRate", (maxHr > 0 ? maxHr : 110) + " bpm");
+        result.put("highIntensitySessions", highIntensityCount);
+        result.put("riskAssessment", danhGiaNguyCo);
+        result.put("trainingRecommendations", khuyenNghiHuanLuyen);
         result.put("actionUrl", "/trainer/dashboard");
         return result;
     }
@@ -1336,12 +1316,12 @@ public class AiToolExecutionService {
         String lyDoDeXuat = "Phân tích từ " + workouts.size() + " buổi tập thực tế cho thấy ngựa đạt phong độ và chỉ số hồi phục tim mạch cao nhất ở cự ly và mặt sân này.";
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("cuLyDeXuat", cuLyDeXuat);
-        result.put("matSanUaThich", matSanUaThich);
-        result.put("tocDoToiUu", tocDoToiUu);
-        result.put("lyDoDeXuat", lyDoDeXuat);
+        result.put("horseName", horse.getName());
+        result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("recommendedDistance", cuLyDeXuat);
+        result.put("preferredSurface", matSanUaThich);
+        result.put("optimalSpeed", tocDoToiUu);
+        result.put("recommendationReason", lyDoDeXuat);
         result.put("actionUrl", "/trainer/racing");
         return result;
     }
@@ -1396,12 +1376,12 @@ public class AiToolExecutionService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("buoiTapGanNhat", buoiTapGanNhat);
-        result.put("nhanXetTheLuc", nhanXetTheLuc);
-        result.put("baiTapKeTiepDeXuat", baiTapKeTiepDeXuat);
-        result.put("lyDoDieuChinh", lyDoDieuChinh);
+        result.put("horseName", horse.getName());
+        result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("lastWorkout", buoiTapGanNhat);
+        result.put("fitnessReview", nhanXetTheLuc);
+        result.put("nextRecommendedWorkout", baiTapKeTiepDeXuat);
+        result.put("adjustmentReason", lyDoDieuChinh);
         result.put("actionUrl", "/trainer/plans");
         return result;
     }
@@ -1433,11 +1413,11 @@ public class AiToolExecutionService {
         for (CareSchedule cs : allSchedules) {
             String horseName = horseNames.getOrDefault(cs.getHorseId(), "Ngựa #" + cs.getHorseId());
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horseName);
-            item.put("loaiKham", cs.getCareType() != null ? cs.getCareType().name() : "Khám tổng quát");
-            item.put("mucDich", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A");
-            item.put("thoiGianHen", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A");
-            item.put("moTa", cs.getDescription() != null ? cs.getDescription() : "");
+            item.put("horseName", horseName);
+            item.put("examType", cs.getCareType() != null ? cs.getCareType().name() : "Khám tổng quát");
+            item.put("purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A");
+            item.put("scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A");
+            item.put("description", cs.getDescription() != null ? cs.getDescription() : "");
 
             if (cs.getStatus() == CareScheduleStatus.IN_PROGRESS) {
                 dangKham.add(item);
@@ -1448,14 +1428,7 @@ public class AiToolExecutionService {
             }
         }
 
-        return Map.of(
-                "tongSoLichKham", allSchedules.size(),
-                "dangKham", dangKham,
-                "soCaDangKham", dangKham.size(),
-                "chuaKhamChuaDenLich", chuaKham,
-                "soCaChuaKham", chuaKham.size(),
-                "daKhamHoanThanh", daKham,
-                "soCaDaKham", daKham.size()
+        return Map.of("totalScheduledExams", allSchedules.size(), "inProgressExams", dangKham, "inProgressExamsCount", dangKham.size(), "pendingScheduledExams", chuaKham, "pendingScheduledExamsCount", chuaKham.size(), "completedExams", daKham, "completedExamsCount", daKham.size()
         );
     }
 
@@ -1468,14 +1441,14 @@ public class AiToolExecutionService {
         List<Map<String, Object>> list = new ArrayList<>();
         for (HealthRecord hr : records) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horse.getName());
-            item.put("ngayKham", hr.getExaminedAt());
-            item.put("trieuChung", hr.getSymptoms());
-            item.put("ghiNhanLamSang", hr.getFindings());
-            item.put("chanDoan", hr.getDiagnosis());
-            item.put("phacDoDieuTri", hr.getTreatment());
-            item.put("quyetDinhTapLuyen", hr.getTrainingDecision());
-            item.put("chiTietHanChe", hr.getRestrictionDetails());
+            item.put("horseName", horse.getName());
+            item.put("examDate", hr.getExaminedAt());
+            item.put("symptoms", hr.getSymptoms());
+            item.put("clinicalObservations", hr.getFindings());
+            item.put("diagnosis", hr.getDiagnosis());
+            item.put("treatmentPlan", hr.getTreatment());
+            item.put("trainingDecision", hr.getTrainingDecision());
+            item.put("restrictionDetails", hr.getRestrictionDetails());
             list.add(item);
         }
         return list;
@@ -1492,16 +1465,16 @@ public class AiToolExecutionService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (CareSchedule cs : active) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horse.getName());
-            item.put("loaiDieuTri", cs.getCareType() != null ? cs.getCareType().name() : "N/A");
-            item.put("thoiGianHen", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A");
-            item.put("mucDich", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A");
-            item.put("moTa", cs.getDescription() != null ? cs.getDescription() : "");
+            item.put("horseName", horse.getName());
+            item.put("treatmentType", cs.getCareType() != null ? cs.getCareType().name() : "N/A");
+            item.put("scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A");
+            item.put("purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A");
+            item.put("description", cs.getDescription() != null ? cs.getDescription() : "");
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoDonThuocVaDieuTri", result.size());
-        response.put("danhSachDieuTri", result);
+        response.put("totalPrescriptions", result.size());
+        response.put("treatmentList", result);
         return response;
     }
 
@@ -1533,12 +1506,12 @@ public class AiToolExecutionService {
                 .sorted(Comparator.comparing(CareSchedule::getScheduledAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(cs -> {
                     Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("tenNgua", horseNames.getOrDefault(cs.getHorseId(), "Ngựa #" + cs.getHorseId()));
-                    item.put("loaiChamSoc", cs.getCareType());
-                    item.put("mucDich", cs.getPurpose());
-                    item.put("trangThai", cs.getStatus());
-                    item.put("thoiGianHen", cs.getScheduledAt());
-                    item.put("ghiChu", cs.getDescription());
+                    item.put("horseName", horseNames.getOrDefault(cs.getHorseId(), "Ngựa #" + cs.getHorseId()));
+                    item.put("careType", cs.getCareType());
+                    item.put("purpose", cs.getPurpose());
+                    item.put("status", cs.getStatus());
+                    item.put("scheduledAt", cs.getScheduledAt());
+                    item.put("notes", cs.getDescription());
                     return item;
                 })
                 .toList();
@@ -1575,34 +1548,32 @@ public class AiToolExecutionService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Horse h : uniqueHorses.values()) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", h.getName());
-            item.put("maDangKy", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
-            item.put("trangThaiHienTai", h.getCurrentStatus());
+            item.put("horseName", h.getName());
+            item.put("registrationNumber", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
+            item.put("currentStatus", h.getCurrentStatus());
             // TUYỆT ĐỐI KHÔNG CONFLICT: Ngựa cách ly luôn luôn BLOCKED khỏi tập luyện
-            item.put("quyetDinhTapLuyen", "BLOCKED");
-            item.put("duocPhepTapLuyen", false);
-            item.put("lyDoQuyetDinh", h.getTrainingDecisionReason() != null ? h.getTrainingDecisionReason() : "Đang thực hiện cách ly kiểm dịch nghiêm ngặt - Cấm tập luyện");
+            item.put("trainingDecision", "BLOCKED");
+            item.put("isTrainingAllowed", false);
+            item.put("decisionReason", h.getTrainingDecisionReason() != null ? h.getTrainingDecisionReason() : "Đang thực hiện cách ly kiểm dịch nghiêm ngặt - Cấm tập luyện");
 
             boolean inQuarantineStall = h.getCurrentStallId() != null && qStallIds.contains(h.getCurrentStallId());
-            item.put("oKhuChuongCachLy", inQuarantineStall);
+            item.put("inQuarantineArea", inQuarantineStall);
             if (inQuarantineStall && stallMap.containsKey(h.getCurrentStallId())) {
-                item.put("maChuong", stallMap.get(h.getCurrentStallId()).getStallCode());
+                item.put("stallCode", stallMap.get(h.getCurrentStallId()).getStallCode());
             }
 
             List<HealthRecord> records = healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(h.getId());
             if (!records.isEmpty()) {
                 HealthRecord latest = records.get(0);
-                item.put("chanDoanMoiNhat", latest.getDiagnosis());
-                item.put("chiTietHanChe", latest.getRestrictionDetails());
-                item.put("ngayKhamGanNhat", latest.getExaminedAt());
+                item.put("latestDiagnosis", latest.getDiagnosis());
+                item.put("restrictionDetails", latest.getRestrictionDetails());
+                item.put("lastExamDate", latest.getExaminedAt());
             }
 
             result.add(item);
         }
 
-        return Map.of(
-                "tongSoNguaCachLyHoacCamTap", result.size(),
-                "danhSachNguaCachLy", result
+        return Map.of("quarantinedOrRestrictedHorsesCount", result.size(), "quarantinedHorseList", result
         );
     }
 
@@ -1620,18 +1591,16 @@ public class AiToolExecutionService {
             if (r.getGroomId() != null && userRepository != null) {
                 groomName = userRepository.findById(r.getGroomId()).map(User::getFullName).orElse(groomName);
             }
-            item.put("tieuDeSuCo", r.getTitle());
-            item.put("tenNgua", horseName);
-            item.put("nguoiBaoCao", groomName);
-            item.put("mucDoNghiemTrong", r.getSeverity());
-            item.put("moTaChiTiet", r.getDescription());
-            item.put("trangThaiXuLy", r.getStatus());
-            item.put("thoiGianBaoCao", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
+            item.put("incidentTitle", r.getTitle());
+            item.put("horseName", horseName);
+            item.put("reporterName", groomName);
+            item.put("severity", r.getSeverity());
+            item.put("detailedDescription", r.getDescription());
+            item.put("incidentStatus", r.getStatus());
+            item.put("reportedAt", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
             result.add(item);
         }
-        return Map.of(
-                "tongSoBaoCaoTrong48h", result.size(),
-                "danhSachSuCo", result
+        return Map.of("totalReportsLast48Hours", result.size(), "incidentList", result
         );
     }
 
@@ -1657,16 +1626,16 @@ public class AiToolExecutionService {
             }
 
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horseName);
-            item.put("tenChuNgua", ownerName);
-            item.put("ngayNop", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : "N/A"));
-            item.put("trangThai", "Chờ bác sĩ khám sàng lọc");
+            item.put("horseName", horseName);
+            item.put("ownerName", ownerName);
+            item.put("submittedDate", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : "N/A"));
+            item.put("status", "Chờ bác sĩ khám sàng lọc");
             item.put("actionUrl", "/veterinarian/admissions");
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoCaKhamNhapDanDangCho", result.size());
-        response.put("danhSachCaKham", result);
+        response.put("pendingExamCount", result.size());
+        response.put("examList", result);
         return response;
     }
 
@@ -1686,17 +1655,17 @@ public class AiToolExecutionService {
             String stallName = h != null ? resolveStallName(h.getCurrentStallId()) : "Chưa rõ chuồng";
 
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horseName);
-            item.put("chuong", stallName);
-            item.put("mucDo", "Khẩn cấp");
-            item.put("trieuChung", cs.getDescription() != null ? cs.getDescription() : "Cần can thiệp y tế khẩn cấp");
-            item.put("thoiGian", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A");
+            item.put("horseName", horseName);
+            item.put("stall", stallName);
+            item.put("severity", "Khẩn cấp");
+            item.put("symptoms", cs.getDescription() != null ? cs.getDescription() : "Cần can thiệp y tế khẩn cấp");
+            item.put("timestamp", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A");
             item.put("actionUrl", "/veterinarian/urgent");
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoCanhBaoKhan", result.size());
-        response.put("danhSachCanhBao", result);
+        response.put("totalUrgentAlerts", result.size());
+        response.put("alertList", result);
         return response;
     }
 
@@ -1736,13 +1705,13 @@ public class AiToolExecutionService {
                             horseRepository.findById(id).map(Horse::getName).orElse("Ngựa #" + id));
                 }
                 Map<String, Object> item = new LinkedHashMap<>();
-                item.put("tenNgua", hName);
-                item.put("ngayDo", m.getRecordedAt() != null ? m.getRecordedAt().toString() : "N/A");
-                item.put("canNang", m.getWeight() != null ? m.getWeight() + " kg" : "N/A");
-                item.put("thanNhiet", m.getTemperature() != null ? m.getTemperature() + " °C" : "N/A");
-                item.put("nhipTim", m.getHeartRate() != null ? m.getHeartRate() + " bpm" : "N/A");
-                item.put("nhipTho", m.getRespiratoryRate() != null ? m.getRespiratoryRate() + " nhịp/phút" : "N/A");
-                item.put("nhanXet", m.getNotes() != null ? m.getNotes() : (m.getHydrationStatus() != null ? m.getHydrationStatus() : "Chỉ số ổn định"));
+                item.put("horseName", hName);
+                item.put("measurementDate", m.getRecordedAt() != null ? m.getRecordedAt().toString() : "N/A");
+                item.put("weight", m.getWeight() != null ? m.getWeight() + " kg" : "N/A");
+                item.put("temperature", m.getTemperature() != null ? m.getTemperature() + " °C" : "N/A");
+                item.put("heartRate", m.getHeartRate() != null ? m.getHeartRate() + " bpm" : "N/A");
+                item.put("respiratoryRate", m.getRespiratoryRate() != null ? m.getRespiratoryRate() + " nhịp/phút" : "N/A");
+                item.put("clinicalNotes", m.getNotes() != null ? m.getNotes() : (m.getHydrationStatus() != null ? m.getHydrationStatus() : "Chỉ số ổn định"));
                 result.add(item);
             }
             return result;
@@ -1752,13 +1721,13 @@ public class AiToolExecutionService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (HorseHealthMetric m : metrics) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horse.getName());
-            item.put("ngayDo", m.getRecordedAt() != null ? m.getRecordedAt().toString() : "N/A");
-            item.put("canNang", m.getWeight() != null ? m.getWeight() + " kg" : "N/A");
-            item.put("thanNhiet", m.getTemperature() != null ? m.getTemperature() + " °C" : "N/A");
-            item.put("nhipTim", m.getHeartRate() != null ? m.getHeartRate() + " bpm" : "N/A");
-            item.put("nhipTho", m.getRespiratoryRate() != null ? m.getRespiratoryRate() + " nhịp/phút" : "N/A");
-            item.put("nhanXet", m.getNotes() != null ? m.getNotes() : (m.getHydrationStatus() != null ? m.getHydrationStatus() : "Chỉ số ổn định"));
+            item.put("horseName", horse.getName());
+            item.put("measurementDate", m.getRecordedAt() != null ? m.getRecordedAt().toString() : "N/A");
+            item.put("weight", m.getWeight() != null ? m.getWeight() + " kg" : "N/A");
+            item.put("temperature", m.getTemperature() != null ? m.getTemperature() + " °C" : "N/A");
+            item.put("heartRate", m.getHeartRate() != null ? m.getHeartRate() + " bpm" : "N/A");
+            item.put("respiratoryRate", m.getRespiratoryRate() != null ? m.getRespiratoryRate() + " nhịp/phút" : "N/A");
+            item.put("clinicalNotes", m.getNotes() != null ? m.getNotes() : (m.getHydrationStatus() != null ? m.getHydrationStatus() : "Chỉ số ổn định"));
             result.add(item);
         }
         return result;
@@ -1808,13 +1777,13 @@ public class AiToolExecutionService {
         String khuyenNghiPhongNgua = "Thực hiện kiểm tra khớp và móng định kỳ trước các bài tập nặng, xoa bóp cơ bắp sau giờ tập, bổ sung men vi sinh và duy trì kiểm tra khẩu phần xơ thô.";
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("tongSoSuCo", incidents.size());
-        result.put("tongSoLanKhamBenh", records.size());
-        result.put("benhLyPhoBien", benhLyPhoBien);
-        result.put("nguyCoTaiPhat", nguyCoTaiPhat);
-        result.put("khuyenNghiPhongNgua", khuyenNghiPhongNgua);
+        result.put("horseName", horse.getName());
+        result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("totalIncidents", incidents.size());
+        result.put("totalExamsCount", records.size());
+        result.put("commonConditions", benhLyPhoBien);
+        result.put("recurrenceRisk", nguyCoTaiPhat);
+        result.put("preventiveRecommendations", khuyenNghiPhongNgua);
         result.put("actionUrl", "/veterinarian/admissions");
         return result;
     }
@@ -1847,13 +1816,13 @@ public class AiToolExecutionService {
         String thoiGianTheoDoiToiThieu = "24 - 48 giờ liên tục dưới sự giám sát trực tiếp của Bác sĩ thú y trực ban.";
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse != null ? horse.getName() : "Chiến mã đang khám");
-        result.put("maDangKy", horse != null && horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("trieuChungDauVao", symptoms);
-        result.put("phacDoCanThiepDeXuat", phacDoCanThiepDeXuat);
-        result.put("xetNghiemCanLam", xetNghiemCanLam);
-        result.put("thoiGianTheoDoiToiThieu", thoiGianTheoDoiToiThieu);
-        result.put("taiLieuThamKhaoRAG", refDocs);
+        result.put("horseName", horse != null ? horse.getName() : "Chiến mã đang khám");
+        result.put("registrationNumber", horse != null && horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("intakeSymptoms", symptoms);
+        result.put("recommendedIntervention", phacDoCanThiepDeXuat);
+        result.put("requiredTests", xetNghiemCanLam);
+        result.put("minObservationTime", thoiGianTheoDoiToiThieu);
+        result.put("referenceGuidelines", refDocs);
         result.put("actionUrl", "/veterinarian/urgent");
         return result;
     }
@@ -1891,13 +1860,13 @@ public class AiToolExecutionService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("trangThaiHienTai", horse.getCurrentStatus() != null ? horse.getCurrentStatus().name() : "N/A");
-        result.put("quyetDinhTapLuyen", horse.getTrainingDecision() != null ? horse.getTrainingDecision().name() : "N/A");
-        result.put("diemSanSang", diemSanSang);
-        result.put("khuyenNghiBacSi", khuyenNghiBacSi);
-        result.put("hanCheTapLuyenDeXuat", hanCheTapLuyenDeXuat);
+        result.put("horseName", horse.getName());
+        result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("currentStatus", horse.getCurrentStatus() != null ? horse.getCurrentStatus().name() : "N/A");
+        result.put("trainingDecision", horse.getTrainingDecision() != null ? horse.getTrainingDecision().name() : "N/A");
+        result.put("readinessScore", diemSanSang);
+        result.put("vetRecommendations", khuyenNghiBacSi);
+        result.put("proposedTrainingRestriction", hanCheTapLuyenDeXuat);
         result.put("actionUrl", "/veterinarian/preventive-care");
         return result;
     }
@@ -1916,9 +1885,7 @@ public class AiToolExecutionService {
         Long groomId = currentUser.getUserId();
         List<StableStall> stalls = stableStallRepository.findByGroomId(groomId);
         if (stalls.isEmpty()) {
-            return Map.of(
-                    "thongBao", "Hiện tại bạn chưa được phân công phụ trách chuồng nào.",
-                    "danhSachChuongVaNgua", Collections.emptyList()
+            return Map.of("message", "Hiện tại bạn chưa được phân công phụ trách chuồng nào.", "stallAndHorseList", Collections.emptyList()
             );
         }
 
@@ -1931,27 +1898,23 @@ public class AiToolExecutionService {
         List<Map<String, Object>> horseList = new ArrayList<>();
         for (StableStall stall : stalls) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("maChuong", stall.getStallCode());
-            item.put("soThuTuChuong", stall.getStallNumber());
-            item.put("trangThaiChuong", stall.getStatus());
+            item.put("stallCode", stall.getStallCode());
+            item.put("stallNumber", stall.getStallNumber());
+            item.put("stallStatus", stall.getStatus());
 
             Horse h = horseByStall.get(stall.getId());
             if (h != null) {
-                item.put("tenNgua", h.getName());
-                item.put("maDangKy", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
-                item.put("trangThaiNgua", h.getCurrentStatus());
-                item.put("quyetDinhTapLuyen", h.getTrainingDecision());
+                item.put("horseName", h.getName());
+                item.put("registrationNumber", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
+                item.put("horseStatus", h.getCurrentStatus());
+                item.put("trainingDecision", h.getTrainingDecision());
             } else {
-                item.put("nguaTrongChuong", "Chuồng đang trống");
+                item.put("horseInStall", "Chuồng đang trống");
             }
             horseList.add(item);
         }
 
-        return Map.of(
-                "tenGroom", resolveUserName(currentUser, "Groom"),
-                "tongSoChuongPhuTrach", stalls.size(),
-                "soChuongCoNgua", horses.size(),
-                "danhSachChuongVaNgua", horseList
+        return Map.of("groomName", resolveUserName(currentUser, "Groom"), "assignedStallsCount", stalls.size(), "stallsWithHorsesCount", horses.size(), "stallAndHorseList", horseList
         );
     }
 
@@ -1974,30 +1937,28 @@ public class AiToolExecutionService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("trangThai", horse.getCurrentStatus());
-        result.put("quyetDinhTapLuyen", horse.getTrainingDecision());
-        result.put("lyDoQuyetDinh", horse.getTrainingDecisionReason() != null ? horse.getTrainingDecisionReason() : "Không có hạn chế đặc biệt");
+        result.put("horseName", horse.getName());
+        result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("status", horse.getCurrentStatus());
+        result.put("trainingDecision", horse.getTrainingDecision());
+        result.put("decisionReason", horse.getTrainingDecisionReason() != null ? horse.getTrainingDecisionReason() : "Không có hạn chế đặc biệt");
 
         List<HealthRecord> records = healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(horse.getId());
         if (!records.isEmpty()) {
             HealthRecord latest = records.get(0);
-            result.put("chanDoanMoiNhat", latest.getDiagnosis());
-            result.put("phacDoDieuTri", latest.getTreatment());
-            result.put("ghiChuChamSocYTe", latest.getRestrictionDetails());
-            result.put("ngayKhamGanNhat", latest.getExaminedAt());
+            result.put("latestDiagnosis", latest.getDiagnosis());
+            result.put("treatmentPlan", latest.getTreatment());
+            result.put("medicalCareNotes", latest.getRestrictionDetails());
+            result.put("lastExamDate", latest.getExaminedAt());
         }
 
         List<CareSchedule> activeSchedules = careScheduleRepository.findByHorseIdAndStatusIn(
                 horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
         );
         List<Map<String, Object>> careList = activeSchedules.stream().map(cs -> Map.<String, Object>of(
-                "loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám thú y",
-                "thoiGianHen", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A",
-                "mucDich", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A"
+                "loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám thú y", "scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A", "purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A"
         )).toList();
-        result.put("lichChamSocSapToi", careList);
+        result.put("upcomingCareSchedule", careList);
 
         return result;
     }
@@ -2021,11 +1982,11 @@ public class AiToolExecutionService {
             }
         }
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("viTriChuong", stallName);
-        result.put("khuVuc", areaName);
-        result.put("groomPhuTrach", groomName);
+        result.put("horseName", horse.getName());
+        result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("stallLocation", stallName);
+        result.put("areaName", areaName);
+        result.put("assignedGroom", groomName);
         return result;
     }
 
@@ -2042,11 +2003,11 @@ public class AiToolExecutionService {
                     continue;
                 }
                 Map<String, Object> item = new LinkedHashMap<>();
-                item.put("tenNgua", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
-                item.put("tieuDe", r.getTitle());
-                item.put("mucDoNghiemTrong", r.getSeverity() != null ? r.getSeverity().name() : "MEDIUM");
-                item.put("thoiGianBaoCao", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
-                item.put("trangThaiXuLy", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
+                item.put("horseName", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
+                item.put("title", r.getTitle());
+                item.put("severity", r.getSeverity() != null ? r.getSeverity().name() : "MEDIUM");
+                item.put("reportedAt", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
+                item.put("incidentStatus", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
                 item.put("actionUrl", "/groom/incidents");
                 result.add(item);
             }
@@ -2058,18 +2019,18 @@ public class AiToolExecutionService {
                     continue;
                 }
                 Map<String, Object> item = new LinkedHashMap<>();
-                item.put("tenNgua", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
-                item.put("tieuDe", r.getTitle());
-                item.put("mucDoNghiemTrong", r.getSeverity() != null ? r.getSeverity().name() : "MEDIUM");
-                item.put("thoiGianBaoCao", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
-                item.put("trangThaiXuLy", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
+                item.put("horseName", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
+                item.put("title", r.getTitle());
+                item.put("severity", r.getSeverity() != null ? r.getSeverity().name() : "MEDIUM");
+                item.put("reportedAt", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
+                item.put("incidentStatus", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
                 item.put("actionUrl", "/groom/incidents");
                 result.add(item);
             }
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoSuCoDaBaoCao", result.size());
-        response.put("danhSachSuCo", result);
+        response.put("totalReportedIncidents", result.size());
+        response.put("incidentList", result);
         return response;
     }
 
@@ -2087,10 +2048,10 @@ public class AiToolExecutionService {
         String tyLeHoanThanh = String.format(Locale.US, "%.1f%%", rate);
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("ngay", targetDate.toString());
-        result.put("tongSoNhiemVu", tongSoNhiemVu);
-        result.put("soNhiemVuHoanThanh", soNhiemVuHoanThanh);
-        result.put("tyLeHoanThanh", tyLeHoanThanh);
+        result.put("date", targetDate.toString());
+        result.put("totalTasksCount", tongSoNhiemVu);
+        result.put("completedTasksCount", soNhiemVuHoanThanh);
+        result.put("completionRate", tyLeHoanThanh);
         result.put("actionUrl", "/groom/tasks");
         return result;
     }
@@ -2152,11 +2113,11 @@ public class AiToolExecutionService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenNgua", horse.getName());
-        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
-        result.put("dauHieuBatThuong", dauHieuBatThuong);
-        result.put("mucDoCanhBao", mucDoCanhBao);
-        result.put("hanhDongCanLamNgay", hanhDongCanLamNgay);
+        result.put("horseName", horse.getName());
+        result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("abnormalSigns", dauHieuBatThuong);
+        result.put("alertLevel", mucDoCanhBao);
+        result.put("immediateActionRequired", hanhDongCanLamNgay);
         result.put("actionUrl", "/groom/incidents");
         return result;
     }
@@ -2191,52 +2152,32 @@ public class AiToolExecutionService {
             int seq = 1;
             for (GroomDailyTask t : sorted) {
                 Map<String, Object> item = new LinkedHashMap<>();
-                item.put("thuTuUuTien", seq++);
-                item.put("loaiCongViec", formatGroomTaskType(t.getTaskType()));
-                item.put("tenNgua", horseNames.getOrDefault(t.getHorseId(), "Chiến mã"));
-                item.put("thoiGianDuKien", t.getScheduledTime() != null ? t.getScheduledTime().toLocalTime().toString() : "Trong ngày");
-                item.put("trangThai", Boolean.TRUE.equals(t.getIsCompleted()) ? "Đã hoàn thành" : "Chưa hoàn thành");
-                item.put("ghiChu", t.getNotes() != null ? t.getNotes() : "");
+                item.put("priorityOrder", seq++);
+                item.put("taskType", formatGroomTaskType(t.getTaskType()));
+                item.put("horseName", horseNames.getOrDefault(t.getHorseId(), "Chiến mã"));
+                item.put("estimatedTime", t.getScheduledTime() != null ? t.getScheduledTime().toLocalTime().toString() : "Trong ngày");
+                item.put("status", Boolean.TRUE.equals(t.getIsCompleted()) ? "Đã hoàn thành" : "Chưa hoàn thành");
+                item.put("notes", t.getNotes() != null ? t.getNotes() : "");
                 priorityList.add(item);
             }
         } else {
             // Default SOP priority schedule template
-            priorityList.add(Map.of(
-                    "thuTuUuTien", 1,
-                    "loaiCongViec", "Kiểm tra y tế & Cấp cứu thú y (VET_ASSIST / SPECIAL_CARE)",
-                    "tenNgua", "Ngựa có cảnh báo sức khỏe hoặc chỉ định tái khám",
-                    "thoiGianDuKien", "06:00 - 07:00",
-                    "ghiChu", "Ưu tiên số 1: Hỗ trợ bác sĩ đo sinh hiệu và cấp phát thuốc theo đơn"
+            priorityList.add(Map.of("priorityOrder", 1, "taskType", "Kiểm tra y tế & Cấp cứu thú y (VET_ASSIST / SPECIAL_CARE)", "horseName", "Ngựa có cảnh báo sức khỏe hoặc chỉ định tái khám", "estimatedTime", "06:00 - 07:00", "notes", "Ưu tiên số 1: Hỗ trợ bác sĩ đo sinh hiệu và cấp phát thuốc theo đơn"
             ));
-            priorityList.add(Map.of(
-                    "thuTuUuTien", 2,
-                    "loaiCongViec", "Dẫn ngựa ra sân tập ca sáng (WORKOUT_ASSIST)",
-                    "tenNgua", "Chiến mã có lịch tập ca sáng (Lot)",
-                    "thoiGianDuKien", "07:00 - 09:30",
-                    "ghiChu", "Ưu tiên số 2: Đúng giờ theo ca tập của Huấn luyện viên"
+            priorityList.add(Map.of("priorityOrder", 2, "taskType", "Dẫn ngựa ra sân tập ca sáng (WORKOUT_ASSIST)", "horseName", "Chiến mã có lịch tập ca sáng (Lot)", "estimatedTime", "07:00 - 09:30", "notes", "Ưu tiên số 2: Đúng giờ theo ca tập của Huấn luyện viên"
             ));
-            priorityList.add(Map.of(
-                    "thuTuUuTien", 3,
-                    "loaiCongViec", "Cho ăn & Vệ sinh chuồng thông thường (FEEDING / MUCKING_OUT)",
-                    "tenNgua", "Khu chuồng ngựa khỏe mạnh",
-                    "thoiGianDuKien", "09:30 - 11:30",
-                    "ghiChu", "Ưu tiên số 3: Thay đệm lót rơm, bổ sung nước sạch và thức ăn thô"
+            priorityList.add(Map.of("priorityOrder", 3, "taskType", "Cho ăn & Vệ sinh chuồng thông thường (FEEDING / MUCKING_OUT)", "horseName", "Khu chuồng ngựa khỏe mạnh", "estimatedTime", "09:30 - 11:30", "notes", "Ưu tiên số 3: Thay đệm lót rơm, bổ sung nước sạch và thức ăn thô"
             ));
-            priorityList.add(Map.of(
-                    "thuTuUuTien", 4,
-                    "loaiCongViec", "Chăm sóc & Vệ sinh chuồng cách ly (QUARANTINE_CARE)",
-                    "tenNgua", "Khu chuồng cách ly y tế",
-                    "thoiGianDuKien", "14:00 - 16:00",
-                    "ghiChu", "Ưu tiên số 4: Thực hiện SAU CÙNG để đảm bảo an toàn sinh học dịch tễ"
+            priorityList.add(Map.of("priorityOrder", 4, "taskType", "Chăm sóc & Vệ sinh chuồng cách ly (QUARANTINE_CARE)", "horseName", "Khu chuồng cách ly y tế", "estimatedTime", "14:00 - 16:00", "notes", "Ưu tiên số 4: Thực hiện SAU CÙNG để đảm bảo an toàn sinh học dịch tễ"
             ));
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("ngay", today.toString());
-        result.put("tenGroom", resolveUserName(currentUser, "Nhân viên chăm sóc"));
-        result.put("tongSoDauViec", priorityList.size());
-        result.put("danhSachThuTuUuTien", priorityList);
-        result.put("luuYVeSinhPhongDich", "Quy tắc an toàn sinh học dịch tễ: Luôn mang đồ bảo hộ khi vào khu cách ly và tiến hành vệ sinh, cho ăn tại chuồng cách ly SAU CÙNG để triệt tiêu nguy cơ lây nhiễm chéo.");
+        result.put("date", today.toString());
+        result.put("groomName", resolveUserName(currentUser, "Nhân viên chăm sóc"));
+        result.put("totalWorkItemsCount", priorityList.size());
+        result.put("priorityOrderList", priorityList);
+        result.put("biosecurityNotes", "Quy tắc an toàn sinh học dịch tễ: Luôn mang đồ bảo hộ khi vào khu cách ly và tiến hành vệ sinh, cho ăn tại chuồng cách ly SAU CÙNG để triệt tiêu nguy cơ lây nhiễm chéo.");
         result.put("actionUrl", "/groom/tasks");
         return result;
     }
@@ -2273,11 +2214,7 @@ public class AiToolExecutionService {
         long availableQuarantine = stableStallRepository.countAvailableQuarantineStalls();
         long occupiedQuarantine = stableStallRepository.countOccupiedQuarantineStalls();
         long availableRegular = stableStallRepository.countAvailableRegularStalls();
-        return Map.of(
-                "tongSoChuongTrangTrai", totalStalls,
-                "chuongCachLyConTrong", availableQuarantine,
-                "chuongCachLyDangSuDung", occupiedQuarantine,
-                "chuongThuongConTrong", availableRegular
+        return Map.of("totalStalls", totalStalls, "vacantQuarantineStalls", availableQuarantine, "occupiedQuarantineStalls", occupiedQuarantine, "vacantRegularStalls", availableRegular
         );
     }
 
@@ -2305,25 +2242,25 @@ public class AiToolExecutionService {
                 + soDonChoKhamThuY + soDonChoHuanLuyenVien + soDonChoManagerDuyet;
 
         Map<String, Object> chiTietTheoGiaiDoan = new LinkedHashMap<>();
-        chiTietTheoGiaiDoan.put("choGroomKiemTra", soDonChoGroomKiemTra);
-        chiTietTheoGiaiDoan.put("choXepChuongCachLy", soDonChoXepChuongCachLy);
-        chiTietTheoGiaiDoan.put("choNguaDenTrangTrai", soDonChoNhapChuong);
-        chiTietTheoGiaiDoan.put("choBacSiKhamDauVao", soDonChoKhamThuY);
-        chiTietTheoGiaiDoan.put("choHuanLuyenVienTiepNhan", soDonChoHuanLuyenVien);
-        chiTietTheoGiaiDoan.put("choClubManagerPheDuyetCuoi", soDonChoManagerDuyet);
-        chiTietTheoGiaiDoan.put("daPheDuyetThanhCong", soDonDaDuyetNhapDan);
-        chiTietTheoGiaiDoan.put("daTuChoi", soDonTuChoi);
-        chiTietTheoGiaiDoan.put("quaHanVanChuyen", soDonQuaHanVanChuyen);
+        chiTietTheoGiaiDoan.put("waitingGroomReview", soDonChoGroomKiemTra);
+        chiTietTheoGiaiDoan.put("waitingQuarantineStall", soDonChoXepChuongCachLy);
+        chiTietTheoGiaiDoan.put("waitingArrival", soDonChoNhapChuong);
+        chiTietTheoGiaiDoan.put("waitingVetReview", soDonChoKhamThuY);
+        chiTietTheoGiaiDoan.put("waitingTrainerReview", soDonChoHuanLuyenVien);
+        chiTietTheoGiaiDoan.put("waitingManagerApproval", soDonChoManagerDuyet);
+        chiTietTheoGiaiDoan.put("fullyApproved", soDonDaDuyetNhapDan);
+        chiTietTheoGiaiDoan.put("rejected", soDonTuChoi);
+        chiTietTheoGiaiDoan.put("arrivalExpired", soDonQuaHanVanChuyen);
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoDonTrongHeThong", tongSoDon);
-        response.put("soDonDangKyNhapChuongChoDuyet", soDonChoManagerDuyet);
-        response.put("soDonChoClubManagerPheDuyet", soDonChoManagerDuyet);
-        response.put("tongSoDonDangTrongTienTrinhXuLy", tongSoDonDangXuLy);
-        response.put("soDonDaHoanTatNhapDan", soDonDaDuyetNhapDan);
-        response.put("soDonTuChoiHoacQuaHan", soDonTuChoi + soDonQuaHanVanChuyen);
-        response.put("chiTietTungGiaiDoan", chiTietTheoGiaiDoan);
-        response.put("trangThaiHeThong", "HOAT_DONG_BINH_THUONG");
+        response.put("totalApplications", tongSoDon);
+        response.put("pendingAdmissionsCount", soDonChoManagerDuyet);
+        response.put("pendingManagerReviewCount", soDonChoManagerDuyet);
+        response.put("inProgressApplications", tongSoDonDangXuLy);
+        response.put("approvedApplications", soDonDaDuyetNhapDan);
+        response.put("rejectedOrExpiredApplications", soDonTuChoi + soDonQuaHanVanChuyen);
+        response.put("stageBreakdown", chiTietTheoGiaiDoan);
+        response.put("systemStatus", "HOAT_DONG_BINH_THUONG");
         response.put("actionUrl", "/manager/admissions");
 
         return response;
@@ -2350,12 +2287,12 @@ public class AiToolExecutionService {
             }
 
             Map<String, Object> map = new LinkedHashMap<>();
-            map.put("tenKhuVuc", area.getName());
-            map.put("maKhuVuc", area.getCode());
-            map.put("loaiKhuVuc", area.getType());
-            map.put("huanLuyenVienPhuTrach", trainerName);
-            map.put("tongSoChuong", stalls.size());
-            map.put("soGroomPhuTrach", groomIds.size());
+            map.put("areaName", area.getName());
+            map.put("areaCode", area.getCode());
+            map.put("areaType", area.getType());
+            map.put("assignedTrainer", trainerName);
+            map.put("totalStalls", stalls.size());
+            map.put("assignedGroomCount", groomIds.size());
             result.add(map);
         }
         return result;
@@ -2369,20 +2306,16 @@ public class AiToolExecutionService {
         LocalDateTime weekAgo = LocalDateTime.now().minusDays(7);
         List<GroomIncidentReport> weekIncidents = groomIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(weekAgo);
 
-        return Map.of(
-                "tongSoNguaTrongTrangTrai", horses.size(),
-                "soNguaDuocPhepTapLuyen", allowedCount,
-                "soNguaBiCamTapLuyenYTe", blockedCount,
-                "soSuCoTrong7NgayQua", weekIncidents.size()
+        return Map.of("totalClubHorses", horses.size(), "allowedTrainingHorses", allowedCount, "medicallyBlockedHorsesCount", blockedCount, "incidentsLast7DaysCount", weekIncidents.size()
         );
     }
 
     private Object handleGetSystemStaffOverview(Map<String, Object> args) {
         if (userRepository == null) {
             Map<String, Object> emptyResponse = new LinkedHashMap<>();
-            emptyResponse.put("tongSoNhanSu", 0);
-            emptyResponse.put("phanLoaiTheoVaiTro", Collections.emptyMap());
-            emptyResponse.put("danhSachNhanSu", Collections.emptyList());
+            emptyResponse.put("totalStaff", 0);
+            emptyResponse.put("roleBreakdown", Collections.emptyMap());
+            emptyResponse.put("staffList", Collections.emptyList());
             return emptyResponse;
         }
         List<User> users = userRepository.findAll();
@@ -2440,26 +2373,27 @@ public class AiToolExecutionService {
             String thongTinChuyenMon = resolveStaffSpecialty(u, roleName);
 
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("hoTen", u.getFullName());
-            item.put("vaiTro", vaiTroVi);
+            item.put("fullName", u.getFullName());
+            item.put("role", roleName);
+            item.put("roleTitle", vaiTroVi);
             item.put("email", u.getEmail());
-            item.put("soDienThoai", (u.getPhone() != null && !u.getPhone().isBlank()) ? u.getPhone() : "Chưa cập nhật");
-            item.put("trangThaiHoatDong", u.isActive() ? "Đang hoạt động" : "Đã khóa");
-            item.put("thongTinChuyenMon", thongTinChuyenMon);
+            item.put("phone", (u.getPhone() != null && !u.getPhone().isBlank()) ? u.getPhone() : "Chưa cập nhật");
+            item.put("activeStatus", u.isActive() ? "Đang hoạt động" : "Đã khóa");
+            item.put("specialtyInfo", thongTinChuyenMon);
             item.put("actionUrl", "/manager/staff");
             result.add(item);
         }
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoNhanSu", result.size());
+        response.put("totalStaff", result.size());
 
         Map<String, Integer> roleBreakdown = new LinkedHashMap<>();
         for (Map<String, Object> item : result) {
-            String vaiTro = (String) item.get("vaiTro");
+            String vaiTro = (String) item.get("role");
             roleBreakdown.merge(vaiTro, 1, Integer::sum);
         }
-        response.put("phanLoaiTheoVaiTro", roleBreakdown);
-        response.put("danhSachNhanSu", result);
+        response.put("roleBreakdown", roleBreakdown);
+        response.put("staffList", result);
         return response;
     }
 
@@ -2567,16 +2501,16 @@ public class AiToolExecutionService {
             String trainerName = resolveHorseTrainerName(h);
 
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", h.getName());
-            item.put("maDangKy", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
-            item.put("maSoNgua", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
-            item.put("tenChuNgua", ownerName);
-            item.put("trangThai", statusVi);
-            item.put("trangThaiHienTai", statusVi);
-            item.put("quyetDinhTapLuyen", (isQuarantineStall || isBlocked) ? "BLOCKED" : (h.getTrainingDecision() != null ? h.getTrainingDecision().name() : "ALLOWED"));
-            item.put("viTriChuong", stallName);
-            item.put("huanLuyenVienPhuTrach", trainerName);
-            item.put("tongSoNguaCauLacBo", allHorses.size());
+            item.put("horseName", h.getName());
+            item.put("registrationNumber", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
+            item.put("horseId", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
+            item.put("ownerName", ownerName);
+            item.put("status", statusVi);
+            item.put("currentStatus", statusVi);
+            item.put("trainingDecision", (isQuarantineStall || isBlocked) ? "BLOCKED" : (h.getTrainingDecision() != null ? h.getTrainingDecision().name() : "ALLOWED"));
+            item.put("stallLocation", stallName);
+            item.put("assignedTrainer", trainerName);
+            item.put("totalClubHorses", allHorses.size());
             item.put("actionUrl", "/manager/horses");
             result.add(item);
         }
@@ -2617,19 +2551,19 @@ public class AiToolExecutionService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (AuditLog log : logs) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("thoiGian", log.getCreatedAt() != null ? log.getCreatedAt().toString() : "N/A");
+            item.put("timestamp", log.getCreatedAt() != null ? log.getCreatedAt().toString() : "N/A");
 
             String nguoiThucHien = "Hệ thống";
             if (log.getUser() != null) {
                 String roleStr = log.getUser().getRole() != null ? log.getUser().getRole().getName() : "";
                 nguoiThucHien = log.getUser().getFullName() + (!roleStr.isBlank() ? " (" + roleStr + ")" : "");
             }
-            item.put("nguoiThucHien", nguoiThucHien);
+            item.put("performedBy", nguoiThucHien);
 
             String hanhDong = log.getAction() != null && !log.getAction().isBlank()
                     ? log.getAction()
                     : (log.getHttpMethod() != null ? log.getHttpMethod() + " " + (log.getRequestPath() != null ? log.getRequestPath() : "") : "Thao tác hệ thống");
-            item.put("hanhDong", hanhDong);
+            item.put("action", hanhDong);
 
             StringBuilder sb = new StringBuilder();
             if (log.getEntityName() != null && !log.getEntityName().isBlank()) {
@@ -2643,14 +2577,14 @@ public class AiToolExecutionService {
                 if (!sb.isEmpty()) sb.append(" | ");
                 sb.append("Mã trạng thái HTTP: ").append(log.getStatusCode());
             }
-            item.put("chiTietThayDoi", sb.isEmpty() ? "Không có chi tiết bổ sung" : sb.toString());
+            item.put("changeDetails", sb.isEmpty() ? "Không có chi tiết bổ sung" : sb.toString());
             item.put("actionUrl", "/manager/audit-log");
 
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("tongSoNhatKyGhiNhan", result.size());
-        response.put("danhSachNhatKy", result);
+        response.put("totalAuditLogs", result.size());
+        response.put("auditLogList", result);
         return response;
     }
 
@@ -2727,14 +2661,14 @@ public class AiToolExecutionService {
             String duongDanDieuHuong = a.getId() != null ? "/manager/admissions/" + a.getId() : "/manager/admissions";
 
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenNgua", horseName);
-            item.put("tenChuNgua", ownerName);
-            item.put("ngayNopDon", ngayNopDon);
-            item.put("buocHienTai", buocHienTai);
-            item.put("trangThai", a.getStatus() != null ? a.getStatus().name() : "N/A");
-            item.put("bacSiPhuTrach", vetName);
-            item.put("huanLuyenVienChiDinh", trainerName);
-            item.put("duongDanDieuHuong", duongDanDieuHuong);
+            item.put("horseName", horseName);
+            item.put("ownerName", ownerName);
+            item.put("submittedDate", ngayNopDon);
+            item.put("currentStage", buocHienTai);
+            item.put("status", a.getStatus() != null ? a.getStatus().name() : "N/A");
+            item.put("assignedVet", vetName);
+            item.put("designatedTrainer", trainerName);
+            item.put("navigationUrl", duongDanDieuHuong);
             item.put("actionUrl", "/manager/admissions");
 
             result.add(item);
@@ -2772,14 +2706,14 @@ public class AiToolExecutionService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tongSoChuong", tongSoChuong);
-        result.put("soChuongDangSuDung", soChuongDangSuDung);
-        result.put("soChuongTrong", soChuongTrong);
-        result.put("soCaCachLy", occupiedQuarantine);
-        result.put("soDonNhapDanDangCho", soDonPending);
-        result.put("tyLeLapDay", String.format(Locale.US, "%.1f%%", occupancyRate));
-        result.put("duBaoDiemNghen", duBaoDiemNghen);
-        result.put("khuyenNghiQuanLy", khuyenNghiQuanLy);
+        result.put("totalStalls", tongSoChuong);
+        result.put("occupiedStalls", soChuongDangSuDung);
+        result.put("vacantStalls", soChuongTrong);
+        result.put("quarantineCasesCount", occupiedQuarantine);
+        result.put("waitingAdmissionsCount", soDonPending);
+        result.put("occupancyRate", String.format(Locale.US, "%.1f%%", occupancyRate));
+        result.put("bottleneckForecast", duBaoDiemNghen);
+        result.put("managementRecommendations", khuyenNghiQuanLy);
         result.put("actionUrl", "/manager/stable");
         return result;
     }
@@ -2819,10 +2753,10 @@ public class AiToolExecutionService {
             }
 
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("tenGroom", g.getFullName() != null ? g.getFullName() : g.getEmail());
-            item.put("soChuongPhuTrach", stalls.size());
-            item.put("soNhiemVuTrongNgay", taskCount);
-            item.put("trangThaiTai", trangThaiTai);
+            item.put("groomName", g.getFullName() != null ? g.getFullName() : g.getEmail());
+            item.put("assignedStallCount", stalls.size());
+            item.put("tasksTodayCount", taskCount);
+            item.put("workloadStatus", trangThaiTai);
             danhSachGroomKemTaiTrong.add(item);
         }
 
@@ -2838,10 +2772,10 @@ public class AiToolExecutionService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tongSoGroom", grooms.size());
-        result.put("danhSachGroomKemTaiTrong", danhSachGroomKemTaiTrong);
-        result.put("nhanVienQuaTai", nhanVienQuaTai.isEmpty() ? List.of("Không có nhân viên quá tải") : nhanVienQuaTai);
-        result.put("deXuatDieuChuyenChuong", deXuatDieuChuyenChuong);
+        result.put("totalGrooms", grooms.size());
+        result.put("groomWorkloadList", danhSachGroomKemTaiTrong);
+        result.put("overloadedStaff", nhanVienQuaTai.isEmpty() ? List.of("Không có nhân viên quá tải") : nhanVienQuaTai);
+        result.put("proposedStallTransfer", deXuatDieuChuyenChuong);
         result.put("actionUrl", "/manager/staff");
         return result;
     }
