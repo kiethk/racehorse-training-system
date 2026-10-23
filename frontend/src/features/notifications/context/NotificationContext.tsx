@@ -55,20 +55,22 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const openNotificationRef = useRef<(notification: NotificationItem) => Promise<void>>(() => Promise.resolve());
   // A ref, not state: toasting must not re-render, and concurrent polls must see the latest set.
   const toastedIds = useRef<Set<number> | null>(null);
   const requestGeneration = useRef(0);
 
   const markAsRead = useCallback(async (id: number) => {
     // An assignment opened from a toast may not be in the 10 most recent items; the next poll reconciles the count.
-    const wasUnread = notifications.some((item) => item.id === id && !item.read);
     await notificationApi.markAsRead(id);
-    setNotifications((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, read: true } : item))
-    );
-    if (wasUnread) setUnreadCount((prev) => Math.max(0, prev - 1));
-  }, [notifications]);
+    setNotifications((prev) => {
+      const wasUnread = prev.some((item) => item.id === id && !item.read);
+      if (wasUnread) setUnreadCount((count) => Math.max(0, count - 1));
+      return prev.map((item) => (item.id === id ? { ...item, read: true } : item));
+    });
+  }, []);
 
+  const userRole = user?.role;
   const openNotification = useCallback(
     async (notification: NotificationItem) => {
       try {
@@ -76,11 +78,15 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
       } catch {
         // Best effort, like the bell: still take the user to the item.
       }
-      const href = getNotificationHref(notification, user?.role);
+      const href = getNotificationHref(notification, userRole);
       if (href) router.push(href);
     },
-    [markAsRead, router, user]
+    [markAsRead, router, userRole]
   );
+
+  useEffect(() => {
+    openNotificationRef.current = openNotification;
+  }, [openNotification]);
 
   const announceNewAssignments = useCallback(
     (unread: NotificationItem[]) => {
@@ -101,14 +107,14 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
       if (fresh.length === 1) {
         const [only] = fresh;
         toast.info(only.title || 'New horse assignment', only.message, {
-          action: { label: 'View', onClick: () => void openNotification(only) },
+          action: { label: 'View', onClick: () => void openNotificationRef.current(only) },
           duration: ACTION_TOAST_MS,
         });
       } else {
         toast.info(`You have ${fresh.length} new horse assignments`, 'Open the notification bell to review them.');
       }
     },
-    [openNotification, storageKey]
+    [storageKey]
   );
 
   const refreshNotifications = useCallback(async () => {
