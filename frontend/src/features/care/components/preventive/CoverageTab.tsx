@@ -84,7 +84,7 @@ export function CoverageTab() {
                 <Td>
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{row.name}</span>
-                    {row.mandatory ? <Pill tone="info" size="sm">Mandatory</Pill> : <Pill tone="neutral" size="sm">Recommended</Pill>}
+                    {row.mandatory ? <Pill tone="neutral" size="sm">Mandatory</Pill> : <Pill tone="neutral" size="sm">Recommended</Pill>}
                   </div>
                 </Td>
                 <Td>

@@ -1,7 +1,6 @@
 package com.rtms.backend.medical.dto;
 
 import com.rtms.backend.medical.enums.VaccinationSource;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -13,8 +12,8 @@ public class VaccinationRequest {
     @NotNull(message = "protocolId is required")
     private Long protocolId;
 
-    @NotBlank(message = "Dosage is required")
-    @Size(max = 255)
+    /** Bắt buộc với mũi tiêm trong ca; mũi HISTORICAL (sổ tiêm cũ) được bỏ trống. */
+    @Size(max = 100)
     private String dosage;
 
     /** Bỏ trống thì dùng default_route của phác đồ. */

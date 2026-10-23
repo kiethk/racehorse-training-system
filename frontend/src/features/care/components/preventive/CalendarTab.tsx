@@ -152,7 +152,7 @@ export function CalendarTab() {
                         {s.scheduledAt ? s.scheduledAt.slice(11, 16) : '—'}
                       </span>
                       <span className="font-semibold text-[var(--color-text-primary)]">{horseName(s.horseId)}</span>
-                      <Pill tone={s.purpose === 'PREVENTIVE' ? 'info' : 'neutral'} size="sm">
+                      <Pill tone="neutral" size="sm">
                         {s.purpose === 'PREVENTIVE' ? 'Vaccination' : 'Follow-up'}
                       </Pill>
                       <Pill tone={s.status === 'REQUESTED' ? 'warning' : 'success'} size="sm">

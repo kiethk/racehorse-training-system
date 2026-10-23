@@ -33,7 +33,7 @@ import java.util.Objects;
 @Service
 public class CareRescheduleService {
 
-    static final String AUDIT_ACTION = "CARE_SCHEDULE_RESCHEDULED";
+    static final String AUDIT_ACTION = "Care Schedule Rescheduled";
     private static final String MANAGER = "CLUB_MANAGER";
     private static final String VET = "VETERINARIAN";
     private static final DateTimeFormatter FULL_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -108,7 +108,7 @@ public class CareRescheduleService {
         }
 
         AuditLog audit = new AuditLog();
-        audit.setAction("Care Schedule Rescheduled");
+        audit.setAction(AUDIT_ACTION);
         audit.setEntityName("CareSchedule");
         audit.setEntityId(saved.getId());
         audit.setUser(users.findById(actor.getUserId()).orElse(null));

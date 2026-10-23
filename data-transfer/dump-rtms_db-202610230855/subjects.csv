@@ -1,0 +1,5 @@
+﻿"id","name","description","surface_type","target_distance_meters","intensity_level","created_at","updated_at","duration_minutes","category","trainer_id"
+"1","Khởi động & Chạy bền nhịp đều","Duy trì nhịp thở và nhịp tim ổn định cự ly dài","TURF","1500","MEDIUM","2026-10-23 08:42:31.413773","__RTMS_NULL_20261023__","90","ENDURANCE","2"
+"2","Biến tốc tăng tốc nước rút","Rèn luyện khả năng bứt tốc nước rút ở đoạn thẳng","DIRT","800","HIGH","2026-10-23 08:42:31.413773","__RTMS_NULL_20261023__","60","SPEED","2"
+"3","Chạy thử tính giờ (Trial Run)","Chạy hết sức tính thời gian vòng đua chuẩn","TURF","1200","HIGH","2026-10-23 08:42:31.413773","__RTMS_NULL_20261023__","60","SPEED","2"
+"4","Đi bộ và thả lỏng cơ sau tập","Hồi phục nhịp tim về mức bình thường","SYNTHETIC","500","LOW","2026-10-23 08:42:31.413773","__RTMS_NULL_20261023__","45","RECOVERY","2"

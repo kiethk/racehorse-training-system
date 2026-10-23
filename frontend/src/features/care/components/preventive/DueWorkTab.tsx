@@ -1,31 +1,28 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Button,
-  ChoiceInput,
-  EmptyState,
+  DataTable,
+  FilterBar,
   FilterChips,
   FormField,
-  ListSkeleton,
   MetricCard,
   Notice,
-  Panel,
-  Pill,
+  SearchInput,
   Select,
   StatusBadge,
-  Table,
-  TBody,
-  Td,
-  Th,
-  THead,
-  Tr,
 } from '@/components/ui';
-import { cn } from '@/lib/cn';
+import type { DataTableColumn } from '@/components/ui/DataTable';
 import { displayError, formatDate } from '@/lib/display';
 import { preventiveCareService } from '../../services/preventiveCareService';
-import type { PreventiveDueItem, PreventiveDueStatus, PreventiveProtocol } from '../../types/preventive';
-import { BatchVaccinationModal } from './BatchVaccinationModal';
+import type {
+  PreventiveDueHorse,
+  PreventiveDueStatus,
+  PreventiveDueSummary,
+  PreventiveProtocol,
+} from '../../types/preventive';
+import { CompleteVaccinationModal } from './CompleteVaccinationModal';
 import { DueStatusPill } from './preventiveDisplay';
 
 type Filter = 'ACTION' | 'OVERDUE' | 'DUE_SOON' | 'OK';
@@ -71,22 +68,31 @@ interface DueWorkTabProps {
 }
 
 export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
-  const [items, setItems] = useState<PreventiveDueItem[]>([]);
-  const [summary, setSummary] = useState<PreventiveDueItem[]>([]);
+  const [rows, setRows] = useState<PreventiveDueHorse[]>([]);
+  const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState<PreventiveDueSummary | null>(null);
   const [filter, setFilter] = useState<Filter>('ACTION');
   const [protocolId, setProtocolId] = useState<number | undefined>();
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [batchOpen, setBatchOpen] = useState(false);
+  const [completing, setCompleting] = useState<PreventiveDueHorse | null>(null);
+
+  // Ask the server once typing pauses, not on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [rows, actionable] = await Promise.all([
-        preventiveCareService.listDue({ statuses: FILTER_STATUSES[filter], protocolId }),
-        preventiveCareService.listDue({ statuses: FILTER_STATUSES.ACTION }),
+      const [result, counts] = await Promise.all([
+        preventiveCareService.listDueHorses({ statuses: FILTER_STATUSES[filter], protocolId, search, page, size: PAGE_SIZE }),
+        preventiveCareService.dueSummary(),
       ]);
       setItems(Array.isArray(rows) ? rows : []);
       setSummary(Array.isArray(actionable) ? actionable : []);
@@ -96,7 +102,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [filter, protocolId]);
+  }, [filter, protocolId, search, page]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -121,31 +127,83 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
   const selectedHorses = [...new Map(selectedItems.map((item) => [item.horseId, { id: item.horseId, name: item.horseName }])).values()];
   const allSelected = safeItems.length > 0 && selected.size === safeItems.length;
 
-  const toggle = (key: string) => {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
+  const columns: DataTableColumn<PreventiveDueHorse>[] = [
+    {
+      id: 'horse',
+      header: 'Horse',
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">{row.horseName}</span>
+          <StatusBadge status={row.horseStatus} size="sm" />
+        </div>
+      ),
+    },
+    {
+      id: 'protocols',
+      header: 'Protocols',
+      render: (row) => (
+        <span className="text-[var(--color-text-secondary)]">{row.protocols.map((p) => p.name).join(' · ')}</span>
+      ),
+    },
+    {
+      id: 'nextDue',
+      header: 'Next due',
+      render: (row) => <span className="whitespace-nowrap">{row.earliestDueOn ? formatDate(row.earliestDueOn) : 'Now'}</span>,
+    },
+    { id: 'status', header: 'Status', render: (row) => <DueStatusPill status={row.worstStatus} /> },
+  ];
+  if (canRecord) {
+    columns.push({
+      id: 'action',
+      header: '',
+      align: 'right',
+      render: (row) => (
+        <Button variant="secondary" size="sm" icon="check" onClick={() => setCompleting(row)}>Complete</Button>
+      ),
     });
-  };
+  }
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <MetricCard label="Overdue or no record" value={counts.overdue} icon="alert-triangle" tone="danger"
-          onClick={() => setFilter('OVERDUE')} active={filter === 'OVERDUE'} />
-        <MetricCard label="Due soon" value={counts.dueSoon} icon="clock" tone="warning"
-          onClick={() => setFilter('DUE_SOON')} active={filter === 'DUE_SOON'} />
-        <MetricCard label="Horses needing care" value={counts.horses} icon="horse"
-          onClick={() => setFilter('ACTION')} active={filter === 'ACTION'} />
+        <MetricCard label="Overdue or no record" value={summary?.overdue ?? '—'} icon="alert-triangle"
+          onClick={() => changeFilter('OVERDUE')} active={filter === 'OVERDUE'} />
+        <MetricCard label="Due soon" value={summary?.dueSoon ?? '—'} icon="clock"
+          onClick={() => changeFilter('DUE_SOON')} active={filter === 'DUE_SOON'} />
+        <MetricCard label="Horses needing care" value={summary?.horses ?? '—'} icon="horse"
+          onClick={() => changeFilter('ACTION')} active={filter === 'ACTION'} />
       </div>
 
-      <Panel padded className="flex flex-wrap items-end justify-between gap-3">
+      <FilterBar onSubmit={(event) => event.preventDefault()}>
+        <FormField label="Search horse" className="min-w-[14rem] flex-1">
+          <SearchInput
+            label="Search horse"
+            placeholder="Horse name"
+            value={searchInput}
+            onChange={(value) => {
+              setSearchInput(value);
+              setPage(0);
+            }}
+          />
+        </FormField>
+        <FormField label="Protocol" className="w-56">
+          <Select
+            value={protocolId ?? ''}
+            onChange={(e) => {
+              setProtocolId(e.target.value ? Number(e.target.value) : undefined);
+              setPage(0);
+            }}
+          >
+            <option value="">All protocols</option>
+            {protocols.map((protocol) => (
+              <option key={protocol.id} value={protocol.id}>{protocol.name}</option>
+            ))}
+          </Select>
+        </FormField>
         <FilterChips<Filter>
           label="Status"
           value={filter}
-          onChange={setFilter}
+          onChange={changeFilter}
           options={[
             { value: 'ACTION', label: 'Needs action' },
             { value: 'OVERDUE', label: 'Overdue' },
@@ -153,18 +211,8 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
             { value: 'OK', label: 'Up to date' },
           ]}
         />
-        <div className="flex items-end gap-2">
-          <FormField label="Protocol" className="w-56">
-            <Select value={protocolId ?? ''} onChange={(e) => setProtocolId(e.target.value ? Number(e.target.value) : undefined)}>
-              <option value="">All protocols</option>
-              {protocols.map((protocol) => (
-                <option key={protocol.id} value={protocol.id}>{protocol.name}</option>
-              ))}
-            </Select>
-          </FormField>
-          <Button variant="secondary" icon="refresh" onClick={load} disabled={loading}>Refresh</Button>
-        </div>
-      </Panel>
+        <Button type="button" variant="secondary" icon="refresh" onClick={load} disabled={loading}>Refresh</Button>
+      </FilterBar>
 
       {error && <Notice tone="error" title="Could not load" onDismiss={() => setError(null)}>{error}</Notice>}
 
@@ -247,12 +295,10 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
         </div>
       )}
 
-      <BatchVaccinationModal
-        open={batchOpen}
-        onClose={() => setBatchOpen(false)}
-        horses={selectedHorses}
+      <CompleteVaccinationModal
+        horse={completing}
         protocols={protocols}
-        initialProtocolId={selectedProtocolIds.size === 1 ? [...selectedProtocolIds][0] : undefined}
+        onClose={() => setCompleting(null)}
         onRecorded={load}
       />
     </div>

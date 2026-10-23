@@ -1,12 +1,14 @@
 import { apiGet, apiPatch, apiPost } from '@/services/api';
 import type { CareScheduleResponse } from '../types';
 import type {
-  BatchVaccinationRequest,
-  BatchVaccinationResult,
   HorsePreventiveStatus,
+  HorseVaccinationRequest,
+  HorseVaccinationResult,
+  PagedResult,
   PreventiveCoverage,
-  PreventiveDueItem,
+  PreventiveDueHorse,
   PreventiveDueStatus,
+  PreventiveDueSummary,
   PreventiveProtocol,
   RescheduleRequest,
   RescheduleResponse,
@@ -19,11 +21,14 @@ export const preventiveCareService = {
     return unwrapArray<PreventiveProtocol>(res);
   },
 
-  listDue: async (params?: {
+  /** "To do" tab: one row per horse, filtered and paged on the server. */
+  listDueHorses: async (params: {
     statuses?: PreventiveDueStatus[];
-    withinDays?: number;
     protocolId?: number;
-  }): Promise<PreventiveDueItem[]> => {
+    search?: string;
+    page: number;
+    size: number;
+  }): Promise<PagedResult<PreventiveDueHorse>> => {
     const qs = new URLSearchParams();
     params?.statuses?.forEach((status) => qs.append('status', status));
     if (params?.withinDays != null) qs.set('withinDays', String(params.withinDays));

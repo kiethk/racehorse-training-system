@@ -159,8 +159,11 @@ public class PreventiveStatusService {
                             ? milestone.getRequestedAt().toLocalDate()
                             : milestone.getScheduledAt().toLocalDate();
                     if (!target.isAfter(slotDay.plusDays(OPPORTUNITY_WINDOW_DAYS))) {
-                        // Ca đã xếp vẫn còn việc để làm: giữ nguyên, không xáo lịch của vet.
-                        return existing;
+                        // Ca đã xếp vẫn còn việc để làm: giữ giờ của vet, chỉ cập nhật danh sách mũi còn lại.
+                        String remaining = describe(dueByProtocol, slotDay);
+                        if (remaining.equals(milestone.getDescription())) return existing;
+                        milestone.setDescription(remaining);
+                        return Optional.of(schedules.save(milestone));
                     }
                     milestone.setStatus(CareScheduleStatus.CANCELLED);
                     milestone.setCancelReason("Vaccinated early in a combined visit on " + today.format(DAY_MONTH));

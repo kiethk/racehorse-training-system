@@ -1,4 +1,7 @@
-import fitz  # PyMuPDF
+try:
+    import pymupdf as fitz
+except ImportError:
+    import fitz
 import numpy as np
 from app.schemas import OcrResponse, ExtractedData
 from app.services.layout_detector import layout_detector

@@ -1,0 +1,6 @@
+﻿"id","title","category","source_url","allowed_roles","version","is_active","created_at","updated_at"
+"1","Phác đồ điều trị viêm gân gót và dây chằng treo (Superficial Digital Flexor Tendonitis - SDFT)","ORTHOPEDIC","https://rtms.internal/clinical/sdft-protocol","{VETERINARIAN,HEAD_TRAINER}","1.0","t","2026-10-23 01:42:33.713804+00","2026-10-23 01:42:33.713804+00"
+"2","Quy trình cấp cứu và điều trị chứng đau bụng cấp tính ở ngựa (Equine Colic)","GASTROINTESTINAL","https://rtms.internal/clinical/colic-emergency","{VETERINARIAN}","1.0","t","2026-10-23 01:42:33.713804+00","2026-10-23 01:42:33.713804+00"
+"3","Phác đồ quản lý viêm khớp cổ chân và khớp bàn ngón (Equine Fetlock Arthritis)","ORTHOPEDIC","https://rtms.internal/clinical/fetlock-arthritis","{VETERINARIAN,HEAD_TRAINER}","1.0","t","2026-10-23 01:42:33.713804+00","2026-10-23 01:42:33.713804+00"
+"4","Xử trí xuất huyết phổi do gắng sức ở ngựa đua (Exercise-Induced Pulmonary Hemorrhage - EIPH)","RESPIRATORY","https://rtms.internal/clinical/eiph-protocol","{VETERINARIAN,HEAD_TRAINER}","1.0","t","2026-10-23 01:42:33.713804+00","2026-10-23 01:42:33.713804+00"
+"5","Điều trị áp xe móng và nứt móng thể nặng (Hoof Abscess & Quarter Crack)","HOOF_CARE","https://rtms.internal/clinical/hoof-abscess","{VETERINARIAN,GROOM}","1.0","t","2026-10-23 01:42:33.713804+00","2026-10-23 01:42:33.713804+00"

@@ -32,6 +32,8 @@ public class PreventiveVaccinationService {
 
     static final String PLAN_NAME = "Vaccination";
     static final String HISTORICAL_TAG = "[HISTORICAL]";
+    /** prescriptions.dosage là NOT NULL; mũi cũ nhập từ sổ tiêm thường không còn ghi liều. */
+    static final String DOSAGE_NOT_RECORDED = "Not recorded";
 
     private final PreventiveProtocolRepository protocols;
     private final TreatmentPlanRepository treatmentPlans;
@@ -73,7 +75,8 @@ public class PreventiveVaccinationService {
             if (request == null || request.getProtocolId() == null) {
                 throw invalid("protocolId is required for every vaccination");
             }
-            if (request.getDosage() == null || request.getDosage().isBlank()) {
+            VaccinationSource source = request.getSource() == null ? VaccinationSource.ADMINISTERED : request.getSource();
+            if (source != VaccinationSource.HISTORICAL && (request.getDosage() == null || request.getDosage().isBlank())) {
                 throw invalid("Dosage is required for every vaccination");
             }
             PreventiveProtocol protocol = protocols.findById(request.getProtocolId())
@@ -81,14 +84,13 @@ public class PreventiveVaccinationService {
                     .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "PROTOCOL_NOT_FOUND",
                             "Preventive protocol " + request.getProtocolId() + " does not exist or is inactive"));
 
-            VaccinationSource source = request.getSource() == null ? VaccinationSource.ADMINISTERED : request.getSource();
             LocalDate on = request.getAdministeredOn() == null ? today : request.getAdministeredOn();
             if (source == VaccinationSource.HISTORICAL) {
                 if (careType != CareType.INITIAL) {
                     throw invalid("Historical vaccinations can only be entered during the admission (INITIAL) examination");
                 }
-                if (!on.isBefore(today)) {
-                    throw invalid("Historical vaccination date for " + protocol.getCode() + " must be in the past");
+                if (request.getAdministeredOn() == null || on.isAfter(today)) {
+                    throw invalid("Last dose date for " + protocol.getCode() + " must be today or earlier");
                 }
             } else {
                 if (!on.equals(today)) {
@@ -126,7 +128,8 @@ public class PreventiveVaccinationService {
             prescription.setTreatmentPlanId(savedPlan.getId());
             prescription.setPreventiveProtocolId(protocol.getId());
             prescription.setMedicationName(protocol.getName());
-            prescription.setDosage(request.getDosage().trim());
+            prescription.setDosage(request.getDosage() == null || request.getDosage().isBlank()
+                    ? DOSAGE_NOT_RECORDED : request.getDosage().trim());
             prescription.setRoute(request.getRoute() != null && !request.getRoute().isBlank()
                     ? request.getRoute().trim() : protocol.getDefaultRoute());
             prescription.setFrequency("ONCE");
