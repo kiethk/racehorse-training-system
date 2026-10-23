@@ -176,10 +176,11 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getHorseSpecialtyAnalysis",
-                        "Phân tích sở trường của ngựa (cự ly tối ưu, mặt sân ưa thích, số lượng sở trường). Nếu không truyền ID/tên ngựa hoặc truyền 'all'/'tất cả', hệ thống tự động trả về bảng XẾP HẠNG tất cả các con ngựa theo số lượng sở trường (specialtyCount). Bắt buộc dùng khi người dùng yêu cầu xếp hạng ngựa theo sở trường (Specialty).",
+                        "Phân tích sở trường của ngựa (cự ly tối ưu, mặt sân ưa thích, số lượng sở trường, điểm trung bình phong độ averageRating). Nếu không truyền ID/tên ngựa hoặc truyền 'all'/'tất cả', hệ thống tự động trả về bảng XẾP HẠNG tất cả các con ngựa theo số lượng sở trường (sortBy='count') hoặc theo điểm trung bình phong độ sở trường (sortBy='rating'). Bắt buộc dùng khi người dùng yêu cầu xếp hạng ngựa theo sở trường (Specialty) hoặc điểm trung bình phong độ.",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all' để xếp hạng tất cả các con ngựa)"),
-                                "horseName", Map.of("type", "string", "description", "Tên con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all'/'tất cả' để xếp hạng tất cả các con ngựa)")
+                                "horseName", Map.of("type", "string", "description", "Tên con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all'/'tất cả' để xếp hạng tất cả các con ngựa)"),
+                                "sortBy", Map.of("type", "string", "description", "Tiêu chí xếp hạng khi quét toàn bộ ngựa: 'rating' (theo điểm trung bình phong độ sở trường từ cao xuống thấp) hoặc 'count' (theo số lượng sở trường, mặc định kết hợp cả hai)")
                         ))
                 ),
                 new AiToolDefinition(
@@ -461,10 +462,11 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getHorseSpecialtyAnalysis",
-                        "Phân tích sở trường của ngựa (cự ly tối ưu, mặt sân ưa thích, số lượng sở trường). Nếu không truyền ID/tên ngựa hoặc truyền 'all'/'tất cả', hệ thống tự động trả về bảng XẾP HẠNG tất cả các con ngựa theo số lượng sở trường (specialtyCount). Bắt buộc dùng khi người dùng yêu cầu xếp hạng ngựa theo sở trường (Specialty).",
+                        "Phân tích sở trường của ngựa (cự ly tối ưu, mặt sân ưa thích, số lượng sở trường, điểm trung bình phong độ averageRating). Nếu không truyền ID/tên ngựa hoặc truyền 'all'/'tất cả', hệ thống tự động trả về bảng XẾP HẠNG tất cả các con ngựa theo số lượng sở trường (sortBy='count') hoặc theo điểm trung bình phong độ sở trường (sortBy='rating'). Bắt buộc dùng khi người dùng yêu cầu xếp hạng ngựa theo sở trường (Specialty) hoặc điểm trung bình phong độ.",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all' để xếp hạng tất cả các con ngựa)"),
-                                "horseName", Map.of("type", "string", "description", "Tên con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all'/'tất cả' để xếp hạng tất cả các con ngựa)")
+                                "horseName", Map.of("type", "string", "description", "Tên con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all'/'tất cả' để xếp hạng tất cả các con ngựa)"),
+                                "sortBy", Map.of("type", "string", "description", "Tiêu chí xếp hạng khi quét toàn bộ ngựa: 'rating' (theo điểm trung bình phong độ sở trường từ cao xuống thấp) hoặc 'count' (theo số lượng sở trường, mặc định kết hợp cả hai)")
                         ))
                 ),
                 new AiToolDefinition(

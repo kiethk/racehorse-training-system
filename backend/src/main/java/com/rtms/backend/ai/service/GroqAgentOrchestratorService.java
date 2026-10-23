@@ -420,16 +420,13 @@ public class GroqAgentOrchestratorService {
                        * Cơ cấu theo vai trò: trường `roleBreakdown` (ví dụ: Huấn luyện viên trưởng, Bác sĩ thú y, Nhân viên chăm sóc (Groom), Quản lý)
                      + TUYỆT ĐỐI KHÔNG tự đếm thủ công các phần tử trong danh sách JSON. TUYỆT ĐỐI KHÔNG làm tròn hoặc bịa đặt số lượng nhân sự (ví dụ: không được báo 30 hay 36 khi dữ liệu trả về ghi rõ 24 Groom).
 
-                15. XẾP HẠNG SỞ TRƯỜNG CHIẾN MÃ (HORSE SPECIALTY & FLEET RANKING):
-                   - Khi người dùng hỏi về sở trường thi đấu, cự ly sở trường, mặt sân ưa thích hoặc yêu cầu xếp hạng các con ngựa theo tiêu chí sở trường (Specialty, số lượng Specialty):
-                     + BẮT BUỘC gọi công cụ `getHorseSpecialtyAnalysis` (với horseName='all' hoặc không truyền tham số để lấy bảng xếp hạng toàn bộ) hoặc `getClubHorsesDirectory`.
-                     + Hệ thống tính toán sẵn:
-                       * `specialtyCount`: Số lượng sở trường đạt chuẩn (dựa trên các bài tập workout hoàn thành đạt chuẩn trong 90 ngày gần nhất).
-                       * `specialties`: Danh sách các cự ly sở trường (Nước rút SPRINT, Cự ly trung bình MILE, Cự ly trung xa MIDDLE, Đường trường STAYER).
-                       * `preferredSurface`: Mặt sân thi đấu ưa thích (Sân cỏ TURF / Sân cát DIRT).
-                       * `rankedHorseList`: Danh sách toàn bộ chiến mã đã được sắp xếp giảm dần theo số lượng sở trường (`specialtyCount DESC`).
-                     + Báo cáo rõ ràng thứ hạng (Hạng 1, Hạng 2,...), Tên ngựa, Mã đăng ký, Số lượng sở trường (`specialtyCount`) và Chi tiết cự ly/mặt sân.
-                     + TUYỆT ĐỐI KHÔNG từ chối xếp hạng với lý do thiếu thông tin hay không có khả năng so sánh khi người dùng yêu cầu xếp hạng.
+                15. XẾP HẠNG SỞ TRƯỜNG & ĐIỂM TRUNG BÌNH PHONG ĐỘ (HORSE SPECIALTY & RATING RANKING):
+                    - Khi người dùng hỏi về sở trường thi đấu, cự ly sở trường, mặt sân ưa thích hoặc yêu cầu xếp hạng các con ngựa:
+                      + Nếu yêu cầu xếp hạng theo ĐIỂM TRUNG BÌNH / PHONG ĐỘ: Gọi `getHorseSpecialtyAnalysis` với `sortBy='rating'` (hoặc `horseName='all'`). ĐỌC VÀ BÁO CÁO các trường: thứ hạng `rank`, tên ngựa `horseName`, điểm trung bình sở trường `averageRating`, điểm cự ly xuất sắc nhất `bestRating` và chi tiết `specialtyBreakdown`.
+                      + Nếu yêu cầu xếp hạng theo SỐ LƯỢNG SỞ TRƯỜNG: Gọi `getHorseSpecialtyAnalysis` với `sortBy='count'` (hoặc `horseName='all'`). ĐỌC VÀ BÁO CÁO: thứ hạng `rank`, số lượng sở trường `specialtyCount`, danh sách cự ly `specialties` và điểm trung bình `averageRating`.
+                      + Bảng `rankedHorseList` là kết quả ĐÃ ĐƯỢC HỆ THỐNG TÍNH TOÁN VÀ SẮP XẾP SẴN từ cao xuống thấp (dựa trên các bài tập workout hoàn thành đạt chuẩn trong 90 ngày gần nhất).
+                      + Báo cáo rõ ràng thứ hạng (Hạng 1, Hạng 2,...), Tên ngựa, Mã đăng ký, Điểm trung bình (`averageRating`), Số lượng sở trường (`specialtyCount`) và Chi tiết cự ly/mặt sân.
+                      + TUYỆT ĐỐI KHÔNG từ chối xếp hạng với lý do thiếu thông tin hay không có khả năng so sánh khi người dùng yêu cầu xếp hạng.
                 """, userName, role) + "\n" + buildRoleDomainOntology(role);
     }
 
@@ -692,6 +689,10 @@ public class GroqAgentOrchestratorService {
             case "recommendationReason" -> "Lý do đề xuất";
             case "specialties" -> "Sở trường";
             case "specialtyCount" -> "Số lượng sở trường";
+            case "averageRating", "diemTrungBinh" -> "Điểm trung bình sở trường";
+            case "bestRating", "diemCaoNhat" -> "Điểm cự ly xuất sắc nhất";
+            case "specialtyBreakdown" -> "Chi tiết điểm số từng cự ly";
+            case "sortBy" -> "Tiêu chí xếp hạng";
             case "strongDistances" -> "Các cự ly sở trường";
             case "rankedHorseList" -> "Bảng xếp hạng chiến mã";
             case "rank" -> "Thứ hạng";

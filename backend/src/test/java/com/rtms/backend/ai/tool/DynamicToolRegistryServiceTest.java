@@ -69,6 +69,10 @@ class DynamicToolRegistryServiceTest {
         assertTrue(registryService.isToolAllowedForRole("recommendOptimalRaceDistanceAndTrack", "HEAD_TRAINER"));
         assertTrue(registryService.isToolAllowedForRole("recommendNextWorkoutAdjustment", "HEAD_TRAINER"));
         assertFalse(registryService.isToolAllowedForRole("searchClinicalKnowledge", "HEAD_TRAINER"));
+
+        AiToolDefinition specialtyDef = tools.stream().filter(t -> t.name().equals("getHorseSpecialtyAnalysis")).findFirst().orElseThrow();
+        Map<?, ?> props = (Map<?, ?>) specialtyDef.parameters().get("properties");
+        assertTrue(props.containsKey("sortBy"), "getHorseSpecialtyAnalysis phải có tham số sortBy");
     }
 
     @Test
@@ -184,6 +188,10 @@ class DynamicToolRegistryServiceTest {
         assertTrue(registryService.isToolAllowedForRole("getAdmissionPipelineDetails", "ADMIN"));
         assertTrue(registryService.isToolAllowedForRole("getHorseSpecialtyAnalysis", "CLUB_MANAGER"));
         assertTrue(registryService.isToolAllowedForRole("getHorseSpecialtyAnalysis", "ADMIN"));
+
+        AiToolDefinition mgrSpecialtyDef = tools.stream().filter(t -> t.name().equals("getHorseSpecialtyAnalysis")).findFirst().orElseThrow();
+        Map<?, ?> mgrProps = (Map<?, ?>) mgrSpecialtyDef.parameters().get("properties");
+        assertTrue(mgrProps.containsKey("sortBy"), "getHorseSpecialtyAnalysis của Manager phải có tham số sortBy");
     }
 
     @Test

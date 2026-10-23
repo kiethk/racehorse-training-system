@@ -79,6 +79,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import com.rtms.backend.training.dto.DistanceStat;
 import com.rtms.backend.training.enums.DistanceBand;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -764,24 +766,18 @@ public class AiToolExecutionService {
                 }
             }
             HorseSpecialtyResponse specResp = trainerSpecialties.get(h.getId());
-            int specialtyCount = (specResp != null && specResp.strongDistances() != null) ? specResp.strongDistances().size() : 0;
-            List<String> strongBands = (specResp != null && specResp.strongDistances() != null)
-                    ? specResp.strongDistances().stream().map(DistanceBand::name).toList()
-                    : Collections.emptyList();
-            List<String> formattedDistances = (specResp != null && specResp.strongDistances() != null && !specResp.strongDistances().isEmpty())
-                    ? specResp.strongDistances().stream().map(this::formatDistanceBand).toList()
-                    : List.of("Chưa xác định");
-            String preferredSurface = (specResp != null && specResp.preferredSurface() != null)
-                    ? (specResp.preferredSurface() == SurfaceType.TURF ? "Sân cỏ (TURF)" : "Sân cát (DIRT)")
-                    : "Chưa rõ";
+            SpecialtyMetrics sm = computeSpecialtyMetrics(specResp);
 
             item.put("stallLocation", stallName);
             item.put("assignedGroomName", groomName);
             item.put("groomPhone", groomPhone);
-            item.put("specialtyCount", specialtyCount);
-            item.put("specialties", formattedDistances);
-            item.put("strongDistances", strongBands);
-            item.put("preferredSurface", preferredSurface);
+            item.put("specialtyCount", sm.specialtyCount());
+            item.put("averageRating", sm.averageRating());
+            item.put("bestRating", sm.bestRating());
+            item.put("specialties", sm.formattedDistances());
+            item.put("strongDistances", sm.strongBands());
+            item.put("preferredSurface", sm.preferredSurface());
+            item.put("specialtyBreakdown", sm.specialtyBreakdown());
             item.put("actionUrl", h.getId() != null ? "/trainer/horses/" + h.getId() : "/trainer/horses");
             list.add(item);
         }
@@ -921,13 +917,110 @@ public class AiToolExecutionService {
         return result;
     }
 
+    record SpecialtyMetrics(
+            int specialtyCount,
+            List<String> strongBands,
+            List<String> formattedDistances,
+            String preferredSurface,
+            BigDecimal averageRating,
+            BigDecimal bestRating,
+            List<String> specialtyBreakdown
+    ) {}
+
+    private SpecialtyMetrics computeSpecialtyMetrics(HorseSpecialtyResponse resp) {
+        if (resp == null) {
+            return new SpecialtyMetrics(
+                    0,
+                    Collections.emptyList(),
+                    List.of("Chưa xác định"),
+                    "Chưa rõ",
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    Collections.emptyList()
+            );
+        }
+
+        List<DistanceBand> strong = resp.strongDistances() != null ? resp.strongDistances() : Collections.emptyList();
+        int specialtyCount = strong.size();
+        List<String> strongBands = strong.stream().map(DistanceBand::name).toList();
+        List<String> formattedDistances = !strong.isEmpty()
+                ? strong.stream().map(this::formatDistanceBand).toList()
+                : List.of("Chưa xác định");
+
+        String surf = resp.preferredSurface() != null
+                ? (resp.preferredSurface() == SurfaceType.TURF ? "Sân cỏ (TURF)" : "Sân cát (DIRT)")
+                : "Chưa rõ";
+
+        List<DistanceStat> stats = resp.distanceStats() != null ? resp.distanceStats() : Collections.emptyList();
+
+        List<DistanceStat> qualifyingStats = stats.stream()
+                .filter(s -> strong.contains(s.band()) && s.averageRating() != null && s.workoutCount() > 0)
+                .toList();
+
+        BigDecimal bestRating = BigDecimal.ZERO;
+        BigDecimal avgRating = BigDecimal.ZERO;
+
+        if (!qualifyingStats.isEmpty()) {
+            bestRating = qualifyingStats.stream()
+                    .map(DistanceStat::averageRating)
+                    .max(Comparator.naturalOrder())
+                    .orElse(BigDecimal.ZERO);
+
+            int totalWorkouts = qualifyingStats.stream().mapToInt(DistanceStat::workoutCount).sum();
+            if (totalWorkouts > 0) {
+                BigDecimal sum = BigDecimal.ZERO;
+                for (DistanceStat s : qualifyingStats) {
+                    sum = sum.add(s.averageRating().multiply(BigDecimal.valueOf(s.workoutCount())));
+                }
+                avgRating = sum.divide(BigDecimal.valueOf(totalWorkouts), 1, RoundingMode.HALF_UP);
+            }
+        } else {
+            List<DistanceStat> allValid = stats.stream()
+                    .filter(s -> s.averageRating() != null && s.workoutCount() > 0)
+                    .toList();
+            if (!allValid.isEmpty()) {
+                bestRating = allValid.stream()
+                        .map(DistanceStat::averageRating)
+                        .max(Comparator.naturalOrder())
+                        .orElse(BigDecimal.ZERO);
+                int totalWorkouts = allValid.stream().mapToInt(DistanceStat::workoutCount).sum();
+                if (totalWorkouts > 0) {
+                    BigDecimal sum = BigDecimal.ZERO;
+                    for (DistanceStat s : allValid) {
+                        sum = sum.add(s.averageRating().multiply(BigDecimal.valueOf(s.workoutCount())));
+                    }
+                    avgRating = sum.divide(BigDecimal.valueOf(totalWorkouts), 1, RoundingMode.HALF_UP);
+                }
+            }
+        }
+
+        List<String> breakdown = new ArrayList<>();
+        for (DistanceStat s : stats) {
+            if (s.workoutCount() > 0 && s.averageRating() != null) {
+                String badge = strong.contains(s.band()) ? "⭐ [SỞ TRƯỜNG] " : "";
+                String speedStr = s.averageTopSpeedKmh() != null ? (", Tốc độ đỉnh: " + s.averageTopSpeedKmh() + " km/h") : "";
+                breakdown.add(badge + formatDistanceBand(s.band()) + ": " + s.averageRating() + "/10 (" + s.workoutCount() + " buổi tập" + speedStr + ")");
+            }
+        }
+
+        return new SpecialtyMetrics(
+                specialtyCount,
+                strongBands,
+                formattedDistances,
+                surf,
+                avgRating,
+                bestRating,
+                breakdown
+        );
+    }
+
     private Object handleGetHorseSpecialtyAnalysis(Map<String, Object> args, AuthenticatedUser currentUser) {
         String horseNameArg = args.get("horseName") != null ? args.get("horseName").toString().trim().toLowerCase() : "";
         boolean isFleetRequest = horseNameArg.equals("all") || horseNameArg.equals("tất cả") || horseNameArg.equals("toàn bộ")
                 || (args.get("horseId") == null && (args.get("horseName") == null || horseNameArg.isBlank()));
 
         if (isFleetRequest) {
-            return handleRankAllHorsesBySpecialty(currentUser);
+            return handleRankAllHorsesBySpecialty(args, currentUser);
         }
 
         Horse horse = resolveHorse(args);
@@ -965,21 +1058,18 @@ public class AiToolExecutionService {
             }
         }
 
-        int specialtyCount = (resp != null && resp.strongDistances() != null) ? resp.strongDistances().size() : 0;
-        List<String> strongBands = (resp != null && resp.strongDistances() != null)
-                ? resp.strongDistances().stream().map(DistanceBand::name).toList()
-                : Collections.emptyList();
-        List<String> formattedDistances = (resp != null && resp.strongDistances() != null && !resp.strongDistances().isEmpty())
-                ? resp.strongDistances().stream().map(this::formatDistanceBand).toList()
-                : List.of("Chưa đủ buổi tập đạt chuẩn để xác định sở trường");
+        SpecialtyMetrics metrics = computeSpecialtyMetrics(resp);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("horseName", horse.getName());
         result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
         result.put("horseId", horse.getId());
-        result.put("specialtyCount", specialtyCount);
-        result.put("specialties", formattedDistances);
-        result.put("strongDistances", strongBands);
+        result.put("specialtyCount", metrics.specialtyCount());
+        result.put("averageRating", metrics.averageRating());
+        result.put("bestRating", metrics.bestRating());
+        result.put("specialties", metrics.formattedDistances());
+        result.put("strongDistances", metrics.strongBands());
+        result.put("specialtyBreakdown", metrics.specialtyBreakdown());
         result.put("optimalDistance", (resp != null && !resp.strongDistances().isEmpty()) ? resp.strongDistances() : List.of("Đang phân tích thêm cự ly"));
         result.put("preferredSurface", matSanUaThich);
         result.put("distanceStats", resp != null ? resp.distanceStats() : Collections.emptyList());
@@ -987,7 +1077,10 @@ public class AiToolExecutionService {
         return result;
     }
 
-    private Object handleRankAllHorsesBySpecialty(AuthenticatedUser currentUser) {
+    private Object handleRankAllHorsesBySpecialty(Map<String, Object> args, AuthenticatedUser currentUser) {
+        String sortByArg = args.get("sortBy") != null ? args.get("sortBy").toString().trim().toLowerCase() : "count";
+        boolean sortByRating = sortByArg.contains("rating") || sortByArg.contains("diem") || sortByArg.contains("điểm") || sortByArg.contains("score");
+
         List<Horse> horses;
         if (currentUser != null && "HEAD_TRAINER".equals(currentUser.getRole())) {
             horses = horseRepository.findManagedHorsesByTrainerIdAndStatusIn(
@@ -1030,35 +1123,38 @@ public class AiToolExecutionService {
 
         for (Horse h : horses) {
             HorseSpecialtyResponse resp = specialtiesMap.get(h.getId());
-            int specCount = (resp != null && resp.strongDistances() != null) ? resp.strongDistances().size() : 0;
-            if (specCount > 0) {
+            SpecialtyMetrics m = computeSpecialtyMetrics(resp);
+            if (m.specialtyCount() > 0) {
                 countWithSpecialties++;
             }
-            List<String> strongBands = (resp != null && resp.strongDistances() != null)
-                    ? resp.strongDistances().stream().map(DistanceBand::name).toList()
-                    : Collections.emptyList();
-            List<String> formattedDistances = (resp != null && resp.strongDistances() != null && !resp.strongDistances().isEmpty())
-                    ? resp.strongDistances().stream().map(this::formatDistanceBand).toList()
-                    : List.of("Chưa xác định");
-            String surf = (resp != null && resp.preferredSurface() != null)
-                    ? (resp.preferredSurface() == SurfaceType.TURF ? "Sân cỏ (TURF)" : "Sân cát (DIRT)")
-                    : "Chưa rõ";
 
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("horseId", h.getId());
             item.put("horseName", h.getName());
             item.put("registrationNumber", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
-            item.put("specialtyCount", specCount);
-            item.put("specialties", formattedDistances);
-            item.put("strongDistances", strongBands);
-            item.put("preferredSurface", surf);
+            item.put("specialtyCount", m.specialtyCount());
+            item.put("averageRating", m.averageRating());
+            item.put("bestRating", m.bestRating());
+            item.put("specialties", m.formattedDistances());
+            item.put("strongDistances", m.strongBands());
+            item.put("preferredSurface", m.preferredSurface());
+            item.put("specialtyBreakdown", m.specialtyBreakdown());
             item.put("status", h.getCurrentStatus() != null ? h.getCurrentStatus().name() : "N/A");
             item.put("actionUrl", resolveHorseActionUrl(h.getId(), currentUser));
             unrankedList.add(item);
         }
 
-        unrankedList.sort(Comparator.comparingInt((Map<String, Object> m) -> (Integer) m.get("specialtyCount")).reversed()
-                .thenComparing(m -> (String) m.get("horseName")));
+        if (sortByRating) {
+            unrankedList.sort(Comparator.comparing((Map<String, Object> m) -> (BigDecimal) m.get("averageRating"), Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(m -> (BigDecimal) m.get("bestRating"), Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(Comparator.comparingInt((Map<String, Object> m) -> (Integer) m.get("specialtyCount")).reversed())
+                    .thenComparing(m -> (String) m.get("horseName")));
+        } else {
+            unrankedList.sort(Comparator.comparingInt((Map<String, Object> m) -> (Integer) m.get("specialtyCount")).reversed()
+                    .thenComparing((Map<String, Object> m) -> (BigDecimal) m.get("averageRating"), Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(m -> (BigDecimal) m.get("bestRating"), Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(m -> (String) m.get("horseName")));
+        }
 
         List<Map<String, Object>> rankedList = new ArrayList<>();
         int rank = 1;
@@ -1069,11 +1165,20 @@ public class AiToolExecutionService {
             rankedList.add(rankedItem);
         }
 
+        String criterion = sortByRating
+                ? "Điểm trung bình phong độ sở trường (averageRating DESC, WINDOW_DAYS=90, MIN_WORKOUTS=3, MIN_RATING=7.0)"
+                : "Số lượng sở trường cự ly kết hợp điểm trung bình (specialtyCount DESC, averageRating DESC)";
+
+        String summary = "Bảng xếp hạng " + rankedList.size() + " chiến mã theo "
+                + (sortByRating ? "điểm trung bình phong độ sở trường (Average Rating)" : "số lượng sở trường (Specialty Count)")
+                + ". Có " + countWithSpecialties + " ngựa đã xác định được sở trường.";
+
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("totalHorses", rankedList.size());
         response.put("horsesWithSpecialties", countWithSpecialties);
-        response.put("rankingCriterion", "Số lượng sở trường cự ly đạt chuẩn (WINDOW_DAYS=90, MIN_WORKOUTS=3, MIN_RATING=7.0)");
-        response.put("summary", "Bảng xếp hạng " + rankedList.size() + " chiến mã theo số lượng sở trường (Specialty Count). Có " + countWithSpecialties + " ngựa đã xác định được sở trường.");
+        response.put("sortBy", sortByRating ? "RATING" : "COUNT");
+        response.put("rankingCriterion", criterion);
+        response.put("summary", summary);
         response.put("rankedHorseList", rankedList);
         return response;
     }
@@ -2687,16 +2792,7 @@ public class AiToolExecutionService {
             String trainerName = resolveHorseTrainerName(h);
 
             HorseSpecialtyResponse specResp = dirSpecialties.get(h.getId());
-            int specialtyCount = (specResp != null && specResp.strongDistances() != null) ? specResp.strongDistances().size() : 0;
-            List<String> strongBands = (specResp != null && specResp.strongDistances() != null)
-                    ? specResp.strongDistances().stream().map(DistanceBand::name).toList()
-                    : Collections.emptyList();
-            List<String> formattedDistances = (specResp != null && specResp.strongDistances() != null && !specResp.strongDistances().isEmpty())
-                    ? specResp.strongDistances().stream().map(this::formatDistanceBand).toList()
-                    : List.of("Chưa xác định");
-            String preferredSurface = (specResp != null && specResp.preferredSurface() != null)
-                    ? (specResp.preferredSurface() == SurfaceType.TURF ? "Sân cỏ (TURF)" : "Sân cát (DIRT)")
-                    : "Chưa rõ";
+            SpecialtyMetrics sm = computeSpecialtyMetrics(specResp);
 
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("horseName", h.getName());
@@ -2708,10 +2804,13 @@ public class AiToolExecutionService {
             item.put("trainingDecision", (isQuarantineStall || isBlocked) ? "BLOCKED" : (h.getTrainingDecision() != null ? h.getTrainingDecision().name() : "ALLOWED"));
             item.put("stallLocation", stallName);
             item.put("assignedTrainer", trainerName);
-            item.put("specialtyCount", specialtyCount);
-            item.put("specialties", formattedDistances);
-            item.put("strongDistances", strongBands);
-            item.put("preferredSurface", preferredSurface);
+            item.put("specialtyCount", sm.specialtyCount());
+            item.put("averageRating", sm.averageRating());
+            item.put("bestRating", sm.bestRating());
+            item.put("specialties", sm.formattedDistances());
+            item.put("strongDistances", sm.strongBands());
+            item.put("preferredSurface", sm.preferredSurface());
+            item.put("specialtyBreakdown", sm.specialtyBreakdown());
             item.put("totalClubHorses", allHorses.size());
             item.put("actionUrl", h.getId() != null ? "/manager/horses/" + h.getId() : "/manager/horses");
             result.add(item);

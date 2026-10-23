@@ -102,6 +102,7 @@ class GroqAgentOrchestratorServiceTest {
         assertTrue(prompt.contains("ĐƯỢC PHÉP phản hồi trực tiếp các câu chào hỏi xã giao"));
         assertTrue(prompt.contains("PHÂN BIỆT RÕ RÀNG GIỮA SỐ LƯỢNG NGỰA VÀ SỐ LƯỢNG CHUỒNG TRẠI"));
         assertTrue(prompt.contains("THỐNG KÊ ĐƠN ĐĂNG KÝ NHẬP ĐÀN"));
+        assertTrue(prompt.contains("XẾP HẠNG SỞ TRƯỜNG & ĐIỂM TRUNG BÌNH PHONG ĐỘ"));
     }
 
     @Test
@@ -128,6 +129,10 @@ class GroqAgentOrchestratorServiceTest {
         org.junit.jupiter.api.Assertions.assertEquals("Tổng số đơn nhập đàn", service.humanizeKey("totalApplications"));
         org.junit.jupiter.api.Assertions.assertEquals("Sở trường", service.humanizeKey("specialties"));
         org.junit.jupiter.api.Assertions.assertEquals("Số lượng sở trường", service.humanizeKey("specialtyCount"));
+        org.junit.jupiter.api.Assertions.assertEquals("Điểm trung bình sở trường", service.humanizeKey("averageRating"));
+        org.junit.jupiter.api.Assertions.assertEquals("Điểm cự ly xuất sắc nhất", service.humanizeKey("bestRating"));
+        org.junit.jupiter.api.Assertions.assertEquals("Chi tiết điểm số từng cự ly", service.humanizeKey("specialtyBreakdown"));
+        org.junit.jupiter.api.Assertions.assertEquals("Tiêu chí xếp hạng", service.humanizeKey("sortBy"));
 
         // Vietnamese legacy keys
         org.junit.jupiter.api.Assertions.assertEquals("Tên ngựa", service.humanizeKey("tenNgua"));
