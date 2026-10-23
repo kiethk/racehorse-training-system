@@ -16,6 +16,8 @@ public class AuditLogResponse {
     private String action;
     private String entityName;
     private Long entityId;
+    private String details;
+    private boolean success;
     private LocalDateTime createdAt;
 
     public AuditLogResponse() {}
@@ -53,6 +55,12 @@ public class AuditLogResponse {
     public Long getEntityId() { return entityId; }
     public void setEntityId(Long entityId) { this.entityId = entityId; }
 
+    public String getDetails() { return details; }
+    public void setDetails(String details) { this.details = details; }
+
+    public boolean isSuccess() { return success; }
+    public void setSuccess(boolean success) { this.success = success; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
@@ -65,6 +73,8 @@ public class AuditLogResponse {
         dto.setAction(log.getAction());
         dto.setEntityName(log.getEntityName());
         dto.setEntityId(log.getEntityId());
+        dto.setDetails(log.getDetails());
+        dto.setSuccess(log.getStatusCode() == null || (log.getStatusCode() >= 200 && log.getStatusCode() < 300));
         dto.setCreatedAt(log.getCreatedAt());
 
         if (log.getUser() != null) {

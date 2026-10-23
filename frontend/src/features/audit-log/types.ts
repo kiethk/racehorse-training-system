@@ -10,6 +10,8 @@ export interface AuditLogItem {
   action: string | null;
   entityName: string | null;
   entityId: number | null;
+  details: string | null;
+  success: boolean;
   createdAt: string;
 }
 

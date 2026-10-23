@@ -950,10 +950,11 @@ public class CareScheduleService {
 
     private void recordAssignmentAudit(CareSchedule schedule, User veterinarian) {
         AuditLog audit = new AuditLog();
-        audit.setAction("CARE_SCHEDULE_AUTO_ASSIGNED");
+        audit.setAction("Care Schedule Auto Assigned");
         audit.setEntityName("CareSchedule");
         audit.setEntityId(schedule.getId());
         audit.setUser(veterinarian);
+        audit.setDetails("Care schedule #" + schedule.getId() + " (" + schedule.getCareType() + ") was automatically assigned to veterinarian " + veterinarian.getFullName());
         auditLogRepository.save(audit);
     }
 
