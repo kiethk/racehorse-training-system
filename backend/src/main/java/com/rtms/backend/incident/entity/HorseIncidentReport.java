@@ -53,6 +53,10 @@ public class HorseIncidentReport {
     @Column(name = "handler_note", columnDefinition = "TEXT")
     private String handlerNote;
 
+    /** Tên vet được giao / đã xử lý (handledById). Chỉ để trả ra API, không lưu DB. */
+    @Transient
+    private String handlerName;
+
     public HorseIncidentReport() {
     }
 
@@ -181,5 +185,13 @@ public class HorseIncidentReport {
 
     public void setHandlerNote(String handlerNote) {
         this.handlerNote = handlerNote;
+    }
+
+    public String getHandlerName() {
+        return handlerName;
+    }
+
+    public void setHandlerName(String handlerName) {
+        this.handlerName = handlerName;
     }
 }
