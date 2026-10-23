@@ -1,0 +1,2 @@
+﻿"id","horse_id","sire_id","dam_id","pedigree_notes","sire_name","sire_registration_number","dam_name","dam_registration_number"
+"5","7","5","6","Public pedigree names sourced from API Equides / IFCE-derived data. UELNs are not exposed by the API and are intentionally not fabricated.","BOOSTER WINNER","__RTMS_NULL_20261023__","JEWELLE DARK","__RTMS_NULL_20261023__"
