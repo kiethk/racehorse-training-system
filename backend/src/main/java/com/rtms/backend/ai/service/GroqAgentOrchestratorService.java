@@ -310,7 +310,7 @@ public class GroqAgentOrchestratorService {
         return new AiChatResponseDto(finalAnswer, conversationId, executedTools, Collections.emptyList());
     }
 
-    private String buildSystemPrompt(AuthenticatedUser user) {
+    String buildSystemPrompt(AuthenticatedUser user) {
         String role = user != null && user.getRole() != null ? user.getRole() : "ANONYMOUS";
         String userName = user != null && user.getEmail() != null ? user.getEmail() : "Người dùng";
 
@@ -324,7 +324,13 @@ public class GroqAgentOrchestratorService {
                 3. HẠN CHẾ CONFLICT DỮ LIỆU:
                    - Tất cả các ngựa đang trong diện cách ly y tế hoặc ở khu chuồng cách ly (Quarantine) TUYỆT ĐỐI KHÔNG ĐƯỢC PHÉP TẬP LUYỆN (trạng thái luyện tập luôn là CẤM TẬP / BLOCKED). Không bao giờ trả lời mâu thuẫn giữa cách ly y tế và cho phép tập luyện.
                 4. VẬN HÀNH 100%% READ-ONLY / RAG ADVISORY: Bạn chỉ giải đáp, phân tích và tra cứu thông tin dựa trên quyền hạn vai trò người dùng.
-                5. KHI TRẢ LỜI CẦN DỮ LIỆU THỰC TẾ: Hãy chủ động gọi công cụ (tool_calls) được cung cấp theo đúng vai trò.
+                5. BẢO CHỨNG DỮ LIỆU THỰC TẾ & CHỐNG ẢO GIÁC (GROUNDEDNESS & ZERO HALLUCINATION):
+                   - ĐỐI VỚI DỮ LIỆU THỰC THỂ & NGHIỆP VỤ NỘI BỘ (Tên ngựa, mã UELN, chuồng trại, lịch tập, chỉ số sinh hiệu, bệnh án, đơn đăng ký, nhân sự):
+                     + TUYỆT ĐỐI KHÔNG tự suy đoán, phỏng đoán hoặc bịa đặt dữ liệu. MỌI dữ kiện thực tế về hệ thống RTMS bắt buộc phải được lấy thông qua việc gọi công cụ (tool_calls) tương ứng với vai trò.
+                     + Nếu công cụ trả về rỗng hoặc không tìm thấy dữ liệu: BẮT BUỘC thông báo rõ ràng là hệ thống không tìm thấy bản ghi hoặc dữ liệu chưa tồn tại, TUYỆT ĐỐI KHÔNG tự sáng tác số liệu thay thế.
+                   - ĐỐI VỚI KIẾN THỨC CHUYÊN MÔN & SUY LUẬN TỔNG QUÁT:
+                     + Bạn ĐƯỢC PHÉP sử dụng tri thức thú y và huấn luyện đua ngựa tiêu chuẩn để phân tích, đánh giá và đối chiếu các số liệu thu thập được từ công cụ (ví dụ: đánh giá nhịp tim đo được so với ngưỡng sinh lý an toàn).
+                     + Bạn ĐƯỢC PHÉP phản hồi trực tiếp các câu chào hỏi xã giao, giải thích quyền hạn vai trò và hướng dẫn các câu hỏi/chức năng mà bạn có thể hỗ trợ mà không cần gọi tool.
 
                 6. QUY TRÌNH TỰ ĐỘNG THU THẬP THAM SỐ (CHAIN OF ACTION / PARAMETER DISCOVERY):
                    - Khi người dùng hỏi phân tích hoặc tra cứu cho một con ngựa mà chưa rõ ID hoặc tên chính xác: AI PHẢI TỰ ĐỘNG gọi các công cụ danh sách/danh bạ trước (`getTrainerHorses`, `getMyAssignedHorses`, `getMyHorses`, `getClubHorsesDirectory`) để lấy thông tin tên và ID ngựa, SAU ĐÓ tự động gọi tiếp công cụ mục tiêu (ví dụ `recommendOptimalRaceDistanceAndTrack`, `getHorseVitalSignsTrend`, `getHorseStallLocation`).

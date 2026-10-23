@@ -78,4 +78,27 @@ class GroqAgentOrchestratorServiceTest {
         assertNotNull(response);
         assertNotNull(response.reply());
     }
+
+    @Test
+    @DisplayName("System Prompt bao hàm đầy đủ quy tắc Groundedness và Zero Hallucination")
+    void testBuildSystemPrompt_GroundednessAndAntiHallucinationRules() {
+        GroqAgentOrchestratorService service = new GroqAgentOrchestratorService(
+                "https://api.groq.com/openai/v1",
+                "test-key",
+                "qwen/qwen3.8-27b",
+                toolRegistryService,
+                toolExecutionService,
+                objectMapper
+        );
+
+        AuthenticatedUser vet = new AuthenticatedUser(20L, "vet@test.com", "VETERINARIAN");
+        String prompt = service.buildSystemPrompt(vet);
+
+        assertNotNull(prompt);
+        assertTrue(prompt.contains("BẢO CHỨNG DỮ LIỆU THỰC TẾ & CHỐNG ẢO GIÁC"));
+        assertTrue(prompt.contains("TUYỆT ĐỐI KHÔNG tự suy đoán, phỏng đoán hoặc bịa đặt dữ liệu"));
+        assertTrue(prompt.contains("MỌI dữ kiện thực tế về hệ thống RTMS bắt buộc phải được lấy thông qua việc gọi công cụ"));
+        assertTrue(prompt.contains("ĐƯỢC PHÉP sử dụng tri thức thú y và huấn luyện đua ngựa tiêu chuẩn"));
+        assertTrue(prompt.contains("ĐƯỢC PHÉP phản hồi trực tiếp các câu chào hỏi xã giao"));
+    }
 }
