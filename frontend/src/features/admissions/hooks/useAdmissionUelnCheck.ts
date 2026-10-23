@@ -17,7 +17,7 @@ export function useAdmissionUelnCheck() {
     const currentRevision = ++revision.current;
     if (timer.current) clearTimeout(timer.current);
     const ueln = rawUeln.trim().toUpperCase();
-    if (!/^[0-9]{6}[A-Z0-9]{9}$/.test(ueln)) {
+    if (!/^[0-9]{6}[A-Z0-9]{9}$/.test(ueln) && !/^[A-Z]{3}[A-Z0-9]{12}$/.test(ueln)) {
       setResult({ status: 'idle', message: '' });
       return;
     }

@@ -109,7 +109,7 @@ class HorsePedigreeServiceTest {
         when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse));
 
         CreateHorsePedigreeRequest request = new CreateHorsePedigreeRequest();
-        request.setRegistrationNumber("VNM22SC00000001");
+        request.setRegistrationNumber("INVALID_UELN_123");
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> pedigreeService.createOrUpdate(horseId, request));
