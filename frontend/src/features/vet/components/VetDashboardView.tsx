@@ -1,41 +1,44 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { MetricCard } from '@/components/ui/MetricCard';
-import { Panel, SectionTitle } from '@/components/ui/Panel';
-import { Pill } from '@/components/ui/StatusBadge';
-import { Button, LinkButton, IconButton } from '@/components/ui/Button';
-import { HorseAvatar } from '@/components/ui/HorseAvatar';
-import { Icon } from '@/components/ui/Icon';
-import { EmptyState, ListSkeleton } from '@/components/ui/states';
-import { Notice } from '@/components/ui/Notice';
-import { admissionsApi } from '@/features/admissions/services/api';
-import { stableApi } from '@/features/stable/services/stableService';
-import { CreateRoutineModal } from '@/features/routine/components/CreateRoutineModal';
-import type { CareSchedule, VetQueueSummary } from '@/features/admissions/types';
-import type { Horse, StableStall } from '@/features/stable/types';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { MetricCard } from "@/components/ui/MetricCard";
+import { Panel, SectionTitle } from "@/components/ui/Panel";
+import { Pill } from "@/components/ui/StatusBadge";
+import { Button, LinkButton, IconButton } from "@/components/ui/Button";
+import { HorseAvatar } from "@/components/ui/HorseAvatar";
+import { Icon } from "@/components/ui/Icon";
+import { EmptyState, ListSkeleton } from "@/components/ui/states";
+import { Notice } from "@/components/ui/Notice";
+import { admissionsApi } from "@/features/admissions/services/api";
+import { stableApi } from "@/features/stable/services/stableService";
+import { CreateRoutineModal } from "@/features/routine/components/CreateRoutineModal";
+import type {
+  CareSchedule,
+  VetQueueSummary,
+} from "@/features/admissions/types";
+import type { Horse, StableStall } from "@/features/stable/types";
 import {
   filterActiveEmergencies,
   filterBlockedHorses,
   filterTodayAppointments,
-} from '../lib/dashboardUtils';
+} from "../lib/dashboardUtils";
 
 function getTodayLocalDate(): string {
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 function formatAppointmentTime(scheduledAt?: string | null): string {
-  if (!scheduledAt) return '--:--';
+  if (!scheduledAt) return "--:--";
   const date = new Date(scheduledAt);
   if (!Number.isNaN(date.getTime())) {
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${hours}:${minutes}`;
   }
   return scheduledAt.length >= 16 ? scheduledAt.slice(11, 16) : scheduledAt;
@@ -61,28 +64,33 @@ export function VetDashboardView() {
       setLoading(true);
       setError(null);
 
-      const [summaryRes, todayRes, urgentRes, horsesRes, stallsRes] = await Promise.all([
-        admissionsApi.getVetQueueSummary().catch((err) => {
-          console.error('Failed to load vet queue summary', err);
-          return null;
-        }),
-        admissionsApi.getCareSchedules({ date: todayLocal, size: 50 }).catch((err) => {
-          console.error('Failed to load today schedules', err);
-          return { content: [] };
-        }),
-        admissionsApi.getCareSchedules({ careType: 'URGENT', size: 50 }).catch((err) => {
-          console.error('Failed to load urgent schedules', err);
-          return { content: [] };
-        }),
-        stableApi.getHorses().catch((err) => {
-          console.error('Failed to load horses', err);
-          return [];
-        }),
-        stableApi.getStalls().catch((err) => {
-          console.error('Failed to load stalls', err);
-          return [];
-        }),
-      ]);
+      const [summaryRes, todayRes, urgentRes, horsesRes, stallsRes] =
+        await Promise.all([
+          admissionsApi.getVetQueueSummary().catch((err) => {
+            console.error("Failed to load vet queue summary", err);
+            return null;
+          }),
+          admissionsApi
+            .getCareSchedules({ date: todayLocal, size: 50 })
+            .catch((err) => {
+              console.error("Failed to load today schedules", err);
+              return { content: [] };
+            }),
+          admissionsApi
+            .getCareSchedules({ careType: "URGENT", size: 50 })
+            .catch((err) => {
+              console.error("Failed to load urgent schedules", err);
+              return { content: [] };
+            }),
+          stableApi.getHorses().catch((err) => {
+            console.error("Failed to load horses", err);
+            return [];
+          }),
+          stableApi.getStalls().catch((err) => {
+            console.error("Failed to load stalls", err);
+            return [];
+          }),
+        ]);
 
       setSummary(summaryRes);
       setTodaySchedules(todayRes?.content ?? []);
@@ -90,7 +98,10 @@ export function VetDashboardView() {
       setHorses(horsesRes ?? []);
       setStalls(stallsRes ?? []);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load veterinary dashboard data';
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Failed to load veterinary dashboard data";
       setError(msg);
     } finally {
       setLoading(false);
@@ -107,41 +118,50 @@ export function VetDashboardView() {
     };
   }, [loadData]);
 
-  const horseMap = useMemo(() => new Map(horses.map((h) => [h.id, h])), [horses]);
-  const stallMap = useMemo(() => new Map(stalls.map((s) => [s.id, s.stallCode])), [stalls]);
+  const horseMap = useMemo(
+    () => new Map(horses.map((h) => [h.id, h])),
+    [horses],
+  );
+  const stallMap = useMemo(
+    () => new Map(stalls.map((s) => [s.id, s.stallCode])),
+    [stalls],
+  );
 
   const activeEmergencies = useMemo(
     () => filterActiveEmergencies(urgentSchedules),
-    [urgentSchedules]
+    [urgentSchedules],
   );
   const blockedHorses = useMemo(
     () => filterBlockedHorses(horses, stallMap),
-    [horses, stallMap]
+    [horses, stallMap],
   );
   const todayAppointments = useMemo(
     () => filterTodayAppointments(todaySchedules, todayLocal),
-    [todaySchedules, todayLocal]
+    [todaySchedules, todayLocal],
   );
 
   const admissionClearanceCount = summary?.active ?? summary?.awaiting ?? 0;
 
   const handleStartExam = async (schedule: CareSchedule) => {
     try {
-      if (schedule.status === 'SCHEDULED') {
+      if (schedule.status === "SCHEDULED") {
         await admissionsApi.startCareSchedule(schedule.id);
       }
     } catch (err: unknown) {
-      console.error('Failed to start care schedule:', err);
-      const msg = err instanceof Error ? err.message : 'Cannot start examination: veterinarian is currently busy with another in-progress schedule';
+      console.error("Failed to start care schedule:", err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Cannot start examination: veterinarian is currently busy with another in-progress schedule";
       setError(msg);
       return;
     }
 
-    if (schedule.careType === 'INITIAL') {
+    if (schedule.careType === "INITIAL") {
       router.push(`/veterinarian/admissions?scheduleId=${schedule.id}`);
-    } else if (schedule.careType === 'ROUTINE') {
+    } else if (schedule.careType === "ROUTINE") {
       router.push(`/veterinarian/routine/${schedule.id}`);
-    } else if (schedule.careType === 'URGENT') {
+    } else if (schedule.careType === "URGENT") {
       router.push(`/veterinarian/urgent/${schedule.id}`);
     } else {
       router.push(`/veterinarian/schedule/${schedule.id}`);
@@ -149,11 +169,11 @@ export function VetDashboardView() {
   };
 
   const handleViewFindings = (schedule: CareSchedule) => {
-    if (schedule.careType === 'INITIAL') {
+    if (schedule.careType === "INITIAL") {
       router.push(`/veterinarian/admissions?scheduleId=${schedule.id}`);
-    } else if (schedule.careType === 'ROUTINE') {
+    } else if (schedule.careType === "ROUTINE") {
       router.push(`/veterinarian/routine/${schedule.id}`);
-    } else if (schedule.careType === 'URGENT') {
+    } else if (schedule.careType === "URGENT") {
       router.push(`/veterinarian/urgent/${schedule.id}`);
     } else {
       router.push(`/veterinarian/schedule/${schedule.id}`);
@@ -175,10 +195,18 @@ export function VetDashboardView() {
               onClick={loadData}
               disabled={loading}
             />
-            <LinkButton href="/veterinarian/preventive-care" variant="secondary" size="md">
+            <LinkButton
+              href="/veterinarian/preventive-care"
+              variant="secondary"
+              size="md"
+            >
               Vaccine Protocols
             </LinkButton>
-            <LinkButton href="/veterinarian/health" variant="secondary" size="md">
+            <LinkButton
+              href="/veterinarian/health"
+              variant="secondary"
+              size="md"
+            >
               Medical Records
             </LinkButton>
             <Button
@@ -210,15 +238,15 @@ export function VetDashboardView() {
           label="Active Emergencies"
           value={activeEmergencies.length}
           icon="alert-triangle"
-          tone={activeEmergencies.length > 0 ? 'danger' : 'neutral'}
-          onClick={() => router.push('/veterinarian/urgent')}
+          tone={activeEmergencies.length > 0 ? "danger" : "neutral"}
+          onClick={() => router.push("/veterinarian/urgent")}
         />
         <MetricCard
           label="Admission Quarantine"
           value={admissionClearanceCount}
           icon="stethoscope"
-          tone={admissionClearanceCount > 0 ? 'info' : 'neutral'}
-          onClick={() => router.push('/veterinarian/admissions')}
+          tone={admissionClearanceCount > 0 ? "info" : "neutral"}
+          onClick={() => router.push("/veterinarian/admissions")}
         />
         <MetricCard
           label="Today's Schedule"
@@ -230,7 +258,7 @@ export function VetDashboardView() {
           label="Training on Hold"
           value={blockedHorses.length}
           icon="shield"
-          tone={blockedHorses.length > 0 ? 'warning' : 'neutral'}
+          tone={blockedHorses.length > 0 ? "warning" : "neutral"}
         />
       </div>
 
@@ -268,8 +296,14 @@ export function VetDashboardView() {
               <div className="divide-y divide-[var(--color-border)]">
                 {todayAppointments.map((schedule) => {
                   const horse = horseMap.get(schedule.horseId);
-                  const horseName = schedule.candidateName || horse?.name || `Horse #${schedule.horseId}`;
-                  const stallCode = horse?.currentStallId != null ? stallMap.get(horse.currentStallId) : null;
+                  const horseName =
+                    schedule.candidateName ||
+                    horse?.name ||
+                    `Horse #${schedule.horseId}`;
+                  const stallCode =
+                    horse?.currentStallId != null
+                      ? stallMap.get(horse.currentStallId)
+                      : null;
                   const timeStr = formatAppointmentTime(schedule.scheduledAt);
                   const duration = schedule.durationMinutes ?? 30;
 
@@ -300,31 +334,39 @@ export function VetDashboardView() {
                             <span className="font-medium text-[var(--color-text-primary)]">
                               {timeStr}
                             </span>
-                            <span className="text-[var(--color-text-muted)]">({duration}m)</span>
-                            <span className="text-[var(--color-border-strong)]">·</span>
-                            <span>{stallCode ? `Stall: ${stallCode}` : 'Stall: Unassigned'}</span>
+                            <span className="text-[var(--color-text-muted)]">
+                              ({duration}m)
+                            </span>
+                            <span className="text-[var(--color-border-strong)]">
+                              ·
+                            </span>
+                            <span>
+                              {stallCode
+                                ? `Stall: ${stallCode}`
+                                : "Stall: Unassigned"}
+                            </span>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
-                        {schedule.careType === 'URGENT' && (
+                        {schedule.careType === "URGENT" && (
                           <Pill tone="danger" icon="alert-triangle" size="sm">
                             Urgent
                           </Pill>
                         )}
-                        {schedule.careType === 'INITIAL' && (
+                        {schedule.careType === "INITIAL" && (
                           <Pill tone="info" icon="stethoscope" size="sm">
                             Initial
                           </Pill>
                         )}
-                        {schedule.careType === 'ROUTINE' && (
+                        {schedule.careType === "ROUTINE" && (
                           <Pill tone="neutral" icon="clock" size="sm">
                             Routine
                           </Pill>
                         )}
 
-                        {schedule.status === 'IN_PROGRESS' ? (
+                        {schedule.status === "IN_PROGRESS" ? (
                           <Button
                             variant="primary"
                             size="sm"
@@ -332,7 +374,7 @@ export function VetDashboardView() {
                           >
                             Resume Exam
                           </Button>
-                        ) : schedule.status === 'COMPLETED' ? (
+                        ) : schedule.status === "COMPLETED" ? (
                           <Button
                             variant="secondary"
                             size="sm"
@@ -361,17 +403,24 @@ export function VetDashboardView() {
         {/* Right Column (40%): Active Emergencies & Medical Hold Watchlist */}
         <div className="space-y-6 lg:col-span-5">
           {/* Card 1: 🚨 Immediate Attention (Active Emergencies) */}
-          <Panel padded tone={activeEmergencies.length > 0 ? 'danger' : 'default'}>
+          <Panel
+            padded
+            tone={activeEmergencies.length > 0 ? "danger" : "default"}
+          >
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <SectionTitle>🚨 Immediate Attention</SectionTitle>
+                <SectionTitle>Immediate Attention</SectionTitle>
                 {activeEmergencies.length > 0 && (
                   <Pill tone="danger" size="sm">
                     {activeEmergencies.length} Active
                   </Pill>
                 )}
               </div>
-              <LinkButton href="/veterinarian/urgent" variant="tertiary" size="sm">
+              <LinkButton
+                href="/veterinarian/urgent"
+                variant="tertiary"
+                size="sm"
+              >
                 View All
               </LinkButton>
             </div>
@@ -391,10 +440,18 @@ export function VetDashboardView() {
               <div className="space-y-3">
                 {activeEmergencies.map((schedule) => {
                   const horse = horseMap.get(schedule.horseId);
-                  const horseName = schedule.candidateName || horse?.name || `Horse #${schedule.horseId}`;
-                  const stallCode = horse?.currentStallId != null ? stallMap.get(horse.currentStallId) : null;
+                  const horseName =
+                    schedule.candidateName ||
+                    horse?.name ||
+                    `Horse #${schedule.horseId}`;
+                  const stallCode =
+                    horse?.currentStallId != null
+                      ? stallMap.get(horse.currentStallId)
+                      : null;
                   const excerpt =
-                    schedule.description || schedule.notes || 'Emergency examination requested';
+                    schedule.description ||
+                    schedule.notes ||
+                    "Emergency examination requested";
 
                   return (
                     <div
@@ -414,7 +471,7 @@ export function VetDashboardView() {
                               {horseName}
                             </span>
                             <span className="ml-2 text-xs text-[var(--color-text-muted)]">
-                              {stallCode ? `Stall ${stallCode}` : 'Unassigned'}
+                              {stallCode ? `Stall ${stallCode}` : "Unassigned"}
                             </span>
                           </div>
                         </div>
@@ -444,9 +501,9 @@ export function VetDashboardView() {
           </Panel>
 
           {/* Card 2: ⛔ Training Clearance Watchlist */}
-          <Panel padded tone={blockedHorses.length > 0 ? 'warning' : 'default'}>
+          <Panel padded tone={blockedHorses.length > 0 ? "warning" : "default"}>
             <div className="mb-3 flex items-center gap-2">
-              <SectionTitle>⛔ Training Clearance Watchlist</SectionTitle>
+              <SectionTitle>Training Clearance Watchlist</SectionTitle>
               {blockedHorses.length > 0 && (
                 <Pill tone="warning" size="sm">
                   {blockedHorses.length} Blocked
@@ -502,7 +559,9 @@ export function VetDashboardView() {
                     </div>
 
                     <div className="rounded-[var(--radius-xs)] bg-[var(--color-warning-soft)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]">
-                      <span className="font-medium text-[var(--color-warning)]">Hold Reason: </span>
+                      <span className="font-medium text-[var(--color-warning)]">
+                        Hold Reason:{" "}
+                      </span>
                       {item.reason}
                     </div>
 
