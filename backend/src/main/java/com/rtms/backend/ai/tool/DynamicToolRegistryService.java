@@ -439,7 +439,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getClubHealthOverview",
-                        "Báo cáo toàn đàn: số ngựa ALLOWED vs BLOCKED, số ca sự cố trong tuần.",
+                        "Thống kê tổng số lượng ngựa và tình trạng sức khỏe toàn đàn trong câu lạc bộ (tổng số chiến mã, số ngựa được phép tập luyện vs cấm tập y tế, số ca sự cố trong tuần). Bắt buộc dùng công cụ này khi người dùng hỏi có bao nhiêu ngựa trong câu lạc bộ hoặc quy mô đàn ngựa.",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
@@ -453,7 +453,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getClubHorsesDirectory",
-                        "Tra cứu danh bạ toàn bộ chiến mã trong câu lạc bộ, lọc theo trạng thái (status) hoặc tên ngựa / tên chủ ngựa.",
+                        "Tra cứu danh sách chi tiết các chiến mã trong câu lạc bộ (tên ngựa, UELN, chuồng, HLV phụ trách). Lọc theo trạng thái (status) hoặc tên ngựa / tên chủ ngựa.",
                         buildParamSchema(Map.of(
                                 "status", Map.of("type", "string", "description", "Trạng thái chiến mã (ACTIVE, IN_TRAINING, RESTING, QUARANTINE)"),
                                 "keyword", Map.of("type", "string", "description", "Từ khóa tìm kiếm theo tên ngựa hoặc tên chủ ngựa")

@@ -2463,6 +2463,7 @@ public class AiToolExecutionService {
             item.put("quyetDinhTapLuyen", (isQuarantineStall || isBlocked) ? "BLOCKED" : (h.getTrainingDecision() != null ? h.getTrainingDecision().name() : "ALLOWED"));
             item.put("viTriChuong", stallName);
             item.put("huanLuyenVienPhuTrach", trainerName);
+            item.put("tongSoNguaCauLacBo", allHorses.size());
             item.put("actionUrl", "/manager/horses");
             result.add(item);
         }

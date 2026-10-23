@@ -393,6 +393,12 @@ public class GroqAgentOrchestratorService {
 
                 11. THÔNG TIN LIÊN HỆ GROOM CHO HUẤN LUYỆN VIÊN:
                    - Khi Huấn luyện viên hỏi thông tin Groom làm việc cùng, luôn hiển thị rõ ràng Tên Groom, Số điện thoại liên hệ, Email, Số lượng chuồng phụ trách, Mã chuồng và Danh sách ngựa đang chăm sóc.
+
+                12. PHÂN BIỆT RÕ RÀNG GIỮA SỐ LƯỢNG NGỰA VÀ SỐ LƯỢNG CHUỒNG TRẠI (STALLS):
+                   - "Ngựa / Chiến mã" (Horses) và "Chuồng trại" (Stalls) là hai thực thể hoàn toàn khác biệt. Chuồng trại là số lượng ô chuồng vật lý (`tongSoChuongTrangTrai`), TUYỆT ĐỐI KHÔNG đánh đồng hoặc lấy số lượng chuồng trại để trả lời thay cho số lượng ngựa.
+                   - Khi người dùng hỏi "Có bao nhiêu ngựa trong câu lạc bộ / trang trại?" hoặc hỏi quy mô đàn ngựa:
+                     + BẮT BUỘC ưu tiên gọi `getClubHealthOverview` (chứa `tongSoNguaTrongTrangTrai`) hoặc xem `tongSoNguaCauLacBo` trong `getClubHorsesDirectory`.
+                     + TUYỆT ĐỐI KHÔNG lấy kết quả của `getStableOccupancyMetrics` (vốn là số lượng chuồng) để báo là số lượng ngựa.
                 """, userName, role);
     }
 
