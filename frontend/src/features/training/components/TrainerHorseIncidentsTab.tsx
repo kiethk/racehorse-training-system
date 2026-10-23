@@ -5,6 +5,7 @@ import { Button, EmptyState, Icon, ListSkeleton, Notice, Panel, Pill } from '@/c
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { formatDateTime } from '@/lib/display';
 import { incidentApi } from '@/features/groom/services/incidentService';
+import { assignedVetLabel } from '@/features/groom/lib/assignedVet';
 import type { IncidentReport, IncidentSeverity, IncidentStatus } from '@/features/groom/types';
 import { ReportIncidentDialog } from './ReportIncidentDialog';
 
@@ -102,6 +103,7 @@ export function TrainerHorseIncidentsTab({ horseId, horseName }: { horseId: numb
                       {report.reportedByName && (
                         <span> • Reported by: <strong>{report.reportedByName}</strong></span>
                       )}
+                      {assignedVetLabel(report) && <span> • {assignedVetLabel(report)}</span>}
                     </p>
                   </div>
                   <Pill tone={statusConfig.tone} size="sm">{statusConfig.label}</Pill>

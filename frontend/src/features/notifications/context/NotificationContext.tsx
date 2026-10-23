@@ -3,10 +3,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from '@/lib/toast';
 import { notificationApi } from '../services/api';
 import type { NotificationItem } from '../types';
 import { getNotificationHref } from '../lib/notificationRoute';
-import { AssignmentNotificationModal } from '../components/AssignmentNotificationModal';
 
 interface NotificationContextValue {
   notifications: NotificationItem[];
@@ -17,6 +17,10 @@ interface NotificationContextValue {
 }
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
+
+const ASSIGNMENT_TYPES = new Set(['ADMISSION_VET_ASSIGNED', 'ADMISSION_TRAINER_ASSIGNED']);
+/** Long enough to read the message and reach the View button. */
+const ACTION_TOAST_MS = 8000;
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -29,6 +33,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   );
 }
 
+/** Assignment notifications already announced in this browser session, so polling never repeats a toast. */
+function readToastedIds(storageKey: string): Set<number> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = sessionStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return Array.isArray(parsed) ? new Set<number>(parsed.map(Number)) : new Set<number>();
+  } catch {
+    // Ignore sessionStorage read errors
+    return new Set<number>();
+  }
+}
+
 function NotificationProviderForUser({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const router = useRouter();
@@ -38,25 +55,61 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [activeModalNotification, setActiveModalNotification] = useState<NotificationItem | null>(null);
-  const [temporarilyDismissedIds, setTemporarilyDismissedIds] = useState<Set<number>>(() => {
-    if (typeof window === 'undefined') return new Set();
-    try {
-      const raw = sessionStorage.getItem(`rtms_dismissed_notifications_${userId ?? 'anon'}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          return new Set<number>(parsed.map(Number));
-        }
-      }
-    } catch {
-      // Ignore sessionStorage read errors
-    }
-    return new Set<number>();
-  });
-  const [modalActionError, setModalActionError] = useState<string | null>(null);
-  const [modalActionPending, setModalActionPending] = useState(false);
+  // A ref, not state: toasting must not re-render, and concurrent polls must see the latest set.
+  const toastedIds = useRef<Set<number> | null>(null);
   const requestGeneration = useRef(0);
+
+  const markAsRead = useCallback(async (id: number) => {
+    // An assignment opened from a toast may not be in the 10 most recent items; the next poll reconciles the count.
+    const wasUnread = notifications.some((item) => item.id === id && !item.read);
+    await notificationApi.markAsRead(id);
+    setNotifications((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, read: true } : item))
+    );
+    if (wasUnread) setUnreadCount((prev) => Math.max(0, prev - 1));
+  }, [notifications]);
+
+  const openNotification = useCallback(
+    async (notification: NotificationItem) => {
+      try {
+        await markAsRead(notification.id);
+      } catch {
+        // Best effort, like the bell: still take the user to the item.
+      }
+      const href = getNotificationHref(notification, user?.role);
+      if (href) router.push(href);
+    },
+    [markAsRead, router, user]
+  );
+
+  const announceNewAssignments = useCallback(
+    (unread: NotificationItem[]) => {
+      if (toastedIds.current === null) toastedIds.current = readToastedIds(storageKey);
+      const seen = toastedIds.current;
+      const fresh = unread
+        .filter((n) => ASSIGNMENT_TYPES.has(n.notificationType) && !seen.has(n.id))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id - b.id);
+      if (fresh.length === 0) return;
+
+      fresh.forEach((n) => seen.add(n.id));
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(Array.from(seen)));
+      } catch {
+        // Ignore sessionStorage write errors
+      }
+
+      if (fresh.length === 1) {
+        const [only] = fresh;
+        toast.info(only.title || 'New horse assignment', only.message, {
+          action: { label: 'View', onClick: () => void openNotification(only) },
+          duration: ACTION_TOAST_MS,
+        });
+      } else {
+        toast.info(`You have ${fresh.length} new horse assignments`, 'Open the notification bell to review them.');
+      }
+    },
+    [openNotification, storageKey]
+  );
 
   const refreshNotifications = useCallback(async () => {
     if (!userId) return;
@@ -79,24 +132,11 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
       if (generation !== requestGeneration.current) return;
       setUnreadCount(count);
       setNotifications(historyPage.content);
-
-      const pendingAssignments = unread
-        .filter(
-          (n) =>
-          (n.notificationType === 'ADMISSION_VET_ASSIGNED' ||
-            n.notificationType === 'ADMISSION_TRAINER_ASSIGNED') &&
-          !temporarilyDismissedIds.has(n.id)
-        )
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id - b.id);
-
-      setActiveModalNotification((current) => {
-        if (current && unread.some((item) => item.id === current.id)) return current;
-        return pendingAssignments[0] ?? null;
-      });
+      announceNewAssignments(unread);
     } catch {
       // Ignore background fetch error
     }
-  }, [userId, temporarilyDismissedIds]);
+  }, [userId, announceNewAssignments]);
 
   useEffect(() => () => {
     requestGeneration.current += 1;
@@ -116,83 +156,11 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
     };
   }, [userId, refreshNotifications]);
 
-  const markAsRead = useCallback(async (id: number) => {
-    const wasUnread =
-      notifications.some((item) => item.id === id && !item.read) ||
-      (activeModalNotification?.id === id && !activeModalNotification.read);
-    await notificationApi.markAsRead(id);
-    setNotifications((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, read: true } : item))
-    );
-    if (wasUnread) setUnreadCount((prev) => Math.max(0, prev - 1));
-    setActiveModalNotification((current) => (current?.id === id ? null : current));
-    setModalActionError(null);
-  }, [activeModalNotification, notifications]);
-
   const markAllAsRead = useCallback(async () => {
-    try {
-      await notificationApi.markAllAsRead();
-      setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
-      setUnreadCount(0);
-      setActiveModalNotification(null);
-    } catch (cause) {
-      throw cause;
-    }
+    await notificationApi.markAllAsRead();
+    setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+    setUnreadCount(0);
   }, []);
-
-  const handleViewDetails = useCallback(
-    async (notification: NotificationItem) => {
-      setModalActionPending(true);
-      setModalActionError(null);
-      try {
-        await markAsRead(notification.id);
-        await refreshNotifications();
-
-        const href = getNotificationHref(notification, user?.role);
-        if (href) router.push(href);
-      } catch (cause) {
-        setModalActionError(cause instanceof Error ? cause.message : 'Could not mark this notification as read. Please retry.');
-      } finally {
-        setModalActionPending(false);
-      }
-    },
-    [markAsRead, refreshNotifications, router, user]
-  );
-
-  const handleDismissRead = useCallback(
-    async (notification: NotificationItem) => {
-      setModalActionPending(true);
-      setModalActionError(null);
-      try {
-        await markAsRead(notification.id);
-        await refreshNotifications();
-      } catch (cause) {
-        setModalActionError(cause instanceof Error ? cause.message : 'Could not mark this notification as read. Please retry.');
-      } finally {
-        setModalActionPending(false);
-      }
-    },
-    [markAsRead, refreshNotifications]
-  );
-
-  const handleDismissTemporary = useCallback(() => {
-    if (activeModalNotification) {
-      const dismissedId = activeModalNotification.id;
-      setTemporarilyDismissedIds((prev) => {
-        const next = new Set(prev).add(dismissedId);
-        try {
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem(storageKey, JSON.stringify(Array.from(next)));
-          }
-        } catch {
-          // Ignore sessionStorage write errors
-        }
-        return next;
-      });
-    }
-    setActiveModalNotification(null);
-    setModalActionError(null);
-  }, [activeModalNotification, storageKey]);
 
   const contextValue = useMemo(
     () => ({
@@ -208,14 +176,6 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
   return (
     <NotificationContext.Provider value={contextValue}>
       {children}
-      <AssignmentNotificationModal
-        notification={activeModalNotification}
-        onViewDetails={handleViewDetails}
-        onDismissRead={handleDismissRead}
-        onDismissTemporary={handleDismissTemporary}
-        actionError={modalActionError}
-        actionPending={modalActionPending}
-      />
     </NotificationContext.Provider>
   );
 }
