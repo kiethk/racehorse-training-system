@@ -32,7 +32,8 @@ export function CoverageTab() {
     setLoading(true);
     setError(null);
     try {
-      setRows(await preventiveCareService.coverage());
+      const data = await preventiveCareService.coverage();
+      setRows(Array.isArray(data) ? data : []);
     } catch (cause) {
       setError(displayError(cause, 'Could not load vaccine coverage.'));
     } finally {
@@ -53,7 +54,9 @@ export function CoverageTab() {
       </Notice>
     );
   }
-  if (rows.length === 0 || rows[0].totalHorses === 0) {
+
+  const safeRows = Array.isArray(rows) ? rows : [];
+  if (safeRows.length === 0 || safeRows[0]?.totalHorses === 0) {
     return (
       <Panel padded>
         <EmptyState icon="shield" title="No horses in the stable" description="Coverage appears once horses are admitted." />
@@ -74,8 +77,8 @@ export function CoverageTab() {
           </Tr>
         </THead>
         <TBody>
-          {rows.map((row) => {
-            const percent = Math.round((covered(row) / row.totalHorses) * 100);
+          {safeRows.map((row) => {
+            const percent = row.totalHorses > 0 ? Math.round((covered(row) / row.totalHorses) * 100) : 0;
             return (
               <Tr key={row.protocolId}>
                 <Td>

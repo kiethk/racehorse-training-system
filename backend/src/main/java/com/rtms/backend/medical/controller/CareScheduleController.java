@@ -79,9 +79,8 @@ public class CareScheduleController {
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         if ("VETERINARIAN".equals(currentUser.getRole())) {
             if (status == CareScheduleStatus.REQUESTED) {
-                if (veterinarianId != null && !veterinarianId.equals(currentUser.getUserId())) {
-                    veterinarianId = currentUser.getUserId();
-                }
+                // Vet must never see other vets' REQUESTED schedules, even when no veterinarianId param is passed.
+                veterinarianId = currentUser.getUserId();
             } else {
                 veterinarianId = currentUser.getUserId();
             }

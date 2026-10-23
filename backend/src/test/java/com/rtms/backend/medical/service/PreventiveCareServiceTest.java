@@ -25,12 +25,13 @@ class PreventiveCareServiceTest {
     @Mock CareScheduleRepository schedules;
     @Mock HorseRepository horses;
     @Mock CareScheduleService care;
+    @Mock com.rtms.backend.admission.repository.AdmissionApplicationRepository admissions;
     private final AuthenticatedUser vet = new AuthenticatedUser(7L, "vet@example.com", "VETERINARIAN");
 
     @Test
     void legacyCompletionCannotBypassUnifiedStateMachine() {
         ApiException error = assertThrows(ApiException.class, () ->
-                new PreventiveCareService(schedules, horses, care)
+                new PreventiveCareService(schedules, horses, care, admissions)
                     .recordCompletion(1L, new CompletePreventiveCareScheduleRequest(), vet));
         assertEquals(HttpStatus.GONE, error.getStatus());
         verifyNoInteractions(schedules, horses, care);
@@ -42,7 +43,7 @@ class PreventiveCareServiceTest {
             CreatePreventiveCareScheduleRequest request = new CreatePreventiveCareScheduleRequest();
             request.setCareType(type);
             assertThrows(ApiException.class, () ->
-                    new PreventiveCareService(schedules, horses, care).createSchedule(request, vet));
+                    new PreventiveCareService(schedules, horses, care, admissions).createSchedule(request, vet));
         }
         verifyNoInteractions(care, schedules);
     }
@@ -64,12 +65,12 @@ class PreventiveCareServiceTest {
         when(schedules.findById(1L)).thenReturn(Optional.of(schedule));
         CreatePreventiveCareScheduleRequest request = new CreatePreventiveCareScheduleRequest();
         request.setHorseId(2L);
-        request.setCareType("VACCINATION");
-        assertSame(schedule, new PreventiveCareService(schedules, horses, care).createSchedule(request, vet));
+        request.setCareType("ROUTINE_EXAM");
+        assertSame(schedule, new PreventiveCareService(schedules, horses, care, admissions).createSchedule(request, vet));
         verify(care).createNextSchedule(argThat(r -> r.getCareType() == CareType.ROUTINE
                 && Long.valueOf(99L).equals(r.getSourceScheduleId())
                 && r.getIdempotencyKey() != null
-                && r.getDescription().startsWith("VACCINATION:")), eq(7L));
+                && r.getDescription().startsWith("ROUTINE_EXAM:")), eq(7L));
         verify(schedules, never()).save(any());
     }
 }

@@ -37,7 +37,33 @@ const FILTER_STATUSES: Record<Filter, PreventiveDueStatus[]> = {
   OK: ['OK'],
 };
 
-const rowKey = (item: PreventiveDueItem) => `${item.horseId}:${item.protocol.protocolId}`;
+interface NormalizedDueProtocol {
+  protocolId: number;
+  name: string;
+  code?: string;
+  mandatory?: boolean;
+  lastDoseOn?: string | null;
+  nextDueOn?: string | null;
+  status: PreventiveDueStatus;
+}
+
+function getProtocol(item: Partial<PreventiveDueItem> | any): NormalizedDueProtocol {
+  const p = item?.protocol || item?.protocolStatus || item;
+  return {
+    protocolId: p?.protocolId ?? p?.id ?? 0,
+    name: p?.name ?? p?.protocolName ?? 'Unknown Protocol',
+    code: p?.code ?? '',
+    mandatory: Boolean(p?.mandatory),
+    lastDoseOn: p?.lastDoseOn ?? null,
+    nextDueOn: p?.nextDueOn ?? null,
+    status: p?.status ?? 'NONE',
+  };
+}
+
+const rowKey = (item: PreventiveDueItem) => {
+  const p = getProtocol(item);
+  return `${item?.horseId ?? 0}:${p.protocolId}`;
+};
 
 interface DueWorkTabProps {
   protocols: PreventiveProtocol[];
@@ -62,8 +88,8 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
         preventiveCareService.listDue({ statuses: FILTER_STATUSES[filter], protocolId }),
         preventiveCareService.listDue({ statuses: FILTER_STATUSES.ACTION }),
       ]);
-      setItems(rows);
-      setSummary(actionable);
+      setItems(Array.isArray(rows) ? rows : []);
+      setSummary(Array.isArray(actionable) ? actionable : []);
       setSelected(new Set());
     } catch (cause) {
       setError(displayError(cause, 'Could not load preventive care work.'));
@@ -77,16 +103,23 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
     load();
   }, [load]);
 
-  const counts = useMemo(() => ({
-    overdue: summary.filter((i) => i.protocol.status === 'OVERDUE' || i.protocol.status === 'MISSING').length,
-    dueSoon: summary.filter((i) => i.protocol.status === 'DUE_SOON').length,
-    horses: new Set(summary.map((i) => i.horseId)).size,
-  }), [summary]);
+  const counts = useMemo(() => {
+    const list = Array.isArray(summary) ? summary : [];
+    return {
+      overdue: list.filter((i) => {
+        const status = getProtocol(i).status;
+        return status === 'OVERDUE' || status === 'MISSING';
+      }).length,
+      dueSoon: list.filter((i) => getProtocol(i).status === 'DUE_SOON').length,
+      horses: new Set(list.map((i) => i?.horseId).filter(Boolean)).size,
+    };
+  }, [summary]);
 
-  const selectedItems = items.filter((item) => selected.has(rowKey(item)));
-  const selectedProtocolIds = new Set(selectedItems.map((item) => item.protocol.protocolId));
+  const safeItems = Array.isArray(items) ? items : [];
+  const selectedItems = safeItems.filter((item) => selected.has(rowKey(item)));
+  const selectedProtocolIds = new Set(selectedItems.map((item) => getProtocol(item).protocolId));
   const selectedHorses = [...new Map(selectedItems.map((item) => [item.horseId, { id: item.horseId, name: item.horseName }])).values()];
-  const allSelected = items.length > 0 && selected.size === items.length;
+  const allSelected = safeItems.length > 0 && selected.size === safeItems.length;
 
   const toggle = (key: string) => {
     setSelected((current) => {
@@ -137,7 +170,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
 
       {loading ? (
         <ListSkeleton />
-      ) : items.length === 0 ? (
+      ) : safeItems.length === 0 ? (
         <Panel padded>
           <EmptyState icon="check" title="Nothing here"
             description={filter === 'OK' ? 'No horse is up to date for this filter yet.' : 'Every horse is covered for this filter.'} />
@@ -152,7 +185,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
                     <ChoiceInput
                       aria-label="Select all rows"
                       checked={allSelected}
-                      onChange={() => setSelected(allSelected ? new Set() : new Set(items.map(rowKey)))}
+                      onChange={() => setSelected(allSelected ? new Set() : new Set(safeItems.map(rowKey)))}
                     />
                   </Th>
                 )}
@@ -164,14 +197,15 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
               </Tr>
             </THead>
             <TBody>
-              {items.map((item) => {
-                const key = rowKey(item);
+              {safeItems.map((item, index) => {
+                const proto = getProtocol(item);
+                const key = rowKey(item) || `row-${index}`;
                 return (
                   <Tr key={key} className={cn(selected.has(key) && 'bg-[var(--color-primary-subtle)]')}>
                     {canRecord && (
                       <Td>
                         <ChoiceInput
-                          aria-label={`Select ${item.horseName} – ${item.protocol.name}`}
+                          aria-label={`Select ${item.horseName ?? 'Horse'} – ${proto.name}`}
                           checked={selected.has(key)}
                           onChange={() => toggle(key)}
                         />
@@ -179,19 +213,19 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
                     )}
                     <Td>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold">{item.horseName}</span>
-                        <StatusBadge status={item.horseStatus} size="sm" />
+                        <span className="font-semibold">{item.horseName ?? `Horse #${item.horseId}`}</span>
+                        {item.horseStatus && <StatusBadge status={item.horseStatus} size="sm" />}
                       </div>
                     </Td>
                     <Td>
                       <div className="flex items-center gap-2">
-                        <span>{item.protocol.name}</span>
-                        {item.protocol.mandatory && <Pill tone="info" size="sm">Mandatory</Pill>}
+                        <span>{proto.name}</span>
+                        {proto.mandatory && <Pill tone="info" size="sm">Mandatory</Pill>}
                       </div>
                     </Td>
-                    <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">{formatDate(item.protocol.lastDoseOn)}</Td>
-                    <Td className="whitespace-nowrap">{item.protocol.nextDueOn ? formatDate(item.protocol.nextDueOn) : 'Now'}</Td>
-                    <Td><DueStatusPill status={item.protocol.status} /></Td>
+                    <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">{formatDate(proto.lastDoseOn)}</Td>
+                    <Td className="whitespace-nowrap">{proto.nextDueOn ? formatDate(proto.nextDueOn) : 'Now'}</Td>
+                    <Td><DueStatusPill status={proto.status} /></Td>
                   </Tr>
                 );
               })}

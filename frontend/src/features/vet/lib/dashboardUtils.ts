@@ -13,6 +13,7 @@ export function filterActiveEmergencies(schedules: CareSchedule[]): CareSchedule
 
 /**
  * Filters horses who have a 'BLOCKED' training decision, mapping them to the watchlist view structure.
+ * Horses rejected from the club are excluded: they keep their BLOCKED decision but no longer belong on the watchlist.
  */
 export function filterBlockedHorses(
   horses: Array<{
@@ -20,13 +21,14 @@ export function filterBlockedHorses(
     name: string;
     breed?: string | null;
     currentStallId?: number | null;
+    currentStatus?: string;
     trainingDecision?: string;
     trainingDecisionReason?: string | null;
   }>,
   stallMap: Map<number, string>
 ): VetWatchlistHorse[] {
   return horses
-    .filter((h) => h.trainingDecision === 'BLOCKED')
+    .filter((h) => h.trainingDecision === 'BLOCKED' && h.currentStatus !== 'REJECTED')
     .map((h) => ({
       id: h.id,
       name: h.name,
