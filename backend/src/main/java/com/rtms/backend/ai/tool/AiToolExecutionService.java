@@ -2224,11 +2224,51 @@ public class AiToolExecutionService {
     }
 
     private Object handleGetAdmissionRequestsOverview() {
-        int pendingCount = admissionApplicationRepository.findByStatus(AdmissionStatus.MANAGER_REVIEW).size();
-        return Map.of(
-                "soDonDangKyNhapChuongChoDuyet", pendingCount,
-                "trangThaiHeThong", "HOAT_DONG_BINH_THUONG"
-        );
+        List<AdmissionApplication> allApps = admissionApplicationRepository != null
+                ? admissionApplicationRepository.findAll()
+                : Collections.emptyList();
+        long tongSoDon = allApps.size();
+
+        Map<AdmissionStatus, Long> countsByStatus = allApps.stream()
+                .filter(a -> a.getStatus() != null)
+                .collect(Collectors.groupingBy(AdmissionApplication::getStatus, Collectors.counting()));
+
+        long soDonChoManagerDuyet = countsByStatus.getOrDefault(AdmissionStatus.MANAGER_REVIEW, 0L);
+        long soDonChoGroomKiemTra = countsByStatus.getOrDefault(AdmissionStatus.GROOM_REVIEW, 0L);
+        long soDonChoNhapChuong = countsByStatus.getOrDefault(AdmissionStatus.WAITING_FOR_ARRIVAL, 0L);
+        long soDonChoKhamThuY = countsByStatus.getOrDefault(AdmissionStatus.VET_REVIEW, 0L);
+        long soDonChoHuanLuyenVien = countsByStatus.getOrDefault(AdmissionStatus.TRAINER_REVIEW, 0L);
+        long soDonDaDuyetNhapDan = countsByStatus.getOrDefault(AdmissionStatus.APPROVED, 0L);
+        long soDonTuChoi = countsByStatus.getOrDefault(AdmissionStatus.REJECTED, 0L);
+        long soDonQuaHanVanChuyen = countsByStatus.getOrDefault(AdmissionStatus.ARRIVAL_EXPIRED, 0L);
+        long soDonChoXepChuongCachLy = countsByStatus.getOrDefault(AdmissionStatus.WAITING_FOR_STALL, 0L);
+
+        long tongSoDonDangXuLy = soDonChoGroomKiemTra + soDonChoXepChuongCachLy + soDonChoNhapChuong
+                + soDonChoKhamThuY + soDonChoHuanLuyenVien + soDonChoManagerDuyet;
+
+        Map<String, Object> chiTietTheoGiaiDoan = new LinkedHashMap<>();
+        chiTietTheoGiaiDoan.put("choGroomKiemTra", soDonChoGroomKiemTra);
+        chiTietTheoGiaiDoan.put("choXepChuongCachLy", soDonChoXepChuongCachLy);
+        chiTietTheoGiaiDoan.put("choNguaDenTrangTrai", soDonChoNhapChuong);
+        chiTietTheoGiaiDoan.put("choBacSiKhamDauVao", soDonChoKhamThuY);
+        chiTietTheoGiaiDoan.put("choHuanLuyenVienTiepNhan", soDonChoHuanLuyenVien);
+        chiTietTheoGiaiDoan.put("choClubManagerPheDuyetCuoi", soDonChoManagerDuyet);
+        chiTietTheoGiaiDoan.put("daPheDuyetThanhCong", soDonDaDuyetNhapDan);
+        chiTietTheoGiaiDoan.put("daTuChoi", soDonTuChoi);
+        chiTietTheoGiaiDoan.put("quaHanVanChuyen", soDonQuaHanVanChuyen);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoDonTrongHeThong", tongSoDon);
+        response.put("soDonDangKyNhapChuongChoDuyet", soDonChoManagerDuyet);
+        response.put("soDonChoClubManagerPheDuyet", soDonChoManagerDuyet);
+        response.put("tongSoDonDangTrongTienTrinhXuLy", tongSoDonDangXuLy);
+        response.put("soDonDaHoanTatNhapDan", soDonDaDuyetNhapDan);
+        response.put("soDonTuChoiHoacQuaHan", soDonTuChoi + soDonQuaHanVanChuyen);
+        response.put("chiTietTungGiaiDoan", chiTietTheoGiaiDoan);
+        response.put("trangThaiHeThong", "HOAT_DONG_BINH_THUONG");
+        response.put("actionUrl", "/manager/admissions");
+
+        return response;
     }
 
     private Object handleGetTrainerAreaDistribution() {

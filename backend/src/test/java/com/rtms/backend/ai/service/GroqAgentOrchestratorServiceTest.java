@@ -101,5 +101,6 @@ class GroqAgentOrchestratorServiceTest {
         assertTrue(prompt.contains("ĐƯỢC PHÉP sử dụng tri thức thú y và huấn luyện đua ngựa tiêu chuẩn"));
         assertTrue(prompt.contains("ĐƯỢC PHÉP phản hồi trực tiếp các câu chào hỏi xã giao"));
         assertTrue(prompt.contains("PHÂN BIỆT RÕ RÀNG GIỮA SỐ LƯỢNG NGỰA VÀ SỐ LƯỢNG CHUỒNG TRẠI"));
+        assertTrue(prompt.contains("THỐNG KÊ ĐƠN ĐĂNG KÝ NHẬP ĐÀN"));
     }
 }

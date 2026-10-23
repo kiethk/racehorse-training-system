@@ -650,6 +650,31 @@ class AiToolExecutionServiceTest {
     }
 
     @Test
+    @DisplayName("CLUB_MANAGER gọi getAdmissionRequestsOverview lấy thống kê tổng quan toàn bộ đơn nhập đàn")
+    void testManager_GetAdmissionRequestsOverview() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        AdmissionApplication app1 = new AdmissionApplication();
+        app1.setId(1L);
+        app1.setStatus(AdmissionStatus.MANAGER_REVIEW);
+
+        AdmissionApplication app2 = new AdmissionApplication();
+        app2.setId(2L);
+        app2.setStatus(AdmissionStatus.APPROVED);
+
+        when(admissionApplicationRepository.findAll()).thenReturn(List.of(app1, app2));
+
+        Object result = toolExecutionService.executeTool("getAdmissionRequestsOverview", Map.of(), manager);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals(2L, map.get("tongSoDonTrongHeThong"));
+        assertEquals(1L, map.get("soDonChoClubManagerPheDuyet"));
+        assertEquals(1L, map.get("soDonDaHoanTatNhapDan"));
+    }
+
+    @Test
     @DisplayName("CLUB_MANAGER gọi getAdmissionPipelineDetails tra cứu chi tiết các đơn đăng ký nhập đàn")
     void testManager_GetAdmissionPipelineDetails() {
         AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");

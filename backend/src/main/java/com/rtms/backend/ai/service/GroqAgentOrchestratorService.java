@@ -399,6 +399,14 @@ public class GroqAgentOrchestratorService {
                    - Khi người dùng hỏi "Có bao nhiêu ngựa trong câu lạc bộ / trang trại?" hoặc hỏi quy mô đàn ngựa:
                      + BẮT BUỘC ưu tiên gọi `getClubHealthOverview` (chứa `tongSoNguaTrongTrangTrai`) hoặc xem `tongSoNguaCauLacBo` trong `getClubHorsesDirectory`.
                      + TUYỆT ĐỐI KHÔNG lấy kết quả của `getStableOccupancyMetrics` (vốn là số lượng chuồng) để báo là số lượng ngựa.
+
+                13. THỐNG KÊ ĐƠN ĐĂNG KÝ NHẬP ĐÀN (ADMISSION APPLICATIONS):
+                   - Khi người dùng hỏi tổng số đơn đăng ký nhập đàn/nhập chuồng trong hệ thống hoặc tình hình tuyển sinh:
+                     + Báo cáo rõ TỔNG SỐ ĐƠN (`tongSoDonTrongHeThong`, ví dụ 56 đơn) và giải thích chi tiết cơ cấu:
+                       * Số đơn đang trong tiến trình xử lý liên phòng ban (`tongSoDonDangTrongTienTrinhXuLy`, ví dụ 12 đơn): bao gồm Groom kiểm tra sơ bộ, chờ khám thú y, HLV tiếp nhận và chờ Club Manager phê duyệt cuối.
+                       * Số đơn đã hoàn tất phê duyệt nhập đàn (`soDonDaHoanTatNhapDan`, ví dụ 42 đơn).
+                       * Số đơn từ chối hoặc quá hạn (`soDonTuChoiHoacQuaHan`, ví dụ 2 đơn).
+                     + Phân biệt rõ ràng giữa "Tổng số đơn trong hệ thống" và "Số đơn đang chờ riêng Club Manager duyệt" (`soDonChoClubManagerPheDuyet`). Tuyệt đối không nhầm lẫn số đơn chờ riêng bước của Manager với tổng số đơn của toàn bộ hệ thống.
                 """, userName, role);
     }
 

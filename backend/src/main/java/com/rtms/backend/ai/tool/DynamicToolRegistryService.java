@@ -429,7 +429,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getAdmissionRequestsOverview",
-                        "Xem tổng quan số lượng đơn đăng ký nhập chuồng đang chờ xét duyệt.",
+                        "Thống kê tổng quan số lượng đơn đăng ký nhập đàn/nhập chuồng trong toàn hệ thống (tổng số đơn toàn hệ thống, số đơn đang chờ Club Manager phê duyệt cuối, số đơn đang trong tiến trình xử lý liên phòng ban, số đơn đã hoàn tất nhập đàn và từ chối/quá hạn).",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
