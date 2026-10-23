@@ -259,8 +259,10 @@ class AiToolExecutionServiceTest {
         );
 
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("tongSoCaTap"));
+        List<?> list = (List<?>) response.get("danhSachCaTap");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertTrue(item.get("caTap").toString().contains("Ca Sáng"));
@@ -663,8 +665,10 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getRecentAuditLogs", Map.of("limit", 10), manager);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("tongSoNhatKyGhiNhan"));
+        List<?> list = (List<?>) response.get("danhSachNhatKy");
         assertEquals(1, list.size());
 
         Map<?, ?> item = (Map<?, ?>) list.get(0);
@@ -833,8 +837,10 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getMyHorseRaceRegistrations", Map.of(), trainer);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("tongSoGiaiDuaDangKy"));
+        List<?> list = (List<?>) response.get("danhSachGiaiDua");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertEquals("THUNDER", item.get("tenNgua"));
@@ -862,8 +868,10 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getAssignedAdmissionReviews", Map.of(), trainer);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("tongSoDonChoThamDinh"));
+        List<?> list = (List<?>) response.get("danhSachDon");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertEquals("WIND RUNNER", item.get("tenNgua"));
@@ -920,8 +928,10 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getPendingAdmissionExams", Map.of(), vet);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("tongSoCaKhamNhapDanDangCho"));
+        List<?> list = (List<?>) response.get("danhSachCaKham");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertEquals("SILVER BULLET", item.get("tenNgua"));
@@ -950,8 +960,10 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getUrgentCareAlerts", Map.of(), vet);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("tongSoCanhBaoKhan"));
+        List<?> list = (List<?>) response.get("danhSachCanhBao");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertEquals("LIGHTNING", item.get("tenNgua"));
@@ -1060,8 +1072,10 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getMyReportedIncidents", Map.of(), groom);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("tongSoSuCoDaBaoCao"));
+        List<?> list = (List<?>) response.get("danhSachSuCo");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertEquals("SHADOW", item.get("tenNgua"));

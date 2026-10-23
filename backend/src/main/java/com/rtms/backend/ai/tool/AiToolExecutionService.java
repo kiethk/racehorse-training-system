@@ -397,6 +397,8 @@ public class AiToolExecutionService {
     private Object handleGetMyHorses(AuthenticatedUser currentUser) {
         List<Horse> horses = horseRepository.findByOwnerId(currentUser.getUserId());
         List<Map<String, Object>> result = new ArrayList<>();
+        int duocTapLuyen = 0;
+        int camTapLuyen = 0;
         for (Horse h : horses) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("tenNgua", h.getName());
@@ -405,8 +407,20 @@ public class AiToolExecutionService {
             item.put("quyetDinhTapLuyen", h.getTrainingDecision());
             item.put("viTriChuong", resolveStallName(h.getCurrentStallId()));
             result.add(item);
+
+            String dec = h.getTrainingDecision() != null ? h.getTrainingDecision().name().toUpperCase() : "";
+            if (dec.contains("ELIGIBLE") || dec.contains("ALLOWED") || dec.contains("NORMAL")) {
+                duocTapLuyen++;
+            } else if (dec.contains("RESTRICTED") || dec.contains("BLOCKED") || dec.contains("CAM")) {
+                camTapLuyen++;
+            }
         }
-        return result;
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoNguaSoHuu", result.size());
+        response.put("soNguaDuocPhepTapLuyen", duocTapLuyen);
+        response.put("soNguaCamTapHoacHanChe", camTapLuyen);
+        response.put("danhSachNgua", result);
+        return response;
     }
 
     private Object handleGetMyHorseHealthSummary(Map<String, Object> args, AuthenticatedUser currentUser) {
@@ -500,7 +514,10 @@ public class AiToolExecutionService {
             item.put("danhSachNguaCuaBan", namesByLot.getOrDefault(lot.lotId(), Collections.emptyList()));
             result.add(item);
         }
-        return result;
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoBuoiTapSapToi", result.size());
+        response.put("danhSachLichTap", result);
+        return response;
     }
 
     private Object handleGetMyHorseAdmissions(AuthenticatedUser currentUser) {
@@ -521,7 +538,21 @@ public class AiToolExecutionService {
             item.put("ngayNopDon", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : "N/A");
             result.add(item);
         }
-        return result;
+        int daDuyet = 0;
+        int dangXuLy = 0;
+        for (AdmissionApplication a : apps) {
+            if (a.getStatus() == AdmissionStatus.APPROVED) {
+                daDuyet++;
+            } else if (a.getStatus() != AdmissionStatus.REJECTED && a.getStatus() != AdmissionStatus.ARRIVAL_EXPIRED) {
+                dangXuLy++;
+            }
+        }
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoDonDaNop", result.size());
+        response.put("soDonDaPheDuyet", daDuyet);
+        response.put("soDonDangXuLy", dangXuLy);
+        response.put("danhSachDon", result);
+        return response;
     }
 
     private Object handleGetHorseTrainingSummary(Map<String, Object> args, AuthenticatedUser currentUser) {
@@ -778,7 +809,10 @@ public class AiToolExecutionService {
 
         List<TrainingLotRow> lotRows = trainingLotRepository.findTrainerLotRows(trainerId, from, to, false);
         if (lotRows.isEmpty()) {
-            return Collections.emptyList();
+            Map<String, Object> emptyResp = new LinkedHashMap<>();
+            emptyResp.put("tongSoCaTap", 0);
+            emptyResp.put("danhSachCaTap", Collections.emptyList());
+            return emptyResp;
         }
 
         List<Long> lotIds = lotRows.stream().map(TrainingLotRow::lotId).toList();
@@ -799,7 +833,10 @@ public class AiToolExecutionService {
             item.put("danhSachNgua", namesByLot.getOrDefault(lot.lotId(), Collections.emptyList()));
             result.add(item);
         }
-        return result;
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoCaTap", result.size());
+        response.put("danhSachCaTap", result);
+        return response;
     }
 
     private Object handleGetTrainerPlansSummary(Map<String, Object> args, AuthenticatedUser currentUser) {
@@ -1063,7 +1100,10 @@ public class AiToolExecutionService {
 
     private Object handleGetMyHorseRaceRegistrations(Map<String, Object> args, AuthenticatedUser currentUser) {
         if (raceRegistrationRepository == null) {
-            return Collections.emptyList();
+            Map<String, Object> emptyResp = new LinkedHashMap<>();
+            emptyResp.put("tongSoGiaiDuaDangKy", 0);
+            emptyResp.put("danhSachGiaiDua", Collections.emptyList());
+            return emptyResp;
         }
         Long trainerId = currentUser.getUserId();
         Horse targetHorse = resolveHorse(args);
@@ -1088,7 +1128,10 @@ public class AiToolExecutionService {
             item.put("actionUrl", "/trainer/racing");
             result.add(item);
         }
-        return result;
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoGiaiDuaDangKy", result.size());
+        response.put("danhSachGiaiDua", result);
+        return response;
     }
 
     private Object handleGetAssignedAdmissionReviews(AuthenticatedUser currentUser) {
@@ -1125,7 +1168,10 @@ public class AiToolExecutionService {
             item.put("actionUrl", "/trainer/admissions");
             result.add(item);
         }
-        return result;
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoDonChoThamDinh", result.size());
+        response.put("danhSachDon", result);
+        return response;
     }
 
     private Object handleGetCourseCurriculumOverview() {
@@ -1453,7 +1499,10 @@ public class AiToolExecutionService {
             item.put("moTa", cs.getDescription() != null ? cs.getDescription() : "");
             result.add(item);
         }
-        return result;
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoDonThuocVaDieuTri", result.size());
+        response.put("danhSachDieuTri", result);
+        return response;
     }
 
     private Object handleGetPreventiveCareSchedule(Map<String, Object> args) {
@@ -1615,7 +1664,10 @@ public class AiToolExecutionService {
             item.put("actionUrl", "/veterinarian/admissions");
             result.add(item);
         }
-        return result;
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoCaKhamNhapDanDangCho", result.size());
+        response.put("danhSachCaKham", result);
+        return response;
     }
 
     private Object handleGetUrgentCareAlerts() {
@@ -1642,7 +1694,10 @@ public class AiToolExecutionService {
             item.put("actionUrl", "/veterinarian/urgent");
             result.add(item);
         }
-        return result;
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoCanhBaoKhan", result.size());
+        response.put("danhSachCanhBao", result);
+        return response;
     }
 
     private Object handleGetHorseVitalSignsTrend(Map<String, Object> args) {
@@ -2012,7 +2067,10 @@ public class AiToolExecutionService {
                 result.add(item);
             }
         }
-        return result;
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoSuCoDaBaoCao", result.size());
+        response.put("danhSachSuCo", result);
+        return response;
     }
 
     private Object handleGetGroomTaskCompletionRate(Map<String, Object> args, AuthenticatedUser currentUser) {
@@ -2590,7 +2648,10 @@ public class AiToolExecutionService {
 
             result.add(item);
         }
-        return result;
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoNhatKyGhiNhan", result.size());
+        response.put("danhSachNhatKy", result);
+        return response;
     }
 
     private Object handleGetAdmissionPipelineDetails(Map<String, Object> args) {

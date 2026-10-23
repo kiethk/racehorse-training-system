@@ -415,7 +415,77 @@ public class GroqAgentOrchestratorService {
                        * Tổng số nhân sự: trường `tongSoNhanSu`
                        * Cơ cấu theo vai trò: trường `phanLoaiTheoVaiTro` (ví dụ: Huấn luyện viên trưởng, Bác sĩ thú y, Nhân viên chăm sóc (Groom), Quản lý)
                      + TUYỆT ĐỐI KHÔNG tự đếm thủ công các phần tử trong danh sách JSON. TUYỆT ĐỐI KHÔNG làm tròn hoặc bịa đặt số lượng nhân sự (ví dụ: không được báo 30 hay 36 khi dữ liệu trả về ghi rõ 24 Groom).
-                """, userName, role);
+                """, userName, role) + "\n" + buildRoleDomainOntology(role);
+    }
+
+    private String buildRoleDomainOntology(String role) {
+        if (role == null) return "";
+        return switch (role.toUpperCase()) {
+            case "HEAD_TRAINER", "TRAINER" -> """
+                15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO HUẤN LUYỆN VIÊN (HEAD_TRAINER DOMAIN ONTOLOGY):
+                   - QUAN HỆ THỰC THỂ:
+                     + Huấn luyện viên trưởng [Trainer] quản lý Khu vực [Area] gồm nhiều Cụm chuồng [StableLot] và Ô chuồng [Stall].
+                     + Mỗi Ô chuồng [Stall] được phân công cho 1 Groom chăm sóc và chứa 1 Chiến mã [Horse].
+                     + Chiến mã [Horse] được ghi danh vào Khóa huấn luyện [Training Plan] -> gồm nhiều Buổi tập [Workout Session] -> chia thành các Lượt tập [Training Lot].
+                     + Chiến mã có thành tích tốt được Huấn luyện viên đăng ký tham gia các Giải đua [Race Registration].
+                   - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
+                     + Tra cứu lịch tập & ca tập: Dùng `getTrainerSchedule` (đọc `tongSoCaTap` và `danhSachCaTap`).
+                     + Tra cứu ngựa thuộc quyền huấn luyện: Dùng `getTrainerHorses` -> để lấy danh sách tên và ID ngựa.
+                     + Tra cứu kế hoạch huấn luyện: Dùng `getTrainerPlansSummary`.
+                     + Đăng ký giải đua: Dùng `getMyHorseRaceRegistrations` (đọc `tongSoGiaiDuaDangKy`).
+                     + Đơn tuyển nhận nhập đàn chờ thẩm định: Dùng `getAssignedAdmissionReviews` (đọc `tongSoDonChoThamDinh`).
+                """;
+            case "VETERINARIAN", "VET" -> """
+                15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO BÁC SĨ THÚ Y (VETERINARIAN DOMAIN ONTOLOGY):
+                   - QUAN HỆ THỰC THỂ:
+                     + Bác sĩ thú y [Vet] theo dõi sức khỏe và điều trị cho toàn bộ Đàn ngựa [Horses].
+                     + Khi ngựa gặp vấn đề sức khỏe: Bác sĩ ghi nhận Hồ sơ bệnh án [HealthRecord], Chỉ số sinh hiệu [HorseHealthMetric] và Lịch chăm sóc/điều trị [CareSchedule].
+                     + Ngựa bị chấn thương/truyền nhiễm hoặc mới nhập đàn -> Chuyển vào Khu cách ly [Quarantine Area] và BAN HÀNH LỆNH CẤM TẬP (BLOCKED/RESTRICTED).
+                     + Tiếp nhận ngựa mới vào đàn: Bác sĩ thực hiện Khám sàng lọc nhập đàn [Admission Vet Exam].
+                   - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
+                     + Cảnh báo cấp cứu khẩn cấp: Dùng `getUrgentCareAlerts` (đọc `tongSoCanhBaoKhan`).
+                     + Đơn khám sàng lọc nhập đàn chờ xử lý: Dùng `getPendingAdmissionExams` (đọc `tongSoCaKhamNhapDanDangCho`).
+                     + Đơn thuốc và phác đồ điều trị đang thực hiện: Dùng `getActivePrescriptions` (đọc `tongSoDonThuocVaDieuTri`).
+                     + Kiểm tra tình trạng cách ly: Dùng `getQuarantineStatus`.
+                """;
+            case "GROOM", "STABLE_STAFF" -> """
+                15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO GROOM (GROOM DOMAIN ONTOLOGY):
+                   - QUAN HỆ THỰC THỂ:
+                     + Nhân viên chăm sóc [Groom] được phân công phụ trách một nhóm Ô chuồng [Stall] thuộc Cụm chuồng [StableLot].
+                     + Groom chịu trách nhiệm trực tiếp cho ăn, dọn dẹp, kiểm tra sức khỏe hàng ngày cho các Chiến mã trong ô chuồng của mình.
+                     + Nếu phát hiện ngựa có dấu hiệu bất thường (bỏ ăn, cào đất, sốt, đau bụng Colic, trầy xước) -> Groom tạo Báo cáo sự cố [Incident Report].
+                     + Khi có xe chở ngựa mới đến cổng -> Groom tiến hành Kiểm tra sơ bộ thể trạng [Admission Groom Review].
+                   - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
+                     + Chuồng và ngựa phụ trách: Dùng `getMyAssignedHorses` (đọc `tongSoChuongPhuTrach`, `soChuongCoNgua`).
+                     + Nhiệm vụ trong ngày: Dùng `getDailyGroomTasks` hoặc `getTodayAggregatedTasks`.
+                     + Sự cố đã báo cáo: Dùng `getMyReportedIncidents` (đọc `tongSoSuCoDaBaoCao`).
+                     + Tra cứu vị trí chuồng ngựa: Dùng `getHorseStallLocation`.
+                """;
+            case "HORSE_OWNER", "OWNER" -> """
+                15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO CHỦ SỞ HỮU NGỰA (HORSE_OWNER DOMAIN ONTOLOGY):
+                   - QUAN HỆ THỰC THỂ:
+                     + Chủ ngựa [Horse Owner] nộp Đơn đăng ký nhập đàn [Admission Application] để đưa ngựa vào câu lạc bộ RTMS.
+                     + Sau khi được duyệt, Chiến mã [Horse] lưu trú tại Ô chuồng [Stall] của câu lạc bộ, được chăm sóc bởi Groom và huấn luyện bởi HLV trưởng.
+                     + Chủ ngựa có quyền tra cứu minh bạch: Tiến độ tập luyện, Lịch chăm sóc thú y, Lịch thi đấu và Lịch sử sự cố của chính các chiến mã mình sở hữu.
+                   - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
+                     + Ngựa thuộc sở hữu: Dùng `getMyHorses` (đọc `tongSoNguaSoHuu`, `soNguaDuocPhepTapLuyen`, `soNguaCamTapHoacHanChe`).
+                     + Đơn đăng ký nhập chuồng: Dùng `getMyHorseAdmissions` (đọc `tongSoDonDaNop`, `soDonDaPheDuyet`, `soDonDangXuLy`).
+                     + Lịch tập sắp tới: Dùng `getMyHorseUpcomingSchedule` (đọc `tongSoBuoiTapSapToi`).
+                     + Phả hệ / huyết thống: Dùng `getMyHorsePedigreeInfo`.
+                """;
+            case "CLUB_MANAGER", "ADMIN" -> """
+                15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO QUẢN LÝ (CLUB_MANAGER DOMAIN ONTOLOGY):
+                   - QUAN HỆ THỰC THỂ:
+                     + Quản lý câu lạc bộ [Club Manager] giám sát toàn diện mọi mặt hoạt động: Quy mô đàn ngựa, Công suất chuồng trại, Đội ngũ nhân sự, Tiến trình tuyển nhận nhập đàn và Nhật ký kiểm toán bảo mật [Audit Trail].
+                   - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
+                     + Quy mô đàn ngựa & Sức khỏe toàn đàn: BẮT BUỘC dùng `getClubHealthOverview` (đọc `tongSoNguaTrongTrangTrai`) hoặc `getClubHorsesDirectory` (đọc `tongSoNguaCauLacBo`).
+                     + Công suất chuồng trại: Dùng `getStableOccupancyMetrics` (đọc `tongSoChuongTrangTrai`, `soChuongDangSuDung`, `tyLeLapDay`).
+                     + Đội ngũ nhân sự: Dùng `getSystemStaffOverview` (đọc `tongSoNhanSu` và `phanLoaiTheoVaiTro`).
+                     + Tiến trình tuyển nhận nhập đàn: Dùng `getAdmissionRequestsOverview` (đọc `tongSoDonTrongHeThong`) và `getAdmissionPipelineDetails`.
+                     + Nhật ký kiểm toán: Dùng `getRecentAuditLogs` (đọc `tongSoNhatKyGhiNhan`).
+                """;
+            default -> "";
+        };
     }
 
     private String formatFallbackToolSummary(List<Map<String, Object>> executedTools) {

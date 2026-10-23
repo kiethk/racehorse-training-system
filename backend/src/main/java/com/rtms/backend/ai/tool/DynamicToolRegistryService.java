@@ -58,7 +58,7 @@ public class DynamicToolRegistryService {
         List<AiToolDefinition> ownerTools = List.of(
                 new AiToolDefinition(
                         "getMyHorses",
-                        "Lấy danh sách các ngựa mà chủ ngựa hiện tại đang sở hữu (tên ngựa, UELN, chuồng, tình trạng).",
+                        "Lấy danh sách các ngựa mà chủ ngựa hiện tại đang sở hữu (tổng số ngựa sở hữu tongSoNguaSoHuu, số ngựa được phép tập luyện soNguaDuocPhepTapLuyen, số ngựa cấm tập y tế soNguaCamTapHoacHanChe, danh sách chi tiết danhSachNgua). Bắt buộc dùng khi hỏi chủ ngựa có bao nhiêu ngựa.",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
@@ -461,7 +461,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getRecentAuditLogs",
-                        "Tra cứu nhật ký kiểm toán hệ thống (Audit Trail) các thao tác nhạy cảm gần đây.",
+                        "Tra cứu nhật ký kiểm toán hệ thống (Audit Trail) các thao tác nhạy cảm gần đây (tổng số nhật ký tongSoNhatKyGhiNhan, danh sách chi tiết danhSachNhatKy).",
                         buildParamSchema(Map.of(
                                 "limit", Map.of("type", "integer", "description", "Số lượng bản ghi nhật ký kiểm toán (mặc định 10)")
                         ))
