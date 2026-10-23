@@ -1,7 +1,0 @@
-﻿"id","code","name","category","interval_days","warning_days","mandatory","active","default_dosage","default_route","created_at","updated_at"
-"6","DEWORM","Deworming","DEWORMING","90","7","t","t","By body weight","Oral","2026-10-23 08:42:33.405794","2026-10-23 08:42:33.442501"
-"1","EI","Equine Influenza","VACCINE","180","14","t","t","1 dose","IM","2026-10-23 08:42:33.405794","2026-10-23 08:42:33.442501"
-"2","TETANUS","Tetanus","VACCINE","365","30","t","t","1 dose","IM","2026-10-23 08:42:33.405794","2026-10-23 08:42:33.442501"
-"3","RABIES","Rabies","VACCINE","365","30","f","t","1 dose","IM","2026-10-23 08:42:33.405794","2026-10-23 08:42:33.442501"
-"4","EEE_WEE","Equine Encephalomyelitis (EEE/WEE)","VACCINE","365","30","t","t","1 dose","IM","2026-10-23 08:42:33.405794","2026-10-23 08:42:33.442501"
-"5","WEST_NILE","West Nile Virus","VACCINE","365","30","f","t","1 dose","IM","2026-10-23 08:42:33.405794","2026-10-23 08:42:33.442501"
