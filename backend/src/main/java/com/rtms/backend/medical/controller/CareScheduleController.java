@@ -65,6 +65,7 @@ public class CareScheduleController {
             @RequestParam(required = false) Long horseId,
             @RequestParam(required = false) Long veterinarianId,
             @RequestParam(required = false) Long admissionId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
             Pageable pageable,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         if ("VETERINARIAN".equals(currentUser.getRole())) {
@@ -74,7 +75,7 @@ public class CareScheduleController {
             return ApiResponse.success(careScheduleService.listSchedulesForAdmissionAssignee(status, careType,
                     horseId, veterinarianId, admissionId, currentUser.getUserId(), currentUser.getRole(), pageable));
         }
-        return ApiResponse.success(careScheduleService.listSchedules(status, careType, horseId, veterinarianId, admissionId, pageable));
+        return ApiResponse.success(careScheduleService.listSchedules(status, careType, horseId, veterinarianId, admissionId, date, pageable));
     }
 
     @GetMapping("/{id}")

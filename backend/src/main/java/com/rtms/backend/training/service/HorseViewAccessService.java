@@ -3,6 +3,7 @@ package com.rtms.backend.training.service;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -18,15 +19,20 @@ public class HorseViewAccessService {
 
     private final HorseRepository horseRepository;
     private final HorseTrainingPlanRepository planRepository;
+    private final StableStallRepository stallRepository;
 
-    public HorseViewAccessService(HorseRepository horseRepository, HorseTrainingPlanRepository planRepository) {
+    public HorseViewAccessService(HorseRepository horseRepository, HorseTrainingPlanRepository planRepository,
+                                  StableStallRepository stallRepository) {
         this.horseRepository = horseRepository;
         this.planRepository = planRepository;
+        this.stallRepository = stallRepository;
     }
 
     /**
-     * Owner chỉ xem ngựa của mình; Trainer chỉ xem ngựa trong khu mình phụ trách; vai khác theo quyền HORSE_VIEW.
-     * (An owner sees only their own horses; a trainer only horses in their areas; other roles follow HORSE_VIEW.)
+     * Owner chỉ xem ngựa của mình; Trainer chỉ xem ngựa trong khu mình phụ trách; Groom chỉ xem ngựa trong chuồng mình
+     * chăm; vai khác theo quyền HORSE_VIEW.
+     * (An owner sees only their own horses; a trainer only horses in their areas; a groom only horses in the stalls
+     * they look after; other roles follow HORSE_VIEW.)
      */
     public void assertCanViewHorse(Long horseId, AuthenticatedUser currentUser) {
         Horse horse = horseRepository.findById(horseId)
@@ -39,6 +45,11 @@ public class HorseViewAccessService {
         if ("HEAD_TRAINER".equals(currentUser.getRole())
                 && !planRepository.existsHorseInTrainerArea(horseId, currentUser.getUserId())) {
             throw new AccessDeniedException("You can only view horses in the areas you manage");
+        }
+        if ("GROOM".equals(currentUser.getRole())
+                && (horse.getCurrentStallId() == null
+                    || !stallRepository.existsByIdAndGroomId(horse.getCurrentStallId(), currentUser.getUserId()))) {
+            throw new AccessDeniedException("You can only view horses in the stalls you look after");
         }
     }
 }

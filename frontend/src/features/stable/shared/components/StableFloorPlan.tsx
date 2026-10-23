@@ -20,6 +20,8 @@ export interface StableFloorPlanProps {
   onSelectStall: (stall: StableStall | null) => void;
   /** Stalls in the viewer's own scope. When given, every other stall is faded. */
   ownStallIds?: ReadonlySet<number>;
+  /** With `ownStallIds`: other stalls become locked frames that show nothing and cannot be picked. */
+  lockOthers?: boolean;
   /** The lens decoration under the horse name. */
   cellFooter?: (stall: StableStall, horse: Horse | undefined) => ReactNode;
   emptyTitle?: string;
@@ -53,13 +55,15 @@ function StallRow({
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
       {stalls.map((stall, index) => {
         const horse = props.horseByStallId.get(stall.id);
+        const outside = props.ownStallIds ? !props.ownStallIds.has(stall.id) : false;
         return (
           <StallCell
             key={stall.id}
             stall={stall}
             horse={horse}
             selected={props.selectedStallId === stall.id}
-            dimmed={props.ownStallIds ? !props.ownStallIds.has(stall.id) : false}
+            dimmed={outside}
+            locked={outside && props.lockOthers}
             footer={props.cellFooter?.(stall, horse)}
             onSelect={props.onSelectStall}
             // Short stagger so the block draws in as one sweep; capped so a large barn does not feel slow.
@@ -98,7 +102,11 @@ export function StableFloorPlan(props: StableFloorPlanProps) {
           .filter((stall) => stall.areaId === area.id)
           .sort((a, b) => a.stallNumber - b.stallNumber);
         const half = Math.ceil(areaStalls.length / 2);
-        const occupied = areaStalls.filter((stall) => horseByStallId.has(stall.id)).length;
+        // A locked view only knows about the viewer's own stalls, so it counts only those.
+        const counted = props.lockOthers && props.ownStallIds
+          ? areaStalls.filter((stall) => props.ownStallIds?.has(stall.id))
+          : areaStalls;
+        const occupied = counted.filter((stall) => horseByStallId.has(stall.id)).length;
         const quarantine = area.type === 'QUARANTINE';
 
         return (
@@ -109,7 +117,7 @@ export function StableFloorPlan(props: StableFloorPlanProps) {
                 {quarantine && <Pill tone="warning" size="sm" icon="shield">Quarantine</Pill>}
               </div>
               <span className="text-xs text-[var(--color-text-muted)]">
-                {occupied} of {areaStalls.length} stalls occupied
+                {occupied} of {props.lockOthers ? 'your ' : ''}{counted.length} stalls occupied
               </span>
             </div>
 

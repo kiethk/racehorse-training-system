@@ -42,7 +42,7 @@ interface StableMapViewProps extends StableFloorPlanProps {
 
 /** The stable map with two views of the same data: the 2D plan (default, accessible) and the 3D barn. */
 export function StableMapView({ personName, currentUserId, onMoveHorse, legendNote, ...plan }: StableMapViewProps) {
-  const { areas, stalls, horseByStallId, selectedStallId, onSelectStall, ownStallIds, lens } = plan;
+  const { areas, stalls, horseByStallId, selectedStallId, onSelectStall, ownStallIds, lockOthers, lens } = plan;
   const [view, setView] = useState<StableView>('plan');
   const [unavailable, setUnavailable] = useState(false);
   const [viewMode, setViewMode] = useState<BarnViewMode>('isometric');
@@ -68,16 +68,22 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
   const areaId = selectedAreaId ?? pickedAreaId ?? orderedAreas[0]?.id;
   const area = orderedAreas.find((item) => item.id === areaId) ?? orderedAreas[0];
   const areaStalls = useMemo(() => stalls.filter((stall) => stall.areaId === area?.id), [stalls, area]);
-  const occupied = areaStalls.filter((stall) => horseByStallId.has(stall.id)).length;
+  // A locked view only knows about the viewer's own stalls, so counts cover only those.
+  const isCounted = useCallback(
+    (stall: StableStall) => !lockOthers || !ownStallIds || ownStallIds.has(stall.id),
+    [lockOthers, ownStallIds],
+  );
+  const countedStalls = areaStalls.filter(isCounted);
+  const occupied = countedStalls.filter((stall) => horseByStallId.has(stall.id)).length;
   // Per-area counts for the area picker, from data already on screen.
   const occupancy = useMemo(() => {
     const counts = new Map<number, { occupied: number; total: number }>();
-    stalls.forEach((stall) => {
+    stalls.filter(isCounted).forEach((stall) => {
       const count = counts.get(stall.areaId) ?? { occupied: 0, total: 0 };
       counts.set(stall.areaId, { occupied: count.occupied + Number(horseByStallId.has(stall.id)), total: count.total + 1 });
     });
     return counts;
-  }, [stalls, horseByStallId]);
+  }, [stalls, horseByStallId, isCounted]);
 
   const handleUnavailable = useCallback(() => {
     setUnavailable(true);
@@ -89,7 +95,9 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
     if (selectedAreaId != null && selectedAreaId !== next.id) onSelectStall(null);
   };
 
-  const ownNote = ownStallIds ? `${OWN_LABEL[lens]} are shown at full strength; the rest are faded.` : null;
+  const ownNote = !ownStallIds ? null
+    : lockOthers ? `Only ${OWN_LABEL[lens].toLowerCase()} are shown; other stalls are locked.`
+    : `${OWN_LABEL[lens]} are shown at full strength; the rest are faded.`;
   const is3d = view === '3d' && !unavailable;
 
   return (
@@ -143,6 +151,7 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
               selectedStallId={selectedStallId}
               onSelectStall={onSelectStall}
               ownStallIds={ownStallIds}
+              lockOthers={lockOthers}
               personName={personName}
               currentUserId={currentUserId}
               viewMode={viewMode}
@@ -156,7 +165,7 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
             <div data-scene-overlay className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 shadow-[var(--shadow-panel)]">
               <span className="text-sm font-semibold text-[var(--color-text-primary)]">{area.name}</span>
               {area.type === 'QUARANTINE' && <Pill tone="warning" size="sm" icon="shield">Quarantine</Pill>}
-              <span className="text-xs text-[var(--color-text-muted)]">{occupied} of {areaStalls.length} occupied</span>
+              <span className="text-xs text-[var(--color-text-muted)]">{occupied} of {lockOthers ? 'your ' : ''}{countedStalls.length} occupied</span>
             </div>
             <p data-scene-overlay className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] shadow-[var(--shadow-panel)]">
               {hint ?? (onMoveHorse

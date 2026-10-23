@@ -2,9 +2,13 @@
 
 import { FileInput, Input, Select, Textarea } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { ImageLightbox, ImageThumbnail } from '@/components/ui/ImageLightbox';
+import { isImageFile } from '@/features/admissions/shared/lib/documentKind';
 import { ownerAdmissionApi } from '@/features/admissions/services/ownerApi';
+import { LocalFilePreviewModal } from '@/features/admissions/shared/components/LocalFilePreviewModal';
+import { renderPdfFirstPage } from '@/lib/pdfThumbnail';
 import type { AdmissionDocumentType } from '@/features/admissions/types/owner';
 
 const DOCUMENT_SECTIONS: {
@@ -140,6 +144,13 @@ function DocumentUploadSection({
     onDiscard: () => void;
 }) {
     const [file, setFile] = useState<File | null>(null);
+    // Local preview of a picked image or rendered pdf thumbnail
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [rawPdfUrl, setRawPdfUrl] = useState<string | null>(null);
+    const [activePdfPreview, setActivePdfPreview] = useState<{ file: File; url: string } | null>(null);
+    const [viewingPreview, setViewingPreview] = useState(false);
+    const previewRef = useRef<string | null>(null);
+    const rawPdfRef = useRef<string | null>(null);
     const [recordDate, setRecordDate] = useState('');
     const [note, setNote] = useState('');
     const [busy, setBusy] = useState(false);
@@ -158,6 +169,46 @@ function DocumentUploadSection({
         ? ['image/jpeg', 'image/png', 'image/webp']
         : ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
+    useEffect(() => () => {
+        if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+        if (rawPdfRef.current) URL.revokeObjectURL(rawPdfRef.current);
+    }, []);
+
+    function choose(nextFile: File | null) {
+        if (previewRef.current) {
+            URL.revokeObjectURL(previewRef.current);
+            previewRef.current = null;
+        }
+        if (rawPdfRef.current) {
+            URL.revokeObjectURL(rawPdfRef.current);
+            rawPdfRef.current = null;
+        }
+        setPreviewUrl(null);
+        setRawPdfUrl(null);
+        setViewingPreview(false);
+        setActivePdfPreview(null);
+        setFile(nextFile);
+
+        if (!nextFile) return;
+
+        if (isImageFile(nextFile)) {
+            const url = URL.createObjectURL(nextFile);
+            previewRef.current = url;
+            setPreviewUrl(url);
+        } else if (nextFile.type === 'application/pdf' || nextFile.name.toLowerCase().endsWith('.pdf')) {
+            const rawUrl = URL.createObjectURL(nextFile);
+            rawPdfRef.current = rawUrl;
+            setRawPdfUrl(rawUrl);
+            renderPdfFirstPage(nextFile, 240)
+                .then(png => {
+                    const thumbUrl = URL.createObjectURL(png);
+                    previewRef.current = thumbUrl;
+                    setPreviewUrl(thumbUrl);
+                })
+                .catch(() => undefined);
+        }
+    }
+
     function updateDraftState(nextFile: File | null, nextDate = recordDate, nextNote = note, nextDateError = Boolean(dateError)) {
         onDraftChange(Boolean(nextFile || nextDate || nextNote || nextDateError));
     }
@@ -166,13 +217,13 @@ function DocumentUploadSection({
         setError('');
         setFileValidationError('');
         if (!candidate) {
-            setFile(null);
+            choose(null);
             updateDraftState(null);
             return;
         }
 
         if (candidate.size === 0 || candidate.size > 10 * 1024 * 1024) {
-            setFile(null);
+            choose(null);
             updateDraftState(null);
             setFileValidationError('File must be between 1 byte and 10 MB.');
             setInputKey(current => current + 1);
@@ -180,7 +231,7 @@ function DocumentUploadSection({
         }
 
         if (!acceptedTypes.includes(candidate.type)) {
-            setFile(null);
+            choose(null);
             updateDraftState(null);
             setFileValidationError(
                 imageOnly
@@ -191,7 +242,7 @@ function DocumentUploadSection({
             return;
         }
 
-        setFile(candidate);
+        choose(candidate);
         updateDraftState(candidate);
     }
 
@@ -237,7 +288,7 @@ function DocumentUploadSection({
             return;
         }
 
-        setFile(null);
+        choose(null);
         setRecordDate('');
         setNote('');
         onDraftChange(false);
@@ -254,6 +305,18 @@ function DocumentUploadSection({
         setBusy(false);
         if (refreshed) onDone();
     }
+
+    const isPdf = file ? (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) : false;
+
+    const handleOpenPreview = () => {
+        if (!file) return;
+        if (isPdf) {
+            const url = rawPdfUrl || URL.createObjectURL(file);
+            setActivePdfPreview({ file, url });
+        } else if (previewUrl) {
+            setViewingPreview(true);
+        }
+    };
 
     return (
         <fieldset
@@ -283,13 +346,40 @@ function DocumentUploadSection({
 
             {file && (
                 <div className="flex min-h-11 flex-wrap items-center justify-between gap-2 text-sm">
-                    <span className="min-w-0 break-all text-[var(--color-text-muted)]">{file.name}</span>
+                    <span className="flex min-w-0 items-center gap-3">
+                        {previewUrl ? (
+                            <ImageThumbnail
+                                src={previewUrl}
+                                alt={file.name}
+                                onClick={handleOpenPreview}
+                                className="h-16 w-16 shrink-0"
+                            />
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={handleOpenPreview}
+                                className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] text-xs font-semibold text-[var(--color-text-muted)] hover:border-[var(--color-primary)]"
+                            >
+                                {isPdf ? 'PDF' : 'FILE'}
+                            </button>
+                        )}
+                        <div className="min-w-0">
+                            <span className="block truncate font-medium text-[var(--color-text-primary)]">{file.name}</span>
+                            <button
+                                type="button"
+                                onClick={handleOpenPreview}
+                                className="text-xs text-[var(--color-primary)] hover:underline focus-visible:outline-none"
+                            >
+                                {isPdf ? 'Preview full PDF' : 'Preview image'}
+                            </button>
+                        </div>
+                    </span>
                     <Button
                         type="button"
                         className="min-h-11"
                         aria-label={`Remove selected ${section.label.toLowerCase()}`}
                         onClick={() => {
-                            setFile(null);
+                            choose(null);
                             setError('');
                             setFileValidationError('');
                             setInputKey(current => current + 1);
@@ -371,10 +461,25 @@ function DocumentUploadSection({
                     </Button>
                 )}
             </div>
+            {activePdfPreview && (
+                <LocalFilePreviewModal
+                    file={activePdfPreview.file}
+                    previewUrl={activePdfPreview.url}
+                    onClose={() => setActivePdfPreview(null)}
+                />
+            )}
+            {previewUrl && file && !isPdf && (
+                <ImageLightbox
+                    images={[{ src: previewUrl, alt: file.name }]}
+                    index={viewingPreview ? 0 : null}
+                    onIndexChange={() => undefined}
+                    onClose={() => setViewingPreview(false)}
+                />
+            )}
         </fieldset>
     );
 }
 
-function draftActiveLabel(file: File | null, recordDate: string, note: string, hasDateError = false) {
+function draftActiveLabel(file: File | null, recordDate: string, note: string, hasDateError: boolean): boolean {
     return Boolean(file || recordDate || note || hasDateError);
 }

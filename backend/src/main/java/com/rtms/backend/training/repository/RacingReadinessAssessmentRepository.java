@@ -13,6 +13,7 @@ public interface RacingReadinessAssessmentRepository
 
     Optional<RacingReadinessAssessment> findByAdmissionId(Long admissionId);
 
+    Optional<RacingReadinessAssessment> findTopByHorseIdOrderByCreatedAtDesc(Long horseId);
 
     /** Toàn bộ lịch sử của một chiến mã, mới nhất trước. (The whole history of a horse, newest first.) */
     List<RacingReadinessAssessment> findByHorseIdOrderByAssessmentDateDesc(Long horseId);

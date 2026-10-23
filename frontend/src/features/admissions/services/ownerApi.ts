@@ -1,10 +1,11 @@
 import { apiGet, apiUpload } from '@/services/api';
 import type { AdmissionSummaryResponse, AdmissionStatus } from '../types';
 import type { CreateOwnerAdmissionRequest, AdmissionDocumentUpload } from '../types/owner';
+import type { HorseSex } from '@/types/horse';
 
 export type CandidateForm = {
   name: string; breed: string; dateOfBirth: string | null;
-  sex: import('@/types/horse').HorseSex | null;
+  sex: HorseSex | null;
   registrationNumber: string | null; registryName: string | null;
   sireName: string | null; sireRegistrationNumber: string | null;
   damName: string | null; damRegistrationNumber: string | null;
@@ -23,6 +24,35 @@ export type OwnerAdmissionDetail = {
   groomFeedback: string | null; vetFeedback: string | null;
   trainerFeedback: string | null; managerFeedback: string | null;
 };
+
+export interface OcrExtractionData {
+  name?: string | null;
+  sex?: HorseSex | null;
+  rawSexText?: string | null;
+  breed?: string | null;
+  dateOfBirth?: string | null;
+  registrationNumber?: string | null;
+  registryName?: string | null;
+  sireName?: string | null;
+  sireRegistrationNumber?: string | null;
+  damName?: string | null;
+  damRegistrationNumber?: string | null;
+  fileReference?: {
+    tempFileId: string;
+    fileUrl: string;
+    originalFilename: string;
+  } | null;
+  confidenceScore?: number | null;
+  hasConflict?: boolean;
+  conflictMessage?: string | null;
+}
+
+export interface OcrExtractionResponse {
+  success: boolean;
+  message: string;
+  data: OcrExtractionData;
+  extractedFieldsCount: number;
+}
 
 type ApiResponse<T> = { success: boolean; data: T; message: string };
 
@@ -59,6 +89,12 @@ export const ownerAdmissionApi = {
     if (!json?.success) throw new Error(json?.message || 'Document upload failed');
     return json.data;
   },
+  scanOcr: async (file: File, documentType: string) => {
+    const body = new FormData();
+    body.append('file', file);
+    body.append('documentType', documentType);
+    const json = await apiUpload<ApiResponse<OcrExtractionResponse>>('/api/owner/admissions/ocr-scan', body);
+    if (!json?.success) throw new Error(json?.message || 'OCR extraction failed');
+    return json.data;
+  },
 };
-
-

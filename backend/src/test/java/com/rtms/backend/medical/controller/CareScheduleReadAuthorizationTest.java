@@ -39,7 +39,7 @@ class CareScheduleReadAuthorizationTest {
             var owner = new AuthenticatedUser(1L, "owner@example.com", "HORSE_OWNER");
             assertThrows(AccessDeniedException.class, () -> controller.getById(1L, owner));
             assertThrows(AccessDeniedException.class,
-                    () -> controller.list(null, null, null, null, null, PageRequest.of(0, 10), owner));
+                    () -> controller.list(null, null, null, null, null, null, PageRequest.of(0, 10), owner));
             verifyNoInteractions(context.getBean(CareScheduleService.class));
         } finally {
             SecurityContextHolder.clearContext();
@@ -52,14 +52,14 @@ class CareScheduleReadAuthorizationTest {
             var controller = context.getBean(CareScheduleController.class);
             var service = context.getBean(CareScheduleService.class);
             var page = PageRequest.of(0, 10);
-            when(service.listSchedules(null, null, null, null, 2L, page)).thenReturn(Page.empty());
+            when(service.listSchedules(null, null, null, null, 2L, null, page)).thenReturn(Page.empty());
             SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                     "vet", "", List.of(new SimpleGrantedAuthority("VET_EXAM_VIEW"))));
             var manager = new AuthenticatedUser(9L, "manager@example.com", "CLUB_MANAGER");
             assertDoesNotThrow(() -> controller.getById(1L, manager));
-            assertDoesNotThrow(() -> controller.list(null, null, null, null, 2L, page, manager));
+            assertDoesNotThrow(() -> controller.list(null, null, null, null, 2L, null, page, manager));
             verify(service).getScheduleDetail(1L);
-            verify(service).listSchedules(null, null, null, null, 2L, page);
+            verify(service).listSchedules(null, null, null, null, 2L, null, page);
         } finally {
             SecurityContextHolder.clearContext();
         }

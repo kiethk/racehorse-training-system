@@ -85,6 +85,12 @@ export function GroomStableView() {
     [stalls, user],
   );
 
+  // The stall list is already scoped by the backend; areas are not, so keep only the ones holding a stall.
+  const visibleAreas = useMemo(
+    () => areas.filter((area) => stalls.some((stall) => stall.areaId === area.id)),
+    [areas, stalls],
+  );
+
   const tasksByHorseId = useMemo(() => {
     const map = new Map<number, TodayTaskItem[]>();
     tasks.forEach((task) => map.set(task.horseId, [...(map.get(task.horseId) ?? []), task]));
@@ -148,10 +154,14 @@ export function GroomStableView() {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
         <StableMapView
           lens="groom"
-          areas={areas}
+          areas={visibleAreas}
           stalls={stalls}
           horseByStallId={horseByStallId}
           ownStallIds={ownStallIds}
+          // Grooms only see their own stalls; the rest of the barn is drawn as locked frames.
+          lockOthers
+          emptyTitle="You are not assigned to any stall yet"
+          emptyDescription="The Club Manager assigns stalls to grooms. Your stalls will appear here once assigned."
           selectedStallId={selectedStallId}
           onSelectStall={selectStall}
           // Grooms cannot read the staff directory (USER_VIEW), so only their own figure is named.
@@ -198,12 +208,6 @@ export function GroomStableView() {
             ) : undefined
           }
         >
-          {selectedStall && !selectedIsOwn && (
-            <p className="text-xs text-[var(--color-text-muted)]">
-              This stall is looked after by another groom. Tasks and incidents are shown only for your own stalls.
-            </p>
-          )}
-
           {selectedHorse && selectedIsOwn && (
             <>
               <section className="space-y-2">

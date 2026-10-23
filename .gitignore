@@ -5,12 +5,22 @@ backend/.mvn/wrapper/maven-wrapper.jar
 # Frontend (Next.js)
 frontend/node_modules/
 **/.next/
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+# AI Worker (Python)
+ai-worker/**/__pycache__/
+ai-worker/**/.pytest_cache/
+ai-worker/venv/
+ai-worker/.venv/
+*.pt
 
 # Environment
 .env
 .env.local
 !.env*.example
 backend/.env.cloud
+backend/src/main/resources/application-local.properties
 
 # IDE
 .idea/
@@ -21,6 +31,8 @@ backend/.env.cloud
 .DS_Store
 Thumbs.db
 
+# Project Docs & Artifacts
+artifacts/
 ui-reference/
 tutorials/
 docs/
@@ -38,3 +50,5 @@ IDEA.md
 GEMINI.md
 gemini.md
 .claude
+skills-lock.json
+.sdd/

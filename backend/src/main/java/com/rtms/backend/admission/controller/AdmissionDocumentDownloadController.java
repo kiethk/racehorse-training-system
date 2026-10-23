@@ -1,7 +1,6 @@
 package com.rtms.backend.admission.controller;
 
 import com.rtms.backend.admission.entity.AdmissionDocument;
-import com.rtms.backend.admission.enums.AdmissionDocumentType;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.admission.service.AdmissionQueryService;
@@ -42,10 +41,9 @@ public class AdmissionDocumentDownloadController {
         String filename = document.getOriginalFileName() == null
                 ? "admission-document-" + documentId
                 : document.getOriginalFileName();
-        boolean isHorsePhoto = document.getDocumentType() == AdmissionDocumentType.HORSE_PHOTO;
-        ContentDisposition disposition = isHorsePhoto
-                ? ContentDisposition.inline().filename(filename, StandardCharsets.UTF_8).build()
-                : ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build();
+        ContentDisposition disposition = ContentDisposition.inline()
+                .filename(filename, StandardCharsets.UTF_8)
+                .build();
         return ResponseEntity.ok()
                 .contentType(storage.mediaType(document.getFileUrl()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())

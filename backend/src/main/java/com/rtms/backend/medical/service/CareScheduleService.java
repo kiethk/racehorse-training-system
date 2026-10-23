@@ -428,17 +428,62 @@ public class CareScheduleService {
             eventPublisher.publishEvent(new InitialExamCompletedEvent(schedule.getAdmissionId()));
         }
 
-        if (schedule.getCareType() == CareType.URGENT && schedule.getSourceIncidentId() != null) {
-            incidentReportRepository.findById(schedule.getSourceIncidentId()).ifPresent(incident -> {
-                if (incident.getStatus() == IncidentStatus.IN_REVIEW || incident.getStatus() == IncidentStatus.REPORTED) {
-                    incident.setStatus(IncidentStatus.RESOLVED);
-                    incident.setHandledById(vetId);
-                    incident.setHandledAt(now);
-                    // The Groom who reported it reads the outcome on the incident, not on the health record.
-                    incident.setHandlerNote(incidentOutcomeNote(request));
-                    incidentReportRepository.save(incident);
+        if (schedule.getCareType() == CareType.URGENT) {
+            List<GroomIncidentReport> openIncidents = new java.util.ArrayList<>(
+                    incidentReportRepository.findByHorseIdAndStatusIn(
+                            horse.getId(),
+                            List.of(IncidentStatus.REPORTED, IncidentStatus.IN_REVIEW)
+                    )
+            );
+            if (schedule.getSourceIncidentId() != null) {
+                incidentReportRepository.findById(schedule.getSourceIncidentId()).ifPresent(src -> {
+                    boolean alreadyPresent = openIncidents.stream().anyMatch(i -> Objects.equals(i.getId(), src.getId()));
+                    if (!alreadyPresent && (src.getStatus() == IncidentStatus.REPORTED || src.getStatus() == IncidentStatus.IN_REVIEW)) {
+                        openIncidents.add(src);
+                    }
+                });
+            }
+
+            java.util.Set<Long> recipients = new java.util.HashSet<>();
+            for (GroomIncidentReport inc : openIncidents) {
+                inc.setStatus(IncidentStatus.RESOLVED);
+                inc.setHandledById(vetId);
+                inc.setHandledAt(now);
+                inc.setHandlerNote(incidentOutcomeNote(request));
+                if (inc.getGroomId() != null) {
+                    recipients.add(inc.getGroomId());
                 }
-            });
+            }
+            if (!openIncidents.isEmpty()) {
+                incidentReportRepository.saveAll(openIncidents);
+            }
+
+            // Gửi thông báo cho Trainer phụ trách khu chuồng của ngựa
+            horseRepository.findTrainerIdByHorseId(horse.getId()).ifPresent(recipients::add);
+
+            // Bắn thông báo URGENT_CASE_CLOSED về cho cả Groom và Trainer liên quan
+            String horseName = horse.getName() != null ? horse.getName() : ("#" + horse.getId());
+            String title = "Ca khám khẩn cấp hoàn tất: " + horseName;
+            String message = "Bác sĩ Thú y đã hoàn tất ca khám khẩn cấp cho ngựa " + horseName
+                    + ". Quyết định tập luyện: " + request.getTrainingDecision();
+
+            for (Long recipientId : recipients) {
+                if (recipientId != null) {
+                    try {
+                        notificationService.sendAssignmentNotification(
+                                recipientId,
+                                NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                                schedule.getId(),
+                                horse.getId(),
+                                NotificationTypes.URGENT_CASE_CLOSED,
+                                title,
+                                message
+                        );
+                    } catch (Exception ex) {
+                        // Bỏ qua lỗi gửi notification để không làm gián đoạn hoàn tất ca khám
+                    }
+                }
+            }
         }
 
         // Atomic next schedule creation if provided
@@ -528,9 +573,17 @@ public class CareScheduleService {
 
     @Transactional(readOnly = true)
     public Page<CareScheduleResponse> listSchedules(CareScheduleStatus status, CareType careType,
-            Long horseId, Long vetId, Long admissionId, Pageable pageable) {
-        return careScheduleRepository.findFiltered(status, careType, horseId, vetId, admissionId, pageable)
+            Long horseId, Long vetId, Long admissionId, LocalDate date, Pageable pageable) {
+        LocalDateTime dayStart = date != null ? date.atStartOfDay() : null;
+        LocalDateTime dayEnd = date != null ? dayStart.plusDays(1) : null;
+        return careScheduleRepository.findFiltered(status, careType, horseId, vetId, admissionId, dayStart, dayEnd, pageable)
                 .map(CareScheduleResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CareScheduleResponse> listSchedules(CareScheduleStatus status, CareType careType,
+            Long horseId, Long vetId, Long admissionId, Pageable pageable) {
+        return listSchedules(status, careType, horseId, vetId, admissionId, null, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -897,10 +950,11 @@ public class CareScheduleService {
 
     private void recordAssignmentAudit(CareSchedule schedule, User veterinarian) {
         AuditLog audit = new AuditLog();
-        audit.setAction("CARE_SCHEDULE_AUTO_ASSIGNED");
+        audit.setAction("Care Schedule Auto Assigned");
         audit.setEntityName("CareSchedule");
         audit.setEntityId(schedule.getId());
         audit.setUser(veterinarian);
+        audit.setDetails("Care schedule #" + schedule.getId() + " (" + schedule.getCareType() + ") was automatically assigned to veterinarian " + veterinarian.getFullName());
         auditLogRepository.save(audit);
     }
 
@@ -961,6 +1015,13 @@ public class CareScheduleService {
             Horse horse, Long veterinarianId, LocalDateTime assignedAt) {
         User reporter = incident != null && incident.getGroomId() != null
                 ? userRepository.findById(incident.getGroomId()).orElse(null) : null;
+        String roleName = (reporter != null && reporter.getRole() != null) ? reporter.getRole().getName() : null;
+        String roleLabel = "GROOM".equalsIgnoreCase(roleName) ? "Groom"
+                : ("HEAD_TRAINER".equalsIgnoreCase(roleName) || "TRAINER".equalsIgnoreCase(roleName)) ? "Trainer"
+                : (roleName != null ? roleName : "");
+        String formattedName = reporter != null
+                ? (!roleLabel.isEmpty() ? (roleLabel + " " + reporter.getFullName()) : reporter.getFullName())
+                : null;
         StableStall stall = horse.getCurrentStallId() == null ? null
                 : stallRepository.findById(horse.getCurrentStallId()).orElse(null);
         long eventId = schedule.getId();
@@ -974,7 +1035,8 @@ public class CareScheduleService {
                 horse.getStableLocation(),
                 stall != null ? stall.getStallCode() : null,
                 incident != null ? incident.getGroomId() : null,
-                reporter != null ? reporter.getFullName() : null,
+                formattedName,
+                roleLabel.isEmpty() ? null : roleLabel,
                 incident != null ? incident.getReportedAt() : schedule.getCreatedAt(),
                 incident != null ? incident.getSeverity() : null,
                 incident != null ? incident.getTitle() : "Urgent Care",

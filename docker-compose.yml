@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   rtms-db:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: rtms-postgres
     restart: always
     environment:

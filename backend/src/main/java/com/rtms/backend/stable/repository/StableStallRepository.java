@@ -35,6 +35,9 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
 
     long countByGroomId(Long groomId);
 
+    /** Whether the stall is one the groom looks after; used to limit what a groom may see. */
+    boolean existsByIdAndGroomId(Long id, Long groomId);
+
     List<StableStall> findByAreaIdAndGroomId(Long areaId, Long groomId);
 
     @Query(value = """
