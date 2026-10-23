@@ -237,6 +237,7 @@ export interface CareSchedule {
   assignedVetId?: number | null;
   scheduledDate?: string | null;
   scheduledAt?: string | null;
+  completedAt?: string | null;
   durationMinutes?: number | null;
   notes?: string | null;
   description?: string | null;

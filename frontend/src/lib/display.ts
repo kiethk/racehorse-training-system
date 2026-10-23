@@ -36,3 +36,13 @@ export function formatNumber(value: number | null | undefined, fractionDigits = 
     maximumFractionDigits: fractionDigits,
   }).format(value);
 }
+
+/**
+ * Returns a date string formatted as "YYYY-MM-DD" in the business timezone (Asia/Ho_Chi_Minh).
+ * Avoids UTC offset issues where toISOString() yields yesterday's date prior to 07:00 AM VN.
+ */
+export function formatLocalDateIso(value: string | Date = new Date()): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(date);
+}

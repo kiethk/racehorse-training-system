@@ -11,6 +11,7 @@ import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { admissionsApi } from '@/features/admissions/services/api';
 import { stableApi } from '@/features/stable/services/stableService';
+import { formatLocalDateIso } from '@/lib/display';
 import type { CareSchedule, CareType, CareScheduleStatus } from '@/features/admissions/types';
 import type { Horse, StableStall } from '@/features/stable/types';
 import {
@@ -22,8 +23,7 @@ import {
 export function VetScheduleTimeline() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<string>(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    return formatLocalDateIso();
   });
   const [schedules, setSchedules] = useState<CareSchedule[]>([]);
   const [horses, setHorses] = useState<Horse[]>([]);
@@ -98,17 +98,25 @@ export function VetScheduleTimeline() {
   }, [schedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
-    router.push(`/veterinarian/schedule/${item.id}`);
+    if (item.careType === 'INITIAL') {
+      router.push(`/veterinarian/admissions?scheduleId=${item.id}`);
+    } else if (item.careType === 'ROUTINE') {
+      router.push(`/veterinarian/routine/${item.id}`);
+    } else if (item.careType === 'URGENT') {
+      router.push(`/veterinarian/urgent/${item.id}`);
+    } else {
+      router.push(`/veterinarian/schedule/${item.id}`);
+    }
   };
 
   const handleDateShift = (days: number) => {
-    const current = new Date(selectedDate);
-    current.setDate(current.getDate() + days);
-    setSelectedDate(current.toISOString().split('T')[0]);
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const target = new Date(y, m - 1, d + days);
+    setSelectedDate(formatLocalDateIso(target));
   };
 
   const handleJumpToToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setSelectedDate(formatLocalDateIso());
   };
 
   return (

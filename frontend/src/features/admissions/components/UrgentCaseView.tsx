@@ -13,6 +13,7 @@ import { Pill } from '@/components/ui/StatusBadge';
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { admissionsApi } from '../services/api';
+import { careService } from '@/features/care/services/careService';
 import { displayError } from '@/lib/display';
 import type {
   CompleteCareScheduleRequest,
@@ -105,6 +106,26 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
         if (data.description) {
           setSymptoms((prev) => prev || data.description);
         }
+
+        if (data.status === 'COMPLETED') {
+          careService
+            .getScheduleDetail(scheduleId)
+            .then((detail) => {
+              if (!active) return;
+              if (detail && detail.healthRecord) {
+                setCompletedData({
+                  symptoms: data.description || '',
+                  findings: detail.healthRecord.findings || '',
+                  diagnosis: detail.healthRecord.diagnosis || '',
+                  treatment: detail.healthRecord.treatment || undefined,
+                  trainingDecision: detail.healthRecord.trainingDecision === 'RESTRICTED' ? 'BLOCKED' : (detail.healthRecord.trainingDecision as TrainingDecision),
+                  restrictionDetails: detail.healthRecord.restrictionDetails || undefined,
+                });
+              }
+            })
+            .catch(() => {});
+        }
+
         admissionsApi
           .getUrgentCaseReports(scheduleId)
           .then((reportList) => {
@@ -725,6 +746,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                           <div className="mt-1.5 flex gap-1.5">
                             {[3, 7, 14].map((days) => (
                               <Button
+                                type="button"
                                 key={days}
                                 size="sm"
                                 variant="secondary"
@@ -817,6 +839,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       <dt className="font-semibold text-[var(--color-text-muted)]">Restriction Instructions</dt>
                       <dd className="mt-1 text-[var(--color-danger)] font-medium">
                         {completedData.restrictionDetails}
+                      </dd>
+                    </div>
+                  )}
+                  {completedData.treatment && (
+                    <div className="sm:col-span-2">
+                      <dt className="font-semibold text-[var(--color-text-muted)]">Treatment</dt>
+                      <dd className="mt-1 text-[var(--color-text-secondary)] leading-relaxed">
+                        {completedData.treatment}
                       </dd>
                     </div>
                   )}

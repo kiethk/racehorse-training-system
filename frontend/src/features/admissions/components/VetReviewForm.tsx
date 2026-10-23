@@ -564,6 +564,61 @@ export function VetReviewForm({
     setDraftSavedTime(null);
   };
 
+  const handleRandomizeData = () => {
+    // 1. Generate realistic vital metrics within normal physiological limits for a Thoroughbred/Arabian racehorse
+    const randomTemp = (37.5 + Math.random() * 0.7).toFixed(1);
+    const randomHr = Math.floor(32 + Math.random() * 9).toString();
+    const randomRr = Math.floor(10 + Math.random() * 5).toString();
+    const randomWeight = (480 + Math.floor(Math.random() * 45 * 2) / 2).toFixed(1);
+    const randomBcs = (5.0 + (Math.random() > 0.5 ? 0.5 : 0)).toFixed(1);
+
+    const observationNotesPool = [
+      'Calm disposition, alert and responsive, post-transport check normal.',
+      'Clear respiratory sounds bilaterally, capillary refill time < 2s, gut motility active.',
+      'Good body condition, responsive to stimuli, mucous membranes pink and moist.',
+      'Resting comfortably in stall, vital telemetry within standard resting range.',
+      'Normal heart sounds without murmurs, digital pulses equal and normal.',
+    ];
+    const randomObservation = observationNotesPool[Math.floor(Math.random() * observationNotesPool.length)];
+
+    setMetrics({
+      temperature: randomTemp,
+      heartRate: randomHr,
+      respiratoryRate: randomRr,
+      weight: randomWeight,
+      bodyConditionScore: randomBcs,
+      hydrationStatus: 'Normal (CRT < 2s, pink)',
+      notes: randomObservation,
+    });
+
+    // 2. Clinical Findings & Examination
+    setPhysicalExamConfirmed(true);
+    setExamMode('NORMAL');
+    setSystemFindings({ ...normalSystemFindings });
+    setSelectedSymptoms(['No symptoms observed']);
+    setStructuredDiagnosis('Clinically healthy');
+    setTreatment('No medical treatment required. Cleared for routine care protocol.');
+    setNotes('General physical examination reveals no clinical abnormalities. Cardiovascular, respiratory, and musculoskeletal systems intact.');
+
+    if (isUrgent) {
+      setSymptoms('Mild fatigue following transport, no acute distress.');
+      setFindings('Clear lungs, strong peripheral pulses, sound hooves, no heat or effusion.');
+      setDiagnosis('Clinically healthy with normal post-transport adaptation.');
+    }
+
+    // 3. Training Decision
+    setTrainingDecision('ALLOWED');
+    setRestrictionDetails('');
+    setScheduleFollowUp(false);
+    setFollowUpDate('');
+
+    // Clear validation errors
+    setFieldErrors({});
+    setFormError('');
+
+    onDirtyChange?.(true);
+  };
+
   // 15-second debounce auto-save when dirty (FR-CHUNG-93)
   // Do NOT autosave while an unrestored draft banner is pending user action to prevent overwriting
   useEffect(() => {
@@ -640,6 +695,8 @@ export function VetReviewForm({
     setVaccinationErrors(doseErrors);
     if (Object.keys(doseErrors).length > 0) {
       errors.vaccinations = 'Complete or remove the vaccinations before submitting.';
+    } else if (schedulePurpose === 'PREVENTIVE' && vaccinationDrafts.length === 0 && deferVaccinationDays == null) {
+      errors.vaccinations = 'Please record at least one vaccination or select deferral days for preventive care.';
     }
 
     return errors;
@@ -654,7 +711,10 @@ export function VetReviewForm({
     const errors = validate();
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
-      setFormError('Please resolve all validation errors before submitting.');
+      const msg = errors.vaccinations && Object.keys(errors).length === 1
+        ? errors.vaccinations
+        : 'Please resolve all validation errors before submitting.';
+      setFormError(msg);
       return;
     }
     setFormError('');
@@ -672,7 +732,9 @@ export function VetReviewForm({
     const errors = validate();
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      const msg = 'Please resolve all validation errors before submitting.';
+      const msg = errors.vaccinations && Object.keys(errors).length === 1
+        ? errors.vaccinations
+        : 'Please resolve all validation errors before submitting.';
       setFormError(msg);
       setShowApproveConfirm(false);
       return;
@@ -867,7 +929,7 @@ export function VetReviewForm({
               <Icon name="check" size={12} className="text-[var(--color-success)]" />
               Draft saved at {draftSavedTime}
             </span>
-            <Button variant="link" size="sm" onClick={handleClearDraft}>
+            <Button type="button" variant="link" size="sm" onClick={handleClearDraft}>
               Delete draft
             </Button>
           </div>
@@ -883,6 +945,18 @@ export function VetReviewForm({
                 <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
                   1. Patient Vitals &amp; Telemetry
                 </h3>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  icon="sparkles"
+                  onClick={handleRandomizeData}
+                  disabled={isFormDisabled}
+                  className="transition-all active:scale-[0.97]"
+                  title="Simulate automated telemetry scan and randomize realistic examination findings"
+                >
+                  Simulate Auto-Exam
+                </Button>
               </div>
 
               {/* Vitals Grid without heavy card wrappers */}
@@ -1098,7 +1172,7 @@ export function VetReviewForm({
                           <h4 className="text-xs font-bold text-[var(--color-text-primary)]">
                             8 Body Systems Checklist
                           </h4>
-                          <Button variant="link" size="sm" onClick={() => setSystemFindings({ ...normalSystemFindings })}>
+                          <Button type="button" variant="link" size="sm" onClick={() => setSystemFindings({ ...normalSystemFindings })}>
                             Reset all to normal
                           </Button>
                         </div>
@@ -1260,19 +1334,36 @@ export function VetReviewForm({
 
             {/* Section 3: Vaccination & deworming given in this exam */}
             {horseId != null && (
-              <ExamVaccinationSection
-                horseId={horseId}
-                careType={careType}
-                purpose={schedulePurpose}
-                temperature={metrics.temperature}
-                trainingBlocked={trainingDecision === 'BLOCKED'}
-                disabled={isFormDisabled}
-                value={vaccinationDrafts}
-                onChange={setVaccinationDrafts}
-                deferDays={deferVaccinationDays}
-                onDeferChange={setDeferVaccinationDays}
-                errors={vaccinationErrors}
-              />
+              <div>
+                <ExamVaccinationSection
+                  horseId={horseId}
+                  careType={careType}
+                  purpose={schedulePurpose}
+                  temperature={metrics.temperature}
+                  trainingBlocked={trainingDecision === 'BLOCKED'}
+                  disabled={isFormDisabled}
+                  value={vaccinationDrafts}
+                  onChange={(next) => {
+                    setVaccinationDrafts(next);
+                    if (fieldErrors.vaccinations) {
+                      setFieldErrors((errs) => ({ ...errs, vaccinations: '' }));
+                    }
+                  }}
+                  deferDays={deferVaccinationDays}
+                  onDeferChange={(days) => {
+                    setDeferVaccinationDays(days);
+                    if (fieldErrors.vaccinations) {
+                      setFieldErrors((errs) => ({ ...errs, vaccinations: '' }));
+                    }
+                  }}
+                  errors={vaccinationErrors}
+                />
+                {fieldErrors.vaccinations && (
+                  <p className="mt-1.5 text-xs font-medium text-[var(--color-danger)]" role="alert">
+                    {fieldErrors.vaccinations}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
@@ -1435,7 +1526,7 @@ export function VetReviewForm({
                       {[3, 7, 14].map((days) => {
                         const iso = businessDateFromToday(days);
                         return (
-                          <Button key={days} size="sm" variant="secondary" onClick={() => setFollowUpDate(iso)}>
+                          <Button type="button" key={days} size="sm" variant="secondary" onClick={() => setFollowUpDate(iso)}>
                             +{days}d
                           </Button>
                         );

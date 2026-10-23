@@ -523,7 +523,9 @@ public class AdmissionQueryService {
                     CareScheduleResponse.from(cs)
             );
         }).filter(Objects::nonNull).toList();
-        return new org.springframework.data.domain.PageImpl<>(items, pageable, schedulePage.getTotalElements());
+        long dropped = schedulePage.getNumberOfElements() - items.size();
+        long adjustedTotal = Math.max(items.size(), schedulePage.getTotalElements() - dropped);
+        return new org.springframework.data.domain.PageImpl<>(items, pageable, adjustedTotal);
     }
 
     public VetQueueSummaryResponse getVetQueueSummary(Long vetId) {

@@ -5,6 +5,8 @@ import com.rtms.backend.medical.dto.CreatePrescriptionRequest;
 import com.rtms.backend.medical.dto.PrescriptionResponse;
 import com.rtms.backend.medical.service.TreatmentPlanService;
 import jakarta.validation.Valid;
+import com.rtms.backend.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,10 +23,11 @@ public class PrescriptionController {
     @PreAuthorize("hasAuthority('TREATMENT_PLAN_MANAGE')")
     public ApiResponse<PrescriptionResponse> createPrescription(
             @PathVariable Long treatmentPlanId,
-            @Valid @RequestBody CreatePrescriptionRequest request
+            @Valid @RequestBody CreatePrescriptionRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser
     ) {
         return ApiResponse.success(
-                treatmentPlanService.createPrescription(treatmentPlanId, request)
+                treatmentPlanService.createPrescription(treatmentPlanId, request, currentUser)
         );
     }
 }

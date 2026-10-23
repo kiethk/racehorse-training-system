@@ -24,6 +24,7 @@ import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeade
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
+import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSection';
 import { admissionsApi } from '../services/api';
 import type {
   AdmissionDetailResponse,
@@ -409,6 +410,9 @@ export function VetAdmissionQueue() {
         setDetail(detailData);
         setDocuments(docs);
         setCareSchedules(schedulesPage.content);
+        if (detailData.status === 'APPROVED') {
+          setActiveTab((prev) => (prev === 'exam' ? 'history' : prev));
+        }
         if (detailData.quarantineStallCode) {
           setStallCodes((prev) => ({
             ...prev,
@@ -480,19 +484,25 @@ export function VetAdmissionQueue() {
   );
   const displayedTrainingDecision =
     currentScheduleRecord?.trainingDecision ??
-    (currentActiveSchedule?.careType === 'INITIAL' ? detail?.vetTrainingDecision : null);
+    (currentActiveSchedule?.careType === 'INITIAL' ? detail?.vetTrainingDecision : null) ??
+    detail?.vetTrainingDecision;
 
   const assignedVetId = currentActiveSchedule?.veterinarianId ?? currentActiveSchedule?.assignedVetId ?? null;
   const assignedElsewhere = Boolean(assignedVetId && assignedVetId !== user?.userId);
 
+  const isApprovedAdmission = detail?.status === 'APPROVED' || selectedRow?.admissionStatus === 'APPROVED';
+
   // Requirement: Disable Start for REQUESTED schedules; only allow starting when SCHEDULED
+  // If admission is already APPROVED, examining is disabled (read-only record viewing only).
   const canStartExam = Boolean(
+    !isApprovedAdmission &&
     currentActiveSchedule &&
       currentActiveSchedule.status === 'SCHEDULED' &&
       assignedVetId === user?.userId,
   );
 
   const canCompleteExam = Boolean(
+    !isApprovedAdmission &&
     currentActiveSchedule &&
       ['SCHEDULED', 'IN_PROGRESS'].includes(currentActiveSchedule.status) &&
       assignedVetId === user?.userId,
@@ -528,12 +538,14 @@ export function VetAdmissionQueue() {
     return list.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
   }, [careSchedules, selectedId, detail]);
 
-  const handleOpenAdmission = (id: number, schedule: CareSchedule | null) => {
+  const handleOpenAdmission = (id: number, schedule: CareSchedule | null, forceViewRecord = false) => {
     setTargetScheduleId(schedule?.id ?? null);
     setDeepLinkedSchedule(null);
     setSelectedId(id);
-    // A completed exam has no review form to fill; its results live in the medical records.
-    setActiveTab(schedule?.status === 'COMPLETED' ? 'history' : 'exam');
+    const row = items.find((r) => r.admissionId === id);
+    const isApproved = forceViewRecord || row?.admissionStatus === 'APPROVED' || queuePillFilter === 'APPROVED';
+    // When approved, user only views records; a completed exam has no review form to fill either.
+    setActiveTab(isApproved || schedule?.status === 'COMPLETED' ? 'history' : 'exam');
     setScheduleWarning('');
     setIsDrawerDirty(false);
     setDrawerOpen(true);
@@ -696,6 +708,20 @@ export function VetAdmissionQueue() {
       header: 'Action',
       align: 'right',
       render: (row) => {
+        const isApproved = row.admissionStatus === 'APPROVED' || queuePillFilter === 'APPROVED';
+        if (isApproved) {
+          return (
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="clipboard"
+              className="min-w-[6.5rem] transition-all active:scale-[0.97]"
+              onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule, true)}
+            >
+              View Record
+            </Button>
+          );
+        }
         const status = row.careSchedule?.status;
         const action =
           status === 'IN_PROGRESS' ? ({ label: 'Continue', icon: 'activity', primary: true } as const)
@@ -881,7 +907,76 @@ export function VetAdmissionQueue() {
                   {/* Tab 1: Clinical Examination & VetReviewForm */}
                   {/* Tab 1: Clinical Examination & VetReviewForm (kept mounted to preserve state across tab switches) */}
                   <div className={activeTab === 'exam' ? 'block' : 'hidden'}>
-                    {canCompleteExam ? (
+                    {isApprovedAdmission ? (
+                      <div className="space-y-5">
+                        <div className="rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-5">
+                          <div className="flex items-center gap-2.5">
+                            <Icon name="check" size={24} className="text-[var(--color-success)] shrink-0" />
+                            <div>
+                              <h3 className="text-base font-bold text-[var(--color-success)]">
+                                Admission Approved
+                              </h3>
+                              <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
+                                This admission has been finalized and approved by management. Clinical examination records are locked for editing.
+                              </p>
+                            </div>
+                          </div>
+                          {displayedTrainingDecision && (
+                            <div className="mt-3">
+                              <Pill
+                                tone={displayedTrainingDecision === 'ALLOWED' ? 'success' : 'danger'}
+                              >
+                                Training Decision: {formatLabel(displayedTrainingDecision)}
+                              </Pill>
+                            </div>
+                          )}
+                        </div>
+
+                        {detail.initialVetExam ? (
+                          <MedicalFindingsSection exam={detail.initialVetExam} />
+                        ) : detail.healthRecords && detail.healthRecords.length > 0 ? (
+                          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+                            <h4 className="text-sm font-bold text-[var(--color-text-primary)] mb-3">
+                              Recorded Health Findings
+                            </h4>
+                            <div className="space-y-3">
+                              {detail.healthRecords.map((record) => (
+                                <div
+                                  key={record.id}
+                                  className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-sm"
+                                >
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="font-semibold text-[var(--color-text-primary)]">
+                                      {formatLabel(record.recordType)} Examination
+                                    </span>
+                                    <span className="text-xs text-[var(--color-text-muted)]">
+                                      {formatDate(record.examinedAt, true)}
+                                    </span>
+                                  </div>
+                                  {record.trainingDecision && (
+                                    <div className="mb-2">
+                                      <Pill tone={record.trainingDecision === 'ALLOWED' ? 'success' : 'danger'}>
+                                        {record.trainingDecision === 'ALLOWED' ? 'Allowed to Train' : 'Blocked'}
+                                      </Pill>
+                                    </div>
+                                  )}
+                                  <div className="grid gap-2 sm:grid-cols-2">
+                                    {record.symptoms && <div><span className="text-xs text-[var(--color-text-muted)] block">Symptoms</span>{record.symptoms}</div>}
+                                    {record.findings && <div><span className="text-xs text-[var(--color-text-muted)] block">Findings</span>{record.findings}</div>}
+                                    {record.diagnosis && <div><span className="text-xs text-[var(--color-text-muted)] block">Diagnosis</span>{record.diagnosis}</div>}
+                                    {record.treatment && <div><span className="text-xs text-[var(--color-text-muted)] block">Treatment</span>{record.treatment}</div>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center text-sm text-[var(--color-text-muted)]">
+                            No additional examination records found for this admission.
+                          </div>
+                        )}
+                      </div>
+                    ) : canCompleteExam ? (
                       <VetReviewForm
                         key={`${detail.admissionId}-${currentActiveSchedule?.id}`}
                         admissionId={detail.admissionId}

@@ -78,7 +78,13 @@ public class CareScheduleController {
             Pageable pageable,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         if ("VETERINARIAN".equals(currentUser.getRole())) {
-            veterinarianId = currentUser.getUserId();
+            if (status == CareScheduleStatus.REQUESTED) {
+                if (veterinarianId != null && !veterinarianId.equals(currentUser.getUserId())) {
+                    veterinarianId = currentUser.getUserId();
+                }
+            } else {
+                veterinarianId = currentUser.getUserId();
+            }
         }
         if ("GROOM".equals(currentUser.getRole())) {
             return ApiResponse.success(careScheduleService.listSchedulesForAdmissionAssignee(status, careType,

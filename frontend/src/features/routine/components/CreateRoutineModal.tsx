@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { FormField } from '@/components/ui/FormField';
 import { Input, Select, Textarea } from '@/components/ui/Input';
 import { Notice } from '@/components/ui/Notice';
 import { admissionsApi } from '@/features/admissions/services/api';
+import { ApiError } from '@/services/api';
 import type { Horse } from '@/features/stable/types';
 import { validateCreateRoutineForm, getMinRoutineDate } from '../utils/routineValidation';
 
@@ -26,6 +27,17 @@ export function CreateRoutineModal({ open, horses, onClose, onSuccess }: Props) 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setHorseId(0);
+      setCareType('ROUTINE_EXAM');
+      setScheduledDate(getMinRoutineDate());
+      setDescription('');
+      setErrors({});
+      setSubmitError(null);
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,14 +66,27 @@ export function CreateRoutineModal({ open, horses, onClose, onSuccess }: Props) 
     } catch (err: unknown) {
       let msg = 'Unable to schedule preventive care.';
       const raw = err instanceof Error ? err.message : String(err);
-      if (raw.includes('previously examined') || raw.includes('403')) {
-        msg = 'You can only schedule preventive care for horses you have previously examined.';
-      } else if (raw.includes('IDEMPOTENCY_CONFLICT') || raw.includes('409')) {
+      const code = err instanceof ApiError ? (err.errorCode || '') : '';
+      const status = err instanceof ApiError ? err.status : 0;
+
+      if (raw.includes('previously examined')) {
+        msg = 'A veterinarian may only schedule preventive care for an active horse.';
+      } else if (code === 'FORBIDDEN' || raw.includes('FORBIDDEN') || status === 403) {
+        msg = 'You do not have permission to schedule preventive care for this horse.';
+      } else if (code === 'IDEMPOTENCY_CONFLICT' || raw.includes('IDEMPOTENCY_CONFLICT') || status === 409 || raw.includes('already exists')) {
         msg = 'A care schedule of this type already exists for this horse on the selected date.';
-      } else if (raw.includes('INVALID_DATE') || raw.includes('future') || raw.includes('400')) {
+      } else if (
+        code === 'INVALID_DATE' ||
+        raw.includes('INVALID_DATE') ||
+        raw.includes('future') ||
+        raw.includes('past today cutoff') ||
+        (status === 400 && (raw.toLowerCase().includes('date') || raw.toLowerCase().includes('time')))
+      ) {
         msg = 'Scheduled date is invalid or past today cutoff time (14:00). Please select the next available date.';
+      } else if (code === 'HORSE_NOT_FOUND' || raw.includes('HORSE_NOT_FOUND') || status === 404) {
+        msg = 'Selected horse was not found.';
       } else {
-        msg = raw;
+        msg = raw || 'Unable to schedule preventive care.';
       }
       setSubmitError(msg);
     } finally {

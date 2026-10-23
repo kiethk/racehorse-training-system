@@ -98,7 +98,13 @@ export function VetDashboardView() {
   }, [todayLocal]);
 
   useEffect(() => {
-    loadData();
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) void loadData();
+    });
+    return () => {
+      active = false;
+    };
   }, [loadData]);
 
   const horseMap = useMemo(() => new Map(horses.map((h) => [h.id, h])), [horses]);
@@ -121,27 +127,34 @@ export function VetDashboardView() {
 
   const handleStartExam = async (schedule: CareSchedule) => {
     try {
-      if (schedule.status === 'SCHEDULED' || schedule.status === 'REQUESTED') {
+      if (schedule.status === 'SCHEDULED') {
         await admissionsApi.startCareSchedule(schedule.id);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to start care schedule:', err);
+      const msg = err instanceof Error ? err.message : 'Cannot start examination: veterinarian is currently busy with another in-progress schedule';
+      setError(msg);
+      return;
     }
 
-    if (schedule.careType === 'URGENT') {
-      router.push(`/veterinarian/urgent/${schedule.id}`);
+    if (schedule.careType === 'INITIAL') {
+      router.push(`/veterinarian/admissions?scheduleId=${schedule.id}`);
     } else if (schedule.careType === 'ROUTINE') {
       router.push(`/veterinarian/routine/${schedule.id}`);
+    } else if (schedule.careType === 'URGENT') {
+      router.push(`/veterinarian/urgent/${schedule.id}`);
     } else {
       router.push(`/veterinarian/schedule/${schedule.id}`);
     }
   };
 
   const handleViewFindings = (schedule: CareSchedule) => {
-    if (schedule.careType === 'URGENT') {
-      router.push(`/veterinarian/urgent/${schedule.id}`);
+    if (schedule.careType === 'INITIAL') {
+      router.push(`/veterinarian/admissions?scheduleId=${schedule.id}`);
     } else if (schedule.careType === 'ROUTINE') {
       router.push(`/veterinarian/routine/${schedule.id}`);
+    } else if (schedule.careType === 'URGENT') {
+      router.push(`/veterinarian/urgent/${schedule.id}`);
     } else {
       router.push(`/veterinarian/schedule/${schedule.id}`);
     }
@@ -181,7 +194,7 @@ export function VetDashboardView() {
       />
 
       {error && (
-        <Notice tone="error" title="Data synchronization error">
+        <Notice tone="error" title="Notice">
           <div className="flex items-center justify-between">
             <span>{error}</span>
             <Button variant="secondary" size="sm" onClick={loadData}>
@@ -227,7 +240,7 @@ export function VetDashboardView() {
         <div className="space-y-4 lg:col-span-7">
           <Panel padded>
             <div className="mb-4 flex items-center justify-between border-b border-[var(--color-border)] pb-3">
-              <SectionTitle>Today's Clinical Agenda</SectionTitle>
+              <SectionTitle>Today&apos;s Clinical Agenda</SectionTitle>
               <Pill tone="primary" icon="clock" size="sm">
                 13:30 - 15:30
               </Pill>
