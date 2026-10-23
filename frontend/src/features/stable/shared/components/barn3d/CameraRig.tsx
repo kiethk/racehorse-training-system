@@ -2,9 +2,10 @@
 
 import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type ComponentRef } from 'react';
 import * as THREE from 'three';
-import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+
+type OrbitControlsImpl = ComponentRef<typeof OrbitControls>;
 
 export type BarnViewMode = 'isometric' | 'top';
 
