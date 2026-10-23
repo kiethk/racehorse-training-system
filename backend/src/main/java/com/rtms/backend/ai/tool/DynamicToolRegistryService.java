@@ -444,7 +444,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getSystemStaffOverview",
-                        "Tra cứu danh bạ nhân sự trong hệ thống (HLV, Bác sĩ, Groom), có thể lọc theo vai trò (role), trạng thái (isActive) hoặc từ khóa tìm kiếm.",
+                        "Tra cứu danh bạ nhân sự và thống kê số lượng nhân sự trong hệ thống (tổng số nhân sự 'tongSoNhanSu', phân loại theo vai trò 'phanLoaiTheoVaiTro': Huấn luyện viên trưởng, Bác sĩ thú y, Nhân viên chăm sóc Groom, Quản lý). Có thể lọc theo vai trò (role), trạng thái (isActive) hoặc từ khóa tìm kiếm. Bắt buộc dùng công cụ này khi người dùng hỏi có bao nhiêu nhân sự, bao nhiêu groom, bao nhiêu huấn luyện viên hoặc bác sĩ trong câu lạc bộ.",
                         buildParamSchema(Map.of(
                                 "role", Map.of("type", "string", "description", "Vai trò nhân sự cần lọc (HEAD_TRAINER, VETERINARIAN, GROOM, CLUB_MANAGER)"),
                                 "isActive", Map.of("type", "boolean", "description", "Trạng thái hoạt động (true: đang hoạt động, false: đã khóa)"),

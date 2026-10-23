@@ -407,6 +407,14 @@ public class GroqAgentOrchestratorService {
                        * Số đơn đã hoàn tất phê duyệt nhập đàn (`soDonDaHoanTatNhapDan`, ví dụ 42 đơn).
                        * Số đơn từ chối hoặc quá hạn (`soDonTuChoiHoacQuaHan`, ví dụ 2 đơn).
                      + Phân biệt rõ ràng giữa "Tổng số đơn trong hệ thống" và "Số đơn đang chờ riêng Club Manager duyệt" (`soDonChoClubManagerPheDuyet`). Tuyệt đối không nhầm lẫn số đơn chờ riêng bước của Manager với tổng số đơn của toàn bộ hệ thống.
+
+                14. THỐNG KÊ NHÂN SỰ TOÀN HỆ THỐNG:
+                   - Khi người dùng hỏi tổng số nhân sự hoặc số lượng theo từng vị trí (Huấn luyện viên, Bác sĩ thú y, Groom, Quản lý):
+                     + BẮT BUỘC gọi `getSystemStaffOverview`.
+                     + ĐỌC VÀ BÁO CÁO CHÍNH XÁC các con số đã được hệ thống tính toán sẵn:
+                       * Tổng số nhân sự: trường `tongSoNhanSu`
+                       * Cơ cấu theo vai trò: trường `phanLoaiTheoVaiTro` (ví dụ: Huấn luyện viên trưởng, Bác sĩ thú y, Nhân viên chăm sóc (Groom), Quản lý)
+                     + TUYỆT ĐỐI KHÔNG tự đếm thủ công các phần tử trong danh sách JSON. TUYỆT ĐỐI KHÔNG làm tròn hoặc bịa đặt số lượng nhân sự (ví dụ: không được báo 30 hay 36 khi dữ liệu trả về ghi rõ 24 Groom).
                 """, userName, role);
     }
 

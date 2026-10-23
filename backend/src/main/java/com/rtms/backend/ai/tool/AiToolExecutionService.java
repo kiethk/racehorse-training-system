@@ -2321,7 +2321,11 @@ public class AiToolExecutionService {
 
     private Object handleGetSystemStaffOverview(Map<String, Object> args) {
         if (userRepository == null) {
-            return Collections.emptyList();
+            Map<String, Object> emptyResponse = new LinkedHashMap<>();
+            emptyResponse.put("tongSoNhanSu", 0);
+            emptyResponse.put("phanLoaiTheoVaiTro", Collections.emptyMap());
+            emptyResponse.put("danhSachNhanSu", Collections.emptyList());
+            return emptyResponse;
         }
         List<User> users = userRepository.findAll();
 
@@ -2387,7 +2391,18 @@ public class AiToolExecutionService {
             item.put("actionUrl", "/manager/staff");
             result.add(item);
         }
-        return result;
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tongSoNhanSu", result.size());
+
+        Map<String, Integer> roleBreakdown = new LinkedHashMap<>();
+        for (Map<String, Object> item : result) {
+            String vaiTro = (String) item.get("vaiTro");
+            roleBreakdown.merge(vaiTro, 1, Integer::sum);
+        }
+        response.put("phanLoaiTheoVaiTro", roleBreakdown);
+        response.put("danhSachNhanSu", result);
+        return response;
     }
 
     private String resolveStaffSpecialty(User u, String roleName) {

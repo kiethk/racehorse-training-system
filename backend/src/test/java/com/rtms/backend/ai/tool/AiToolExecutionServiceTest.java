@@ -527,13 +527,36 @@ class AiToolExecutionServiceTest {
         r2.setName("VETERINARIAN");
         u2.setRole(r2);
 
-        when(userRepository.findAll()).thenReturn(List.of(u1, u2));
+        User u3 = new User();
+        u3.setId(30L);
+        u3.setFullName("Lê Văn Groom");
+        u3.setEmail("groom@rtms.com");
+        u3.setPhone("0909999888");
+        u3.setActive(true);
+        Role r3 = new Role();
+        r3.setName("GROOM");
+        u3.setRole(r3);
+
+        when(userRepository.findAll()).thenReturn(List.of(u1, u2, u3));
 
         Object result = toolExecutionService.executeTool("getSystemStaffOverview", Map.of(), manager);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
-        assertEquals(2, list.size());
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+
+        // Verify summary counts
+        assertEquals(3, response.get("tongSoNhanSu"));
+
+        // Verify role breakdown
+        Map<?, ?> roleBreakdown = (Map<?, ?>) response.get("phanLoaiTheoVaiTro");
+        assertNotNull(roleBreakdown);
+        assertEquals(1, roleBreakdown.get("Huấn luyện viên trưởng"));
+        assertEquals(1, roleBreakdown.get("Bác sĩ thú y"));
+        assertEquals(1, roleBreakdown.get("Nhân viên chăm sóc (Groom)"));
+
+        // Verify staff list
+        List<?> list = (List<?>) response.get("danhSachNhanSu");
+        assertEquals(3, list.size());
 
         Map<?, ?> item1 = (Map<?, ?>) list.get(0);
         assertEquals("Nguyễn Văn HLV", item1.get("hoTen"));
@@ -553,12 +576,13 @@ class AiToolExecutionServiceTest {
                 Map.of("role", "HEAD_TRAINER", "isActive", true),
                 manager
         );
-        assertTrue(filteredResult instanceof List<?>);
-        List<?> filteredList = (List<?>) filteredResult;
+        assertTrue(filteredResult instanceof Map<?, ?>);
+        Map<?, ?> filteredResponse = (Map<?, ?>) filteredResult;
+        assertEquals(1, filteredResponse.get("tongSoNhanSu"));
+        List<?> filteredList = (List<?>) filteredResponse.get("danhSachNhanSu");
         assertEquals(1, filteredList.size());
         assertEquals("Nguyễn Văn HLV", ((Map<?, ?>) filteredList.get(0)).get("hoTen"));
     }
-
     @Test
     @DisplayName("CLUB_MANAGER gọi getClubHorsesDirectory tra cứu danh bạ chiến mã kèm trạng thái và HLV phụ trách")
     void testManager_GetClubHorsesDirectory() {
