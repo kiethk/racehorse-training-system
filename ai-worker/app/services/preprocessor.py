@@ -1,5 +1,8 @@
 import cv2
-import fitz
+try:
+    import pymupdf as fitz
+except ImportError:
+    import fitz
 import numpy as np
 from typing import List
 
