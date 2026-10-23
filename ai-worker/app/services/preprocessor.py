@@ -9,16 +9,25 @@ from typing import List
 def pdf_to_cv2_images(file_bytes: bytes, dpi: int = 300) -> List[np.ndarray]:
     """Chuyển đổi từng trang PDF sang ma trận ảnh OpenCV chuẩn 300 DPI."""
     images = []
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
-    zoom = dpi / 72.0
-    matrix = fitz.Matrix(zoom, zoom)
+    try:
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        zoom = dpi / 72.0
+        matrix = fitz.Matrix(zoom, zoom)
 
-    for page in doc:
-        pix = page.get_pixmap(matrix=matrix, alpha=False)
-        img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape((pix.height, pix.width, 3))
-        img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGRA)
-        images.append(img_bgr)
-    doc.close()
+        for page in doc:
+            pix = page.get_pixmap(matrix=matrix, alpha=False)
+            img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape((pix.height, pix.width, 3))
+            img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+            images.append(img_bgr)
+        doc.close()
+    except Exception:
+        # Fallback: cố gắng đọc như file ảnh trực tiếp
+        try:
+            img = bytes_to_cv2_image(file_bytes)
+            if img is not None:
+                images.append(img)
+        except Exception:
+            pass
     return images
 
 def bytes_to_cv2_image(file_bytes: bytes) -> np.ndarray:
@@ -54,5 +63,3 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
     """Chuẩn hóa ảnh: deskew và tăng tương phản CLAHE nhẹ."""
     deskewed = deskew(image)
     return deskewed
-
-

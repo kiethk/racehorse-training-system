@@ -182,46 +182,57 @@ export function OwnerAdmissionForm() {
         return;
       }
 
-      let countUpdated = 0;
+      const isPedigree = type === 'PEDIGREE_CERTIFICATE';
+      const updatedKeys: string[] = [];
+
       setForm(currentForm => {
         const nextForm = { ...currentForm };
-        const updatedKeys: string[] = [];
 
-        // Precedence: REGISTRATION_DOCUMENT là chân lý tối cao cho định danh ngựa
-        const isPedigree = type === 'PEDIGREE_CERTIFICATE';
-
+        // Precedence: REGISTRATION_DOCUMENT là chân lý tối cao cho định danh ngựa; PEDIGREE chỉ điền nếu chưa có
         // 1. Name
-        if (data.name && (!isPedigree || !nextForm.name?.trim())) {
-          if (!nextForm.name?.trim()) {
-            nextForm.name = data.name;
-            updatedKeys.push('name');
+        if (data.name) {
+          if (!isPedigree || !nextForm.name?.trim()) {
+            if (nextForm.name !== data.name) {
+              nextForm.name = data.name;
+              updatedKeys.push('name');
+            }
           }
         }
-        // 2. Sex (Sex Safeguard: chỉ set nếu OCR chắc chắn và form chưa có)
-        if (data.sex && !nextForm.sex) {
-          nextForm.sex = data.sex;
-          updatedKeys.push('sex');
+        // 2. Sex (Sex Safeguard: chỉ set nếu OCR chắc chắn)
+        if (data.sex) {
+          if (!isPedigree || !nextForm.sex) {
+            if (nextForm.sex !== data.sex) {
+              nextForm.sex = data.sex;
+              updatedKeys.push('sex');
+            }
+          }
         }
         // 3. Breed
-        if (data.breed && (!isPedigree || !nextForm.breed?.trim())) {
-          if (!nextForm.breed?.trim()) {
-            nextForm.breed = data.breed;
-            updatedKeys.push('breed');
+        if (data.breed) {
+          if (!isPedigree || !nextForm.breed?.trim()) {
+            if (nextForm.breed !== data.breed) {
+              nextForm.breed = data.breed;
+              updatedKeys.push('breed');
+            }
           }
         }
         // 4. Date of Birth
-        if (data.dateOfBirth && (!isPedigree || !nextForm.dateOfBirth?.trim())) {
-          if (!nextForm.dateOfBirth?.trim()) {
-            nextForm.dateOfBirth = data.dateOfBirth;
-            updatedKeys.push('dateOfBirth');
+        if (data.dateOfBirth) {
+          if (!isPedigree || !nextForm.dateOfBirth?.trim()) {
+            if (nextForm.dateOfBirth !== data.dateOfBirth) {
+              nextForm.dateOfBirth = data.dateOfBirth;
+              updatedKeys.push('dateOfBirth');
+            }
           }
         }
         // 5. UELN / Registration Number
-        if (data.registrationNumber && (!isPedigree || !nextForm.registrationNumber?.trim())) {
-          if (!nextForm.registrationNumber?.trim()) {
-            nextForm.registrationNumber = data.registrationNumber;
-            updatedKeys.push('registrationNumber');
-            checkUeln(data.registrationNumber);
+        if (data.registrationNumber) {
+          if (!isPedigree || !nextForm.registrationNumber?.trim()) {
+            if (nextForm.registrationNumber !== data.registrationNumber) {
+              nextForm.registrationNumber = data.registrationNumber;
+              updatedKeys.push('registrationNumber');
+              checkUeln(data.registrationNumber);
+            }
           }
         }
         // 6. Registry Name
@@ -248,18 +259,24 @@ export function OwnerAdmissionForm() {
           updatedKeys.push('damRegistrationNumber');
         }
 
-        countUpdated = updatedKeys.length;
-        if (updatedKeys.length > 0) {
-          setHighlightedFields(new Set(updatedKeys));
-          setTimeout(() => setHighlightedFields(new Set()), 6000);
-        }
         return nextForm;
       });
 
-      if (countUpdated > 0) {
+      // Clear any previous validation errors for auto-filled fields
+      setFieldErrors(current => {
+        const next = { ...current };
+        updatedKeys.forEach(key => {
+          delete next[key as keyof CreateOwnerAdmissionRequest];
+        });
+        return next;
+      });
+
+      if (updatedKeys.length > 0) {
+        setHighlightedFields(new Set(updatedKeys));
+        setTimeout(() => setHighlightedFields(new Set()), 6000);
         setOcrNotice({
           tone: 'success',
-          message: `AI đã tự động trích xuất và điền ${countUpdated} trường thông tin từ ${docName}. Vui lòng rà soát lại ở Bước 2 trước khi nộp.`,
+          message: `AI đã tự động trích xuất và điền ${updatedKeys.length} trường thông tin từ ${docName}. Vui lòng rà soát lại ở Bước 2 trước khi nộp.`,
         });
       } else {
         setOcrNotice({
@@ -634,17 +651,17 @@ export function OwnerAdmissionForm() {
                 <span className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
                   PDF, JPEG, PNG, WebP · Dung lượng tối đa 10 MB
                 </span>
-                <FileInput
-                  id={`file-${doc.type}`}
-                  className="sr-only"
-                  ref={element => { fileInputs.current[doc.type] = element; }}
-                  accept=".pdf,.jpg,.jpeg,.png,.webp"
-                  disabled={isAnyScanning}
-                  aria-required={doc.required}
-                  aria-invalid={Boolean(message)}
-                  onChange={event => selectFile(doc.type, event.target.files?.[0])}
-                />
               </label>
+              <FileInput
+                id={`file-${doc.type}`}
+                className="sr-only"
+                ref={element => { fileInputs.current[doc.type] = element; }}
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                disabled={isAnyScanning}
+                aria-required={doc.required}
+                aria-invalid={Boolean(message)}
+                onChange={event => selectFile(doc.type, event.target.files?.[0])}
+              />
               {message && <p role="alert" className="text-xs text-[var(--color-danger)]">{message}</p>}
             </div>
           )}
