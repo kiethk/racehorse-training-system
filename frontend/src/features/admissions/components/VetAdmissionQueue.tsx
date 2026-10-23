@@ -24,6 +24,7 @@ import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeade
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
+import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSection';
 import { admissionsApi } from '../services/api';
 import type {
@@ -1249,41 +1250,7 @@ export function VetAdmissionQueue() {
                   {activeTab === 'documents' && (
                     <div className="grid gap-5 xl:grid-cols-2">
                       <div>
-                        <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
-                          Attached Admission Documents
-                        </h3>
-                        {documents.length > 0 ? (
-                          <ul className="mt-3 space-y-2">
-                            {documents.map((doc) => (
-                              <li
-                                key={doc.id}
-                                className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-xs"
-                              >
-                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
-                                  <Icon name="file-text" size={14} />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <a
-                                    href={doc.fileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-semibold text-[var(--color-primary)] hover:underline truncate block"
-                                  >
-                                    {formatLabel(doc.documentType)}
-                                  </a>
-                                  <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--color-text-muted)] font-metric">
-                                    {doc.recordDate && <span>Dated: {formatDate(doc.recordDate)}</span>}
-                                    <span>Uploaded: {formatDate(doc.uploadedAt)}</span>
-                                  </div>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-2 text-xs text-[var(--color-text-muted)] italic">
-                            No documents attached.
-                          </p>
-                        )}
+                        <AdmissionDocumentsSection documents={documents} assetUrl={admissionsApi.assetUrl} />
                       </div>
 
                       <div className="space-y-4">
