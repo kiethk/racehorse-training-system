@@ -1,4 +1,5 @@
 # Local profile — matches Docker Compose setup in docker-compose.yml
+# Copy this file to application-local.properties and fill in your own values.
 spring.datasource.url=jdbc:postgresql://localhost:5433/rtms_db
 spring.datasource.username=rtms_user
 spring.datasource.password=rtms_password
@@ -7,3 +8,9 @@ spring.datasource.password=rtms_password
 # Cloudinary while the database stays local. Only that key is used here; without the file
 # (or the key) uploads stay on local disk. A real CLOUDINARY_URL environment variable still wins.
 spring.config.import=optional:file:./.env.cloud[.properties],optional:file:./backend/.env.cloud[.properties]
+
+# AI Provider (OpenAI-compatible) — local override
+# Get your key from the team or generate your own at https://platform.openai.com/api-keys
+groq.api.base-url=https://api.openai.com/v1
+groq.api.key=YOUR_OPENAI_API_KEY_HERE
+groq.api.model=gpt-4o-mini

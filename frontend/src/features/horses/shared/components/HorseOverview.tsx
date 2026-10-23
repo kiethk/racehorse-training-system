@@ -22,7 +22,6 @@ export function HorseOverview({ horse, specialty = null, children }: {
             <HorseInfoRow stacked label="Registry" value={horse.registryName?.trim()} />
             <HorseInfoRow stacked label="Date of birth" value={horse.dateOfBirth ? formatDate(horse.dateOfBirth) : null} />
             <HorseInfoRow stacked label="Sex" value={formatHorseSex(horse.sex)} />
-            <HorseInfoRow stacked label="Location note" value={horse.stableLocation?.trim()} />
           </div>
         </HorseInfoSection>
         <HorseSpecialtySection specialty={specialty} />

@@ -108,10 +108,11 @@ public class CareRescheduleService {
         }
 
         AuditLog audit = new AuditLog();
-        audit.setAction(AUDIT_ACTION);
+        audit.setAction("Care Schedule Rescheduled");
         audit.setEntityName("CareSchedule");
         audit.setEntityId(saved.getId());
         audit.setUser(users.findById(actor.getUserId()).orElse(null));
+        audit.setDetails("Care schedule #" + saved.getId() + " rescheduled to " + request.getNewDate() + (request.getReason() != null ? " (Reason: " + request.getReason() + ")" : ""));
         auditLogs.save(audit);
 
         return new RescheduleCareScheduleResponse(CareScheduleResponse.from(saved), warnings(saved, request.getNewDate()));

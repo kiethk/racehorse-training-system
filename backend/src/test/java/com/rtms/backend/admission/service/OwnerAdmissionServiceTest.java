@@ -313,11 +313,20 @@ class OwnerAdmissionServiceTest {
     void createRejectsInvalidUelnFormat() {
         var invalidRequest = new CreateOwnerAdmissionRequest(
                 "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2), HorseSex.MALE,
-                "VNM22SC00000001", "SIRE", "Sire", null,
+                "INVALID_UELN_123", "SIRE", "Sire", null,
                 "Dam", null, "Notes");
         var ex = assertThrows(ResponseStatusException.class, () -> service.create(7L, invalidRequest));
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
         assertTrue(ex.getReason().contains("UELN"));
+    }
+
+    @Test
+    void createAcceptsIsoAlpha3UelnFormat() {
+        var validRequest = new CreateOwnerAdmissionRequest(
+                "Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2), HorseSex.MALE,
+                "VNM22SC00000001", "SIRE", "Midnight Shadow", "VNM17MS00000002",
+                "Dam", null, "Notes");
+        assertDoesNotThrow(() -> service.create(7L, validRequest));
     }
 
     @Test
