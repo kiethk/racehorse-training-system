@@ -550,32 +550,196 @@ public class GroqAgentOrchestratorService {
         }
     }
 
-    private String humanizeKey(String key) {
-        if (key == null) return "";
+    String humanizeKey(String key) {
+        if (key == null || key.isBlank()) return "";
         return switch (key) {
-            case "tenNgua" -> "Tên ngựa";
-            case "maDangKy", "maSoNgua" -> "Mã đăng ký";
-            case "ngayDo" -> "Ngày đo";
-            case "canNang" -> "Cân nặng";
-            case "thanNhiet" -> "Thân nhiệt";
-            case "nhipTim" -> "Nhịp tim";
-            case "nhipTho" -> "Nhịp thở";
-            case "nhanXet" -> "Nhận xét";
-            case "viTriChuong" -> "Vị trí chuồng";
-            case "khuVuc" -> "Khu vực";
-            case "tenGroom" -> "Groom phụ trách";
-            case "soDienThoai" -> "Số điện thoại";
+            // Ngựa & Phả hệ
+            case "horseName", "tenNgua" -> "Tên ngựa";
+            case "registrationNumber", "horseId", "maDangKy", "maSoNgua" -> "Mã đăng ký";
+            case "breed" -> "Giống ngựa";
+            case "sire" -> "Ngựa cha (Sire)";
+            case "dam" -> "Ngựa mẹ (Dam)";
+            case "origin" -> "Xuất xứ";
+            case "pedigreeGeneration" -> "Phả hệ chi tiết";
+            case "joinedAt" -> "Thời gian gia nhập";
+            case "horseList", "myHorseList", "danhSachNgua" -> "Danh sách ngựa";
+            case "caredHorseList", "danhSachNguaDangChamSoc" -> "Ngựa đang chăm sóc";
+            case "horseInStall" -> "Ngựa trong chuồng";
+            case "totalOwnedHorses", "totalClubHorses", "horseCount", "tongSoNguaQuanLy" -> "Tổng số ngựa";
+
+            // Sinh hiệu & Y tế
+            case "weight", "canNang" -> "Cân nặng";
+            case "temperature", "thanNhiet" -> "Thân nhiệt";
+            case "heartRate", "avgHeartRate", "maxHeartRate", "nhipTim" -> "Nhịp tim";
+            case "respiratoryRate", "nhipTho" -> "Nhịp thở";
+            case "clinicalNotes", "clinicalObservations", "notes", "nhanXet" -> "Ghi chú lâm sàng";
+            case "diagnosis", "latestDiagnosis" -> "Chẩn đoán bệnh lý";
+            case "treatmentPlan" -> "Phác đồ điều trị";
+            case "medicalRestrictionNotes", "restrictionDetails" -> "Chỉ định y tế";
+            case "symptoms", "intakeSymptoms" -> "Triệu chứng";
+            case "severity" -> "Mức độ nghiêm trọng";
+            case "measurementDate", "ngayDo" -> "Ngày đo";
+            case "examDate", "lastExamDate" -> "Ngày khám";
+            case "examType" -> "Loại hình khám";
+            case "totalUrgentAlerts" -> "Tổng số ca cấp cứu";
+            case "alertList" -> "Danh sách ca cấp cứu";
+            case "totalPrescriptions" -> "Số đơn thuốc đang dùng";
+            case "treatmentList" -> "Danh sách điều trị";
+            case "treatmentType" -> "Loại điều trị";
+            case "careType" -> "Loại chăm sóc";
+            case "purpose" -> "Mục đích chăm sóc";
+            case "upcomingCareSchedule" -> "Lịch chăm sóc sắp tới";
+            case "inQuarantineArea" -> "Đang ở khu cách ly";
+            case "abnormalSigns" -> "Dấu hiệu bất thường";
+            case "alertLevel" -> "Mức độ cảnh báo";
+            case "immediateActionRequired" -> "Hành động cần làm ngay";
+            case "commonConditions" -> "Bệnh lý phổ biến";
+            case "recurrenceRisk" -> "Nguy cơ tái phát";
+            case "preventiveRecommendations" -> "Khuyến nghị phòng ngừa";
+            case "recommendedIntervention" -> "Phác đồ can thiệp đề xuất";
+            case "requiredTests" -> "Xét nghiệm cận lâm sàng";
+            case "minObservationTime" -> "Thời gian theo dõi tối thiểu";
+            case "referenceGuidelines" -> "Tài liệu tham chiếu";
+            case "readinessScore" -> "Điểm sẵn sàng";
+            case "readinessStatus" -> "Trạng thái sẵn sàng";
+            case "vetRecommendations" -> "Khuyến nghị của Bác sĩ thú y";
+            case "proposedTrainingRestriction" -> "Giới hạn tập luyện đề xuất";
+
+            // Chuồng trại & Vị trí
+            case "stallLocation", "stall", "stallCode", "stallNumber", "viTriChuong" -> "Vị trí ô chuồng";
+            case "areaName", "areaCode", "areaType", "khuVuc" -> "Khu vực chuồng trại";
+            case "totalStalls" -> "Tổng số ô chuồng";
+            case "occupiedStalls" -> "Số chuồng đang sử dụng";
+            case "vacantStalls" -> "Số chuồng trống";
+            case "quarantineCasesCount" -> "Số ca cách ly";
+            case "occupancyRate" -> "Tỷ lệ lấp đầy";
+            case "bottleneckForecast" -> "Dự báo điểm nghẽn chuồng";
+            case "managementRecommendations" -> "Khuyến nghị quản lý";
+            case "stallStatus" -> "Trạng thái chuồng";
+            case "stallCodeList", "danhSachMaChuong" -> "Các chuồng phụ trách";
+
+            // Nhân sự & Phân công
+            case "fullName" -> "Họ và tên";
             case "email" -> "Email";
-            case "soChuongPhuTrach" -> "Số chuồng phụ trách";
-            case "danhSachMaChuong" -> "Các chuồng phụ trách";
-            case "danhSachNguaDangChamSoc" -> "Ngựa đang chăm sóc";
-            case "danhSachNgua" -> "Danh sách ngựa";
-            case "tongSoNguaQuanLy" -> "Tổng số ngựa";
-            case "tongSoGroomLamViecCung" -> "Số Groom làm việc cùng";
-            case "tenHuanLuyenVien" -> "Huấn luyện viên";
-            case "trangThai" -> "Trạng thái";
-            case "quyetDinhTapLuyen" -> "Quyết định tập luyện";
-            default -> key;
+            case "phone", "groomPhone", "soDienThoai" -> "Số điện thoại";
+            case "role", "roleTitle", "vaiTro" -> "Vai trò";
+            case "activeStatus" -> "Trạng thái hoạt động";
+            case "specialtyInfo" -> "Thông tin chuyên môn";
+            case "totalStaff", "tongSoNhanSu" -> "Tổng số nhân sự";
+            case "roleBreakdown", "phanLoaiTheoVaiTro" -> "Phân loại theo vai trò";
+            case "staffList", "danhSachNhanSu" -> "Danh sách nhân sự";
+            case "assignedGroomName", "groomName", "assignedGroom", "tenGroom" -> "Groom phụ trách";
+            case "assignedGroomCount" -> "Số Groom phụ trách";
+            case "assignedTrainer", "tenHuanLuyenVien" -> "Huấn luyện viên phụ trách";
+            case "assignedVet" -> "Bác sĩ thú y phụ trách";
+            case "designatedTrainer" -> "Huấn luyện viên chỉ định";
+            case "assignedStallCount", "soChuongPhuTrach" -> "Số chuồng phụ trách";
+            case "totalGrooms", "tongSoGroomLamViecCung" -> "Số Groom làm việc cùng";
+            case "tasksTodayCount" -> "Số việc hôm nay";
+            case "workloadStatus" -> "Trạng thái tải trọng";
+            case "groomWorkloadList" -> "Tải trọng nhân sự Groom";
+            case "overloadedStaff" -> "Nhân sự quá tải";
+            case "proposedStallTransfer" -> "Đề xuất điều chuyển chuồng";
+
+            // Tập luyện & Kế hoạch
+            case "trainingDecision", "isTrainingAllowed", "quyetDinhTapLuyen" -> "Quyết định tập luyện";
+            case "decisionReason" -> "Lý do quyết định";
+            case "totalWorkouts" -> "Tổng số buổi tập";
+            case "completedSessions" -> "Số buổi đã hoàn thành";
+            case "totalSessions" -> "Tổng số buổi theo giáo trình";
+            case "planName" -> "Tên kế hoạch";
+            case "courseName" -> "Tên khóa học";
+            case "subjectName" -> "Bài tập / Môn học";
+            case "targetGoal" -> "Mục tiêu huấn luyện";
+            case "progress" -> "Tiến độ";
+            case "startDate" -> "Ngày bắt đầu";
+            case "endDate" -> "Ngày kết thúc";
+            case "startTime" -> "Giờ bắt đầu";
+            case "endTime" -> "Giờ kết thúc";
+            case "sessionTime" -> "Ca tập (Lot)";
+            case "surface" -> "Mặt sân";
+            case "preferredSurface" -> "Mặt sân ưa thích";
+            case "intensity" -> "Cường độ";
+            case "durationMinutes" -> "Thời lượng (phút)";
+            case "targetDistance" -> "Cự ly mục tiêu";
+            case "actualDistanceMeters" -> "Cự ly thực tế (m)";
+            case "topSpeedKmh", "optimalSpeed" -> "Tốc độ tối ưu";
+            case "fitnessProgressionRate" -> "Tiến độ thể lực";
+            case "racingPotentialEvaluation" -> "Tiềm năng thi đấu";
+            case "totalDistance14Days" -> "Tổng cự ly 14 ngày";
+            case "workoutCount" -> "Số buổi tập";
+            case "highIntensitySessions" -> "Số buổi cường độ cao";
+            case "riskAssessment" -> "Đánh giá nguy cơ";
+            case "trainingRecommendations" -> "Khuyến nghị huấn luyện";
+            case "lastWorkout" -> "Buổi tập gần nhất";
+            case "fitnessReview" -> "Nhận xét thể lực";
+            case "nextRecommendedWorkout" -> "Bài tập kế tiếp đề xuất";
+            case "adjustmentReason" -> "Lý do điều chỉnh";
+            case "optimalDistance", "recommendedDistance" -> "Cự ly sở trường";
+            case "recommendationReason" -> "Lý do đề xuất";
+            case "specialties" -> "Sở trường";
+            case "specialtyCount" -> "Số lượng sở trường";
+
+            // Nhiệm vụ Groom & Sự cố
+            case "taskType" -> "Loại công việc";
+            case "estimatedTime" -> "Thời gian dự kiến";
+            case "priorityOrder" -> "Thứ tự ưu tiên";
+            case "priorityOrderList" -> "Danh sách ưu tiên";
+            case "completionRate" -> "Tỷ lệ hoàn thành";
+            case "completedTasksCount" -> "Số việc hoàn thành";
+            case "totalTasksCount" -> "Tổng số công việc";
+            case "totalWorkItemsCount" -> "Tổng số đầu việc";
+            case "biosecurityNotes" -> "Quy tắc an toàn sinh học";
+            case "incidentTitle", "title" -> "Tiêu đề sự cố";
+            case "incidentStatus" -> "Trạng thái sự cố";
+            case "reportedAt", "timestamp" -> "Thời gian ghi nhận";
+            case "reporterName" -> "Người báo cáo";
+            case "totalReportedIncidents", "totalIncidents" -> "Tổng số sự cố";
+            case "incidentList" -> "Danh sách sự cố";
+
+            // Đơn đăng ký nhập đàn
+            case "totalApplications", "tongSoDon" -> "Tổng số đơn nhập đàn";
+            case "pendingAdmissionsCount" -> "Số đơn chờ xử lý";
+            case "pendingManagerReviewCount" -> "Số đơn chờ Quản lý duyệt";
+            case "inProgressApplications" -> "Số đơn đang xử lý liên phòng ban";
+            case "approvedApplications", "approvedApplicationCount", "fullyApproved" -> "Số đơn đã duyệt nhập đàn";
+            case "rejectedOrExpiredApplications", "rejected", "arrivalExpired" -> "Số đơn từ chối / quá hạn";
+            case "applicationList" -> "Danh sách đơn đăng ký";
+            case "applicationStatus" -> "Trạng thái đơn";
+            case "currentStage" -> "Giai đoạn hiện tại";
+            case "submittedDate" -> "Ngày nộp đơn";
+            case "ownerName" -> "Chủ sở hữu";
+            case "groomCheckResult" -> "Kiểm tra sơ bộ Groom";
+            case "vetExamResult" -> "Khám sàng lọc Thú y";
+            case "managerApprovalResult" -> "Quyết định Quản lý";
+            case "pendingExamCount" -> "Số đơn chờ khám thú y";
+            case "examList" -> "Danh sách đơn chờ khám";
+            case "pendingReviewCount" -> "Số đơn chờ HLV thẩm định";
+            case "stageBreakdown" -> "Chi tiết theo giai đoạn";
+
+            // Giải đua
+            case "raceName" -> "Tên giải đua";
+            case "registrationDate" -> "Ngày đăng ký đua";
+            case "totalRaceRegistrations" -> "Tổng số giải đăng ký";
+            case "raceList" -> "Danh sách giải đua";
+
+            // Nhật ký kiểm toán
+            case "action" -> "Hành động thao tác";
+            case "performedBy" -> "Người thực hiện";
+            case "changeDetails" -> "Chi tiết thay đổi";
+            case "totalAuditLogs" -> "Tổng số nhật ký";
+            case "auditLogList" -> "Danh sách nhật ký kiểm toán";
+
+            // Chung & Điều hướng
+            case "status", "currentStatus", "horseStatus", "trangThai" -> "Trạng thái";
+            case "systemStatus" -> "Tình trạng hệ thống";
+            case "description", "detailedDescription" -> "Mô tả";
+            case "actionUrl", "navigationUrl" -> "Đường dẫn chi tiết";
+
+            default -> {
+                String spaced = key.replaceAll("([a-z])([A-Z])", "$1 $2");
+                yield Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
+            }
         };
     }
 

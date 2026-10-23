@@ -103,4 +103,39 @@ class GroqAgentOrchestratorServiceTest {
         assertTrue(prompt.contains("PHÂN BIỆT RÕ RÀNG GIỮA SỐ LƯỢNG NGỰA VÀ SỐ LƯỢNG CHUỒNG TRẠI"));
         assertTrue(prompt.contains("THỐNG KÊ ĐƠN ĐĂNG KÝ NHẬP ĐÀN"));
     }
+
+    @Test
+    @DisplayName("humanizeKey chuyển đổi chính xác các trường English camelCase và Vietnamese sang tiếng Việt")
+    void testHumanizeKey_EnglishAndVietnameseKeys() {
+        GroqAgentOrchestratorService service = new GroqAgentOrchestratorService(
+                "https://api.groq.com/openai/v1",
+                "test-key",
+                "qwen/qwen3.8-27b",
+                toolRegistryService,
+                toolExecutionService,
+                objectMapper
+        );
+
+        // English keys
+        org.junit.jupiter.api.Assertions.assertEquals("Tên ngựa", service.humanizeKey("horseName"));
+        org.junit.jupiter.api.Assertions.assertEquals("Mã đăng ký", service.humanizeKey("registrationNumber"));
+        org.junit.jupiter.api.Assertions.assertEquals("Thân nhiệt", service.humanizeKey("temperature"));
+        org.junit.jupiter.api.Assertions.assertEquals("Nhịp tim", service.humanizeKey("heartRate"));
+        org.junit.jupiter.api.Assertions.assertEquals("Vị trí ô chuồng", service.humanizeKey("stallLocation"));
+        org.junit.jupiter.api.Assertions.assertEquals("Quyết định tập luyện", service.humanizeKey("trainingDecision"));
+        org.junit.jupiter.api.Assertions.assertEquals("Tổng số nhân sự", service.humanizeKey("totalStaff"));
+        org.junit.jupiter.api.Assertions.assertEquals("Phân loại theo vai trò", service.humanizeKey("roleBreakdown"));
+        org.junit.jupiter.api.Assertions.assertEquals("Tổng số đơn nhập đàn", service.humanizeKey("totalApplications"));
+        org.junit.jupiter.api.Assertions.assertEquals("Sở trường", service.humanizeKey("specialties"));
+        org.junit.jupiter.api.Assertions.assertEquals("Số lượng sở trường", service.humanizeKey("specialtyCount"));
+
+        // Vietnamese legacy keys
+        org.junit.jupiter.api.Assertions.assertEquals("Tên ngựa", service.humanizeKey("tenNgua"));
+        org.junit.jupiter.api.Assertions.assertEquals("Thân nhiệt", service.humanizeKey("thanNhiet"));
+        org.junit.jupiter.api.Assertions.assertEquals("Nhịp tim", service.humanizeKey("nhipTim"));
+        org.junit.jupiter.api.Assertions.assertEquals("Cân nặng", service.humanizeKey("canNang"));
+
+        // Fallback for unknown camelCase key
+        org.junit.jupiter.api.Assertions.assertEquals("Unknown Custom Field", service.humanizeKey("unknownCustomField"));
+    }
 }
