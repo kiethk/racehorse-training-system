@@ -1,12 +1,14 @@
 import { apiGet, apiPatch, apiPost } from '@/services/api';
 import type { CareScheduleResponse } from '../types';
 import type {
-  BatchVaccinationRequest,
-  BatchVaccinationResult,
   HorsePreventiveStatus,
+  HorseVaccinationRequest,
+  HorseVaccinationResult,
+  PagedResult,
   PreventiveCoverage,
-  PreventiveDueItem,
+  PreventiveDueHorse,
   PreventiveDueStatus,
+  PreventiveDueSummary,
   PreventiveProtocol,
   RescheduleRequest,
   RescheduleResponse,
@@ -20,18 +22,25 @@ export const preventiveCareService = {
   listProtocols: async (): Promise<PreventiveProtocol[]> =>
     (await apiGet<ApiResponse<PreventiveProtocol[]>>('/api/preventive-protocols')).data,
 
-  listDue: async (params?: {
+  /** "To do" tab: one row per horse, filtered and paged on the server. */
+  listDueHorses: async (params: {
     statuses?: PreventiveDueStatus[];
-    withinDays?: number;
     protocolId?: number;
-  }): Promise<PreventiveDueItem[]> => {
+    search?: string;
+    page: number;
+    size: number;
+  }): Promise<PagedResult<PreventiveDueHorse>> => {
     const qs = new URLSearchParams();
-    params?.statuses?.forEach((status) => qs.append('status', status));
-    if (params?.withinDays != null) qs.set('withinDays', String(params.withinDays));
-    if (params?.protocolId != null) qs.set('protocolId', String(params.protocolId));
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    return (await apiGet<ApiResponse<PreventiveDueItem[]>>(`/api/preventive-care/due${query}`)).data;
+    params.statuses?.forEach((status) => qs.append('status', status));
+    if (params.protocolId != null) qs.set('protocolId', String(params.protocolId));
+    if (params.search?.trim()) qs.set('search', params.search.trim());
+    qs.set('page', String(params.page));
+    qs.set('size', String(params.size));
+    return (await apiGet<ApiResponse<PagedResult<PreventiveDueHorse>>>(`/api/preventive-care/due?${qs.toString()}`)).data;
   },
+
+  dueSummary: async (): Promise<PreventiveDueSummary> =>
+    (await apiGet<ApiResponse<PreventiveDueSummary>>('/api/preventive-care/due/summary')).data,
 
   coverage: async (): Promise<PreventiveCoverage[]> =>
     (await apiGet<ApiResponse<PreventiveCoverage[]>>('/api/preventive-care/coverage')).data,
@@ -39,8 +48,8 @@ export const preventiveCareService = {
   horseStatus: async (horseId: number): Promise<HorsePreventiveStatus> =>
     (await apiGet<ApiResponse<HorsePreventiveStatus>>(`/api/horses/${horseId}/preventive-status`)).data,
 
-  recordBatch: async (data: BatchVaccinationRequest): Promise<BatchVaccinationResult[]> =>
-    (await apiPost<ApiResponse<BatchVaccinationResult[]>>('/api/preventive-care/batch-vaccinations', data)).data,
+  recordForHorse: async (horseId: number, data: HorseVaccinationRequest): Promise<HorseVaccinationResult> =>
+    (await apiPost<ApiResponse<HorseVaccinationResult>>(`/api/horses/${horseId}/vaccinations`, data)).data,
 
   reschedule: async (
     scheduleId: number,

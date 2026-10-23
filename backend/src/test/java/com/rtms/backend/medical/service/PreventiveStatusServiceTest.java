@@ -218,8 +218,15 @@ class PreventiveStatusServiceTest {
         assertSame(booked, result);
         assertEquals(CareScheduleStatus.SCHEDULED, booked.getStatus());
         assertEquals(21L, booked.getVeterinarianId());
-        verify(schedules, never()).save(any());
+        assertEquals(TODAY.plusDays(4).atTime(9, 0), booked.getScheduledAt());
+        // Only the doses still due remain in the description; EI was just given.
+        assertTrue(booked.getDescription().contains("TETANUS"));
+        assertFalse(booked.getDescription().contains("EI ("));
         verify(schedules, never()).saveAndFlush(any());
+
+        clearInvocations(schedules);
+        service.upsertMilestone(HORSE, "preventive:16", ACTOR, null);
+        verify(schedules, never()).save(any());
     }
 
     @Test

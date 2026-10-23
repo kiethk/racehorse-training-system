@@ -31,11 +31,29 @@ export interface PreventiveProtocolStatus {
   status: PreventiveDueStatus;
 }
 
-export interface PreventiveDueItem {
+export interface PreventiveDueHorse {
   horseId: number;
   horseName: string;
   horseStatus: HorseStatus;
-  protocol: PreventiveProtocolStatus;
+  /** Only the protocols that match the current filter, most urgent first. */
+  protocols: PreventiveProtocolStatus[];
+  /** Null when the most urgent protocol has never been recorded. */
+  earliestDueOn: string | null;
+  worstStatus: PreventiveDueStatus;
+}
+
+export interface PreventiveDueSummary {
+  overdue: number;
+  dueSoon: number;
+  horses: number;
+}
+
+export interface PagedResult<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
 }
 
 export interface PreventiveCoverage {
@@ -72,23 +90,21 @@ export interface HorsePreventiveStatus {
 
 export interface VaccinationRequest {
   protocolId: number;
-  dosage: string;
+  /** Required for a dose given in the exam; omitted for a passport last-dose date. */
+  dosage?: string;
   route?: string;
   instructions?: string;
   administeredOn?: string;
   source?: VaccinationSource;
 }
 
-export interface BatchVaccinationRequest {
-  horseIds: number[];
-  protocolId: number;
-  dosage: string;
-  route?: string;
+export interface HorseVaccinationRequest {
   administeredOn?: string;
   instructions?: string;
+  doses: { protocolId: number; dosage: string; route?: string }[];
 }
 
-export interface BatchVaccinationResult {
+export interface HorseVaccinationResult {
   horseId: number;
   healthRecordId: number;
 }

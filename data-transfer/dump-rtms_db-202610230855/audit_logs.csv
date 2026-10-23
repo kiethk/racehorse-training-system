@@ -1,0 +1,2 @@
+﻿"id","user_id","action","entity_name","entity_id","created_at","http_method","request_path","status_code","details"
+"1","3","Care Schedule Auto Assigned","CareSchedule","1","2026-10-23 08:42:46.884013","__RTMS_NULL_20261023__","__RTMS_NULL_20261023__","__RTMS_NULL_20261023__","Care schedule #1 (INITIAL) was automatically assigned to veterinarian Test Vet"

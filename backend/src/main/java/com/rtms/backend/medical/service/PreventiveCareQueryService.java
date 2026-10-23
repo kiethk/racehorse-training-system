@@ -7,7 +7,8 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.HorsePreventiveStatusResponse;
 import com.rtms.backend.medical.dto.PreventiveCoverageResponse;
-import com.rtms.backend.medical.dto.PreventiveDueItem;
+import com.rtms.backend.medical.dto.PreventiveDueHorse;
+import com.rtms.backend.medical.dto.PreventiveDueSummary;
 import com.rtms.backend.medical.dto.PreventiveProtocolResponse;
 import com.rtms.backend.medical.dto.PreventiveProtocolStatus;
 import com.rtms.backend.medical.entity.PreventiveProtocol;
@@ -18,6 +19,9 @@ import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.PreventiveProtocolRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,10 +33,9 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /** Dữ liệu đọc cho hub Preventive Care (docs/preventive-care-flow.md mục 6, 7). */
 @Service
@@ -89,36 +92,76 @@ public class PreventiveCareQueryService {
     }
 
     /**
-     * Tab "Việc cần làm": các (ngựa, phác đồ) theo trạng thái, quá hạn / chưa có dữ liệu lên đầu.
+     * Tab "To do": mỗi dòng một ngựa, kèm các phác đồ khớp bộ lọc; ngựa khẩn nhất lên đầu.
+     * Trạng thái được tính trong bộ nhớ (số ngựa trong trại nhỏ), rồi mới cắt trang.
      *
      * @param statuses   rỗng = OVERDUE, MISSING, DUE_SOON
-     * @param withinDays chỉ giữ mục có hạn trong số ngày tới (mục chưa có dữ liệu luôn giữ); null = không lọc
      * @param protocolId null = mọi phác đồ
+     * @param search     lọc theo tên ngựa, không phân biệt hoa thường; rỗng = không lọc
      */
     @Transactional(readOnly = true)
-    public List<PreventiveDueItem> due(Set<PreventiveDueStatus> statuses, Integer withinDays, Long protocolId) {
+    public Page<PreventiveDueHorse> dueHorses(Set<PreventiveDueStatus> statuses, Long protocolId, String search,
+            int page, int size) {
         Set<PreventiveDueStatus> wanted = statuses == null || statuses.isEmpty() ? DEFAULT_DUE_STATUSES : statuses;
-        LocalDate limit = withinDays == null ? null : LocalDate.now(clock).plusDays(withinDays);
+        String needle = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+        List<Horse> inScope = horses.findByCurrentStatusInOrderByNameAsc(HORSES_IN_SCOPE).stream()
+                .filter(h -> needle.isEmpty()
+                        || (h.getName() != null && h.getName().toLowerCase(Locale.ROOT).contains(needle)))
+                .toList();
+        Map<Long, List<PreventiveProtocolStatus>> statusByHorse =
+                preventiveStatus.statusFor(inScope.stream().map(Horse::getId).toList());
 
-        List<Horse> inScope = horses.findByCurrentStatusInOrderByNameAsc(HORSES_IN_SCOPE);
-        Map<Long, Horse> byId = inScope.stream().collect(Collectors.toMap(Horse::getId, Function.identity()));
-        Map<Long, List<PreventiveProtocolStatus>> statusByHorse = preventiveStatus.statusFor(byId.keySet());
-
-        List<PreventiveDueItem> items = new ArrayList<>();
+        List<PreventiveDueHorse> rows = new ArrayList<>();
         for (Horse horse : inScope) {
-            for (PreventiveProtocolStatus status : statusByHorse.getOrDefault(horse.getId(), List.of())) {
-                if (!wanted.contains(status.status())) continue;
-                if (protocolId != null && !protocolId.equals(status.protocolId())) continue;
-                if (limit != null && status.nextDueOn() != null && status.nextDueOn().isAfter(limit)) continue;
-                items.add(new PreventiveDueItem(horse.getId(), horse.getName(), horse.getCurrentStatus(), status));
-            }
+            List<PreventiveProtocolStatus> matching = statusByHorse.getOrDefault(horse.getId(), List.of()).stream()
+                    .filter(status -> wanted.contains(status.status()))
+                    .filter(status -> protocolId == null || protocolId.equals(status.protocolId()))
+                    .sorted(BY_URGENCY)
+                    .toList();
+            if (matching.isEmpty()) continue;
+            PreventiveProtocolStatus worst = matching.get(0);
+            rows.add(new PreventiveDueHorse(horse.getId(), horse.getName(), horse.getCurrentStatus(), matching,
+                    worst.nextDueOn(), worst.status()));
         }
-        items.sort(Comparator
-                .comparingInt((PreventiveDueItem item) -> urgency(item.protocol().status()))
-                .thenComparing(item -> item.protocol().nextDueOn(), Comparator.nullsFirst(Comparator.naturalOrder()))
-                .thenComparing(PreventiveDueItem::horseName, Comparator.nullsLast(Comparator.naturalOrder())));
-        return items;
+        rows.sort(Comparator
+                .comparingInt((PreventiveDueHorse row) -> urgency(row.worstStatus()))
+                .thenComparing(PreventiveDueHorse::earliestDueOn, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(PreventiveDueHorse::horseName, Comparator.nullsLast(Comparator.naturalOrder())));
+
+        int pageSize = Math.max(1, Math.min(size, 100));
+        int pageIndex = Math.max(0, page);
+        int from = Math.min(pageIndex * pageSize, rows.size());
+        int to = Math.min(from + pageSize, rows.size());
+        return new PageImpl<>(rows.subList(from, to), PageRequest.of(pageIndex, pageSize), rows.size());
     }
+
+    /** Số liệu cho các thẻ của tab "To do", trên toàn bộ ngựa trong trại (không phụ thuộc trang hay bộ lọc). */
+    @Transactional(readOnly = true)
+    public PreventiveDueSummary dueSummary() {
+        List<Long> horseIds = horses.findByCurrentStatusInOrderByNameAsc(HORSES_IN_SCOPE).stream()
+                .map(Horse::getId).toList();
+        int overdue = 0;
+        int dueSoon = 0;
+        int horsesNeedingCare = 0;
+        for (List<PreventiveProtocolStatus> statuses : preventiveStatus.statusFor(horseIds).values()) {
+            boolean needsCare = false;
+            for (PreventiveProtocolStatus status : statuses) {
+                if (status.status() == PreventiveDueStatus.OVERDUE || status.status() == PreventiveDueStatus.MISSING) {
+                    overdue++;
+                    needsCare = true;
+                } else if (status.status() == PreventiveDueStatus.DUE_SOON) {
+                    dueSoon++;
+                    needsCare = true;
+                }
+            }
+            if (needsCare) horsesNeedingCare++;
+        }
+        return new PreventiveDueSummary(overdue, dueSoon, horsesNeedingCare);
+    }
+
+    private static final Comparator<PreventiveProtocolStatus> BY_URGENCY = Comparator
+            .comparingInt((PreventiveProtocolStatus status) -> urgency(status.status()))
+            .thenComparing(PreventiveProtocolStatus::nextDueOn, Comparator.nullsFirst(Comparator.naturalOrder()));
 
     /** Tab "Theo vaccine": đếm trạng thái của từng phác đồ trên các ngựa trong trại. */
     @Transactional(readOnly = true)

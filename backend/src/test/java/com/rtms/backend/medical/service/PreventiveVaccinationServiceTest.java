@@ -77,12 +77,13 @@ class PreventiveVaccinationServiceTest {
     }
 
     @Test
-    void historicalDoseOnlyDuringAdmissionAndOnlyInThePast() {
+    void historicalDoseOnlyDuringAdmissionAndNotInTheFuture() {
         VaccinationRequest past = entry(1L, VaccinationSource.HISTORICAL, TODAY.minusDays(120));
         assertEquals(1, service.validate(List.of(past), CareType.INITIAL).size());
 
         assertCode("INVALID_VACCINATION", List.of(past), CareType.ROUTINE);
-        assertCode("INVALID_VACCINATION", List.of(entry(1L, VaccinationSource.HISTORICAL, TODAY)), CareType.INITIAL);
+        assertEquals(1, service.validate(List.of(entry(1L, VaccinationSource.HISTORICAL, TODAY)), CareType.INITIAL).size());
+        assertCode("INVALID_VACCINATION", List.of(entry(1L, VaccinationSource.HISTORICAL, TODAY.plusDays(1))), CareType.INITIAL);
         assertCode("INVALID_VACCINATION", List.of(entry(1L, VaccinationSource.HISTORICAL, null)), CareType.INITIAL);
     }
 
@@ -101,6 +102,20 @@ class PreventiveVaccinationServiceTest {
     void unknownOrInactiveProtocolIsRejected() {
         assertCode("PROTOCOL_NOT_FOUND", List.of(entry(404L, null, null)), CareType.ROUTINE);
         assertCode("PROTOCOL_NOT_FOUND", List.of(entry(9L, null, null)), CareType.ROUTINE);
+    }
+
+    @Test
+    void historicalDoseNeedsNoDosageAndIsStoredAsNotRecorded() {
+        VaccinationRequest lastDose = entry(1L, VaccinationSource.HISTORICAL, TODAY.minusDays(30));
+        lastDose.setDosage(null);
+        var validated = service.validate(List.of(lastDose), CareType.INITIAL);
+
+        service.record(999L, validated);
+
+        ArgumentCaptor<Prescription> saved = ArgumentCaptor.forClass(Prescription.class);
+        verify(prescriptions).save(saved.capture());
+        assertEquals(PreventiveVaccinationService.DOSAGE_NOT_RECORDED, saved.getValue().getDosage());
+        assertEquals(TODAY.minusDays(30), saved.getValue().getStartDate());
     }
 
     @Test
