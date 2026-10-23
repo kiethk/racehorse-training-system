@@ -31,3 +31,24 @@ export interface CorrectInjuryRequest {
   description?: string;
   status?: string;
 }
+
+/** Mirrors the backend HealthRecord entity — one entry of a horse's health history. */
+export interface HealthRecord {
+  id: number;
+  horseId: number;
+  veterinarianId: number;
+  careScheduleId: number | null;
+  sourceTrainingWorkoutId: number | null;
+  examinedAt: string;
+  symptoms: string | null;
+  findings: string | null;
+  diagnosis: string | null;
+  treatment: string | null;
+  trainingDecision: 'ALLOWED' | 'BLOCKED' | null;
+  restrictionDetails: string | null;
+  recordType: string;
+  productOrService: string | null;
+  notes: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}

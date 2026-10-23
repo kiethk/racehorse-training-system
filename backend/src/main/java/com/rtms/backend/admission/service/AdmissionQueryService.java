@@ -523,20 +523,26 @@ public class AdmissionQueryService {
                     CareScheduleResponse.from(cs)
             );
         }).filter(Objects::nonNull).toList();
-        return new org.springframework.data.domain.PageImpl<>(items, pageable, schedulePage.getTotalElements());
+        long dropped = schedulePage.getNumberOfElements() - items.size();
+        long adjustedTotal = Math.max(items.size(), schedulePage.getTotalElements() - dropped);
+        return new org.springframework.data.domain.PageImpl<>(items, pageable, adjustedTotal);
     }
 
     public VetQueueSummaryResponse getVetQueueSummary(Long vetId) {
         if (careScheduleRepository == null) {
-            return new VetQueueSummaryResponse(0, 0, 0);
+            return new VetQueueSummaryResponse(0, 0, 0, 0, 0);
         }
+        List<CareScheduleStatus> activeStatuses = List.of(
+                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED,
+                CareScheduleStatus.IN_PROGRESS);
         long total = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
-                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED,
-                        CareScheduleStatus.IN_PROGRESS));
-        long awaiting = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
+                vetId, activeStatuses);
+        long active = careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses);
+        long awaiting = careScheduleRepository.countActiveVetQueueItems(
                 vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));
-        long inProgress = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
+        long inProgress = careScheduleRepository.countActiveVetQueueItems(
                 vetId, List.of(CareScheduleStatus.IN_PROGRESS));
-        return new VetQueueSummaryResponse(total, awaiting, inProgress);
+        long approved = careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses);
+        return new VetQueueSummaryResponse(total, active, awaiting, inProgress, approved);
     }
 }

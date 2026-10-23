@@ -105,8 +105,8 @@ export interface CreatePrescriptionRequest {
   frequency: string;
   route: string;
   startDate: string;
-  endDate: string;
-  instructions: string;
+  endDate?: string;
+  instructions?: string;
 }
 
 export interface TreatmentPlan {
@@ -124,7 +124,7 @@ export interface CreateTreatmentPlanRequest {
   treatmentName: string;
   instructions: string;
   startDate: string;
-  endDate: string;
+  endDate?: string;
 }
 
 export interface PageResponse<T> {

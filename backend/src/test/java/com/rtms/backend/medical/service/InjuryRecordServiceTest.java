@@ -34,6 +34,7 @@ class InjuryRecordServiceTest {
     @Mock private HealthRecordRepository healthRecordRepository;
     @Mock private CareScheduleRepository careScheduleRepository;
     @Mock private AuditLogRepository auditLogRepository;
+    @Mock private com.rtms.backend.identity.repository.UserRepository userRepository;
 
     private InjuryRecordService injuryRecordService;
     private Horse horse;
@@ -43,7 +44,7 @@ class InjuryRecordServiceTest {
     void setUp() {
         injuryRecordService = new InjuryRecordService(
                 injuryRecordRepository, horseRepository, healthRecordRepository,
-                careScheduleRepository, auditLogRepository);
+                careScheduleRepository, auditLogRepository, userRepository);
 
         horse = new Horse();
         horse.setId(10L);
@@ -86,7 +87,7 @@ class InjuryRecordServiceTest {
         CorrectInjuryRecordRequest req = new CorrectInjuryRecordRequest(
                 "Đính chính mức độ nghiêm trọng", "Sprain", "CRITICAL", "Đau nặng hơn dự kiến", "ACTIVE");
 
-        InjuryRecord corrected = injuryRecordService.correctInjuryRecord(100L, req, 20L);
+        InjuryRecord corrected = injuryRecordService.correctInjuryRecord(10L, 100L, req, 20L);
 
         assertNotNull(corrected);
         assertEquals("CRITICAL", corrected.getSeverity());

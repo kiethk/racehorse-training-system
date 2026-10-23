@@ -5,12 +5,12 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.RoleRepository;
 import com.rtms.backend.identity.repository.UserRepository;
+import com.rtms.backend.incident.entity.HorseIncidentReport;
+import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.entity.Area;
-import com.rtms.backend.stable.entity.GroomIncidentReport;
 import com.rtms.backend.stable.entity.StableStall;
-import com.rtms.backend.stable.enums.IncidentSeverity;
 import com.rtms.backend.stable.repository.AreaRepository;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.CourseSubjectResponse;
 import com.rtms.backend.training.dto.DashboardHorseRow;
@@ -83,7 +83,7 @@ class TrainingQueriesIntegrationTest {
     @Autowired private HorseTrainingPlanRepository plans;
     @Autowired private TrainingLotRepository lots;
     @Autowired private TrainingWorkoutRepository workouts;
-    @Autowired private GroomIncidentReportRepository incidents;
+    @Autowired private HorseIncidentReportRepository incidents;
 
     private final LocalDate today = LocalDate.now();
 
@@ -446,9 +446,9 @@ class TrainingQueriesIntegrationTest {
 
     @Test
     void incidentCountsAreGroupedPerHorse() {
-        incidents.saveAndFlush(new GroomIncidentReport(groom.getId(), horse1.getId(), "Limping", "Left foreleg",
+        incidents.saveAndFlush(new HorseIncidentReport(groom.getId(), horse1.getId(), "Limping", "Left foreleg",
                 null, IncidentSeverity.HIGH));
-        incidents.saveAndFlush(new GroomIncidentReport(groom.getId(), horse1.getId(), "Limping again", "Left foreleg",
+        incidents.saveAndFlush(new HorseIncidentReport(groom.getId(), horse1.getId(), "Limping again", "Left foreleg",
                 null, IncidentSeverity.HIGH));
 
         List<IncidentCountRow> counts = incidents.countIncidentsByHorseIds(

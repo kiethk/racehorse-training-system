@@ -63,7 +63,6 @@ export function OwnerAdmissionsListView() {
   return (
     <AdmissionListLayout
         title="My admissions"
-        description="Track each application and its review status."
         actions={<LinkButton href="/owner/admissions/new" variant="primary" icon="plus">New admission</LinkButton>}
     >
       {loading ? <ListSkeleton rows={5} /> : error ? <Notice tone="error">{error}</Notice> : (

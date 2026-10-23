@@ -2,7 +2,7 @@ package com.rtms.backend.notification.service;
 
 import com.rtms.backend.notification.dto.UrgentAssignmentAlert;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
-import com.rtms.backend.stable.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentSeverity;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
 import org.junit.jupiter.api.Test;

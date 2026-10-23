@@ -134,7 +134,7 @@ export function ManagerAdmissionsListView() {
 
   if (loading) {
     return (
-      <AdmissionListLayout title="Admissions" description="Review and manage horse admission applications.">
+      <AdmissionListLayout title="Admissions">
         <ListSkeleton rows={10} />
       </AdmissionListLayout>
     );
@@ -162,7 +162,7 @@ export function ManagerAdmissionsListView() {
   const detailQuery = detailParams.toString() ? `?${detailParams.toString()}` : '';
 
   return (
-    <AdmissionListLayout title="Admissions" description="Review and manage horse admission applications.">
+    <AdmissionListLayout title="Admissions">
       <AdmissionFilterBar
         search={draft.candidateName}
         onSearchChange={(candidateName) => setDraft({ ...draft, candidateName })}

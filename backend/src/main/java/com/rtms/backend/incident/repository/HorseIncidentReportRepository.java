@@ -30,6 +30,10 @@ public interface HorseIncidentReportRepository extends JpaRepository<HorseIncide
 
     List<HorseIncidentReport> findByHorseIdAndStatus(Long horseId, IncidentStatus status);
 
+    List<HorseIncidentReport> findByHorseIdAndStatusIn(Long horseId, Collection<IncidentStatus> statuses);
+
+    List<HorseIncidentReport> findByCareScheduleIdOrderByReportedAtAsc(Long careScheduleId);
+
     List<HorseIncidentReport> findAllByOrderByReportedAtDesc();
 
     long countByHorseIdAndReportedAtAfter(Long horseId, LocalDateTime after);
