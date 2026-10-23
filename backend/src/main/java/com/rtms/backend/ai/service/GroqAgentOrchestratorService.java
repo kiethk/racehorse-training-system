@@ -360,36 +360,40 @@ public class GroqAgentOrchestratorService {
                    - CẤM TUYỆT ĐỐI chỉ trả lời câu cụt lủn, chung chung sáo rỗng vô nghĩa như "Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn." AI luôn phải trình bày dữ liệu chi tiết kèm phân tích nghiệp vụ.
                    - Luôn trả lời bằng tiếng Việt lịch sự, gãy gọn, chuyên nghiệp và súc tích.
 
-                10. BẢNG TRA CỨU ROUTE FRONTEND CHÍNH XÁC (TUYỆT ĐỐI TRÁNH LỖI 404):
-                   - Khi tạo action link điều hướng nội bộ Markdown `[Xem chi tiết](route)`, BẮT BUỘC dùng đúng route frontend sau:
-                     * Head Trainer:
-                       - Lịch tập: `/trainer/schedule`
-                       - Kế hoạch huấn luyện: `/trainer/plans`
-                       - Dashboard & Cảnh báo rủi ro: `/trainer/dashboard` (LƯU Ý: KHÔNG CÓ ROUTE `/trainer/risk-alerts`, chỉ dùng `/trainer/dashboard`)
-                       - Đăng ký đua & Thành tích: `/trainer/racing`
-                       - Thẩm định nhập đàn: `/trainer/admissions`
-                       - Chuồng trại & Phân công: `/trainer/stable`
-                       - Giáo trình khóa học: `/trainer/courses`
-                     * Veterinarian:
-                       - Đơn khám nhập đàn: `/veterinarian/admissions`
-                       - Chăm sóc định kỳ: `/veterinarian/preventive-care`
-                       - Cấp cứu khẩn cấp: `/veterinarian/urgent` (LƯU Ý: KHÔNG DÙNG `/vet/quarantine` hay `/vet/urgent-care`, luôn dùng `/veterinarian/admissions`, `/veterinarian/preventive-care`, `/veterinarian/urgent`)
-                     * Club Manager:
-                       - Chuồng trại: `/manager/stable` (LƯU Ý: KHÔNG CÓ CHỮ S `/manager/stables`, đường dẫn đúng là `/manager/stable`)
-                       - Quản lý nhân sự: `/manager/staff`
-                       - Quản lý đàn ngựa: `/manager/horses`
-                       - Tuyển nhận nhập đàn: `/manager/admissions`
-                       - Nhật ký kiểm toán: `/manager/audit-log`
-                       - Phân quyền & Tài khoản: `/manager/access-control`
-                     * Groom:
-                       - Nhiệm vụ hôm nay: `/groom/tasks`
-                       - Báo cáo sự cố: `/groom/incidents`
-                       - Chuồng trại phụ trách: `/groom/stable`
-                       - Tuyển nhận: `/groom/admissions`
-                     * Horse Owner:
-                       - Danh sách ngựa sở hữu: `/owner/horses`
-                       - Chi tiết ngựa & Sức khỏe / Sự cố: `/owner/horses`
-                       - Đơn đăng ký nhập chuồng: `/owner/admissions` (LƯU Ý: KHÔNG DÙNG `/owner/health` hay `/owner/incidents` vì hệ thống quản lý tập trung tại `/owner/horses` và `/owner/admissions`)
+                10. BẢNG TRA CỨU ROUTE FRONTEND CHÍNH XÁC & LIÊN KẾT ĐIỀU HƯỚNG (TUYỆT ĐỐI TRÁNH LỖI 404):
+                   - Khi tạo action link điều hướng nội bộ Markdown `[Xem chi tiết](route)`, BẮT BUỘC:
+                     * ƯU TIÊN SỐ 1: NẾU KẾT QUẢ TOOL CÓ TRƯỜNG `actionUrl` HOẶC `navigationUrl`: LUÔN LUÔN DÙNG CHÍNH XÁC URL ĐÓ ĐỂ TẠO LINK TRỰC TIẾP (DEEP LINK) (Ví dụ: `[Chi tiết đơn](/manager/admissions/123)`, `[Hồ sơ ngựa](/owner/horses/10)`, `[Chi tiết cấp cứu](/veterinarian/urgent/501)`, `[Khám sàng lọc](/veterinarian/admissions?id=401)`).
+                     * NẾU CẦN TẠO LINK CHUNG TOÀN HỆ THỐNG: Dùng chính xác bảng route sau:
+                       * Head Trainer:
+                         - Lịch tập: `/trainer/schedule`
+                         - Kế hoạch huấn luyện: `/trainer/plans` (hoặc `/trainer/plans/[id]`)
+                         - Dashboard & Cảnh báo rủi ro: `/trainer/dashboard` (LƯU Ý: KHÔNG CÓ ROUTE `/trainer/risk-alerts`, chỉ dùng `/trainer/dashboard`)
+                         - Đăng ký đua & Thành tích: `/trainer/racing` (hoặc `/trainer/racing/[id]`)
+                         - Thẩm định nhập đàn: `/trainer/admissions` (hoặc `/trainer/admissions/[id]`)
+                         - Chuồng trại & Phân công: `/trainer/stable`
+                         - Giáo trình khóa học: `/trainer/courses`
+                         - Hồ sơ chiến mã: `/trainer/horses` (hoặc `/trainer/horses/[id]`)
+                       * Veterinarian:
+                         - Đơn khám nhập đàn: `/veterinarian/admissions` (hoặc `/veterinarian/admissions?id=[id]`)
+                         - Bệnh án & Theo dõi sức khỏe: `/veterinarian/health` (hoặc `/veterinarian/health?horseId=[id]`)
+                         - Chăm sóc định kỳ: `/veterinarian/preventive-care`
+                         - Cấp cứu khẩn cấp: `/veterinarian/urgent` (hoặc `/veterinarian/urgent/[scheduleId]`)
+                         - Lịch trình khám: `/veterinarian/schedule`
+                       * Club Manager:
+                         - Chuồng trại: `/manager/stable` (LƯU Ý: KHÔNG CÓ CHỮ S `/manager/stables`, đường dẫn đúng là `/manager/stable`)
+                         - Quản lý nhân sự: `/manager/staff`
+                         - Quản lý đàn ngựa: `/manager/horses` (hoặc `/manager/horses/[id]`)
+                         - Tuyển nhận nhập đàn: `/manager/admissions` (hoặc `/manager/admissions/[id]`)
+                         - Nhật ký kiểm toán: `/manager/audit-log`
+                         - Phân quyền & Tài khoản: `/manager/access-control`
+                       * Groom:
+                         - Nhiệm vụ hôm nay: `/groom/tasks`
+                         - Báo cáo sự cố: `/groom/incidents` (hoặc tạo mới `/groom/incidents/new`)
+                         - Chuồng trại phụ trách: `/groom/stable`
+                         - Tuyển nhận: `/groom/admissions` (hoặc `/groom/admissions/[id]`)
+                       * Horse Owner:
+                         - Danh sách & Chi tiết ngựa: `/owner/horses` (hoặc `/owner/horses/[id]`)
+                         - Đơn đăng ký nhập chuồng: `/owner/admissions` (hoặc `/owner/admissions/[id]`) (LƯU Ý: KHÔNG DÙNG `/owner/health` hay `/owner/incidents` vì hệ thống quản lý tập trung tại `/owner/horses` và `/owner/admissions`)
 
                 11. THÔNG TIN LIÊN HỆ GROOM CHO HUẤN LUYỆN VIÊN:
                    - Khi Huấn luyện viên hỏi thông tin Groom làm việc cùng, luôn hiển thị rõ ràng Tên Groom, Số điện thoại liên hệ, Email, Số lượng chuồng phụ trách, Mã chuồng và Danh sách ngựa đang chăm sóc.

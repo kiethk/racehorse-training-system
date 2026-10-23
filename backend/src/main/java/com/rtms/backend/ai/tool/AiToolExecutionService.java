@@ -406,6 +406,7 @@ public class AiToolExecutionService {
             item.put("status", h.getCurrentStatus());
             item.put("trainingDecision", h.getTrainingDecision());
             item.put("stallLocation", resolveStallName(h.getCurrentStallId()));
+            item.put("actionUrl", h.getId() != null ? "/owner/horses/" + h.getId() : "/owner/horses");
             result.add(item);
 
             String dec = h.getTrainingDecision() != null ? h.getTrainingDecision().name().toUpperCase() : "";
@@ -420,6 +421,7 @@ public class AiToolExecutionService {
         response.put("allowedTrainingHorses", duocTapLuyen);
         response.put("restrictedHorses", camTapLuyen);
         response.put("horseList", result);
+        response.put("actionUrl", "/owner/horses");
         return response;
     }
 
@@ -437,6 +439,7 @@ public class AiToolExecutionService {
         summary.put("trainingDecision", horse.getTrainingDecision());
         summary.put("decisionReason", horse.getTrainingDecisionReason() != null ? horse.getTrainingDecisionReason() : "Bình thường");
         summary.put("stallLocation", resolveStallName(horse.getCurrentStallId()));
+        summary.put("actionUrl", horse.getId() != null ? "/owner/horses/" + horse.getId() : "/owner/horses");
 
         List<HealthRecord> records = healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(horse.getId());
         if (!records.isEmpty()) {
@@ -534,6 +537,7 @@ public class AiToolExecutionService {
             item.put("vetExamResult", a.getVetTrainingDecision() != null ? a.getVetTrainingDecision().name() : "Chờ đánh giá");
             item.put("managerApprovalResult", a.getManagerDecision() != null ? a.getManagerDecision().name() : "Chờ phê duyệt");
             item.put("submittedDate", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : "N/A");
+            item.put("actionUrl", a.getId() != null ? "/owner/admissions/" + a.getId() : "/owner/admissions");
             result.add(item);
         }
         int daDuyet = 0;
@@ -550,6 +554,7 @@ public class AiToolExecutionService {
         response.put("approvedApplicationCount", daDuyet);
         response.put("pendingApplicationCount", dangXuLy);
         response.put("applicationList", result);
+        response.put("actionUrl", "/owner/admissions");
         return response;
     }
 
@@ -612,7 +617,7 @@ public class AiToolExecutionService {
                 item.put("description", r.getDescription() != null ? r.getDescription() : "");
                 item.put("timestamp", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
                 item.put("status", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
-                item.put("actionUrl", "/owner/horses");
+                item.put("actionUrl", horse != null && horse.getId() != null ? "/owner/horses/" + horse.getId() : "/owner/horses");
                 result.add(item);
             }
         }
@@ -625,7 +630,7 @@ public class AiToolExecutionService {
                 item.put("description", r.getDescription() != null ? r.getDescription() : "");
                 item.put("timestamp", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
                 item.put("status", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
-                item.put("actionUrl", "/owner/horses");
+                item.put("actionUrl", horse != null && horse.getId() != null ? "/owner/horses/" + horse.getId() : "/owner/horses");
                 result.add(item);
             }
         }
@@ -649,7 +654,7 @@ public class AiToolExecutionService {
         result.put("dam", pedigreeOpt.map(HorsePedigree::getDamName).filter(d -> !d.isBlank()).orElse("Chưa rõ"));
         result.put("origin", pedigreeOpt.map(HorsePedigree::getPedigreeNotes).filter(n -> !n.isBlank()).orElse("Việt Nam"));
         result.put("pedigreeGeneration", pedigreeOpt.map(p -> "Ngựa cha: " + (p.getSireName() != null ? p.getSireName() : "Chưa rõ") + ", Ngựa mẹ: " + (p.getDamName() != null ? p.getDamName() : "Chưa rõ")).orElse("Chưa có hồ sơ phả hệ chi tiết"));
-        result.put("actionUrl", "/owner/horses");
+        result.put("actionUrl", horse != null && horse.getId() != null ? "/owner/horses/" + horse.getId() : "/owner/horses");
         return result;
     }
 
@@ -704,7 +709,7 @@ public class AiToolExecutionService {
         roiResult.put("qualifiedWorkoutsCount", tongSoBuoiTapDatYeuCau);
         roiResult.put("fitnessProgressionRate", tocDoPhatTrienTheLuc);
         roiResult.put("racingPotentialEvaluation", danhGiaTiemNangThiDau);
-        roiResult.put("actionUrl", "/owner/horses");
+        roiResult.put("actionUrl", horse != null && horse.getId() != null ? "/owner/horses/" + horse.getId() : "/owner/horses");
         return roiResult;
     }
 
@@ -748,6 +753,7 @@ public class AiToolExecutionService {
             item.put("stallLocation", stallName);
             item.put("assignedGroomName", groomName);
             item.put("groomPhone", groomPhone);
+            item.put("actionUrl", h.getId() != null ? "/trainer/horses/" + h.getId() : "/trainer/horses");
             list.add(item);
         }
         return Map.of("trainerName", resolveUserName(currentUser, "Huấn luyện viên trưởng"), "totalManagedHorses", list.size(), "horseList", list
@@ -1105,12 +1111,13 @@ public class AiToolExecutionService {
             item.put("registrationDate", r.getEventDate() != null ? r.getEventDate().toString() : (r.getCreatedAt() != null ? r.getCreatedAt().toString() : "N/A"));
             item.put("status", r.getStatus() != null ? r.getStatus().name() : "PENDING");
             item.put("notes", r.getTrainerNotes() != null ? r.getTrainerNotes() : (r.getSelectionReason() != null ? r.getSelectionReason() : ""));
-            item.put("actionUrl", "/trainer/racing");
+            item.put("actionUrl", r.getId() != null ? "/trainer/racing/" + r.getId() : "/trainer/racing");
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("totalRaceRegistrations", result.size());
         response.put("raceList", result);
+        response.put("actionUrl", "/trainer/racing");
         return response;
     }
 
@@ -1145,12 +1152,13 @@ public class AiToolExecutionService {
             item.put("ownerName", ownerName);
             item.put("submittedDate", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : "N/A"));
             item.put("status", "Chờ Huấn luyện viên thẩm định");
-            item.put("actionUrl", "/trainer/admissions");
+            item.put("actionUrl", a.getId() != null ? "/trainer/admissions/" + a.getId() : "/trainer/admissions");
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("pendingReviewCount", result.size());
         response.put("applicationList", result);
+        response.put("actionUrl", "/trainer/admissions");
         return response;
     }
 
@@ -1630,12 +1638,13 @@ public class AiToolExecutionService {
             item.put("ownerName", ownerName);
             item.put("submittedDate", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : "N/A"));
             item.put("status", "Chờ bác sĩ khám sàng lọc");
-            item.put("actionUrl", "/veterinarian/admissions");
+            item.put("actionUrl", a.getId() != null ? "/veterinarian/admissions?id=" + a.getId() : "/veterinarian/admissions");
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("pendingExamCount", result.size());
         response.put("examList", result);
+        response.put("actionUrl", "/veterinarian/admissions");
         return response;
     }
 
@@ -1660,12 +1669,13 @@ public class AiToolExecutionService {
             item.put("severity", "Khẩn cấp");
             item.put("symptoms", cs.getDescription() != null ? cs.getDescription() : "Cần can thiệp y tế khẩn cấp");
             item.put("timestamp", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A");
-            item.put("actionUrl", "/veterinarian/urgent");
+            item.put("actionUrl", cs.getId() != null ? "/veterinarian/urgent/" + cs.getId() : "/veterinarian/urgent");
             result.add(item);
         }
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("totalUrgentAlerts", result.size());
         response.put("alertList", result);
+        response.put("actionUrl", "/veterinarian/urgent");
         return response;
     }
 
@@ -1784,7 +1794,7 @@ public class AiToolExecutionService {
         result.put("commonConditions", benhLyPhoBien);
         result.put("recurrenceRisk", nguyCoTaiPhat);
         result.put("preventiveRecommendations", khuyenNghiPhongNgua);
-        result.put("actionUrl", "/veterinarian/admissions");
+        result.put("actionUrl", horse != null && horse.getId() != null ? "/veterinarian/health?horseId=" + horse.getId() : "/veterinarian/health");
         return result;
     }
 
@@ -2031,6 +2041,7 @@ public class AiToolExecutionService {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("totalReportedIncidents", result.size());
         response.put("incidentList", result);
+        response.put("actionUrl", "/groom/incidents");
         return response;
     }
 
@@ -2511,7 +2522,7 @@ public class AiToolExecutionService {
             item.put("stallLocation", stallName);
             item.put("assignedTrainer", trainerName);
             item.put("totalClubHorses", allHorses.size());
-            item.put("actionUrl", "/manager/horses");
+            item.put("actionUrl", h.getId() != null ? "/manager/horses/" + h.getId() : "/manager/horses");
             result.add(item);
         }
         return result;
@@ -2585,6 +2596,7 @@ public class AiToolExecutionService {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("totalAuditLogs", result.size());
         response.put("auditLogList", result);
+        response.put("actionUrl", "/manager/audit-log");
         return response;
     }
 
@@ -2669,7 +2681,7 @@ public class AiToolExecutionService {
             item.put("assignedVet", vetName);
             item.put("designatedTrainer", trainerName);
             item.put("navigationUrl", duongDanDieuHuong);
-            item.put("actionUrl", "/manager/admissions");
+            item.put("actionUrl", duongDanDieuHuong);
 
             result.add(item);
         }

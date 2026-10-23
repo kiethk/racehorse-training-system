@@ -753,7 +753,7 @@ class AiToolExecutionServiceTest {
         assertEquals("BS Thú Y Hoàng", item.get("assignedVet"));
         assertEquals("HLV Park", item.get("designatedTrainer"));
         assertEquals("/manager/admissions/123", item.get("navigationUrl"));
-        assertEquals("/manager/admissions", item.get("actionUrl"));
+        assertEquals("/manager/admissions/123", item.get("actionUrl"));
     }
 
     // =================================================================
@@ -787,7 +787,7 @@ class AiToolExecutionServiceTest {
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertEquals("RED RUM", item.get("horseName"));
         assertEquals("Trầy xước chân trước", item.get("title"));
-        assertEquals("/owner/horses", item.get("actionUrl"));
+        assertEquals("/owner/horses/10", item.get("actionUrl"));
     }
 
     @Test
@@ -815,7 +815,7 @@ class AiToolExecutionServiceTest {
         assertEquals("RED RUM", map.get("horseName"));
         assertEquals("Galileo", map.get("sire"));
         assertEquals("Urban Sea", map.get("dam"));
-        assertEquals("/owner/horses", map.get("actionUrl"));
+        assertEquals("/owner/horses/10", map.get("actionUrl"));
     }
 
     @Test
@@ -847,7 +847,7 @@ class AiToolExecutionServiceTest {
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertEquals("THUNDER", item.get("horseName"));
         assertEquals("Cúp Mùa Xuân", item.get("raceName"));
-        assertEquals("/trainer/racing", item.get("actionUrl"));
+        assertEquals("/trainer/racing/1", item.get("actionUrl"));
     }
 
     @Test
@@ -878,7 +878,7 @@ class AiToolExecutionServiceTest {
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertEquals("WIND RUNNER", item.get("horseName"));
         assertEquals("Thoroughbred", item.get("breed"));
-        assertEquals("/trainer/admissions", item.get("actionUrl"));
+        assertEquals("/trainer/admissions/301", item.get("actionUrl"));
     }
 
     @Test
@@ -938,7 +938,7 @@ class AiToolExecutionServiceTest {
         Map<?, ?> item = (Map<?, ?>) list.get(0);
         assertEquals("SILVER BULLET", item.get("horseName"));
         assertEquals("Chờ bác sĩ khám sàng lọc", item.get("status"));
-        assertEquals("/veterinarian/admissions", item.get("actionUrl"));
+        assertEquals("/veterinarian/admissions?id=401", item.get("actionUrl"));
     }
 
     @Test
@@ -971,7 +971,7 @@ class AiToolExecutionServiceTest {
         assertEquals("LIGHTNING", item.get("horseName"));
         assertEquals("Khẩn cấp", item.get("severity"));
         assertEquals("Ngựa sốt cao đột ngột", item.get("symptoms"));
-        assertEquals("/veterinarian/urgent", item.get("actionUrl"));
+        assertEquals("/veterinarian/urgent/501", item.get("actionUrl"));
     }
 
     @Test
@@ -1144,7 +1144,7 @@ class AiToolExecutionServiceTest {
         assertEquals(1, map.get("qualifiedWorkoutsCount"));
         assertNotNull(map.get("fitnessProgressionRate"));
         assertNotNull(map.get("racingPotentialEvaluation"));
-        assertEquals("/owner/horses", map.get("actionUrl"));
+        assertEquals("/owner/horses/10", map.get("actionUrl"));
     }
 
     @Test
@@ -1291,7 +1291,7 @@ class AiToolExecutionServiceTest {
         assertEquals(1, map.get("totalIncidents"));
         assertEquals(1, map.get("totalExamsCount"));
         assertTrue(map.get("commonConditions").toString().contains("Viêm khớp"));
-        assertEquals("/veterinarian/admissions", map.get("actionUrl"));
+        assertEquals("/veterinarian/health?horseId=10", map.get("actionUrl"));
     }
 
     @Test
