@@ -11,6 +11,7 @@ import { FilterChips } from '@/components/ui/SegmentedControl';
 import { formatDateTime } from '@/lib/display';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { incidentApi } from '../services/incidentService';
+import { assignedVetLabel } from '../lib/assignedVet';
 import { stableApi } from '@/features/stable/services/stableService';
 import type { IncidentReport, IncidentSeverity, IncidentStatus } from '../types';
 import type { Horse } from '@/features/stable/types';
@@ -130,6 +131,7 @@ export function IncidentList() {
             const statusCfg = STATUS_MAP[report.status] || { tone: 'neutral', label: report.status };
             const severityCfg = SEVERITY_MAP[report.severity] || { tone: 'neutral', label: report.severity };
             const imgSrc = incidentApi.imageSrc(report);
+            const vetLabel = assignedVetLabel(report);
 
             return (
               <Panel key={report.id} padded>
@@ -152,6 +154,14 @@ export function IncidentList() {
                         <span>
                           Reported: {report.reportedAt ? new Date(report.reportedAt).toLocaleString('en-US') : '—'}
                         </span>
+                        {vetLabel && (
+                          <>
+                            <span>•</span>
+                            <span className={report.handlerName ? 'font-medium text-[var(--color-text-primary)]' : undefined}>
+                              {vetLabel}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
 
