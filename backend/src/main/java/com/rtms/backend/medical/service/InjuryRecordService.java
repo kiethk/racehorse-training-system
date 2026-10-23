@@ -12,6 +12,7 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.audit.repository.AuditLogRepository;
@@ -30,23 +31,32 @@ public class InjuryRecordService {
     private final HealthRecordRepository healthRecordRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final AuditLogRepository auditLogRepository;
+    private final UserRepository userRepository;
 
     public InjuryRecordService(
             InjuryRecordRepository injuryRecordRepository,
             HorseRepository horseRepository,
             HealthRecordRepository healthRecordRepository,
             CareScheduleRepository careScheduleRepository,
-            AuditLogRepository auditLogRepository) {
+            AuditLogRepository auditLogRepository,
+            UserRepository userRepository) {
         this.injuryRecordRepository = injuryRecordRepository;
         this.horseRepository = horseRepository;
         this.healthRecordRepository = healthRecordRepository;
         this.careScheduleRepository = careScheduleRepository;
         this.auditLogRepository = auditLogRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
     public List<InjuryRecord> getInjuryRecordsByHorse(Long horseId) {
         return injuryRecordRepository.findByHorseIdOrderByDiagnosedAtDesc(horseId);
+    }
+
+    /** Lịch sử khám của một ngựa, mới nhất trước (health history trong Health tab). */
+    @Transactional(readOnly = true)
+    public List<HealthRecord> getHealthRecordsByHorse(Long horseId) {
+        return healthRecordRepository.findByHorseIdOrderByExaminedAtDesc(horseId);
     }
 
     @Transactional(readOnly = true)
@@ -78,9 +88,17 @@ public class InjuryRecordService {
     }
 
     @Transactional
-    public InjuryRecord correctInjuryRecord(Long id, CorrectInjuryRecordRequest req, Long userId) {
+    public InjuryRecord correctInjuryRecord(Long horseId, Long id, CorrectInjuryRecordRequest req, Long userId) {
         InjuryRecord existing = injuryRecordRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "INJURY_NOT_FOUND", "Injury record not found"));
+
+        if (existing.getHorseId() == null || !existing.getHorseId().equals(horseId)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "INJURY_NOT_FOUND", "Injury record not found for this horse");
+        }
+
+        if (existing.getStatus() != null && "SUPERSEDED".equalsIgnoreCase(existing.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "INJURY_ALREADY_SUPERSEDED", "Cannot correct an injury record that has already been superseded");
+        }
 
         // Tạo bản mới hiệu chỉnh
         InjuryRecord corrected = new InjuryRecord();
@@ -108,8 +126,7 @@ public class InjuryRecordService {
         audit.setAction("INJURY_RECORD_CORRECTION: " + req.correctionReason());
         audit.setEntityName("InjuryRecord");
         audit.setEntityId(saved.getId());
-        User u = new User();
-        u.setId(userId);
+        User u = userRepository.getReferenceById(userId);
         audit.setUser(u);
         auditLogRepository.save(audit);
 

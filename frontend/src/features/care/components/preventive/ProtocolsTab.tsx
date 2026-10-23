@@ -24,7 +24,7 @@ const columns: DataTableColumn<PreventiveProtocol>[] = [
   {
     id: 'mandatory',
     header: 'Requirement',
-    render: (row) => (row.mandatory ? <Pill tone="info" size="sm">Mandatory</Pill> : <Pill tone="neutral" size="sm">Recommended</Pill>),
+    render: (row) => (row.mandatory ? <Pill tone="neutral" size="sm">Mandatory</Pill> : <Pill tone="neutral" size="sm">Recommended</Pill>),
   },
   { id: 'interval', header: 'Repeat every', align: 'right', sortValue: (row) => row.intervalDays, render: (row) => `${row.intervalDays} days` },
   { id: 'warning', header: 'Warn before', align: 'right', render: (row) => `${row.warningDays} days` },

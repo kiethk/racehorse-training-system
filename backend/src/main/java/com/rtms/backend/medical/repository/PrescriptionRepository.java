@@ -25,6 +25,7 @@ public interface PrescriptionRepository extends JpaRepository<Prescription,Long>
             WHERE p.treatmentPlanId = tp.id AND tp.healthRecordId = hr.id
               AND hr.horseId IN :horseIds
               AND p.preventiveProtocolId IS NOT NULL AND p.startDate IS NOT NULL
+              AND tp.status <> 'CANCELLED'
             GROUP BY hr.horseId, p.preventiveProtocolId
             """)
     List<LastPreventiveDose> findLastPreventiveDoses(@Param("horseIds") Collection<Long> horseIds);

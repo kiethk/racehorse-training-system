@@ -33,7 +33,6 @@ export function PreventiveCareHub() {
     <ScreenLayout variant="list">
       <PageHeader
         title="Preventive Care"
-        description="Vaccinations, deworming and routine visits for every horse in the stable."
       />
       {error && <Notice tone="error" title="Could not load" onDismiss={() => setError(null)}>{error}</Notice>}
       <Tabs

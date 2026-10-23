@@ -54,9 +54,10 @@ export function validateVaccinationDrafts(drafts: VaccinationDraft[]): Record<st
   const errors: Record<string, string> = {};
   const today = todayIso();
   for (const draft of drafts) {
-    if (!draft.dosage.trim()) errors[draft.key] = 'Dosage is required.';
-    else if (draft.source === 'HISTORICAL' && (!draft.administeredOn || draft.administeredOn >= today)) {
-      errors[draft.key] = 'A previous dose needs a date before today.';
+    if (draft.source === 'HISTORICAL') {
+      if (!draft.administeredOn || draft.administeredOn > today) errors[draft.key] = 'Pick a date on or before today.';
+    } else if (!draft.dosage.trim()) {
+      errors[draft.key] = 'Dosage is required.';
     }
   }
   return errors;
@@ -65,7 +66,7 @@ export function validateVaccinationDrafts(drafts: VaccinationDraft[]): Record<st
 export function toVaccinationRequests(drafts: VaccinationDraft[]): VaccinationRequest[] {
   return drafts.map((draft) => ({
     protocolId: draft.protocolId,
-    dosage: draft.dosage.trim(),
+    dosage: draft.dosage.trim() || undefined,
     route: draft.route.trim() || undefined,
     source: draft.source,
     administeredOn: draft.source === 'HISTORICAL' ? draft.administeredOn : undefined,
@@ -73,9 +74,10 @@ export function toVaccinationRequests(drafts: VaccinationDraft[]): VaccinationRe
 }
 
 /**
- * Vaccinations recorded in the same exam (docs/preventive-care-flow.md 5.1, 5.2, 5.6):
- * suggests doses that are due, warns when the horse looks unwell, and lets a preventive
- * visit defer vaccination by 7–10 days.
+ * Vaccinations in an exam (docs/preventive-care-flow.md 5.1, 5.2, 5.6).
+ * Admission exam: the vet only records the last dose date of each protocol from the passport.
+ * Other exams: suggests doses that are due, warns when the horse looks unwell, and lets a
+ * preventive visit defer vaccination by 7–10 days.
  */
 export function ExamVaccinationSection({
   horseId,
@@ -124,7 +126,7 @@ export function ExamVaccinationSection({
   const fever = Number(temperature) > FEVER_THRESHOLD_C;
   const unwell = fever || trainingBlocked;
 
-  const add = (protocolId: number, source: VaccinationSource = 'ADMINISTERED') => {
+  const add = (protocolId: number) => {
     const protocol = protocols.find((p) => p.id === protocolId);
     draftSequence.current += 1;
     onChange([
@@ -134,8 +136,8 @@ export function ExamVaccinationSection({
         protocolId,
         dosage: protocol?.defaultDosage ?? '',
         route: protocol?.defaultRoute ?? '',
-        source,
-        administeredOn: source === 'HISTORICAL' ? '' : today,
+        source: 'ADMINISTERED',
+        administeredOn: today,
       },
     ]);
     onDeferChange(null);
@@ -145,6 +147,16 @@ export function ExamVaccinationSection({
   const remove = (key: string) => onChange(value.filter((draft) => draft.key !== key));
   const protocolName = (id: number) => protocols.find((p) => p.id === id)?.name ?? `Protocol #${id}`;
 
+  // Admission: at most one "last dose" draft per protocol; clearing the date removes it.
+  const lastDoseKey = (protocolId: number) => `last-dose-${protocolId}`;
+  const lastDoseOf = (protocolId: number) => value.find((d) => d.key === lastDoseKey(protocolId))?.administeredOn ?? '';
+  const setLastDose = (protocolId: number, date: string) => {
+    const others = value.filter((d) => d.key !== lastDoseKey(protocolId));
+    onChange(date
+      ? [...others, { key: lastDoseKey(protocolId), protocolId, dosage: '', route: '', source: 'HISTORICAL', administeredOn: date }]
+      : others);
+  };
+
   return (
     <fieldset
       disabled={disabled}
@@ -152,13 +164,35 @@ export function ExamVaccinationSection({
     >
       <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
         <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">Vaccination &amp; deworming</h3>
-        {isPreventiveVisit && <Pill tone="info" size="sm">Preventive visit</Pill>}
+        {isPreventiveVisit && <Pill tone="neutral" size="sm">Preventive visit</Pill>}
       </div>
 
       {loading ? (
         <Skeleton className="h-16" />
       ) : loadError ? (
         <Notice tone="error">{loadError}</Notice>
+      ) : isAdmission ? (
+        <div className="space-y-2">
+          <p className="text-xs text-[var(--color-text-muted)]">
+            Enter the date of the last vaccination or deworming from the horse&apos;s passport. Leave it empty when there is no record.
+          </p>
+          <ul className="divide-y divide-[var(--color-border)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+            {protocols.map((protocol) => (
+              <li key={protocol.id} className="flex flex-wrap items-end justify-between gap-3 p-3">
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-[var(--color-text-primary)]">{protocol.name}</span>
+                  <span className="block text-xs text-[var(--color-text-muted)]">
+                    {protocol.mandatory ? 'Mandatory' : 'Recommended'} · repeat every {protocol.intervalDays} days
+                  </span>
+                </div>
+                <FormField label="Last dose" className="w-44" error={errors[lastDoseKey(protocol.id)]}>
+                  <Input type="date" value={lastDoseOf(protocol.id)} max={today}
+                    onChange={(e) => setLastDose(protocol.id, e.target.value)} />
+                </FormField>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : (
         <>
           {unwell && (
@@ -171,8 +205,8 @@ export function ExamVaccinationSection({
           )}
 
           {suggestions.length > 0 && deferDays == null && (
-            <div className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-info)] bg-[var(--color-info-soft)] p-3">
-              <p className="text-sm font-semibold text-[var(--color-info)]">Due now or within 7 days — give it in this visit?</p>
+            <div className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
+              <p className="text-sm font-semibold text-[var(--color-text-primary)]">Due now or within 7 days — give it in this visit?</p>
               <ul className="space-y-1.5">
                 {suggestions.map((p) => (
                   <li key={p.protocolId} className="flex flex-wrap items-center justify-between gap-2">
@@ -199,9 +233,7 @@ export function ExamVaccinationSection({
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-[var(--color-text-primary)]">{protocolName(draft.protocolId)}</span>
-                      <Pill tone={draft.source === 'HISTORICAL' ? 'neutral' : 'success'} size="sm">
-                        {draft.source === 'HISTORICAL' ? 'Previous dose' : 'Given today'}
-                      </Pill>
+                      <Pill tone="neutral" size="sm">Given today</Pill>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <FormField label="Dosage" required error={errors[draft.key]}>
@@ -210,12 +242,6 @@ export function ExamVaccinationSection({
                       <FormField label="Route">
                         <Input value={draft.route} maxLength={100} onChange={(e) => update(draft.key, { route: e.target.value })} />
                       </FormField>
-                      {draft.source === 'HISTORICAL' && (
-                        <FormField label="Date given" required>
-                          <Input type="date" value={draft.administeredOn} max={today}
-                            onChange={(e) => update(draft.key, { administeredOn: e.target.value })} />
-                        </FormField>
-                      )}
                     </div>
                   </div>
                   <IconButton icon="x" label={`Remove ${protocolName(draft.protocolId)}`} onClick={() => remove(draft.key)} />
@@ -232,14 +258,6 @@ export function ExamVaccinationSection({
                   {addable.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </Select>
               </FormField>
-              {isAdmission && (
-                <FormField label="Add a previous dose from the passport" className="w-64">
-                  <Select value="" onChange={(e) => e.target.value && add(Number(e.target.value), 'HISTORICAL')}>
-                    <option value="">Choose a protocol…</option>
-                    {protocols.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </Select>
-                </FormField>
-              )}
             </div>
           )}
 

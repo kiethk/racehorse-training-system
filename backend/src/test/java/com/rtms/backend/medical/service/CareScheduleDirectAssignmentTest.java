@@ -16,10 +16,10 @@ import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.service.NotificationService;
-import com.rtms.backend.stable.entity.GroomIncidentReport;
-import com.rtms.backend.stable.enums.IncidentSeverity;
-import com.rtms.backend.stable.enums.IncidentStatus;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
+import com.rtms.backend.incident.entity.HorseIncidentReport;
+import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentStatus;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingWorkoutService;
@@ -46,7 +46,7 @@ class CareScheduleDirectAssignmentTest {
     private HorseRepository horses;
     private UserRepository users;
     private VeterinarianProfileRepository profiles;
-    private GroomIncidentReportRepository incidents;
+    private HorseIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
     private TrainingWorkoutService workoutService;
     private CareScheduleService service;
@@ -57,7 +57,7 @@ class CareScheduleDirectAssignmentTest {
         horses = mock(HorseRepository.class);
         users = mock(UserRepository.class);
         profiles = mock(VeterinarianProfileRepository.class);
-        incidents = mock(GroomIncidentReportRepository.class);
+        incidents = mock(HorseIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
         workoutService = mock(TrainingWorkoutService.class);
         service = new CareScheduleService(
@@ -175,7 +175,7 @@ class CareScheduleDirectAssignmentTest {
         requested.setDurationMinutes(30);
         requested.setSourceIncidentId(700L);
 
-        GroomIncidentReport incident = new GroomIncidentReport();
+        HorseIncidentReport incident = new HorseIncidentReport();
         incident.setId(700L);
         incident.setGroomId(8L);
         incident.setHorseId(99L);

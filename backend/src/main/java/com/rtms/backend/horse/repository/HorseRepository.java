@@ -1,7 +1,6 @@
 /**
  * HorseRepository — REFERENCE IMPLEMENTATION
  *
- * Đây là ví dụ mẫu về cách tạo Spring Data JPA Repository trong dự án.
  * Convention:
  *  - Extends JpaRepository<Entity, IdType> — không cần viết query cơ bản (findAll, findById, save, delete)
  *  - Dùng @Repository để Spring nhận diện
@@ -31,6 +30,7 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT h FROM Horse h WHERE h.registrationNumber = :ueln")
     List<Horse> findByRegistrationNumberForUpdate(@Param("ueln") String ueln);
+
     List<Horse> findByCurrentStallIdIsNotNull();
     List<Horse> findByCurrentStallIdIn(List<Long> stallIds);
 
@@ -48,6 +48,27 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
     Optional<Horse> findByCurrentStallId(Long stallId);
 
     @Query("""
+            SELECT CASE WHEN COUNT(h) > 0 THEN true ELSE false END
+            FROM Horse h
+            JOIN StableStall ss ON h.currentStallId = ss.id
+            JOIN Area a ON ss.areaId = a.id
+            WHERE h.id = :horseId
+              AND a.trainerId = :trainerId
+            """)
+    boolean isManagedByTrainer(@Param("horseId") Long horseId,
+                               @Param("trainerId") Long trainerId);
+
+    @Query("""
+            SELECT CASE WHEN COUNT(h) > 0 THEN true ELSE false END
+            FROM Horse h
+            JOIN StableStall ss ON h.currentStallId = ss.id
+            WHERE h.id = :horseId
+              AND ss.groomId = :groomId
+            """)
+    boolean isManagedByGroom(@Param("horseId") Long horseId,
+                             @Param("groomId") Long groomId);
+
+    @Query("""
             SELECT a.trainerId, COUNT(h.id)
             FROM Horse h
             JOIN StableStall ss ON h.currentStallId = ss.id
@@ -55,7 +76,7 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
             WHERE a.trainerId IN :trainerIds
             GROUP BY a.trainerId
             """)
-    List<Object[]> countHorsesByTrainerIds(@Param("trainerIds") java.util.Collection<Long> trainerIds);
+    List<Object[]> countHorsesByTrainerIds(@Param("trainerIds") Collection<Long> trainerIds);
 
     @Query("""
             SELECT a.trainerId, h.id
@@ -64,7 +85,7 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
             JOIN Area a ON ss.areaId = a.id
             WHERE a.trainerId IN :trainerIds
             """)
-    List<Object[]> findManagedHorsePairs(@Param("trainerIds") java.util.Collection<Long> trainerIds);
+    List<Object[]> findManagedHorsePairs(@Param("trainerIds") Collection<Long> trainerIds);
 
     @Query("""
             SELECT DISTINCT h.id
@@ -74,6 +95,25 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
             WHERE a.trainerId = :trainerId
             """)
     List<Long> findManagedHorseIdsByTrainerId(@Param("trainerId") Long trainerId);
+
+    @Query("""
+            SELECT DISTINCT h
+            FROM Horse h
+            JOIN StableStall ss ON h.currentStallId = ss.id
+            JOIN Area a ON ss.areaId = a.id
+            WHERE a.trainerId = :trainerId
+            ORDER BY h.name ASC
+            """)
+    List<Horse> findManagedHorsesByTrainerId(@Param("trainerId") Long trainerId);
+
+    @Query("""
+            SELECT DISTINCT h
+            FROM Horse h
+            JOIN StableStall ss ON h.currentStallId = ss.id
+            WHERE ss.groomId = :groomId
+            ORDER BY h.name ASC
+            """)
+    List<Horse> findManagedHorsesByGroomUserId(@Param("groomId") Long groomId);
 
     @Query("""
             SELECT DISTINCT h

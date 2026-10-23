@@ -90,8 +90,10 @@ class CareRescheduleServiceTest {
 
         ArgumentCaptor<AuditLog> audit = ArgumentCaptor.forClass(AuditLog.class);
         verify(audits).save(audit.capture());
-        assertEquals(CareRescheduleService.AUDIT_ACTION, audit.getValue().getAction());
+        assertEquals("Care Schedule Rescheduled", audit.getValue().getAction());
         assertEquals(100L, audit.getValue().getEntityId());
+        assertEquals("Care schedule #100 rescheduled to " + TODAY.plusDays(9) + " (Reason: WEATHER)",
+                audit.getValue().getDetails());
     }
 
     @Test

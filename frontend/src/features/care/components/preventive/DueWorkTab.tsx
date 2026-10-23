@@ -1,31 +1,28 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Button,
-  ChoiceInput,
-  EmptyState,
+  DataTable,
+  FilterBar,
   FilterChips,
   FormField,
-  ListSkeleton,
   MetricCard,
   Notice,
-  Panel,
-  Pill,
+  SearchInput,
   Select,
   StatusBadge,
-  Table,
-  TBody,
-  Td,
-  Th,
-  THead,
-  Tr,
 } from '@/components/ui';
-import { cn } from '@/lib/cn';
+import type { DataTableColumn } from '@/components/ui/DataTable';
 import { displayError, formatDate } from '@/lib/display';
 import { preventiveCareService } from '../../services/preventiveCareService';
-import type { PreventiveDueItem, PreventiveDueStatus, PreventiveProtocol } from '../../types/preventive';
-import { BatchVaccinationModal } from './BatchVaccinationModal';
+import type {
+  PreventiveDueHorse,
+  PreventiveDueStatus,
+  PreventiveDueSummary,
+  PreventiveProtocol,
+} from '../../types/preventive';
+import { CompleteVaccinationModal } from './CompleteVaccinationModal';
 import { DueStatusPill } from './preventiveDisplay';
 
 type Filter = 'ACTION' | 'OVERDUE' | 'DUE_SOON' | 'OK';
@@ -36,8 +33,8 @@ const FILTER_STATUSES: Record<Filter, PreventiveDueStatus[]> = {
   DUE_SOON: ['DUE_SOON'],
   OK: ['OK'],
 };
-
-const rowKey = (item: PreventiveDueItem) => `${item.horseId}:${item.protocol.protocolId}`;
+const PAGE_SIZE = 20;
+const SEARCH_DELAY_MS = 300;
 
 interface DueWorkTabProps {
   protocols: PreventiveProtocol[];
@@ -45,74 +42,129 @@ interface DueWorkTabProps {
 }
 
 export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
-  const [items, setItems] = useState<PreventiveDueItem[]>([]);
-  const [summary, setSummary] = useState<PreventiveDueItem[]>([]);
+  const [rows, setRows] = useState<PreventiveDueHorse[]>([]);
+  const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState<PreventiveDueSummary | null>(null);
   const [filter, setFilter] = useState<Filter>('ACTION');
   const [protocolId, setProtocolId] = useState<number | undefined>();
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [batchOpen, setBatchOpen] = useState(false);
+  const [completing, setCompleting] = useState<PreventiveDueHorse | null>(null);
+
+  // Ask the server once typing pauses, not on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [rows, actionable] = await Promise.all([
-        preventiveCareService.listDue({ statuses: FILTER_STATUSES[filter], protocolId }),
-        preventiveCareService.listDue({ statuses: FILTER_STATUSES.ACTION }),
+      const [result, counts] = await Promise.all([
+        preventiveCareService.listDueHorses({ statuses: FILTER_STATUSES[filter], protocolId, search, page, size: PAGE_SIZE }),
+        preventiveCareService.dueSummary(),
       ]);
-      setItems(rows);
-      setSummary(actionable);
-      setSelected(new Set());
+      setRows(result.content);
+      setTotal(result.totalElements);
+      setSummary(counts);
     } catch (cause) {
       setError(displayError(cause, 'Could not load preventive care work.'));
     } finally {
       setLoading(false);
     }
-  }, [filter, protocolId]);
+  }, [filter, protocolId, search, page]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
-  const counts = useMemo(() => ({
-    overdue: summary.filter((i) => i.protocol.status === 'OVERDUE' || i.protocol.status === 'MISSING').length,
-    dueSoon: summary.filter((i) => i.protocol.status === 'DUE_SOON').length,
-    horses: new Set(summary.map((i) => i.horseId)).size,
-  }), [summary]);
-
-  const selectedItems = items.filter((item) => selected.has(rowKey(item)));
-  const selectedProtocolIds = new Set(selectedItems.map((item) => item.protocol.protocolId));
-  const selectedHorses = [...new Map(selectedItems.map((item) => [item.horseId, { id: item.horseId, name: item.horseName }])).values()];
-  const allSelected = items.length > 0 && selected.size === items.length;
-
-  const toggle = (key: string) => {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  const changeFilter = (next: Filter) => {
+    setFilter(next);
+    setPage(0);
   };
+
+  const columns: DataTableColumn<PreventiveDueHorse>[] = [
+    {
+      id: 'horse',
+      header: 'Horse',
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">{row.horseName}</span>
+          <StatusBadge status={row.horseStatus} size="sm" />
+        </div>
+      ),
+    },
+    {
+      id: 'protocols',
+      header: 'Protocols',
+      render: (row) => (
+        <span className="text-[var(--color-text-secondary)]">{row.protocols.map((p) => p.name).join(' · ')}</span>
+      ),
+    },
+    {
+      id: 'nextDue',
+      header: 'Next due',
+      render: (row) => <span className="whitespace-nowrap">{row.earliestDueOn ? formatDate(row.earliestDueOn) : 'Now'}</span>,
+    },
+    { id: 'status', header: 'Status', render: (row) => <DueStatusPill status={row.worstStatus} /> },
+  ];
+  if (canRecord) {
+    columns.push({
+      id: 'action',
+      header: '',
+      align: 'right',
+      render: (row) => (
+        <Button variant="secondary" size="sm" icon="check" onClick={() => setCompleting(row)}>Complete</Button>
+      ),
+    });
+  }
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <MetricCard label="Overdue or no record" value={counts.overdue} icon="alert-triangle" tone="danger"
-          onClick={() => setFilter('OVERDUE')} active={filter === 'OVERDUE'} />
-        <MetricCard label="Due soon" value={counts.dueSoon} icon="clock" tone="warning"
-          onClick={() => setFilter('DUE_SOON')} active={filter === 'DUE_SOON'} />
-        <MetricCard label="Horses needing care" value={counts.horses} icon="horse"
-          onClick={() => setFilter('ACTION')} active={filter === 'ACTION'} />
+        <MetricCard label="Overdue or no record" value={summary?.overdue ?? '—'} icon="alert-triangle"
+          onClick={() => changeFilter('OVERDUE')} active={filter === 'OVERDUE'} />
+        <MetricCard label="Due soon" value={summary?.dueSoon ?? '—'} icon="clock"
+          onClick={() => changeFilter('DUE_SOON')} active={filter === 'DUE_SOON'} />
+        <MetricCard label="Horses needing care" value={summary?.horses ?? '—'} icon="horse"
+          onClick={() => changeFilter('ACTION')} active={filter === 'ACTION'} />
       </div>
 
-      <Panel padded className="flex flex-wrap items-end justify-between gap-3">
+      <FilterBar onSubmit={(event) => event.preventDefault()}>
+        <FormField label="Search horse" className="min-w-[14rem] flex-1">
+          <SearchInput
+            label="Search horse"
+            placeholder="Horse name"
+            value={searchInput}
+            onChange={(value) => {
+              setSearchInput(value);
+              setPage(0);
+            }}
+          />
+        </FormField>
+        <FormField label="Protocol" className="w-56">
+          <Select
+            value={protocolId ?? ''}
+            onChange={(e) => {
+              setProtocolId(e.target.value ? Number(e.target.value) : undefined);
+              setPage(0);
+            }}
+          >
+            <option value="">All protocols</option>
+            {protocols.map((protocol) => (
+              <option key={protocol.id} value={protocol.id}>{protocol.name}</option>
+            ))}
+          </Select>
+        </FormField>
         <FilterChips<Filter>
           label="Status"
           value={filter}
-          onChange={setFilter}
+          onChange={changeFilter}
           options={[
             { value: 'ACTION', label: 'Needs action' },
             { value: 'OVERDUE', label: 'Overdue' },
@@ -120,105 +172,26 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
             { value: 'OK', label: 'Up to date' },
           ]}
         />
-        <div className="flex items-end gap-2">
-          <FormField label="Protocol" className="w-56">
-            <Select value={protocolId ?? ''} onChange={(e) => setProtocolId(e.target.value ? Number(e.target.value) : undefined)}>
-              <option value="">All protocols</option>
-              {protocols.map((protocol) => (
-                <option key={protocol.id} value={protocol.id}>{protocol.name}</option>
-              ))}
-            </Select>
-          </FormField>
-          <Button variant="secondary" icon="refresh" onClick={load} disabled={loading}>Refresh</Button>
-        </div>
-      </Panel>
+        <Button type="button" variant="secondary" icon="refresh" onClick={load} disabled={loading}>Refresh</Button>
+      </FilterBar>
 
       {error && <Notice tone="error" title="Could not load" onDismiss={() => setError(null)}>{error}</Notice>}
 
-      {loading ? (
-        <ListSkeleton />
-      ) : items.length === 0 ? (
-        <Panel padded>
-          <EmptyState icon="check" title="Nothing here"
-            description={filter === 'OK' ? 'No horse is up to date for this filter yet.' : 'Every horse is covered for this filter.'} />
-        </Panel>
-      ) : (
-        <Panel>
-          <Table bare aria-label="Preventive care work">
-            <THead>
-              <Tr>
-                {canRecord && (
-                  <Th className="w-10">
-                    <ChoiceInput
-                      aria-label="Select all rows"
-                      checked={allSelected}
-                      onChange={() => setSelected(allSelected ? new Set() : new Set(items.map(rowKey)))}
-                    />
-                  </Th>
-                )}
-                <Th>Horse</Th>
-                <Th>Protocol</Th>
-                <Th>Last dose</Th>
-                <Th>Next due</Th>
-                <Th>Status</Th>
-              </Tr>
-            </THead>
-            <TBody>
-              {items.map((item) => {
-                const key = rowKey(item);
-                return (
-                  <Tr key={key} className={cn(selected.has(key) && 'bg-[var(--color-primary-subtle)]')}>
-                    {canRecord && (
-                      <Td>
-                        <ChoiceInput
-                          aria-label={`Select ${item.horseName} – ${item.protocol.name}`}
-                          checked={selected.has(key)}
-                          onChange={() => toggle(key)}
-                        />
-                      </Td>
-                    )}
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">{item.horseName}</span>
-                        <StatusBadge status={item.horseStatus} size="sm" />
-                      </div>
-                    </Td>
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <span>{item.protocol.name}</span>
-                        {item.protocol.mandatory && <Pill tone="info" size="sm">Mandatory</Pill>}
-                      </div>
-                    </Td>
-                    <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">{formatDate(item.protocol.lastDoseOn)}</Td>
-                    <Td className="whitespace-nowrap">{item.protocol.nextDueOn ? formatDate(item.protocol.nextDueOn) : 'Now'}</Td>
-                    <Td><DueStatusPill status={item.protocol.status} /></Td>
-                  </Tr>
-                );
-              })}
-            </TBody>
-          </Table>
-        </Panel>
-      )}
+      <DataTable
+        rows={rows}
+        columns={columns}
+        getRowKey={(row) => row.horseId}
+        loading={loading}
+        ariaLabel="Horses needing preventive care"
+        emptyTitle={search ? 'No horse matches this search' : 'Nothing here'}
+        emptyDescription={filter === 'OK' ? 'No horse is up to date for this filter yet.' : 'Every horse is covered for this filter.'}
+        pagination={{ page, pageSize: PAGE_SIZE, total, onPageChange: setPage, disabled: loading }}
+      />
 
-      {canRecord && selected.size > 0 && (
-        <div className="sticky bottom-4 z-[var(--z-dropdown)] flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-popover)]">
-          <span className="text-sm text-[var(--color-text-secondary)]">
-            <strong className="text-[var(--color-text-primary)]">{selectedHorses.length}</strong> horse{selectedHorses.length === 1 ? '' : 's'} selected
-            {selectedProtocolIds.size > 1 && ' · several protocols selected, pick one in the form'}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="tertiary" onClick={() => setSelected(new Set())}>Clear</Button>
-            <Button variant="primary" icon="pill" onClick={() => setBatchOpen(true)}>Record batch vaccination</Button>
-          </div>
-        </div>
-      )}
-
-      <BatchVaccinationModal
-        open={batchOpen}
-        onClose={() => setBatchOpen(false)}
-        horses={selectedHorses}
+      <CompleteVaccinationModal
+        horse={completing}
         protocols={protocols}
-        initialProtocolId={selectedProtocolIds.size === 1 ? [...selectedProtocolIds][0] : undefined}
+        onClose={() => setCompleting(null)}
         onRecorded={load}
       />
     </div>

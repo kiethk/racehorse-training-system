@@ -164,7 +164,6 @@ export function TrainerDashboardView() {
     <ScreenLayout variant="dashboard">
       <PageHeader
         title="Fitness and training overview"
-        description="Track training progress across your stable and identify overtraining risks early."
         actions={
           <>
             <LinkButton href="/trainer/plans" size="sm" icon="clipboard">Manage plans</LinkButton>
@@ -176,22 +175,20 @@ export function TrainerDashboardView() {
       {error && <Notice tone="error">{error}</Notice>}
 
       <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="Total horses" value={horses.length} icon="horse" hint="Assigned stable" />
-        <MetricCard label="In training" value={inTraining.length} icon="activity" tone="info" unit="active plans" hint="With scheduled sessions" />
+        <MetricCard label="Total horses" value={horses.length} icon="horse" />
+        <MetricCard label="In training" value={inTraining.length} icon="activity" tone="info" unit="active plans" />
         <MetricCard
           label="Risk alerts"
           value={withAlerts.length}
           icon="alert-triangle"
           tone={withAlerts.length > 0 ? 'danger' : 'success'}
           unit="horses"
-          hint="Horses to monitor"
         />
         <MetricCard
           label="Average performance (30 days)"
           value={averageRating != null ? `${formatNumber(averageRating, 1)}/10` : '—'}
           icon="trending-up"
           tone="success"
-          hint="Across all assigned horses"
         />
       </div>
 

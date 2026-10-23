@@ -207,9 +207,23 @@ export interface UrgentAssignmentAlert {
   description: string;
   imageUrl: string | null;
   trainingDecision: TrainingDecision;
+  previousTrainingDecision: TrainingDecision | null;
+  previousTrainingDecisionReason: string | null;
   status: CareScheduleStatus;
   scheduledAt: string | null;
   assignedAt: string;
+}
+
+export interface UrgentCaseReport {
+  id: number;
+  reportedById: number;
+  reportedByName: string | null;
+  reportedByRole: string | null;
+  reportedAt: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  title: string;
+  description: string;
+  imageUrl: string | null;
 }
 
 export interface CareSchedule {
@@ -223,6 +237,7 @@ export interface CareSchedule {
   assignedVetId?: number | null;
   scheduledDate?: string | null;
   scheduledAt?: string | null;
+  completedAt?: string | null;
   durationMinutes?: number | null;
   notes?: string | null;
   description?: string | null;
@@ -230,6 +245,8 @@ export interface CareSchedule {
   purpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   requestedAt?: string | null;
 }
+
+export type CareScheduleResponse = CareSchedule;
 
 export interface CareScheduleDetail {
   schedule: CareSchedule;
@@ -303,15 +320,17 @@ export interface VetAdmissionQueueItem {
 
 export interface VetQueueSummary {
   total: number;
+  active?: number;
   awaiting: number;
   inProgress: number;
+  approved?: number;
 }
 
 export type VetQueueSummaryResponse = VetQueueSummary;
 
 export interface VetQueueFilters {
   search?: string;
-  pill?: 'ALL' | 'AWAITING' | 'IN_PROGRESS';
+  pill?: 'ALL' | 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'APPROVED';
   admissionStatus?: AdmissionStatus | 'ALL';
   scheduleStatus?: CareScheduleStatus | 'ALL';
   careType?: CareType | 'ALL';

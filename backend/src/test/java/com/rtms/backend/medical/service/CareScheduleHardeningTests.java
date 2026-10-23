@@ -20,9 +20,9 @@ import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.entity.Notification;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
-import com.rtms.backend.stable.entity.GroomIncidentReport;
-import com.rtms.backend.stable.enums.IncidentStatus;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
+import com.rtms.backend.incident.entity.HorseIncidentReport;
+import com.rtms.backend.incident.enums.IncidentStatus;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingWorkoutService;
@@ -53,7 +53,7 @@ class CareScheduleHardeningTests {
     private HorseRepository horses;
     private UserRepository users;
     private VeterinarianProfileRepository profiles;
-    private GroomIncidentReportRepository incidents;
+    private HorseIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
     private TrainingWorkoutService workoutService;
     private NotificationService notificationService;
@@ -66,7 +66,7 @@ class CareScheduleHardeningTests {
         horses = mock(HorseRepository.class);
         users = mock(UserRepository.class);
         profiles = mock(VeterinarianProfileRepository.class);
-        incidents = mock(GroomIncidentReportRepository.class);
+        incidents = mock(HorseIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
         workoutService = mock(TrainingWorkoutService.class);
         notificationService = mock(NotificationService.class);
@@ -152,7 +152,7 @@ class CareScheduleHardeningTests {
                 eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
                 eq(101L),
                 eq(10L),
-                eq(NotificationTypes.ADMISSION_VET_ASSIGNED),
+                eq(NotificationTypes.ROUTINE_ASSIGNED),
                 anyString(),
                 contains("Thunder")
         );
@@ -165,7 +165,7 @@ class CareScheduleHardeningTests {
         User vet = mockVet(5L);
         when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
 
-        GroomIncidentReport incident = new GroomIncidentReport();
+        HorseIncidentReport incident = new HorseIncidentReport();
         incident.setId(50L);
         incident.setHorseId(10L);
         incident.setStatus(IncidentStatus.REPORTED);
@@ -190,7 +190,7 @@ class CareScheduleHardeningTests {
                 eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
                 eq(102L),
                 eq(10L),
-                eq(NotificationTypes.ADMISSION_VET_ASSIGNED),
+                eq(NotificationTypes.CARE_SCHEDULE_URGENT_ASSIGNED),
                 anyString(),
                 anyString()
         );

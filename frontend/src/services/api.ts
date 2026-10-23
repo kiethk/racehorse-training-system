@@ -46,8 +46,49 @@ async function parseJsonResponse<T>(res: Response): Promise<T> {
 
 let refreshPromise: Promise<boolean> | null = null;
 
-export function createAuthenticatedEventSource(path: string): EventSource {
-  return new EventSource(getApiUrl(path), { withCredentials: true });
+export interface AuthenticatedEventStreamOptions {
+  signal?: AbortSignal;
+  onEvent: (event: string, data: string) => void;
+}
+
+/**
+ * Reads a server-sent-events response with normal Bearer authentication.
+ * EventSource cannot send an Authorization header, so the urgent alert stream
+ * must be read with fetch instead of EventSource.
+ */
+export async function openAuthenticatedEventStream(
+  path: string,
+  { signal, onEvent }: AuthenticatedEventStreamOptions,
+): Promise<void> {
+  const res = await doFetch(path, { credentials: 'include', signal });
+  if (!res.ok) {
+    throw await responseError(res);
+  }
+  if (!res.body) {
+    throw new Error('The server did not return an event stream.');
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, '\n');
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary >= 0) {
+      const frame = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      let event = 'message';
+      const data: string[] = [];
+      for (const line of frame.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
+      }
+      if (data.length > 0) onEvent(event, data.join('\n'));
+      boundary = buffer.indexOf('\n\n');
+    }
+  }
 }
 
 let accessToken: string | null = null;

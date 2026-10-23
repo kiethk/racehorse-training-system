@@ -3,6 +3,8 @@ package com.rtms.backend.incident.service;
 import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.identity.entity.User;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.incident.dto.CreateIncidentReportRequest;
 import com.rtms.backend.incident.dto.HandleIncidentRequest;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
@@ -26,6 +28,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class HorseIncidentReportService {
@@ -36,19 +41,22 @@ public class HorseIncidentReportService {
     private final CareScheduleRepository careScheduleRepository;
     private final CareScheduleService careScheduleService;
     private final TrainingDecisionService trainingDecisionService;
+    private final UserRepository userRepository;
 
     public HorseIncidentReportService(HorseIncidentReportRepository incidentReportRepository,
                                       HorseRepository horseRepository,
                                       FileStorageService fileStorage,
                                       CareScheduleRepository careScheduleRepository,
                                       CareScheduleService careScheduleService,
-                                      TrainingDecisionService trainingDecisionService) {
+                                      TrainingDecisionService trainingDecisionService,
+                                      UserRepository userRepository) {
         this.incidentReportRepository = incidentReportRepository;
         this.horseRepository = horseRepository;
         this.fileStorage = fileStorage;
         this.careScheduleRepository = careScheduleRepository;
         this.careScheduleService = careScheduleService;
         this.trainingDecisionService = trainingDecisionService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -130,10 +138,10 @@ public class HorseIncidentReportService {
                 })
                 .toList();
 
-        if (status == null) {
-            return base;
+        if (status != null) {
+            base = base.stream().filter(r -> r.getStatus() == status).toList();
         }
-        return base.stream().filter(r -> r.getStatus() == status).toList();
+        return withHandlerNames(base);
     }
 
     @Transactional
@@ -167,7 +175,9 @@ public class HorseIncidentReportService {
             report.setHandlerNote(request.getHandlerNote().trim());
         }
 
-        return incidentReportRepository.save(report);
+        HorseIncidentReport saved = incidentReportRepository.save(report);
+        withHandlerNames(List.of(saved));
+        return saved;
     }
 
     public HorseIncidentReport getReportById(Long id, AuthenticatedUser currentUser) {
@@ -177,6 +187,7 @@ public class HorseIncidentReportService {
                 && !currentUser.getUserId().equals(report.getReportedById())) {
             throw new AccessDeniedException("You can only view incident reports you submitted");
         }
+        withHandlerNames(List.of(report));
         return report;
     }
 
@@ -222,5 +233,41 @@ public class HorseIncidentReportService {
 
     public MediaType imageMediaType(Long reportId, AuthenticatedUser currentUser) {
         return fileStorage.mediaType(getReportById(reportId, currentUser).getImageUrl());
+    }
+
+    /**
+     * Gắn tên vet được giao để người báo biết ai đang nhận ca. Ưu tiên vet đã xử lý báo cáo
+     * (handledById); nếu chưa có thì lấy vet của ca urgent mà báo cáo được gắn vào
+     * (báo cáo thứ hai trên cùng ngựa dùng chung ca urgent đang mở, nên không có handledById).
+     * Mỗi loại dữ liệu chỉ truy vấn một lần cho cả danh sách.
+     */
+    private List<HorseIncidentReport> withHandlerNames(List<HorseIncidentReport> reports) {
+        List<Long> scheduleIds = reports.stream()
+                .filter(report -> report.getHandledById() == null)
+                .map(HorseIncidentReport::getCareScheduleId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Long> vetBySchedule = scheduleIds.isEmpty() ? Map.of()
+                : careScheduleRepository.findAllById(scheduleIds).stream()
+                        .filter(schedule -> schedule.getVeterinarianId() != null)
+                        .collect(Collectors.toMap(CareSchedule::getId, CareSchedule::getVeterinarianId, (a, b) -> a));
+
+        Map<HorseIncidentReport, Long> vetByReport = new java.util.IdentityHashMap<>();
+        for (HorseIncidentReport report : reports) {
+            Long vetId = report.getHandledById() != null ? report.getHandledById()
+                    : report.getCareScheduleId() != null ? vetBySchedule.get(report.getCareScheduleId())
+                    : null;
+            if (vetId != null) vetByReport.put(report, vetId);
+        }
+        if (vetByReport.isEmpty()) return reports;
+
+        Map<Long, String> names = userRepository.findAllById(vetByReport.values().stream().distinct().toList()).stream()
+                .collect(Collectors.toMap(User::getId, User::getFullName, (a, b) -> a));
+        reports.forEach(report -> {
+            Long vetId = vetByReport.get(report);
+            report.setHandlerName(vetId == null ? null : names.get(vetId));
+        });
+        return reports;
     }
 }

@@ -25,13 +25,15 @@ class AuditLogServiceReadTest {
 
     private AuditLogRepository repository;
     private UserRepository userRepository;
+    private AuditActivityResolver activityResolver;
     private AuditLogService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(AuditLogRepository.class);
         userRepository = mock(UserRepository.class);
-        service = new AuditLogService(repository, userRepository);
+        activityResolver = new AuditActivityResolver();
+        service = new AuditLogService(repository, userRepository, activityResolver);
     }
 
     private AuditLog makeLog(Long id, User user, String method, String path, int status, LocalDateTime at) {

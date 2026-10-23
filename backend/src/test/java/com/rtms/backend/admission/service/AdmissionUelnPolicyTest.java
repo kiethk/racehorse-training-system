@@ -41,6 +41,12 @@ class AdmissionUelnPolicyTest {
     }
 
     @Test
+    void availabilityCheckAcceptsIsoAlpha3Format() {
+        var res = policy.checkAvailability("VNM22SC00000001");
+        assertTrue(res.available());
+    }
+
+    @Test
     void checksOpenAdmissionsAfterTakingTransactionLock() {
         when(admissions.existsOpenAdmissionByUeln(eq(UELN), anyCollection())).thenReturn(true);
 
@@ -110,7 +116,7 @@ class AdmissionUelnPolicyTest {
     @Test
     void availabilityCheckRejectsInvalidFormatBeforeReadingDatabase() {
         var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> policy.checkAvailability("VNM22SC00000001"));
+                () -> policy.checkAvailability("INVALID_UELN_123"));
         assertEquals(400, error.getStatusCode().value());
         verifyNoInteractions(entityManager, admissions, horses);
     }

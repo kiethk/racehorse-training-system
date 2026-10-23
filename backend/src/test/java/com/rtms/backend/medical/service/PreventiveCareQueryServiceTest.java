@@ -5,7 +5,8 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.dto.PreventiveCoverageResponse;
-import com.rtms.backend.medical.dto.PreventiveDueItem;
+import com.rtms.backend.medical.dto.PreventiveDueHorse;
+import com.rtms.backend.medical.dto.PreventiveDueSummary;
 import com.rtms.backend.medical.dto.PreventiveProtocolStatus;
 import com.rtms.backend.medical.entity.PreventiveProtocol;
 import com.rtms.backend.medical.enums.PreventiveDueStatus;
@@ -71,23 +72,50 @@ class PreventiveCareQueryServiceTest {
     }
 
     @Test
-    void dueListDefaultsToWorkThatNeedsDoingMostUrgentFirst() {
-        List<PreventiveDueItem> items = service.due(null, null, null);
+    void dueListHasOneRowPerHorseMostUrgentFirst() {
+        var page = service.dueHorses(null, null, null, 0, 20);
 
-        assertEquals(List.of("2:1:MISSING", "2:3:OVERDUE", "2:2:DUE_SOON", "1:2:DUE_SOON"),
-                items.stream().map(PreventiveDueItemDescriber::describe).toList());
-        assertEquals("Bravo", items.get(0).horseName());
-        assertEquals(HorseStatus.CANDIDATE, items.get(0).horseStatus());
+        assertEquals(2, page.getTotalElements());
+        PreventiveDueHorse bravo = page.getContent().get(0);
+        assertEquals("Bravo", bravo.horseName());
+        assertEquals(HorseStatus.CANDIDATE, bravo.horseStatus());
+        assertEquals(PreventiveDueStatus.MISSING, bravo.worstStatus());
+        assertNull(bravo.earliestDueOn());
+        assertEquals(List.of(1L, 3L, 2L), bravo.protocols().stream().map(PreventiveProtocolStatus::protocolId).toList());
+        PreventiveDueHorse alpha = page.getContent().get(1);
+        assertEquals(List.of(2L), alpha.protocols().stream().map(PreventiveProtocolStatus::protocolId).toList());
+        assertEquals(TODAY.plusDays(20), alpha.earliestDueOn());
     }
 
     @Test
-    void dueListFiltersByStatusWindowAndProtocol() {
-        assertEquals(List.of("2:2:DUE_SOON"), service.due(EnumSet.of(PreventiveDueStatus.DUE_SOON), 10, null)
-                .stream().map(PreventiveDueItemDescriber::describe).toList());
-        assertEquals(List.of("2:1:MISSING"), service.due(null, null, 1L)
-                .stream().map(PreventiveDueItemDescriber::describe).toList());
-        assertEquals(List.of("1:1:OK"), service.due(EnumSet.of(PreventiveDueStatus.OK), null, null)
-                .stream().map(PreventiveDueItemDescriber::describe).toList());
+    void dueListFiltersByStatusProtocolAndHorseName() {
+        assertEquals(List.of("Bravo", "Alpha"), names(service.dueHorses(EnumSet.of(PreventiveDueStatus.DUE_SOON), null, null, 0, 20)));
+        assertEquals(List.of("Bravo"), names(service.dueHorses(null, 1L, null, 0, 20)));
+        assertEquals(List.of("Alpha"), names(service.dueHorses(EnumSet.of(PreventiveDueStatus.OK), null, null, 0, 20)));
+        assertEquals(List.of("Alpha"), names(service.dueHorses(null, null, "  aLP ", 0, 20)));
+        assertEquals(List.of(), names(service.dueHorses(null, null, "zulu", 0, 20)));
+    }
+
+    @Test
+    void dueListIsPagedAfterSorting() {
+        var first = service.dueHorses(null, null, null, 0, 1);
+        var second = service.dueHorses(null, null, null, 1, 1);
+        var beyond = service.dueHorses(null, null, null, 5, 1);
+
+        assertEquals(List.of("Bravo"), names(first));
+        assertEquals(List.of("Alpha"), names(second));
+        assertEquals(2, first.getTotalElements());
+        assertEquals(2, first.getTotalPages());
+        assertTrue(beyond.getContent().isEmpty());
+    }
+
+    @Test
+    void summaryCountsAcrossTheWholeStable() {
+        PreventiveDueSummary summary = service.dueSummary();
+
+        assertEquals(2, summary.overdue());
+        assertEquals(2, summary.dueSoon());
+        assertEquals(2, summary.horses());
     }
 
     @Test
@@ -118,6 +146,10 @@ class PreventiveCareQueryServiceTest {
         assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
     }
 
+    private static List<String> names(org.springframework.data.domain.Page<PreventiveDueHorse> page) {
+        return page.getContent().stream().map(PreventiveDueHorse::horseName).toList();
+    }
+
     private static Horse horse(long id, String name, HorseStatus status, long ownerId) {
         Horse horse = new Horse();
         horse.setId(id);
@@ -142,11 +174,5 @@ class PreventiveCareQueryServiceTest {
         protocol.setMandatory(true);
         protocol.setActive(true);
         return protocol;
-    }
-
-    private static final class PreventiveDueItemDescriber {
-        static String describe(PreventiveDueItem item) {
-            return item.horseId() + ":" + item.protocol().protocolId() + ":" + item.protocol().status();
-        }
     }
 }

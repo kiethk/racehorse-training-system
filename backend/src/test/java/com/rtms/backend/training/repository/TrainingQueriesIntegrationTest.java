@@ -3,13 +3,14 @@ package com.rtms.backend.training.repository;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
+import com.rtms.backend.identity.repository.RoleRepository;
 import com.rtms.backend.identity.repository.UserRepository;
+import com.rtms.backend.incident.entity.HorseIncidentReport;
+import com.rtms.backend.incident.enums.IncidentSeverity;
+import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.entity.Area;
-import com.rtms.backend.stable.entity.GroomIncidentReport;
 import com.rtms.backend.stable.entity.StableStall;
-import com.rtms.backend.stable.enums.IncidentSeverity;
 import com.rtms.backend.stable.repository.AreaRepository;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.CourseSubjectResponse;
 import com.rtms.backend.training.dto.DashboardHorseRow;
@@ -72,6 +73,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class TrainingQueriesIntegrationTest {
 
     @Autowired private UserRepository users;
+    @Autowired private RoleRepository roles;
     @Autowired private AreaRepository areas;
     @Autowired private StableStallRepository stalls;
     @Autowired private HorseRepository horses;
@@ -81,7 +83,7 @@ class TrainingQueriesIntegrationTest {
     @Autowired private HorseTrainingPlanRepository plans;
     @Autowired private TrainingLotRepository lots;
     @Autowired private TrainingWorkoutRepository workouts;
-    @Autowired private GroomIncidentReportRepository incidents;
+    @Autowired private HorseIncidentReportRepository incidents;
 
     private final LocalDate today = LocalDate.now();
 
@@ -101,10 +103,12 @@ class TrainingQueriesIntegrationTest {
 
     @BeforeEach
     void buildFixture() {
-        trainer = users.findByEmail("trainer@rtms.com").orElseThrow();
-        groom = users.findByEmail("groom@rtms.com").orElseThrow();
-        owner = users.findByEmail("owner@rtms.com").orElseThrow();
-        otherOwner = users.findByEmail("vet@rtms.com").orElseThrow();   // any other user works as "another owner"
+        // Own users instead of seed accounts: the local demo seed renames trainer@/vet@/groom@rtms.com,
+        // and the test transaction rolls these back anyway.
+        trainer = user("HEAD_TRAINER", "trainer");
+        groom = user("GROOM", "groom");
+        owner = user("HORSE_OWNER", "owner");
+        otherOwner = user("HORSE_OWNER", "other-owner");
 
         Area area = areas.findAll().stream().filter(a -> "A".equals(a.getCode())).findFirst().orElseThrow();
         area.setTrainerId(trainer.getId());
@@ -159,6 +163,16 @@ class TrainingQueriesIntegrationTest {
         done.setPerformanceRating(8);
         done.setActualDistanceMeters(BigDecimal.valueOf(800));
         workouts.saveAndFlush(done);
+    }
+
+    private User user(String role, String label) {
+        User user = new User();
+        user.setFullName("IT " + label);
+        user.setEmail("it-" + label + "-" + System.nanoTime() + "@test.invalid");
+        user.setPasswordHash("not-used");
+        user.setRole(roles.findByName(role).orElseThrow());
+        user.setActive(true);
+        return users.saveAndFlush(user);
     }
 
     private StableStall stall(Area area, int number, String code) {
@@ -432,9 +446,9 @@ class TrainingQueriesIntegrationTest {
 
     @Test
     void incidentCountsAreGroupedPerHorse() {
-        incidents.saveAndFlush(new GroomIncidentReport(groom.getId(), horse1.getId(), "Limping", "Left foreleg",
+        incidents.saveAndFlush(new HorseIncidentReport(groom.getId(), horse1.getId(), "Limping", "Left foreleg",
                 null, IncidentSeverity.HIGH));
-        incidents.saveAndFlush(new GroomIncidentReport(groom.getId(), horse1.getId(), "Limping again", "Left foreleg",
+        incidents.saveAndFlush(new HorseIncidentReport(groom.getId(), horse1.getId(), "Limping again", "Left foreleg",
                 null, IncidentSeverity.HIGH));
 
         List<IncidentCountRow> counts = incidents.countIncidentsByHorseIds(
