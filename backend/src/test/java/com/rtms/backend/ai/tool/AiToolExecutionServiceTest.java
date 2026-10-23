@@ -232,6 +232,10 @@ class AiToolExecutionServiceTest {
         Map<?, ?> map = (Map<?, ?>) result;
         assertEquals(1, map.get("totalManagedHorses"));
         assertTrue(map.containsKey("horseList"));
+        List<?> list = (List<?>) map.get("horseList");
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertTrue(item.containsKey("specialtyCount"));
+        assertTrue(item.containsKey("specialties"));
     }
 
     @Test
@@ -336,7 +340,103 @@ class AiToolExecutionServiceTest {
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
         assertEquals("RED RUM", map.get("horseName"));
+        assertEquals(1, map.get("specialtyCount"));
+        assertEquals(10L, map.get("horseId"));
         assertTrue(map.get("preferredSurface").toString().contains("TURF"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi getHorseSpecialtyAnalysis với horseName='all' để xếp hạng các con ngựa theo số lượng sở trường")
+    void testTrainer_GetHorseSpecialtyAnalysis_FleetRanking() {
+        AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        Horse h1 = new Horse();
+        h1.setId(10L);
+        h1.setName("ALPHA SPRINT");
+        h1.setRegistrationNumber("VN-010");
+        h1.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        Horse h2 = new Horse();
+        h2.setId(20L);
+        h2.setName("BETA DUAL");
+        h2.setRegistrationNumber("VN-020");
+        h2.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        when(horseRepository.findManagedHorsesByTrainerIdAndStatusIn(eq(5L), anyCollection()))
+                .thenReturn(List.of(h1, h2));
+
+        // h1 has 1 specialty (SPRINT), h2 has 2 specialties (MILE, MIDDLE)
+        HorseSpecialtyResponse spec1 = new HorseSpecialtyResponse(
+                3, List.of(DistanceBand.SPRINT), SurfaceType.TURF, List.of());
+        HorseSpecialtyResponse spec2 = new HorseSpecialtyResponse(
+                3, List.of(DistanceBand.MILE, DistanceBand.MIDDLE), SurfaceType.DIRT, List.of());
+
+        when(horseSpecialtyService.getSpecialties(anyCollection()))
+                .thenReturn(Map.of(10L, spec1, 20L, spec2));
+
+        Object result = toolExecutionService.executeTool(
+                "getHorseSpecialtyAnalysis",
+                Map.of("horseName", "all"),
+                trainer
+        );
+
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals(2, map.get("totalHorses"));
+        assertEquals(2, map.get("horsesWithSpecialties"));
+        assertTrue(map.containsKey("rankedHorseList"));
+
+        List<?> rankedList = (List<?>) map.get("rankedHorseList");
+        assertEquals(2, rankedList.size());
+
+        // Top horse should be BETA DUAL (2 specialties)
+        Map<?, ?> top = (Map<?, ?>) rankedList.get(0);
+        assertEquals(1, top.get("rank"));
+        assertEquals("BETA DUAL", top.get("horseName"));
+        assertEquals(2, top.get("specialtyCount"));
+
+        // Second horse should be ALPHA SPRINT (1 specialty)
+        Map<?, ?> second = (Map<?, ?>) rankedList.get(1);
+        assertEquals(2, second.get("rank"));
+        assertEquals("ALPHA SPRINT", second.get("horseName"));
+        assertEquals(1, second.get("specialtyCount"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi getHorseSpecialtyAnalysis để xếp hạng toàn bộ chiến mã trong câu lạc bộ")
+    void testManager_GetHorseSpecialtyAnalysis_FleetRanking() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        Horse h1 = new Horse();
+        h1.setId(101L);
+        h1.setName("ZEUS");
+        h1.setRegistrationNumber("VN-101");
+        h1.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        when(horseRepository.findAll()).thenReturn(List.of(h1));
+
+        HorseSpecialtyResponse spec = new HorseSpecialtyResponse(
+                3, List.of(DistanceBand.STAYER), SurfaceType.TURF, List.of());
+        when(horseSpecialtyService.getSpecialties(anyCollection()))
+                .thenReturn(Map.of(101L, spec));
+
+        Object result = toolExecutionService.executeTool(
+                "getHorseSpecialtyAnalysis",
+                Map.of(),
+                manager
+        );
+
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals(1, map.get("totalHorses"));
+        assertEquals(1, map.get("horsesWithSpecialties"));
+        List<?> rankedList = (List<?>) map.get("rankedHorseList");
+        assertEquals(1, rankedList.size());
+        Map<?, ?> top = (Map<?, ?>) rankedList.get(0);
+        assertEquals("ZEUS", top.get("horseName"));
+        assertEquals(1, top.get("specialtyCount"));
     }
 
     @Test
@@ -638,6 +738,8 @@ class AiToolExecutionServiceTest {
         assertTrue(item.get("currentStatus").toString().contains("ACTIVE"));
         assertTrue(item.get("stallLocation").toString().contains("A-01"));
         assertEquals("HLV Park", item.get("assignedTrainer"));
+        assertTrue(item.containsKey("specialtyCount"));
+        assertTrue(item.containsKey("specialties"));
     }
 
     @Test

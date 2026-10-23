@@ -158,7 +158,7 @@ class DynamicToolRegistryServiceTest {
     void testClubManagerTools() {
         List<AiToolDefinition> tools = registryService.getToolsForRole("CLUB_MANAGER");
         assertNotNull(tools);
-        assertEquals(10, tools.size());
+        assertEquals(11, tools.size());
 
         List<String> toolNames = tools.stream().map(AiToolDefinition::name).toList();
         assertTrue(toolNames.contains("getStableOccupancyMetrics"));
@@ -171,6 +171,7 @@ class DynamicToolRegistryServiceTest {
         assertTrue(toolNames.contains("getAdmissionPipelineDetails"));
         assertTrue(toolNames.contains("analyzeStableCapacityAndStallBottlenecks"));
         assertTrue(toolNames.contains("recommendGroomWorkloadRebalancing"));
+        assertTrue(toolNames.contains("getHorseSpecialtyAnalysis"));
         assertFalse(toolNames.contains("getUpcomingRacesAndCompetitions"), "getUpcomingRacesAndCompetitions phải được bỏ");
 
         // Alias RACING_MANAGER & ADMIN
@@ -181,6 +182,8 @@ class DynamicToolRegistryServiceTest {
         assertTrue(registryService.isToolAllowedForRole("analyzeStableCapacityAndStallBottlenecks", "ADMIN"));
         assertTrue(registryService.isToolAllowedForRole("recommendGroomWorkloadRebalancing", "CLUB_MANAGER"));
         assertTrue(registryService.isToolAllowedForRole("getAdmissionPipelineDetails", "ADMIN"));
+        assertTrue(registryService.isToolAllowedForRole("getHorseSpecialtyAnalysis", "CLUB_MANAGER"));
+        assertTrue(registryService.isToolAllowedForRole("getHorseSpecialtyAnalysis", "ADMIN"));
     }
 
     @Test

@@ -419,6 +419,17 @@ public class GroqAgentOrchestratorService {
                        * Tổng số nhân sự: trường `totalStaff`
                        * Cơ cấu theo vai trò: trường `roleBreakdown` (ví dụ: Huấn luyện viên trưởng, Bác sĩ thú y, Nhân viên chăm sóc (Groom), Quản lý)
                      + TUYỆT ĐỐI KHÔNG tự đếm thủ công các phần tử trong danh sách JSON. TUYỆT ĐỐI KHÔNG làm tròn hoặc bịa đặt số lượng nhân sự (ví dụ: không được báo 30 hay 36 khi dữ liệu trả về ghi rõ 24 Groom).
+
+                15. XẾP HẠNG SỞ TRƯỜNG CHIẾN MÃ (HORSE SPECIALTY & FLEET RANKING):
+                   - Khi người dùng hỏi về sở trường thi đấu, cự ly sở trường, mặt sân ưa thích hoặc yêu cầu xếp hạng các con ngựa theo tiêu chí sở trường (Specialty, số lượng Specialty):
+                     + BẮT BUỘC gọi công cụ `getHorseSpecialtyAnalysis` (với horseName='all' hoặc không truyền tham số để lấy bảng xếp hạng toàn bộ) hoặc `getClubHorsesDirectory`.
+                     + Hệ thống tính toán sẵn:
+                       * `specialtyCount`: Số lượng sở trường đạt chuẩn (dựa trên các bài tập workout hoàn thành đạt chuẩn trong 90 ngày gần nhất).
+                       * `specialties`: Danh sách các cự ly sở trường (Nước rút SPRINT, Cự ly trung bình MILE, Cự ly trung xa MIDDLE, Đường trường STAYER).
+                       * `preferredSurface`: Mặt sân thi đấu ưa thích (Sân cỏ TURF / Sân cát DIRT).
+                       * `rankedHorseList`: Danh sách toàn bộ chiến mã đã được sắp xếp giảm dần theo số lượng sở trường (`specialtyCount DESC`).
+                     + Báo cáo rõ ràng thứ hạng (Hạng 1, Hạng 2,...), Tên ngựa, Mã đăng ký, Số lượng sở trường (`specialtyCount`) và Chi tiết cự ly/mặt sân.
+                     + TUYỆT ĐỐI KHÔNG từ chối xếp hạng với lý do thiếu thông tin hay không có khả năng so sánh khi người dùng yêu cầu xếp hạng.
                 """, userName, role) + "\n" + buildRoleDomainOntology(role);
     }
 
@@ -426,7 +437,7 @@ public class GroqAgentOrchestratorService {
         if (role == null) return "";
         return switch (role.toUpperCase()) {
             case "HEAD_TRAINER", "TRAINER" -> """
-                15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO HUẤN LUYỆN VIÊN (HEAD_TRAINER DOMAIN ONTOLOGY):
+                16. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO HUẤN LUYỆN VIÊN (HEAD_TRAINER DOMAIN ONTOLOGY):
                    - QUAN HỆ THỰC THỂ:
                      + Huấn luyện viên trưởng [Trainer] quản lý Khu vực [Area] gồm nhiều Cụm chuồng [StableLot] và Ô chuồng [Stall].
                      + Mỗi Ô chuồng [Stall] được phân công cho 1 Groom chăm sóc và chứa 1 Chiến mã [Horse].
@@ -438,9 +449,10 @@ public class GroqAgentOrchestratorService {
                      + Tra cứu kế hoạch huấn luyện: Dùng `getTrainerPlansSummary`.
                      + Đăng ký giải đua: Dùng `getMyHorseRaceRegistrations` (đọc `totalRaceRegistrations`).
                      + Đơn tuyển nhận nhập đàn chờ thẩm định: Dùng `getAssignedAdmissionReviews` (đọc `pendingReviewCount`).
+                      + Phân tích & Xếp hạng sở trường: Dùng `getHorseSpecialtyAnalysis` (đọc `rankedHorseList` và `specialtyCount`).
                 """;
             case "VETERINARIAN", "VET" -> """
-                15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO BÁC SĨ THÚ Y (VETERINARIAN DOMAIN ONTOLOGY):
+                16. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO BÁC SĨ THÚ Y (VETERINARIAN DOMAIN ONTOLOGY):
                    - QUAN HỆ THỰC THỂ:
                      + Bác sĩ thú y [Vet] theo dõi sức khỏe và điều trị cho toàn bộ Đàn ngựa [Horses].
                      + Khi ngựa gặp vấn đề sức khỏe: Bác sĩ ghi nhận Hồ sơ bệnh án [HealthRecord], Chỉ số sinh hiệu [HorseHealthMetric] và Lịch chăm sóc/điều trị [CareSchedule].
@@ -453,7 +465,7 @@ public class GroqAgentOrchestratorService {
                      + Kiểm tra tình trạng cách ly: Dùng `getQuarantineStatus`.
                 """;
             case "GROOM", "STABLE_STAFF" -> """
-                15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO GROOM (GROOM DOMAIN ONTOLOGY):
+                16. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO GROOM (GROOM DOMAIN ONTOLOGY):
                    - QUAN HỆ THỰC THỂ:
                      + Nhân viên chăm sóc [Groom] được phân công phụ trách một nhóm Ô chuồng [Stall] thuộc Cụm chuồng [StableLot].
                      + Groom chịu trách nhiệm trực tiếp cho ăn, dọn dẹp, kiểm tra sức khỏe hàng ngày cho các Chiến mã trong ô chuồng của mình.
@@ -466,7 +478,7 @@ public class GroqAgentOrchestratorService {
                      + Tra cứu vị trí chuồng ngựa: Dùng `getHorseStallLocation`.
                 """;
             case "HORSE_OWNER", "OWNER" -> """
-                15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO CHỦ SỞ HỮU NGỰA (HORSE_OWNER DOMAIN ONTOLOGY):
+                16. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO CHỦ SỞ HỮU NGỰA (HORSE_OWNER DOMAIN ONTOLOGY):
                    - QUAN HỆ THỰC THỂ:
                      + Chủ ngựa [Horse Owner] nộp Đơn đăng ký nhập đàn [Admission Application] để đưa ngựa vào câu lạc bộ RTMS.
                      + Sau khi được duyệt, Chiến mã [Horse] lưu trú tại Ô chuồng [Stall] của câu lạc bộ, được chăm sóc bởi Groom và huấn luyện bởi HLV trưởng.
@@ -478,7 +490,7 @@ public class GroqAgentOrchestratorService {
                      + Phả hệ / huyết thống: Dùng `getMyHorsePedigreeInfo`.
                 """;
             case "CLUB_MANAGER", "ADMIN" -> """
-                15. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO QUẢN LÝ (CLUB_MANAGER DOMAIN ONTOLOGY):
+                16. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO QUẢN LÝ (CLUB_MANAGER DOMAIN ONTOLOGY):
                    - QUAN HỆ THỰC THỂ:
                      + Quản lý câu lạc bộ [Club Manager] giám sát toàn diện mọi mặt hoạt động: Quy mô đàn ngựa, Công suất chuồng trại, Đội ngũ nhân sự, Tiến trình tuyển nhận nhập đàn và Nhật ký kiểm toán bảo mật [Audit Trail].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
@@ -487,6 +499,7 @@ public class GroqAgentOrchestratorService {
                      + Đội ngũ nhân sự: Dùng `getSystemStaffOverview` (đọc `totalStaff` và `roleBreakdown`).
                      + Tiến trình tuyển nhận nhập đàn: Dùng `getAdmissionRequestsOverview` (đọc `totalApplications`) và `getAdmissionPipelineDetails`.
                      + Nhật ký kiểm toán: Dùng `getRecentAuditLogs` (đọc `totalAuditLogs`).
+                      + Xếp hạng sở trường chiến mã toàn đàn: Dùng `getHorseSpecialtyAnalysis` (đọc `rankedHorseList` và `specialtyCount`) hoặc `getClubHorsesDirectory`.
                 """;
             default -> "";
         };
@@ -679,6 +692,11 @@ public class GroqAgentOrchestratorService {
             case "recommendationReason" -> "Lý do đề xuất";
             case "specialties" -> "Sở trường";
             case "specialtyCount" -> "Số lượng sở trường";
+            case "strongDistances" -> "Các cự ly sở trường";
+            case "rankedHorseList" -> "Bảng xếp hạng chiến mã";
+            case "rank" -> "Thứ hạng";
+            case "rankingCriterion" -> "Tiêu chí xếp hạng";
+            case "horsesWithSpecialties" -> "Số ngựa có sở trường";
 
             // Nhiệm vụ Groom & Sự cố
             case "taskType" -> "Loại công việc";

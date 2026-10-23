@@ -176,10 +176,10 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getHorseSpecialtyAnalysis",
-                        "Phân tích sở trường của ngựa (cự ly tối ưu, mặt sân ưa thích rõ ràng, tốc độ đỉnh).",
+                        "Phân tích sở trường của ngựa (cự ly tối ưu, mặt sân ưa thích, số lượng sở trường). Nếu không truyền ID/tên ngựa hoặc truyền 'all'/'tất cả', hệ thống tự động trả về bảng XẾP HẠNG tất cả các con ngựa theo số lượng sở trường (specialtyCount). Bắt buộc dùng khi người dùng yêu cầu xếp hạng ngựa theo sở trường (Specialty).",
                         buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của con ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên con ngựa (tùy chọn)")
+                                "horseId", Map.of("type", "integer", "description", "ID của con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all' để xếp hạng tất cả các con ngựa)"),
+                                "horseName", Map.of("type", "string", "description", "Tên con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all'/'tất cả' để xếp hạng tất cả các con ngựa)")
                         ))
                 ),
                 new AiToolDefinition(
@@ -453,10 +453,18 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getClubHorsesDirectory",
-                        "Tra cứu danh sách chi tiết các chiến mã trong câu lạc bộ (tên ngựa, UELN, chuồng, HLV phụ trách). Lọc theo trạng thái (status) hoặc tên ngựa / tên chủ ngựa.",
+                        "Tra cứu danh sách chi tiết các chiến mã trong câu lạc bộ (tên ngựa, UELN, chuồng, HLV phụ trách, số lượng sở trường specialtyCount, danh sách sở trường specialties). Lọc theo trạng thái (status) hoặc tên ngựa / tên chủ ngựa.",
                         buildParamSchema(Map.of(
                                 "status", Map.of("type", "string", "description", "Trạng thái chiến mã (ACTIVE, IN_TRAINING, RESTING, QUARANTINE)"),
                                 "keyword", Map.of("type", "string", "description", "Từ khóa tìm kiếm theo tên ngựa hoặc tên chủ ngựa")
+                        ))
+                ),
+                new AiToolDefinition(
+                        "getHorseSpecialtyAnalysis",
+                        "Phân tích sở trường của ngựa (cự ly tối ưu, mặt sân ưa thích, số lượng sở trường). Nếu không truyền ID/tên ngựa hoặc truyền 'all'/'tất cả', hệ thống tự động trả về bảng XẾP HẠNG tất cả các con ngựa theo số lượng sở trường (specialtyCount). Bắt buộc dùng khi người dùng yêu cầu xếp hạng ngựa theo sở trường (Specialty).",
+                        buildParamSchema(Map.of(
+                                "horseId", Map.of("type", "integer", "description", "ID của con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all' để xếp hạng tất cả các con ngựa)"),
+                                "horseName", Map.of("type", "string", "description", "Tên con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all'/'tất cả' để xếp hạng tất cả các con ngựa)")
                         ))
                 ),
                 new AiToolDefinition(

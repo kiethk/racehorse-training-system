@@ -336,7 +336,7 @@ public class AiToolExecutionService {
             case "getHorseFitnessTrend" -> handleGetHorseFitnessTrend(args);
             case "getTrainerSchedule" -> handleGetTrainerSchedule(args, currentUser);
             case "getTrainerPlansSummary" -> handleGetTrainerPlansSummary(args, currentUser);
-            case "getHorseSpecialtyAnalysis" -> handleGetHorseSpecialtyAnalysis(args);
+            case "getHorseSpecialtyAnalysis" -> handleGetHorseSpecialtyAnalysis(args, currentUser);
             case "getTrainerRiskAlerts" -> handleGetTrainerRiskAlerts(args, currentUser);
             case "getRacingReadinessAssessment" -> handleGetRacingReadinessAssessment(args);
             case "checkGroomConflictForLot" -> handleCheckGroomConflictForLot(args);
@@ -728,6 +728,19 @@ public class AiToolExecutionService {
                 List.of(HorseStatus.ELIGIBLE, HorseStatus.CANDIDATE)
         );
 
+        List<Long> trainerHorseIds = horses.stream().map(Horse::getId).filter(Objects::nonNull).toList();
+        Map<Long, HorseSpecialtyResponse> trainerSpecialties = Collections.emptyMap();
+        if (horseSpecialtyService != null && !trainerHorseIds.isEmpty()) {
+            try {
+                Map<Long, HorseSpecialtyResponse> queried = horseSpecialtyService.getSpecialties(trainerHorseIds);
+                if (queried != null) {
+                    trainerSpecialties = queried;
+                }
+            } catch (Exception e) {
+                log.warn("Lỗi khi tải sở trường cho danh sách ngựa HLV: {}", e.getMessage());
+            }
+        }
+
         List<Map<String, Object>> list = new ArrayList<>();
         for (Horse h : horses) {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -750,9 +763,25 @@ public class AiToolExecutionService {
                     }
                 }
             }
+            HorseSpecialtyResponse specResp = trainerSpecialties.get(h.getId());
+            int specialtyCount = (specResp != null && specResp.strongDistances() != null) ? specResp.strongDistances().size() : 0;
+            List<String> strongBands = (specResp != null && specResp.strongDistances() != null)
+                    ? specResp.strongDistances().stream().map(DistanceBand::name).toList()
+                    : Collections.emptyList();
+            List<String> formattedDistances = (specResp != null && specResp.strongDistances() != null && !specResp.strongDistances().isEmpty())
+                    ? specResp.strongDistances().stream().map(this::formatDistanceBand).toList()
+                    : List.of("Chưa xác định");
+            String preferredSurface = (specResp != null && specResp.preferredSurface() != null)
+                    ? (specResp.preferredSurface() == SurfaceType.TURF ? "Sân cỏ (TURF)" : "Sân cát (DIRT)")
+                    : "Chưa rõ";
+
             item.put("stallLocation", stallName);
             item.put("assignedGroomName", groomName);
             item.put("groomPhone", groomPhone);
+            item.put("specialtyCount", specialtyCount);
+            item.put("specialties", formattedDistances);
+            item.put("strongDistances", strongBands);
+            item.put("preferredSurface", preferredSurface);
             item.put("actionUrl", h.getId() != null ? "/trainer/horses/" + h.getId() : "/trainer/horses");
             list.add(item);
         }
@@ -892,7 +921,15 @@ public class AiToolExecutionService {
         return result;
     }
 
-    private Object handleGetHorseSpecialtyAnalysis(Map<String, Object> args) {
+    private Object handleGetHorseSpecialtyAnalysis(Map<String, Object> args, AuthenticatedUser currentUser) {
+        String horseNameArg = args.get("horseName") != null ? args.get("horseName").toString().trim().toLowerCase() : "";
+        boolean isFleetRequest = horseNameArg.equals("all") || horseNameArg.equals("tất cả") || horseNameArg.equals("toàn bộ")
+                || (args.get("horseId") == null && (args.get("horseName") == null || horseNameArg.isBlank()));
+
+        if (isFleetRequest) {
+            return handleRankAllHorsesBySpecialty(currentUser);
+        }
+
         Horse horse = resolveHorse(args);
         if (horse == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
@@ -928,13 +965,138 @@ public class AiToolExecutionService {
             }
         }
 
+        int specialtyCount = (resp != null && resp.strongDistances() != null) ? resp.strongDistances().size() : 0;
+        List<String> strongBands = (resp != null && resp.strongDistances() != null)
+                ? resp.strongDistances().stream().map(DistanceBand::name).toList()
+                : Collections.emptyList();
+        List<String> formattedDistances = (resp != null && resp.strongDistances() != null && !resp.strongDistances().isEmpty())
+                ? resp.strongDistances().stream().map(this::formatDistanceBand).toList()
+                : List.of("Chưa đủ buổi tập đạt chuẩn để xác định sở trường");
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("horseName", horse.getName());
         result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("horseId", horse.getId());
+        result.put("specialtyCount", specialtyCount);
+        result.put("specialties", formattedDistances);
+        result.put("strongDistances", strongBands);
         result.put("optimalDistance", (resp != null && !resp.strongDistances().isEmpty()) ? resp.strongDistances() : List.of("Đang phân tích thêm cự ly"));
         result.put("preferredSurface", matSanUaThich);
         result.put("distanceStats", resp != null ? resp.distanceStats() : Collections.emptyList());
+        result.put("actionUrl", resolveHorseActionUrl(horse.getId(), currentUser));
         return result;
+    }
+
+    private Object handleRankAllHorsesBySpecialty(AuthenticatedUser currentUser) {
+        List<Horse> horses;
+        if (currentUser != null && "HEAD_TRAINER".equals(currentUser.getRole())) {
+            horses = horseRepository.findManagedHorsesByTrainerIdAndStatusIn(
+                    currentUser.getUserId(),
+                    List.of(HorseStatus.ELIGIBLE, HorseStatus.CANDIDATE)
+            );
+            if (horses == null || horses.isEmpty()) {
+                horses = horseRepository.findAll();
+            }
+        } else if (currentUser != null && "HORSE_OWNER".equals(currentUser.getRole())) {
+            horses = horseRepository.findByOwnerId(currentUser.getUserId());
+        } else {
+            horses = horseRepository.findAll();
+        }
+
+        if (horses == null || horses.isEmpty()) {
+            return Map.of(
+                    "totalHorses", 0,
+                    "horsesWithSpecialties", 0,
+                    "rankedHorseList", Collections.emptyList(),
+                    "summary", "Không tìm thấy chiến mã nào trong hệ thống để xếp hạng."
+            );
+        }
+
+        List<Long> horseIds = horses.stream().map(Horse::getId).filter(Objects::nonNull).toList();
+        Map<Long, HorseSpecialtyResponse> specialtiesMap = Collections.emptyMap();
+        if (horseSpecialtyService != null && !horseIds.isEmpty()) {
+            try {
+                Map<Long, HorseSpecialtyResponse> queried = horseSpecialtyService.getSpecialties(horseIds);
+                if (queried != null) {
+                    specialtiesMap = queried;
+                }
+            } catch (Exception e) {
+                log.warn("Lỗi khi batch query sở trường ngựa: {}", e.getMessage());
+            }
+        }
+
+        List<Map<String, Object>> unrankedList = new ArrayList<>();
+        int countWithSpecialties = 0;
+
+        for (Horse h : horses) {
+            HorseSpecialtyResponse resp = specialtiesMap.get(h.getId());
+            int specCount = (resp != null && resp.strongDistances() != null) ? resp.strongDistances().size() : 0;
+            if (specCount > 0) {
+                countWithSpecialties++;
+            }
+            List<String> strongBands = (resp != null && resp.strongDistances() != null)
+                    ? resp.strongDistances().stream().map(DistanceBand::name).toList()
+                    : Collections.emptyList();
+            List<String> formattedDistances = (resp != null && resp.strongDistances() != null && !resp.strongDistances().isEmpty())
+                    ? resp.strongDistances().stream().map(this::formatDistanceBand).toList()
+                    : List.of("Chưa xác định");
+            String surf = (resp != null && resp.preferredSurface() != null)
+                    ? (resp.preferredSurface() == SurfaceType.TURF ? "Sân cỏ (TURF)" : "Sân cát (DIRT)")
+                    : "Chưa rõ";
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("horseId", h.getId());
+            item.put("horseName", h.getName());
+            item.put("registrationNumber", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
+            item.put("specialtyCount", specCount);
+            item.put("specialties", formattedDistances);
+            item.put("strongDistances", strongBands);
+            item.put("preferredSurface", surf);
+            item.put("status", h.getCurrentStatus() != null ? h.getCurrentStatus().name() : "N/A");
+            item.put("actionUrl", resolveHorseActionUrl(h.getId(), currentUser));
+            unrankedList.add(item);
+        }
+
+        unrankedList.sort(Comparator.comparingInt((Map<String, Object> m) -> (Integer) m.get("specialtyCount")).reversed()
+                .thenComparing(m -> (String) m.get("horseName")));
+
+        List<Map<String, Object>> rankedList = new ArrayList<>();
+        int rank = 1;
+        for (Map<String, Object> m : unrankedList) {
+            Map<String, Object> rankedItem = new LinkedHashMap<>();
+            rankedItem.put("rank", rank++);
+            rankedItem.putAll(m);
+            rankedList.add(rankedItem);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("totalHorses", rankedList.size());
+        response.put("horsesWithSpecialties", countWithSpecialties);
+        response.put("rankingCriterion", "Số lượng sở trường cự ly đạt chuẩn (WINDOW_DAYS=90, MIN_WORKOUTS=3, MIN_RATING=7.0)");
+        response.put("summary", "Bảng xếp hạng " + rankedList.size() + " chiến mã theo số lượng sở trường (Specialty Count). Có " + countWithSpecialties + " ngựa đã xác định được sở trường.");
+        response.put("rankedHorseList", rankedList);
+        return response;
+    }
+
+    private String formatDistanceBand(DistanceBand band) {
+        if (band == null) return "Chưa xác định";
+        return switch (band) {
+            case SPRINT -> "Nước rút (SPRINT: <=1400m)";
+            case MILE -> "Cự ly trung bình (MILE: 1401m-1800m)";
+            case MIDDLE -> "Cự ly trung xa (MIDDLE: 1801m-2400m)";
+            case STAYER -> "Đường trường (STAYER: >2400m)";
+        };
+    }
+
+    private String resolveHorseActionUrl(Long horseId, AuthenticatedUser currentUser) {
+        if (horseId == null) return "/manager/horses";
+        String role = currentUser != null && currentUser.getRole() != null ? currentUser.getRole() : "CLUB_MANAGER";
+        return switch (role) {
+            case "HEAD_TRAINER" -> "/trainer/horses/" + horseId;
+            case "HORSE_OWNER" -> "/owner/horses/" + horseId;
+            case "VETERINARIAN" -> "/veterinarian/horses/" + horseId;
+            default -> "/manager/horses/" + horseId;
+        };
     }
 
     private Object handleGetTrainerRiskAlerts(Map<String, Object> args, AuthenticatedUser currentUser) {
@@ -2451,6 +2613,19 @@ public class AiToolExecutionService {
                     .stream().map(StableStall::getId).collect(Collectors.toSet());
         }
 
+        List<Long> allHorseIds = allHorses.stream().map(Horse::getId).filter(Objects::nonNull).toList();
+        Map<Long, HorseSpecialtyResponse> dirSpecialties = Collections.emptyMap();
+        if (horseSpecialtyService != null && !allHorseIds.isEmpty()) {
+            try {
+                Map<Long, HorseSpecialtyResponse> queried = horseSpecialtyService.getSpecialties(allHorseIds);
+                if (queried != null) {
+                    dirSpecialties = queried;
+                }
+            } catch (Exception e) {
+                log.warn("Lỗi khi tải sở trường cho danh bạ ngựa: {}", e.getMessage());
+            }
+        }
+
         List<Map<String, Object>> result = new ArrayList<>();
         for (Horse h : allHorses) {
             String ownerName = "Chưa xác định";
@@ -2511,6 +2686,18 @@ public class AiToolExecutionService {
             String stallName = resolveStallName(h.getCurrentStallId());
             String trainerName = resolveHorseTrainerName(h);
 
+            HorseSpecialtyResponse specResp = dirSpecialties.get(h.getId());
+            int specialtyCount = (specResp != null && specResp.strongDistances() != null) ? specResp.strongDistances().size() : 0;
+            List<String> strongBands = (specResp != null && specResp.strongDistances() != null)
+                    ? specResp.strongDistances().stream().map(DistanceBand::name).toList()
+                    : Collections.emptyList();
+            List<String> formattedDistances = (specResp != null && specResp.strongDistances() != null && !specResp.strongDistances().isEmpty())
+                    ? specResp.strongDistances().stream().map(this::formatDistanceBand).toList()
+                    : List.of("Chưa xác định");
+            String preferredSurface = (specResp != null && specResp.preferredSurface() != null)
+                    ? (specResp.preferredSurface() == SurfaceType.TURF ? "Sân cỏ (TURF)" : "Sân cát (DIRT)")
+                    : "Chưa rõ";
+
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("horseName", h.getName());
             item.put("registrationNumber", h.getRegistrationNumber() != null ? h.getRegistrationNumber() : "N/A");
@@ -2521,6 +2708,10 @@ public class AiToolExecutionService {
             item.put("trainingDecision", (isQuarantineStall || isBlocked) ? "BLOCKED" : (h.getTrainingDecision() != null ? h.getTrainingDecision().name() : "ALLOWED"));
             item.put("stallLocation", stallName);
             item.put("assignedTrainer", trainerName);
+            item.put("specialtyCount", specialtyCount);
+            item.put("specialties", formattedDistances);
+            item.put("strongDistances", strongBands);
+            item.put("preferredSurface", preferredSurface);
             item.put("totalClubHorses", allHorses.size());
             item.put("actionUrl", h.getId() != null ? "/manager/horses/" + h.getId() : "/manager/horses");
             result.add(item);
