@@ -20,6 +20,7 @@ ai-worker/.venv/
 .env.local
 !.env*.example
 backend/.env.cloud
+backend/src/main/resources/application-local.properties
 
 # IDE
 .idea/
