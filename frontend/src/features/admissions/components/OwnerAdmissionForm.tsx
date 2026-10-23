@@ -21,28 +21,28 @@ import { HORSE_SEX_OPTIONS, isHorseSex } from '@/features/horses/lib/sex';
 const OCR_DOCUMENTS: { type: AdmissionDocumentType; label: string; description: string; required: boolean }[] = [
   {
     type: 'REGISTRATION_DOCUMENT',
-    label: 'Giấy đăng ký / Hộ chiếu ngựa (Registration document)',
-    description: 'Trích xuất tự động: Tên ngựa, UELN (15 ký tự), Giống, Ngày sinh, Giới tính, Sổ đăng bạ.',
+    label: 'Registration document / Horse passport',
+    description: 'Auto-extracts: Horse name, UELN (15 characters), Breed, Date of birth, Sex, Registry name.',
     required: true,
   },
   {
     type: 'PEDIGREE_CERTIFICATE',
-    label: 'Giấy phả hệ (Pedigree certificate)',
-    description: 'Trích xuất tự động: Tên ngựa cha, UELN cha, Tên ngựa mẹ, UELN mẹ, Ghi chú phả hệ.',
+    label: 'Pedigree certificate',
+    description: 'Auto-extracts: Sire name, Sire UELN, Dam name, Dam UELN, Pedigree notes.',
     required: true,
   },
 ];
 
 const REMAINING_REQUIRED_DOCUMENTS: { type: AdmissionDocumentType; label: string; required: boolean }[] = [
-  { type: 'HORSE_PHOTO', label: 'Ảnh chụp ngựa (Horse photo)', required: true },
-  { type: 'VACCINATION_RECORD', label: 'Sổ tiêm chủng vắc xin (Vaccination record)', required: true },
+  { type: 'HORSE_PHOTO', label: 'Horse photo', required: true },
+  { type: 'VACCINATION_RECORD', label: 'Vaccination record', required: true },
 ];
 
 const OPTIONAL_DOCUMENTS: { type: AdmissionDocumentType; label: string; required: boolean }[] = [
-  { type: 'DEWORMING_RECORD', label: 'Hồ sơ tẩy giun (Deworming record)', required: false },
-  { type: 'HEALTH_CERTIFICATE', label: 'Chứng nhận sức khỏe (Health certificate)', required: false },
-  { type: 'PREVIOUS_MEDICAL_RECORD', label: 'Bệnh án điều trị trước đây (Previous medical record)', required: false },
-  { type: 'PREVIOUS_INJURY_RECORD', label: 'Hồ sơ chấn thương cũ (Previous injury record)', required: false },
+  { type: 'DEWORMING_RECORD', label: 'Deworming record', required: false },
+  { type: 'HEALTH_CERTIFICATE', label: 'Health certificate', required: false },
+  { type: 'PREVIOUS_MEDICAL_RECORD', label: 'Previous medical record', required: false },
+  { type: 'PREVIOUS_INJURY_RECORD', label: 'Previous injury record', required: false },
 ];
 
 const DOCUMENTS = [
@@ -52,17 +52,17 @@ const DOCUMENTS = [
 ];
 
 const FIELDS: { key: Exclude<keyof CreateOwnerAdmissionRequest, 'sex'>; label: string; required?: boolean; type?: string; hint?: string }[] = [
-  { key: 'name', label: 'Tên ngựa (Horse name)', required: true },
-  { key: 'breed', label: 'Giống ngựa (Breed)' },
-  { key: 'dateOfBirth', label: 'Ngày sinh (Date of birth)', type: 'date' },
-  { key: 'registrationNumber', label: 'Mã số UELN / Số đăng bạ', hint: 'Gồm 15 ký tự (VD: 704001SC0000001 hoặc VNM22SC00000001).' },
-  { key: 'registryName', label: 'Sổ đăng bạ (Registry name)' },
-  { key: 'sireName', label: 'Tên ngựa cha (Sire name)' },
-  { key: 'sireRegistrationNumber', label: 'UELN ngựa cha', hint: '15 ký tự theo chuẩn quốc tế, nếu có.' },
-  { key: 'damName', label: 'Tên ngựa mẹ (Dam name)' },
-  { key: 'damRegistrationNumber', label: 'UELN ngựa mẹ', hint: '15 ký tự theo chuẩn quốc tế, nếu có.' },
+  { key: 'name', label: 'Horse name', required: true },
+  { key: 'breed', label: 'Breed' },
+  { key: 'dateOfBirth', label: 'Date of birth', type: 'date' },
+  { key: 'registrationNumber', label: 'UELN / registration number', hint: '15 characters (e.g. 704001SC0000001 or VNM22SC00000001).' },
+  { key: 'registryName', label: 'Registry name' },
+  { key: 'sireName', label: 'Sire name' },
+  { key: 'sireRegistrationNumber', label: 'Sire UELN', hint: '15 characters (e.g. 704001RT0000001 or VNM18RT00000001).' },
+  { key: 'damName', label: 'Dam name' },
+  { key: 'damRegistrationNumber', label: 'Dam UELN', hint: '15 characters (e.g. 704001GB0000001 or VNM19GB00000001).' },
 ];
-const SEX_FIELD = { key: 'sex', label: 'Giới tính (Sex)', required: true } as const;
+const SEX_FIELD = { key: 'sex', label: 'Sex', required: true } as const;
 const FORM_FIELDS = [...FIELDS.slice(0, 2), SEX_FIELD, ...FIELDS.slice(2)];
 
 type AdmissionFormState = Omit<CreateOwnerAdmissionRequest, 'sex'> & { sex: HorseSex | '' };
@@ -78,18 +78,18 @@ function normalizeUeln(raw?: string | null): string | null {
 
 function validateField(key: keyof CreateOwnerAdmissionRequest, raw: string, input?: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) {
   const value = raw.trim();
-  if (key === 'name' && !value) return 'Vui lòng nhập tên ngựa.';
-  if (key === 'sex' && !isHorseSex(value)) return 'Vui lòng chọn giới tính (Male hoặc Female).';
+  if (key === 'name' && !value) return 'Enter the horse name.';
+  if (key === 'sex' && !isHorseSex(value)) return 'Select Male or Female.';
   if (key.toLowerCase().includes('registration') && value) {
     const normalized = value.toUpperCase();
     if (!/^[0-9]{6}[A-Z0-9]{9}$/.test(normalized) && !/^[A-Z]{3}[A-Z0-9]{12}$/.test(normalized)) {
-      return 'Mã UELN phải gồm 15 ký tự hợp lệ (VD: 704001SC0000001 hoặc VNM22SC00000001), hoặc để trống.';
+      return 'Enter a valid 15-character UELN (e.g. 704001SC0000001 or VNM22SC00000001), or leave this field empty.';
     }
   }
-  if (key === 'dateOfBirth' && input?.validity.badInput) return 'Vui lòng nhập ngày sinh hợp lệ.';
-  if (key === 'dateOfBirth' && input?.validity.rangeOverflow) return 'Ngày sinh phải là hôm nay hoặc trong quá khứ.';
+  if (key === 'dateOfBirth' && input?.validity.badInput) return 'Enter a valid date of birth.';
+  if (key === 'dateOfBirth' && input?.validity.rangeOverflow) return 'Date of birth must be today or earlier.';
   const limit = key === 'pedigreeNotes' ? 2000 : 255;
-  return value.length > limit ? `Vui lòng nhập tối đa ${limit} ký tự.` : '';
+  return value.length > limit ? `Use ${limit} characters or fewer.` : '';
 }
 
 function validatePedigreeRelationships(formData: Omit<CreateOwnerAdmissionRequest, 'sex'>): FieldErrors {
@@ -99,13 +99,13 @@ function validatePedigreeRelationships(formData: Omit<CreateOwnerAdmissionReques
   const damUeln = normalizeUeln(formData.damRegistrationNumber);
 
   if (childUeln && sireUeln && childUeln === sireUeln) {
-    errors.sireRegistrationNumber = 'Mã UELN của ngựa cha không được trùng với mã của ngựa con.';
+    errors.sireRegistrationNumber = 'Sire UELN cannot be the same as horse UELN.';
   }
   if (childUeln && damUeln && childUeln === damUeln) {
-    errors.damRegistrationNumber = 'Mã UELN của ngựa mẹ không được trùng với mã của ngựa con.';
+    errors.damRegistrationNumber = 'Dam UELN cannot be the same as horse UELN.';
   }
   if (sireUeln && damUeln && sireUeln === damUeln) {
-    errors.damRegistrationNumber = 'Mã UELN của ngựa mẹ không được trùng với mã của ngựa cha.';
+    errors.damRegistrationNumber = 'Dam UELN cannot be the same as sire UELN.';
   }
   return errors;
 }
@@ -145,9 +145,12 @@ export function OwnerAdmissionForm() {
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const previewsRef = useRef(filePreviews);
-  previewsRef.current = filePreviews;
   const rawUrlsRef = useRef(rawFileUrls);
-  rawUrlsRef.current = rawFileUrls;
+
+  useEffect(() => {
+    previewsRef.current = filePreviews;
+    rawUrlsRef.current = rawFileUrls;
+  }, [filePreviews, rawFileUrls]);
 
   useEffect(() => () => {
     Object.values(previewsRef.current).forEach(url => {
@@ -165,10 +168,10 @@ export function OwnerAdmissionForm() {
   async function triggerOcrScan(file: File, type: AdmissionDocumentType) {
     if (type !== 'REGISTRATION_DOCUMENT' && type !== 'PEDIGREE_CERTIFICATE') return;
     setScanningDocType(type);
-    const docName = type === 'REGISTRATION_DOCUMENT' ? 'Giấy đăng ký' : 'Giấy phả hệ';
+    const docName = type === 'REGISTRATION_DOCUMENT' ? 'Registration document' : 'Pedigree certificate';
     setOcrNotice({
       tone: 'info',
-      message: `AI đang quét và bóc tách dữ liệu từ ${docName}... Các ô tải tệp tạm thời được khóa để tránh xung đột dữ liệu.`,
+      message: `AI is scanning and extracting data from ${docName}... Document inputs are temporarily locked to prevent data conflicts.`,
     });
 
     try {
@@ -177,62 +180,51 @@ export function OwnerAdmissionForm() {
       if (!data) {
         setOcrNotice({
           tone: 'warning',
-          message: 'Không thể trích xuất tự động từ tài liệu này. Vui lòng rà soát và điền tay.',
+          message: 'Unable to automatically extract data from this document. Please review and fill in fields manually.',
         });
         return;
       }
 
-      const isPedigree = type === 'PEDIGREE_CERTIFICATE';
-      const updatedKeys: string[] = [];
-
+      let countUpdated = 0;
       setForm(currentForm => {
         const nextForm = { ...currentForm };
+        const updatedKeys: string[] = [];
 
-        // Precedence: REGISTRATION_DOCUMENT là chân lý tối cao cho định danh ngựa; PEDIGREE chỉ điền nếu chưa có
+        // Precedence: REGISTRATION_DOCUMENT is primary authority for horse identity; PEDIGREE only fills if still blank
+        const isPedigree = type === 'PEDIGREE_CERTIFICATE';
+
         // 1. Name
-        if (data.name) {
-          if (!isPedigree || !nextForm.name?.trim()) {
-            if (nextForm.name !== data.name) {
-              nextForm.name = data.name;
-              updatedKeys.push('name');
-            }
+        if (data.name && (!isPedigree || !nextForm.name?.trim())) {
+          if (!nextForm.name?.trim()) {
+            nextForm.name = data.name;
+            updatedKeys.push('name');
           }
         }
-        // 2. Sex (Sex Safeguard: chỉ set nếu OCR chắc chắn)
-        if (data.sex) {
-          if (!isPedigree || !nextForm.sex) {
-            if (nextForm.sex !== data.sex) {
-              nextForm.sex = data.sex;
-              updatedKeys.push('sex');
-            }
-          }
+        // 2. Sex (Safeguard: only set if recognized and form does not have it yet)
+        if (data.sex && !nextForm.sex) {
+          nextForm.sex = data.sex;
+          updatedKeys.push('sex');
         }
         // 3. Breed
-        if (data.breed) {
-          if (!isPedigree || !nextForm.breed?.trim()) {
-            if (nextForm.breed !== data.breed) {
-              nextForm.breed = data.breed;
-              updatedKeys.push('breed');
-            }
+        if (data.breed && (!isPedigree || !nextForm.breed?.trim())) {
+          if (!nextForm.breed?.trim()) {
+            nextForm.breed = data.breed;
+            updatedKeys.push('breed');
           }
         }
         // 4. Date of Birth
-        if (data.dateOfBirth) {
-          if (!isPedigree || !nextForm.dateOfBirth?.trim()) {
-            if (nextForm.dateOfBirth !== data.dateOfBirth) {
-              nextForm.dateOfBirth = data.dateOfBirth;
-              updatedKeys.push('dateOfBirth');
-            }
+        if (data.dateOfBirth && (!isPedigree || !nextForm.dateOfBirth?.trim())) {
+          if (!nextForm.dateOfBirth?.trim()) {
+            nextForm.dateOfBirth = data.dateOfBirth;
+            updatedKeys.push('dateOfBirth');
           }
         }
         // 5. UELN / Registration Number
-        if (data.registrationNumber) {
-          if (!isPedigree || !nextForm.registrationNumber?.trim()) {
-            if (nextForm.registrationNumber !== data.registrationNumber) {
-              nextForm.registrationNumber = data.registrationNumber;
-              updatedKeys.push('registrationNumber');
-              checkUeln(data.registrationNumber);
-            }
+        if (data.registrationNumber && (!isPedigree || !nextForm.registrationNumber?.trim())) {
+          if (!nextForm.registrationNumber?.trim()) {
+            nextForm.registrationNumber = data.registrationNumber;
+            updatedKeys.push('registrationNumber');
+            checkUeln(data.registrationNumber);
           }
         }
         // 6. Registry Name
@@ -259,35 +251,29 @@ export function OwnerAdmissionForm() {
           updatedKeys.push('damRegistrationNumber');
         }
 
+        countUpdated = updatedKeys.length;
+        if (updatedKeys.length > 0) {
+          setHighlightedFields(new Set(updatedKeys));
+          setTimeout(() => setHighlightedFields(new Set()), 6000);
+        }
         return nextForm;
       });
 
-      // Clear any previous validation errors for auto-filled fields
-      setFieldErrors(current => {
-        const next = { ...current };
-        updatedKeys.forEach(key => {
-          delete next[key as keyof CreateOwnerAdmissionRequest];
-        });
-        return next;
-      });
-
-      if (updatedKeys.length > 0) {
-        setHighlightedFields(new Set(updatedKeys));
-        setTimeout(() => setHighlightedFields(new Set()), 6000);
+      if (countUpdated > 0) {
         setOcrNotice({
           tone: 'success',
-          message: `AI đã tự động trích xuất và điền ${updatedKeys.length} trường thông tin từ ${docName}. Vui lòng rà soát lại ở Bước 2 trước khi nộp.`,
+          message: `AI successfully extracted and filled ${countUpdated} fields from ${docName}. Please review them in Step 2 before submitting.`,
         });
       } else {
         setOcrNotice({
           tone: 'info',
-          message: `Quét ${docName} hoàn tất. Các trường thông tin đã có sẵn được bảo vệ và giữ nguyên.`,
+          message: `Scanned ${docName} successfully. Existing field values were preserved.`,
         });
       }
     } catch {
       setOcrNotice({
         tone: 'warning',
-        message: 'Dịch vụ AI OCR tạm thời gián đoạn. Tệp đã được lưu, bạn có thể tự kiểm tra và nhập thông tin.',
+        message: 'AI OCR service is temporarily unavailable. File has been attached; please review and enter details manually.',
       });
     } finally {
       setScanningDocType(null);
@@ -298,7 +284,7 @@ export function OwnerAdmissionForm() {
     if (isAnyScanning) {
       setOcrNotice({
         tone: 'warning',
-        message: 'AI đang quét tài liệu khác. Vui lòng chờ quá trình quét hoàn tất trước khi tải lên tệp tiếp theo.',
+        message: 'AI is currently scanning another document. Please wait for it to complete before uploading the next file.',
       });
       return;
     }
@@ -326,9 +312,9 @@ export function OwnerAdmissionForm() {
     const allowed = ['image/jpeg', 'image/png', 'image/webp', ...(imageOnly ? [] : ['application/pdf'])];
     let message = '';
     if (file && (file.size === 0 || file.size > 10 * 1024 * 1024)) {
-      message = 'Dung lượng tệp phải từ 1 byte đến tối đa 10 MB.';
+      message = 'File must be between 1 byte and 10 MB.';
     } else if (file && !allowed.includes(file.type)) {
-      message = imageOnly ? 'Chỉ chấp nhận ảnh JPEG, PNG hoặc WebP.' : 'Chỉ chấp nhận tệp PDF, JPEG, PNG hoặc WebP.';
+      message = imageOnly ? 'Select a JPEG, PNG or WebP image.' : 'Select a PDF, JPEG, PNG or WebP file.';
     }
 
     updateSelection(type, { file: message ? undefined : file });
@@ -401,8 +387,8 @@ export function OwnerAdmissionForm() {
     setError('');
 
     const nextFieldErrors: FieldErrors = {};
-    if (!form.name.trim()) nextFieldErrors.name = 'Vui lòng nhập tên ngựa.';
-    if (!form.sex) nextFieldErrors.sex = 'Vui lòng chọn giới tính (Male hoặc Female).';
+    if (!form.name.trim()) nextFieldErrors.name = 'Enter the horse name.';
+    if (!form.sex) nextFieldErrors.sex = 'Select Male or Female.';
     FIELDS.forEach(field => {
       const value = (form[field.key] || '').trim();
       const err = validateField(field.key, value, fieldInputs.current[field.key]);
@@ -424,7 +410,7 @@ export function OwnerAdmissionForm() {
     DOCUMENTS.forEach(section => {
       const selection = selections[section.type];
       if (section.required && !selection?.file) {
-        nextDocErrors[section.type] = `${section.label} là bắt buộc.`;
+        nextDocErrors[section.type] = `${section.label} is required.`;
       }
     });
 
@@ -465,9 +451,9 @@ export function OwnerAdmissionForm() {
       router.push(`/owner/admissions/${result.admissionId}?created=true`);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message || 'Không thể gửi hồ sơ tiếp nhận.');
+        setError(err.message || 'Unable to submit admission application.');
       } else {
-        setError('Không thể gửi hồ sơ tiếp nhận.');
+        setError('Unable to submit admission application.');
       }
     } finally {
       setBusy(false);
@@ -552,7 +538,7 @@ export function OwnerAdmissionForm() {
           {isThisScanning && (
             <div className="flex items-center gap-2.5 rounded-[var(--radius-sm)] bg-[var(--color-primary-soft)] p-3 text-xs font-medium text-[var(--color-primary)]">
               <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
-              <span>AI đang quét và trích xuất dữ liệu từ tài liệu...</span>
+              <span>AI is scanning and extracting data from document...</span>
             </div>
           )}
 
@@ -569,13 +555,14 @@ export function OwnerAdmissionForm() {
                       className="h-14 w-14 shrink-0 cursor-pointer rounded border border-[var(--color-border)]"
                     />
                   ) : (
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
                       onClick={() => handleOpenPreview(doc.type)}
                       className="flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] text-xs font-semibold text-[var(--color-text-muted)] hover:border-[var(--color-primary)]"
                     >
                       {isPdf ? 'PDF' : 'FILE'}
-                    </button>
+                    </Button>
                   )}
                   <div className="min-w-0">
                     <span className="block truncate font-medium text-[var(--color-text-primary)]" title={selection.file.name}>
@@ -584,13 +571,15 @@ export function OwnerAdmissionForm() {
                     <div className="flex items-center gap-2 pt-0.5 text-xs text-[var(--color-text-muted)]">
                       <span>{(selection.file.size / (1024 * 1024)).toFixed(2)} MB</span>
                       <span>·</span>
-                      <button
+                      <Button
                         type="button"
+                        variant="link"
+                        size="sm"
                         onClick={() => handleOpenPreview(doc.type)}
-                        className="text-[var(--color-primary)] hover:underline focus-visible:outline-none"
+                        className="text-xs text-[var(--color-primary)]"
                       >
-                        {isPdf ? 'Xem trước PDF' : 'Xem trước ảnh'}
-                      </button>
+                        {isPdf ? 'Preview PDF' : 'Preview image'}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -603,10 +592,10 @@ export function OwnerAdmissionForm() {
                       variant="secondary"
                       disabled={isAnyScanning}
                       onClick={() => triggerOcrScan(selection.file!, doc.type)}
-                      title="Quét lại tài liệu này để cập nhật form"
+                      title="Re-scan this document to update form"
                     >
                       <Icon name="sparkles" size={13} className="mr-1" />
-                      Quét lại
+                      Re-scan
                     </Button>
                   )}
                   <Button
@@ -614,14 +603,14 @@ export function OwnerAdmissionForm() {
                     size="sm"
                     variant="tertiary"
                     disabled={isAnyScanning}
-                    aria-label={`Xóa ${doc.label}`}
+                    aria-label={`Remove ${doc.label}`}
                     onClick={() => {
                       selectFile(doc.type);
                       const input = fileInputs.current[doc.type];
                       if (input) input.value = '';
                     }}
                   >
-                    Xóa
+                    Remove
                   </Button>
                 </div>
               </div>
@@ -629,7 +618,7 @@ export function OwnerAdmissionForm() {
               {!isThisScanning && (
                 <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
                   <Icon name="check" size={13} className="text-emerald-600" />
-                  <span>Đã trích xuất và bảo vệ dữ liệu</span>
+                  <span>Data extracted & preserved</span>
                 </div>
               )}
             </div>
@@ -646,22 +635,22 @@ export function OwnerAdmissionForm() {
               >
                 <Icon name="upload" size={26} className="mb-1 text-[var(--color-primary)]" />
                 <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                  Kéo thả tệp vào đây, hoặc <span className="text-[var(--color-primary)] underline">chọn tệp từ máy</span>
+                  Drag and drop file here, or <span className="text-[var(--color-primary)] underline">browse files</span>
                 </span>
                 <span className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
-                  PDF, JPEG, PNG, WebP · Dung lượng tối đa 10 MB
+                  PDF, JPEG, PNG, WebP · Up to 10 MB
                 </span>
+                <FileInput
+                  id={`file-${doc.type}`}
+                  className="sr-only"
+                  ref={element => { fileInputs.current[doc.type] = element; }}
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  disabled={isAnyScanning}
+                  aria-required={doc.required}
+                  aria-invalid={Boolean(message)}
+                  onChange={event => selectFile(doc.type, event.target.files?.[0])}
+                />
               </label>
-              <FileInput
-                id={`file-${doc.type}`}
-                className="sr-only"
-                ref={element => { fileInputs.current[doc.type] = element; }}
-                accept=".pdf,.jpg,.jpeg,.png,.webp"
-                disabled={isAnyScanning}
-                aria-required={doc.required}
-                aria-invalid={Boolean(message)}
-                onChange={event => selectFile(doc.type, event.target.files?.[0])}
-              />
               {message && <p role="alert" className="text-xs text-[var(--color-danger)]">{message}</p>}
             </div>
           )}
@@ -670,11 +659,11 @@ export function OwnerAdmissionForm() {
         {/* Date / Note details */}
         <details ref={element => { metadataDetails.current[doc.type] = element; }} className="mt-3 text-xs">
           <summary className="cursor-pointer text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
-            {selection?.recordDate || selection?.note ? 'Chỉnh sửa ngày cấp hoặc ghi chú' : '+ Thêm ngày cấp hoặc ghi chú (tùy chọn)'}
+            {selection?.recordDate || selection?.note ? 'Edit record date or note' : '+ Add record date or note (optional)'}
           </summary>
           <div className="mt-2.5 space-y-2.5 rounded bg-[var(--color-surface-muted)] p-2.5">
             <label className="block space-y-1">
-              <span>Ngày cấp (tùy chọn)</span>
+              <span>Record date (optional)</span>
               <Input
                 id={`record-${doc.type}`}
                 type="date"
@@ -682,7 +671,7 @@ export function OwnerAdmissionForm() {
                 ref={element => { recordInputs.current[doc.type] = element; }}
                 disabled={isAnyScanning}
                 aria-invalid={Boolean(recordErrors[doc.type])}
-                onBlur={event => setRecordErrors(current => ({ ...current, [doc.type]: event.target.validity.badInput ? 'Ngày cấp không hợp lệ.' : '' }))}
+                onBlur={event => setRecordErrors(current => ({ ...current, [doc.type]: event.target.validity.badInput ? 'Enter a valid date.' : '' }))}
                 onChange={event => {
                   updateSelection(doc.type, { recordDate: event.target.value });
                   setRecordErrors(current => ({ ...current, [doc.type]: '' }));
@@ -690,7 +679,7 @@ export function OwnerAdmissionForm() {
               />
               {recordErrors[doc.type] && <span role="alert" className="block text-xs text-[var(--color-danger)]">{recordErrors[doc.type]}</span>}
             </label>
-            <FormField label="Ghi chú (tùy chọn)">
+            <FormField label="Note (optional)">
               <Textarea
                 rows={2}
                 maxLength={2000}
@@ -717,12 +706,12 @@ export function OwnerAdmissionForm() {
         <div className="flex items-center justify-between">
           <legend className="px-1 text-sm font-semibold text-[var(--color-text-primary)]">
             {section.label}{' '}
-            {section.required ? <span aria-hidden="true" className="text-[var(--color-danger)]">*</span> : <span className="font-normal text-[var(--color-text-muted)]">(Tùy chọn)</span>}
+            {section.required ? <span aria-hidden="true" className="text-[var(--color-danger)]">*</span> : <span className="font-normal text-[var(--color-text-muted)]">(Optional)</span>}
           </legend>
         </div>
         <div className="max-w-xs space-y-1">
           <label className="block space-y-1 text-sm">
-            <span>Chọn tệp</span>
+            <span>Select file</span>
             <FileInput
               id={`file-${section.type}`}
               className={`block h-10 w-full min-w-0 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-1.5 text-sm file:mr-3 file:h-6 file:cursor-pointer file:rounded file:border-0 file:bg-[var(--color-surface-muted)] file:px-2 file:text-xs file:font-semibold file:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] aria-invalid:border-[var(--color-danger)] ${isAnyScanning ? 'opacity-60 cursor-not-allowed' : ''} ${selection?.file ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)]'}`}
@@ -735,7 +724,7 @@ export function OwnerAdmissionForm() {
             />
           </label>
           <p id={`file-hint-${section.type}`} className="text-xs leading-5 text-[var(--color-text-muted)]">
-            {section.type === 'HORSE_PHOTO' ? 'Ảnh JPEG, PNG hoặc WebP' : 'Tệp PDF, JPEG, PNG hoặc WebP'} · Tối đa 10 MB
+            {section.type === 'HORSE_PHOTO' ? 'JPEG, PNG or WebP' : 'PDF, JPEG, PNG or WebP'} · Up to 10 MB
           </p>
           {message && <p id={`error-${section.type}`} role="alert" className="text-sm text-[var(--color-danger)]">{message}</p>}
         </div>
@@ -750,51 +739,54 @@ export function OwnerAdmissionForm() {
                   className="h-14 w-14 shrink-0 rounded border border-[var(--color-border)]"
                 />
               ) : (
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={() => handleOpenPreview(section.type)}
                   className="flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] text-xs font-semibold text-[var(--color-text-muted)] hover:border-[var(--color-primary)]"
                 >
                   {isPdf ? 'PDF' : 'FILE'}
-                </button>
+                </Button>
               )}
               <div className="min-w-0">
                 <span className="block truncate font-medium text-[var(--color-text-primary)]">{selection.file.name}</span>
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => handleOpenPreview(section.type)}
-                  className="text-xs text-[var(--color-primary)] hover:underline focus-visible:outline-none"
+                  className="text-xs text-[var(--color-primary)]"
                 >
-                  {isPdf ? 'Xem trước PDF' : 'Xem trước ảnh'}
-                </button>
+                  {isPdf ? 'Preview full PDF' : 'Preview image'}
+                </Button>
               </div>
             </span>
             <Button
               type="button"
               size="sm"
               disabled={isAnyScanning}
-              aria-label={`Xóa ${section.label.toLowerCase()}`}
+              aria-label={`Remove ${section.label.toLowerCase()}`}
               onClick={() => {
                 selectFile(section.type);
                 const input = fileInputs.current[section.type];
                 if (input) input.value = '';
               }}
             >
-              Xóa
+              Remove
             </Button>
           </div>
         ) : message && !section.required ? (
           <Button type="button" size="sm" variant="tertiary" disabled={isAnyScanning} onClick={() => selectFile(section.type)}>
-            Xóa lỗi tệp
+            Clear file error
           </Button>
         ) : null}
         <details ref={element => { metadataDetails.current[section.type] = element; }} className="text-sm">
           <summary className="cursor-pointer rounded text-[var(--color-text-secondary)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
-            {selection?.recordDate || selection?.note ? 'Chỉnh sửa ngày hoặc ghi chú' : 'Thêm ngày hoặc ghi chú (tùy chọn)'}
+            {selection?.recordDate || selection?.note ? 'Edit date or note' : 'Add date or note (optional)'}
           </summary>
           <div className="mt-3 space-y-3">
             <label className="block space-y-1">
-              <span>Ngày cấp (tùy chọn)</span>
+              <span>Record date (optional)</span>
               <Input
                 id={`record-${section.type}`}
                 type="date"
@@ -802,7 +794,7 @@ export function OwnerAdmissionForm() {
                 ref={element => { recordInputs.current[section.type] = element; }}
                 disabled={isAnyScanning}
                 aria-invalid={Boolean(recordErrors[section.type])}
-                onBlur={event => setRecordErrors(current => ({ ...current, [section.type]: event.target.validity.badInput ? 'Vui lòng nhập ngày hợp lệ.' : '' }))}
+                onBlur={event => setRecordErrors(current => ({ ...current, [section.type]: event.target.validity.badInput ? 'Enter a valid date.' : '' }))}
                 onChange={event => {
                   updateSelection(section.type, { recordDate: event.target.value });
                   setRecordErrors(current => ({ ...current, [section.type]: '' }));
@@ -810,7 +802,7 @@ export function OwnerAdmissionForm() {
               />
               {recordErrors[section.type] && <span role="alert" className="block text-sm text-[var(--color-danger)]">{recordErrors[section.type]}</span>}
             </label>
-            <FormField label="Ghi chú (tùy chọn)">
+            <FormField label="Note (optional)">
               <Textarea
                 rows={2}
                 maxLength={2000}
@@ -849,16 +841,16 @@ export function OwnerAdmissionForm() {
               </span>
               <div>
                 <h2 id="step-1-ocr-title" className="text-base font-bold text-[var(--color-text-primary)]">
-                  Bước 1: Quét nhanh tài liệu bằng AI (Smart OCR)
+                  Step 1: Quick upload with Smart OCR
                 </h2>
                 <p className="text-xs text-[var(--color-text-secondary)]">
-                  Tải lên Giấy đăng ký hoặc Giấy phả hệ để AI tự động trích xuất và điền sẵn thông tin ngựa bên dưới.
+                  Upload your registration document or pedigree certificate to automatically extract and auto-fill horse details below.
                 </p>
               </div>
             </div>
             <span className="inline-flex self-start sm:self-auto items-center gap-1.5 rounded-full bg-[var(--color-primary-soft)] px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
               <Icon name="sparkles" size={13} />
-              Tự động điền 10+ trường
+              Auto-fills 10+ fields
             </span>
           </div>
 
@@ -868,31 +860,33 @@ export function OwnerAdmissionForm() {
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs text-[var(--color-text-secondary)]">
             <div className="flex items-center gap-1.5">
-              <span>Chưa có bản scan sẵn?</span>
-              <button
+              <span>Don&apos;t have scanned files ready?</span>
+              <Button
                 type="button"
+                variant="link"
+                size="sm"
                 onClick={scrollToManualForm}
-                className="font-semibold text-[var(--color-primary)] hover:underline focus:outline-none"
+                className="text-xs font-semibold text-[var(--color-primary)]"
               >
-                Bỏ qua quét và tự nhập tay vào biểu mẫu bên dưới &darr;
-              </button>
+                Skip scanning and enter details manually below &darr;
+              </Button>
             </div>
             <span className="font-medium text-[var(--color-text-muted)]">
-              Độ ưu tiên: Giấy đăng ký là căn cứ chính cho định danh ngựa
+              Data precedence: Registration document is the primary authority for horse identity
             </span>
           </div>
         </section>
 
         {/* STEP 2: CANDIDATE HORSE IDENTITY */}
         <AdmissionInfoSection
-          title="Bước 2: Rà soát & Bổ sung thông tin ngựa (Candidate horse identity)"
+          title="Step 2: Candidate horse identity"
         >
           <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2 text-xs">
             <p className="text-[var(--color-text-secondary)]">
-              Kiểm tra lại dữ liệu do AI bóc tách và bổ sung các trường còn thiếu trước khi nộp.
+              Review details extracted by AI and complete any remaining fields before submission.
             </p>
             <span className="rounded bg-[var(--color-surface-muted)] px-2.5 py-1 font-semibold text-[var(--color-text-primary)]">
-              {filledCount}/10 trường đã hoàn thành
+              {filledCount} of 10 fields completed
             </span>
           </div>
 
@@ -914,7 +908,7 @@ export function OwnerAdmissionForm() {
                     onChange={event => changeField('sex', event.target.value)}
                     onBlur={event => setFieldErrors(current => ({ ...current, sex: validateField('sex', event.target.value) }))}
                   >
-                    <option value="">Chọn giới tính</option>
+                    <option value="">Select sex</option>
                     {HORSE_SEX_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </Select>
                 </FormField>
@@ -966,7 +960,7 @@ export function OwnerAdmissionForm() {
                   {fieldError(field.key) && <span id={`error-${field.key}`} role="alert" className="block text-sm text-[var(--color-danger)]">{fieldError(field.key)}</span>}
                   {field.key === 'registrationNumber' && (
                     <span id="ueln-check-status" role="status" className="block text-xs text-[var(--color-text-muted)]">
-                      {uelnCheck.status === 'checking' ? 'Đang kiểm tra UELN…' : uelnCheck.status === 'error' ? uelnCheck.message : ''}
+                      {uelnCheck.status === 'checking' ? 'Checking UELN…' : uelnCheck.status === 'error' ? uelnCheck.message : ''}
                     </span>
                   )}
                 </label>
@@ -975,7 +969,7 @@ export function OwnerAdmissionForm() {
           </div>
 
           <label className="block space-y-1">
-            <span className="text-sm font-medium text-[var(--color-text-primary)]">Ghi chú phả hệ (Pedigree notes)</span>
+            <span className="text-sm font-medium text-[var(--color-text-primary)]">Pedigree notes</span>
             <Textarea
               id="candidate-pedigreeNotes"
               rows={3}
@@ -993,14 +987,14 @@ export function OwnerAdmissionForm() {
 
         {/* STEP 3: REMAINING SUPPORTING DOCUMENTS */}
         <AdmissionInfoSection
-          title="Bước 3: Hồ sơ bắt buộc còn lại & Giấy tờ y tế (Supporting documents)"
+          title="Step 3: Remaining required & medical documents"
         >
           <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2 text-xs">
             <p className="text-[var(--color-text-secondary)]">
-              Tải ảnh chụp thể trạng ngựa và sổ tiêm chủng kiểm dịch trước khi nhập chuồng.
+              Upload horse photo and quarantine vaccination records before stable admission.
             </p>
             <span role="status" className="rounded bg-[var(--color-surface-muted)] px-2.5 py-1 font-semibold text-[var(--color-text-primary)]">
-              Hồ sơ bắt buộc đã tải: {completed}/4
+              Required documents uploaded: {completed}/4
             </span>
           </div>
 
@@ -1010,9 +1004,9 @@ export function OwnerAdmissionForm() {
 
           <details ref={optionalDocuments} className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
             <summary className="cursor-pointer rounded text-sm font-medium text-[var(--color-text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
-              Tài liệu y tế bổ sung (Tùy chọn)
+              Optional medical documents
               <span className="ml-2 font-normal text-[var(--color-text-muted)]">
-                {optionalSelected ? `${optionalSelected} tệp đã chọn` : '4 loại giấy tờ y tế bổ sung'}
+                {optionalSelected ? `${optionalSelected} selected` : '4 optional document types'}
               </span>
             </summary>
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1024,7 +1018,7 @@ export function OwnerAdmissionForm() {
         {/* ACTIONS */}
         <div className="flex flex-wrap justify-end gap-3 pt-2">
           <Button type="button" disabled={isAnyScanning} onClick={() => router.push('/owner/admissions')}>
-            Hủy bỏ
+            Cancel
           </Button>
           <Button
             variant="primary"
@@ -1032,7 +1026,7 @@ export function OwnerAdmissionForm() {
             loading={busy}
             disabled={isAnyScanning || uelnCheck.status === 'checking' || uelnCheck.status === 'unavailable'}
           >
-            Nộp hồ sơ tiếp nhận
+            Submit admission
           </Button>
         </div>
 
