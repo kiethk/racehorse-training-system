@@ -66,37 +66,18 @@ export function VetDashboardView() {
 
       const [summaryRes, todayRes, urgentRes, horsesRes, stallsRes] =
         await Promise.all([
-          admissionsApi.getVetQueueSummary().catch((err) => {
-            console.error("Failed to load vet queue summary", err);
-            return null;
-          }),
-          admissionsApi
-            .getCareSchedules({ date: todayLocal, size: 50 })
-            .catch((err) => {
-              console.error("Failed to load today schedules", err);
-              return { content: [] };
-            }),
-          admissionsApi
-            .getCareSchedules({ careType: "URGENT", size: 50 })
-            .catch((err) => {
-              console.error("Failed to load urgent schedules", err);
-              return { content: [] };
-            }),
-          stableApi.getHorses().catch((err) => {
-            console.error("Failed to load horses", err);
-            return [];
-          }),
-          stableApi.getStalls().catch((err) => {
-            console.error("Failed to load stalls", err);
-            return [];
-          }),
+          admissionsApi.getVetQueueSummary(),
+          admissionsApi.getCareSchedules({ date: todayLocal, size: 50 }),
+          admissionsApi.getCareSchedules({ careType: "URGENT", size: 50 }),
+          stableApi.getHorses(),
+          stableApi.getStalls(),
         ]);
 
       setSummary(summaryRes);
-      setTodaySchedules(todayRes?.content ?? []);
-      setUrgentSchedules(urgentRes?.content ?? []);
-      setHorses(horsesRes ?? []);
-      setStalls(stallsRes ?? []);
+      setTodaySchedules(todayRes.content);
+      setUrgentSchedules(urgentRes.content);
+      setHorses(horsesRes);
+      setStalls(stallsRes);
     } catch (err: unknown) {
       const msg =
         err instanceof Error

@@ -37,6 +37,27 @@ test('filterBlockedHorses returns horses with BLOCKED training decision', () => 
   assert.equal(blocked[1].stallCode, 'Unassigned');
 });
 
+test('filterBlockedHorses excludes horses rejected from the club', () => {
+  const mockHorses = [
+    { id: 20, name: 'Rogue', breed: 'Thoroughbred', currentStallId: 1, currentStatus: 'REJECTED', trainingDecision: 'BLOCKED', trainingDecisionReason: 'Old hold' },
+    { id: 21, name: 'Misty', breed: 'Arabian', currentStallId: 2, currentStatus: 'ELIGIBLE', trainingDecision: 'BLOCKED', trainingDecisionReason: 'Fetlock swelling' },
+  ];
+  const stallMap = new Map<number, string>([[1, 'Barn A · S01'], [2, 'Barn A · S02']]);
+
+  const blocked = filterBlockedHorses(mockHorses, stallMap);
+  assert.equal(blocked.length, 1);
+  assert.equal(blocked[0].name, 'Misty');
+});
+
+test('filterBlockedHorses keeps a non-rejected horse with a BLOCKED decision', () => {
+  const mockHorses = [
+    { id: 22, name: 'Comet', breed: 'Quarter', currentStallId: null, currentStatus: 'CANDIDATE', trainingDecision: 'BLOCKED', trainingDecisionReason: 'Awaiting vet review' },
+  ];
+
+  const blocked = filterBlockedHorses(mockHorses, new Map());
+  assert.deepEqual(blocked.map((h) => h.name), ['Comet']);
+});
+
 test('filterTodayAppointments sorts chronologically and filters by target date', () => {
   const mockSchedules = [
     { id: 1, scheduledAt: '2026-10-22T14:30:00' },

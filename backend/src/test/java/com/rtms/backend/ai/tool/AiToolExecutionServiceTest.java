@@ -22,7 +22,6 @@ import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.dto.TodayTaskItemResponse;
 import com.rtms.backend.stable.entity.Area;
-import com.rtms.backend.stable.entity.GroomIncidentReport;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.enums.IncidentSeverity;
@@ -32,7 +31,6 @@ import com.rtms.backend.stable.enums.TaskSource;
 import com.rtms.backend.stable.enums.GroomTaskType;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.stable.service.GroomDailyTaskService;
 import com.rtms.backend.training.dto.*;
@@ -108,7 +106,6 @@ class AiToolExecutionServiceTest {
     private HorseSpecialtyService horseSpecialtyService;
     private HorsePerformanceService horsePerformanceService;
     private RacingReadinessAssessmentRepository racingReadinessAssessmentRepository;
-    private GroomIncidentReportRepository groomIncidentReportRepository;
     private AreaRepository areaRepository;
     private UserRepository userRepository;
     private CourseRepository courseRepository;
@@ -140,7 +137,6 @@ class AiToolExecutionServiceTest {
         horseSpecialtyService = Mockito.mock(HorseSpecialtyService.class);
         horsePerformanceService = Mockito.mock(HorsePerformanceService.class);
         racingReadinessAssessmentRepository = Mockito.mock(RacingReadinessAssessmentRepository.class);
-        groomIncidentReportRepository = Mockito.mock(GroomIncidentReportRepository.class);
         areaRepository = Mockito.mock(AreaRepository.class);
         userRepository = Mockito.mock(UserRepository.class);
         courseRepository = Mockito.mock(CourseRepository.class);
@@ -169,7 +165,6 @@ class AiToolExecutionServiceTest {
                 horseSpecialtyService,
                 horsePerformanceService,
                 racingReadinessAssessmentRepository,
-                groomIncidentReportRepository,
                 areaRepository,
                 userRepository,
                 courseRepository,
@@ -387,13 +382,15 @@ class AiToolExecutionServiceTest {
         cs1.setId(1L);
         cs1.setHorseId(10L);
         cs1.setStatus(CareScheduleStatus.IN_PROGRESS);
+        cs1.setVeterinarianId(8L);
 
         CareSchedule cs2 = new CareSchedule();
         cs2.setId(2L);
         cs2.setHorseId(11L);
         cs2.setStatus(CareScheduleStatus.SCHEDULED);
+        cs2.setVeterinarianId(8L);
 
-        when(careScheduleRepository.findAll()).thenReturn(List.of(cs1, cs2));
+        when(careScheduleRepository.findByVeterinarianId(8L)).thenReturn(List.of(cs1, cs2));
 
         Object result = toolExecutionService.executeTool("getVetExaminationOverview", Map.of(), vet);
         assertNotNull(result);
@@ -488,8 +485,8 @@ class AiToolExecutionServiceTest {
         h2.setTrainingDecision(TrainingDecision.BLOCKED);
 
         when(horseRepository.findAll()).thenReturn(List.of(h1, h2));
-        when(groomIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(any(LocalDateTime.class)))
-                .thenReturn(List.of(new GroomIncidentReport()));
+        when(horseIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(any(LocalDateTime.class)))
+                .thenReturn(List.of(new HorseIncidentReport()));
 
         Object result = toolExecutionService.executeTool("getClubHealthOverview", Map.of(), manager);
 
@@ -868,6 +865,11 @@ class AiToolExecutionServiceTest {
         cand.setAdmissionId(401L);
         cand.setName("SILVER BULLET");
         when(candidateHorseProfileRepository.findByAdmissionIdIn(any())).thenReturn(List.of(cand));
+        CareSchedule initialCs = new CareSchedule();
+        initialCs.setCareType(CareType.INITIAL);
+        initialCs.setAdmissionId(401L);
+        initialCs.setVeterinarianId(300L);
+        when(careScheduleRepository.findByVeterinarianId(300L)).thenReturn(List.of(initialCs));
 
         Object result = toolExecutionService.executeTool("getPendingAdmissionExams", Map.of(), vet);
         assertNotNull(result);
@@ -892,7 +894,8 @@ class AiToolExecutionServiceTest {
         cs.setStatus(CareScheduleStatus.SCHEDULED);
         cs.setDescription("Ngựa sốt cao đột ngột");
         cs.setScheduledAt(LocalDateTime.of(2026, 10, 20, 14, 0));
-        when(careScheduleRepository.findAll()).thenReturn(List.of(cs));
+        cs.setVeterinarianId(300L);
+        when(careScheduleRepository.findByVeterinarianId(300L)).thenReturn(List.of(cs));
 
         Horse h = new Horse();
         h.setId(10L);
