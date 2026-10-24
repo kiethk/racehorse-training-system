@@ -36,6 +36,8 @@ public interface HorseIncidentReportRepository extends JpaRepository<HorseIncide
 
     List<HorseIncidentReport> findAllByOrderByReportedAtDesc();
 
+    List<HorseIncidentReport> findByReportedAtAfterOrderByReportedAtDesc(LocalDateTime after);
+
     long countByHorseIdAndReportedAtAfter(Long horseId, LocalDateTime after);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

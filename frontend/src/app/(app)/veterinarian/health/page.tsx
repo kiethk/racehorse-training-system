@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Panel } from '@/components/ui/Panel';
-import { Button } from '@/components/ui/Button';
+import { Button, LinkButton } from '@/components/ui/Button';
 import { Pill } from '@/components/ui/StatusBadge';
 import { DataTable } from '@/components/ui/DataTable';
 import { FilterChips, Tabs, SearchInput, MetricCard, Notice, PageHeader } from '@/components/ui';
@@ -65,6 +65,8 @@ function HealthRecordsContent() {
   const [planTargetRecord, setPlanTargetRecord] = useState<HealthRecord | null>(null);
   const [plansByRecordId, setPlansByRecordId] = useState<Record<number, TreatmentPlan[]>>({});
   const [expandedRecordPlans, setExpandedRecordPlans] = useState<Set<number>>(new Set());
+  const [openFollowUp, setOpenFollowUp] = useState<{ id: number; scheduledAt: string | null } | null>(null);
+  const [followUpLoading, setFollowUpLoading] = useState(false);
 
   const refreshData = useCallback(() => {
     fetchingIdsRef.current.clear();
@@ -184,14 +186,49 @@ function HealthRecordsContent() {
     return map;
   }, [stalls]);
 
+  // Rejected horses are out of the clinical roster: no training to clear, so keep them out of the list and metrics.
+  const activeHorses = useMemo(
+    () => horses.filter((h) => h.currentStatus !== 'REJECTED'),
+    [horses],
+  );
+
+  // VET-HLT-08: the vet needs a way back into the examination that will lift a BLOCKED decision.
+  useEffect(() => {
+    if (selectedHorseId == null) {
+      setOpenFollowUp(null);
+      return;
+    }
+    let ignore = false;
+    setFollowUpLoading(true);
+    careService
+      .listSchedules({ horseId: selectedHorseId, careType: 'ROUTINE', size: 20 })
+      .then((page) => {
+        if (ignore) return;
+        const open = (page.content || []).filter(
+          (s) => s.status === 'SCHEDULED' || s.status === 'IN_PROGRESS',
+        );
+        const next = open.find((s) => s.purpose === 'FOLLOW_UP') ?? open[0];
+        setOpenFollowUp(next ? { id: next.id, scheduledAt: next.scheduledAt ?? null } : null);
+      })
+      .catch(() => {
+        if (!ignore) setOpenFollowUp(null);
+      })
+      .finally(() => {
+        if (!ignore) setFollowUpLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [selectedHorseId]);
+
   const listItems = useMemo<HorseListItem[]>(() => {
-    return horses.map((h) => ({
+    return activeHorses.map((h) => ({
       horse: h,
       stallCode: (h.currentStallId && stallMap.get(h.currentStallId)) || 'Unassigned',
       summary: summaries[h.id] ?? null,
       activeInjuries: [],
     }));
-  }, [horses, stallMap, summaries]);
+  }, [activeHorses, stallMap, summaries]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -229,9 +266,9 @@ function HealthRecordsContent() {
   // 3. AC-8: Progressive batch fetch of Health Summaries for ALL horses in roster
   useEffect(() => {
     let ignore = false;
-    if (horses.length === 0) return;
+    if (activeHorses.length === 0) return;
 
-    const uncached = horses.filter(
+    const uncached = activeHorses.filter(
       (h) => summaries[h.id] === undefined && !fetchingIdsRef.current.has(h.id)
     );
     if (uncached.length === 0) return;
@@ -280,7 +317,7 @@ function HealthRecordsContent() {
     return () => {
       ignore = true;
     };
-  }, [horses, summaries, pagedItems]);
+  }, [activeHorses, summaries, pagedItems]);
 
   const stats = useMemo(() => {
     let allowedCount = 0;
@@ -288,7 +325,7 @@ function HealthRecordsContent() {
     let openInjuriesCount = 0;
     let urgentCasesCount = 0;
 
-    for (const h of horses) {
+    for (const h of activeHorses) {
       const decision = summaries[h.id]?.trainingDecision ?? h.trainingDecision ?? 'ALLOWED';
       if (decision === 'BLOCKED') {
         blockedCount++;
@@ -304,7 +341,7 @@ function HealthRecordsContent() {
       }
     }
     return { allowedCount, blockedCount, openInjuriesCount, urgentCasesCount };
-  }, [horses, summaries]);
+  }, [activeHorses, summaries]);
 
   const handleOpenInjuryModal = (injury: InjuryRecord) => {
     setSelectedInjury(injury);
@@ -413,6 +450,40 @@ function HealthRecordsContent() {
                 {reason && (
                   <div className="rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)]/20 p-2.5 text-xs text-[var(--color-warning)]">
                     <strong>Clearance Reason:</strong> {reason}
+                  </div>
+                )}
+                {decision === 'BLOCKED' && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)]/20 p-2.5 text-xs">
+                    <span className="text-[var(--color-danger)] font-medium">
+                      {followUpLoading
+                        ? 'Looking for an open follow-up examination…'
+                        : openFollowUp
+                          ? `Open follow-up #${openFollowUp.id}${
+                              openFollowUp.scheduledAt ? ` · ${formatDate(openFollowUp.scheduledAt)}` : ''
+                            } — complete it to reassess clearance.`
+                          : 'No open follow-up examination for this horse. Schedule one in Routine Care to reassess clearance.'}
+                    </span>
+                    {!followUpLoading &&
+                      (openFollowUp ? (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon="stethoscope"
+                          onClick={() => router.push(`/veterinarian/routine/${openFollowUp.id}`)}
+                          className="transition-all active:scale-[0.98]"
+                        >
+                          Reassess clearance
+                        </Button>
+                      ) : (
+                        <LinkButton
+                          href="/veterinarian/routine"
+                          size="sm"
+                          icon="calendar"
+                          className="transition-all active:scale-[0.98]"
+                        >
+                          Open Routine Care
+                        </LinkButton>
+                      ))}
                   </div>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">

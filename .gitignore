@@ -45,6 +45,8 @@ backend/docs/*
 .codex/
 uploads/
 .agents/
+.trail/
+.kombai/
 AGENTS.md
 IDEA.md
 GEMINI.md

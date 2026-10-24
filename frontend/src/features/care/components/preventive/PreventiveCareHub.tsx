@@ -24,7 +24,7 @@ export function PreventiveCareHub() {
   useEffect(() => {
     preventiveCareService
       .listProtocols()
-      .then(setProtocols)
+      .then((data) => setProtocols(Array.isArray(data) ? data : []))
       .catch((cause) => setError(displayError(cause, 'Could not load preventive protocols.')))
       .finally(() => setProtocolsLoading(false));
   }, []);

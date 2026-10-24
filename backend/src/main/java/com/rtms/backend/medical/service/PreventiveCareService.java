@@ -12,6 +12,9 @@ import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 
+import com.rtms.backend.admission.entity.AdmissionApplication;
+import com.rtms.backend.admission.enums.AdmissionStatus;
+import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -38,15 +41,19 @@ import java.util.Set;
 @Service
 public class PreventiveCareService {
     private static final Set<String> TYPES = Set.of("ROUTINE_EXAM", "VACCINATION", "DEWORMING");
+    private static final List<CareScheduleStatus> ACTIVE_PREVENTIVE_STATUSES = List.of(
+            CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
     private final CareScheduleRepository schedules;
     private final HorseRepository horses;
     private final CareScheduleService care;
+    private final AdmissionApplicationRepository admissions;
 
     public PreventiveCareService(CareScheduleRepository schedules, HorseRepository horses,
-            CareScheduleService care) {
+            CareScheduleService care, AdmissionApplicationRepository admissions) {
         this.schedules = schedules;
         this.horses = horses;
         this.care = care;
+        this.admissions = admissions;
     }
 
     @Transactional
@@ -58,6 +65,11 @@ public class PreventiveCareService {
         if (request.getHorseId() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "horseId is required");
         }
+
+        // Chỉ tiêm phòng / tẩy giun mới là mốc PREVENTIVE; khám thường luôn là FOLLOW_UP.
+        // Mỗi ngựa chỉ giữ một mốc PREVENTIVE active (uq_care_schedule_one_active_preventive_per_horse).
+        boolean preventive = !"ROUTINE_EXAM".equals(request.getCareType());
+        CareSchedulePurpose purpose = preventive ? CareSchedulePurpose.PREVENTIVE : CareSchedulePurpose.FOLLOW_UP;
 
         // 1. Look for completed schedule examined by the current veterinarian
         CareSchedule source = schedules
@@ -86,8 +98,9 @@ public class PreventiveCareService {
         String description = request.getCareType() + ": " + (request.getDescription() == null ? "" : request.getDescription().trim());
         String idempotencyKey = "preventive:" + request.getCareType() + ":" + request.getHorseId() + ":" + request.getScheduledDate();
 
-        // 4. If current veterinarian completed the source schedule, use unified createNextSchedule flow
-        if (source != null && Objects.equals(source.getVeterinarianId(), user.getUserId())) {
+        // 4. If current veterinarian completed the source schedule, use unified createNextSchedule flow.
+        // Chỉ lịch khám lại đi đường này: createNextSchedule luôn tạo FOLLOW_UP.
+        if (!preventive && source != null && Objects.equals(source.getVeterinarianId(), user.getUserId())) {
             try {
                 CreateNextScheduleRequest next = new CreateNextScheduleRequest();
                 next.setHorseId(request.getHorseId());
@@ -116,6 +129,12 @@ public class PreventiveCareService {
         }
 
         Long admissionId = source != null ? source.getAdmissionId() : null;
+        if (admissionId != null) {
+            AdmissionApplication adm = admissions.findById(admissionId).orElse(null);
+            if (adm != null && adm.getStatus() == AdmissionStatus.APPROVED) {
+                admissionId = null;
+            }
+        }
         String fingerprint = fingerprint(request.getHorseId(), admissionId, requestedAt, description);
 
         Optional<CareSchedule> existing = schedules.findByRequestedByIdAndIdempotencyKey(user.getUserId(), idempotencyKey);
@@ -126,6 +145,25 @@ public class PreventiveCareService {
             return existing.get();
         }
 
+        // 6. Mốc tiêm phòng đang chờ là duy nhất: dời mốc đó thay vì INSERT thêm dòng PREVENTIVE thứ hai.
+        if (preventive) {
+            Optional<CareSchedule> milestone = schedules.findFirstByHorseIdAndPurposeAndStatusIn(
+                    request.getHorseId(), CareSchedulePurpose.PREVENTIVE, ACTIVE_PREVENTIVE_STATUSES);
+            if (milestone.isPresent()) {
+                CareSchedule active = milestone.get();
+                if (active.getStatus() != CareScheduleStatus.REQUESTED) {
+                    throw new ApiException(HttpStatus.CONFLICT, "PREVENTIVE_ALREADY_SCHEDULED",
+                            "This horse already has an active preventive care visit; reschedule that visit instead");
+                }
+                // Mốc chưa xếp vet: dời tới ngày Vet chọn rồi xếp cho chính Vet đó.
+                active.setRequestedAt(requestedAt);
+                active.setDescription(description);
+                CareSchedule moved = schedules.save(active);
+                care.assignRequestedSchedule(moved, user.getUserId());
+                return moved;
+            }
+        }
+
         CareSchedule schedule = new CareSchedule();
         schedule.setHorseId(request.getHorseId());
         schedule.setAdmissionId(admissionId);
@@ -134,14 +172,14 @@ public class PreventiveCareService {
         schedule.setIdempotencyKey(idempotencyKey);
         schedule.setRequestFingerprint(fingerprint);
         schedule.setCareType(CareType.ROUTINE);
-        schedule.setPurpose(CareSchedulePurpose.PREVENTIVE);
+        schedule.setPurpose(purpose);
         schedule.setStatus(CareScheduleStatus.REQUESTED);
         schedule.setDurationMinutes(30);
         schedule.setDescription(description);
         schedule.setRequestedAt(requestedAt);
 
         CareSchedule saved = schedules.save(schedule);
-        care.assignRequestedSchedule(saved);
+        care.assignRequestedSchedule(saved, user.getUserId());
         return saved;
     }
 

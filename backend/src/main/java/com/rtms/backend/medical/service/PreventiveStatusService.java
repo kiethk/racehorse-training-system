@@ -215,7 +215,8 @@ public class PreventiveStatusService {
      */
     private Long currentAdmissionId(Long horseId) {
         return admissions.findByHorseIdOrderBySubmittedAtDesc(horseId).stream()
-                .filter(admission -> admission.getStatus() != AdmissionStatus.REJECTED)
+                .filter(admission -> admission.getStatus() != AdmissionStatus.REJECTED
+                        && admission.getStatus() != AdmissionStatus.APPROVED)
                 .map(AdmissionApplication::getId)
                 .findFirst()
                 .orElse(null);
