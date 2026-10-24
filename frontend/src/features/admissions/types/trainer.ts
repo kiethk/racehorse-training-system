@@ -16,6 +16,11 @@ export interface TrainerAdmissionQueue {
   pending: AdmissionSummaryResponse[];
   /** Admissions I have evaluated — every later status, including rejected by the Manager. */
   reviewed: AdmissionSummaryResponse[];
+  /** Horses I look after now: horses in my areas plus admissions assigned to me that are not finished. */
+  activeHorseCount: number;
+  /** Load limit; at this count the system assigns me no new admissions. */
+  horseLimit: number;
+  atCapacity: boolean;
 }
 
 /**

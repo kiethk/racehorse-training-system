@@ -74,7 +74,7 @@ class HeadTrainerWorkloadServiceTest {
                 new Object[]{3L, 20L},
                 new Object[]{3L, 21L}
         ));
-        when(admissionRepository.findAssignedHorsePairs(anyCollection(), eq(AdmissionStatus.TRAINER_REVIEW)))
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), eq(HeadTrainerWorkloadService.ASSIGNED_OPEN_STATUSES)))
                 .thenReturn(rows(
                         new Object[]{1L, 14L},
                         new Object[]{2L, 10L}, // trùng ngựa trong khu -> chỉ đếm 1 lần
@@ -101,7 +101,7 @@ class HeadTrainerWorkloadServiceTest {
         when(horseRepository.findManagedHorsePairs(anyCollection())).thenReturn(rows(
                 new Object[]{2L, 50L}
         ));
-        when(admissionRepository.findAssignedHorsePairs(anyCollection(), eq(AdmissionStatus.TRAINER_REVIEW)))
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), eq(HeadTrainerWorkloadService.ASSIGNED_OPEN_STATUSES)))
                 .thenReturn(rows(
                         new Object[]{1L, 60L},
                         new Object[]{1L, 61L}
@@ -128,7 +128,7 @@ class HeadTrainerWorkloadServiceTest {
                 new Object[]{5L, 101L},
                 new Object[]{20L, 102L}
         ));
-        when(admissionRepository.findAssignedHorsePairs(anyCollection(), eq(AdmissionStatus.TRAINER_REVIEW)))
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), eq(HeadTrainerWorkloadService.ASSIGNED_OPEN_STATUSES)))
                 .thenReturn(Collections.emptyList());
 
         Optional<User> selected = service.selectLeastLoadedHeadTrainer();
@@ -146,7 +146,7 @@ class HeadTrainerWorkloadServiceTest {
         when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainerA, trainerB));
         mockValidProfiles(trainerA, trainerB);
         when(horseRepository.findManagedHorsePairs(anyCollection())).thenReturn(Collections.emptyList());
-        when(admissionRepository.findAssignedHorsePairs(anyCollection(), any()))
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), anyCollection()))
                 .thenReturn(Collections.emptyList());
 
         service.selectLeastLoadedHeadTrainer();
@@ -174,7 +174,7 @@ class HeadTrainerWorkloadServiceTest {
         when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainerWithProfile, trainerWithoutProfile));
         mockValidProfiles(trainerWithProfile);
         when(horseRepository.findManagedHorsePairs(anyCollection())).thenReturn(Collections.emptyList());
-        when(admissionRepository.findAssignedHorsePairs(anyCollection(), any()))
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), anyCollection()))
                 .thenReturn(Collections.emptyList());
 
         Optional<User> selected = service.selectLeastLoadedHeadTrainer();
@@ -190,7 +190,7 @@ class HeadTrainerWorkloadServiceTest {
                 new Object[]{1L, 10L},
                 new Object[]{1L, 20L}
         ));
-        when(admissionRepository.findAssignedHorsePairs(List.of(1L), AdmissionStatus.TRAINER_REVIEW))
+        when(admissionRepository.findAssignedHorsePairs(List.of(1L), HeadTrainerWorkloadService.ASSIGNED_OPEN_STATUSES))
                 .thenReturn(rows(
                         new Object[]{1L, 20L},
                         new Object[]{1L, 30L}
@@ -207,6 +207,74 @@ class HeadTrainerWorkloadServiceTest {
     void calculateDistinctHorseWorkloads_empty_returnsEmptyMap() {
         assertTrue(service.calculateDistinctHorseWorkloads(List.of()).isEmpty());
         verifyNoInteractions(horseRepository, admissionRepository);
+    }
+
+    @Test
+    @DisplayName("9. Đơn chờ Trainer đánh giá và đơn chờ Quản lý duyệt đều tính vào tải")
+    void assignedOpenStatusesCoverQuarantineAndPendingApproval() {
+        assertEquals(EnumSet.of(AdmissionStatus.TRAINER_REVIEW, AdmissionStatus.MANAGER_REVIEW),
+                HeadTrainerWorkloadService.ASSIGNED_OPEN_STATUSES);
+    }
+
+    @Test
+    @DisplayName("10. Trainer đã đủ 3 ngựa (khu + cách ly + chờ duyệt) thì không được giao đơn mới")
+    void selectLeastLoadedHeadTrainer_skipsTrainersAtCapacity() {
+        User full = createHeadTrainer(1L, "Trainer Full", true);
+        User free = createHeadTrainer(2L, "Trainer Free", true);
+
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(full, free));
+        mockValidProfiles(full, free);
+
+        // Trainer 1: khu ngựa 10, đơn cách ly ngựa 11, đơn chờ Quản lý ngựa 12 -> 3 (đủ)
+        // Trainer 2: khu 10..11 trùng lặp với đơn -> 2 (còn chỗ, dù nhiều dòng hơn)
+        when(horseRepository.findManagedHorsePairs(anyCollection())).thenReturn(rows(
+                new Object[]{1L, 10L},
+                new Object[]{2L, 20L},
+                new Object[]{2L, 21L}
+        ));
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), anyCollection()))
+                .thenReturn(rows(
+                        new Object[]{1L, 11L},
+                        new Object[]{1L, 12L},
+                        new Object[]{2L, 21L}
+                ));
+
+        Optional<User> selected = service.selectLeastLoadedHeadTrainer();
+
+        assertTrue(selected.isPresent());
+        assertEquals(2L, selected.get().getId());
+    }
+
+    @Test
+    @DisplayName("11. Mọi Trainer đều đủ 3 ngựa -> Optional.empty() (đơn nằm chờ, job gán lại sau)")
+    void selectLeastLoadedHeadTrainer_allAtCapacity_returnsEmpty() {
+        User trainer1 = createHeadTrainer(1L, "Trainer 1", true);
+        User trainer2 = createHeadTrainer(2L, "Trainer 2", true);
+
+        when(userRepository.findActiveHeadTrainers()).thenReturn(List.of(trainer1, trainer2));
+        mockValidProfiles(trainer1, trainer2);
+        when(horseRepository.findManagedHorsePairs(anyCollection())).thenReturn(rows(
+                new Object[]{1L, 10L}, new Object[]{1L, 11L}, new Object[]{1L, 12L},
+                new Object[]{2L, 20L}, new Object[]{2L, 21L}, new Object[]{2L, 22L}, new Object[]{2L, 23L}
+        ));
+        when(admissionRepository.findAssignedHorsePairs(anyCollection(), anyCollection()))
+                .thenReturn(Collections.emptyList());
+
+        assertTrue(service.selectLeastLoadedHeadTrainer().isEmpty());
+    }
+
+    @Test
+    @DisplayName("12. getWorkload trả tải của một Trainer, không có ngựa -> 0")
+    void getWorkload_returnsSingleTrainerLoad() {
+        when(horseRepository.findManagedHorsePairs(List.of(1L))).thenReturn(rows(new Object[]{1L, 10L}));
+        when(admissionRepository.findAssignedHorsePairs(List.of(1L), HeadTrainerWorkloadService.ASSIGNED_OPEN_STATUSES))
+                .thenReturn(rows(new Object[]{1L, 11L}));
+        when(horseRepository.findManagedHorsePairs(List.of(2L))).thenReturn(Collections.emptyList());
+        when(admissionRepository.findAssignedHorsePairs(List.of(2L), HeadTrainerWorkloadService.ASSIGNED_OPEN_STATUSES))
+                .thenReturn(Collections.emptyList());
+
+        assertEquals(2L, service.getWorkload(1L));
+        assertEquals(0L, service.getWorkload(2L));
     }
 
     private User createHeadTrainer(Long id, String name, boolean active) {

@@ -17,6 +17,7 @@ import com.rtms.backend.training.repository.RacingReadinessAssessmentRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.admission.service.AdmissionQueryService;
 import com.rtms.backend.admission.service.AdmissionTrainerReviewService;
+import com.rtms.backend.admission.service.HeadTrainerWorkloadService;
 import com.rtms.backend.config.ApiException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,6 +37,7 @@ public class AdmissionTrainerReviewController {
     private final RacingReadinessAssessmentRepository assessmentRepository;
     private final HealthRecordRepository healthRecordRepository;
     private final HorseHealthMetricRepository horseHealthMetricRepository;
+    private final HeadTrainerWorkloadService workloadService;
 
     public AdmissionTrainerReviewController(
             AdmissionTrainerReviewService trainerReviewService,
@@ -43,13 +45,15 @@ public class AdmissionTrainerReviewController {
             HorseRepository horseRepository,
             RacingReadinessAssessmentRepository assessmentRepository,
             HealthRecordRepository healthRecordRepository,
-            HorseHealthMetricRepository horseHealthMetricRepository) {
+            HorseHealthMetricRepository horseHealthMetricRepository,
+            HeadTrainerWorkloadService workloadService) {
         this.trainerReviewService = trainerReviewService;
         this.queryService = queryService;
         this.horseRepository = horseRepository;
         this.assessmentRepository = assessmentRepository;
         this.healthRecordRepository = healthRecordRepository;
         this.horseHealthMetricRepository = horseHealthMetricRepository;
+        this.workloadService = workloadService;
     }
 
     /**
@@ -67,7 +71,9 @@ public class AdmissionTrainerReviewController {
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VIEW')")
     public ApiResponse<TrainerAdmissionQueueResponse> getTrainerQueue(
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(queryService.getTrainerQueue(currentUser.getUserId()));
+        Long trainerId = currentUser.getUserId();
+        return ApiResponse.success(queryService.getTrainerQueue(trainerId)
+                .withCapacity(workloadService.getWorkload(trainerId), HeadTrainerWorkloadService.MAX_ACTIVE_HORSES));
     }
 
     /**

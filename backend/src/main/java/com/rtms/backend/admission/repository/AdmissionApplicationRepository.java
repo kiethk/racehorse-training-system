@@ -98,19 +98,19 @@ public interface AdmissionApplicationRepository
     List<AdmissionApplication> findByTrainerId(Long trainerId);
 
     /**
-     * (trainerId, horseId) của các đơn đang chờ Trainer duyệt — phần "việc đã
-     * giao nhưng chưa xong" trong tải của Trainer. Không tính phần này thì nhiều
-     * đơn hoàn tất cùng lúc sẽ dồn hết về một người.
+     * (trainerId, horseId) của các đơn đã giao cho Trainer mà chưa xong — phần
+     * "việc đã giao nhưng chưa xong" trong tải của Trainer. Không tính phần này
+     * thì nhiều đơn hoàn tất cùng lúc sẽ dồn hết về một người.
      */
     @Query("""
             SELECT a.trainerId, a.horseId
             FROM AdmissionApplication a
-            WHERE a.status = :status
+            WHERE a.status IN :statuses
               AND a.trainerId IN :trainerIds
               AND a.horseId IS NOT NULL
             """)
     List<Object[]> findAssignedHorsePairs(@Param("trainerIds") java.util.Collection<Long> trainerIds,
-                                          @Param("status") AdmissionStatus status);
+                                          @Param("statuses") Collection<AdmissionStatus> statuses);
 
     /**
      * Batch: the latest (by id desc) application that has a horseId in the given set.

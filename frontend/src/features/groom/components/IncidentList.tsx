@@ -1,37 +1,27 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Icon } from '@/components/ui/Icon';
-import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { FilterChips } from '@/components/ui/SegmentedControl';
-import { formatDateTime } from '@/lib/display';
-import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { EmptyState } from '@/components/ui/states';
 import { incidentApi } from '../services/incidentService';
-import { assignedVetLabel } from '../lib/assignedVet';
+import {
+  INCIDENT_SEVERITY_MAP,
+  INCIDENT_STATUS_MAP,
+  formatIncidentReportedAt,
+  incidentHorseName,
+} from '../lib/incidentDisplay';
+import { IncidentDetailModal } from './IncidentDetailModal';
 import { stableApi } from '@/features/stable/services/stableService';
-import type { IncidentReport, IncidentSeverity, IncidentStatus } from '../types';
+import type { IncidentReport, IncidentStatus } from '../types';
 import type { Horse } from '@/features/stable/types';
 
-const STATUS_MAP: Record<
-  IncidentStatus,
-  { tone: 'warning' | 'info' | 'success' | 'neutral'; label: string }
-> = {
-  REPORTED: { tone: 'warning', label: 'Reported - Awaiting Veterinary Review' },
-  IN_REVIEW: { tone: 'info', label: 'Under Veterinary Review' },
-  RESOLVED: { tone: 'success', label: 'Resolved' },
-  DISMISSED: { tone: 'neutral', label: 'No Issue' },
-};
-
-const SEVERITY_MAP: Record<IncidentSeverity, { tone: 'neutral' | 'info' | 'warning' | 'danger'; label: string }> = {
-  LOW: { tone: 'neutral', label: 'Minor' },
-  MEDIUM: { tone: 'info', label: 'Moderate' },
-  HIGH: { tone: 'warning', label: 'Major' },
-  CRITICAL: { tone: 'danger', label: 'Critical' },
-};
+const PAGE_SIZE = 10;
 
 export function IncidentList() {
   const [reports, setReports] = useState<IncidentReport[]>([]);
@@ -39,6 +29,7 @@ export function IncidentList() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | IncidentStatus>('ALL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<IncidentReport | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -63,10 +54,77 @@ export function IncidentList() {
     loadData();
   }, [loadData]);
 
-  const horseMap = new Map<number, Horse>();
-  for (const h of horses) {
-    horseMap.set(h.id, h);
-  }
+  const horseMap = useMemo(() => new Map<number, Horse>(horses.map((h) => [h.id, h])), [horses]);
+  const horseName = useCallback(
+    (report: IncidentReport) => incidentHorseName(report, horseMap.get(report.horseId)),
+    [horseMap],
+  );
+
+  const columns: DataTableColumn<IncidentReport>[] = [
+    {
+      id: 'reportedAt',
+      header: 'Reported',
+      render: (report) => formatIncidentReportedAt(report.reportedAt),
+      sortValue: (report) => report.reportedAt,
+      className: 'whitespace-nowrap',
+    },
+    {
+      id: 'horse',
+      header: 'Horse',
+      render: (report) => (
+        <span className="font-medium text-[var(--color-text-primary)]">{horseName(report)}</span>
+      ),
+      sortValue: (report) => horseName(report),
+    },
+    {
+      id: 'title',
+      header: 'Incident',
+      render: (report) => (
+        <span>
+          <span className="text-[var(--color-text-muted)]">#{report.id}</span> {report.title}
+        </span>
+      ),
+      sortValue: (report) => report.title,
+    },
+    {
+      id: 'veterinarian',
+      header: 'Veterinarian',
+      render: (report) => report.handlerName
+        ? report.handlerName
+        : (
+          <span className="italic text-[var(--color-text-muted)]">
+            {report.status === 'REPORTED' ? 'Awaiting assignment' : '—'}
+          </span>
+        ),
+      sortValue: (report) => report.handlerName ?? '',
+    },
+    {
+      id: 'severity',
+      header: 'Severity',
+      render: (report) => {
+        const cfg = INCIDENT_SEVERITY_MAP[report.severity] || { tone: 'neutral', label: report.severity };
+        return <Pill tone={cfg.tone} size="sm">{cfg.label}</Pill>;
+      },
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      render: (report) => {
+        const cfg = INCIDENT_STATUS_MAP[report.status] || { tone: 'neutral', label: report.status };
+        return <Pill tone={cfg.tone} size="sm">{cfg.label}</Pill>;
+      },
+    },
+    {
+      id: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      align: 'right',
+      render: (report) => (
+        <Button variant="secondary" size="sm" onClick={() => setSelected(report)}>
+          Details
+        </Button>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -106,112 +164,34 @@ export function IncidentList() {
         ]}
       />
 
-      {loading ? (
-        <ListSkeleton rows={4} />
-      ) : error ? (
+      {error ? (
         <Panel padded>
           <EmptyState icon="alert-triangle" title="Unable to load data" description={error} />
         </Panel>
-      ) : reports.length === 0 ? (
-        <Panel padded>
-          <EmptyState
-            icon="shield"
-            title="No incident reports found"
-            description={
-              statusFilter === 'ALL'
-                ? 'No injury incidents have been recorded for your assigned horses.'
-                : 'No incident reports match the current filter.'
-            }
-          />
-        </Panel>
       ) : (
-        <div className="space-y-4">
-          {reports.map((report) => {
-            const horse = horseMap.get(report.horseId);
-            const statusCfg = STATUS_MAP[report.status] || { tone: 'neutral', label: report.status };
-            const severityCfg = SEVERITY_MAP[report.severity] || { tone: 'neutral', label: report.severity };
-            const imgSrc = incidentApi.imageSrc(report);
-            const vetLabel = assignedVetLabel(report);
-
-            return (
-              <Panel key={report.id} padded>
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--color-border)] pb-2.5">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-[var(--color-text-muted)]">
-                          #{report.id}
-                        </span>
-                        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                          {report.title}
-                        </h2>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
-                        <span className="font-medium text-[var(--color-text-primary)]">
-                          Horse: {horse ? horse.name : report.horseName || `ID #${report.horseId}`}
-                        </span>
-                        <span>•</span>
-                        <span>
-                          Reported: {report.reportedAt ? new Date(report.reportedAt).toLocaleString('en-US') : '—'}
-                        </span>
-                        {vetLabel && (
-                          <>
-                            <span>•</span>
-                            <span className={report.handlerName ? 'font-medium text-[var(--color-text-primary)]' : undefined}>
-                              {vetLabel}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Pill tone={severityCfg.tone} size="sm">
-                        {severityCfg.label}
-                      </Pill>
-                      <Pill tone={statusCfg.tone} size="sm">
-                        {statusCfg.label}
-                      </Pill>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div className="text-xs text-[var(--color-text-secondary)] whitespace-pre-wrap leading-relaxed">
-                    {report.description}
-                  </div>
-
-                  {/* Incident image */}
-                  {imgSrc && (
-                    <div className="pt-1">
-                      <ProtectedImage
-                        src={imgSrc}
-                        alt={`Incident image: ${report.title}`}
-                        className="max-h-56 max-w-sm rounded-[var(--radius-md)] border border-[var(--color-border)] object-cover shadow-[var(--shadow-panel)]"
-                      />
-                    </div>
-                  )}
-
-                  {/* Veterinary assessment, when available */}
-                  {report.handlerNote && (
-                    <div className="rounded-[var(--radius-sm)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-3 text-xs">
-                      <div className="flex items-center gap-1.5 font-medium text-[var(--color-success)]">
-                        <Icon name="stethoscope" size={14} />
-                        <span>
-                          Veterinary assessment & guidance{' '}
-                          {report.handledAt ? `(${formatDateTime(report.handledAt)})` : ''}:
-                        </span>
-                      </div>
-                      <p className="mt-1.5 whitespace-pre-wrap text-[var(--color-text-primary)]">
-                        {report.handlerNote}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </Panel>
-            );
-          })}
-        </div>
+        <DataTable
+          ariaLabel="Incident reports"
+          rows={reports}
+          columns={columns}
+          getRowKey={(report) => report.id}
+          loading={loading}
+          pageSize={PAGE_SIZE}
+          getSearchText={horseName}
+          searchPlaceholder="Search by horse name…"
+          emptyTitle="No incident reports found"
+          emptyDescription={
+            statusFilter === 'ALL'
+              ? 'No injury incidents have been recorded for your assigned horses.'
+              : 'No incident reports match the current filter.'
+          }
+        />
       )}
+
+      <IncidentDetailModal
+        report={selected}
+        horseName={selected ? horseName(selected) : ''}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }
