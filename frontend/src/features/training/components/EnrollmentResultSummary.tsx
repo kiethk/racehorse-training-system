@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 import { Button, Icon, LinkButton, Notice, PageHeader, PageSection, Panel, Pill, ScreenLayout } from '@/components/ui';
-import type { Horse } from '@/features/stable/types';
 import { formatDate, formatTime } from '@/lib/display';
 import { PLAN_STATUS } from '../lib/status';
 import type { HorseTrainingPlanDetailResponse, PlanWorkoutItemResponse } from '../types';
@@ -19,7 +18,8 @@ export function EnrollmentResultSummary({
   onDone,
 }: {
   plans: HorseTrainingPlanDetailResponse[];
-  horses: Horse[];
+  /** Only the names are needed, to label each plan. */
+  horses: { id: number; name: string }[];
   onDone: () => void;
 }) {
   const horseNameById = useMemo(() => new Map(horses.map((h) => [h.id, h.name] as const)), [horses]);

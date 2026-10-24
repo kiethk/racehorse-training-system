@@ -82,6 +82,50 @@ export interface HorseEnrollmentItem {
   groomId?: number | null;
 }
 
+/** Whether a horse can join the plan being previewed. Mirrors the backend enum PlanAvailability. */
+export type PlanAvailability = 'AVAILABLE' | 'BUSY' | 'BLOCKED' | 'NO_GROOM';
+
+/** A running or upcoming plan of a horse. */
+export interface RunningPlanRow {
+  planId: number;
+  horseId: number;
+  courseName: string;
+  startDate: string;
+  endDate: string;
+  status: PlanStatus;
+}
+
+export interface PlanPreviewRequest {
+  courseId: number;
+  startDate: string; // YYYY-MM-DD
+  trainingDays: TrainingDay[];
+  selectedHorseIds: number[];
+}
+
+export interface HorsePlanAvailability {
+  horseId: number;
+  horseName: string;
+  breed: string | null;
+  stallCode: string | null;
+  availability: PlanAvailability;
+  /** Ready-to-show explanation; null when the horse is available. */
+  reason: string | null;
+  /** Plans overlapping the previewed period. */
+  conflicts: RunningPlanRow[];
+  /** Earliest date this horse is free for the whole course; only for BUSY horses. */
+  earliestStart: string | null;
+}
+
+export interface PlanPreviewResponse {
+  /** The chosen start moved to the nearest training weekday: the date the plan really starts. */
+  firstSessionDate: string;
+  endDate: string;
+  totalSessions: number;
+  /** Earliest date every selected horse is free for the whole course; null when none is selected. */
+  groupEarliestStart: string | null;
+  horses: HorsePlanAvailability[];
+}
+
 export interface CreateHorseTrainingPlanRequest {
   courseId: number;
   startDate: string; // YYYY-MM-DD

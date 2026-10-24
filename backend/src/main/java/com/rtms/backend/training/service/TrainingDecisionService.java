@@ -87,16 +87,26 @@ public class TrainingDecisionService {
                     horse.getName(), horse.getCurrentStatus()));
         }
         if (horse.getTrainingDecision() == TrainingDecision.BLOCKED) {
-            LocalDateTime nextExam = careScheduleRepository.findNextExamTime(horse.getId(), PENDING_EXAM_STATUSES);
-            String reason = horse.getTrainingDecisionReason() == null || horse.getTrainingDecisionReason().isBlank()
-                    ? "as directed by the vet"
-                    : horse.getTrainingDecisionReason();
-            String until = nextExam == null
-                    ? "no follow-up exam scheduled"
-                    : "re-examination at " + nextExam.format(DATE_TIME);
             throw new ApiException(HttpStatus.CONFLICT, "TRAINING_BLOCKED", String.format(
-                    "Horse '%s' is resting: %s (%s). A new plan cannot be created!",
-                    horse.getName(), reason, until));
+                    "Horse '%s' is resting: %s. A new plan cannot be created!",
+                    horse.getName(), describeRest(horse)));
         }
+    }
+
+    /**
+     * Lý do nghỉ tập và hạn khám lại của một ngựa đang bị chặn, ví dụ "Tendon strain (re-examination at
+     * 20/10/2026 14:00)". Dùng chung cho thông báo lỗi khi tạo kế hoạch và cho màn hình xem trước kế hoạch.
+     * (The rest reason and re-examination time of a blocked horse, for example "Tendon strain (re-examination at
+     * 20/10/2026 14:00)". Shared by the plan creation error and the plan preview screen.)
+     */
+    public String describeRest(Horse horse) {
+        LocalDateTime nextExam = careScheduleRepository.findNextExamTime(horse.getId(), PENDING_EXAM_STATUSES);
+        String reason = horse.getTrainingDecisionReason() == null || horse.getTrainingDecisionReason().isBlank()
+                ? "as directed by the vet"
+                : horse.getTrainingDecisionReason();
+        String until = nextExam == null
+                ? "no follow-up exam scheduled"
+                : "re-examination at " + nextExam.format(DATE_TIME);
+        return reason + " (" + until + ")";
     }
 }

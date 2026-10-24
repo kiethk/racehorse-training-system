@@ -7,7 +7,6 @@ import com.rtms.backend.training.enums.TrainingDay;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -97,20 +96,6 @@ class TrainingLotServiceTest {
         LocalTime slot = lotService.findFirstFreeSlot(List.of(lot1, lot2, lot3), 45);
 
         assertNull(slot);
-    }
-
-    @Test
-    @DisplayName("calculateEndDate: exact end date for a Mon/Wed/Fri schedule")
-    void testCalculateEndDate() {
-        // Bắt đầu Thứ Hai 2026-10-05, tập T2, T4, T6, tổng 6 buổi (starts Monday 2026-10-05, trains Mon/Wed/Fri, 6 sessions in total)
-        LocalDate start = LocalDate.of(2026, 10, 5); // Monday
-        Set<TrainingDay> days = Set.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY, TrainingDay.FRIDAY);
-
-        // Buổi 1: T2 05/10, Buổi 2: T4 07/10, Buổi 3: T6 09/10 (Sessions 1-3: Mon 05/10, Wed 07/10, Fri 09/10)
-        // Buổi 4: T2 12/10, Buổi 5: T4 14/10, Buổi 6: T6 16/10 (Sessions 4-6: Mon 12/10, Wed 14/10, Fri 16/10)
-        LocalDate end = HorseTrainingPlanService.calculateEndDate(start, days, 6);
-
-        assertEquals(LocalDate.of(2026, 10, 16), end);
     }
 
     @Test

@@ -1,5 +1,7 @@
-import { Button, FieldLabel, FormField, Input, Panel, SectionTitle } from '@/components/ui';
-import type { TrainingDay } from '../../types';
+import { Button, FieldLabel, FormField, Icon, Input, Panel, SectionTitle } from '@/components/ui';
+import { cn } from '@/lib/cn';
+import { formatDate } from '@/lib/display';
+import type { PlanPreviewResponse, TrainingDay } from '../../types';
 
 export const DAYS_OF_WEEK: { value: TrainingDay; label: string }[] = [
   { value: 'MONDAY', label: 'Monday' },
@@ -11,29 +13,51 @@ export const DAYS_OF_WEEK: { value: TrainingDay; label: string }[] = [
   { value: 'SUNDAY', label: 'Sunday' },
 ];
 
-/** Step 3: first training date, weekdays and an optional note for the plans. */
+const DAY_WITH_DATE: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' };
+
+/**
+ * Step 2: first training date, weekdays and an optional note. The period the course will really cover comes from
+ * the backend preview, because the end date depends on the session count and the weekdays together.
+ */
 export function ScheduleStep({
   startDate,
+  minDate,
   onStartDateChange,
   trainingDays,
   onToggleDay,
   notes,
   onNotesChange,
+  preview,
+  stale,
 }: {
   startDate: string;
+  /** Today: a plan cannot start in the past. */
+  minDate: string;
   onStartDateChange: (value: string) => void;
   trainingDays: TrainingDay[];
   onToggleDay: (day: TrainingDay) => void;
   notes: string;
   onNotesChange: (value: string) => void;
+  preview: PlanPreviewResponse | null;
+  /** The preview belongs to the previous schedule and is being refreshed. */
+  stale: boolean;
 }) {
+  const inPast = startDate !== '' && startDate < minDate;
+  // Only compared once the preview matches the current date, otherwise an old answer would claim a move.
+  const moved = preview !== null && !stale && preview.firstSessionDate !== startDate;
+
   return (
     <Panel padded className="space-y-4">
-      <SectionTitle>3. Schedule and training days</SectionTitle>
+      <SectionTitle>2. Schedule and training days</SectionTitle>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormField label="Start date" required hint="The group’s first session will start on this date.">
-          <Input type="date" value={startDate} onChange={(e) => onStartDateChange(e.target.value)} />
+        <FormField
+          label="Start date"
+          required
+          hint="The group's first session is the first training day on or after this date."
+          error={inPast ? 'The start date cannot be in the past.' : undefined}
+        >
+          <Input type="date" min={minDate} value={startDate} onChange={(e) => onStartDateChange(e.target.value)} />
         </FormField>
 
         <div className="space-y-1.5">
@@ -57,6 +81,27 @@ export function ScheduleStep({
           </div>
         </div>
       </div>
+
+      {preview && !inPast && (
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs text-[var(--color-text-secondary)] transition-opacity duration-[var(--duration-fast)]',
+            stale && 'opacity-60',
+          )}
+        >
+          <span className="flex items-center gap-1.5 font-semibold text-[var(--color-text-primary)]">
+            <Icon name="calendar" size={13} />
+            {preview.totalSessions} sessions · {formatDate(preview.firstSessionDate, DAY_WITH_DATE)} →{' '}
+            {formatDate(preview.endDate, DAY_WITH_DATE)}
+          </span>
+          {moved && (
+            <span>
+              {formatDate(startDate, DAY_WITH_DATE)} is not a training day, so the first session is on{' '}
+              {formatDate(preview.firstSessionDate, DAY_WITH_DATE)}.
+            </span>
+          )}
+        </div>
+      )}
 
       <FormField label="Plan notes">
         <Input value={notes} onChange={(e) => onNotesChange(e.target.value)} placeholder="e.g. Three horses preparing for the autumn racing season…" />

@@ -8,6 +8,8 @@ import type {
   CreateCourseRequest,
   JoinableCohortResponse,
   CreateHorseTrainingPlanRequest,
+  PlanPreviewRequest,
+  PlanPreviewResponse,
   HorseTrainingPlanDetailResponse,
   PlanSummaryResponse,
   CompleteWorkoutRequest,
@@ -61,6 +63,10 @@ export const trainingService = {
     (await apiGet<ApiResponse<JoinableCohortResponse[]>>(
       `/api/training-plans/joinable-cohorts?courseId=${courseId}`,
     )).data,
+
+  /** Dry run of createPlan: the course period and which horses are free, busy or blocked. Nothing is saved. */
+  previewPlan: async (data: PlanPreviewRequest, signal?: AbortSignal): Promise<PlanPreviewResponse> =>
+    (await apiPost<ApiResponse<PlanPreviewResponse>>('/api/training-plans/preview', data, signal)).data,
 
   /** Enrols a group; the response holds one plan per horse. */
   createPlan: async (data: CreateHorseTrainingPlanRequest): Promise<HorseTrainingPlanDetailResponse[]> =>

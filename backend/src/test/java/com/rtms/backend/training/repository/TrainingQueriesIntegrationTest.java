@@ -1,6 +1,7 @@
 package com.rtms.backend.training.repository;
 
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.RoleRepository;
@@ -26,6 +27,7 @@ import com.rtms.backend.training.dto.PlanNamesRow;
 import com.rtms.backend.training.dto.PlanSummaryResponse;
 import com.rtms.backend.training.dto.PlanWorkoutItemResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
+import com.rtms.backend.training.dto.RunningPlanRow;
 import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
 import com.rtms.backend.training.dto.TrainingLotRow;
 import com.rtms.backend.training.entity.Course;
@@ -269,17 +271,32 @@ class TrainingQueriesIntegrationTest {
     }
 
     @Test
-    void overlappingPlansAreFoundByDateRange() {
-        List<TrainingPlanStatus> running = List.of(TrainingPlanStatus.ACTIVE, TrainingPlanStatus.UPCOMING);
+    void runningPlansCarryCourseNameAndSkipFinishedOnes() {
+        List<RunningPlanRow> running = plans.findRunningPlans(List.of(horse1.getId()), today.plusDays(5));
+        assertEquals(1, running.size());
+        assertEquals(plan.getId(), running.get(0).planId());
+        assertEquals(course.getName(), running.get(0).courseName());
+        assertEquals(TrainingPlanStatus.ACTIVE, running.get(0).status());
 
-        assertEquals(1, plans.findOverlappingPlans(List.of(horse1.getId()), running,
-                today.plusDays(5), today.plusDays(8)).size());
-        assertTrue(plans.findOverlappingPlans(List.of(horse1.getId()), running,
-                today.plusDays(11), today.plusDays(20)).isEmpty(), "Starts after the plan ends");
-        assertTrue(plans.findOverlappingPlans(List.of(horse2.getId()), running,
-                today, today.plusDays(5)).isEmpty(), "Another horse");
-        assertTrue(plans.findOverlappingPlans(List.of(horse1.getId()), List.of(TrainingPlanStatus.COMPLETED),
-                today, today.plusDays(5)).isEmpty(), "Status filter");
+        assertTrue(plans.findRunningPlans(List.of(horse1.getId()), today.plusDays(11)).isEmpty(),
+                "The plan ends before the given date");
+        assertTrue(plans.findRunningPlans(List.of(horse2.getId()), today).isEmpty(), "Another horse");
+
+        plan.setStatus(TrainingPlanStatus.COMPLETED);
+        plans.saveAndFlush(plan);
+        assertTrue(plans.findRunningPlans(List.of(horse1.getId()), today).isEmpty(), "Only ACTIVE and UPCOMING");
+    }
+
+    @Test
+    void enrollableHorsesAreTheAdmittedHorsesOfTheTrainerAreas() {
+        horse2.setCurrentStatus(HorseStatus.CANDIDATE);
+        horses.saveAndFlush(horse2);
+
+        List<Horse> enrollable = plans.findEnrollableHorses(trainer.getId());
+
+        assertTrue(enrollable.stream().anyMatch(h -> h.getId().equals(horse1.getId())));
+        assertFalse(enrollable.stream().anyMatch(h -> h.getId().equals(horse2.getId())), "Not admitted yet");
+        assertTrue(plans.findEnrollableHorses(groom.getId()).isEmpty(), "Not a trainer of any area");
     }
 
     @Test
