@@ -67,6 +67,8 @@ export interface AdmissionDetailResponse {
   admissionId: number;
   ownerId: number;
   ownerName: string | null;
+  ownerEmail?: string | null;
+  ownerPhone?: string | null;
   status: AdmissionStatus;
   quarantineStallId: number | null;
   quarantineStallCode: string | null;
@@ -82,18 +84,22 @@ export interface AdmissionDetailResponse {
     registrationNumber: string | null;
     registryName: string | null;
     sireName: string | null;
+    sireRegistrationNumber?: string | null;
     damName: string | null;
+    damRegistrationNumber?: string | null;
     pedigreeNotes: string | null;
   } | null;
 
   documents: AdmissionDocument[];
 
   groomId: number | null;
+  groomName?: string | null;
   groomDecision: string | null;
   groomFeedback: string | null;
   groomReviewedAt: string | null;
 
   veterinarianId: number | null;
+  veterinarianName?: string | null;
   /** Outcome of the admission exam. The vet does not approve or reject the admission. */
   vetTrainingDecision: TrainingDecision | null;
   vetFeedback: string | null;
@@ -106,6 +112,7 @@ export interface AdmissionDetailResponse {
   trainerReviewedAt: string | null;
 
   managerId: number | null;
+  managerName?: string | null;
   managerDecision: string | null;
   managerFeedback: string | null;
   managerReviewedAt: string | null;
