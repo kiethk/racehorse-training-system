@@ -7,7 +7,9 @@ import { Notice } from '@/components/ui/Notice';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
 import { admissionsApi } from '../services/api';
-import { formatDateTime, formatEnumLabel } from '@/lib/display';
+import { formatDateTime, formatDate, formatEnumLabel } from '@/lib/display';
+import { formatHorseSex } from '@/features/horses/lib/sex';
+import { Pill } from '@/components/ui/StatusBadge';
 import type { AdmissionDetailResponse } from '../types';
 
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
@@ -22,6 +24,31 @@ import { ManagerFinalReviewPanel } from './ManagerFinalReviewPanel';
 
 function datetime(value: string | null) {
   return value ? formatDateTime(value) : 'Not recorded';
+}
+
+function calculateAge(dateOfBirth: string | null | undefined): string | null {
+  if (!dateOfBirth) return null;
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let years = now.getFullYear() - dob.getFullYear();
+  const m = now.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
+    years--;
+  }
+  if (years < 1) {
+    const months = Math.max(0, (now.getFullYear() - dob.getFullYear()) * 12 + now.getMonth() - dob.getMonth());
+    return `${months} mo`;
+  }
+  return `${years} yo`;
+}
+
+function calculateDaysInQuarantine(arrivedAt: string | null | undefined): number | null {
+  if (!arrivedAt) return null;
+  const arrival = new Date(arrivedAt);
+  if (Number.isNaN(arrival.getTime())) return null;
+  const diffMs = Date.now() - arrival.getTime();
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
 interface ManagerAdmissionDetailViewProps {
@@ -77,6 +104,8 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
     detail.vetTrainingDecision ?? detail.initialVetExam?.trainingDecision ?? null;
   // The admission passed the vet stage but the system has not found an eligible Trainer to assign yet.
   const trainerUnassigned = detail.status === 'TRAINER_REVIEW' && detail.trainerId == null;
+  const age = calculateAge(candidate.dateOfBirth);
+  const daysInQuarantine = calculateDaysInQuarantine(detail.arrivedAt);
   
   const TABS: TabItem[] = [
     { id: 'overview', label: 'Overview' },
@@ -88,27 +117,125 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
 
   const renderOverview = () => (
     <div className="space-y-5">
-      <AdmissionInfoSection title="Pedigree & Registration">
+      {/* 1. Candidate Identification & Pedigree */}
+      <AdmissionInfoSection title="Candidate Identification & Pedigree">
+        <InfoRow
+          label="Date of Birth"
+          value={
+            candidate.dateOfBirth
+              ? `${formatDate(candidate.dateOfBirth)}${age ? ` (${age})` : ''}`
+              : 'Not recorded'
+          }
+        />
+        <InfoRow label="Breed" value={candidate.breed || 'Not provided'} />
+        <InfoRow label="Sex" value={formatHorseSex(candidate.sex)} />
         <InfoRow label="Registry Name" value={candidate.registryName} />
         <InfoRow label="Registration No." value={candidate.registrationNumber} />
         <div className="space-y-3 border-t border-[var(--color-border)] pt-3">
-          <InfoRow label="Sire" value={candidate.sireName} />
-          <InfoRow label="Dam" value={candidate.damName} />
+          <InfoRow
+            label="Sire"
+            value={
+              candidate.sireName
+                ? `${candidate.sireName}${candidate.sireRegistrationNumber ? ` (#${candidate.sireRegistrationNumber})` : ''}`
+                : null
+            }
+          />
+          <InfoRow
+            label="Dam"
+            value={
+              candidate.damName
+                ? `${candidate.damName}${candidate.damRegistrationNumber ? ` (#${candidate.damRegistrationNumber})` : ''}`
+                : null
+            }
+          />
           {candidate.pedigreeNotes && (
-            <div className="mt-2 text-[var(--color-text-secondary)] italic">
+            <div className="mt-2 text-xs text-[var(--color-text-secondary)] italic">
               &quot;{candidate.pedigreeNotes}&quot;
             </div>
           )}
         </div>
       </AdmissionInfoSection>
-      
-      {/* Short Trainer/Vet Assessment Summary if available */}
-      {(detail.trainerFeedback || currentTrainingDecision) && (
-        <AdmissionInfoSection title="Assessment Summary">
-          {currentTrainingDecision && <InfoRow label="Vet Training Decision" value={currentTrainingDecision} />}
-          {detail.trainerFeedback && <InfoRow label="Trainer Assessment" value={detail.trainerFeedback} />}
-        </AdmissionInfoSection>
-      )}
+
+      {/* 2. Owner & Contact Information */}
+      <AdmissionInfoSection title="Owner & Intake Details">
+        <InfoRow
+          label="Owner"
+          value={
+            detail.ownerName
+              ? `${detail.ownerName}${detail.ownerId != null ? ` (#${detail.ownerId})` : ''}`
+              : detail.ownerId != null
+                ? `#${detail.ownerId}`
+                : '—'
+          }
+        />
+        <InfoRow label="Owner Email" value={detail.ownerEmail} />
+        <InfoRow label="Owner Phone" value={detail.ownerPhone} />
+        <div className="space-y-3 border-t border-[var(--color-border)] pt-3">
+          <InfoRow label="Submitted At" value={datetime(detail.submittedAt)} />
+          <InfoRow label="Quarantine Stall" value={detail.quarantineStallCode} />
+          <InfoRow
+            label="Arrival Status"
+            value={
+              detail.arrivedAt
+                ? `Arrived on ${datetime(detail.arrivedAt)}${daysInQuarantine != null ? ` (${daysInQuarantine} days in quarantine)` : ''}`
+                : detail.arrivalDeadlineAt
+                  ? `Pending arrival (Deadline: ${datetime(detail.arrivalDeadlineAt)})`
+                  : 'Not arrived'
+            }
+          />
+        </div>
+      </AdmissionInfoSection>
+
+      {/* 3. Executive Assessment Highlights */}
+      <AdmissionInfoSection title="Executive Assessment Highlights">
+        <InfoRow
+          label="Vet Clearance"
+          value={
+            currentTrainingDecision ? (
+              <Pill tone={currentTrainingDecision === 'ALLOWED' ? 'success' : 'danger'} size="sm">
+                {formatEnumLabel(currentTrainingDecision)}
+              </Pill>
+            ) : (
+              <span className="italic text-[var(--color-text-muted)]">Pending vet examination</span>
+            )
+          }
+        />
+        <InfoRow
+          label="Examining Vet"
+          value={
+            detail.veterinarianName ??
+            detail.initialVetExam?.veterinarianName ??
+            (detail.veterinarianId ? `#${detail.veterinarianId}` : null)
+          }
+        />
+        {(detail.vetFeedback || detail.initialVetExam?.diagnosis) && (
+          <InfoRow
+            label="Vet Diagnosis / Notes"
+            value={detail.vetFeedback || detail.initialVetExam?.diagnosis}
+          />
+        )}
+        <div className="space-y-3 border-t border-[var(--color-border)] pt-3">
+          <InfoRow
+            label="Trainer Readiness"
+            value={
+              detail.trainerFeedback ? (
+                'Assessment submitted'
+              ) : detail.trainerId ? (
+                <span className="italic text-[var(--color-text-muted)]">Awaiting trainer evaluation</span>
+              ) : (
+                <span className="italic text-[var(--color-text-muted)]">Pending trainer assignment</span>
+              )
+            }
+          />
+          <InfoRow
+            label="Assigned Trainer"
+            value={detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : null)}
+          />
+          {detail.trainerFeedback && (
+            <InfoRow label="Trainer Notes" value={detail.trainerFeedback} />
+          )}
+        </div>
+      </AdmissionInfoSection>
     </div>
   );
 
@@ -144,6 +271,10 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         {detail.groomReviewedAt && (
           <div className="space-y-2">
             <InfoGroupTitle>Groom Review</InfoGroupTitle>
+            <InfoRow
+              label="Reviewed by"
+              value={detail.groomName ?? (detail.groomId ? `#${detail.groomId}` : 'Assigned Groom')}
+            />
             <InfoRow label="Decision" value={detail.groomDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.groomReviewedAt)} />
             {detail.groomFeedback && <InfoRow label="Feedback" value={detail.groomFeedback} />}
@@ -153,6 +284,14 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         {detail.vetReviewedAt && (
           <div className="space-y-2 pt-4 border-t border-[var(--color-border)]">
             <InfoGroupTitle>Veterinarian Review</InfoGroupTitle>
+            <InfoRow
+              label="Examined by"
+              value={
+                detail.veterinarianName ??
+                detail.initialVetExam?.veterinarianName ??
+                (detail.veterinarianId ? `#${detail.veterinarianId}` : 'Assigned Veterinarian')
+              }
+            />
             <InfoRow label="Training Decision" value={currentTrainingDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.vetReviewedAt)} />
             {detail.vetFeedback && <InfoRow label="Feedback" value={detail.vetFeedback} />}
@@ -162,6 +301,10 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         {detail.trainerReviewedAt && (
           <div className="space-y-2 pt-4 border-t border-[var(--color-border)]">
             <InfoGroupTitle>Trainer Readiness Assessment</InfoGroupTitle>
+            <InfoRow
+              label="Assessed by"
+              value={detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : 'Assigned Trainer')}
+            />
             <InfoRow label="Assessed At" value={datetime(detail.trainerReviewedAt)} />
             {detail.trainerFeedback && <InfoRow label="Assessment Notes" value={detail.trainerFeedback} />}
           </div>
@@ -170,6 +313,10 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
         {detail.managerReviewedAt && (
           <div className="space-y-2 pt-4 border-t border-[var(--color-border)]">
             <InfoGroupTitle>Manager Decision</InfoGroupTitle>
+            <InfoRow
+              label="Decided by"
+              value={detail.managerName ?? (detail.managerId ? `#${detail.managerId}` : 'Manager')}
+            />
             <InfoRow label="Decision" value={detail.managerDecision} />
             <InfoRow label="Reviewed At" value={datetime(detail.managerReviewedAt)} />
             {detail.managerFeedback && <InfoRow label="Notes" value={detail.managerFeedback} />}
@@ -215,8 +362,42 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
             <AdmissionSideCard title="Admission at a glance">
               <InfoRow label="Current status" value={<AdmissionStatusBadge status={detail.status} size="sm" />} />
               {detail.quarantineStallCode && <InfoRow label="Quarantine stall" value={detail.quarantineStallCode} />}
-              {currentTrainingDecision && <InfoRow label="Training" value={formatEnumLabel(currentTrainingDecision)} />}
-              {detail.trainerId != null && <InfoRow label="Head Trainer" value={detail.trainerName ?? `#${detail.trainerId}`} />}
+              <InfoRow
+                label="Assigned Groom"
+                value={detail.groomName ?? (detail.groomId ? `#${detail.groomId}` : 'Unassigned')}
+              />
+              <InfoRow
+                label="Examining Vet"
+                value={
+                  detail.veterinarianName ??
+                  detail.initialVetExam?.veterinarianName ??
+                  (detail.veterinarianId ? `#${detail.veterinarianId}` : 'Pending assignment')
+                }
+              />
+              {currentTrainingDecision && (
+                <InfoRow
+                  label="Vet clearance"
+                  value={
+                    <Pill tone={currentTrainingDecision === 'ALLOWED' ? 'success' : 'danger'} size="sm">
+                      {formatEnumLabel(currentTrainingDecision)}
+                    </Pill>
+                  }
+                />
+              )}
+              <InfoRow
+                label="Head Trainer"
+                value={detail.trainerName ?? (detail.trainerId ? `#${detail.trainerId}` : 'Unassigned')}
+              />
+              {detail.arrivedAt && (
+                <InfoRow
+                  label="Quarantine stay"
+                  value={
+                    daysInQuarantine != null
+                      ? `${daysInQuarantine} days (${formatDate(detail.arrivedAt)})`
+                      : formatDate(detail.arrivedAt)
+                  }
+                />
+              )}
               {trainerUnassigned && (
                 <Notice tone="warning" title="No Head Trainer assigned yet">
                   No eligible Head Trainer is available. The system retries automatically; check that at

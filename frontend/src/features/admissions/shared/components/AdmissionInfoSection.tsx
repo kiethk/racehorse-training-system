@@ -1,14 +1,48 @@
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { Panel, SectionTitle } from '@/components/ui/Panel';
 import { cn } from '@/lib/cn';
 
-export function InfoRow({ label, value }: { label: string; value: ReactNode }) {
+const InfoRowContext = createContext<{ defaultLayout: 'aligned' | 'between' }>({
+  defaultLayout: 'aligned',
+});
+
+/**
+ * Key-value row for admission details.
+ * - 'aligned' (default for main cards): Label has a neat left-aligned column (180px),
+ *   and the value sits directly next to it. Eliminates horizontal scanning fatigue.
+ * - 'between' (default for side cards): Space-between layout for narrow sidebars.
+ */
+export function InfoRow({
+  label,
+  value,
+  layout,
+  className,
+}: {
+  label: string;
+  value: ReactNode;
+  layout?: 'aligned' | 'between';
+  className?: string;
+}) {
+  const { defaultLayout } = useContext(InfoRowContext);
+  const activeLayout = layout ?? defaultLayout;
+
+  if (activeLayout === 'between') {
+    return (
+      <div className={cn('flex items-start justify-between gap-4', className)}>
+        <span className="shrink-0 text-sm text-[var(--color-text-muted)]">{label}</span>
+        <span className="min-w-0 break-words text-right text-sm font-medium text-[var(--color-text-primary)]">
+          {value || <span className="font-normal italic text-[var(--color-text-muted)]">N/A</span>}
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="shrink-0 text-[var(--color-text-muted)]">{label}</span>
-      <span className="min-w-0 break-words text-right font-medium text-[var(--color-text-primary)]">
+    <div className={cn('grid grid-cols-1 gap-1 sm:grid-cols-[180px_1fr] sm:gap-4 sm:items-baseline', className)}>
+      <span className="shrink-0 text-sm text-[var(--color-text-muted)]">{label}</span>
+      <div className="min-w-0 break-words text-left text-sm font-medium text-[var(--color-text-primary)]">
         {value || <span className="font-normal italic text-[var(--color-text-muted)]">N/A</span>}
-      </span>
+      </div>
     </div>
   );
 }
@@ -25,13 +59,15 @@ export function AdmissionInfoSection({
   children: ReactNode;
 }) {
   return (
-    <Panel padded>
-      <div className="flex items-center justify-between gap-3">
-        <SectionTitle>{title}</SectionTitle>
-        {aside}
-      </div>
-      <div className="mt-4 space-y-3 text-sm">{children}</div>
-    </Panel>
+    <InfoRowContext.Provider value={{ defaultLayout: 'aligned' }}>
+      <Panel padded>
+        <div className="flex items-center justify-between gap-3">
+          <SectionTitle>{title}</SectionTitle>
+          {aside}
+        </div>
+        <div className="mt-4 space-y-3 text-sm">{children}</div>
+      </Panel>
+    </InfoRowContext.Provider>
   );
 }
 
@@ -48,10 +84,12 @@ export function AdmissionSideCard({
   className?: string;
 }) {
   return (
-    <Panel padded tone={tone}>
-      <SectionTitle>{title}</SectionTitle>
-      <div className={cn('mt-4 space-y-3 text-sm', className)}>{children}</div>
-    </Panel>
+    <InfoRowContext.Provider value={{ defaultLayout: 'between' }}>
+      <Panel padded tone={tone}>
+        <SectionTitle>{title}</SectionTitle>
+        <div className={cn('mt-4 space-y-3 text-sm', className)}>{children}</div>
+      </Panel>
+    </InfoRowContext.Provider>
   );
 }
 

@@ -93,6 +93,8 @@ export async function openAuthenticatedEventStream(
 
 let accessToken: string | null = null;
 
+export const AUTH_UNAUTHORIZED_EVENT = 'rtms:auth-unauthorized';
+
 export function getAccessToken(): string | null {
   return accessToken;
 }
@@ -120,9 +122,15 @@ export async function refreshAccessToken(): Promise<boolean> {
         }
       }
       setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT));
+      }
       return false;
     } catch {
       setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT));
+      }
       return false;
     } finally {
       refreshPromise = null;
