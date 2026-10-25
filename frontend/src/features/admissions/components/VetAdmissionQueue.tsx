@@ -26,6 +26,7 @@ import { AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSe
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSection';
+import { CareRecordDetailModal } from '@/features/care/components/CareRecordDetailModal';
 import { admissionsApi } from '../services/api';
 import type {
   AdmissionDetailResponse,
@@ -614,25 +615,13 @@ export function VetAdmissionQueue() {
   }
 
   const workspaceTabs: TabItem[] = [
-    { id: 'exam', label: 'Clinical Examination', icon: 'stethoscope' },
-    {
-      id: 'history',
-      label: 'Medical Records',
-      icon: 'clipboard',
-      count: (detail?.healthRecords?.length ?? 0) > 0 ? detail?.healthRecords?.length : undefined,
-    },
-    {
-      id: 'vitals',
-      label: 'Vitals History',
-      icon: 'heart-pulse',
-      count: metrics.length > 0 ? metrics.length : undefined,
-    },
     {
       id: 'documents',
-      label: 'Intake & Pedigree',
+      label: 'Documents',
       icon: 'file-text',
       count: documents.length > 0 ? documents.length : undefined,
     },
+    { id: 'exam', label: 'Clinical Examination', icon: 'stethoscope' },
   ];
 
   const queueColumns: DataTableColumn<(typeof items)[number]>[] = [
@@ -1031,219 +1020,14 @@ export function VetAdmissionQueue() {
                     )}
                   </div>
 
-                  {/* Tab 2: Medical Records History */}
-                  {activeTab === 'history' && (
-                    <div className="space-y-5">
-                      <div>
-                        <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
-                          Completed Health Records
-                        </h3>
-                        {detail.healthRecords && detail.healthRecords.length > 0 ? (
-                          <ul className="mt-3 space-y-3">
-                            {detail.healthRecords.map((record) => (
-                              <li
-                                key={record.id}
-                                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-                              >
-                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-bold text-[var(--color-text-primary)]">
-                                      {formatLabel(record.recordType)} Exam
-                                    </span>
-                                    <span className="font-metric text-xs text-[var(--color-text-muted)]">
-                                      Record #{record.id}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-metric text-xs text-[var(--color-text-secondary)]">
-                                      {formatDate(record.examinedAt, true)}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                                  <MedicalNoteBlock label="Symptoms" value={record.symptoms} />
-                                  <MedicalNoteBlock label="Findings" value={record.findings} />
-                                  <MedicalNoteBlock label="Diagnosis" value={record.diagnosis} />
-                                  <MedicalNoteBlock label="Treatment Plan" value={record.treatment} />
-                                  <MedicalNoteBlock label="Notes & Context" value={record.notes} />
-                                </div>
-
-                                {record.trainingDecision && (
-                                  <div className="mt-2.5 flex items-center gap-2">
-                                    <span
-                                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
-                                        record.trainingDecision === 'ALLOWED'
-                                          ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]'
-                                          : 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
-                                      }`}
-                                    >
-                                      Training Decision: {record.trainingDecision}
-                                    </span>
-                                  </div>
-                                )}
-
-                                {record.restrictionDetails && (
-                                  <div className="mt-2 rounded bg-[var(--color-warning-soft)] p-2 text-xs text-[var(--color-warning)]">
-                                    <strong>Restriction Protocol:</strong> {record.restrictionDetails}
-                                  </div>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-2 text-xs text-[var(--color-text-muted)] italic">
-                            No health records filed for this candidate yet.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="border-t border-[var(--color-border)] pt-4">
-                        <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
-                          Examination Schedule Log
-                        </h3>
-                        {selectedHistory.length > 0 ? (
-                          <ol className="mt-3 space-y-2.5">
-                            {selectedHistory.map((item, idx) => (
-                              <li
-                                key={`${item.id}-${idx}`}
-                                className="flex items-start gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-xs"
-                              >
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary-soft)] text-xs font-bold text-[var(--color-primary)]">
-                                  {idx + 1}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <span className="font-bold text-[var(--color-text-primary)]">
-                                      {item.label}
-                                    </span>
-                                    <Pill tone={examTone(item.status)} size="sm">
-                                      {formatLabel(item.status)}
-                                    </Pill>
-                                  </div>
-                                  <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-                                    {item.description}
-                                  </p>
-                                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-muted)]">
-                                    <span>Scheduled: {item.scheduledAt ? formatDate(item.scheduledAt, true) : 'Pending'}</span>
-                                    <span>·</span>
-                                    <span>Assigned Vet: {item.assignedVetId ? `#${item.assignedVetId}` : 'Unassigned'}</span>
-                                  </div>
-                                </div>
-                              </li>
-                            ))}
-                          </ol>
-                        ) : (
-                          <p className="mt-2 text-xs text-[var(--color-text-muted)] italic">
-                            No care schedule logs recorded.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tab 3: Vitals & Health Metrics History */}
-                  {activeTab === 'vitals' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
-                          Recorded Vitals &amp; Telemetry
-                        </h3>
-                        <span className="text-xs text-[var(--color-text-muted)]">
-                          {metrics.length} readings on record
-                        </span>
-                      </div>
-
-                      {metrics.length > 0 ? (
-                        <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-border)]">
-                          <Table bare>
-                            <THead>
-                              <Tr>
-                                <Th className="px-3 py-2">Recorded At</Th>
-                                <Th className="px-3 py-2">Temp</Th>
-                                <Th className="px-3 py-2">Heart Rate</Th>
-                                <Th className="px-3 py-2">Resp Rate</Th>
-                                <Th className="px-3 py-2">Weight</Th>
-                                <Th className="px-3 py-2">BCS</Th>
-                                <Th className="px-3 py-2">Hydration</Th>
-                                <Th className="px-3 py-2">Notes</Th>
-                              </Tr>
-                            </THead>
-                            <TBody>
-                              {metrics.map((m) => (
-                                <Tr key={m.id} className="hover:bg-[var(--color-surface-subtle)]">
-                                  <Td className="px-3 py-2 text-[var(--color-text-primary)]">
-                                    {formatDate(m.recordedAt, true)}
-                                  </Td>
-                                  <Td className="px-3 py-2">
-                                    {m.temperature != null ? `${m.temperature} °C` : '—'}
-                                  </Td>
-                                  <Td className="px-3 py-2">
-                                    {m.heartRate != null ? `${m.heartRate} bpm` : '—'}
-                                  </Td>
-                                  <Td className="px-3 py-2">
-                                    {m.respiratoryRate != null ? `${m.respiratoryRate} rpm` : '—'}
-                                  </Td>
-                                  <Td className="px-3 py-2">
-                                    {m.weight != null ? `${m.weight} kg` : '—'}
-                                  </Td>
-                                  <Td className="px-3 py-2">
-                                    {m.bodyConditionScore != null ? `${m.bodyConditionScore} / 9` : '—'}
-                                  </Td>
-                                  <Td className="px-3 py-2 font-sans">
-                                    {m.hydrationStatus || '—'}
-                                  </Td>
-                                  <Td className="px-3 py-2 font-sans text-[var(--color-text-secondary)] max-w-xs truncate">
-                                    {m.notes || '—'}
-                                  </Td>
-                                </Tr>
-                              ))}
-                            </TBody>
-                          </Table>
-                        </div>
-                      ) : (
-                        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] p-6 text-center text-[var(--color-text-muted)]">
-                          <Icon name="heart-pulse" size={24} className="mx-auto mb-1.5 opacity-50" />
-                          <p className="text-xs font-medium text-[var(--color-text-secondary)]">
-                            No telemetry metrics recorded yet
-                          </p>
-                        </div>
-                      )}
-
-                      {latestMetrics && (
-                        <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] p-3 border border-[var(--color-border)]">
-                          <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
-                            Latest Telemetry Baseline ({formatDate(latestMetrics.recordedAt, true)})
-                          </span>
-                          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6 font-metric text-xs">
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">TEMP</span>
-                              <strong>{latestMetrics.temperature ?? '—'} °C</strong>
-                            </div>
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">PULSE</span>
-                              <strong>{latestMetrics.heartRate ?? '—'} bpm</strong>
-                            </div>
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">RESP</span>
-                              <strong>{latestMetrics.respiratoryRate ?? '—'} rpm</strong>
-                            </div>
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">WEIGHT</span>
-                              <strong>{latestMetrics.weight ?? '—'} kg</strong>
-                            </div>
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">BCS</span>
-                              <strong>{latestMetrics.bodyConditionScore ?? '—'} / 9</strong>
-                            </div>
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">HYDRATION</span>
-                              <strong className="font-sans text-xs">{latestMetrics.hydrationStatus ?? 'Normal'}</strong>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                  {/* View Record (common form) */}
+                  {activeTab === 'record' && (
+                    <CareRecordDetailModal
+                      scheduleId={currentActiveSchedule?.id ?? null}
+                      open={true}
+                      onClose={() => setActiveTab('exam')}
+                      onScheduleUpdated={() => {}}
+                    />
                   )}
 
                   {/* Tab 4: Intake Documents & Pedigree */}

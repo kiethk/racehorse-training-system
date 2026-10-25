@@ -40,13 +40,26 @@ export default function UrgentCasesPage() {
 
   useEffect(() => {
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
-    const interval = setInterval(() => {
-      if (active) loadData(true);
+    let interval: ReturnType<typeof setInterval> | null = setInterval(() => {
+      if (active && document.visibilityState === 'visible') loadData(true);
     }, 15000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        if (interval) { clearInterval(interval); interval = null; }
+      } else {
+        if (!interval) interval = setInterval(() => {
+          if (active) loadData(true);
+        }, 15000);
+        if (active) loadData(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       active = false;
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
 

@@ -4,7 +4,6 @@ import type {
   HorsePreventiveStatus,
   HorseVaccinationRequest,
   HorseVaccinationResult,
-  PagedResult,
   PreventiveCoverage,
   PreventiveDueHorse,
   PreventiveDueStatus,
@@ -26,17 +25,23 @@ export const preventiveCareService = {
     statuses?: PreventiveDueStatus[];
     protocolId?: number;
     search?: string;
+    withinDays?: number;
     page: number;
     size: number;
-  }): Promise<PagedResult<PreventiveDueHorse>> => {
+  }): Promise<PreventiveDueHorse[]> => {
     const qs = new URLSearchParams();
     params?.statuses?.forEach((status) => qs.append('status', status));
     if (params?.withinDays != null) qs.set('withinDays', String(params.withinDays));
     if (params?.protocolId != null) qs.set('protocolId', String(params.protocolId));
     const query = qs.toString() ? `?${qs.toString()}` : '';
     const res = await apiGet<unknown>(`/api/preventive-care/due${query}`);
-    const rawItems = unwrapArray<any>(res);
+    const rawItems = unwrapArray<Record<string, unknown>>(res);
     return rawItems.map(normalizeDueItem);
+  },
+
+  dueSummary: async (): Promise<PreventiveDueSummary> => {
+    const res = await apiGet<unknown>('/api/preventive-care/due/summary');
+    return unwrapData<PreventiveDueSummary>(res);
   },
 
   coverage: async (): Promise<PreventiveCoverage[]> => {
@@ -49,9 +54,12 @@ export const preventiveCareService = {
     return unwrapData<HorsePreventiveStatus>(res);
   },
 
-  recordBatch: async (data: BatchVaccinationRequest): Promise<BatchVaccinationResult[]> => {
-    const res = await apiPost<unknown>('/api/preventive-care/batch-vaccinations', data);
-    return unwrapArray<BatchVaccinationResult>(res);
+  recordForHorse: async (
+    horseId: number,
+    data: HorseVaccinationRequest,
+  ): Promise<HorseVaccinationResult> => {
+    const res = await apiPost<unknown>(`/api/horses/${horseId}/vaccinations`, data);
+    return unwrapData<HorseVaccinationResult>(res);
   },
 
   reschedule: async (

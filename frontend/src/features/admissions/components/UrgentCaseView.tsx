@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useState, type FormEvent } from 'react';
+import { z } from 'zod';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Notice } from '@/components/ui/Notice';
 import { ChoiceInput, Input, Textarea } from '@/components/ui/Input';
@@ -13,6 +15,12 @@ import { Pill } from '@/components/ui/StatusBadge';
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { admissionsApi } from '../services/api';
+import { healthApi } from '@/features/health/services/healthApi';
+
+const UrgentHorseInjuryViewer = dynamic(
+  () => import('@/features/vet/components/UrgentHorseInjuryViewer'),
+  { ssr: false },
+);
 import { careService } from '@/features/care/services/careService';
 import { displayError } from '@/lib/display';
 import type {
@@ -72,8 +80,37 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [weight, setWeight] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  type InjuryMarker = {
+    id: string;
+    position: [number, number, number];
+    normal: [number, number, number];
+    zoneId?: string;
+    label: string;
+  };
+
+  const [injuryMarkers, setInjuryMarkers] = useState<InjuryMarker[]>([]);
+  const [isAddMode, setIsAddMode] = useState(false);
+  const [anatomyTab, setAnatomyTab] = useState<'form' | 'anatomy3d'>('form');
+
+  const handleInjuryHit = (hit: {
+    position: [number, number, number];
+    normal: [number, number, number];
+    zoneId: string;
+  }) => {
+    const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `marker-${Date.now()}`;
+    setInjuryMarkers((prev) => [
+      ...prev,
+      { id, position: hit.position, normal: hit.normal, zoneId: hit.zoneId, label: `Marker ${prev.length + 1}` },
+    ]);
+    setFindings((prev) => {
+      const line = `- 3D injury marker at [${hit.position.map((n) => n.toFixed(2)).join(', ')}]`;
+      return prev ? `${prev}\n${line}` : line;
+    });
+  };
+
   useEffect(() => {
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on id change
     setUrgentCase(null);
     setLoading(true);
     setReports([]);
@@ -97,6 +134,9 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     setRespiratoryRate('');
     setWeight('');
     setFieldErrors({});
+    setInjuryMarkers([]);
+    setIsAddMode(false);
+    setAnatomyTab('form');
 
     admissionsApi
       .getUrgentCase(scheduleId)
@@ -106,6 +146,33 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
         if (data.description) {
           setSymptoms((prev) => prev || data.description);
         }
+
+        // Load active injury markers (persisted) for read-only display on the 3D model.
+        healthApi
+          .getActiveInjuries(data.horseId)
+          .then((injuries) => {
+            if (!active) return;
+            setInjuryMarkers(
+              injuries.map((inj, idx) => ({
+                id: String(inj.id),
+                position: [
+                  Number(inj.positionX ?? 0),
+                  Number(inj.positionY ?? 0),
+                  Number(inj.positionZ ?? 0),
+                ] as [number, number, number],
+                normal: [
+                  Number(inj.normalX ?? 0),
+                  Number(inj.normalY ?? 1),
+                  Number(inj.normalZ ?? 0),
+                ] as [number, number, number],
+                zoneId: inj.zoneId ?? undefined,
+                label: inj.zoneId ? `Injury ${idx + 1}` : `Marker ${idx + 1}`,
+              })),
+            );
+          })
+          .catch(() => {
+            // Keep empty marker list if active injuries fail to load
+          });
 
         if (data.status === 'COMPLETED') {
           careService
@@ -170,33 +237,51 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   }
 
   function validateForm(): boolean {
+    const schema = z
+      .object({
+        symptoms: z.string().min(1, 'Symptoms are required for an urgent examination.'),
+        findings: z.string().min(1, 'Examination findings are required.'),
+        diagnosis: z.string().min(1, 'A clinical diagnosis is required.'),
+        restrictionDetails: z.string().optional(),
+        followUpDate: z.string().optional(),
+        followUpDescription: z.string().optional(),
+      })
+      .superRefine((data, ctx) => {
+        if (trainingDecision === 'BLOCKED') {
+          if (!data.restrictionDetails?.trim()) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['restrictionDetails'], message: 'Restriction details are required when training is blocked.' });
+          }
+          if (!data.followUpDate) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUpDate'], message: 'Select a follow-up date when training is blocked.' });
+          } else if (data.followUpDate < businessDate(1)) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUpDate'], message: 'The follow-up date must be tomorrow or later.' });
+          }
+          if (!data.followUpDescription?.trim()) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUpDescription'], message: 'A follow-up description is required.' });
+          }
+        }
+      });
+
+    const parsed = schema.safeParse({
+      symptoms: symptoms.trim(),
+      findings: findings.trim(),
+      diagnosis: diagnosis.trim(),
+      restrictionDetails: restrictionDetails.trim(),
+      followUpDate,
+      followUpDescription: followUpDescription.trim(),
+    });
+
+    if (parsed.success) {
+      setFieldErrors({});
+      return true;
+    }
     const errors: Record<string, string> = {};
-
-    if (!symptoms.trim()) {
-      errors.symptoms = 'Symptoms are required for an urgent examination.';
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0];
+      if (typeof field === 'string' && !errors[field]) errors[field] = issue.message;
     }
-    if (!findings.trim()) {
-      errors.findings = 'Examination findings are required.';
-    }
-    if (!diagnosis.trim()) {
-      errors.diagnosis = 'A clinical diagnosis is required.';
-    }
-    if (trainingDecision === 'BLOCKED') {
-      if (!restrictionDetails.trim()) {
-        errors.restrictionDetails = 'Restriction details are required when training is blocked.';
-      }
-      if (!followUpDate) {
-        errors.followUpDate = 'Select a follow-up date when training is blocked.';
-      } else if (followUpDate < businessDate(1)) {
-        errors.followUpDate = 'The follow-up date must be tomorrow or later.';
-      }
-      if (!followUpDescription.trim()) {
-        errors.followUpDescription = 'A follow-up description is required.';
-      }
-    }
-
     setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+    return false;
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -226,6 +311,27 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       restrictionDetails: restrictionDetails.trim() || undefined,
       notes: notes.trim() || undefined,
       metrics: Object.keys(metrics).length > 0 ? [metrics] : undefined,
+      injuryMarkers:
+        injuryMarkers.length > 0
+          ? injuryMarkers.map((m) => ({
+              injuryType: 'UNSPECIFIED',
+              bodyRegionId: 1,
+              severity: 'MODERATE',
+              description: m.label,
+              diagnosedAt: new Date().toISOString(),
+              positionX: m.position[0],
+              positionY: m.position[1],
+              positionZ: m.position[2],
+              zoneId: m.zoneId ?? null,
+              localX: null,
+              localY: null,
+              localZ: null,
+              normalX: m.normal[0],
+              normalY: m.normal[1],
+              normalZ: m.normal[2],
+              meshName: 'Horse.001_M_Body_0',
+            }))
+          : undefined,
       nextSchedule:
         trainingDecision === 'BLOCKED'
           ? {
@@ -466,16 +572,56 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           {urgentCase.status === 'IN_PROGRESS' && (
             <Panel padded className="space-y-6">
               <div className="border-b border-[var(--color-border)] pb-3">
-                <h3 className="text-base font-bold text-[var(--color-text-primary)]">
-                  Urgent Clinical Examination Form
-                </h3>
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  Record vitals telemetry, clinical diagnosis, and immediate training restriction decision.
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={anatomyTab === 'form' ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => setAnatomyTab('form')}
+                  >
+                    Examination Form
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={anatomyTab === 'anatomy3d' ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => setAnatomyTab('anatomy3d')}
+                  >
+                    3D Anatomy
+                  </Button>
+                </div>
+                {anatomyTab === 'form' ? (
+                  <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+                    Record vitals telemetry, clinical diagnosis, and immediate training restriction decision.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+                    Click the horse to place injury markers. Markers are appended to examination findings.
+                  </p>
+                )}
               </div>
 
-              {submitError && <Notice tone="error">{submitError}</Notice>}
+              {submitError && anatomyTab === 'form' && <Notice tone="error">{submitError}</Notice>}
 
+              {anatomyTab === 'anatomy3d' ? (
+                <div className="space-y-4">
+                  {urgentCase.status === 'IN_PROGRESS' && (
+                    <Button
+                      type="button"
+                      variant={isAddMode ? 'primary' : 'secondary'}
+                      onClick={() => setIsAddMode((prev) => !prev)}
+                    >
+                      {isAddMode ? 'Adding marker: click horse' : 'Add injury marker'}
+                    </Button>
+                  )}
+                  <UrgentHorseInjuryViewer
+                    injuries={injuryMarkers}
+                    isAddMode={isAddMode}
+                    readOnly={urgentCase.status !== 'IN_PROGRESS'}
+                    onPointerHit={handleInjuryHit}
+                  />
+                </div>
+              ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* 1. Clinical Vitals (Integrated Labels, No Bottom Helper Text, No Out-of-Range Warnings) */}
                 <div className="space-y-3">
@@ -493,14 +639,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       >
                         Temperature (°C)
                       </label>
-                      <input
+                      <Input
                         id="vital-temp"
                         type="number"
                         step="0.1"
                         placeholder="38.0"
                         value={temperature}
                         onChange={(e) => setTemperature(e.target.value)}
-                        className="mt-1 w-full bg-transparent font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
+                        className="mt-1 w-full !min-h-0 !rounded-none !border-0 !bg-transparent !px-0 !py-0 font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
                       />
                     </div>
 
@@ -512,14 +658,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       >
                         Heart Rate (bpm)
                       </label>
-                      <input
+                      <Input
                         id="vital-hr"
                         type="number"
                         step="1"
                         placeholder="36"
                         value={heartRate}
                         onChange={(e) => setHeartRate(e.target.value)}
-                        className="mt-1 w-full bg-transparent font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
+                        className="mt-1 w-full !min-h-0 !rounded-none !border-0 !bg-transparent !px-0 !py-0 font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
                       />
                     </div>
 
@@ -531,14 +677,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       >
                         Respiration (rpm)
                       </label>
-                      <input
+                      <Input
                         id="vital-rr"
                         type="number"
                         step="1"
                         placeholder="12"
                         value={respiratoryRate}
                         onChange={(e) => setRespiratoryRate(e.target.value)}
-                        className="mt-1 w-full bg-transparent font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
+                        className="mt-1 w-full !min-h-0 !rounded-none !border-0 !bg-transparent !px-0 !py-0 font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
                       />
                     </div>
 
@@ -550,14 +696,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       >
                         Weight (kg)
                       </label>
-                      <input
+                      <Input
                         id="vital-wt"
                         type="number"
                         step="0.5"
                         placeholder="500"
                         value={weight}
                         onChange={(e) => setWeight(e.target.value)}
-                        className="mt-1 w-full bg-transparent font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
+                        className="mt-1 w-full !min-h-0 !rounded-none !border-0 !bg-transparent !px-0 !py-0 font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
                       />
                     </div>
                   </div>
@@ -798,6 +944,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   </Button>
                 </div>
               </form>
+              )}
             </Panel>
           )}
 

@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { RoutineChecksWorkspace } from '@/features/routine/components/RoutineChecksWorkspace';
+import { RoutineChecksWorkspace } from '@/features/care/shared/components/RoutineChecksWorkspace';
 
 export const metadata: Metadata = {
   title: 'Routine & Preventive Care | RTMS',

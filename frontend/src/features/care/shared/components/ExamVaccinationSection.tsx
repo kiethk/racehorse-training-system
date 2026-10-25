@@ -20,7 +20,7 @@ import type {
   VaccinationRequest,
   VaccinationSource,
 } from '../../types/preventive';
-import { DueStatusPill, FEVER_THRESHOLD_C, isDueForCombinedVisit, todayIso } from './preventiveDisplay';
+import { DueStatusPill, FEVER_THRESHOLD_C, isDueForCombinedVisit, todayIso } from '@/features/care/components/preventive/preventiveDisplay';
 
 /** One dose being entered in the exam form. `key` only keeps React rows stable. */
 export interface VaccinationDraft {

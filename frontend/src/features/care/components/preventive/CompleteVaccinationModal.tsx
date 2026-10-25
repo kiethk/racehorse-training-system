@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { z } from 'zod';
 import { Button, Checkbox, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
 import { displayError, formatDate } from '@/lib/display';
 import { toast } from '@/lib/toast';
@@ -24,6 +25,22 @@ interface DoseLine {
 
 const FORM_ID = 'complete-vaccination-form';
 
+const vaccinationSchema = z.object({
+  administeredOn: z
+    .string()
+    .min(1, 'Date given is required.')
+    .refine((value) => value <= todayIso(), { message: 'The vaccination date cannot be in the future.' }),
+  doses: z
+    .array(
+      z.object({
+        protocolId: z.number(),
+        dosage: z.string().min(1, 'Enter a dosage for every selected protocol.'),
+        route: z.string().optional(),
+      }),
+    )
+    .min(1, 'Select at least one protocol.'),
+});
+
 export function CompleteVaccinationModal(props: CompleteVaccinationModalProps) {
   // Remount per horse so the lines start from that horse's due protocols.
   if (!props.horse) return null;
@@ -45,6 +62,7 @@ function CompleteVaccinationForm({
   const [instructions, setInstructions] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const listed = new Set(lines.map((line) => line.protocolId));
   const addable = protocols.filter((p) => !listed.has(p.id));
@@ -56,9 +74,39 @@ function CompleteVaccinationForm({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const chosen = lines.filter((line) => line.selected);
-    if (chosen.length === 0) return setError('Select at least one protocol.');
-    if (chosen.some((line) => !line.dosage.trim())) return setError('Enter a dosage for every selected protocol.');
-    if (administeredOn > todayIso()) return setError('The vaccination date cannot be in the future.');
+    const parsed = vaccinationSchema.safeParse({
+      administeredOn,
+      doses: chosen.map((line) => ({
+        protocolId: line.protocolId,
+        dosage: line.dosage.trim(),
+        route: line.route.trim() || undefined,
+      })),
+    });
+
+    if (!parsed.success) {
+      const errors: Record<string, string> = {};
+      let formError: string | null = null;
+      for (const issue of parsed.error.issues) {
+        const segments = issue.path.map((segment) => String(segment));
+        const [root, index, field] = segments;
+        if (root === 'administeredOn') {
+          errors.administeredOn = issue.message;
+          continue;
+        }
+        const lineIndex = Number(index);
+        const dosageLine = Number.isInteger(lineIndex) ? chosen[lineIndex] : undefined;
+        if (dosageLine && field) {
+          errors[String(dosageLine.protocolId)] = issue.message;
+          continue;
+        }
+        formError = issue.message;
+      }
+      setFieldErrors(errors);
+      setError(formError);
+      return;
+    }
+
+    setFieldErrors({});
     setError(null);
     setSubmitting(true);
     try {
@@ -114,7 +162,7 @@ function CompleteVaccinationForm({
                   }
                   description={status ? (status.nextDueOn ? `Due ${formatDate(status.nextDueOn)}` : 'Never recorded') : 'Added manually'}
                 />
-                <FormField label="Dosage" required={line.selected}>
+                <FormField label="Dosage" required={line.selected} error={fieldErrors[String(line.protocolId)]}>
                   <Input value={line.dosage} maxLength={100} disabled={!line.selected}
                     onChange={(e) => update(line.protocolId, { dosage: e.target.value })} />
                 </FormField>
@@ -135,7 +183,7 @@ function CompleteVaccinationForm({
           </FormField>
         )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Date given" required>
+          <FormField label="Date given" required error={fieldErrors.administeredOn}>
             <Input type="date" value={administeredOn} max={todayIso()} onChange={(e) => setAdministeredOn(e.target.value)} />
           </FormField>
         </div>

@@ -1,23 +1,27 @@
 'use client';
 
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
-import { FormField } from '@/components/ui/FormField';
-import { ChoiceInput, Input, Select, Textarea } from '@/components/ui/Input';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { z } from 'zod';
+import { VitalsSection } from './vet-review/VitalsSection';
+// FindingsSection removed: section 2 clinical body-system exam is no longer collected.
+import { DiagnosisSection } from './vet-review/DiagnosisSection';
+import { TreatmentSection } from './vet-review/TreatmentSection';
+import { TrainingDecisionSection } from './vet-review/TrainingDecisionSection';
+import { FollowUpSection } from './vet-review/FollowUpSection';
 import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Notice } from '@/components/ui/Notice';
 import { admissionAsideClassName, admissionDetailGridClassName } from '../shared/components/AdmissionDetailLayout';
-import { Icon, type IconName } from '@/components/ui/Icon';
-import { Pill } from '@/components/ui/StatusBadge';
+import { Icon } from '@/components/ui/Icon';
+
 import { admissionsApi } from '../services/api';
 import {
   ExamVaccinationSection,
   toVaccinationRequests,
   validateVaccinationDrafts,
   type VaccinationDraft,
-} from '@/features/care/components/preventive/ExamVaccinationSection';
+} from '@/features/care/shared/components/ExamVaccinationSection';
 import type {
   CareType,
   CareSchedule,
@@ -64,78 +68,6 @@ const findingLevelLabels: Record<FindingLevel, string> = {
 const normalSystemFindings = Object.fromEntries(
   bodySystems.map(({ key }) => [key, 'NORMAL']),
 ) as Record<BodySystemKey, FindingLevel>;
-
-const symptomOptions = [
-  'No symptoms observed',
-  'Cough',
-  'Nasal discharge',
-  'Elevated temperature',
-  'Lameness',
-  'Joint swelling',
-  'Reduced flexion',
-  'Hoof pain',
-  'Skin lesion',
-  'Poor appetite',
-  'Digestive discomfort',
-  'Neurological signs',
-];
-
-const diagnosisOptions = [
-  'Clinically healthy',
-  'Minor clinical condition',
-  'Treatment required',
-  'Follow-up examination required',
-  'Infectious disease suspected',
-  'Musculoskeletal condition suspected',
-  'Medically unsuitable for admission',
-];
-
-const restrictionOptions = [
-  'Walking only; no trotting, cantering, or galloping',
-  'Light exercise only; maximum 20 minutes per session',
-  'No strenuous exercise until veterinary re-examination',
-  'Stall rest with hand-walking only',
-  'Complete stall rest; no training activity',
-  'Isolation protocol; no contact with other horses',
-];
-
-
-
-const followUpDescriptionOptions = [
-  'Routine follow-up recheck examination',
-  'Post-treatment clinical reassessment',
-  'Lameness and gait reassessment',
-  'Respiratory and infectious disease recheck',
-  'Training restriction clearance examination',
-];
-
-interface TrainingDecisionOption {
-  value: TrainingDecision;
-  title: string;
-  icon: IconName;
-  tone: 'success' | 'danger';
-  activeBorder: string;
-  activeBg: string;
-}
-
-const trainingDecisions: TrainingDecisionOption[] = [
-  {
-    value: 'ALLOWED',
-    title: 'Training Allowed',
-    icon: 'check',
-    tone: 'success',
-    activeBorder: 'border-[var(--color-success)] ring-1 ring-[var(--color-success)]',
-    activeBg: 'bg-[var(--color-success-soft)]',
-  },
-  {
-    value: 'BLOCKED',
-    title: 'Training Blocked',
-    icon: 'lock',
-    tone: 'danger',
-    activeBorder: 'border-[var(--color-danger)] ring-1 ring-[var(--color-danger)]',
-    activeBg: 'bg-[var(--color-danger-soft)]',
-  },
-];
 
 interface MetricConfig {
   key: MetricField;
@@ -242,62 +174,6 @@ function tomorrowBusinessDate() {
   return businessDateFromToday(1);
 }
 
-function getMetricBorderTone(
-  valStr: string,
-  normalMin: number,
-  normalMax: number,
-  criticalMin: number,
-  criticalMax: number,
-): { borderClass: string; statusLabel: string | null; tone: 'warning' | 'danger' | 'success' | null } {
-  if (!valStr.trim()) {
-    return {
-      borderClass: 'border-[var(--color-border)] focus:border-[var(--color-primary)]',
-      statusLabel: null,
-      tone: null,
-    };
-  }
-  const num = Number(valStr);
-  if (Number.isNaN(num)) {
-    return {
-      borderClass: 'border-[var(--color-danger)] focus:border-[var(--color-danger)] ring-1 ring-[var(--color-danger)]',
-      statusLabel: 'Invalid',
-      tone: 'danger',
-    };
-  }
-  if (num < criticalMin) {
-    return {
-      borderClass: 'border-[var(--color-danger)] focus:border-[var(--color-danger)] ring-1 ring-[var(--color-danger)]',
-      statusLabel: 'Critical Low',
-      tone: 'danger',
-    };
-  }
-  if (num > criticalMax) {
-    return {
-      borderClass: 'border-[var(--color-danger)] focus:border-[var(--color-danger)] ring-1 ring-[var(--color-danger)]',
-      statusLabel: 'Critical High',
-      tone: 'danger',
-    };
-  }
-  if (num < normalMin) {
-    return {
-      borderClass: 'border-[var(--color-warning)] focus:border-[var(--color-warning)] ring-1 ring-[var(--color-warning)]',
-      statusLabel: 'Low',
-      tone: 'warning',
-    };
-  }
-  if (num > normalMax) {
-    return {
-      borderClass: 'border-[var(--color-warning)] focus:border-[var(--color-warning)] ring-1 ring-[var(--color-warning)]',
-      statusLabel: 'Elevated',
-      tone: 'warning',
-    };
-  }
-  return {
-    borderClass: 'border-[var(--color-success)] focus:border-[var(--color-success)]',
-    statusLabel: 'Normal',
-    tone: 'success',
-  };
-}
 
 export interface VetReviewFormProps {
   admissionId: number;
@@ -418,7 +294,9 @@ export function VetReviewForm({
 
   const isGated = scheduleStatus != null && scheduleStatus !== 'IN_PROGRESS';
   // Blocking training always needs a follow-up exam: "rest until" is that exam's date.
-  const followUpRequired = trainingDecision === 'BLOCKED';
+  // Routine/preventive visits must always produce a follow-up schedule.
+  // Follow-up schedule is mandatory for every examination (user requirement).
+  const followUpRequired = true;
   const followUpActive = scheduleFollowUp || followUpRequired;
   const isFormDisabled = submitting || startingExam || isGated;
   const isUrgent = careType === 'URGENT';
@@ -648,39 +526,59 @@ export function VetReviewForm({
   function validate(): Record<string, string> {
     const errors: Record<string, string> = {};
 
-    if (!physicalExamConfirmed) {
-      errors.physicalExamConfirmed = 'In-person physical examination confirmation is required.';
-    }
-    if (isUrgent && !symptoms.trim()) {
-      errors.symptoms = 'Detailed presenting symptoms are required for urgent care.';
-    }
-    if (!effectiveFindings) {
-      errors.findings = 'Clinical examination findings are required.';
-    }
-    if (!effectiveDiagnosis) {
-      errors.diagnosis = 'Clinical diagnosis is required.';
-    }
-    if (
-      !isUrgent &&
-      examMode === 'ABNORMAL' &&
-      bodySystems.every(({ key }) => systemFindings[key] === 'NORMAL')
-    ) {
-      errors.systemFindings = 'Select at least one abnormal or not-examined body system.';
-    }
-    if (trainingDecision === 'BLOCKED' && !restrictionDetails.trim()) {
-      errors.restrictionDetails = 'Restriction details are mandatory when training is blocked.';
-    }
-    if (followUpActive) {
-      if (!followUpDate) {
-        errors.followUpDate = 'Follow-up date is required when scheduling follow-up care.';
-      } else if (followUpDate < tomorrowBusinessDate()) {
-        errors.followUpDate = 'Follow-up date must be at least one day in the future.';
+    // Zod schema for the core, conditional text/date fields (T6).
+    const schema = z.object({
+      physicalExamConfirmed: z.boolean(),
+      symptoms: z.string(),
+      effectiveFindings: z.string().min(1, 'Clinical examination findings are required.'),
+      effectiveDiagnosis: z.string().min(1, 'Clinical diagnosis is required.'),
+      restrictionDetails: z.string(),
+      followUpDate: z.string(),
+      followUpDescription: z.string(),
+    }).superRefine((data, ctx) => {
+      if (!data.physicalExamConfirmed) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['physicalExamConfirmed'], message: 'In-person physical examination confirmation is required.' });
       }
-      if (!followUpDescription.trim()) {
-        errors.followUpDescription = 'Follow-up care description is required.';
+      if (isUrgent && !data.symptoms.trim()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['symptoms'], message: 'Detailed presenting symptoms are required for urgent care.' });
       }
-    }
+      if (
+        !isUrgent &&
+        examMode === 'ABNORMAL' &&
+        bodySystems.every(({ key }) => systemFindings[key] === 'NORMAL')
+      ) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['systemFindings'], message: 'Select at least one abnormal or not-examined body system.' });
+      }
+      if (trainingDecision === 'BLOCKED' && !data.restrictionDetails.trim()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['restrictionDetails'], message: 'Restriction details are mandatory when training is blocked.' });
+      }
+      if (followUpActive) {
+        if (!data.followUpDate) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUpDate'], message: 'Follow-up date is required when scheduling follow-up care.' });
+        } else if (data.followUpDate < tomorrowBusinessDate()) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUpDate'], message: 'Follow-up date must be at least one day in the future.' });
+        }
+        if (!data.followUpDescription.trim()) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUpDescription'], message: 'Follow-up care description is required.' });
+        }
+      }
+    });
 
+    const parsed = schema.safeParse({
+      physicalExamConfirmed,
+      symptoms,
+      effectiveFindings,
+      effectiveDiagnosis,
+      restrictionDetails,
+      followUpDate,
+      followUpDescription,
+    });
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        const field = String(issue.path[0] ?? '');
+        if (field && !errors[field]) errors[field] = issue.message;
+      }
+    }
     for (const cfg of metricConfigs) {
       const val = metrics[cfg.key];
       if (val && val.trim()) {
@@ -689,6 +587,11 @@ export function VetReviewForm({
           errors[cfg.key] = `${cfg.label} must be a valid positive number.`;
         }
       }
+    }
+
+    const hasVital = metricConfigs.some((cfg) => metrics[cfg.key]?.trim()) || metrics.hydrationStatus?.trim();
+    if (!hasVital) {
+      errors.metrics = 'At least one vital sign is required before submitting.';
     }
 
     const doseErrors = validateVaccinationDrafts(vaccinationDrafts);
@@ -940,397 +843,42 @@ export function VetReviewForm({
           {/* LEFT COLUMN: Clinical Examination (~65% width = lg:col-span-8) */}
           <div className="min-w-0 space-y-5">
             {/* Section 1: Patient Vitals & Telemetry */}
-            <fieldset disabled={isFormDisabled} className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)] space-y-4">
-              <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-                <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
-                  1. Patient Vitals &amp; Telemetry
-                </h3>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  icon="sparkles"
-                  onClick={handleRandomizeData}
-                  disabled={isFormDisabled}
-                  className="transition-all active:scale-[0.97]"
-                  title="Simulate automated telemetry scan and randomize realistic examination findings"
-                >
-                  Simulate Auto-Exam
-                </Button>
-              </div>
+            <VitalsSection
+              metrics={metrics}
+              setMetrics={setMetrics}
+              fieldErrors={fieldErrors}
+              isFormDisabled={isFormDisabled}
+              onRandomize={handleRandomizeData}
+            />
+            {fieldErrors.metrics && (
+              <p className="text-xs font-medium text-[var(--color-danger)]" role="alert">
+                {fieldErrors.metrics}
+              </p>
+            )}
 
-              {/* Vitals Grid without heavy card wrappers */}
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-5">
-                {metricConfigs.map((cfg) => {
-                  const borderInfo = getMetricBorderTone(
-                    metrics[cfg.key],
-                    cfg.normalMin,
-                    cfg.normalMax,
-                    cfg.criticalMin,
-                    cfg.criticalMax,
-                  );
-                  return (
-                    <div key={cfg.key} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <label
-                          htmlFor={`metric-${cfg.key}`}
-                          className="font-medium text-[var(--color-text-primary)]"
-                        >
-                          {cfg.label}
-                        </label>
-                        {borderInfo.statusLabel && (
-                          <span
-                            className={`text-xs font-bold ${
-                              borderInfo.tone === 'danger'
-                                ? 'text-[var(--color-danger)]'
-                                : borderInfo.tone === 'warning'
-                                  ? 'text-[var(--color-warning)]'
-                                  : 'text-[var(--color-success)]'
-                            }`}
-                          >
-                            {borderInfo.statusLabel}
-                          </span>
-                        )}
-                      </div>
+            {/* Section 2 removed: body-system exam no longer collected; findings are auto-generated. */}
 
-                      <div className="relative">
-                        <Input
-                          id={`metric-${cfg.key}`}
-                          type="number"
-                          min="0"
-                          step={cfg.step}
-                          placeholder={cfg.placeholder}
-                          value={metrics[cfg.key]}
-                          onChange={(e) =>
-                            setMetrics((curr) => ({ ...curr, [cfg.key]: e.target.value }))
-                          }
-                          className={`w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface)] px-3 pr-10 font-metric text-sm font-semibold text-[var(--color-text-primary)] outline-none transition-all ${borderInfo.borderClass}`}
-                        />
-                        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--color-text-muted)]">
-                          {cfg.unit}
-                        </span>
-                      </div>
-
-                      {fieldErrors[cfg.key] && (
-                        <span className="block text-xs font-medium text-[var(--color-danger)]">
-                          {fieldErrors[cfg.key]}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Hydration & Notes inline */}
-              <div className="grid gap-3 sm:grid-cols-2 pt-1">
-                <div>
-                  <FormField label="Hydration &amp; Mucous Membranes" htmlFor="metric-hydration">
-                    <Select
-                      id="metric-hydration"
-                      value={metrics.hydrationStatus}
-                      onChange={(e) => setMetrics((curr) => ({ ...curr, hydrationStatus: e.target.value }))}
-                    >
-                      <option value="">Not recorded</option>
-                      <option value="Normal (CRT < 2s, pink)">
-                        Normal (CRT &lt; 2s, pink)
-                      </option>
-                      <option value="Mild dehydration">Mild dehydration</option>
-                      <option value="Moderate dehydration">Moderate dehydration</option>
-                      <option value="Severe dehydration">Severe dehydration</option>
-                      <option value="Abnormal CRT / mucous membranes">
-                        Abnormal mucous membranes / CRT
-                      </option>
-                    </Select>
-                  </FormField>
-                </div>
-
-                <div>
-                  <FormField label="Telemetry &amp; Observation Context" htmlFor="metric-notes">
-                    <Input
-                      id="metric-notes"
-                      type="text"
-                      maxLength={2000}
-                      value={metrics.notes}
-                      onChange={(e) => setMetrics((curr) => ({ ...curr, notes: e.target.value }))}
-                      placeholder="e.g. Calm disposition, post-transport check"
-                    />
-                  </FormField>
-                </div>
-              </div>
-            </fieldset>
-
-            {/* Section 2: Clinical Findings & Diagnostics */}
-            <fieldset disabled={isFormDisabled} className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)] space-y-4">
-              <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-                <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
-                  2. Clinical Findings &amp; Examination
-                </h3>
-                <span className="text-xs font-medium text-[var(--color-danger)]">
-                  * Required
-                </span>
-              </div>
-
-              {/* Compact Physical Exam Conducted In-Person Toggle */}
-              <div className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-2">
-                <label className="flex cursor-pointer items-center gap-2">
-                  <ChoiceInput
-                    type="checkbox"
-                    checked={physicalExamConfirmed}
-                    onChange={(e) => {
-                      setPhysicalExamConfirmed(e.target.checked);
-                      if (fieldErrors.physicalExamConfirmed) {
-                        setFieldErrors((errs) => ({ ...errs, physicalExamConfirmed: '' }));
-                      }
-                    }}
-                  />
-                  <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                    Physical Exam Conducted In-Person
-                  </span>
-                </label>
-                <span className="text-xs text-[var(--color-text-muted)]">
-                  Quarantine facility: {quarantineStallCode || 'Stall verified'}
-                </span>
-              </div>
-              {fieldErrors.physicalExamConfirmed && (
-                <p className="text-xs font-medium text-[var(--color-danger)]">
-                  {fieldErrors.physicalExamConfirmed}
-                </p>
-              )}
-
-              {/* Urgent Mode vs Standard Progressive Disclosure */}
-              {isUrgent ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <FormField label="Urgent Presenting Symptoms" htmlFor="field-symptoms" required>
-                      <Textarea
-                        id="field-symptoms"
-                        rows={3}
-                        value={symptoms}
-                        onChange={(e) => setSymptoms(e.target.value)}
-                        placeholder="Describe onset, symptoms, and urgency..."
-                      />
-                    </FormField>
-                    {fieldErrors.symptoms && (
-                      <p className="text-xs font-medium text-[var(--color-danger)]">
-                        {fieldErrors.symptoms}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <FormField label="Urgent Physical Findings" htmlFor="field-findings" required>
-                      <Textarea
-                        id="field-findings"
-                        rows={3}
-                        value={findings}
-                        onChange={(e) => setFindings(e.target.value)}
-                        placeholder="Document trauma, distress, or acute signs..."
-                      />
-                    </FormField>
-                    {fieldErrors.findings && (
-                      <p className="text-xs font-medium text-[var(--color-danger)]">
-                        {fieldErrors.findings}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Segmented Control: Normal | Abnormal */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-[var(--color-text-secondary)]">
-                      Clinical Status Assessment
-                    </label>
-                    <div>
-                      <SegmentedControl
-                        label="Clinical status assessment"
-                        value={examMode}
-                        onChange={(mode) => {
-                          setExamMode(mode);
-                          if (mode === 'NORMAL') {
-                            setSystemFindings({ ...normalSystemFindings });
-                            setSelectedSymptoms(['No symptoms observed']);
-                            setStructuredDiagnosis('Clinically healthy');
-                            setFieldErrors((errs) => ({ ...errs, systemFindings: '' }));
-                          } else {
-                            setSelectedSymptoms([]);
-                            setStructuredDiagnosis('Minor clinical condition');
-                          }
-                        }}
-                        options={[
-                          { value: 'NORMAL', label: 'Normal', icon: 'check' },
-                          { value: 'ABNORMAL', label: 'Abnormal', icon: 'alert-triangle' },
-                        ]}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Progressive Disclosure Checklist for the 8 Body Systems (Only when Abnormal) */}
-                  {examMode === 'ABNORMAL' && (
-                    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3.5 space-y-4">
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-xs font-bold text-[var(--color-text-primary)]">
-                            8 Body Systems Checklist
-                          </h4>
-                          <Button type="button" variant="link" size="sm" onClick={() => setSystemFindings({ ...normalSystemFindings })}>
-                            Reset all to normal
-                          </Button>
-                        </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                          {bodySystems.map(({ key, label }) => {
-                            const isAbnormal = systemFindings[key] !== 'NORMAL';
-                            return (
-                              <label key={key} className="space-y-1">
-                                <span className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                                  {label}
-                                </span>
-                                <Select
-                                  value={systemFindings[key]}
-                                  onChange={(e) => {
-                                    setSystemFindings((curr) => ({
-                                      ...curr,
-                                      [key]: e.target.value as FindingLevel,
-                                    }));
-                                    setFieldErrors((errs) => ({ ...errs, systemFindings: '' }));
-                                  }}
-                                  className={`w-full rounded-[var(--radius-sm)] px-2 py-1 text-xs outline-none border transition-colors ${
-                                    isAbnormal
-                                      ? 'border-[var(--color-warning)] bg-[var(--color-warning-soft)] text-[var(--color-warning)] font-semibold'
-                                      : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)]'
-                                  }`}
-                                >
-                                  {(Object.entries(findingLevelLabels) as Array<[FindingLevel, string]>).map(
-                                    ([val, optLabel]) => (
-                                      <option key={val} value={val}>
-                                        {optLabel}
-                                      </option>
-                                    ),
-                                  )}
-                                </Select>
-                              </label>
-                            );
-                          })}
-                        </div>
-                        {fieldErrors.systemFindings && (
-                          <p className="mt-1.5 text-xs font-medium text-[var(--color-danger)]">
-                            {fieldErrors.systemFindings}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Symptoms Tags */}
-                      <div className="border-t border-[var(--color-border)] pt-3">
-                        <span className="block text-xs font-bold text-[var(--color-text-primary)] mb-2">
-                          Observed Symptoms Checklist
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {symptomOptions.map((symptom) => {
-                            const selected = selectedSymptoms.includes(symptom);
-                            return (
-                              <Button
-                                key={symptom}
-                                size="sm"
-                                variant="secondary"
-                                aria-pressed={selected}
-                                onClick={() =>
-                                  setSelectedSymptoms((curr) => {
-                                    if (symptom === 'No symptoms observed') {
-                                      return ['No symptoms observed'];
-                                    }
-                                    const withoutNone = curr.filter((s) => s !== 'No symptoms observed');
-                                    return selected
-                                      ? withoutNone.filter((s) => s !== symptom)
-                                      : [...withoutNone, symptom];
-                                  })
-                                }
-                                className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                                  selected
-                                    ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-semibold'
-                                    : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)]'
-                                }`}
-                              >
-                                {selected ? '✓ ' : ''}
-                                {symptom}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Side-by-Side Assessment & Treatment Inputs */}
+            {/* Side-by-Side Assessment & Treatment Inputs */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                <div>
-                  <label
-                    htmlFor="field-assessment-diag"
-                    className="mb-1 block text-xs font-semibold text-[var(--color-text-primary)]"
-                  >
-                    Clinical Assessment &amp; Diagnosis <span className="text-[var(--color-danger)]">*</span>
-                  </label>
-                  {isUrgent ? (
-                    <Input
-                      id="field-assessment-diag"
-                      type="text"
-                      value={diagnosis}
-                      onChange={(e) => setDiagnosis(e.target.value)}
-                      placeholder="Working diagnosis..."
-                    />
-                  ) : examMode === 'NORMAL' ? (
-                    <div className="flex h-9 items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-success)] bg-[var(--color-success-soft)] px-3 text-xs font-semibold text-[var(--color-success)]">
-                      <Icon name="check" size={14} />
-                      Clinically Healthy
-                    </div>
-                  ) : (
-                    <Select
-                      id="field-assessment-diag"
-                      value={structuredDiagnosis}
-                      onChange={(e) => setStructuredDiagnosis(e.target.value)}
-                    >
-                      {diagnosisOptions
-                        .filter((d) => d !== 'Clinically healthy')
-                        .map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                    </Select>
-                  )}
-                  {fieldErrors.diagnosis && (
-                    <p className="mt-1 text-xs font-medium text-[var(--color-danger)]">
-                      {fieldErrors.diagnosis}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <FormField label="Treatment &amp; Care Protocol (Optional)" htmlFor="field-treatment">
-                    <Textarea
-                      id="field-treatment"
-                      rows={2}
-                      value={treatment}
-                      onChange={(e) => setTreatment(e.target.value)}
-                      placeholder="Enter prescribed medications, bandages, or therapy..."
-                    />
-                  </FormField>
-                </div>
+                <DiagnosisSection
+                  isUrgent={isUrgent}
+                  isFormDisabled={isFormDisabled}
+                  diagnosis={diagnosis}
+                  setDiagnosis={setDiagnosis}
+                  examMode={examMode}
+                  structuredDiagnosis={structuredDiagnosis}
+                  setStructuredDiagnosis={setStructuredDiagnosis}
+                  fieldErrors={fieldErrors}
+                />
+                <TreatmentSection
+                  isFormDisabled={isFormDisabled}
+                  treatment={treatment}
+                  setTreatment={setTreatment}
+                  notes={notes}
+                  setNotes={setNotes}
+                />
               </div>
 
-              {/* Internal Clinical Notes */}
-              <div>
-                <FormField label="Veterinarian Notes &amp; Stable Directives (Optional)" htmlFor="field-notes">
-                  <Textarea
-                    id="field-notes"
-                    rows={2}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Internal notes, groom handling directives, or dietary recommendations..."
-                  />
-                </FormField>
-              </div>
-            </fieldset>
 
             {/* Section 3: Vaccination & deworming given in this exam */}
             {horseId != null && (
@@ -1377,196 +925,39 @@ export function VetReviewForm({
               </h3>
             </div>
 
-            {/* Streamlined Training Decision Options */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                Training Clearance
-              </label>
+            {/* Training Decision */}
+            <TrainingDecisionSection
+              isUrgent={isUrgent}
+              isFormDisabled={isFormDisabled}
+              trainingDecision={trainingDecision}
+              setTrainingDecision={setTrainingDecision}
+              restrictionDetails={restrictionDetails}
+              setRestrictionDetails={setRestrictionDetails}
+              fieldErrors={fieldErrors}
+              setFieldErrors={setFieldErrors}
+              followUpDate={followUpDate}
+              setFollowUpDate={setFollowUpDate}
+              businessDateFromToday={businessDateFromToday}
+            />
 
-              <div className="space-y-2">
-                {trainingDecisions.map((opt) => {
-                  const isSelected = trainingDecision === opt.value;
-                  return (
-                    <label
-                      key={opt.value}
-                      className={`flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-md)] border p-2.5 transition-all ${
-                        isSelected
-                          ? `${opt.activeBorder} ${opt.activeBg}`
-                          : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-subtle)]'
-                      }`}
-                    >
-                      <ChoiceInput
-                        type="radio"
-                        name="trainingDecision"
-                        value={opt.value}
-                        checked={isSelected}
-                        onChange={() => {
-                          setTrainingDecision(opt.value);
-                          if (opt.value === 'BLOCKED' && !followUpDate) {
-                            setFollowUpDate(businessDateFromToday(7));
-                          }
-                          if (fieldErrors.restrictionDetails) {
-                            setFieldErrors((errs) => ({ ...errs, restrictionDetails: '' }));
-                          }
-                        }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-xs font-bold text-[var(--color-text-primary)]">
-                            {opt.title}
-                          </span>
-                          <Pill tone={opt.tone} size="sm" icon={opt.icon}>
-                            {opt.value}
-                          </Pill>
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Expanding Restriction Details ONLY when BLOCKED */}
-            {trainingDecision === 'BLOCKED' && (
-              <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 space-y-1.5 animate-in fade-in duration-200">
-                <label
-                  htmlFor="field-restriction-details"
-                  className="block text-xs font-bold text-[var(--color-warning)]"
-                >
-                  Mandatory Restriction Protocol <span className="text-[var(--color-danger)]">*</span>
-                </label>
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  Shown to the Head Trainer when planning. The horse rests until the follow-up exam below.
-                </p>
-                {isUrgent ? (
-                  <Textarea
-                    id="field-restriction-details"
-                    rows={2}
-                    value={restrictionDetails}
-                    onChange={(e) => setRestrictionDetails(e.target.value)}
-                    placeholder="Describe restriction rules..."
-                  />
-                ) : (
-                  <Select
-                    id="field-restriction-details"
-                    value={restrictionDetails}
-                    onChange={(e) => {
-                      setRestrictionDetails(e.target.value);
-                      if (fieldErrors.restrictionDetails) {
-                        setFieldErrors((errs) => ({ ...errs, restrictionDetails: '' }));
-                      }
-                    }}
-                  >
-                    <option value="">Select restriction protocol</option>
-                    {restrictionOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-                {fieldErrors.restrictionDetails && (
-                  <p className="text-xs font-medium text-[var(--color-danger)]">
-                    {fieldErrors.restrictionDetails}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Inline Schedule Follow-up Toggle */}
-            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 space-y-2">
-              <label className="flex cursor-pointer items-center justify-between">
-                <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                  Schedule Follow-up Exam
-                  {followUpRequired && <span className="text-[var(--color-danger)]"> *</span>}
-                </span>
-                <ChoiceInput
-                  type="checkbox"
-                  checked={followUpActive}
-                  disabled={followUpRequired}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setScheduleFollowUp(checked);
-                    if (checked && !followUpDate) {
-                      setFollowUpDate(businessDateFromToday(7));
-                    }
-                  }}
-                />
-              </label>
-              {followUpRequired && (
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  Required when training is blocked: the horse stays off training until this exam.
-                </p>
-              )}
-              {careType === 'ROUTINE' && !followUpRequired && schedulePurpose !== 'PREVENTIVE' && (
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  Without a follow-up date the system books the next visit automatically — routine
-                  rechecks repeat every 14 days.
-                </p>
-              )}
-
-              {followUpActive && (
-                <div className="space-y-2 border-t border-[var(--color-border)] pt-2 animate-in fade-in duration-200">
-                  <div>
-                    <FormField label="Target Date" htmlFor="field-followup-date" required>
-                      <Input
-                        id="field-followup-date"
-                        type="date"
-                        min={tomorrowBusinessDate()}
-                        value={followUpDate}
-                        onChange={(e) => {
-                          setFollowUpDate(e.target.value);
-                          if (fieldErrors.followUpDate) {
-                            setFieldErrors((errs) => ({ ...errs, followUpDate: '' }));
-                          }
-                        }}
-                      />
-                    </FormField>
-                    <div className="mt-1 flex gap-1">
-                      {[3, 7, 14].map((days) => {
-                        const iso = businessDateFromToday(days);
-                        return (
-                          <Button type="button" key={days} size="sm" variant="secondary" onClick={() => setFollowUpDate(iso)}>
-                            +{days}d
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    {fieldErrors.followUpDate && (
-                      <p className="mt-0.5 text-xs font-medium text-[var(--color-danger)]">
-                        {fieldErrors.followUpDate}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <FormField label="Care Procedure" htmlFor="field-followup-desc" required>
-                      <Select
-                        id="field-followup-desc"
-                        value={followUpDescription}
-                        onChange={(e) => {
-                          setFollowUpDescription(e.target.value);
-                          if (fieldErrors.followUpDescription) {
-                            setFieldErrors((errs) => ({ ...errs, followUpDescription: '' }));
-                          }
-                        }}
-                      >
-                        {followUpDescriptionOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </Select>
-                    </FormField>
-                    {fieldErrors.followUpDescription && (
-                      <p className="mt-0.5 text-xs font-medium text-[var(--color-danger)]">
-                        {fieldErrors.followUpDescription}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Follow-up */}
+            <FollowUpSection
+              isFormDisabled={isFormDisabled}
+              careType={careType}
+              schedulePurpose={schedulePurpose}
+              followUpRequired={followUpRequired}
+              followUpActive={followUpActive}
+              scheduleFollowUp={scheduleFollowUp}
+              setScheduleFollowUp={setScheduleFollowUp}
+              followUpDate={followUpDate}
+              setFollowUpDate={setFollowUpDate}
+              followUpDescription={followUpDescription}
+              setFollowUpDescription={setFollowUpDescription}
+              fieldErrors={fieldErrors}
+              setFieldErrors={setFieldErrors}
+              businessDateFromToday={businessDateFromToday}
+              tomorrowBusinessDate={tomorrowBusinessDate}
+            />
 
             {/* Action Buttons for Desktop / Tablet (hidden on mobile, visible on >= 768px) */}
             <div className="space-y-2 border-t border-[var(--color-border)] pt-3 hidden md:block">

@@ -1,18 +1,28 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { cn } from '@/lib/cn';
 import {
   Button,
-  DataTable,
+  ChoiceInput,
   FilterBar,
   FilterChips,
   FormField,
   MetricCard,
   Notice,
+  Panel,
+  Pill,
   SearchInput,
   Select,
   StatusBadge,
+  Table,
+  TBody,
+  Td,
+  Th,
+  THead,
+  Tr,
 } from '@/components/ui';
+import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import type { DataTableColumn } from '@/components/ui/DataTable';
 import { displayError, formatDate } from '@/lib/display';
 import { preventiveCareService } from '../../services/preventiveCareService';
@@ -34,6 +44,9 @@ const FILTER_STATUSES: Record<Filter, PreventiveDueStatus[]> = {
   OK: ['OK'],
 };
 
+const SEARCH_DELAY_MS = 300;
+const PAGE_SIZE = 20;
+
 interface NormalizedDueProtocol {
   protocolId: number;
   name: string;
@@ -44,16 +57,20 @@ interface NormalizedDueProtocol {
   status: PreventiveDueStatus;
 }
 
-function getProtocol(item: Partial<PreventiveDueItem> | any): NormalizedDueProtocol {
-  const p = item?.protocol || item?.protocolStatus || item;
+type PreventiveDueItem = PreventiveDueHorse;
+
+function getProtocol(item: unknown): NormalizedDueProtocol {
+  const obj = item as Record<string, unknown> | null;
+  const p = (obj?.protocol || obj?.protocolStatus || obj) as Record<string, unknown> | null;
+  const g = (k: string) => (p ? p[k] : undefined);
   return {
-    protocolId: p?.protocolId ?? p?.id ?? 0,
-    name: p?.name ?? p?.protocolName ?? 'Unknown Protocol',
-    code: p?.code ?? '',
-    mandatory: Boolean(p?.mandatory),
-    lastDoseOn: p?.lastDoseOn ?? null,
-    nextDueOn: p?.nextDueOn ?? null,
-    status: p?.status ?? 'NONE',
+    protocolId: (g('protocolId') ?? g('id') ?? 0) as number,
+    name: (g('name') ?? g('protocolName') ?? 'Unknown Protocol') as string,
+    code: (g('code') ?? '') as string,
+    mandatory: Boolean(g('mandatory')),
+    lastDoseOn: (g('lastDoseOn') ?? null) as string | null,
+    nextDueOn: (g('nextDueOn') ?? null) as string | null,
+    status: (g('status') ?? 'NONE') as PreventiveDueStatus,
   };
 }
 
@@ -69,7 +86,6 @@ interface DueWorkTabProps {
 
 export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
   const [rows, setRows] = useState<PreventiveDueHorse[]>([]);
-  const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<PreventiveDueSummary | null>(null);
   const [filter, setFilter] = useState<Filter>('ACTION');
   const [protocolId, setProtocolId] = useState<number | undefined>();
@@ -79,6 +95,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState<PreventiveDueHorse | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // Ask the server once typing pauses, not on every keystroke.
   useEffect(() => {
@@ -94,8 +111,8 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
         preventiveCareService.listDueHorses({ statuses: FILTER_STATUSES[filter], protocolId, search, page, size: PAGE_SIZE }),
         preventiveCareService.dueSummary(),
       ]);
-      setItems(Array.isArray(rows) ? rows : []);
-      setSummary(Array.isArray(actionable) ? actionable : []);
+      setRows(Array.isArray(result) ? result : []);
+      setSummary(counts);
       setSelected(new Set());
     } catch (cause) {
       setError(displayError(cause, 'Could not load preventive care work.'));
@@ -109,21 +126,22 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
     load();
   }, [load]);
 
-  const counts = useMemo(() => {
-    const list = Array.isArray(summary) ? summary : [];
-    return {
-      overdue: list.filter((i) => {
-        const status = getProtocol(i).status;
-        return status === 'OVERDUE' || status === 'MISSING';
-      }).length,
-      dueSoon: list.filter((i) => getProtocol(i).status === 'DUE_SOON').length,
-      horses: new Set(list.map((i) => i?.horseId).filter(Boolean)).size,
-    };
-  }, [summary]);
+  const changeFilter = (next: Filter) => {
+    setFilter(next);
+    setPage(0);
+  };
 
-  const safeItems = Array.isArray(items) ? items : [];
+  const toggle = (key: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const safeItems = Array.isArray(rows) ? rows : [];
   const selectedItems = safeItems.filter((item) => selected.has(rowKey(item)));
-  const selectedProtocolIds = new Set(selectedItems.map((item) => getProtocol(item).protocolId));
   const selectedHorses = [...new Map(selectedItems.map((item) => [item.horseId, { id: item.horseId, name: item.horseName }])).values()];
   const allSelected = safeItems.length > 0 && selected.size === safeItems.length;
 
@@ -286,12 +304,8 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
         <div className="sticky bottom-4 z-[var(--z-dropdown)] flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-popover)]">
           <span className="text-sm text-[var(--color-text-secondary)]">
             <strong className="text-[var(--color-text-primary)]">{selectedHorses.length}</strong> horse{selectedHorses.length === 1 ? '' : 's'} selected
-            {selectedProtocolIds.size > 1 && ' · several protocols selected, pick one in the form'}
           </span>
-          <div className="flex gap-2">
-            <Button variant="tertiary" onClick={() => setSelected(new Set())}>Clear</Button>
-            <Button variant="primary" icon="pill" onClick={() => setBatchOpen(true)}>Record batch vaccination</Button>
-          </div>
+          <Button variant="tertiary" onClick={() => setSelected(new Set())}>Clear</Button>
         </div>
       )}
 

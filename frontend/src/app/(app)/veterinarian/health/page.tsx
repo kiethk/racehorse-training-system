@@ -13,7 +13,7 @@ import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { InjuryCorrectionModal } from '@/features/health/components/InjuryCorrectionModal';
-import { TreatmentPlanModal } from '@/features/care/components/TreatmentPlanModal';
+import { TreatmentPlanModal } from '@/features/care/shared/components/TreatmentPlanModal';
 import { healthApi } from '@/features/health/services/healthApi';
 import { stableApi } from '@/features/stable/services/stableService';
 import { careService } from '@/features/care/services/careService';
@@ -152,6 +152,7 @@ function HealthRecordsContent() {
     if (paramHorseId) {
       const id = Number(paramHorseId);
       if (!Number.isNaN(id) && id > 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedHorseId(id);
         void loadHorseDetail(id);
       }
@@ -195,6 +196,7 @@ function HealthRecordsContent() {
   // VET-HLT-08: the vet needs a way back into the examination that will lift a BLOCKED decision.
   useEffect(() => {
     if (selectedHorseId == null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenFollowUp(null);
       return;
     }
@@ -362,6 +364,7 @@ function HealthRecordsContent() {
   // Handle non-existent deep-linked horse ID gracefully
   useEffect(() => {
     if (selectedHorseId != null && !loading && horses.length > 0 && !selectedHorse) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(`Horse #${selectedHorseId} was not found in stable records.`);
       setSelectedHorseId(null);
       router.replace('/veterinarian/health');
@@ -622,6 +625,23 @@ function HealthRecordsContent() {
                                   {rec.trainingDecision}
                                 </Pill>
                               )}
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                icon="file-text"
+                                onClick={() =>
+                                  router.push(
+                                    `/veterinarian/records?recordId=${rec.id}&horseId=${rec.horseId}${
+                                      rec.careScheduleId != null
+                                        ? `&scheduleId=${rec.careScheduleId}`
+                                        : ''
+                                    }${selectedHorse ? `&horseName=${encodeURIComponent(selectedHorse.name)}` : ''}`
+                                  )
+                                }
+                                className="text-[11px] h-7 px-2 transition-all active:scale-[0.98]"
+                              >
+                                View Record
+                              </Button>
                               {/* AC-3.4: Target Clinical Record Treatment Plan Action */}
                               {rec.recordType !== 'VACCINATION' && (
                                 <Button
@@ -678,6 +698,7 @@ function HealthRecordsContent() {
 
                             return (
                               <div className="mt-3 pt-2.5 border-t border-[var(--color-border)]">
+                                {/* eslint-disable-next-line no-restricted-syntax */}
                                 <button
                                   type="button"
                                   onClick={toggleExpand}

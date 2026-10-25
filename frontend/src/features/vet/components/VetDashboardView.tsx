@@ -13,7 +13,7 @@ import { EmptyState, ListSkeleton } from "@/components/ui/states";
 import { Notice } from "@/components/ui/Notice";
 import { admissionsApi } from "@/features/admissions/services/api";
 import { stableApi } from "@/features/stable/services/stableService";
-import { CreateRoutineModal } from "@/features/routine/components/CreateRoutineModal";
+import { CreateRoutineModal } from "@/features/care/shared/components/CreateRoutineModal";
 import type {
   CareSchedule,
   VetQueueSummary,

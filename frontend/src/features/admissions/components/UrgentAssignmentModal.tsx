@@ -8,6 +8,7 @@ import type { UrgentAssignmentAlert } from '../types';
 interface Props {
   alert: UrgentAssignmentAlert | null;
   onOpenCase: (alert: UrgentAssignmentAlert) => void;
+  onDismiss: (alert: UrgentAssignmentAlert) => void;
 }
 
 function Detail({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
@@ -19,15 +20,14 @@ function Detail({ label, children, className }: { label: string; children: React
   );
 }
 
-export function UrgentAssignmentModal({ alert, onOpenCase }: Props) {
+export function UrgentAssignmentModal({ alert, onOpenCase, onDismiss }: Props) {
   if (!alert) return null;
 
   return (
     <Modal
       open
-      // The assignment is automatic and must be acknowledged by opening the case.
-      dismissible={false}
-      onClose={() => undefined}
+      dismissible
+      onClose={() => onDismiss(alert)}
       size="lg"
       tone="danger"
       title="Urgent case assigned"

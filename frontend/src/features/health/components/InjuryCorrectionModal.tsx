@@ -1,10 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
+import { z } from 'zod';
+import dynamic from 'next/dynamic';
 import { Button, FormField, Input, Modal, Notice, Pill, Select, Textarea } from '@/components/ui';
 import { healthApi } from '../services/healthApi';
 import { displayError, formatDate } from '@/lib/display';
 import type { InjuryRecord, CorrectInjuryRequest } from '../types';
+
+// The 3D canvas (three.js + GLB) must stay out of the server bundle.
+const UrgentHorseInjuryViewer = dynamic(
+  () => import('@/features/vet/components/UrgentHorseInjuryViewer'),
+  { ssr: false, loading: () => <div className="h-[320px] w-full rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] animate-pulse" /> },
+);
 
 interface InjuryCorrectionModalProps {
   open: boolean;
@@ -15,6 +23,13 @@ interface InjuryCorrectionModalProps {
 }
 
 const FORM_ID = 'injury-correction-form';
+
+const correctInjurySchema = z.object({
+  correctionReason: z.string().min(1, 'Correction reason is required for the audit history log.'),
+  severity: z.string().optional(),
+  status: z.string().optional(),
+  description: z.string().optional(),
+});
 
 function InjuryCorrectionModalContent({
   onClose,
@@ -34,14 +49,50 @@ function InjuryCorrectionModalContent({
   const [correctionReason, setCorrectionReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ correctionReason?: string }>({});
+  const [reposition, setReposition] = useState(false);
+  const [markerDraft, setMarkerDraft] = useState<{
+    positionX: number;
+    positionY: number;
+    positionZ: number;
+    zoneId: string;
+    normalX: number;
+    normalY: number;
+    normalZ: number;
+  } | null>(injury.positionX != null
+    ? {
+        positionX: injury.positionX,
+        positionY: injury.positionY ?? 0,
+        positionZ: injury.positionZ ?? 0,
+        zoneId: injury.zoneId ?? '',
+        normalX: injury.normalX ?? 0,
+        normalY: injury.normalY ?? 1,
+        normalZ: injury.normalZ ?? 0,
+      }
+    : null);
 
   const handleCorrect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!correctionReason.trim()) {
-      setError('Correction reason is required for the audit history log.');
+    const parsed = correctInjurySchema.safeParse({
+      correctionReason: correctionReason.trim(),
+      severity,
+      status,
+      description: description.trim(),
+    });
+
+    if (!parsed.success) {
+      const errors: { correctionReason?: string } = {};
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0];
+        if (field === 'correctionReason') {
+          errors.correctionReason = issue.message;
+        }
+      }
+      setFieldErrors(errors);
       return;
     }
 
+    setFieldErrors({});
     setSubmitting(true);
     setError(null);
     try {
@@ -51,6 +102,17 @@ function InjuryCorrectionModalContent({
         status,
         description: description.trim(),
       };
+      if (markerDraft && reposition) {
+        payload.marker = {
+          positionX: markerDraft.positionX,
+          positionY: markerDraft.positionY,
+          positionZ: markerDraft.positionZ,
+          zoneId: markerDraft.zoneId || 'trunk',
+          normalX: markerDraft.normalX,
+          normalY: markerDraft.normalY,
+          normalZ: markerDraft.normalZ,
+        };
+      }
       await healthApi.correctInjury(horseId, injury.id, payload);
       setIsEditing(false);
       onSuccess();
@@ -112,10 +174,75 @@ function InjuryCorrectionModalContent({
           <form id={FORM_ID} onSubmit={handleCorrect} className="space-y-4 border-t border-[var(--color-border)] pt-4">
             <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)]">Audit correction details</h3>
 
-            <FormField label="Correction reason" required>
+            {/* Marker reposition on the 3D model (optional) */}
+            <div className="space-y-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-[var(--color-text-primary)]">
+                  3D marker placement
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={reposition ? 'warning' : 'secondary'}
+                  onClick={() => setReposition(!reposition)}
+                  disabled={!markerDraft && !reposition}
+                  title={
+                    markerDraft
+                      ? 'Reposition the marker by clicking a new spot on the model'
+                      : 'This record has no 3D marker yet'
+                  }
+                >
+                  {reposition ? 'Click the model to place' : 'Reposition marker'}
+                </Button>
+              </div>
+
+              {!markerDraft && !reposition && (
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  This injury has no 3D marker stored. Reposition mode cannot place a new marker yet.
+                </p>
+              )}
+
+              <UrgentHorseInjuryViewer
+                injuries={
+                  markerDraft
+                    ? [
+                        {
+                          id: 'draft',
+                          position: [markerDraft.positionX, markerDraft.positionY, markerDraft.positionZ],
+                          zoneId: markerDraft.zoneId || undefined,
+                          label: 'New position',
+                        },
+                      ]
+                    : []
+                }
+                isAddMode={reposition}
+                readOnly={!reposition}
+                onPointerHit={(hit) =>
+                  setMarkerDraft({
+                    positionX: hit.position[0],
+                    positionY: hit.position[1],
+                    positionZ: hit.position[2],
+                    zoneId: hit.zoneId,
+                    normalX: hit.normal[0],
+                    normalY: hit.normal[1],
+                    normalZ: hit.normal[2],
+                  })
+                }
+              />
+              {reposition && markerDraft && (
+                <p className="text-xs text-[var(--color-success)]">
+                  New placement captured — Save correction to persist it (zone: {markerDraft.zoneId}).
+                </p>
+              )}
+            </div>
+
+            <FormField label="Correction reason" required error={fieldErrors.correctionReason}>
               <Input
                 value={correctionReason}
-                onChange={(e) => setCorrectionReason(e.target.value)}
+                onChange={(e) => {
+                  setCorrectionReason(e.target.value);
+                  setFieldErrors({});
+                }}
                 placeholder="e.g. Updated diagnosis following radiographic examination..."
               />
             </FormField>

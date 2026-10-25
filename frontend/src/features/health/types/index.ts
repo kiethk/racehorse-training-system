@@ -10,6 +10,17 @@ export interface InjuryRecord {
   expectedRecoveryDate?: string;
   recoveredAt?: string;
   status: string;
+  positionX?: number | null;
+  positionY?: number | null;
+  positionZ?: number | null;
+  zoneId?: string | null;
+  localX?: number | null;
+  localY?: number | null;
+  localZ?: number | null;
+  normalX?: number | null;
+  normalY?: number | null;
+  normalZ?: number | null;
+  meshName?: string | null;
 }
 
 export interface HorseHealthSummary {
@@ -30,6 +41,16 @@ export interface CorrectInjuryRequest {
   severity?: string;
   description?: string;
   status?: string;
+  /** New 3D marker placement captured on the model — optional reposition. */
+  marker?: {
+    positionX: number;
+    positionY: number;
+    positionZ: number;
+    zoneId: string;
+    normalX?: number;
+    normalY?: number;
+    normalZ?: number;
+  };
 }
 
 /** Mirrors the backend HealthRecord entity — one entry of a horse's health history. */
