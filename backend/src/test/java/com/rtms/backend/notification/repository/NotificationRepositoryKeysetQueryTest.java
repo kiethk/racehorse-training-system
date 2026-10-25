@@ -33,6 +33,12 @@ class NotificationRepositoryKeysetQueryTest {
 
     @BeforeEach
     void setUp() {
+        // Ensure a recipient user exists regardless of seed state (self-contained test).
+        jdbcTemplate.update(
+                "INSERT INTO users (full_name, email, password_hash, role_id, is_active) " +
+                "SELECT 'Test Trainer', 'trainer@rtms.com', '$2a$10$2rXcS5LHx7wVYOkClxQ1YuIvg4myh7UgloaGcwcgvnahK9pTWVEJ.', r.id, true " +
+                "FROM roles r WHERE r.name = 'HEAD_TRAINER' " +
+                "AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'trainer@rtms.com')");
         recipientId = jdbcTemplate.queryForObject(
                 "SELECT id FROM users WHERE email = 'trainer@rtms.com' LIMIT 1", Long.class);
         jdbcTemplate.update("TRUNCATE TABLE notifications RESTART IDENTITY CASCADE");
