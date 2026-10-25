@@ -6,12 +6,14 @@ import {
   ChoiceInput,
   EmptyState,
   FilterChips,
+  Icon,
   ListSkeleton,
   Notice,
   Panel,
   Pill,
   SectionTitle,
   Spinner,
+  Tooltip,
   type SegmentOption,
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
@@ -26,6 +28,9 @@ const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' 
 export function isSelectable(horse: HorsePlanAvailability): boolean {
   return horse.availability === 'AVAILABLE' || horse.availability === 'BUSY';
 }
+
+/** Free horses first, busy ones next, horses that cannot train last; the backend name order stays inside a group. */
+const AVAILABILITY_ORDER: Record<PlanAvailability, number> = { AVAILABLE: 0, BUSY: 1, BLOCKED: 2, NO_GROOM: 2 };
 
 function matchesFilter(availability: PlanAvailability, filter: HorseFilter): boolean {
   if (filter === 'ALL') return true;
@@ -67,19 +72,16 @@ export function HorseStep({
     { value: 'BUSY', label: 'Busy', count: count('BUSY') },
     { value: 'UNAVAILABLE', label: 'Cannot train', count: count('UNAVAILABLE') },
   ];
-  const shown = horses.filter((horse) => matchesFilter(horse.availability, filter));
+  const shown = horses
+    .filter((horse) => matchesFilter(horse.availability, filter))
+    .sort((a, b) => AVAILABILITY_ORDER[a.availability] - AVAILABILITY_ORDER[b.availability]);
   const freeIds = horses.filter((horse) => horse.availability === 'AVAILABLE').map((horse) => horse.horseId);
   const allFreeSelected = freeIds.length > 0 && freeIds.every((id) => selectedIds.includes(id));
 
   return (
     <Panel padded className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <SectionTitle>3. Select horses for the group ({selectedIds.length} selected)</SectionTitle>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            Admitted horses in your area, checked against the schedule above.
-          </p>
-        </div>
+        <SectionTitle>3. Select horses for the group ({selectedIds.length} selected)</SectionTitle>
         <div className="flex items-center gap-2">
           {stale && <Spinner size="sm" label="Checking the new schedule…" />}
           {freeIds.length > 0 && (
@@ -145,7 +147,7 @@ function HorseCard({
   return (
     <label
       className={cn(
-        'flex h-full min-h-[60px] items-start gap-2.5 rounded-[var(--radius-md)] border p-2.5 text-xs transition-colors duration-[var(--duration-fast)]',
+        'flex h-full items-start gap-2.5 rounded-[var(--radius-md)] border p-2.5 text-xs transition-colors duration-[var(--duration-fast)]',
         selectable ? 'cursor-pointer hover:bg-[var(--color-surface-muted)]' : 'cursor-not-allowed bg-[var(--color-surface-muted)] opacity-75',
         selected && !busy && 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]',
         selected && busy && 'border-[var(--color-warning)] bg-[var(--color-warning-soft)]',
@@ -164,33 +166,53 @@ function HorseCard({
           <span className="truncate font-semibold text-[var(--color-text-primary)]" title={horse.horseName}>
             {horse.horseName}
           </span>
-          <AvailabilityPill availability={horse.availability} />
+          <AvailabilityHint horse={horse} />
         </div>
         <p className="truncate text-[var(--color-text-muted)]">
           {horse.breed || 'Breed unknown'}
           {horse.stallCode && ` · Stall ${horse.stallCode}`}
         </p>
-
-        {busy && (
-          <>
-            {horse.conflicts.map((plan) => (
-              <p key={plan.planId} className="text-[var(--color-warning)]">
-                {plan.courseName}: {formatDate(plan.startDate, SHORT_DATE)} – {formatDate(plan.endDate, SHORT_DATE)}
-              </p>
-            ))}
-            {horse.earliestStart && (
-              <p className="text-[var(--color-text-secondary)]">
-                Free for this course from <strong>{formatDate(horse.earliestStart)}</strong>
-              </p>
-            )}
-          </>
-        )}
-        {!selectable && horse.reason && (
-          <p className="text-[var(--color-text-secondary)]" title={horse.reason}>{horse.reason}</p>
-        )}
       </div>
     </label>
   );
+}
+
+/**
+ * The status pill. Why a horse is busy or cannot train is kept out of the card and shown on hover or keyboard
+ * focus; the info icon and the help cursor tell the trainer there is more to see.
+ */
+function AvailabilityHint({ horse }: { horse: HorsePlanAvailability }) {
+  const details = availabilityDetails(horse);
+  if (!details) return <AvailabilityPill availability={horse.availability} />;
+
+  return (
+    <Tooltip content={<div className="max-w-64 space-y-0.5">{details}</div>}>
+      <span
+        tabIndex={0}
+        aria-label={`${horse.horseName}: details`}
+        className="inline-flex shrink-0 cursor-help items-center gap-1 rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+      >
+        <AvailabilityPill availability={horse.availability} />
+        <Icon name="info" size={13} className="text-[var(--color-text-muted)]" />
+      </span>
+    </Tooltip>
+  );
+}
+
+function availabilityDetails(horse: HorsePlanAvailability) {
+  if (horse.availability === 'BUSY') {
+    return (
+      <>
+        {horse.conflicts.map((plan) => (
+          <p key={plan.planId}>
+            {plan.courseName}: {formatDate(plan.startDate, SHORT_DATE)} – {formatDate(plan.endDate, SHORT_DATE)}
+          </p>
+        ))}
+        {horse.earliestStart && <p>Free for this course from {formatDate(horse.earliestStart)}</p>}
+      </>
+    );
+  }
+  return horse.reason ? <p>{horse.reason}</p> : null;
 }
 
 function AvailabilityPill({ availability }: { availability: PlanAvailability }) {

@@ -939,13 +939,11 @@ public class AiToolExecutionService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("tenNgua", horse.getName());
         result.put("trangThaiSanSang", r.getReadinessStatus());
-        result.put("diemTheLuc", r.getFitnessScore());
         result.put("diemNgoaiHinh", r.getConformationScore());
         result.put("diemTinhKhi", r.getTemperamentScore());
         result.put("diemDangChay", r.getGaitQualityScore());
         result.put("soThangUocTinhCoTheThiDau", r.getEstimatedMonthsToRace());
         result.put("ngayDanhGia", r.getAssessmentDate());
-        result.put("giaTriDenNgay", r.getValidUntil());
         result.put("nhanXetChuyenMon", r.getRemarks());
         return result;
     }
@@ -1117,7 +1115,6 @@ public class AiToolExecutionService {
             item.put("tenKhoaHoc", c.getName());
             item.put("mucTieu", c.getTargetGoal() != null ? c.getTargetGoal() : "Rèn luyện thể lực");
             item.put("soBuoiHoc", c.getTotalSessions() != null ? c.getTotalSessions() : 0);
-            item.put("moTa", c.getDescription() != null ? c.getDescription() : "");
             courseList.add(item);
         }
 

@@ -194,68 +194,62 @@ BEGIN
     RETURNING id INTO v_sub_trial;
 
     -- 5. INSERT 6 COURSES FOR TRAINER1
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Novice Thoroughbred Foundation', 'Comprehensive foundational program for young or recovering racehorses to build aerobic base and gate composure.', 'Establish consistent stride cadence and calm gate behavior.', 6, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Novice Thoroughbred Foundation', 'Establish consistent stride cadence and calm gate behavior.', 6, NOW(), NOW())
     RETURNING id INTO v_crs_foundation;
 
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Advanced Sprint Acceleration', 'Specialized course designed to shave tenths of a second off initial breakout and final stretch sprint.', 'Maximize top speed and explosive acceleration under race pressure.', 6, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Advanced Sprint Acceleration', 'Maximize top speed and explosive acceleration under race pressure.', 6, NOW(), NOW())
     RETURNING id INTO v_crs_sprint;
 
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Classic Cup Endurance Mastery', 'Intensive stamina builder focusing on maintaining high cruising velocity over 1600m to 2400m distances.', 'Sustain top-tier aerobic stamina through distance races.', 6, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Classic Cup Endurance Mastery', 'Sustain top-tier aerobic stamina through distance races.', 6, NOW(), NOW())
     RETURNING id INTO v_crs_endurance;
 
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Barrier Discipline & Gate Mastery', 'Focused curriculum overcoming gate hesitation and perfecting instant start mechanics.', 'Eliminate hesitation and achieve sub-1.5s gate reaction time.', 4, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Barrier Discipline & Gate Mastery', 'Eliminate hesitation and achieve sub-1.5s gate reaction time.', 4, NOW(), NOW())
     RETURNING id INTO v_crs_gate;
 
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Championship Speed & Trial Protocol', 'Pre-competition peaking course to sharpen speed, tactical positioning, and time trial performance.', 'Peak fitness and official readiness score above 85.', 6, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Championship Speed & Trial Protocol', 'Peak fitness and official readiness score above 85.', 6, NOW(), NOW())
     RETURNING id INTO v_crs_championship;
 
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Full-Season Athletic Conditioning', 'Well-rounded athletic cycle balancing endurance, power, high-speed furlongs, and structured hydro-recovery.', 'Maintain prime condition across the active racing season.', 8, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Full-Season Athletic Conditioning', 'Maintain prime condition across the active racing season.', 8, NOW(), NOW())
     RETURNING id INTO v_crs_full_season;
 
-    -- Link Subjects to Courses (course_subjects)
+    -- Link Subjects to Courses (course_subjects): each subject once; the course repeats the list until total_sessions
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_foundation, v_sub_aerobic, 1, NOW()),
     (v_crs_foundation, v_sub_gate_load, 2, NOW()),
     (v_crs_foundation, v_sub_trot, 3, NOW()),
-    (v_crs_foundation, v_sub_aerobic, 4, NOW()),
-    (v_crs_foundation, v_sub_stride, 5, NOW()),
-    (v_crs_foundation, v_sub_cooling, 6, NOW());
+    (v_crs_foundation, v_sub_stride, 4, NOW()),
+    (v_crs_foundation, v_sub_cooling, 5, NOW());
 
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_sprint, v_sub_gate_sprint, 1, NOW()),
     (v_crs_sprint, v_sub_turn_sprint, 2, NOW()),
     (v_crs_sprint, v_sub_interval, 3, NOW()),
-    (v_crs_sprint, v_sub_turn_sprint, 4, NOW()),
-    (v_crs_sprint, v_sub_trial, 5, NOW()),
-    (v_crs_sprint, v_sub_cooling, 6, NOW());
+    (v_crs_sprint, v_sub_trial, 4, NOW()),
+    (v_crs_sprint, v_sub_cooling, 5, NOW());
 
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_endurance, v_sub_aerobic, 1, NOW()),
     (v_crs_endurance, v_sub_stride, 2, NOW()),
     (v_crs_endurance, v_sub_uphill, 3, NOW()),
-    (v_crs_endurance, v_sub_stride, 4, NOW()),
-    (v_crs_endurance, v_sub_uphill, 5, NOW()),
-    (v_crs_endurance, v_sub_cooling, 6, NOW());
+    (v_crs_endurance, v_sub_cooling, 4, NOW());
 
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_gate, v_sub_gate_load, 1, NOW()),
     (v_crs_gate, v_sub_gate_sprint, 2, NOW()),
-    (v_crs_gate, v_sub_gate_sprint, 3, NOW()),
-    (v_crs_gate, v_sub_turn_sprint, 4, NOW());
+    (v_crs_gate, v_sub_turn_sprint, 3, NOW());
 
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_championship, v_sub_turn_sprint, 1, NOW()),
     (v_crs_championship, v_sub_interval, 2, NOW()),
     (v_crs_championship, v_sub_uphill, 3, NOW()),
     (v_crs_championship, v_sub_trial, 4, NOW()),
-    (v_crs_championship, v_sub_trial, 5, NOW()),
-    (v_crs_championship, v_sub_cooling, 6, NOW());
+    (v_crs_championship, v_sub_cooling, 5, NOW());
 
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_full_season, v_sub_aerobic, 1, NOW()),
@@ -286,7 +280,7 @@ BEGIN
         END;
 
         INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
+            horse_id, course_id, trainer_id, start_date, end_date, status,
             created_at, updated_at, training_days, groom_id
         ) VALUES (
             v_horse_id,
@@ -295,10 +289,9 @@ BEGIN
             v_base_date - INTERVAL '22 days',
             v_base_date - INTERVAL '9 days',
             'COMPLETED',
-            'Completed intense conditioning block with outstanding speed and stamina progression.',
             v_base_date - INTERVAL '25 days',
             v_base_date - INTERVAL '9 days',
-            'MONDAY,WEDNESDAY,FRIDAY',
+            'FRIDAY,MONDAY,WEDNESDAY',
             v_groom_id
         ) RETURNING id INTO v_plan_id;
 
@@ -347,26 +340,25 @@ BEGIN
     FOR v_i IN 1..LEAST(3, v_horse_count) LOOP
         v_horse_id := v_horses[v_i];
         INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
+            horse_id, course_id, trainer_id, start_date, end_date, status,
             created_at, updated_at, training_days, groom_id
         ) VALUES (
             v_horse_id, v_crs_gate, v_trainer1,
             v_base_date - INTERVAL '45 days', v_base_date - INTERVAL '37 days',
             'COMPLETED',
-            'Pre-season gate orientation course completed successfully.',
             v_base_date - INTERVAL '48 days', v_base_date - INTERVAL '37 days',
-            'TUESDAY,THURSDAY',
+            'THURSDAY,TUESDAY',
             v_groom_daniel
         ) RETURNING id INTO v_plan_id;
 
         FOR k IN 0..3 LOOP
             v_lot_date := (v_base_date - INTERVAL '45 days')::DATE + (k * 2);
             SELECT id INTO v_lot_id FROM training_lots
-            WHERE trainer_id = v_trainer1 AND lot_date = v_lot_date AND start_time = '07:15:00';
+            WHERE trainer_id = v_trainer1 AND lot_date = v_lot_date AND start_time = '07:00:00';
 
             IF v_lot_id IS NULL THEN
                 INSERT INTO training_lots (trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at)
-                VALUES (v_trainer1, v_sub_gate_sprint, v_lot_date, '07:15:00', '08:00:00', 4, 'COMPLETED', NOW(), NOW())
+                VALUES (v_trainer1, v_sub_gate_sprint, v_lot_date, '07:00:00', '08:00:00', 4, 'COMPLETED', NOW(), NOW())
                 RETURNING id INTO v_lot_id;
             END IF;
 
@@ -385,8 +377,8 @@ BEGIN
 
     -- B. ACTIVE PLANS (4 plans: Nausicaa, Eagle Atena, Si Renesme, Enuma)
     -- Group Lot: Nausicaa & Eagle Atena paired in Slot 1 (06:00 - 07:00)
-    -- Si Renesme in Slot 2 (07:15 - 08:15)
-    -- Enuma in Slot 3 (08:30 - 09:30) with Fatigue Risk Alert
+    -- Si Renesme in Slot 2 (07:00 - 08:00)
+    -- Enuma in Slot 3 (08:00 - 09:00) with Fatigue Risk Alert
     -- ZERO OVERLAPS!
     -- =========================================================================
     DECLARE
@@ -396,47 +388,47 @@ BEGIN
         v_plan_id_h4 BIGINT;
     BEGIN
         INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
+            horse_id, course_id, trainer_id, start_date, end_date, status,
             created_at, updated_at, training_days, groom_id
         ) VALUES (
             v_h_nausicaa, v_crs_sprint, v_trainer1,
             v_base_date - INTERVAL '7 days', v_base_date + INTERVAL '14 days',
-            'ACTIVE', 'Peak sprint acceleration cycle before upcoming Class 1 Handicap.',
+            'ACTIVE',
             v_base_date - INTERVAL '10 days', v_base_date,
-            'MONDAY,WEDNESDAY,FRIDAY', v_groom_daniel
+            'FRIDAY,MONDAY,WEDNESDAY', v_groom_daniel
         ) RETURNING id INTO v_plan_id_h1;
 
         INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
+            horse_id, course_id, trainer_id, start_date, end_date, status,
             created_at, updated_at, training_days, groom_id
         ) VALUES (
             v_h_eagle, v_crs_sprint, v_trainer1,
             v_base_date - INTERVAL '7 days', v_base_date + INTERVAL '14 days',
-            'ACTIVE', 'Sprint acceleration pairing with Nausicaa By Nika.',
+            'ACTIVE',
             v_base_date - INTERVAL '10 days', v_base_date,
-            'MONDAY,WEDNESDAY,FRIDAY', v_groom_daniel
+            'FRIDAY,MONDAY,WEDNESDAY', v_groom_daniel
         ) RETURNING id INTO v_plan_id_h2;
 
         INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
+            horse_id, course_id, trainer_id, start_date, end_date, status,
             created_at, updated_at, training_days, groom_id
         ) VALUES (
             v_h_si_renesme, v_crs_endurance, v_trainer1,
             v_base_date - INTERVAL '5 days', v_base_date + INTERVAL '16 days',
-            'ACTIVE', 'Mid-season distance aerobic stamina build.',
+            'ACTIVE',
             v_base_date - INTERVAL '8 days', v_base_date,
-            'MONDAY,WEDNESDAY,FRIDAY', v_groom_olivia
+            'FRIDAY,MONDAY,WEDNESDAY', v_groom_olivia
         ) RETURNING id INTO v_plan_id_h3;
 
         INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
+            horse_id, course_id, trainer_id, start_date, end_date, status,
             created_at, updated_at, training_days, groom_id
         ) VALUES (
             v_h_enuma, v_crs_championship, v_trainer1,
             v_base_date - INTERVAL '6 days', v_base_date + INTERVAL '15 days',
-            'ACTIVE', 'High intensity championship prep. Monitored for potential muscular fatigue.',
+            'ACTIVE',
             v_base_date - INTERVAL '9 days', v_base_date,
-            'MONDAY,WEDNESDAY,FRIDAY', v_groom_olivia
+            'FRIDAY,MONDAY,WEDNESDAY', v_groom_olivia
         ) RETURNING id INTO v_plan_id_h4;
 
         FOR k IN 0..5 LOOP
@@ -455,7 +447,7 @@ BEGIN
             INSERT INTO training_lots (
                 trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at
             ) VALUES (
-                v_trainer1, v_sub_stride, v_lot_date, '07:15:00', '08:15:00', 4,
+                v_trainer1, v_sub_stride, v_lot_date, '07:00:00', '08:00:00', 4,
                 CASE WHEN v_lot_date < v_base_date THEN 'COMPLETED' ELSE 'SCHEDULED' END,
                 NOW(), NOW()
             ) RETURNING id INTO v_lot_id2;
@@ -464,7 +456,7 @@ BEGIN
             INSERT INTO training_lots (
                 trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at
             ) VALUES (
-                v_trainer1, v_sub_uphill, v_lot_date, '08:30:00', '09:30:00', 4,
+                v_trainer1, v_sub_uphill, v_lot_date, '08:00:00', '09:00:00', 4,
                 CASE WHEN v_lot_date < v_base_date THEN 'COMPLETED' ELSE 'SCHEDULED' END,
                 NOW(), NOW()
             ) RETURNING id INTO v_lot_id3;
@@ -568,13 +560,13 @@ BEGIN
     -- C. UPCOMING PLANS (2 plans: Douglas & Imperium)
     -- =========================================================================
     INSERT INTO horse_training_plans (
-        horse_id, course_id, trainer_id, start_date, end_date, status, notes,
+        horse_id, course_id, trainer_id, start_date, end_date, status,
         created_at, updated_at, training_days, groom_id
     ) VALUES (
         v_h_douglas, v_crs_foundation, v_trainer1,
         v_base_date + INTERVAL '5 days', v_base_date + INTERVAL '26 days',
-        'UPCOMING', 'Scheduled intake for spring foundation cycle.',
-        NOW(), NOW(), 'TUESDAY,THURSDAY', v_groom_alex
+        'UPCOMING',
+        NOW(), NOW(), 'THURSDAY,TUESDAY', v_groom_alex
     ) RETURNING id INTO v_plan_id;
 
     FOR k IN 0..3 LOOP
@@ -596,23 +588,23 @@ BEGIN
     END LOOP;
 
     INSERT INTO horse_training_plans (
-        horse_id, course_id, trainer_id, start_date, end_date, status, notes,
+        horse_id, course_id, trainer_id, start_date, end_date, status,
         created_at, updated_at, training_days, groom_id
     ) VALUES (
         v_h_imperium, v_crs_endurance, v_trainer1,
         v_base_date + INTERVAL '7 days', v_base_date + INTERVAL '28 days',
-        'UPCOMING', 'Scheduled long-distance conditioning for summer cup preparation.',
-        NOW(), NOW(), 'MONDAY,WEDNESDAY,FRIDAY', v_groom_alex
+        'UPCOMING',
+        NOW(), NOW(), 'FRIDAY,MONDAY,WEDNESDAY', v_groom_alex
     ) RETURNING id INTO v_plan_id;
 
     FOR k IN 0..3 LOOP
         v_lot_date := (v_base_date + INTERVAL '7 days')::DATE + (k * 2);
         SELECT id INTO v_lot_id FROM training_lots
-        WHERE trainer_id = v_trainer1 AND lot_date = v_lot_date AND start_time = '07:15:00';
+        WHERE trainer_id = v_trainer1 AND lot_date = v_lot_date AND start_time = '07:00:00';
 
         IF v_lot_id IS NULL THEN
             INSERT INTO training_lots (trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at)
-            VALUES (v_trainer1, v_sub_stride, v_lot_date, '07:15:00', '08:15:00', 4, 'SCHEDULED', NOW(), NOW())
+            VALUES (v_trainer1, v_sub_stride, v_lot_date, '07:00:00', '08:00:00', 4, 'SCHEDULED', NOW(), NOW())
             RETURNING id INTO v_lot_id;
         END IF;
 
@@ -626,20 +618,20 @@ BEGIN
     -- D. CANCELLED PLAN (1 plan: AG Nobel Emir)
     -- =========================================================================
     INSERT INTO horse_training_plans (
-        horse_id, course_id, trainer_id, start_date, end_date, status, notes,
+        horse_id, course_id, trainer_id, start_date, end_date, status,
         created_at, updated_at, training_days, groom_id
     ) VALUES (
         v_h_nobel, v_crs_sprint, v_trainer1,
         v_base_date - INTERVAL '15 days', v_base_date + INTERVAL '5 days',
-        'CANCELLED', 'Plan cancelled due to minor hoof bruising during pasture turnout. Rest advised by vet.',
+        'CANCELLED',
         v_base_date - INTERVAL '18 days', v_base_date - INTERVAL '10 days',
-        'TUESDAY,THURSDAY', v_groom_alex
+        'THURSDAY,TUESDAY', v_groom_alex
     ) RETURNING id INTO v_plan_id;
 
     INSERT INTO training_lots (
         trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at
     ) VALUES (
-        v_trainer1, v_sub_gate_sprint, (v_base_date - INTERVAL '14 days')::DATE, '08:30:00', '09:30:00', 4,
+        v_trainer1, v_sub_gate_sprint, (v_base_date - INTERVAL '14 days')::DATE, '08:00:00', '09:00:00', 4,
         'CANCELLED', NOW(), NOW()
     ) RETURNING id INTO v_lot_id;
 

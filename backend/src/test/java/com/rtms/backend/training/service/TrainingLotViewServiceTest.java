@@ -306,7 +306,19 @@ class TrainingLotViewServiceTest {
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> lotService.rescheduleLot(10L, LocalTime.of(8, 30), 9L));
-        assertTrue(ex.getMessage().contains("overlaps your lot #11"));
+        assertTrue(ex.getMessage().contains("overlaps another lot (08:00–09:00)"));
+    }
+
+    @Test
+    @DisplayName("Rescheduling to a time off the 15-minute steps is rejected")
+    void testRescheduleLot_OffQuarterHour() {
+        when(lotRepository.findById(10L)).thenReturn(Optional.of(lot(10L, 9L, LotStatus.SCHEDULED)));
+        when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject(60)));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> lotService.rescheduleLot(10L, LocalTime.of(8, 10), 9L));
+        assertTrue(ex.getMessage().contains(":00, :15, :30 or :45"));
+        verify(lotRepository, never()).save(any());
     }
 
     @Test

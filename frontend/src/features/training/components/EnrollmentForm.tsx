@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button, EmptyState, ListSkeleton, Notice, PageHeader, Panel, ScreenLayout } from '@/components/ui';
+import { BackLink, Button, EmptyState, ListSkeleton, Notice, PageHeader, Panel, ScreenLayout } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { toIsoDate, tomorrowIso } from '../lib/dateRange';
 import { usePlanPreview } from '../hooks/usePlanPreview';
@@ -43,7 +43,6 @@ export function EnrollmentForm() {
   const [selectedHorseIds, setSelectedHorseIds] = useState<number[]>([]);
   const [startDate, setStartDate] = useState(() => tomorrowIso());
   const [trainingDays, setTrainingDays] = useState<TrainingDay[]>(DEFAULT_DAYS);
-  const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -137,7 +136,6 @@ export function EnrollmentForm() {
         courseId,
         startDate,
         trainingDays,
-        notes: notes.trim() || undefined,
         horses: selectedHorseIds.map((horseId) => ({ horseId })),
       };
       const plans = await trainingService.createPlan(request);
@@ -184,9 +182,9 @@ export function EnrollmentForm() {
 
   return (
     <ScreenLayout variant="form">
+      <BackLink onClick={() => router.back()}>Back</BackLink>
       <PageHeader
         title="Group training enrollment"
-        description="Choose the schedule, then the horses: each horse shows whether it is free for these dates."
         breadcrumbs={[{ label: 'Training', href: '/trainer/courses' }, { label: 'Enroll horses' }]}
       />
 
@@ -207,8 +205,6 @@ export function EnrollmentForm() {
           onStartDateChange={setStartDate}
           trainingDays={trainingDays}
           onToggleDay={toggleDay}
-          notes={notes}
-          onNotesChange={setNotes}
           preview={preview}
           stale={scheduleStale}
         />
@@ -234,7 +230,6 @@ export function EnrollmentForm() {
           {blockedReason && selectedHorseIds.length > 0 && (
             <span className="text-xs text-[var(--color-text-muted)]">{blockedReason}</span>
           )}
-          <Button type="button" onClick={() => router.back()} disabled={submitting}>Back</Button>
           <Button type="submit" variant="primary" loading={submitting} disabled={blockedReason !== null}>
             {submitting ? 'Scheduling workouts…' : `Enroll ${selectedHorseIds.length} horses`}
           </Button>

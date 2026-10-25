@@ -199,9 +199,7 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
   return (
     <AdmissionSideCard title="Racing readiness assessment" tone="primary" className="space-y-4">
       {submittedNotice && (
-        <Notice tone="success">
-          Your evaluation has been submitted successfully and forwarded to the Club Manager.
-        </Notice>
+        <Notice tone="success">Evaluation submitted to the Club Manager.</Notice>
       )}
 
       <fieldset className="space-y-2">
@@ -237,42 +235,30 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
         required
       />
 
-      <FormField label="Estimated months until eligible for race registration">
+      <FormField label="Months until race-ready">
         <Input
           type="number"
           min={0}
           max={60}
-          placeholder="Number of months"
           value={form.estimatedMonthsToRace ?? ''}
           onChange={(e) => setNum('estimatedMonthsToRace')(e.target.value)}
         />
       </FormField>
 
-      <FormField
-        label="Professional remarks"
-        hint={`${form.remarks?.length ?? 0}/${MAX_REMARKS} characters maximum`}
-      >
+      <FormField label="Remarks">
         <Textarea
           rows={4}
           maxLength={MAX_REMARKS}
-          placeholder="Balanced conformation with well-developed musculature. Calm temperament upon contact. Even strides and good reach..."
           value={form.remarks ?? ''}
           onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
         />
       </FormField>
-
-      <p className="text-xs text-[var(--color-text-muted)]">
-        Fitness metrics will be measured and assessed periodically once the horse completes quarantine and enters regular training.
-      </p>
 
       {formError && <Notice tone="error">{formError}</Notice>}
 
       <Button variant="primary" className="w-full" loading={submitting} onClick={handleSubmit}>
         Submit evaluation
       </Button>
-      <p className="text-xs text-[var(--color-text-muted)]">
-        Once submitted, the evaluation will be forwarded to the Club Manager.
-      </p>
     </AdmissionSideCard>
   );
 }

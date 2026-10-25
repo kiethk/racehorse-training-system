@@ -1,4 +1,5 @@
 import type { IconName } from './Icon';
+import { cn } from '@/lib/cn';
 import { Icon } from './Icon';
 
 type Tone = 'default' | 'neutral' | 'success' | 'warning' | 'danger' | 'info';
@@ -21,27 +22,39 @@ interface MetricCardProps {
   hint?: string;
   onClick?: () => void;
   active?: boolean;
+  className?: string;
 }
 
 /** Compact Prism-style operational metric. Not a marketing KPI card. */
-export function MetricCard({ label, value, unit, icon, tone = 'default', hint, onClick, active = false }: MetricCardProps) {
+export function MetricCard({
+  label,
+  value,
+  unit,
+  icon,
+  tone = 'default',
+  hint,
+  onClick,
+  active = false,
+  className,
+}: MetricCardProps) {
   const Wrapper = onClick ? 'button' : 'div';
   return (
     <Wrapper
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onClick={onClick as any}
-      className={
-        'flex flex-col rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left ' +
-        (onClick
-          ? `outline-none transition-colors hover:border-[var(--color-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${active ? 'border-[var(--color-primary)] bg-[var(--color-primary-subtle)]' : ''}`
-          : '')
-      }
+      className={cn(
+        'flex flex-col rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left',
+        onClick &&
+          'outline-none transition-colors hover:border-[var(--color-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]',
+        onClick && active && 'border-[var(--color-primary)] bg-[var(--color-primary-subtle)]',
+        className,
+      )}
     >
       <div className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
         {icon && <Icon name={icon} size={13} />}
         <span className="text-[11px] font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <div className="mt-1.5 flex items-baseline gap-1">
+      <div className="mt-1.5 flex flex-1 items-center gap-1">
         <span className={`font-metric text-[22px] font-semibold leading-none ${toneText[tone]}`}>
           {value}
         </span>

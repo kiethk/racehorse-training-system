@@ -183,10 +183,12 @@ export function Series({
             fill={stroke}
             stroke="var(--color-surface)"
             strokeWidth="1.5"
-            className="cursor-pointer transition-transform hover:scale-150"
+            // fill-box: an SVG shape scales around its own centre. Without it the dot grows away from the pointer,
+            // the pointer leaves it, it shrinks back under the pointer, and the tooltip flickers on and off.
+            className="cursor-pointer transition-transform [transform-box:fill-box] [transform-origin:center] hover:scale-150"
             onMouseEnter={(event) => {
               const box = event.currentTarget.getBoundingClientRect();
-              onHover({ x: box.left, y: box.top, item });
+              onHover({ x: box.left + box.width / 2, y: box.top, item });
             }}
             onMouseLeave={() => onHover(null)}
           />

@@ -16,8 +16,9 @@ export const DAYS_OF_WEEK: { value: TrainingDay; label: string }[] = [
 const DAY_WITH_DATE: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' };
 
 /**
- * Step 2: first training date, weekdays and an optional note. The period the course will really cover comes from
- * the backend preview, because the end date depends on the session count and the weekdays together.
+ * Step 2: first training date and weekdays. The period the course will really cover comes from the backend preview,
+ * because the end date depends on the session count and the weekdays together. The summary line shows the real first
+ * session, so a start date that is not a training day needs no extra explanation.
  */
 export function ScheduleStep({
   startDate,
@@ -25,8 +26,6 @@ export function ScheduleStep({
   onStartDateChange,
   trainingDays,
   onToggleDay,
-  notes,
-  onNotesChange,
   preview,
   stale,
 }: {
@@ -36,15 +35,11 @@ export function ScheduleStep({
   onStartDateChange: (value: string) => void;
   trainingDays: TrainingDay[];
   onToggleDay: (day: TrainingDay) => void;
-  notes: string;
-  onNotesChange: (value: string) => void;
   preview: PlanPreviewResponse | null;
   /** The preview belongs to the previous schedule and is being refreshed. */
   stale: boolean;
 }) {
   const inPast = startDate !== '' && startDate < minDate;
-  // Only compared once the preview matches the current date, otherwise an old answer would claim a move.
-  const moved = preview !== null && !stale && preview.firstSessionDate !== startDate;
 
   return (
     <Panel padded className="space-y-4">
@@ -54,7 +49,6 @@ export function ScheduleStep({
         <FormField
           label="Start date"
           required
-          hint="The group's first session is the first training day on or after this date."
           error={inPast ? 'The start date cannot be in the past.' : undefined}
         >
           <Input type="date" min={minDate} value={startDate} onChange={(e) => onStartDateChange(e.target.value)} />
@@ -94,18 +88,8 @@ export function ScheduleStep({
             {preview.totalSessions} sessions · {formatDate(preview.firstSessionDate, DAY_WITH_DATE)} →{' '}
             {formatDate(preview.endDate, DAY_WITH_DATE)}
           </span>
-          {moved && (
-            <span>
-              {formatDate(startDate, DAY_WITH_DATE)} is not a training day, so the first session is on{' '}
-              {formatDate(preview.firstSessionDate, DAY_WITH_DATE)}.
-            </span>
-          )}
         </div>
       )}
-
-      <FormField label="Plan notes">
-        <Input value={notes} onChange={(e) => onNotesChange(e.target.value)} placeholder="e.g. Three horses preparing for the autumn racing season…" />
-      </FormField>
     </Panel>
   );
 }

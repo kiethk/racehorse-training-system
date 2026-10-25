@@ -355,7 +355,6 @@ public class HorseTrainingPlanService {
             plan.setTrainingDays(selectedDays);        // KHUÔN MẪU (TEMPLATE)
             plan.setGroomId(en.groomId());             // KHUÔN MẪU (TEMPLATE)
             plan.setStatus(status);
-            plan.setNotes(request.getNotes());
             plans.add(plan);
         }
 
@@ -587,22 +586,9 @@ public class HorseTrainingPlanService {
         }
 
         long waitDays = ChronoUnit.DAYS.between(today, suggested);
-
-        // Hiển thị thẳng cho người dùng nên dùng từ thường, không dùng thuật ngữ nội bộ. sharedSessions là số
-        // buổi CÙNG NGÀY CÙNG BÀI, không bảo đảm chung lot: nhóm vẫn bị tách nếu vượt sức chứa (BR-10) hoặc
-        // hai con cùng Groom (BR-09).
-        // (Shown directly to the user, so plain words and no internal jargon. sharedSessions counts workouts on
-        // the SAME DAY with the SAME SUBJECT, not a guarantee of the same lot: the group still splits when it
-        // exceeds capacity (BR-10) or two horses share a groom (BR-09).)
-        String note = upcoming
-                ? String.format("Train together for all %d/%d sessions", sharedSessions, totalSessions)
-                : String.format("Train together for %d/%d sessions, the last %d sessions are separate",
-                        sharedSessions, totalSessions, totalSessions - sharedSessions);
-
         return Optional.of(new JoinableCohortResponse(
-                upcoming ? "UPCOMING" : "ACTIVE", course.getId(), course.getName(), suggested, days,
-                row.horseCount().intValue(), sharedSessions, totalSessions, waitDays,
-                FarmSchedulePolicy.DEFAULT_LOT_CAPACITY, note));
+                upcoming ? "UPCOMING" : "ACTIVE", suggested, days, row.horseCount().intValue(),
+                sharedSessions, totalSessions, waitDays, FarmSchedulePolicy.DEFAULT_LOT_CAPACITY));
     }
 
     private record AlignedPoint(LocalDate date, int sessionIndex) {}

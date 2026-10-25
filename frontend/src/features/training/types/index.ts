@@ -1,5 +1,3 @@
-import type { HorseSpecialty } from '@/features/horses/types';
-
 export type PlanStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 export type WorkoutStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
 export type SurfaceType = 'TURF' | 'DIRT' | 'SYNTHETIC';
@@ -49,7 +47,6 @@ export interface Course {
   id: number;
   trainerId?: number;
   name: string;
-  description: string | null;
   targetGoal: string | null;
   totalSessions: number;
 }
@@ -71,7 +68,6 @@ export interface CourseDetailResponse {
 export interface CreateCourseRequest {
   trainerId?: number;
   name: string;
-  description?: string;
   targetGoal?: string;
   totalSessions: number;
   subjects: CourseSubjectItem[];
@@ -130,14 +126,11 @@ export interface CreateHorseTrainingPlanRequest {
   courseId: number;
   startDate: string; // YYYY-MM-DD
   trainingDays: TrainingDay[];
-  notes?: string;
   horses: HorseEnrollmentItem[];
 }
 
 export interface JoinableCohortResponse {
   cohortStatus: 'UPCOMING' | 'ACTIVE';
-  courseId: number;
-  courseName: string;
   suggestedStartDate: string;
   trainingDays: TrainingDay[];
   horseCount: number;
@@ -151,7 +144,6 @@ export interface JoinableCohortResponse {
   waitDays: number;
   /** Capacity of one lot, returned by the backend so the number 6 is not hardcoded. */
   lotCapacity: number;
-  note: string;
 }
 
 export interface PlanWorkoutItemResponse {
@@ -186,7 +178,6 @@ export interface HorseTrainingPlan {
   startDate: string;
   endDate: string;
   status: PlanStatus;
-  notes: string | null;
 }
 
 export interface HorseTrainingPlanDetailResponse {
@@ -253,7 +244,6 @@ export interface TrainingLotResponse {
 
 export interface RescheduleLotRequest {
   newStartTime: string; // "HH:mm" or "HH:mm:ss"
-  reason?: string;
 }
 
 export interface HorseFitnessTrendItem {
@@ -279,50 +269,18 @@ export interface HorseAlert {
   thresholdValue: number;
 }
 
-export interface TrainerDashboardHorse {
-  horseId: number;
-  horseName: string;
-  breed: string | null;
-  stallCode: string | null;
-  planId: number | null;
-  courseName: string;
-  /** NONE when the horse has no plan yet. */
-  planStatus: PlanStatus | 'NONE';
-  completedSessions: number;
-  totalSessions: number;
-  progressPercent: number;
-  latestPerformanceRating: number | null;
-  avgPerformanceRating30d: number | null;
-  alertsCount: number;
-  alertTitles: string[];
-  startDate: string | null;
-  endDate: string | null;
-  specialty: HorseSpecialty;
-}
-
 /** Training rules the backend enforces, published so the UI does not hard-code them. */
 export interface TrainingRules {
   goldenHoursStart: string; // "06:00:00"
   goldenHoursEnd: string;   // "10:00:00"
-  goldenWindowMinutes: number;
   lotCapacity: number;
+  /** A lot only starts on multiples of this many minutes (00, 15, 30, 45). */
+  lotStartStepMinutes: number;
   minSubjectDurationMinutes: number;
   maxSubjectDurationMinutes: number;
   /** A maximum heart rate above this raises an alert. */
   maxHeartRateLimit: number;
   /** A recovery heart rate above this raises an alert. */
   recoveryHeartRateLimit: number;
-}
-
-export interface ReadinessAssessment {
-  id: number;
-  horseId: number;
-  readinessStatus: string;
-  fitnessScore: number | null;
-  conformationScore: number | null;
-  temperamentScore: number | null;
-  gaitQualityScore: number | null;
-  estimatedMonthsToRace: number | null;
-  assessmentDate: string;
 }
 

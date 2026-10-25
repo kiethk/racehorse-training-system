@@ -21,11 +21,7 @@ import { useTrainingRules } from '../hooks/useTrainingRules';
 import { rangeForPreset, rangeLabel } from '../lib/dateRange';
 import type { DatePreset, DateRange } from '../lib/dateRange';
 import { trainingService } from '../services/trainingService';
-import type {
-  HorseAlert,
-  HorseFitnessTrendItem,
-  ReadinessAssessment,
-} from '../types';
+import type { HorseAlert, HorseFitnessTrendItem } from '../types';
 import { FitnessTrendChart } from './FitnessTrendChart';
 import { HorseAlertList } from './HorseAlertList';
 import { HorseMetricsRow } from './HorseMetricsRow';
@@ -44,7 +40,6 @@ export function HorseFitnessTrendView({ horseId, hideHeader = false }: { horseId
   const [specialty, setSpecialty] = useState<HorseSpecialty | null>(null);
   const [alerts, setAlerts] = useState<HorseAlert[]>([]);
   const [trend, setTrend] = useState<HorseFitnessTrendItem[]>([]);
-  const [readiness, setReadiness] = useState<ReadinessAssessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reportingAlert, setReportingAlert] = useState<HorseAlert | null>(null);
@@ -59,17 +54,15 @@ export function HorseFitnessTrendView({ horseId, hideHeader = false }: { horseId
     try {
       const { from, to } = rangeForPreset(preset, new Date(), appliedCustom);
       // The trend is required; everything else is a bonus and must not hide the screen when it fails.
-      const [trendData, horseData, alertData, readinessData, specialtyData] = await Promise.all([
+      const [trendData, horseData, alertData, specialtyData] = await Promise.all([
         trainingService.getFitnessTrend(horseId, from, to),
         horseService.getById(horseId).catch(() => null),
         trainingService.getHorseAlerts(horseId).catch(() => []),
-        trainingService.getReadinessHistory(horseId, false).catch(() => []),
         horseService.getSpecialty(horseId).catch(() => null),
       ]);
       setTrend(trendData);
       setHorse(horseData);
       setAlerts(alertData);
-      setReadiness(readinessData);
       setSpecialty(specialtyData);
     } catch (cause) {
       setError(displayError(cause, 'Unable to load horse fitness data.'));
@@ -133,7 +126,7 @@ export function HorseFitnessTrendView({ horseId, hideHeader = false }: { horseId
           <div className="flex h-64 items-center justify-center"><Spinner size="lg" /></div>
         </Panel>
       ) : (
-        <FitnessTrendChart trend={trend} readiness={readiness} rules={rules} />
+        <FitnessTrendChart trend={trend} rules={rules} />
       )}
 
       <WorkoutHistoryTable trend={trend} rules={rules} loading={loading} />

@@ -580,7 +580,7 @@ class HorseTrainingPlanServiceTest {
         assertEquals(12, cohorts.get(0).getSharedSessions());
         assertEquals(4, cohorts.get(0).getHorseCount());
         assertEquals(start, cohorts.get(0).getSuggestedStartDate());
-        assertEquals("Train together for all 12/12 sessions", cohorts.get(0).getNote());
+        assertEquals(12, cohorts.get(0).getTotalSessions());
     }
 
     @Test

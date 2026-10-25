@@ -8,7 +8,8 @@ import com.rtms.backend.training.dto.JoinableCohortResponse;
 import com.rtms.backend.training.dto.PlanPreviewRequest;
 import com.rtms.backend.training.dto.PlanPreviewResponse;
 import com.rtms.backend.training.dto.PlanSummaryResponse;
-import com.rtms.backend.training.dto.TrainerDashboardHorseResponse;
+import com.rtms.backend.training.dto.PerformanceTrendResponse;
+import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseTrainingPlanService;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -42,9 +43,20 @@ public class HorseTrainingPlanController {
      */
     @PreAuthorize("hasAuthority('TRAINING_PLAN_VIEW')")
     @GetMapping("/dashboard")
-    public ApiResponse<List<TrainerDashboardHorseResponse>> getDashboard(
+    public ApiResponse<List<DashboardHorseResponse>> getDashboard(
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(performanceService.getTrainerDashboard(currentUser));
+        return ApiResponse.success(performanceService.getDashboard(currentUser));
+    }
+
+    /**
+     * Biểu đồ phong độ chung của toàn khu trên dashboard: trung bình theo ngày, 30 ngày gần nhất.
+     * (Area-wide performance chart on the dashboard: daily averages over the last 30 days.)
+     */
+    @PreAuthorize("hasAuthority('TRAINING_PLAN_VIEW')")
+    @GetMapping("/dashboard/performance-trend")
+    public ApiResponse<PerformanceTrendResponse> getPerformanceTrend(
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(performanceService.getPerformanceTrend(currentUser));
     }
 
     /**

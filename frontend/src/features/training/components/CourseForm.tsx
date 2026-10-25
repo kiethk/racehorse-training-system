@@ -13,7 +13,6 @@ import {
   Pill,
   SearchInput,
   SectionTitle,
-  Textarea,
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { CATEGORY_OPTIONS, intensityOption, surfaceLabel } from '../lib/subjectOptions';
@@ -51,7 +50,6 @@ function CourseFormContent({
   onCancel,
 }: CourseFormProps) {
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [targetGoal, setTargetGoal] = useState('');
   const [totalSessions, setTotalSessions] = useState(DEFAULT_SESSIONS);
   const [rotation, setRotation] = useState<number[]>([]);
@@ -96,7 +94,6 @@ function CourseFormContent({
     setValidation(null);
     onSubmit({
       name: name.trim(),
-      description: description.trim() || undefined,
       targetGoal: targetGoal.trim() || undefined,
       totalSessions: Number(totalSessions),
       subjects: rotation.map((subjectId, index) => ({ subjectId, orderIndex: index + 1 })),
@@ -127,11 +124,7 @@ function CourseFormContent({
                 disabled={submitting}
               />
             </FormField>
-            <FormField
-              label="Total sessions"
-              required
-              hint="Subjects repeat in order until the total number of sessions is reached."
-            >
+            <FormField label="Total sessions" required>
               <Input
                 type="number"
                 min={1}
@@ -151,25 +144,10 @@ function CourseFormContent({
             />
           </FormField>
 
-          <FormField label="Course description">
-            <Textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe the training path and suitable fitness level…"
-              disabled={submitting}
-            />
-          </FormField>
-
           {/* Course Subject Rotation (Drop Zone) */}
           <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
             <div className="flex items-center justify-between gap-2">
-              <div>
-                <FieldLabel>Subject rotation ({rotation.length} selected)</FieldLabel>
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  Drag subjects from the library on the right into this rotation, or select a subject and click &ldquo;Add selected subject&rdquo;.
-                </p>
-              </div>
+              <FieldLabel>Subject rotation ({rotation.length} selected)</FieldLabel>
               {rotation.length > 0 && (
                 <Button
                   type="button"

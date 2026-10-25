@@ -62,10 +62,7 @@ public class TrainingDecisionService {
         horse.setTrainingDecision(TrainingDecision.BLOCKED);
         horse.setTrainingDecisionReason(reason);
         horseRepository.save(horse);
-        workoutService.cancelFutureTrainingForHorse(horse.getId(),
-                reason == null || reason.isBlank()
-                        ? "Horse is blocked from training"
-                        : "Horse is blocked from training: " + reason);
+        workoutService.cancelFutureTrainingForHorse(horse.getId());
     }
 
     @Transactional

@@ -10,8 +10,8 @@ import java.time.LocalTime;
  *
  * @param goldenHoursStart          đầu khung giờ vàng huấn luyện (start of the training golden hours)
  * @param goldenHoursEnd            cuối khung giờ vàng (end of the golden hours)
- * @param goldenWindowMinutes       tổng số phút của khung giờ vàng (total minutes of the golden hours)
  * @param lotCapacity               sức chứa mặc định của một lot (default capacity of a lot)
+ * @param lotStartStepMinutes       lot chỉ bắt đầu ở bội số của số phút này (a lot only starts on multiples of these minutes)
  * @param minSubjectDurationMinutes thời lượng tối thiểu của một bài tập (shortest allowed subject duration)
  * @param maxSubjectDurationMinutes thời lượng tối đa của một bài tập (longest allowed subject duration)
  * @param maxHeartRateLimit         nhịp tim tối đa an toàn, vượt thì cảnh báo (safe maximum heart rate)
@@ -19,8 +19,8 @@ import java.time.LocalTime;
  */
 public record TrainingRulesResponse(LocalTime goldenHoursStart,
                                     LocalTime goldenHoursEnd,
-                                    int goldenWindowMinutes,
                                     int lotCapacity,
+                                    int lotStartStepMinutes,
                                     int minSubjectDurationMinutes,
                                     int maxSubjectDurationMinutes,
                                     int maxHeartRateLimit,

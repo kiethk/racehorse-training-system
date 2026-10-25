@@ -156,7 +156,7 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
                                                 @Param("courseId") Long courseId);
 
     // =================================================================
-    // DASHBOARD CỦA TRAINER (Trainer dashboard)
+    // DASHBOARD THEO PHẠM VI VAI TRÒ (Dashboard by role scope)
     // =================================================================
 
     /** Chiến mã trong các khu của Trainer, kèm mã chuồng. (Horses in the trainer areas, with stall code.) */
@@ -171,9 +171,33 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
     List<DashboardHorseRow> findDashboardHorses(@Param("trainerId") Long trainerId);
 
     /**
-     * Mọi kế hoạch của Trainer kèm tên khóa và số buổi đã hoàn thành (sub-query), không cần
+     * Chiến mã đã nhập trại của một Owner. Ngựa chưa có chuồng vẫn được liệt kê (LEFT JOIN), mã chuồng khi đó là null.
+     * (The admitted horses of one owner. A horse without a stall is still listed (LEFT JOIN), its stall code null.)
+     */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.DashboardHorseRow(h.id, h.name, h.breed, ss.stallCode)
+           FROM Horse h
+           LEFT JOIN StableStall ss ON h.currentStallId = ss.id
+           WHERE h.ownerId = :ownerId
+             AND h.currentStatus = com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE
+           ORDER BY h.id ASC
+           """)
+    List<DashboardHorseRow> findDashboardHorsesOfOwner(@Param("ownerId") Long ownerId);
+
+    /** Mọi chiến mã đã nhập trại của trang trại. (Every admitted horse of the farm.) */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.DashboardHorseRow(h.id, h.name, h.breed, ss.stallCode)
+           FROM Horse h
+           LEFT JOIN StableStall ss ON h.currentStallId = ss.id
+           WHERE h.currentStatus = com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE
+           ORDER BY h.id ASC
+           """)
+    List<DashboardHorseRow> findAllDashboardHorses();
+
+    /**
+     * Mọi kế hoạch của các chiến mã đã cho, kèm tên khóa và số buổi đã hoàn thành (sub-query), không cần
      * tải toàn bộ bảng rồi lọc bằng stream.
-     * (Every plan of the trainer with course name and completed-session count (sub-query), so no
+     * (Every plan of the given horses with course name and completed-session count (sub-query), so no
      * whole-table load followed by stream filtering.)
      */
     @Query("""
@@ -184,10 +208,10 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
                          AND w.status = com.rtms.backend.training.enums.WorkoutStatus.COMPLETED))
            FROM HorseTrainingPlan p
            JOIN Course c ON p.courseId = c.id
-           WHERE p.trainerId = :trainerId
+           WHERE p.horseId IN :horseIds
            ORDER BY p.id ASC
            """)
-    List<DashboardPlanRow> findDashboardPlans(@Param("trainerId") Long trainerId);
+    List<DashboardPlanRow> findDashboardPlans(@Param("horseIds") Collection<Long> horseIds);
 
     /** Ngựa có nằm trong một khu của Trainer không? (Is the horse in one of the trainer areas?) */
     @Query("""

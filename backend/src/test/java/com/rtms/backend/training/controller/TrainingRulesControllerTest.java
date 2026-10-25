@@ -19,8 +19,8 @@ class TrainingRulesControllerTest {
         TrainingRulesResponse rules = response.getData();
         assertEquals(LocalTime.of(6, 0), rules.goldenHoursStart());
         assertEquals(LocalTime.of(10, 0), rules.goldenHoursEnd());
-        assertEquals(240, rules.goldenWindowMinutes());
         assertEquals(6, rules.lotCapacity());
+        assertEquals(15, rules.lotStartStepMinutes());
         assertEquals(15, rules.minSubjectDurationMinutes());
         assertEquals(240, rules.maxSubjectDurationMinutes());
         assertEquals(220, rules.maxHeartRateLimit());

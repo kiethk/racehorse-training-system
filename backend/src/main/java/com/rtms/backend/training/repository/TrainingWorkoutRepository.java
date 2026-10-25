@@ -164,6 +164,26 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
                                                          @Param("toDate") LocalDate toDate);
 
     /**
+     * Các buổi đã hoàn thành của một tập chiến mã trong khoảng ngày, mỗi buổi một dòng, một câu truy vấn cho cả tập thay vì
+     * gọi biểu đồ của từng con. Việc gom theo tuần làm ở PerformanceTrendCalculator.
+     * (The completed sessions of a set of horses in a date range, one row per session, one query for the whole set
+     * instead of calling each horse chart. Grouping by week is done in PerformanceTrendCalculator.)
+     */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.PerformanceSessionRow(
+                      w.horseId, l.lotDate, w.performanceRating, w.averageSpeedKmh, w.maxHeartRate)
+           FROM TrainingWorkout w
+           JOIN TrainingLot l ON w.lotId = l.id
+           WHERE w.horseId IN :horseIds
+             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.COMPLETED
+             AND l.lotDate BETWEEN :fromDate AND :toDate
+           ORDER BY l.lotDate ASC
+           """)
+    List<PerformanceSessionRow> findPerformanceSessions(@Param("horseIds") Collection<Long> horseIds,
+                                                        @Param("fromDate") LocalDate fromDate,
+                                                        @Param("toDate") LocalDate toDate);
+
+    /**
      * Buổi đã hoàn thành từ một mốc ngày của NHIỀU ngựa, mới nhất trước: nguồn cho bộ luật cảnh báo
      * và dashboard. Lọc ngày ngay trong SQL thay vì tải toàn bộ lịch sử rồi lọc bằng stream.
      * (Completed workouts since a date for MANY horses, newest first: the source for the alert rules

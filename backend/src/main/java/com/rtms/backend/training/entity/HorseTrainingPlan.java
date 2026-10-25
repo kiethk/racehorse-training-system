@@ -64,8 +64,6 @@ public class HorseTrainingPlan {
     @Column(nullable = false, length = 20)
     private TrainingPlanStatus status = TrainingPlanStatus.ACTIVE;
 
-    private String notes;
-
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -111,8 +109,6 @@ public class HorseTrainingPlan {
     public TrainingPlanStatus getStatus() { return status; }
     public void setStatus(TrainingPlanStatus status) { this.status = status; }
 
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

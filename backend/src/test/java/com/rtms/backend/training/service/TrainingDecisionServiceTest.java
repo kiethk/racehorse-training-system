@@ -53,7 +53,7 @@ class TrainingDecisionServiceTest {
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         assertEquals("Tendon strain", horse.getTrainingDecisionReason());
         verify(horseRepository).save(horse);
-        verify(workoutService).cancelFutureTrainingForHorse(7L, "Horse is blocked from training: Tendon strain");
+        verify(workoutService).cancelFutureTrainingForHorse(7L);
     }
 
     @Test

@@ -35,8 +35,12 @@ export function usePlanPreview({ courseId, startDate, trainingDays, selectedHors
   const scheduleKey = scheduleReady ? `${courseId}|${startDate}|${[...trainingDays].sort().join(',')}` : null;
   const requestKey = scheduleKey ? `${scheduleKey}|${[...selectedHorseIds].sort((a, b) => a - b).join(',')}` : null;
 
+  // Keyed on the content of the inputs, not on the arrays: ticking a horse and unticking it again, or re-selecting
+  // the same horses, builds a new array with the same ids and must not send a request for an answer already shown.
+  const alreadyLoaded = loadedFor?.request === requestKey;
+
   useEffect(() => {
-    if (courseId === '' || !scheduleKey || !requestKey) return;
+    if (courseId === '' || !scheduleKey || !requestKey || alreadyLoaded) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       trainingService
@@ -57,7 +61,9 @@ export function usePlanPreview({ courseId, startDate, trainingDays, selectedHors
       clearTimeout(timer);
       controller.abort();
     };
-  }, [courseId, startDate, trainingDays, selectedHorseIds, scheduleKey, requestKey]);
+    // The arrays are read through the keys, which change exactly when their content does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduleKey, requestKey, alreadyLoaded]);
 
   return {
     preview,

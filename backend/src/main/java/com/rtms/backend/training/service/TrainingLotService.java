@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class TrainingLotService {
+
+    private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final TrainingLotRepository lotRepository;
     private final TrainingWorkoutRepository workoutRepository;
@@ -110,16 +113,7 @@ public class TrainingLotService {
 
         // ---------- BƯỚC 3 (STEP 3) ----------
         if (slot == null) {
-            long usedMinutes = dayLots.stream()
-                    .mapToLong(l -> Duration.between(l.getStartTime(), l.getEndTime()).toMinutes())
-                    .sum();
-            throw new IllegalStateException(String.format(
-                    "Your schedule on %s is full. Subject '%s' needs %d minutes but the golden window "
-                  + "%s–%s (%d minutes) already uses %d minutes for %d lots, leaving no free slot that is wide enough. "
-                  + "Change the start date or choose a course with shorter subjects.",
-                    date, subject.getName(), duration,
-                    FarmSchedulePolicy.GOLDEN_HOURS_START, FarmSchedulePolicy.GOLDEN_HOURS_END,
-                    FarmSchedulePolicy.goldenWindowMinutes(), usedMinutes, dayLots.size()));
+            throw new IllegalStateException("Your schedule on " + date.format(DAY_FORMAT) + " is full.");
         }
 
         TrainingLot lot = new TrainingLot();
@@ -173,7 +167,10 @@ public class TrainingLotService {
                 return cursor;                       // khe ở giữa đủ rộng (the gap in between is wide enough)
             }
             if (lot.getEndTime().isAfter(cursor)) {
-                cursor = lot.getEndTime();           // nhảy qua lot này, con trỏ KHÔNG lùi (skip this lot; the pointer never moves back)
+                // Nhảy qua lot này, con trỏ KHÔNG lùi; một bài 40 phút kết thúc 06:40 thì lot sau bắt đầu 06:45.
+                // (Skip this lot, the pointer never moves back; a 40-minute subject ending at 06:40 puts the
+                // next lot at 06:45.)
+                cursor = FarmSchedulePolicy.roundUpToLotStartStep(lot.getEndTime());
             }
         }
 
@@ -304,6 +301,9 @@ public class TrainingLotService {
         Subject subject = subjectRepository.findById(lot.getSubjectId())
                 .orElseThrow(() -> new RuntimeException("Subject of the lot not found"));
 
+        if (!FarmSchedulePolicy.isOnLotStartStep(newStart)) {
+            throw new IllegalArgumentException("A lot can only start at :00, :15, :30 or :45!");
+        }
         LocalTime newEnd = newStart.plusMinutes(subject.getDurationMinutes());
 
         // BR-03
@@ -324,9 +324,8 @@ public class TrainingLotService {
                            && newEnd.isAfter(other.getStartTime());
             if (overlap) {
                 throw new IllegalStateException(String.format(
-                        "The new time %s–%s overlaps your lot #%d (%s–%s)!",
-                        newStart, newEnd, other.getId(),
-                        other.getStartTime(), other.getEndTime()));
+                        "The new time %s–%s overlaps another lot (%s–%s)!",
+                        newStart, newEnd, other.getStartTime(), other.getEndTime()));
             }
         }
 

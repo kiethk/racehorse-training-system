@@ -110,7 +110,6 @@ class CourseServiceTest {
     void testCreateCourse_Success() {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Sprint 1200m course");
-        req.setDescription("Sprint training");
         req.setTargetGoal("Prepare for the autumn race");
         req.setTotalSessions(12);
 
@@ -185,6 +184,26 @@ class CourseServiceTest {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> courseService.createCourse(req, trainerUser));
         assertTrue(ex.getMessage().contains("Subject not found"));
+    }
+
+    @Test
+    @DisplayName("6b. Rejects a course that lists the same subject twice")
+    void testCreateCourse_DuplicateSubject_ThrowsIllegalArgument() {
+        CreateCourseRequest req = new CreateCourseRequest();
+        req.setName("Trial course");
+        CourseSubjectItemRequest first = new CourseSubjectItemRequest();
+        first.setSubjectId(1L);
+        CourseSubjectItemRequest again = new CourseSubjectItemRequest();
+        again.setSubjectId(1L);
+        req.setSubjects(List.of(first, again));
+
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(subjectRepository.existsById(1L)).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> courseService.createCourse(req, trainerUser));
+        assertTrue(ex.getMessage().contains("already in this course"));
+        verify(courseSubjectRepository, times(1)).save(any(CourseSubject.class));
     }
 
     @Test

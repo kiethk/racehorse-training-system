@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Button, Icon, LinkButton, Notice, PageHeader, PageSection, Panel, Pill, ScreenLayout } from '@/components/ui';
+import { BackLink, Icon, LinkButton, Notice, PageHeader, PageSection, Panel, Pill, ScreenLayout } from '@/components/ui';
 import { formatDate, formatTime } from '@/lib/display';
 import { PLAN_STATUS } from '../lib/status';
 import type { HorseTrainingPlanDetailResponse, PlanWorkoutItemResponse } from '../types';
@@ -44,12 +44,8 @@ export function EnrollmentResultSummary({
 
   return (
     <ScreenLayout variant="form">
-      <PageHeader
-        title={`Created ${plans.length} training plans`}
-        description="Each horse has its own plan for recording metrics and feedback."
-        eyebrow="Enrollment complete"
-        actions={<Button variant="primary" onClick={onDone}>Back to courses</Button>}
-      />
+      <BackLink onClick={onDone}>Back to courses</BackLink>
+      <PageHeader title={`Created ${plans.length} training plans`} eyebrow="Enrollment complete" />
 
       <PageSection title={`First workout${firstDate ? ` — ${formatDate(firstDate)}` : ''}`}>
         <Panel padded className="space-y-2">
@@ -58,7 +54,6 @@ export function EnrollmentResultSummary({
             return (
               <div key={lotId} className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <Pill tone="info" size="sm">Lot #{lotId}</Pill>
                   <strong>{formatTime(sample.startTime)} – {formatTime(sample.endTime)}</strong>
                   <span className="text-[var(--color-text-secondary)]">{sample.subjectName}</span>
                   <Pill tone="neutral" size="sm" icon="horse">{sample.lotOccupancy ?? entries.length} horses</Pill>
@@ -72,7 +67,7 @@ export function EnrollmentResultSummary({
           {split && (
             <Notice tone="info">
               The group was split across {firstSessionByLot.length} workout sessions because a lot holds a limited number of
-              horses and each groom can lead one horse per session.
+              horses or a groom can lead only one horse per session.
             </Notice>
           )}
         </Panel>

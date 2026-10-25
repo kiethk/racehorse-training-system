@@ -21,7 +21,8 @@ export function Table({
         !bare && 'rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-panel)]',
       )}
     >
-      <div className="scroll-slim overflow-x-auto">
+      {/* relative keeps absolutely positioned cell content (sr-only labels) inside the scroller, not the page. */}
+      <div className="scroll-slim relative overflow-x-auto">
         <table className={cn('w-full text-left text-sm', className)} {...props}>
           {children}
         </table>

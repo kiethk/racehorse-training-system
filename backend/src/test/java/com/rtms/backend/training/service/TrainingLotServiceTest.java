@@ -42,6 +42,16 @@ class TrainingLotServiceTest {
     }
 
     @Test
+    @DisplayName("findFirstFreeSlot: after a lot ending at 06:40 the next lot starts at the 06:45 step")
+    void testFindFirstFreeSlot_RoundsUpToQuarterHour() {
+        TrainingLot lot1 = new TrainingLot();
+        lot1.setStartTime(LocalTime.of(6, 0));
+        lot1.setEndTime(LocalTime.of(6, 40));
+
+        assertEquals(LocalTime.of(6, 45), lotService.findFirstFreeSlot(List.of(lot1), 60));
+    }
+
+    @Test
     @DisplayName("findFirstFreeSlot: finds a gap between lots (first-fit gap)")
     void testFindFirstFreeSlot_GapInMiddle() {
         TrainingLot lot1 = new TrainingLot();

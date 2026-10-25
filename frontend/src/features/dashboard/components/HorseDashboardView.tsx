@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Button,
   FilterChips,
   LinkButton,
   MetricCard,
@@ -18,16 +17,19 @@ import {
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import { displayError, formatNumber } from '@/lib/display';
-import { RATING_LEGEND, ratingDistribution } from '../lib/rating';
-import { PLAN_STATUS } from '../lib/status';
-import { trainingService } from '../services/trainingService';
-import type { TrainerDashboardHorse } from '../types';
-import { RatingPill } from './RatingPill';
-import { StatusPill } from './StatusPill';
+import { RATING_LEGEND, ratingDistribution } from '@/features/training/lib/rating';
+import { PLAN_STATUS } from '@/features/training/lib/status';
+import { RatingPill } from '@/features/training/components/RatingPill';
+import { StatusPill } from '@/features/training/components/StatusPill';
+import { dashboardService } from '../services/dashboardService';
+import type { DashboardHorse } from '../types';
+import { HealthTrendCard } from './HealthTrendCard';
+import { PerformanceTrendCard } from './PerformanceTrendCard';
 
 type HorseFilter = 'ALL' | 'ACTIVE' | 'ALERT';
 
-const columns: DataTableColumn<TrainerDashboardHorse>[] = [
+function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
+  return [
   {
     id: 'horse',
     header: 'Horse',
@@ -35,7 +37,7 @@ const columns: DataTableColumn<TrainerDashboardHorse>[] = [
     render: (horse) => (
       <div className="min-w-0">
         <Link
-          href={`/trainer/horses/${horse.horseId}`}
+          href={`${horseBasePath}/${horse.horseId}`}
           className="font-semibold hover:text-[var(--color-primary)] focus-visible:rounded-sm focus-visible:outline-2"
         >
           {horse.horseName}
@@ -115,15 +117,33 @@ const columns: DataTableColumn<TrainerDashboardHorse>[] = [
     header: <span className="sr-only">Actions</span>,
     align: 'right',
     render: (horse) => (
-      <LinkButton href={`/trainer/horses/${horse.horseId}`} size="sm" icon="trending-up">
-        View fitness
+      <LinkButton href={`${horseBasePath}/${horse.horseId}`} size="sm" icon="trending-up">
+        View details
       </LinkButton>
     ),
   },
-];
+  ];
+}
 
-export function TrainerDashboardView() {
-  const [horses, setHorses] = useState<TrainerDashboardHorse[]>([]);
+/**
+ * The dashboard of a role that looks after horses: counts, a performance chart, an optional health chart, how the
+ * team rates, and a table of the horses with their current plan. The backend scopes the data to the viewer (an owner
+ * sees own horses, a trainer the horses of the areas, the manager every horse), so this screen never selects its
+ * content by role: each actor page composes it with its own title, link target and charts.
+ */
+export function HorseDashboardView({
+  title,
+  horseBasePath,
+  showHealth = false,
+}: {
+  title: string;
+  /** Where a horse opens, without the id: for example "/owner/horses". */
+  horseBasePath: string;
+  /** Adds the health chart below the performance chart. */
+  showHealth?: boolean;
+}) {
+  const columns = useMemo(() => columnsFor(horseBasePath), [horseBasePath]);
+  const [horses, setHorses] = useState<DashboardHorse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HorseFilter>('ALL');
@@ -132,7 +152,7 @@ export function TrainerDashboardView() {
     setLoading(true);
     setError(null);
     try {
-      setHorses(await trainingService.getDashboard());
+      setHorses(await dashboardService.getHorses());
     } catch (cause) {
       setError(displayError(cause, 'Unable to load training dashboard data.'));
     } finally {
@@ -162,39 +182,35 @@ export function TrainerDashboardView() {
 
   return (
     <ScreenLayout variant="dashboard">
-      <PageHeader
-        title="Fitness and training overview"
-        actions={
-          <>
-            <LinkButton href="/trainer/plans" size="sm" icon="clipboard">Manage plans</LinkButton>
-            <Button size="sm" icon="refresh" onClick={load} loading={loading}>Refresh</Button>
-          </>
-        }
-      />
+      <PageHeader title={title} />
 
       {error && <Notice tone="error">{error}</Notice>}
 
       <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="Total horses" value={horses.length} icon="horse" />
-        <MetricCard label="In training" value={inTraining.length} icon="activity" tone="info" unit="active plans" />
+        <MetricCard label="Total horses" value={horses.length} icon="horse" className="min-h-24" />
+        <MetricCard label="In training" value={inTraining.length} icon="activity" tone="info" className="min-h-24" />
         <MetricCard
-          label="Risk alerts"
+          label="Have risk alerts"
           value={withAlerts.length}
           icon="alert-triangle"
           tone={withAlerts.length > 0 ? 'danger' : 'success'}
-          unit="horses"
+          className="min-h-24"
         />
         <MetricCard
-          label="Average performance (30 days)"
+          label="Avg performance (30 days)"
           value={averageRating != null ? `${formatNumber(averageRating, 1)}/10` : '—'}
           icon="trending-up"
           tone="success"
+          className="min-h-24"
         />
       </div>
 
+      <PerformanceTrendCard />
+      {showHealth && <HealthTrendCard />}
+
       <Panel padded className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <SectionTitle>Team performance distribution</SectionTitle>
+          <SectionTitle>Performance distribution</SectionTitle>
           <div className="flex flex-wrap items-center gap-2">
             <Pill tone="success" size="sm">{RATING_LEGEND.excellent}: {distribution.excellent}</Pill>
             <Pill tone="info" size="sm">{RATING_LEGEND.good}: {distribution.good}</Pill>
@@ -204,7 +220,7 @@ export function TrainerDashboardView() {
         </div>
         {horses.length > 0 && (
           <ProgressBar
-            label="Team performance distribution"
+            label="Performance distribution"
             max={horses.length}
             segments={[
               { value: distribution.excellent, tone: 'success', label: `Excellent: ${distribution.excellent}` },
@@ -235,8 +251,7 @@ export function TrainerDashboardView() {
           loading={loading}
           getSearchText={(horse) => `${horse.horseName} ${horse.courseName} ${horse.stallCode ?? ''}`}
           searchPlaceholder="Search horses…"
-          emptyTitle={horses.length === 0 ? 'No horses assigned yet' : 'No horses match the selected filters'}
-          emptyDescription={horses.length === 0 ? 'Horses appear here once they are assigned to a stall in your area.' : undefined}
+          emptyTitle={horses.length === 0 ? 'No horses yet' : 'No horses match the selected filters'}
         />
       </div>
     </ScreenLayout>
