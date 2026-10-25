@@ -39,6 +39,8 @@ DECLARE
         '380005252372019'   -- 12 GRESIA             (D)
     ];
     v_horses BIGINT[];
+    v_sched  BIGINT[];
+    v_hr     BIGINT[];
 
     -- Body regions (resolved via code)
     v_br_foreleg_left  BIGINT;
@@ -92,13 +94,29 @@ BEGIN
         RAISE EXCEPTION 'horse_body_regions codes missing! Run baseline seed first.';
     END IF;
 
-    -- 4. IDEMPOTENT CLEANUP: chi xoa du lieu cua script nay (marker [VET-DEMO])
-    DELETE FROM prescriptions     WHERE instructions  LIKE '[VET-DEMO]%';
-    DELETE FROM treatment_plans   WHERE instructions  LIKE '[VET-DEMO]%';
-    DELETE FROM injury_records    WHERE description   LIKE '[VET-DEMO]%';
-    DELETE FROM horse_health_metrics WHERE notes      LIKE '[VET-DEMO]%';
-    DELETE FROM health_records    WHERE notes         LIKE '[VET-DEMO]%';
-    DELETE FROM care_schedule     WHERE description   LIKE '[VET-DEMO]%';
+    -- 4. IDEMPOTENT CLEANUP: xoa du lieu cua script nay (marker [VET-DEMO]) va moi dong phat sinh tu no
+    -- (care_schedule con qua source_schedule_id, health_records / incident reports do app tao tu lich demo).
+    WITH RECURSIVE tree AS (
+        SELECT id FROM care_schedule WHERE description LIKE '[VET-DEMO]%'
+        UNION
+        SELECT c.id FROM care_schedule c JOIN tree t ON c.source_schedule_id = t.id
+    )
+    SELECT array_agg(id) INTO v_sched FROM tree;
+    v_sched := COALESCE(v_sched, ARRAY[]::BIGINT[]);
+
+    SELECT COALESCE(array_agg(id), ARRAY[]::BIGINT[]) INTO v_hr
+      FROM health_records
+     WHERE notes LIKE '[VET-DEMO]%' OR care_schedule_id = ANY (v_sched);
+
+    DELETE FROM prescriptions WHERE instructions LIKE '[VET-DEMO]%'
+        OR treatment_plan_id IN (SELECT id FROM treatment_plans
+                                  WHERE instructions LIKE '[VET-DEMO]%' OR health_record_id = ANY (v_hr));
+    DELETE FROM treatment_plans   WHERE instructions LIKE '[VET-DEMO]%' OR health_record_id = ANY (v_hr);
+    DELETE FROM injury_records    WHERE description  LIKE '[VET-DEMO]%' OR health_record_id = ANY (v_hr);
+    DELETE FROM horse_health_metrics WHERE notes     LIKE '[VET-DEMO]%';
+    DELETE FROM horse_incident_reports WHERE care_schedule_id = ANY (v_sched);
+    DELETE FROM health_records    WHERE id = ANY (v_hr);
+    DELETE FROM care_schedule     WHERE id = ANY (v_sched);
 
     -- ================================================================
     -- 5. care_schedule: 10 ROUTINE/FOLLOW_UP + 6 URGENT/FOLLOW_UP
