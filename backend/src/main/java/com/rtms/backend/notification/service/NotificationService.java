@@ -1,12 +1,15 @@
 package com.rtms.backend.notification.service;
 
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.notification.dto.NotificationCursor;
+import com.rtms.backend.notification.dto.NotificationFeedResponse;
 import com.rtms.backend.notification.dto.NotificationResponse;
 import com.rtms.backend.notification.entity.Notification;
 import com.rtms.backend.notification.repository.NotificationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -154,6 +157,78 @@ public class NotificationService {
             return notificationRepository.findByRecipientId(recipientId, pageable)
                     .map(NotificationResponse::from);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationFeedResponse getFeed(Long recipientId, String status, String cursor, int size) {
+        int pageSize = Math.min(Math.max(1, size), 50);
+        Boolean read = resolveStatus(status);
+        NotificationCursor c = (cursor == null || cursor.isBlank()) ? null : NotificationCursor.parse(cursor);
+
+        List<Notification> fetched = notificationRepository.feedBefore(
+                recipientId,
+                read,
+                c == null ? null : c.createdAt(),
+                c == null ? null : c.id(),
+                PageRequest.of(0, pageSize + 1)
+        );
+
+        return buildFeedResponse(fetched, pageSize);
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationFeedResponse getSince(Long recipientId, String afterCursor, int limit) {
+        int pageLimit = Math.min(Math.max(1, limit), 100);
+        if (afterCursor == null || afterCursor.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", "after cursor is required");
+        }
+        NotificationCursor c = NotificationCursor.parse(afterCursor);
+
+        List<Notification> fetched = notificationRepository.sinceAfter(
+                recipientId,
+                c.createdAt(),
+                c.id(),
+                PageRequest.of(0, pageLimit + 1)
+        );
+
+        boolean hasMore = fetched.size() > pageLimit;
+        List<Notification> page = hasMore ? fetched.subList(0, pageLimit) : fetched;
+        String nextCursor = page.isEmpty()
+                ? afterCursor
+                : NotificationCursor.from(page.get(page.size() - 1)).format();
+
+        return NotificationFeedResponse.of(
+                page.stream().map(NotificationResponse::from).toList(),
+                nextCursor,
+                hasMore
+        );
+    }
+
+    private NotificationFeedResponse buildFeedResponse(List<Notification> fetched, int pageSize) {
+        boolean hasMore = fetched.size() > pageSize;
+        List<Notification> page = hasMore ? fetched.subList(0, pageSize) : fetched;
+        String nextCursor = null;
+        if (hasMore) {
+            nextCursor = NotificationCursor.from(page.get(page.size() - 1)).format();
+        }
+        return NotificationFeedResponse.of(
+                page.stream().map(NotificationResponse::from).toList(),
+                nextCursor,
+                hasMore
+        );
+    }
+
+    private Boolean resolveStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        if ("UNREAD".equalsIgnoreCase(status)) {
+            return false;
+        }
+        if ("READ".equalsIgnoreCase(status)) {
+            return true;
+        }
+        throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_STATUS", "Status must be UNREAD or READ");
     }
 
     @Transactional(readOnly = true)
