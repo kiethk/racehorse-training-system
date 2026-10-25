@@ -44,7 +44,7 @@ export function getNavigationForRole(role: Role): NavSection[] {
           id: 'administration',
           label: 'Administration',
           items: [
-            { id: 'staff', label: 'Staff', icon: 'users', href: '/manager/staff' },
+            { id: 'accounts', label: 'Accounts', icon: 'users', href: '/manager/accounts' },
             { id: 'access-control', label: 'Access Control', icon: 'shield', href: '/manager/access-control' },
             { id: 'audit-log', label: 'Audit Log', icon: 'file-text', href: '/manager/audit-log' },
             { id: 'reports', label: 'Reports', icon: 'trending-up' },

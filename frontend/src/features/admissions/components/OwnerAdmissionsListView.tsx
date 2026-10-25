@@ -58,7 +58,11 @@ export function OwnerAdmissionsListView() {
       if (fromTime !== null && submitted < fromTime) return false;
       if (toTime !== null && submitted > toTime) return false;
       return true;
-    });
+    }).sort(
+      (a, b) =>
+        (new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()) ||
+        (b.admissionId - a.admissionId)
+    );
   }, [rows, applied]);
   return (
     <AdmissionListLayout

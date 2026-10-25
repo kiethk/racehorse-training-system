@@ -24,6 +24,10 @@ import java.util.Optional;
 @Repository
 public interface HorseRepository extends JpaRepository<Horse, Long> {
     List<Horse> findByOwnerId(Long ownerId);
+
+    @Query("SELECT h.ownerId, COUNT(h.id) FROM Horse h WHERE h.ownerId IS NOT NULL GROUP BY h.ownerId")
+    List<Object[]> countHorsesGroupedByOwner();
+
     List<Horse> findByCurrentStatusInOrderByNameAsc(Collection<HorseStatus> statuses);
     List<Horse> findByRegistrationNumber(String registrationNumber);
 

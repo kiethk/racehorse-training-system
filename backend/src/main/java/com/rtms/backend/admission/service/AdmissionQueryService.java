@@ -139,7 +139,12 @@ public class AdmissionQueryService {
                 .findByAdmissionIdInAndDocumentType(ids, AdmissionDocumentType.HORSE_PHOTO).stream()
                 .collect(Collectors.toMap(AdmissionDocument::getAdmissionId, d -> d,
                         (left, right) -> left.getId() <= right.getId() ? left : right));
-        return admissions.stream().map(admission -> {
+        return admissions.stream()
+                .sorted(Comparator.comparing(
+                        AdmissionApplication::getSubmittedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ).reversed().thenComparing(Comparator.comparing(AdmissionApplication::getId).reversed()))
+                .map(admission -> {
             CandidateHorseProfile candidate = candidates.get(admission.getId());
             if (candidate == null) throw new IllegalStateException("Candidate horse profile not found");
             AdmissionDocument photo = photos.get(admission.getId());

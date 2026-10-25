@@ -38,12 +38,22 @@ export function ManagerHorsesView() {
 
   const filteredHorses = useMemo(() => {
     const q = appliedSearch.trim().toLowerCase();
-    if (!q) return horses;
-    return horses.filter((h) => {
-      const matchName = h.name.toLowerCase().includes(q);
-      const matchReg = h.registrationNumber?.toLowerCase().includes(q) ?? false;
-      const matchBreed = h.breed?.toLowerCase().includes(q) ?? false;
-      return matchName || matchReg || matchBreed;
+    const list = q
+      ? horses.filter((h) => {
+          const matchName = h.name.toLowerCase().includes(q);
+          const matchReg = h.registrationNumber?.toLowerCase().includes(q) ?? false;
+          const matchBreed = h.breed?.toLowerCase().includes(q) ?? false;
+          return matchName || matchReg || matchBreed;
+        })
+      : horses;
+
+    return list.slice().sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (timeB !== timeA) {
+        return timeB - timeA;
+      }
+      return b.id - a.id;
     });
   }, [horses, appliedSearch]);
 
