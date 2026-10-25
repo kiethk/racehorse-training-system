@@ -32,12 +32,18 @@ export function SubjectForm({
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [validation, setValidation] = useState<string | null>(null);
 
+  const durationError =
+    rules && (durationMinutes < rules.minSubjectDurationMinutes || durationMinutes > rules.maxSubjectDurationMinutes)
+      ? `Must be between ${rules.minSubjectDurationMinutes} and ${rules.maxSubjectDurationMinutes} minutes.`
+      : null;
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!name.trim()) {
       setValidation('Enter a subject name.');
       return;
     }
+    if (durationError) return;
     setValidation(null);
     onSubmit({
       category,
@@ -91,13 +97,7 @@ export function SubjectForm({
             />
           </FormField>
 
-          <FormField
-            label="Estimated duration (minutes)"
-            required
-            hint={rules
-              ? `Between ${rules.minSubjectDurationMinutes} and ${rules.maxSubjectDurationMinutes} minutes. It sets the length of the lot.`
-              : 'It sets the length of the lot.'}
-          >
+          <FormField label="Estimated duration (minutes)" required error={durationError ?? undefined}>
             <Input
               type="number"
               step={5}

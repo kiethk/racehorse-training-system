@@ -90,7 +90,6 @@ public class AdmissionTrainerReviewService {
         assessment.setEstimatedMonthsToRace(request.getEstimatedMonthsToRace());
         assessment.setAssessmentDate(LocalDate.now());
         assessment.setRemarks(request.getRemarks());
-        // fitnessScore, validUntil: để NULL — ngựa đang cách ly, chỉ đánh giá định kỳ mới có
         assessmentRepository.save(assessment);
 
         admission.setTrainerFeedback(request.getRemarks());

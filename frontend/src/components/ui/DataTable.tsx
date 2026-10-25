@@ -126,7 +126,9 @@ export function DataTable<Row>({
               {toolbarExtras}
             </div>
           )}
-          <div className="overflow-x-auto">
+          {/* relative: an absolutely positioned cell child (an sr-only header) is then clipped by this scroller
+              instead of widening the whole page. */}
+          <div className="relative overflow-x-auto">
             <table aria-label={ariaLabel} aria-busy={loading} className="w-full min-w-[36rem] text-left text-sm">
               <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-muted)] text-xs font-semibold text-[var(--color-text-secondary)]">
                 <tr>

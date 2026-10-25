@@ -5,13 +5,15 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
+import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.dto.DashboardPlanRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.dto.IncidentCountRow;
+import com.rtms.backend.training.dto.PerformanceSessionRow;
+import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
-import com.rtms.backend.training.dto.TrainerDashboardHorseResponse;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
 import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -65,7 +67,8 @@ class HorsePerformanceServiceTest {
         // Bộ kiểm quyền chạy thật trên repository giả, nên các test phân quyền cũ giữ nguyên.
         // (The access check runs for real on mocked repositories, so the existing authorization tests stay valid.)
         service = new HorsePerformanceService(workoutRepository, planRepository, incidentReportRepository,
-                new HorseViewAccessService(horseRepository, planRepository, stallRepository), specialtyService);
+                new HorseViewAccessService(horseRepository, planRepository, stallRepository), specialtyService,
+                new HorseScopeService(planRepository));
     }
 
     private Horse horse(Long id, Long ownerId) {
@@ -105,6 +108,38 @@ class HorsePerformanceServiceTest {
         verify(workoutRepository).findFitnessTrend(eq(horseId), from.capture(), to.capture());
         assertEquals(LocalDate.of(1900, 1, 1), from.getValue());
         assertEquals(LocalDate.of(2999, 12, 31), to.getValue());
+    }
+
+    @Test
+    @DisplayName("Performance trend: the last 12 weeks up to today, one value per horse per week")
+    void testGetPerformanceTrend_Last12Weeks() {
+        AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+        LocalDate today = LocalDate.now();
+        LocalDate firstWeek = PerformanceTrendCalculator.weekStartOf(today).minusWeeks(11);
+        LocalDate monday = PerformanceTrendCalculator.weekStartOf(today);
+        when(planRepository.findDashboardHorses(9L)).thenReturn(List.of(
+                new DashboardHorseRow(50L, "Wind God", "Thoroughbred", "A-01")));
+        when(workoutRepository.findPerformanceSessions(List.of(50L), firstWeek, today)).thenReturn(List.of(
+                new PerformanceSessionRow(50L, monday, 8, null, null),
+                new PerformanceSessionRow(50L, monday, 6, null, null)));
+
+        PerformanceTrendResponse trend = service.getPerformanceTrend(trainer);
+
+        assertEquals(firstWeek, trend.fromDate());
+        assertEquals(today, trend.toDate());
+        assertEquals(1, trend.weeks().size());
+        assertEquals(monday, trend.weeks().get(0).weekStart());
+        assertEquals(7.0, trend.weeks().get(0).averageRating());
+    }
+
+    @Test
+    @DisplayName("A role with no horses gets an empty performance chart and no query")
+    void testGetPerformanceTrend_NoHorses() {
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        when(planRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of());
+
+        assertTrue(service.getPerformanceTrend(owner).weeks().isEmpty());
+        verify(workoutRepository, never()).findPerformanceSessions(any(), any(), any());
     }
 
     @Test
@@ -227,7 +262,7 @@ class HorsePerformanceServiceTest {
         when(planRepository.findDashboardHorses(trainerId)).thenReturn(List.of(
                 new DashboardHorseRow(50L, "Wind God", "Thoroughbred", "A-01"),
                 new DashboardHorseRow(51L, "Idle Horse", "Arabian", "A-02")));
-        when(planRepository.findDashboardPlans(trainerId)).thenReturn(List.of(
+        when(planRepository.findDashboardPlans(List.of(50L, 51L))).thenReturn(List.of(
                 new DashboardPlanRow(700L, 50L, TrainingPlanStatus.COMPLETED, today.minusDays(60), today.minusDays(30),
                         "Old course", 10, 10L),
                 new DashboardPlanRow(701L, 50L, TrainingPlanStatus.ACTIVE, today.minusDays(5), today.plusDays(20),
@@ -241,11 +276,11 @@ class HorsePerformanceServiceTest {
         HorseSpecialtyResponse noData = new HorseSpecialtyResponse(3, List.of(), null, List.of());
         when(specialtyService.getSpecialties(List.of(50L, 51L))).thenReturn(Map.of(50L, noData, 51L, noData));
 
-        List<TrainerDashboardHorseResponse> dashboard = service.getTrainerDashboard(trainer);
+        List<DashboardHorseResponse> dashboard = service.getDashboard(trainer);
 
         assertEquals(2, dashboard.size());
 
-        TrainerDashboardHorseResponse active = dashboard.get(0);
+        DashboardHorseResponse active = dashboard.get(0);
         assertEquals("Wind God", active.getHorseName());
         assertEquals("A-01", active.getStallCode());
         assertEquals("ACTIVE", active.getPlanStatus(), "The ACTIVE plan wins over the COMPLETED one");
@@ -258,7 +293,7 @@ class HorsePerformanceServiceTest {
         assertEquals(0, active.getAlertsCount());
         assertSame(noData, active.getSpecialty(), "The specialty comes from the shared specialty service");
 
-        TrainerDashboardHorseResponse idle = dashboard.get(1);
+        DashboardHorseResponse idle = dashboard.get(1);
         assertEquals("NONE", idle.getPlanStatus());
         assertEquals("No plan yet", idle.getCourseName());
         assertEquals(0.0, idle.getProgressPercent());
@@ -267,10 +302,47 @@ class HorsePerformanceServiceTest {
 
         // Cố định số truy vấn dù có bao nhiêu ngựa (a fixed number of queries no matter how many horses)
         verify(planRepository, times(1)).findDashboardHorses(trainerId);
-        verify(planRepository, times(1)).findDashboardPlans(trainerId);
+        verify(planRepository, times(1)).findDashboardPlans(List.of(50L, 51L));
         verify(workoutRepository, times(1)).findRecentCompletedWorkouts(any(), any());
         verify(incidentReportRepository, times(1)).countIncidentsByHorseIds(any(), any());
         verify(specialtyService, times(1)).getSpecialties(any());
+    }
+
+    @Test
+    @DisplayName("Scope: an owner sees own horses, a trainer the area horses, the manager every horse")
+    void testDashboardScopeFollowsTheRole() {
+        DashboardHorseRow own = new DashboardHorseRow(1L, "Own", null, null);
+        DashboardHorseRow area = new DashboardHorseRow(2L, "Area", null, "A-01");
+        DashboardHorseRow farm = new DashboardHorseRow(3L, "Farm", null, "B-01");
+        when(planRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(own));
+        when(planRepository.findDashboardHorses(9L)).thenReturn(List.of(area));
+        when(planRepository.findAllDashboardHorses()).thenReturn(List.of(own, area, farm));
+        HorseScopeService scope = new HorseScopeService(planRepository);
+
+        assertEquals(List.of(own), scope.horsesOf(new AuthenticatedUser(5L, "o@example.com", "HORSE_OWNER")));
+        assertEquals(List.of(area), scope.horsesOf(new AuthenticatedUser(9L, "t@example.com", "HEAD_TRAINER")));
+        assertEquals(List.of(1L, 2L, 3L), scope.horseIdsOf(new AuthenticatedUser(1L, "m@example.com", "CLUB_MANAGER")));
+        assertEquals(List.of(1L, 2L, 3L), scope.horseIdsOf(new AuthenticatedUser(2L, "v@example.com", "VETERINARIAN")));
+    }
+
+    @Test
+    @DisplayName("An owner dashboard is built from the owner's horses only")
+    void testGetDashboard_OwnerScope() {
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        when(planRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(
+                new DashboardHorseRow(60L, "Mine", "Arabian", null)));
+        when(planRepository.findDashboardPlans(List.of(60L))).thenReturn(List.of());
+        when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(60L)), any(LocalDate.class))).thenReturn(List.of());
+        when(incidentReportRepository.countIncidentsByHorseIds(eq(List.of(60L)), any(LocalDateTime.class)))
+                .thenReturn(List.of());
+        when(specialtyService.getSpecialties(List.of(60L))).thenReturn(Map.of());
+
+        List<DashboardHorseResponse> dashboard = service.getDashboard(owner);
+
+        assertEquals(1, dashboard.size());
+        assertEquals("Mine", dashboard.get(0).getHorseName());
+        verify(planRepository, never()).findDashboardHorses(any());
+        verify(planRepository, never()).findAllDashboardHorses();
     }
 
     @Test
@@ -279,7 +351,7 @@ class HorsePerformanceServiceTest {
         AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
         when(planRepository.findDashboardHorses(9L)).thenReturn(List.of());
 
-        assertTrue(service.getTrainerDashboard(trainer).isEmpty());
+        assertTrue(service.getDashboard(trainer).isEmpty());
         verifyNoInteractions(workoutRepository, incidentReportRepository);
         verify(planRepository, never()).findDashboardPlans(any());
     }

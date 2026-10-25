@@ -2,6 +2,11 @@ import { Button, Icon, Pill, Panel, Select, SectionTitle } from '@/components/ui
 import { formatDate } from '@/lib/display';
 import type { Course, JoinableCohortResponse } from '../../types';
 
+function waitLabel(days: number): string {
+  if (days === 0) return 'today';
+  return days === 1 ? 'in 1 day' : `in ${days} days`;
+}
+
 /** Step 1: pick the course, and optionally join the schedule of a group that is already forming. */
 export function CourseStep({
   courses,
@@ -36,7 +41,7 @@ export function CourseStep({
         </Select>
         {selected?.targetGoal && (
           <p className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
-            <Icon name="target" size={13} />
+            <Icon name="target" size={13} className="shrink-0 text-[var(--color-text-muted)]" />
             {selected.targetGoal}
           </p>
         )}
@@ -59,21 +64,20 @@ export function CourseStep({
                 key={`${cohort.cohortStatus}-${cohort.suggestedStartDate}-${cohort.trainingDays.join()}`}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-xs"
               >
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2 font-semibold text-[var(--color-text-primary)]">
-                    <span>Group “{cohort.courseName}”</span>
-                    <Pill tone={cohort.cohortStatus === 'ACTIVE' ? 'success' : 'info'} size="sm">
-                      {cohort.cohortStatus === 'ACTIVE' ? 'In training' : 'Upcoming'} · {cohort.horseCount} horses
-                    </Pill>
-                  </div>
-                  <p className="text-[var(--color-text-secondary)]">
-                    {cohort.note} · Starts {formatDate(cohort.suggestedStartDate)} (in {cohort.waitDays} days)
-                  </p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="font-semibold text-[var(--color-text-primary)]">
+                    Starts {formatDate(cohort.suggestedStartDate)}
+                  </span>
+                  <span className="text-[var(--color-text-secondary)]">
+                    {cohort.sharedSessions}/{cohort.totalSessions} sessions together · {waitLabel(cohort.waitDays)}
+                  </span>
+                  <Pill tone={cohort.cohortStatus === 'ACTIVE' ? 'success' : 'info'} size="sm">
+                    {cohort.cohortStatus === 'ACTIVE' ? 'In training' : 'Upcoming'} · {cohort.horseCount}{' '}
+                    {cohort.horseCount === 1 ? 'horse' : 'horses'}
+                  </Pill>
                   {/* Matching the schedule does not guarantee the same lot: a full lot sends extra horses to another one. */}
                   {cohort.horseCount >= cohort.lotCapacity && (
-                    <p className="text-[var(--color-warning)]">
-                      This group is at capacity ({cohort.lotCapacity} horses). Additional horses will train in another session that day.
-                    </p>
+                    <Pill tone="warning" size="sm">Lot full</Pill>
                   )}
                 </div>
                 <Button size="sm" type="button" onClick={() => onUseCohort(cohort)}>Use this group schedule</Button>

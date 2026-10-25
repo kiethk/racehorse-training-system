@@ -190,12 +190,14 @@ export async function apiGetBlob(path: string, signal?: AbortSignal): Promise<Bl
   return res.blob();
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+/** `signal` lets a caller cancel a request whose answer is no longer wanted, such as a superseded preview. */
+export async function apiPost<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await doFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) {
     throw await responseError(res);

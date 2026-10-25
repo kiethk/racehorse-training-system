@@ -24,13 +24,6 @@ export function yAt(value: number | null | undefined, min: number, max: number):
   return CHART_PADDING.top + PLOT_HEIGHT - ratio * PLOT_HEIGHT;
 }
 
-/** X position of a point in time on the axis that runs from `first` to `last` (both timestamps). */
-export function xAtTime(time: number, first: number, last: number): number {
-  if (first === last) return CHART_PADDING.left + PLOT_WIDTH / 2;
-  const ratio = Math.max(0, Math.min(1, (time - first) / (last - first)));
-  return CHART_PADDING.left + ratio * PLOT_WIDTH;
-}
-
 /** The points of one series; sessions without a value are skipped. */
 export function seriesPoints(values: Array<number | null | undefined>, min: number, max: number): Point[] {
   const points: Point[] = [];

@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   ConfirmDialog,
   EmptyState,
-  FormField,
+  IconButton,
   Input,
   ListSkeleton,
   Notice,
@@ -16,12 +16,12 @@ import {
   ScreenLayout,
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
-import { displayError, formatDate, formatTime } from '@/lib/display';
+import { displayError, formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { useTrainingRules } from '../hooks/useTrainingRules';
-import { toIsoDate } from '../lib/dateRange';
+import { shiftIsoDate, toIsoDate } from '../lib/dateRange';
 import { lotFillTone } from '../lib/status';
-import { hourMarks, stripPosition } from '../lib/timeline';
+import { clockOf, hourMarks, minutesOf, snapLotStart, stripPosition } from '../lib/timeline';
 import { trainingService } from '../services/trainingService';
 import type { TrainingLotResponse, TrainingRules } from '../types';
 import { RescheduleDialog } from './RescheduleDialog';
@@ -32,23 +32,83 @@ const STRIP_TONE = {
   success: 'border-[var(--color-success)] bg-[var(--color-success-soft)] text-[var(--color-success)]',
 } as const;
 
-/** The golden-hour window as a strip, with every lot drawn at its time. The window itself comes from the backend. */
-function TimelineStrip({ lots, rules, date }: { lots: TrainingLotResponse[]; rules: TrainingRules; date: string }) {
-  const usedMinutes = lots.reduce((sum, lot) => sum + (lot.durationMinutes || 0), 0);
+/** A lot being dragged: where the pointer started, and the start time it would get if dropped now. */
+interface DragState {
+  lotId: number;
+  pointerX: number;
+  originMinutes: number;
+  startMinutes: number;
+}
+
+function overlapsAnother(lots: TrainingLotResponse[], lotId: number, startMinutes: number, duration: number): boolean {
+  return lots.some(
+    (other) =>
+      other.lotId !== lotId &&
+      startMinutes < minutesOf(other.endTime) &&
+      startMinutes + duration > minutesOf(other.startTime),
+  );
+}
+
+/**
+ * The golden-hour window as a strip, with every lot drawn at its time. A scheduled lot can be dragged along the
+ * strip: it snaps to the quarter-hour steps, stays inside the window, and turns red over another lot (dropping it
+ * there puts it back). The Reschedule button on each card does the same from the keyboard.
+ */
+function TimelineStrip({
+  lots,
+  rules,
+  movable,
+  onMove,
+}: {
+  lots: TrainingLotResponse[];
+  rules: TrainingRules;
+  /** False for past days: their lots have already happened. */
+  movable: boolean;
+  onMove: (lot: TrainingLotResponse, newStart: string) => void;
+}) {
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
   const start = rules.goldenHoursStart;
   const end = rules.goldenHoursEnd;
+  const windowMinutes = minutesOf(end) - minutesOf(start);
+
+  function canDrag(lot: TrainingLotResponse) {
+    return movable && lot.status === 'SCHEDULED';
+  }
+
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>, lot: TrainingLotResponse) {
+    if (!canDrag(lot)) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const origin = minutesOf(lot.startTime);
+    setDrag({ lotId: lot.lotId, pointerX: event.clientX, originMinutes: origin, startMinutes: origin });
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>, lot: TrainingLotResponse) {
+    const width = stripRef.current?.clientWidth;
+    if (!drag || drag.lotId !== lot.lotId || !width) return;
+    const movedMinutes = ((event.clientX - drag.pointerX) / width) * windowMinutes;
+    const startMinutes = snapLotStart(
+      drag.originMinutes + movedMinutes, lot.durationMinutes, rules.lotStartStepMinutes, start, end,
+    );
+    if (startMinutes !== drag.startMinutes) setDrag({ ...drag, startMinutes });
+  }
+
+  function handlePointerUp(lot: TrainingLotResponse) {
+    if (!drag || drag.lotId !== lot.lotId) return;
+    setDrag(null);
+    if (drag.startMinutes === drag.originMinutes) return;
+    if (overlapsAnother(lots, lot.lotId, drag.startMinutes, lot.durationMinutes)) {
+      toast.error('That time overlaps another lot.');
+      return;
+    }
+    onMove(lot, clockOf(drag.startMinutes));
+  }
 
   return (
     <Panel padded className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span className="font-semibold text-[var(--color-text-primary)]">
-          Schedule window {formatTime(start)}–{formatTime(end)} ({formatDate(date)})
-        </span>
-        <span className="text-xs text-[var(--color-text-secondary)]">
-          Used: <strong>{usedMinutes}/{rules.goldenWindowMinutes} minutes</strong> · Available:{' '}
-          <strong>{Math.max(0, rules.goldenWindowMinutes - usedMinutes)} minutes</strong>
-        </span>
-      </div>
+      <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+        Schedule window {formatTime(start)}–{formatTime(end)}
+      </p>
 
       <div className="relative h-5 border-b border-[var(--color-border)] text-xs text-[var(--color-text-muted)]" aria-hidden="true">
         {hourMarks(start, end).map((mark) => (
@@ -62,22 +122,36 @@ function TimelineStrip({ lots, rules, date }: { lots: TrainingLotResponse[]; rul
         ))}
       </div>
 
-      <div className="relative h-16 w-full overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]">
+      <div
+        ref={stripRef}
+        className="relative h-16 w-full overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]"
+      >
         {lots.map((lot) => {
-          const { leftPercent, widthPercent } = stripPosition(lot.startTime, lot.endTime, start, end);
+          const dragging = drag?.lotId === lot.lotId;
+          const startMinutes = dragging ? drag.startMinutes : minutesOf(lot.startTime);
+          const endMinutes = startMinutes + lot.durationMinutes;
+          const clash = dragging && overlapsAnother(lots, lot.lotId, startMinutes, lot.durationMinutes);
+          const { leftPercent, widthPercent } = stripPosition(clockOf(startMinutes), clockOf(endMinutes), start, end);
+          const draggable = canDrag(lot);
           return (
             <div
               key={lot.lotId}
               style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
               className={cn(
-                'absolute bottom-1 top-1 flex flex-col justify-center overflow-hidden rounded-[var(--radius-sm)] border px-2',
-                STRIP_TONE[lotFillTone(lot.remainingSlots)],
+                'absolute bottom-1 top-1 flex touch-none select-none flex-col justify-center overflow-hidden rounded-[var(--radius-sm)] border px-2',
+                clash ? STRIP_TONE.danger : STRIP_TONE[lotFillTone(lot.remainingSlots)],
+                draggable && 'cursor-grab',
+                dragging && 'z-10 cursor-grabbing shadow-[var(--shadow-popover)]',
               )}
-              title={`Lot #${lot.lotId}: ${lot.subjectName} (${formatTime(lot.startTime)}–${formatTime(lot.endTime)}), ${lot.occupied}/${lot.maxCapacity} horses`}
+              title={draggable ? 'Drag to change the time' : undefined}
+              onPointerDown={(event) => handlePointerDown(event, lot)}
+              onPointerMove={(event) => handlePointerMove(event, lot)}
+              onPointerUp={() => handlePointerUp(lot)}
+              onPointerCancel={() => setDrag(null)}
             >
-              <span className="truncate text-xs font-semibold">#{lot.lotId} {lot.subjectName}</span>
+              <span className="truncate text-xs font-semibold">{lot.subjectName}</span>
               <span className="truncate text-xs">
-                {formatTime(lot.startTime)}–{formatTime(lot.endTime)} ({lot.occupied}/{lot.maxCapacity})
+                {clockOf(startMinutes)}–{clockOf(endMinutes)} ({lot.occupied}/{lot.maxCapacity})
               </span>
             </div>
           );
@@ -101,7 +175,7 @@ function LotCard({
       <div className="space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Lot #{lot.lotId} · {lot.subjectName}</h3>
+            <h3 className="text-base font-semibold text-[var(--color-text-primary)]">{lot.subjectName}</h3>
             <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
               <strong>{formatTime(lot.startTime)} – {formatTime(lot.endTime)}</strong> ({lot.durationMinutes} min)
             </p>
@@ -163,13 +237,29 @@ export function LotTimeline() {
   }, [load]);
 
   const sortedLots = useMemo(() => [...lots].sort((a, b) => a.startTime.localeCompare(b.startTime)), [lots]);
+  const today = toIsoDate(new Date());
+
+  /** Drop on the timeline: the lot is shown at its new time at once, and put back if the backend refuses. */
+  async function moveLot(lot: TrainingLotResponse, newStart: string) {
+    const newEnd = clockOf(minutesOf(newStart) + lot.durationMinutes);
+    setLots((current) =>
+      current.map((l) => (l.lotId === lot.lotId ? { ...l, startTime: `${newStart}:00`, endTime: `${newEnd}:00` } : l)),
+    );
+    try {
+      await trainingService.rescheduleLot(lot.lotId, { newStartTime: `${newStart}:00` });
+      toast.success(`${lot.subjectName} moved to ${newStart}.`);
+    } catch (cause) {
+      toast.error(displayError(cause, 'Unable to move this lot.'));
+    }
+    await load();
+  }
 
   async function confirmCancel() {
     if (!cancelTarget) return;
     setCancelling(true);
     try {
       await trainingService.cancelLot(cancelTarget.lotId);
-      toast.success(`Lot #${cancelTarget.lotId} cancelled.`);
+      toast.success(`${cancelTarget.subjectName} cancelled.`);
       setCancelTarget(null);
       await load();
     } catch (cause) {
@@ -183,18 +273,18 @@ export function LotTimeline() {
     <ScreenLayout variant="list">
       <PageHeader
         title="Daily training schedule"
-        description={
-          rules
-            ? `View training lots between ${formatTime(rules.goldenHoursStart)} and ${formatTime(rules.goldenHoursEnd)} and identify available time slots.`
-            : 'View the training lots of a day and identify available time slots.'
-        }
         actions={
-          <>
-            <FormField label="Date" className="w-40">
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </FormField>
-            <Button icon="refresh" onClick={load} loading={loading} className="self-end">Refresh</Button>
-          </>
+          <div className="flex items-center gap-1">
+            <IconButton icon="chevron-left" label="Previous day" onClick={() => setDate((d) => shiftIsoDate(d, -1))} />
+            <Input
+              type="date"
+              aria-label="Date"
+              className="w-40"
+              value={date}
+              onChange={(e) => e.target.value && setDate(e.target.value)}
+            />
+            <IconButton icon="chevron-right" label="Next day" onClick={() => setDate((d) => shiftIsoDate(d, 1))} />
+          </div>
         }
       />
 
@@ -211,7 +301,7 @@ export function LotTimeline() {
         <Panel padded><ListSkeleton rows={4} /></Panel>
       ) : (
         <>
-          {rules && <TimelineStrip lots={sortedLots} rules={rules} date={date} />}
+          {rules && <TimelineStrip lots={sortedLots} rules={rules} movable={date >= today} onMove={moveLot} />}
 
           <PageSection title={`Lots for this day (${sortedLots.length})`}>
             {sortedLots.length === 0 ? (
@@ -253,7 +343,7 @@ export function LotTimeline() {
 
       <ConfirmDialog
         open={cancelTarget !== null}
-        title={`Cancel lot #${cancelTarget?.lotId} (${cancelTarget?.subjectName})?`}
+        title={`Cancel ${cancelTarget?.subjectName}?`}
         description={
           <>
             All <strong>{cancelTarget?.occupied} horse sessions</strong> in this lot will also be cancelled. The{' '}

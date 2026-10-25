@@ -46,8 +46,6 @@ public class CreateHorseTrainingPlanRequest {
      */
     private List<TrainingDay> trainingDays;
 
-    private String notes;
-
     public List<HorseEnrollmentRequest> getHorses() { return horses; }
     public void setHorses(List<HorseEnrollmentRequest> horses) { this.horses = horses; }
 
@@ -59,7 +57,4 @@ public class CreateHorseTrainingPlanRequest {
 
     public List<TrainingDay> getTrainingDays() { return trainingDays; }
     public void setTrainingDays(List<TrainingDay> trainingDays) { this.trainingDays = trainingDays; }
-
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
 }

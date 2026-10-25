@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHART_PADDING, PLOT_HEIGHT, PLOT_WIDTH, labelStride, linePath, seriesPoints, xAt, xAtTime, yAt } from '../lib/chartGeometry.ts';
+import { CHART_PADDING, PLOT_HEIGHT, PLOT_WIDTH, labelStride, linePath, seriesPoints, xAt, yAt } from '../lib/chartGeometry.ts';
 
 describe('chart geometry', () => {
   it('spreads points evenly from the left to the right edge of the plot', () => {
@@ -29,12 +29,6 @@ describe('chart geometry', () => {
     assert.equal(linePath([]), '');
     assert.equal(linePath([[10, 20], [30, 40]]), 'M 10 20 L 30 40');
     assert.equal(linePath([[10, 20]]), 'M 10 20 L 10.1 20');
-  });
-
-  it('places a date on the time axis and clamps it', () => {
-    assert.equal(xAtTime(0, 0, 100), CHART_PADDING.left);
-    assert.equal(xAtTime(500, 0, 100), CHART_PADDING.left + PLOT_WIDTH);
-    assert.equal(xAtTime(5, 5, 5), CHART_PADDING.left + PLOT_WIDTH / 2);
   });
 
   it('thins out date labels only when there are many sessions', () => {

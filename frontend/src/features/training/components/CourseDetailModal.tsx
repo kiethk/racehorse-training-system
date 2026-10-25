@@ -23,15 +23,12 @@ export function CourseDetailModal({ detail, onClose }: { detail: CourseDetailRes
       {detail && (
         <div className="space-y-4">
           {detail.course.targetGoal && (
-            <p className="text-sm font-medium text-[var(--color-primary)]">Goal: {detail.course.targetGoal}</p>
+            <p className="text-sm text-[var(--color-text-secondary)]">Goal: {detail.course.targetGoal}</p>
           )}
           <div>
-            <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
-              Subject rotation ({detail.subjects.length} subjects)
+            <h3 className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">
+              Subjects ({detail.subjects.length}), repeated in order up to {detail.course.totalSessions} sessions
             </h3>
-            <p className="mb-2 mt-0.5 text-xs text-[var(--color-text-secondary)]">
-              Subjects repeat in this order until the course reaches {detail.course.totalSessions} sessions.
-            </p>
             <ol className="space-y-1.5">
               {detail.subjects.map((subject) => (
                 <li

@@ -15,6 +15,8 @@ public interface CourseSubjectRepository extends JpaRepository<CourseSubject, Lo
 
     long countByCourseId(Long courseId);
 
+    boolean existsByCourseIdAndSubjectId(Long courseId, Long subjectId);
+
     /**
      * Các bài tập của khóa theo đúng thứ tự (một câu JOIN thay cho findById từng bài).
      * (A course subjects in order — one JOIN instead of one findById per subject.)

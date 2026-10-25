@@ -124,7 +124,7 @@ class UrgentCareCompletionTest {
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         assertEquals("Urgent veterinary care pending", horse.getTrainingDecisionReason());
         assertFalse(horse.canTrain());
-        verify(workoutService).cancelFutureTrainingForHorse(eq(10L), anyString());
+        verify(workoutService).cancelFutureTrainingForHorse(10L);
     }
 
     @Test
@@ -164,7 +164,7 @@ class UrgentCareCompletionTest {
         assertTrue(incident.getHandlerNote().startsWith("Diagnosis: "));
         assertTrue(incident.getHandlerNote().endsWith("Training: allowed"));
         verify(healthRecordRepository).save(any(HealthRecord.class));
-        verify(workoutService, never()).cancelFutureTrainingForHorse(anyLong(), anyString());
+        verify(workoutService, never()).cancelFutureTrainingForHorse(anyLong());
     }
 
     @Test
@@ -390,7 +390,7 @@ class UrgentCareCompletionTest {
 
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         assertEquals("Walk only for 5 days", horse.getTrainingDecisionReason());
-        verify(workoutService).cancelFutureTrainingForHorse(eq(10L), contains("Walk only for 5 days"));
+        verify(workoutService).cancelFutureTrainingForHorse(10L);
 
         ArgumentCaptor<CareSchedule> followUp = ArgumentCaptor.forClass(CareSchedule.class);
         verify(careScheduleRepository).saveAndFlush(followUp.capture());

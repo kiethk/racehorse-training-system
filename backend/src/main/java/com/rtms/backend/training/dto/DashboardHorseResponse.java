@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TrainerDashboardHorseResponse {
+public class DashboardHorseResponse {
     private Long horseId;
     private String horseName;
     private String breed;
@@ -23,7 +23,7 @@ public class TrainerDashboardHorseResponse {
     private LocalDate endDate;
     private HorseSpecialtyResponse specialty;
 
-    public TrainerDashboardHorseResponse() {
+    public DashboardHorseResponse() {
     }
 
     public Long getHorseId() {

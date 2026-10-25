@@ -14,7 +14,9 @@ import com.rtms.backend.training.repository.SubjectRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class CourseService {
@@ -84,7 +86,6 @@ public class CourseService {
 
         Course course = new Course();
         course.setName(request.getName());
-        course.setDescription(request.getDescription());
         course.setTargetGoal(request.getTargetGoal());
         course.setTotalSessions(request.getTotalSessions());
         course.setTrainerId(trainerId);
@@ -107,7 +108,13 @@ public class CourseService {
         }
 
         int defaultIndex = 1;
+        Set<Long> added = new HashSet<>();
         for (CourseSubjectItemRequest item : items) {
+            // Khóa xoay vòng qua danh sách bài, nên mỗi bài chỉ có một lần.
+            // (The course rotates through the subject list, so each subject appears once.)
+            if (!added.add(item.getSubjectId())) {
+                throw new IllegalArgumentException("Subject #" + item.getSubjectId() + " is already in this course!");
+            }
             // Kiểm tra bài tập có tồn tại trong ngân hàng không (check the subject exists in the bank)
             if (!subjectRepository.existsById(item.getSubjectId())) {
                 throw new IllegalArgumentException("Subject not found with id: " + item.getSubjectId());
@@ -138,6 +145,9 @@ public class CourseService {
 
         Subject subject = subjectRepository.findById(request.getSubjectId())
                 .orElseThrow(() -> new IllegalArgumentException("Subject not found with id: " + request.getSubjectId()));
+        if (courseSubjectRepository.existsByCourseIdAndSubjectId(courseId, subject.getId())) {
+            throw new IllegalArgumentException("Subject '" + subject.getName() + "' is already in this course!");
+        }
 
         courseRepository.findById(courseId).ifPresent(course -> {
             if (course.getTrainerId() != null && subject.getTrainerId() != null

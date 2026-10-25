@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  BackLink,
   Button,
   EmptyState,
   LinkButton,
@@ -57,12 +58,9 @@ function WorkoutRow({
           <span>Date: <strong>{formatDate(workout.lotDate)}</strong></span>
           <span>Time: <strong>{formatTime(workout.startTime)} – {formatTime(workout.endTime)}</strong></span>
           {/* The lot is shared with other horses, while the groom belongs to THIS horse only, so they are labelled apart. */}
-          <span>
-            Lot #{workout.lotId}
-            {workout.lotOccupancy != null && workout.lotOccupancy > 1 && (
-              <span className="text-[var(--color-text-muted)]"> ({workout.lotOccupancy - 1} other horses)</span>
-            )}
-          </span>
+          {workout.lotOccupancy != null && workout.lotOccupancy > 1 && (
+            <span>With {workout.lotOccupancy - 1} other {workout.lotOccupancy === 2 ? 'horse' : 'horses'}</span>
+          )}
           {/* A ternary and not &&: an unassigned groom must stay visible, because that is what needs attention. */}
           {workout.assignedGroomId ? (
             <span>Groom: <strong>{groomName ?? `#${workout.assignedGroomId}`}</strong></span>
@@ -202,6 +200,7 @@ export function PlanDetail({ planId }: { planId: number }) {
 
   return (
     <ScreenLayout variant="detail">
+      <BackLink href="/trainer/plans">Back to plans</BackLink>
       <PageHeader
         title={horseName}
         description={
@@ -212,12 +211,7 @@ export function PlanDetail({ planId }: { planId: number }) {
           </>
         }
         breadcrumbs={[{ label: 'Training plans', href: '/trainer/plans' }, { label: horseName }]}
-        actions={
-          <>
-            <Pill tone={PLAN_STATUS[plan.status].tone}>{PLAN_STATUS[plan.status].label}</Pill>
-            <LinkButton href="/trainer/plans" variant="secondary" size="sm" icon="arrow-left">Back to plans</LinkButton>
-          </>
-        }
+        actions={<Pill tone={PLAN_STATUS[plan.status].tone}>{PLAN_STATUS[plan.status].label}</Pill>}
       />
 
       <Panel padded className="space-y-2">

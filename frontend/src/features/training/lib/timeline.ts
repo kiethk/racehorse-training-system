@@ -4,6 +4,28 @@ export function minutesOf(time: string): number {
   return hours * 60 + minutes;
 }
 
+/** "HH:mm" for a number of minutes since midnight. */
+export function clockOf(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+/** Every start time, on the step, at which a lot of `duration` minutes still ends inside the window. */
+export function lotStartOptions(windowStart: string, windowEnd: string, duration: number, step: number): string[] {
+  const options: string[] = [];
+  for (let minute = minutesOf(windowStart); minute + duration <= minutesOf(windowEnd); minute += step) {
+    options.push(clockOf(minute));
+  }
+  return options;
+}
+
+/** The start nearest to `minutes` on the step, kept so that the whole lot stays inside the window. */
+export function snapLotStart(minutes: number, duration: number, step: number, windowStart: string, windowEnd: string): number {
+  const from = minutesOf(windowStart);
+  const latest = minutesOf(windowEnd) - duration;
+  const snapped = from + Math.round((minutes - from) / step) * step;
+  return Math.min(Math.max(snapped, from), latest);
+}
+
 export interface StripPosition {
   leftPercent: number;
   widthPercent: number;

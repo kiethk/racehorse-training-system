@@ -420,7 +420,7 @@ public class TrainingWorkoutService {
      * @return số buổi tập đã hủy (number of workouts cancelled)
      */
     @Transactional
-    public int cancelFutureTrainingForHorse(Long horseId, String reason) {
+    public int cancelFutureTrainingForHorse(Long horseId) {
         List<TrainingWorkout> future =
                 workoutRepository.findFutureScheduledByHorse(horseId, LocalDate.now());
 
@@ -435,19 +435,14 @@ public class TrainingWorkoutService {
                 .collect(Collectors.toCollection(HashSet::new));
         touchedLotIds.forEach(lotService::cancelLotIfEmpty);
 
-        cancelRunningPlans(horseId, reason);
+        cancelRunningPlans(horseId);
         return future.size();
     }
 
-    private void cancelRunningPlans(Long horseId, String reason) {
+    private void cancelRunningPlans(Long horseId) {
         List<HorseTrainingPlan> plans = planRepository.findByHorseIdAndStatusInOrderByEndDateDesc(
                 horseId, List.of(TrainingPlanStatus.ACTIVE, TrainingPlanStatus.UPCOMING));
-        String suffix = "[Auto-cancelled] " + (reason != null ? reason : "Horse is blocked from training");
-
-        for (HorseTrainingPlan plan : plans) {
-            plan.setStatus(TrainingPlanStatus.CANCELLED);
-            plan.setNotes(plan.getNotes() == null ? suffix : plan.getNotes() + " | " + suffix);
-        }
+        plans.forEach(plan -> plan.setStatus(TrainingPlanStatus.CANCELLED));
         planRepository.saveAll(plans);
     }
 

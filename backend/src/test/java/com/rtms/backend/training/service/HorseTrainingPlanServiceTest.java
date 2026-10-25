@@ -1,5 +1,6 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -10,12 +11,17 @@ import com.rtms.backend.training.dto.HorseTrainingPlanDetailResponse;
 import com.rtms.backend.training.dto.JoinableCohortResponse;
 import com.rtms.backend.training.dto.JoinableCohortRow;
 import com.rtms.backend.training.dto.PlanNamesRow;
+import com.rtms.backend.training.dto.PlanPreviewRequest;
+import com.rtms.backend.training.dto.PlanPreviewResponse;
 import com.rtms.backend.training.dto.PlanSummaryResponse;
 import com.rtms.backend.training.dto.PlanWorkoutItemResponse;
+import com.rtms.backend.training.dto.RunningPlanRow;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.HorseTrainingPlan;
 import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.enums.PlanAvailability;
 import com.rtms.backend.training.enums.TrainingDay;
+import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
 import com.rtms.backend.training.repository.CourseRepository;
 import com.rtms.backend.training.repository.CourseSubjectRepository;
@@ -27,9 +33,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -70,6 +79,9 @@ class HorseTrainingPlanServiceTest {
 
     private final AuthenticatedUser trainerUser = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
 
+    /** A Monday in the future: start dates in the past are rejected, so fixed calendar dates would go stale. */
+    private static final LocalDate NEXT_MONDAY = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+
     @BeforeEach
     void setUp() {
         planService = new HorseTrainingPlanService(
@@ -91,6 +103,10 @@ class HorseTrainingPlanServiceTest {
         horse.setId(id);
         horse.setName(name);
         return horse;
+    }
+
+    private RunningPlanRow runningPlan(Long planId, Long horseId, LocalDate start, LocalDate end) {
+        return new RunningPlanRow(planId, horseId, "Course " + planId, start, end, TrainingPlanStatus.ACTIVE);
     }
 
     private Subject subject(Long id, String name) {
@@ -143,13 +159,14 @@ class HorseTrainingPlanServiceTest {
     @Test
     @DisplayName("1. Creates plans for a group of 2 horses and hands the schedule to the workout service")
     void testCreatePlan_Success() {
-        LocalDate startDate = LocalDate.of(2026, 10, 5); // Monday
+        LocalDate startDate = LocalDate.now();
+        LocalDate secondSession = startDate.plusDays(2);
         Subject warmUp = subject(50L, "Warm-up 30 min");
         stubCourse(100L, 2, warmUp);
         stubHorses(List.of(horse(1L, "White Dragon"), horse(2L, "Red Hare")),
                 new HorseStallInfo(1L, "A1", 4L, "A", 9L),
                 new HorseStallInfo(2L, "A2", 4L, "A", 9L));
-        when(planRepository.findOverlappingPlans(any(), any(), any(), any())).thenReturn(Collections.emptyList());
+        when(planRepository.findRunningPlans(any(), any())).thenReturn(Collections.emptyList());
         when(planRepository.saveAllAndFlush(anyList())).thenAnswer(inv -> {
             List<HorseTrainingPlan> plans = inv.getArgument(0);
             plans.forEach(p -> p.setId(p.getHorseId() + 1000L));
@@ -162,16 +179,18 @@ class HorseTrainingPlanServiceTest {
             return workouts;
         });
 
-        List<HorseTrainingPlanDetailResponse> responses =
-                planService.createPlan(request(100L, startDate, 1L, 2L), trainerUser);
+        CreateHorseTrainingPlanRequest request = request(100L, startDate, 1L, 2L);
+        request.setTrainingDays(List.of(trainingDayOf(startDate), trainingDayOf(secondSession)));
+
+        List<HorseTrainingPlanDetailResponse> responses = planService.createPlan(request, trainerUser);
 
         assertEquals(2, responses.size(), "One response per horse");
         assertEquals(1L, responses.get(0).getPlan().getHorseId());
         assertEquals(2L, responses.get(1).getPlan().getHorseId());
         assertEquals(TrainingPlanStatus.ACTIVE, responses.get(0).getPlan().getStatus(),
                 "A plan that starts today or earlier is ACTIVE");
-        // Hai buổi T2 + T4: buổi cuối rơi vào 2026-10-07 (two sessions Mon + Wed: the last one is 2026-10-07)
-        assertEquals(LocalDate.of(2026, 10, 7), responses.get(0).getPlan().getEndDate());
+        // Hai buổi, hôm nay và hai ngày sau (two sessions, today and two days later)
+        assertEquals(secondSession, responses.get(0).getPlan().getEndDate());
         assertEquals(4L, responses.get(0).getPlan().getGroomId(), "Groom is taken from the stall");
 
         ArgumentCaptor<TrainingWorkoutService.PlanSchedule> captor =
@@ -190,7 +209,7 @@ class HorseTrainingPlanServiceTest {
         LocalDate future = LocalDate.now().plusDays(30);
         stubCourse(100L, 1, subject(50L, "Warm-up"));
         stubHorses(List.of(horse(1L, "White Dragon")), new HorseStallInfo(1L, "A1", 4L, "A", 9L));
-        when(planRepository.findOverlappingPlans(any(), any(), any(), any())).thenReturn(Collections.emptyList());
+        when(planRepository.findRunningPlans(any(), any())).thenReturn(Collections.emptyList());
         when(planRepository.saveAllAndFlush(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(workoutService.createWorkouts(any(), anyList(), anyMap())).thenReturn(new LinkedHashMap<>());
 
@@ -207,7 +226,7 @@ class HorseTrainingPlanServiceTest {
     void testCreatePlan_GroomOverride() {
         stubCourse(100L, 1, subject(50L, "Warm-up"));
         stubHorses(List.of(horse(1L, "White Dragon")), new HorseStallInfo(1L, "A1", 4L, "A", 9L));
-        when(planRepository.findOverlappingPlans(any(), any(), any(), any())).thenReturn(Collections.emptyList());
+        when(planRepository.findRunningPlans(any(), any())).thenReturn(Collections.emptyList());
         when(planRepository.saveAllAndFlush(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(workoutService.createWorkouts(any(), anyList(), anyMap())).thenReturn(new LinkedHashMap<>());
 
@@ -336,23 +355,67 @@ class HorseTrainingPlanServiceTest {
     }
 
     @Test
-    @DisplayName("8. BR-01: blocks a plan overlapping a running plan (ACTIVE/UPCOMING)")
-    void testCreatePlan_OverlappingPlan_ThrowsIllegalStateException() {
+    @DisplayName("8. BR-01: blocks a plan overlapping a running plan with 409 PLAN_SCHEDULE_CONFLICT")
+    void testCreatePlan_OverlappingPlan_ThrowsConflict() {
         stubCourse(10L, 2, subject(1L, "Warm-up"));
         stubHorses(List.of(horse(1L, "Horse One")), new HorseStallInfo(1L, "A1", 4L, "A", 9L));
+        when(planRepository.findRunningPlans(any(), any())).thenReturn(List.of(
+                runningPlan(30L, 1L, NEXT_MONDAY.minusDays(4), NEXT_MONDAY.plusDays(10))));
 
-        // A plan running from 2026-10-01 to 2026-10-15 overlaps 05/10 - 07/10
-        HorseTrainingPlan existing = new HorseTrainingPlan();
-        existing.setHorseId(1L);
-        existing.setStartDate(LocalDate.of(2026, 10, 1));
-        existing.setEndDate(LocalDate.of(2026, 10, 15));
-        existing.setStatus(TrainingPlanStatus.ACTIVE);
-        when(planRepository.findOverlappingPlans(any(), any(), any(), any())).thenReturn(List.of(existing));
-
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> planService.createPlan(request(10L, LocalDate.of(2026, 10, 5), 1L), trainerUser));
-        assertTrue(ex.getMessage().contains("Schedule conflict"));
+        ApiException ex = assertThrows(ApiException.class,
+                () -> planService.createPlan(request(10L, NEXT_MONDAY, 1L), trainerUser));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("PLAN_SCHEDULE_CONFLICT", ex.getErrorCode());
+        assertTrue(ex.getMessage().contains("Course 30"));
         verify(planRepository, never()).saveAllAndFlush(anyList());
+    }
+
+    @Test
+    @DisplayName("8b. BR-01: reports EVERY overlapped plan of EVERY horse in one message, not only the first")
+    void testCreatePlan_OverlappingPlans_AllReported() {
+        stubCourse(10L, 6, subject(1L, "Warm-up"));   // Mon/Wed x 6 = three weeks
+        stubHorses(List.of(horse(1L, "Horse One"), horse(2L, "Horse Two")),
+                new HorseStallInfo(1L, "A1", 4L, "A", 9L),
+                new HorseStallInfo(2L, "A2", 5L, "A", 9L));
+        when(planRepository.findRunningPlans(any(), any())).thenReturn(List.of(
+                runningPlan(30L, 1L, NEXT_MONDAY, NEXT_MONDAY.plusDays(3)),
+                runningPlan(31L, 1L, NEXT_MONDAY.plusDays(14), NEXT_MONDAY.plusDays(20)),
+                runningPlan(32L, 2L, NEXT_MONDAY.plusDays(7), NEXT_MONDAY.plusDays(9)),
+                // ends before the new plan starts, so it is not a conflict
+                runningPlan(33L, 2L, NEXT_MONDAY.minusDays(1), NEXT_MONDAY.minusDays(1))));
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> planService.createPlan(request(10L, NEXT_MONDAY, 1L, 2L), trainerUser));
+        assertTrue(ex.getMessage().contains("Course 30"));
+        assertTrue(ex.getMessage().contains("Course 31"));
+        assertTrue(ex.getMessage().contains("Course 32"));
+        assertFalse(ex.getMessage().contains("Course 33"));
+    }
+
+    @Test
+    @DisplayName("8c. A start date in the past is rejected before anything is loaded")
+    void testCreatePlan_PastStartDate_ThrowsIllegalArgument() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> planService.createPlan(request(10L, LocalDate.now().minusDays(1), 1L), trainerUser));
+        assertTrue(ex.getMessage().contains("past"));
+        verifyNoInteractions(courseRepository, planRepository);
+    }
+
+    @Test
+    @DisplayName("8d. A start date that is not a training day is moved to the first training day")
+    void testCreatePlan_StartMovedToFirstTrainingDay() {
+        stubCourse(100L, 1, subject(50L, "Warm-up"));
+        stubHorses(List.of(horse(1L, "White Dragon")), new HorseStallInfo(1L, "A1", 4L, "A", 9L));
+        when(planRepository.findRunningPlans(any(), any())).thenReturn(Collections.emptyList());
+        when(planRepository.saveAllAndFlush(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(workoutService.createWorkouts(any(), anyList(), anyMap())).thenReturn(new LinkedHashMap<>());
+
+        // Tuesday chosen for a Mon/Wed course: the first session is Wednesday
+        List<HorseTrainingPlanDetailResponse> responses =
+                planService.createPlan(request(100L, NEXT_MONDAY.plusDays(1), 1L), trainerUser);
+
+        assertEquals(NEXT_MONDAY.plusDays(2), responses.get(0).getPlan().getStartDate());
+        assertEquals(NEXT_MONDAY.plusDays(2), responses.get(0).getPlan().getEndDate());
     }
 
     // =================================================================
@@ -517,7 +580,7 @@ class HorseTrainingPlanServiceTest {
         assertEquals(12, cohorts.get(0).getSharedSessions());
         assertEquals(4, cohorts.get(0).getHorseCount());
         assertEquals(start, cohorts.get(0).getSuggestedStartDate());
-        assertEquals("Train together for all 12/12 sessions", cohorts.get(0).getNote());
+        assertEquals(12, cohorts.get(0).getTotalSessions());
     }
 
     @Test
@@ -541,12 +604,83 @@ class HorseTrainingPlanServiceTest {
         assertTrue(planService.getJoinableCohorts(5L, trainerUser).isEmpty());
     }
 
-    @Test
-    @DisplayName("calculateEndDate: last workout date of a Mon/Wed course of 2 sessions")
-    void testCalculateEndDate() {
-        LocalDate end = HorseTrainingPlanService.calculateEndDate(
-                LocalDate.of(2026, 10, 5), Set.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY), 2);
+    // =================================================================
+    // previewPlan
+    // =================================================================
 
-        assertEquals(LocalDate.of(2026, 10, 7), end);
+    private PlanPreviewRequest previewRequest(LocalDate startDate, Long... selectedHorseIds) {
+        PlanPreviewRequest request = new PlanPreviewRequest();
+        request.setCourseId(10L);
+        request.setStartDate(startDate);
+        request.setTrainingDays(List.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY));
+        request.setSelectedHorseIds(List.of(selectedHorseIds));
+        return request;
+    }
+
+    private void stubPreviewHorses(List<Horse> horses, HorseStallInfo... stalls) {
+        when(courseRepository.findById(10L)).thenReturn(Optional.of(course(10L, 4)));   // Mon/Wed x 4 = two weeks
+        when(planRepository.findEnrollableHorses(9L)).thenReturn(horses);
+        when(planRepository.findStallInfoByHorseIds(any())).thenReturn(List.of(stalls));
+    }
+
+    @Test
+    @DisplayName("Preview: classifies each horse as available, busy, blocked or without groom")
+    void testPreviewPlan_ClassifiesHorses() {
+        Horse free = horse(1L, "Free");
+        Horse busy = horse(2L, "Busy");
+        Horse blocked = horse(3L, "Blocked");
+        blocked.setTrainingDecision(TrainingDecision.BLOCKED);
+        Horse groomless = horse(4L, "Groomless");
+        stubPreviewHorses(List.of(free, busy, blocked, groomless),
+                new HorseStallInfo(1L, "A1", 4L, "A", 9L),
+                new HorseStallInfo(2L, "A2", 5L, "A", 9L),
+                new HorseStallInfo(3L, "A3", 6L, "A", 9L),
+                new HorseStallInfo(4L, "A4", null, "A", 9L));
+        when(planRepository.findRunningPlans(any(), any())).thenReturn(List.of(
+                runningPlan(30L, 2L, NEXT_MONDAY.minusDays(3), NEXT_MONDAY.plusDays(4))));
+        when(trainingDecisionService.describeRest(blocked)).thenReturn("Tendon strain (no follow-up exam scheduled)");
+
+        PlanPreviewResponse preview = planService.previewPlan(previewRequest(NEXT_MONDAY), trainerUser);
+
+        assertEquals(NEXT_MONDAY, preview.firstSessionDate());
+        assertEquals(NEXT_MONDAY.plusDays(9), preview.endDate(), "Mon, Wed, Mon, Wed");
+        assertEquals(PlanAvailability.AVAILABLE, preview.horses().get(0).availability());
+        assertEquals(PlanAvailability.BUSY, preview.horses().get(1).availability());
+        assertEquals(30L, preview.horses().get(1).conflicts().get(0).planId());
+        assertEquals(NEXT_MONDAY.plusDays(7), preview.horses().get(1).earliestStart(),
+                "The first Monday after the busy plan ends");
+        assertEquals(PlanAvailability.BLOCKED, preview.horses().get(2).availability());
+        assertTrue(preview.horses().get(2).reason().contains("Tendon strain"));
+        assertEquals(PlanAvailability.NO_GROOM, preview.horses().get(3).availability());
+        assertNull(preview.groupEarliestStart(), "No horse is selected");
+    }
+
+    @Test
+    @DisplayName("Preview: the group date skips a gap that is too short for the course")
+    void testPreviewPlan_GroupEarliestStartSkipsShortGap() {
+        stubPreviewHorses(List.of(horse(1L, "One"), horse(2L, "Two")),
+                new HorseStallInfo(1L, "A1", 4L, "A", 9L),
+                new HorseStallInfo(2L, "A2", 5L, "A", 9L));
+        // Horse 1 is busy this week; horse 2 is busy from the Wednesday of the following week. The free Monday in
+        // between leaves room for one session only, while the course needs four.
+        when(planRepository.findRunningPlans(any(), any())).thenReturn(List.of(
+                runningPlan(30L, 1L, NEXT_MONDAY, NEXT_MONDAY.plusDays(4)),
+                runningPlan(31L, 2L, NEXT_MONDAY.plusDays(9), NEXT_MONDAY.plusDays(18))));
+
+        PlanPreviewResponse preview = planService.previewPlan(previewRequest(NEXT_MONDAY, 1L, 2L), trainerUser);
+
+        assertEquals(NEXT_MONDAY.plusDays(21), preview.groupEarliestStart());
+    }
+
+    @Test
+    @DisplayName("Preview: rejects a start date in the past like createPlan does")
+    void testPreviewPlan_PastStartDate_ThrowsIllegalArgument() {
+        assertThrows(IllegalArgumentException.class,
+                () -> planService.previewPlan(previewRequest(LocalDate.now().minusDays(1)), trainerUser));
+        verifyNoInteractions(planRepository);
+    }
+
+    private static TrainingDay trainingDayOf(LocalDate date) {
+        return TrainingDay.valueOf(date.getDayOfWeek().name());
     }
 }

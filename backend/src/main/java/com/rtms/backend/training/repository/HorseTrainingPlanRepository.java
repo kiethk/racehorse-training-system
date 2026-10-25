@@ -1,11 +1,13 @@
 package com.rtms.backend.training.repository;
 
+import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.dto.DashboardPlanRow;
 import com.rtms.backend.training.dto.HorseStallInfo;
 import com.rtms.backend.training.dto.JoinableCohortRow;
 import com.rtms.backend.training.dto.PlanNamesRow;
 import com.rtms.backend.training.dto.PlanSummaryResponse;
+import com.rtms.backend.training.dto.RunningPlanRow;
 import com.rtms.backend.training.entity.HorseTrainingPlan;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -97,21 +99,42 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
     List<HorseStallInfo> findStallInfoByHorseIds(@Param("horseIds") Collection<Long> horseIds);
 
     /**
-     * BR-01: các kế hoạch đang chạy của nhiều ngựa có khoảng ngày chồng lên [startDate, endDate].
-     * (BR-01: running plans of many horses whose date range overlaps [startDate, endDate].)
+     * BR-01: kế hoạch đang chạy hoặc sắp chạy của nhiều ngựa mà chưa kết thúc trước {@code fromDate}, kèm tên khóa.
+     * Dùng chung cho lúc tạo (kiểm trùng) và lúc xem trước (kiểm trùng + tìm ngày rảnh sớm nhất), nên lấy HẾT các kế
+     * hoạch từ mốc đó trở đi chứ không chỉ những cái chồng lên một khoảng ngày cụ thể.
+     * (BR-01: running or upcoming plans of many horses that have not ended before {@code fromDate}, with the course
+     * name. Shared by plan creation (overlap check) and the preview (overlap check + earliest free date), so it returns
+     * EVERY plan from that date on, not only those overlapping one specific range.)
      */
     @Query("""
-           SELECT p FROM HorseTrainingPlan p
+           SELECT new com.rtms.backend.training.dto.RunningPlanRow(
+                      p.id, p.horseId, c.name, p.startDate, p.endDate, p.status)
+           FROM HorseTrainingPlan p
+           JOIN Course c ON p.courseId = c.id
            WHERE p.horseId IN :horseIds
-             AND p.status IN :statuses
-             AND p.startDate <= :endDate
-             AND p.endDate >= :startDate
-           ORDER BY p.endDate DESC
+             AND p.status IN (com.rtms.backend.training.enums.TrainingPlanStatus.UPCOMING,
+                              com.rtms.backend.training.enums.TrainingPlanStatus.ACTIVE)
+             AND p.endDate >= :fromDate
+           ORDER BY p.startDate ASC, p.id ASC
            """)
-    List<HorseTrainingPlan> findOverlappingPlans(@Param("horseIds") Collection<Long> horseIds,
-                                                 @Param("statuses") Collection<TrainingPlanStatus> statuses,
-                                                 @Param("startDate") LocalDate startDate,
-                                                 @Param("endDate") LocalDate endDate);
+    List<RunningPlanRow> findRunningPlans(@Param("horseIds") Collection<Long> horseIds,
+                                          @Param("fromDate") LocalDate fromDate);
+
+    /**
+     * Chiến mã Trainer ghi danh được: đã được nhận vào CLB (ELIGIBLE) và đang ở chuồng thuộc khu của Trainer. Ngựa bị
+     * Thú y chặn tập VẪN có mặt để giao diện nói rõ lý do thay vì để con ngựa biến mất.
+     * (Horses the trainer can enroll: admitted (ELIGIBLE) and in a stall of the trainer areas. Horses blocked by the vet
+     * ARE included so the UI can explain why instead of making the horse disappear.)
+     */
+    @Query("""
+           SELECT h FROM Horse h
+           JOIN StableStall ss ON h.currentStallId = ss.id
+           JOIN Area a ON ss.areaId = a.id
+           WHERE a.trainerId = :trainerId
+             AND h.currentStatus = com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE
+           ORDER BY h.name ASC, h.id ASC
+           """)
+    List<Horse> findEnrollableHorses(@Param("trainerId") Long trainerId);
 
     /**
      * API gợi ý nhóm (joinable-cohorts). Nhóm không phải entity: là các plan cùng (trainerId, courseId,
@@ -133,7 +156,7 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
                                                 @Param("courseId") Long courseId);
 
     // =================================================================
-    // DASHBOARD CỦA TRAINER (Trainer dashboard)
+    // DASHBOARD THEO PHẠM VI VAI TRÒ (Dashboard by role scope)
     // =================================================================
 
     /** Chiến mã trong các khu của Trainer, kèm mã chuồng. (Horses in the trainer areas, with stall code.) */
@@ -148,9 +171,33 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
     List<DashboardHorseRow> findDashboardHorses(@Param("trainerId") Long trainerId);
 
     /**
-     * Mọi kế hoạch của Trainer kèm tên khóa và số buổi đã hoàn thành (sub-query), không cần
+     * Chiến mã đã nhập trại của một Owner. Ngựa chưa có chuồng vẫn được liệt kê (LEFT JOIN), mã chuồng khi đó là null.
+     * (The admitted horses of one owner. A horse without a stall is still listed (LEFT JOIN), its stall code null.)
+     */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.DashboardHorseRow(h.id, h.name, h.breed, ss.stallCode)
+           FROM Horse h
+           LEFT JOIN StableStall ss ON h.currentStallId = ss.id
+           WHERE h.ownerId = :ownerId
+             AND h.currentStatus = com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE
+           ORDER BY h.id ASC
+           """)
+    List<DashboardHorseRow> findDashboardHorsesOfOwner(@Param("ownerId") Long ownerId);
+
+    /** Mọi chiến mã đã nhập trại của trang trại. (Every admitted horse of the farm.) */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.DashboardHorseRow(h.id, h.name, h.breed, ss.stallCode)
+           FROM Horse h
+           LEFT JOIN StableStall ss ON h.currentStallId = ss.id
+           WHERE h.currentStatus = com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE
+           ORDER BY h.id ASC
+           """)
+    List<DashboardHorseRow> findAllDashboardHorses();
+
+    /**
+     * Mọi kế hoạch của các chiến mã đã cho, kèm tên khóa và số buổi đã hoàn thành (sub-query), không cần
      * tải toàn bộ bảng rồi lọc bằng stream.
-     * (Every plan of the trainer with course name and completed-session count (sub-query), so no
+     * (Every plan of the given horses with course name and completed-session count (sub-query), so no
      * whole-table load followed by stream filtering.)
      */
     @Query("""
@@ -161,10 +208,10 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
                          AND w.status = com.rtms.backend.training.enums.WorkoutStatus.COMPLETED))
            FROM HorseTrainingPlan p
            JOIN Course c ON p.courseId = c.id
-           WHERE p.trainerId = :trainerId
+           WHERE p.horseId IN :horseIds
            ORDER BY p.id ASC
            """)
-    List<DashboardPlanRow> findDashboardPlans(@Param("trainerId") Long trainerId);
+    List<DashboardPlanRow> findDashboardPlans(@Param("horseIds") Collection<Long> horseIds);
 
     /** Ngựa có nằm trong một khu của Trainer không? (Is the horse in one of the trainer areas?) */
     @Query("""

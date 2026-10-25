@@ -1,12 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button, EmptyState, ListSkeleton, Notice, PageHeader, Panel, ScreenLayout } from '@/components/ui';
-import { stableApi } from '@/features/stable/services/stableService';
-import type { Horse } from '@/features/stable/types';
+import { BackLink, Button, EmptyState, ListSkeleton, Notice, PageHeader, Panel, ScreenLayout } from '@/components/ui';
 import { displayError } from '@/lib/display';
-import { tomorrowIso } from '../lib/dateRange';
+import { toIsoDate, tomorrowIso } from '../lib/dateRange';
+import { usePlanPreview } from '../hooks/usePlanPreview';
 import { trainingService } from '../services/trainingService';
 import type {
   Course,
@@ -16,19 +15,23 @@ import type {
   TrainingDay,
 } from '../types';
 import { CourseStep } from './enrollment/CourseStep';
+import { GroupScheduleNotice } from './enrollment/GroupScheduleNotice';
 import { HorseStep } from './enrollment/HorseStep';
 import { ScheduleStep } from './enrollment/ScheduleStep';
 import { EnrollmentResultSummary } from './EnrollmentResultSummary';
 
 const DEFAULT_DAYS: TrainingDay[] = ['MONDAY', 'WEDNESDAY', 'FRIDAY'];
 
-/** Enrolls a group of horses in a course. The backend decides lots, grooms and capacity; this only collects the request. */
+/**
+ * Enrolls a group of horses in a course. The schedule is chosen before the horses, because whether a horse is free
+ * depends on the schedule; the backend preview then marks every horse as free, busy or unable to train. The backend
+ * still decides lots, grooms and capacity, and checks everything again when the plans are created.
+ */
 export function EnrollmentForm() {
   const router = useRouter();
   const initialCourseId = useSearchParams().get('courseId');
 
   const [courses, setCourses] = useState<Course[]>([]);
-  const [horses, setHorses] = useState<Horse[]>([]);
   const [cohorts, setCohorts] = useState<JoinableCohortResponse[]>([]);
   const [cohortsLoading, setCohortsLoading] = useState(false);
   /** Enrollment result: when set, the form is replaced by the summary screen. */
@@ -40,24 +43,29 @@ export function EnrollmentForm() {
   const [selectedHorseIds, setSelectedHorseIds] = useState<number[]>([]);
   const [startDate, setStartDate] = useState(() => tomorrowIso());
   const [trainingDays, setTrainingDays] = useState<TrainingDay[]>(DEFAULT_DAYS);
-  const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Courses, and the horses the trainer can enroll: eligible horses in the trainer's own area.
-  const loadInitial = useCallback(async () => {
+  const today = toIsoDate(new Date());
+  const { preview, error: previewError, initialLoading, scheduleStale, pending } =
+    usePlanPreview({ courseId, startDate, trainingDays, selectedHorseIds });
+
+  const horses = useMemo(() => preview?.horses ?? [], [preview]);
+  // Judged only on a preview of the current schedule: an old answer may call a horse busy for dates no longer chosen.
+  const selectedBusy = useMemo(
+    () => (scheduleStale ? [] : horses.filter((h) => h.availability === 'BUSY' && selectedHorseIds.includes(h.horseId))),
+    [horses, scheduleStale, selectedHorseIds],
+  );
+
+  const loadCourses = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [courseList, horseList] = await Promise.all([
-        trainingService.getCourses(),
-        stableApi.getHorses({ mine: true, status: 'ELIGIBLE' }),
-      ]);
+      const courseList = await trainingService.getCourses();
       setCourses(courseList);
-      setHorses(horseList);
       if (!initialCourseId && courseList.length > 0) setCourseId(courseList[0].id);
     } catch (cause) {
-      setLoadError(displayError(cause, 'Unable to load courses or eligible horses.'));
+      setLoadError(displayError(cause, 'Unable to load courses.'));
     } finally {
       setLoading(false);
     }
@@ -65,8 +73,8 @@ export function EnrollmentForm() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadInitial();
-  }, [loadInitial]);
+    loadCourses();
+  }, [loadCourses]);
 
   // Groups already forming for the chosen course.
   useEffect(() => {
@@ -105,6 +113,11 @@ export function EnrollmentForm() {
     setTrainingDays([...cohort.trainingDays]);
   }
 
+  function dropBusyHorses() {
+    const busyIds = new Set(selectedBusy.map((horse) => horse.horseId));
+    setSelectedHorseIds((current) => current.filter((id) => !busyIds.has(id)));
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!courseId) {
@@ -123,7 +136,6 @@ export function EnrollmentForm() {
         courseId,
         startDate,
         trainingDays,
-        notes: notes.trim() || undefined,
         horses: selectedHorseIds.map((horseId) => ({ horseId })),
       };
       const plans = await trainingService.createPlan(request);
@@ -151,21 +163,28 @@ export function EnrollmentForm() {
           icon="alert-triangle"
           title="Unable to load enrollment data"
           description={loadError}
-          action={<Button size="sm" icon="refresh" onClick={loadInitial}>Try again</Button>}
+          action={<Button size="sm" icon="refresh" onClick={loadCourses}>Try again</Button>}
         />
       </Panel>
     );
   }
 
   if (result) {
-    return <EnrollmentResultSummary plans={result} horses={horses} onDone={() => router.push('/trainer/courses')} />;
+    const horseNames = horses.map((horse) => ({ id: horse.horseId, name: horse.horseName }));
+    return <EnrollmentResultSummary plans={result} horses={horseNames} onDone={() => router.push('/trainer/courses')} />;
   }
+
+  const blockedReason =
+    selectedHorseIds.length === 0 ? 'Select at least one horse.'
+      : startDate < today ? 'The start date cannot be in the past.'
+        : selectedBusy.length > 0 ? 'Some selected horses are busy in this period.'
+          : null;
 
   return (
     <ScreenLayout variant="form">
+      <BackLink onClick={() => router.back()}>Back</BackLink>
       <PageHeader
         title="Group training enrollment"
-        description="Select multiple horses and the system will schedule them in shared workouts."
         breadcrumbs={[{ label: 'Training', href: '/trainer/courses' }, { label: 'Enroll horses' }]}
       />
 
@@ -180,19 +199,38 @@ export function EnrollmentForm() {
           cohortsLoading={cohortsLoading}
           onUseCohort={applyCohortSchedule}
         />
-        <HorseStep horses={horses} selectedIds={selectedHorseIds} onToggle={toggleHorse} onToggleAll={setSelectedHorseIds} />
         <ScheduleStep
           startDate={startDate}
+          minDate={today}
           onStartDateChange={setStartDate}
           trainingDays={trainingDays}
           onToggleDay={toggleDay}
-          notes={notes}
-          onNotesChange={setNotes}
+          preview={preview}
+          stale={scheduleStale}
+        />
+        <HorseStep
+          horses={horses}
+          loading={initialLoading}
+          stale={scheduleStale}
+          error={previewError}
+          scheduleReady={courseId !== '' && startDate >= today}
+          selectedIds={selectedHorseIds}
+          onToggle={toggleHorse}
+          onSelect={setSelectedHorseIds}
+        />
+        <GroupScheduleNotice
+          busyHorses={selectedBusy}
+          groupEarliestStart={preview?.groupEarliestStart ?? null}
+          pending={pending}
+          onUseDate={setStartDate}
+          onDropBusy={dropBusyHorses}
         />
 
         <div className="flex items-center justify-end gap-3">
-          <Button type="button" onClick={() => router.back()} disabled={submitting}>Back</Button>
-          <Button type="submit" variant="primary" loading={submitting} disabled={selectedHorseIds.length === 0}>
+          {blockedReason && selectedHorseIds.length > 0 && (
+            <span className="text-xs text-[var(--color-text-muted)]">{blockedReason}</span>
+          )}
+          <Button type="submit" variant="primary" loading={submitting} disabled={blockedReason !== null}>
             {submitting ? 'Scheduling workouts…' : `Enroll ${selectedHorseIds.length} horses`}
           </Button>
         </div>

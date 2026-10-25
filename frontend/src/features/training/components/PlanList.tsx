@@ -98,7 +98,6 @@ export function PlanList() {
     <ScreenLayout variant="list">
       <PageHeader
         title="Training plans"
-        description="Track each horse’s training progress."
         actions={<LinkButton href="/trainer/plans/new" variant="primary" size="sm" icon="plus">Enroll horses</LinkButton>}
       />
 

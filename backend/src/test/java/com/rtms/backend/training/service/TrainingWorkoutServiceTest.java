@@ -697,14 +697,13 @@ class TrainingWorkoutServiceTest {
         HorseTrainingPlan running = new HorseTrainingPlan();
         running.setId(1L);
         running.setStatus(TrainingPlanStatus.ACTIVE);
-        running.setNotes("Original note");
 
         when(workoutRepository.findFutureScheduledByHorse(eq(77L), any(LocalDate.class)))
                 .thenReturn(List.of(w1, w2, w3));
         when(planRepository.findByHorseIdAndStatusInOrderByEndDateDesc(eq(77L), anyList()))
                 .thenReturn(List.of(running));
 
-        int cancelled = workoutService.cancelFutureTrainingForHorse(77L, "Tendon strain");
+        int cancelled = workoutService.cancelFutureTrainingForHorse(77L);
 
         assertEquals(3, cancelled);
         assertEquals(WorkoutStatus.CANCELLED, w1.getStatus());
@@ -714,12 +713,11 @@ class TrainingWorkoutServiceTest {
         verify(lotService, times(1)).cancelLotIfEmpty(37L);
         verify(lotService, times(1)).cancelLotIfEmpty(38L);
         assertEquals(TrainingPlanStatus.CANCELLED, running.getStatus());
-        assertEquals("Original note | [Auto-cancelled] Tendon strain", running.getNotes());
     }
 
     @Test
-    @DisplayName("Blocked horse without a reason still gets a note on the cancelled plan")
-    void testCancelFutureTraining_NoReason() {
+    @DisplayName("Blocked horse with no future workout: the upcoming plan is still cancelled")
+    void testCancelFutureTraining_NoWorkouts() {
         HorseTrainingPlan running = new HorseTrainingPlan();
         running.setId(1L);
         running.setStatus(TrainingPlanStatus.UPCOMING);
@@ -728,8 +726,8 @@ class TrainingWorkoutServiceTest {
         when(planRepository.findByHorseIdAndStatusInOrderByEndDateDesc(eq(77L), anyList()))
                 .thenReturn(List.of(running));
 
-        assertEquals(0, workoutService.cancelFutureTrainingForHorse(77L, null));
-        assertEquals("[Auto-cancelled] Horse is blocked from training", running.getNotes());
+        assertEquals(0, workoutService.cancelFutureTrainingForHorse(77L));
+        assertEquals(TrainingPlanStatus.CANCELLED, running.getStatus());
         verifyNoInteractions(lotService);
     }
 
