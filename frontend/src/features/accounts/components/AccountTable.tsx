@@ -162,6 +162,9 @@ export function AccountTable({
     if (account.role === 'HEAD_TRAINER' && account.managedAreaCodes && account.managedAreaCodes.length > 0) {
       return `This Head Trainer currently manages regular areas (${account.managedAreaCodes.join(', ')}). All regular areas must be reassigned before deactivation.`;
     }
+    if (account.role === 'HORSE_OWNER' && (account.ownedHorsesCount ?? 0) > 0) {
+      return `This Owner currently has ${account.ownedHorsesCount} registered horse(s) in the system. All horses must be discharged, transferred, or resolved before deactivation.`;
+    }
     return null;
   };
 
@@ -187,13 +190,18 @@ export function AccountTable({
           isBlocked ? (
             <div className="space-y-3">
               <p>
-                You cannot deactivate <strong>{confirmToggle?.fullName}</strong> because they still have active assignments:
+                You cannot deactivate <strong>{confirmToggle?.fullName}</strong> because they still have active{' '}
+                {confirmToggle?.role === 'HORSE_OWNER' ? 'horses' : 'assignments'}:
               </p>
               <div className="p-3 rounded-lg bg-[var(--color-bg-warning-subtle,#fffbeb)] border border-[var(--color-border-warning,#fef3c7)] text-xs text-[var(--color-warning-text,#92400e)] font-medium leading-relaxed">
                 ⚠️ {blockingReason}
               </div>
               <p className="text-xs text-[var(--color-text-secondary)]">
-                Please reassign or unassign these responsibilities first before deactivating this account.
+                Please{' '}
+                {confirmToggle?.role === 'HORSE_OWNER'
+                  ? 'discharge or transfer all horses'
+                  : 'reassign or unassign these responsibilities'}{' '}
+                first before deactivating this account.
               </p>
             </div>
           ) : (
@@ -202,11 +210,6 @@ export function AccountTable({
                 Are you sure you want to deactivate <strong>{confirmToggle?.fullName}</strong>?
                 They will immediately lose the ability to sign in to the platform.
               </p>
-              {confirmToggle?.role === 'HORSE_OWNER' && (confirmToggle.ownedHorsesCount ?? 0) > 0 && (
-                <p className="text-xs text-[var(--color-warning)] font-medium">
-                  Note: If this Owner has active racehorses or pending admission applications, the system will verify those before deactivating.
-                </p>
-              )}
             </div>
           )
         }

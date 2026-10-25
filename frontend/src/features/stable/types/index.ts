@@ -3,7 +3,7 @@ import type { HorseSex } from '@/types/horse';
 export type StallStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED';
 export type AreaType = 'REGULAR' | 'QUARANTINE';
 /** A horse's lifecycle in the club. Health is not tracked here — see trainingDecision. */
-export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED';
+export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED' | 'INACTIVE';
 
 /** Whether the vet allows training or temporarily blocks it. Can train = ELIGIBLE and ALLOWED. */
 export type TrainingDecision = 'ALLOWED' | 'BLOCKED';
@@ -32,6 +32,8 @@ export interface Horse {
   sex: HorseSex | null;
   dateOfBirth: string | null;
   currentStatus: HorseStatus;
+  statusReason?: string | null;
+  statusReasonCode?: string | null;
   currentStallId: number | null;
   ownerId: number | null;
   trainingDecision?: TrainingDecision;
@@ -55,3 +57,35 @@ export interface UserSummary {
   email: string;
   role: string;
 }
+
+export type HorseDeactivationReason =
+  | 'RETIRED'
+  | 'TRANSFERRED'
+  | 'MEDICAL_DISCHARGE'
+  | 'DECEASED'
+  | 'OWNER_WITHDRAWAL'
+  | 'OTHER';
+
+export type HorseReactivationReason =
+  | 'CLEARED_BY_VET'
+  | 'RETURNED_FROM_LOAN'
+  | 'MANAGEMENT_APPROVAL'
+  | 'CORRECTION'
+  | 'OTHER';
+
+export const DEACTIVATION_REASON_OPTIONS: { value: HorseDeactivationReason; label: string }[] = [
+  { value: 'RETIRED', label: 'Retired from training & competition' },
+  { value: 'TRANSFERRED', label: 'Transferred to another facility / club' },
+  { value: 'MEDICAL_DISCHARGE', label: 'Medical discharge / chronic injury' },
+  { value: 'DECEASED', label: 'Deceased' },
+  { value: 'OWNER_WITHDRAWAL', label: 'Withdrawn by owner request' },
+  { value: 'OTHER', label: 'Other reason (specify below)...' },
+];
+
+export const REACTIVATION_REASON_OPTIONS: { value: HorseReactivationReason; label: string }[] = [
+  { value: 'CLEARED_BY_VET', label: 'Cleared by veterinary team / recovered' },
+  { value: 'RETURNED_FROM_LOAN', label: 'Returned from external facility / loan' },
+  { value: 'MANAGEMENT_APPROVAL', label: 'Approved by club management' },
+  { value: 'CORRECTION', label: 'Administrative correction' },
+  { value: 'OTHER', label: 'Other reason (specify below)...' },
+];

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Button, FormField, Input, Modal, Notice, Pill, Select, Spinner } from '@/components/ui';
+import { Button, FormField, Icon, Input, Modal, Notice, Pill, Select, Spinner, StatusBadge } from '@/components/ui';
 import { displayError, formatDateTime, formatEnumLabel } from '@/lib/display';
 import { getAccountDetail, updateAccount } from '../services/accountService';
 import type { AccountDetailResponse, AccountSummary, AccountUpdateRequest } from '../types';
@@ -290,22 +290,35 @@ export function AccountDetailModal({
                 ) : (
                   <div className="divide-y divide-[var(--color-border)] rounded-lg border border-[var(--color-border)] overflow-hidden">
                     {detail.ownedHorses.map((horse) => (
-                      <div
+                      <Link
                         key={horse.id}
-                        className="flex items-center justify-between p-3 text-sm hover:bg-[var(--color-surface-hover)]"
+                        href={`/manager/horses/${horse.id}`}
+                        onClick={onClose}
+                        className="group flex items-center justify-between p-3 text-sm transition-colors hover:bg-[var(--color-surface-hover)] cursor-pointer"
                       >
-                        <div>
-                          <div className="font-semibold text-[var(--color-text-primary)]">
+                        <div className="min-w-0 pr-3">
+                          <div className="font-semibold text-[var(--color-text-primary)] transition-colors group-hover:text-[var(--color-primary)]">
                             {horse.name}
                           </div>
                           <div className="text-xs text-[var(--color-text-muted)]">
-                            UELN: {horse.registrationNumber || 'N/A'} • Stable: {horse.stableLocation || 'Unassigned'}
+                            UELN: {horse.registrationNumber || 'N/A'} • Stall: {horse.stableLocation || 'Unassigned'}
                           </div>
                         </div>
-                        <Pill tone="neutral" size="sm">
-                          {formatEnumLabel(horse.currentStatus || 'UNKNOWN')}
-                        </Pill>
-                      </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {['CANDIDATE', 'ELIGIBLE', 'REJECTED'].includes(horse.currentStatus ?? '') ? (
+                            <StatusBadge status={horse.currentStatus as 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED'} size="sm" />
+                          ) : (
+                            <Pill tone="neutral" size="sm">
+                              {formatEnumLabel(horse.currentStatus || 'UNKNOWN')}
+                            </Pill>
+                          )}
+                          <Icon
+                            name="chevron-right"
+                            size={16}
+                            className="text-[var(--color-text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--color-primary)]"
+                          />
+                        </div>
+                      </Link>
                     ))}
                   </div>
                 )}
