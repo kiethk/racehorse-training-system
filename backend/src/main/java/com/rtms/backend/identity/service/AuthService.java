@@ -43,6 +43,8 @@ public class AuthService {
     private final GroomProfileRepository groomProfileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
 
+    public static final long GRACE_PERIOD_SECONDS = 30L;
+
     @Value("${jwt.refresh-expiration}")
     private long refreshExpirationMs;
 
@@ -85,7 +87,7 @@ public class AuthService {
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
         refreshToken.setTokenHash(hashToken(rawRefreshToken));
-        refreshToken.setExpiresAt(LocalDateTime.now().plusNanos(refreshExpirationMs * 1000000));
+        refreshToken.setExpiresAt(LocalDateTime.now().plusSeconds(refreshExpirationMs / 1000));
         refreshTokenRepository.save(refreshToken);
 
         LoginResponse loginResponse = LoginResponse.fromUser(user, null);
@@ -103,7 +105,10 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "Invalid refresh token"));
 
         if (refreshToken.getRevokedAt() != null) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "REVOKED_REFRESH_TOKEN", "Refresh token has been revoked");
+            boolean withinGracePeriod = refreshToken.getRevokedAt().isAfter(LocalDateTime.now().minusSeconds(GRACE_PERIOD_SECONDS));
+            if (!withinGracePeriod) {
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "REVOKED_REFRESH_TOKEN", "Refresh token has been revoked");
+            }
         }
 
         if (refreshToken.getExpiresAt().isBefore(LocalDateTime.now())) {
@@ -115,14 +120,16 @@ public class AuthService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_INACTIVE", "User is inactive");
         }
 
-        refreshToken.setRevokedAt(LocalDateTime.now());
-        refreshTokenRepository.save(refreshToken);
+        if (refreshToken.getRevokedAt() == null) {
+            refreshToken.setRevokedAt(LocalDateTime.now());
+            refreshTokenRepository.save(refreshToken);
+        }
 
         String newRawRefreshToken = generateOpaqueToken();
         RefreshToken newRefreshToken = new RefreshToken();
         newRefreshToken.setUser(user);
         newRefreshToken.setTokenHash(hashToken(newRawRefreshToken));
-        newRefreshToken.setExpiresAt(LocalDateTime.now().plusNanos(refreshExpirationMs * 1000000));
+        newRefreshToken.setExpiresAt(LocalDateTime.now().plusSeconds(refreshExpirationMs / 1000));
         refreshTokenRepository.save(newRefreshToken);
 
         String newAccessToken = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
