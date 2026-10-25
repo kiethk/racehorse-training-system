@@ -31,6 +31,9 @@ public class CompleteCareScheduleRequest {
     private String notes;
     private List<@NotNull @Valid HorseHealthMetricRequest> metrics;
 
+    /** Marker chấn thương ghi nhận cùng ca khám; lưu nguyên tử với HealthRecord. */
+    private List<@Valid InjuryMarkerRequest> injuryMarkers;
+
     /** Lịch khám lại — bắt buộc khi BLOCKED: "tạm nghỉ đến" chính là ngày của lịch này. */
     private CreateNextScheduleRequest nextSchedule;
 
@@ -77,6 +80,9 @@ public class CompleteCareScheduleRequest {
 
     public List<HorseHealthMetricRequest> getMetrics() { return metrics; }
     public void setMetrics(List<HorseHealthMetricRequest> metrics) { this.metrics = metrics; }
+
+    public List<InjuryMarkerRequest> getInjuryMarkers() { return injuryMarkers; }
+    public void setInjuryMarkers(List<InjuryMarkerRequest> injuryMarkers) { this.injuryMarkers = injuryMarkers; }
 
     @JsonIgnore
     @AssertTrue(message = "Restriction details are required when training is BLOCKED")

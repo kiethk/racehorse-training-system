@@ -17,17 +17,20 @@ import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
 import com.rtms.backend.medical.dto.CareScheduleDetailResponse;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
+import com.rtms.backend.medical.dto.InjuryMarkerRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
 import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
 import com.rtms.backend.medical.dto.UrgentCaseReportResponse;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
+import com.rtms.backend.medical.entity.InjuryRecord;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
 import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.dto.UrgentAssignmentAlert;
 import com.rtms.backend.notification.service.NotificationService;
@@ -94,6 +97,7 @@ public class CareScheduleService {
     private final NotificationService notificationService;
     private final TrainingDecisionService trainingDecisionService;
     private final PreventiveVaccinationService preventiveVaccinationService;
+    private final InjuryRecordRepository injuryRecordRepository;
 
     public CareScheduleService(
             CareScheduleRepository careScheduleRepository,
@@ -110,7 +114,8 @@ public class CareScheduleService {
             EntityManager entityManager,
             NotificationService notificationService,
             TrainingDecisionService trainingDecisionService,
-            PreventiveVaccinationService preventiveVaccinationService) {
+            PreventiveVaccinationService preventiveVaccinationService,
+            InjuryRecordRepository injuryRecordRepository) {
         this.careScheduleRepository = careScheduleRepository;
         this.horseRepository = horseRepository;
         this.healthRecordRepository = healthRecordRepository;
@@ -126,6 +131,7 @@ public class CareScheduleService {
         this.notificationService = notificationService;
         this.trainingDecisionService = trainingDecisionService;
         this.preventiveVaccinationService = preventiveVaccinationService;
+        this.injuryRecordRepository = injuryRecordRepository;
     }
 
     @Transactional
@@ -292,11 +298,7 @@ public class CareScheduleService {
 
         if (schedule.getStatus() == CareScheduleStatus.COMPLETED) {
             if (Objects.equals(schedule.getVeterinarianId(), vetId)) {
-                if (request.getNextSchedule() != null) {
-                    createNextSchedule(request.getNextSchedule(), vetId, schedule);
-                } else {
-                    createRoutineCadenceSchedule(vetId, schedule);
-                }
+                // Idempotent: a completed schedule never creates a follow-up twice.
                 return CareScheduleResponse.from(schedule);
             }
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can access this completed schedule");
@@ -327,10 +329,6 @@ public class CareScheduleService {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
                         "Vaccination can be deferred by 7 to 10 days");
             }
-        }
-        if (schedule.getPurpose() == CareSchedulePurpose.PREVENTIVE && vaccinations.isEmpty() && deferDays == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "PREVENTIVE_ACTION_REQUIRED",
-                    "Preventive care completion requires recording vaccinations or specifying deferral days");
         }
 
         AdmissionApplication linkedAdmission = schedule.getAdmissionId() == null ? null
@@ -398,6 +396,47 @@ public class CareScheduleService {
             preventiveVaccinationService.record(savedRecord.getId(), vaccinations);
         }
 
+        // Persist injury markers captured on the 3D model (T4).
+        java.util.Set<Long> newInjuryIds = new java.util.HashSet<>();
+        if (request.getInjuryMarkers() != null) {
+            for (InjuryMarkerRequest m : request.getInjuryMarkers()) {
+                InjuryRecord ir = new InjuryRecord();
+                ir.setHorseId(horse.getId());
+                ir.setHealthRecordId(savedRecord.getId());
+                ir.setInjuryType(m.getInjuryType());
+                ir.setBodyRegionId(m.getBodyRegionId());
+                ir.setSeverity(m.getSeverity());
+                ir.setDescription(m.getDescription());
+                ir.setDiagnosedAt(m.getDiagnosedAt() != null ? m.getDiagnosedAt() : now);
+                ir.setStatus("ACTIVE");
+                ir.setPositionX(m.getPositionX());
+                ir.setPositionY(m.getPositionY());
+                ir.setPositionZ(m.getPositionZ());
+                ir.setZoneId(m.getZoneId());
+                ir.setLocalX(m.getLocalX());
+                ir.setLocalY(m.getLocalY());
+                ir.setLocalZ(m.getLocalZ());
+                ir.setNormalX(m.getNormalX());
+                ir.setNormalY(m.getNormalY());
+                ir.setNormalZ(m.getNormalZ());
+                ir.setMeshName(m.getMeshName());
+                InjuryRecord savedIr = injuryRecordRepository.save(ir);
+                if (savedIr.getId() != null) newInjuryIds.add(savedIr.getId());
+            }
+        }
+
+        // Auto-recover: when cleared (ALLOWED), mark prior ACTIVE injuries (not just created) as RECOVERED.
+        if (decision == TrainingDecision.ALLOWED) {
+            List<InjuryRecord> active = injuryRecordRepository
+                    .findByHorseIdAndStatusIgnoreCaseOrderByDiagnosedAtDesc(horse.getId(), "ACTIVE");
+            for (InjuryRecord ir : active) {
+                if (ir.getId() != null && newInjuryIds.contains(ir.getId())) continue;
+                ir.setStatus("RECOVERED");
+                ir.setRecoveredAt(now);
+                injuryRecordRepository.save(ir);
+            }
+        }
+
         // Save metrics if present
         if (request.getMetrics() != null) {
             for (HorseHealthMetricRequest metricReq : request.getMetrics()) {
@@ -448,6 +487,12 @@ public class CareScheduleService {
             careScheduleRepository.flush();
             preventiveVaccinationService.deferMilestone(horse.getId(), savedRecord.getId(), vetId, deferDays);
         } else if (!vaccinations.isEmpty()) {
+            careScheduleRepository.flush();
+            preventiveVaccinationService.refreshMilestone(horse.getId(), savedRecord.getId(), vetId,
+                    schedule.getCareType());
+        } else if (schedule.getPurpose() == CareSchedulePurpose.PREVENTIVE) {
+            // Auto-create a preventive (vaccination) milestone after an ALLOWED exam even when
+            // no vaccine was administered, so the next vaccination checkpoint is booked.
             careScheduleRepository.flush();
             preventiveVaccinationService.refreshMilestone(horse.getId(), savedRecord.getId(), vetId,
                     schedule.getCareType());
@@ -609,17 +654,23 @@ public class CareScheduleService {
 
     @Transactional(readOnly = true)
     public Page<CareScheduleResponse> listSchedules(CareScheduleStatus status, CareType careType,
-            Long horseId, Long vetId, Long admissionId, LocalDate date, Pageable pageable) {
+            Long horseId, Long vetId, Long requestedById, Long admissionId, LocalDate date, Pageable pageable) {
         LocalDateTime dayStart = date != null ? date.atStartOfDay() : null;
         LocalDateTime dayEnd = date != null ? dayStart.plusDays(1) : null;
-        return careScheduleRepository.findFiltered(status, careType, horseId, vetId, admissionId, dayStart, dayEnd, pageable)
+        return careScheduleRepository.findFiltered(status, careType, horseId, vetId, requestedById, admissionId, dayStart, dayEnd, pageable)
                 .map(CareScheduleResponse::from);
     }
 
     @Transactional(readOnly = true)
     public Page<CareScheduleResponse> listSchedules(CareScheduleStatus status, CareType careType,
+            Long horseId, Long vetId, Long admissionId, LocalDate date, Pageable pageable) {
+        return listSchedules(status, careType, horseId, vetId, null, admissionId, date, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CareScheduleResponse> listSchedules(CareScheduleStatus status, CareType careType,
             Long horseId, Long vetId, Long admissionId, Pageable pageable) {
-        return listSchedules(status, careType, horseId, vetId, admissionId, null, pageable);
+        return listSchedules(status, careType, horseId, vetId, null, admissionId, null, pageable);
     }
 
     @Transactional(readOnly = true)

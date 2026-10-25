@@ -11,4 +11,6 @@ import org.springframework.stereotype.Repository;
 public interface InjuryRecordRepository extends JpaRepository<InjuryRecord, Long> {
     List<InjuryRecord> findByHorseIdOrderByDiagnosedAtDesc(Long horseId);
 
+    List<InjuryRecord> findByHorseIdAndStatusIgnoreCaseOrderByDiagnosedAtDesc(Long horseId, String status);
+
 }

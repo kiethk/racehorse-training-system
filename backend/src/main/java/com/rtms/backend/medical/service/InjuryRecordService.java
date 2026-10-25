@@ -2,7 +2,9 @@ package com.rtms.backend.medical.service;
 
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.medical.dto.CorrectInjuryRecordRequest;
+import com.rtms.backend.medical.dto.CreateInjuryRecordRequest;
 import com.rtms.backend.medical.dto.HorseHealthSummaryResponse;
+import com.rtms.backend.medical.dto.MarkerPlacementRequest;
 import com.rtms.backend.audit.entity.AuditLog;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.horse.entity.Horse;
@@ -51,6 +53,61 @@ public class InjuryRecordService {
     @Transactional(readOnly = true)
     public List<InjuryRecord> getInjuryRecordsByHorse(Long horseId) {
         return injuryRecordRepository.findByHorseIdOrderByDiagnosedAtDesc(horseId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<InjuryRecord> getActiveInjuryRecordsByHorse(Long horseId) {
+        return injuryRecordRepository.findByHorseIdAndStatusIgnoreCaseOrderByDiagnosedAtDesc(horseId, "ACTIVE");
+    }
+
+    @Transactional
+    public InjuryRecord createInjuryRecord(Long horseId, CreateInjuryRecordRequest req) {
+        InjuryRecord r = new InjuryRecord();
+        r.setHorseId(horseId);
+        r.setHealthRecordId(req.healthRecordId());
+        r.setInjuryType(req.injuryType());
+        r.setBodyRegionId(req.bodyRegionId());
+        r.setSeverity(req.severity());
+        r.setDescription(req.description());
+        r.setDiagnosedAt(req.diagnosedAt());
+        r.setStatus("ACTIVE");
+        r.setPositionX(req.positionX());
+        r.setPositionY(req.positionY());
+        r.setPositionZ(req.positionZ());
+        r.setZoneId(req.zoneId());
+        r.setLocalX(req.localX());
+        r.setLocalY(req.localY());
+        r.setLocalZ(req.localZ());
+        r.setNormalX(req.normalX());
+        r.setNormalY(req.normalY());
+        r.setNormalZ(req.normalZ());
+        r.setMeshName(req.meshName());
+        return injuryRecordRepository.save(r);
+    }
+
+    @Transactional
+    public InjuryRecord recoverInjuryRecord(Long horseId, Long id, Long userId) {
+        InjuryRecord existing = injuryRecordRepository.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "INJURY_NOT_FOUND", "Injury record not found"));
+        if (existing.getHorseId() == null || !existing.getHorseId().equals(horseId)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "INJURY_NOT_FOUND", "Injury record not found for this horse");
+        }
+        if ("RECOVERED".equalsIgnoreCase(existing.getStatus())) {
+            return existing;
+        }
+        existing.setStatus("RECOVERED");
+        existing.setRecoveredAt(LocalDateTime.now());
+        InjuryRecord saved = injuryRecordRepository.save(existing);
+
+        AuditLog audit = new AuditLog();
+        audit.setAction("INJURY_RECORD_RECOVERY");
+        audit.setEntityName("InjuryRecord");
+        audit.setEntityId(saved.getId());
+        User u = userRepository.getReferenceById(userId);
+        audit.setUser(u);
+        auditLogRepository.save(audit);
+
+        return saved;
     }
 
     /** Lịch sử khám của một ngựa, mới nhất trước (health history trong Health tab). */
@@ -114,6 +171,19 @@ public class InjuryRecordService {
         corrected.setPositionX(existing.getPositionX());
         corrected.setPositionY(existing.getPositionY());
         corrected.setPositionZ(existing.getPositionZ());
+        // Preserve durable marker data when correcting (T4).
+        corrected.setZoneId(existing.getZoneId());
+        corrected.setLocalX(existing.getLocalX());
+        corrected.setLocalY(existing.getLocalY());
+        corrected.setLocalZ(existing.getLocalZ());
+        corrected.setNormalX(existing.getNormalX());
+        corrected.setNormalY(existing.getNormalY());
+        corrected.setNormalZ(existing.getNormalZ());
+        corrected.setMeshName(existing.getMeshName());
+        // Vet repositioned the marker on the model — override the captured fields.
+        if (req.marker() != null) {
+            applyMarkerOverride(corrected, req.marker());
+        }
 
         InjuryRecord saved = injuryRecordRepository.save(corrected);
 
@@ -131,5 +201,19 @@ public class InjuryRecordService {
         auditLogRepository.save(audit);
 
         return saved;
+    }
+
+    private static void applyMarkerOverride(InjuryRecord target, MarkerPlacementRequest marker) {
+        if (marker.positionX() != null) target.setPositionX(marker.positionX());
+        if (marker.positionY() != null) target.setPositionY(marker.positionY());
+        if (marker.positionZ() != null) target.setPositionZ(marker.positionZ());
+        if (marker.zoneId() != null) target.setZoneId(marker.zoneId());
+        if (marker.localX() != null) target.setLocalX(marker.localX());
+        if (marker.localY() != null) target.setLocalY(marker.localY());
+        if (marker.localZ() != null) target.setLocalZ(marker.localZ());
+        if (marker.normalX() != null) target.setNormalX(marker.normalX());
+        if (marker.normalY() != null) target.setNormalY(marker.normalY());
+        if (marker.normalZ() != null) target.setNormalZ(marker.normalZ());
+        if (marker.meshName() != null) target.setMeshName(marker.meshName());
     }
 }

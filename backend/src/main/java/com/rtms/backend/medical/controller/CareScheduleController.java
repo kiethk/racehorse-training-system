@@ -77,10 +77,11 @@ public class CareScheduleController {
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
             Pageable pageable,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        Long requestedById = null;
         if ("VETERINARIAN".equals(currentUser.getRole())) {
             if (status == CareScheduleStatus.REQUESTED) {
-                // Vet must never see other vets' REQUESTED schedules, even when no veterinarianId param is passed.
-                veterinarianId = currentUser.getUserId();
+                // REQUESTED schedules have no veterinarian assigned yet; show the ones this vet created
+                requestedById = currentUser.getUserId();
             } else {
                 veterinarianId = currentUser.getUserId();
             }
@@ -89,7 +90,7 @@ public class CareScheduleController {
             return ApiResponse.success(careScheduleService.listSchedulesForAdmissionAssignee(status, careType,
                     horseId, veterinarianId, admissionId, currentUser.getUserId(), currentUser.getRole(), pageable));
         }
-        return ApiResponse.success(careScheduleService.listSchedules(status, careType, horseId, veterinarianId, admissionId, date, pageable));
+        return ApiResponse.success(careScheduleService.listSchedules(status, careType, horseId, veterinarianId, requestedById, admissionId, date, pageable));
     }
 
     @GetMapping("/{id}")

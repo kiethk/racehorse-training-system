@@ -94,7 +94,7 @@ public class AdmissionTrainerReviewService {
 
         admission.setTrainerFeedback(request.getRemarks());
         admission.setTrainerReviewedAt(LocalDateTime.now());
-        admission.setStatus(AdmissionStatus.MANAGER_REVIEW);
+        admission.setStatus(AdmissionStatus.APPROVED);
         return admissionRepository.save(admission);
     }
 
