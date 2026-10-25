@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, EmptyState, ListSkeleton, PageSection, Panel, Pill } from '@/components/ui';
-import { useAuth } from '@/context/AuthContext';
+import { Button, EmptyState, ListSkeleton, Modal, PageSection, Panel, Pill } from '@/components/ui';
 import { displayError, formatNumber } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { categoryLabel, intensityOption, surfaceLabel } from '../lib/subjectOptions';
@@ -10,10 +9,10 @@ import { trainingService } from '../services/trainingService';
 import type { CreateSubjectRequest, Subject } from '../types';
 import { SubjectForm } from './SubjectForm';
 
-function SubjectCard({ subject }: { subject: Subject }) {
+function SubjectCard({ subject, onOpen }: { subject: Subject; onOpen: () => void }) {
   const intensity = intensityOption(subject.intensityLevel);
   return (
-    <Panel padded className="space-y-2">
+    <Panel padded className="flex h-full flex-col justify-between gap-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-[var(--color-text-primary)]">{subject.name}</h3>
@@ -21,26 +20,50 @@ function SubjectCard({ subject }: { subject: Subject }) {
         </div>
         <Pill tone={intensity.tone} size="sm">{intensity.label}</Pill>
       </div>
-      {subject.description && (
-        <p className="line-clamp-2 text-xs text-[var(--color-text-secondary)]">{subject.description}</p>
-      )}
-      <dl className="flex flex-wrap gap-x-4 gap-y-1 border-t border-[var(--color-border)] pt-2 text-xs text-[var(--color-text-muted)]">
-        <div className="flex gap-1"><dt>Duration</dt><dd className="font-medium text-[var(--color-text-secondary)]">{subject.durationMinutes} min</dd></div>
-        <div className="flex gap-1"><dt>Distance</dt><dd className="font-medium text-[var(--color-text-secondary)]">{formatNumber(subject.targetDistanceMeters)} m</dd></div>
-        <div className="flex gap-1"><dt>Surface</dt><dd className="font-medium text-[var(--color-text-secondary)]">{surfaceLabel(subject.surfaceType)}</dd></div>
-      </dl>
+      <div className="border-t border-[var(--color-border)] pt-3">
+        <Button size="sm" onClick={onOpen}>View details</Button>
+      </div>
     </Panel>
   );
 }
 
+function SubjectDetailModal({ subject, onClose }: { subject: Subject | null; onClose: () => void }) {
+  return (
+    <Modal
+      open={subject !== null}
+      onClose={onClose}
+      size="sm"
+      title={subject?.name ?? ''}
+      description={subject ? categoryLabel(subject.category) : undefined}
+      footer={<Button onClick={onClose}>Close</Button>}
+    >
+      {subject && (
+        <div className="space-y-3 text-sm">
+          {subject.description && <p className="text-[var(--color-text-secondary)]">{subject.description}</p>}
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+            <dt className="text-[var(--color-text-muted)]">Intensity</dt>
+            <dd><Pill tone={intensityOption(subject.intensityLevel).tone} size="sm">{intensityOption(subject.intensityLevel).label}</Pill></dd>
+            <dt className="text-[var(--color-text-muted)]">Duration</dt>
+            <dd className="font-medium">{subject.durationMinutes} min</dd>
+            <dt className="text-[var(--color-text-muted)]">Distance</dt>
+            <dd className="font-medium">{formatNumber(subject.targetDistanceMeters)} m</dd>
+            <dt className="text-[var(--color-text-muted)]">Surface</dt>
+            <dd className="font-medium">{surfaceLabel(subject.surfaceType)}</dd>
+          </dl>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 export function SubjectList() {
-  const { user } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<Subject | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,10 +86,7 @@ export function SubjectList() {
     setFormError(null);
     setSubmitting(true);
     try {
-      await trainingService.createSubject({
-        ...request,
-        trainerId: user?.userId,
-      });
+      await trainingService.createSubject(request);
       toast.success('Subject created.');
       setShowForm(false);
       await load();
@@ -95,7 +115,6 @@ export function SubjectList() {
   return (
     <PageSection
       title={`Subject library (${subjects.length})`}
-      description="Standard subjects for building training courses."
       actions={
         <Button variant="primary" size="sm" onClick={() => setShowForm((open) => !open)}>
           {showForm ? 'Close form' : 'Create subject'}
@@ -112,9 +131,11 @@ export function SubjectList() {
         </Panel>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {subjects.map((subject) => <SubjectCard key={subject.id} subject={subject} />)}
+          {subjects.map((subject) => <SubjectCard key={subject.id} subject={subject} onOpen={() => setDetail(subject)} />)}
         </div>
       )}
+
+      <SubjectDetailModal subject={detail} onClose={() => setDetail(null)} />
     </PageSection>
   );
 }

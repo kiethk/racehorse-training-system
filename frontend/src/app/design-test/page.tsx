@@ -7,6 +7,7 @@ import {
   Avatar,
   Button,
   Checkbox,
+  BackLink,
   ConfirmDialog,
   EmptyState,
   FieldLabel,
@@ -22,6 +23,7 @@ import {
   Modal,
   Notice,
   Panel,
+  PeriodBarChart,
   Pill,
   ProgressBar,
   SearchInput,
@@ -113,6 +115,7 @@ export default function DesignTestPage() {
           <LinkButton href="/design-test" variant="secondary" iconRight="chevron-right">LinkButton</LinkButton>
           <IconButton icon="refresh" label="Refresh" />
           <IconButton icon="x" label="Close" size="sm" />
+          <BackLink href="/design-test">Back to list</BackLink>
         </div>
       </Section>
 
@@ -214,6 +217,33 @@ export default function DesignTestPage() {
               ]}
             />
           </div>
+        </Panel>
+      </Section>
+
+      <Section title="Period bar chart">
+        <Panel padded>
+          <PeriodBarChart
+            fromDate="2026-08-03"
+            toDate="2026-10-26"
+            bucketDays={7}
+            labelEvery={2}
+            items={[
+              { date: '2026-08-17', value: 7.5 },
+              { date: '2026-08-24', value: 8 },
+              { date: '2026-09-07', value: 6 },
+              { date: '2026-09-28', value: 9 },
+              { date: '2026-10-12', value: 8.5 },
+              { date: '2026-10-19', value: 5 },
+            ]}
+            getDate={(item) => item.date}
+            getValue={(item) => item.value}
+            renderTooltip={(item) => <span>Week of {item.date}: {item.value}/10</span>}
+            min={0}
+            max={10}
+            ticks={[0, 2, 4, 6, 8, 10]}
+            axisLabel="Rating"
+            ariaLabel="Example rating per week"
+          />
         </Panel>
       </Section>
 

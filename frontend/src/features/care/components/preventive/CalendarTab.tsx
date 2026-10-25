@@ -61,8 +61,9 @@ export function CalendarTab() {
         careService.listSchedules({ careType: 'ROUTINE', size: 500 }),
         horseService.listAll().catch(() => []),
       ]);
-      setSchedules(page.content.filter((s) => OPEN_STATUSES.has(s.status)));
-      setHorseNames(new Map(horses.map((h) => [h.id, h.name])));
+      const content = Array.isArray(page?.content) ? page.content : [];
+      setSchedules(content.filter((s) => OPEN_STATUSES.has(s.status)));
+      setHorseNames(new Map((Array.isArray(horses) ? horses : []).map((h) => [h.id, h.name])));
     } catch (cause) {
       setError(displayError(cause, 'Could not load appointments.'));
     } finally {

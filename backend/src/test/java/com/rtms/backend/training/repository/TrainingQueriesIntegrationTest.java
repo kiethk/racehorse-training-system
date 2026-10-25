@@ -1,6 +1,7 @@
 package com.rtms.backend.training.repository;
 
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.RoleRepository;
@@ -22,10 +23,12 @@ import com.rtms.backend.training.dto.HorseStallInfo;
 import com.rtms.backend.training.dto.IncidentCountRow;
 import com.rtms.backend.training.dto.JoinableCohortRow;
 import com.rtms.backend.training.dto.LotHorseNameRow;
+import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PlanNamesRow;
 import com.rtms.backend.training.dto.PlanSummaryResponse;
 import com.rtms.backend.training.dto.PlanWorkoutItemResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
+import com.rtms.backend.training.dto.RunningPlanRow;
 import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
 import com.rtms.backend.training.dto.TrainingLotRow;
 import com.rtms.backend.training.entity.Course;
@@ -211,6 +214,17 @@ class TrainingQueriesIntegrationTest {
         workout.setHorseId(horse.getId());
         workout.setAssignedToId(groom.getId());
         workout.setStatus(status);
+        if (status == WorkoutStatus.COMPLETED) {
+            // The database requires a full result on a COMPLETED workout (chk_workouts_completed_has_result).
+            workout.setActualDistanceMeters(BigDecimal.valueOf(800));
+            workout.setActualDurationMinutes(BigDecimal.valueOf(40));
+            workout.setTopSpeedKmh(BigDecimal.valueOf(60));
+            workout.setAverageSpeedKmh(BigDecimal.valueOf(50));
+            workout.setAverageHeartRate(140);
+            workout.setMaxHeartRate(180);
+            workout.setRecoveryHeartRate(90);
+            workout.setPerformanceRating(8);
+        }
         return workouts.saveAndFlush(workout);
     }
 
@@ -269,17 +283,32 @@ class TrainingQueriesIntegrationTest {
     }
 
     @Test
-    void overlappingPlansAreFoundByDateRange() {
-        List<TrainingPlanStatus> running = List.of(TrainingPlanStatus.ACTIVE, TrainingPlanStatus.UPCOMING);
+    void runningPlansCarryCourseNameAndSkipFinishedOnes() {
+        List<RunningPlanRow> running = plans.findRunningPlans(List.of(horse1.getId()), today.plusDays(5));
+        assertEquals(1, running.size());
+        assertEquals(plan.getId(), running.get(0).planId());
+        assertEquals(course.getName(), running.get(0).courseName());
+        assertEquals(TrainingPlanStatus.ACTIVE, running.get(0).status());
 
-        assertEquals(1, plans.findOverlappingPlans(List.of(horse1.getId()), running,
-                today.plusDays(5), today.plusDays(8)).size());
-        assertTrue(plans.findOverlappingPlans(List.of(horse1.getId()), running,
-                today.plusDays(11), today.plusDays(20)).isEmpty(), "Starts after the plan ends");
-        assertTrue(plans.findOverlappingPlans(List.of(horse2.getId()), running,
-                today, today.plusDays(5)).isEmpty(), "Another horse");
-        assertTrue(plans.findOverlappingPlans(List.of(horse1.getId()), List.of(TrainingPlanStatus.COMPLETED),
-                today, today.plusDays(5)).isEmpty(), "Status filter");
+        assertTrue(plans.findRunningPlans(List.of(horse1.getId()), today.plusDays(11)).isEmpty(),
+                "The plan ends before the given date");
+        assertTrue(plans.findRunningPlans(List.of(horse2.getId()), today).isEmpty(), "Another horse");
+
+        plan.setStatus(TrainingPlanStatus.COMPLETED);
+        plans.saveAndFlush(plan);
+        assertTrue(plans.findRunningPlans(List.of(horse1.getId()), today).isEmpty(), "Only ACTIVE and UPCOMING");
+    }
+
+    @Test
+    void enrollableHorsesAreTheAdmittedHorsesOfTheTrainerAreas() {
+        horse2.setCurrentStatus(HorseStatus.CANDIDATE);
+        horses.saveAndFlush(horse2);
+
+        List<Horse> enrollable = plans.findEnrollableHorses(trainer.getId());
+
+        assertTrue(enrollable.stream().anyMatch(h -> h.getId().equals(horse1.getId())));
+        assertFalse(enrollable.stream().anyMatch(h -> h.getId().equals(horse2.getId())), "Not admitted yet");
+        assertTrue(plans.findEnrollableHorses(groom.getId()).isEmpty(), "Not a trainer of any area");
     }
 
     @Test
@@ -299,7 +328,7 @@ class TrainingQueriesIntegrationTest {
                 && "IT-901".equals(h.stallCode())));
         assertTrue(dashboardHorses.stream().anyMatch(h -> h.horseId().equals(horse2.getId())));
 
-        List<DashboardPlanRow> dashboardPlans = plans.findDashboardPlans(trainer.getId());
+        List<DashboardPlanRow> dashboardPlans = plans.findDashboardPlans(List.of(horse1.getId(), horse2.getId()));
         DashboardPlanRow row = dashboardPlans.stream().filter(p -> p.planId().equals(plan.getId())).findFirst().orElseThrow();
         assertEquals(course.getName(), row.courseName());
         assertEquals(4, row.totalSessions());
@@ -307,6 +336,25 @@ class TrainingQueriesIntegrationTest {
 
         assertTrue(plans.existsHorseInTrainerArea(horse1.getId(), trainer.getId()));
         assertFalse(plans.existsHorseInTrainerArea(horse1.getId(), groom.getId()));
+    }
+
+    @Test
+    void dashboardHorsesOfAnOwnerAndOfTheWholeFarm() {
+        Horse unhoused = new Horse();
+        unhoused.setName("IT Unhoused");
+        unhoused.setOwnerId(owner.getId());
+        unhoused = horses.saveAndFlush(unhoused);
+
+        List<DashboardHorseRow> ownerHorses = plans.findDashboardHorsesOfOwner(owner.getId());
+        assertEquals(2, ownerHorses.size(), "Only the horses of this owner");
+        assertTrue(ownerHorses.stream().anyMatch(h -> h.horseId().equals(horse1.getId()) && "IT-901".equals(h.stallCode())));
+        final Long unhousedId = unhoused.getId();
+        assertTrue(ownerHorses.stream().anyMatch(h -> h.horseId().equals(unhousedId) && h.stallCode() == null),
+                "A horse without a stall is still listed, without a stall code");
+
+        List<DashboardHorseRow> farm = plans.findAllDashboardHorses();
+        assertTrue(farm.stream().anyMatch(h -> h.horseId().equals(horse1.getId())));
+        assertTrue(farm.stream().anyMatch(h -> h.horseId().equals(horse2.getId())), "Horses of other owners too");
     }
 
     // =================================================================
@@ -346,6 +394,32 @@ class TrainingQueriesIntegrationTest {
         assertEquals(1, recent.size());
         assertEquals(230, recent.get(0).maxHeartRate());
         assertEquals(LocalTime.of(7, 0), recent.get(0).lotEndTime());
+    }
+
+    @Test
+    void performanceSessionsCarryTheValuesOfEveryCompletedSession() {
+        TrainingLot yesterdayLot = lots.findById(done.getLotId()).orElseThrow();
+        TrainingWorkout second = workout(yesterdayLot, horse2, WorkoutStatus.COMPLETED);
+        second.setPerformanceRating(6);
+        second.setMaxHeartRate(190);
+        second.setAverageSpeedKmh(BigDecimal.valueOf(40));
+        workouts.saveAndFlush(second);
+
+        List<PerformanceSessionRow> sessions =
+                workouts.findPerformanceSessions(List.of(horse1.getId(), horse2.getId()), today.minusDays(29), today);
+
+        // Today only has scheduled sessions, so only yesterday's two completed ones come back.
+        assertEquals(2, sessions.size());
+        PerformanceSessionRow other = sessions.stream().filter(s -> s.horseId().equals(horse2.getId())).findFirst().orElseThrow();
+        assertEquals(today.minusDays(1), other.date());
+        assertEquals(6, other.rating());
+        assertEquals(190, other.maxHeartRate());
+        assertEquals(0, BigDecimal.valueOf(40).compareTo(other.averageSpeedKmh()));
+
+        assertEquals(1, workouts.findPerformanceSessions(List.of(horse1.getId()), today.minusDays(29), today).size(),
+                "Only the sessions of the given horses count");
+        assertTrue(workouts.findPerformanceSessions(List.of(-1L), today.minusDays(29), today).isEmpty());
+        assertTrue(workouts.findPerformanceSessions(List.of(horse1.getId()), today, today).isEmpty(), "Outside the range");
     }
 
     @Test
@@ -466,8 +540,9 @@ class TrainingQueriesIntegrationTest {
     private TrainingWorkout completedWorkout(TrainingLot lot, Horse horse, Integer rating, BigDecimal actualDistance) {
         TrainingWorkout workout = workout(lot, horse, WorkoutStatus.COMPLETED);
         workout.setPerformanceRating(rating);
-        workout.setActualDistanceMeters(actualDistance);
-        workout.setTopSpeedKmh(BigDecimal.valueOf(60));
+        if (actualDistance != null) {
+            workout.setActualDistanceMeters(actualDistance);
+        }
         return workouts.saveAndFlush(workout);
     }
 
@@ -495,10 +570,9 @@ class TrainingQueriesIntegrationTest {
     }
 
     @Test
-    void specialtyWorkoutsJoinSurfaceAndFallBackToTheTargetDistance() {
+    void specialtyWorkoutsJoinTheSurfaceAndUseTheRecordedDistance() {
         Subject endurance = subjectOf(SubjectCategory.ENDURANCE, SurfaceType.DIRT, BigDecimal.valueOf(1600));
-        // No actual distance recorded: the subject target distance (1600) is used
-        completedWorkout(lotOf(endurance, today.minusDays(3)), horse1, 7, null);
+        completedWorkout(lotOf(endurance, today.minusDays(3)), horse1, 7, BigDecimal.valueOf(1500));
 
         List<SpecialtyWorkoutRow> rows = workouts.findSpecialtyWorkouts(List.of(horse1.getId()), today.minusDays(90));
 
@@ -509,23 +583,22 @@ class TrainingQueriesIntegrationTest {
         assertEquals(8, fixtureRow.performanceRating());
         SpecialtyWorkoutRow fallbackRow = rows.stream()
                 .filter(r -> r.surfaceType() == SurfaceType.DIRT).findFirst().orElseThrow();
-        assertEquals(0, BigDecimal.valueOf(1600).compareTo(fallbackRow.distanceMeters()));
+        assertEquals(0, BigDecimal.valueOf(1500).compareTo(fallbackRow.distanceMeters()));
         assertEquals(horse1.getId(), fallbackRow.horseId());
     }
 
     @Test
-    void specialtyWorkoutsLeaveOutRecoveryUnratedUnfinishedAndOldOnes() {
+    void specialtyWorkoutsLeaveOutRecoveryUnfinishedAndOldOnes() {
         Subject recovery = subjectOf(SubjectCategory.RECOVERY, SurfaceType.SYNTHETIC, BigDecimal.valueOf(500));
         Subject speed = subjectOf(SubjectCategory.SPEED, SurfaceType.TURF, BigDecimal.valueOf(1000));
         completedWorkout(lotOf(recovery, today.minusDays(2)), horse1, 9, null);          // recovery category
-        completedWorkout(lotOf(speed, today.minusDays(3)), horse1, null, null);           // no rating
         workout(lotOf(speed, today.minusDays(4)), horse1, WorkoutStatus.SCHEDULED);       // not completed
         completedWorkout(lotOf(speed, today.minusDays(120)), horse1, 9, null);           // before the window
         completedWorkout(lotOf(speed, today.minusDays(5)), horse2, 9, null);             // another horse
 
         List<SpecialtyWorkoutRow> rows = workouts.findSpecialtyWorkouts(List.of(horse1.getId()), today.minusDays(90));
 
-        assertEquals(1, rows.size(), "Only the fixture's rated, completed, non-recovery, in-window workout is left");
+        assertEquals(1, rows.size(), "Only the fixture's completed, non-recovery, in-window workout is left");
         assertEquals(SurfaceType.TURF, rows.get(0).surfaceType());
         assertEquals(0, BigDecimal.valueOf(800).compareTo(rows.get(0).distanceMeters()));
     }

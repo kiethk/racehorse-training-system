@@ -139,7 +139,12 @@ public class AdmissionQueryService {
                 .findByAdmissionIdInAndDocumentType(ids, AdmissionDocumentType.HORSE_PHOTO).stream()
                 .collect(Collectors.toMap(AdmissionDocument::getAdmissionId, d -> d,
                         (left, right) -> left.getId() <= right.getId() ? left : right));
-        return admissions.stream().map(admission -> {
+        return admissions.stream()
+                .sorted(Comparator.comparing(
+                        AdmissionApplication::getSubmittedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ).reversed().thenComparing(Comparator.comparing(AdmissionApplication::getId).reversed()))
+                .map(admission -> {
             CandidateHorseProfile candidate = candidates.get(admission.getId());
             if (candidate == null) throw new IllegalStateException("Candidate horse profile not found");
             AdmissionDocument photo = photos.get(admission.getId());
@@ -222,9 +227,13 @@ public class AdmissionQueryService {
 
         response.setAdmissionId(admission.getId());
         response.setOwnerId(admission.getOwnerId());
-        response.setOwnerName(admission.getOwnerId() == null ? null
-                : userRepository.findById(admission.getOwnerId())
-                        .map(com.rtms.backend.identity.entity.User::getFullName).orElse(null));
+        if (admission.getOwnerId() != null) {
+            userRepository.findById(admission.getOwnerId()).ifPresent(owner -> {
+                response.setOwnerName(owner.getFullName());
+                response.setOwnerEmail(owner.getEmail());
+                response.setOwnerPhone(owner.getPhone());
+            });
+        }
         response.setStatus(admission.getStatus());
         response.setQuarantineStallId(admission.getQuarantineStallId());
 
@@ -232,6 +241,9 @@ public class AdmissionQueryService {
         response.setDocuments(documents.stream().map(this::toDocumentResponse).toList());
 
         response.setGroomId(admission.getGroomId());
+        response.setGroomName(admission.getGroomId() == null ? null
+                : userRepository.findById(admission.getGroomId())
+                        .map(com.rtms.backend.identity.entity.User::getFullName).orElse(null));
         response.setGroomDecision(admission.getGroomDecision());
         response.setGroomFeedback(admission.getGroomFeedback());
         response.setGroomReviewedAt(admission.getGroomReviewedAt());
@@ -239,6 +251,9 @@ public class AdmissionQueryService {
         response.setArrivedAt(admission.getArrivedAt());
 
         response.setVeterinarianId(admission.getVeterinarianId());
+        response.setVeterinarianName(admission.getVeterinarianId() == null ? null
+                : userRepository.findById(admission.getVeterinarianId())
+                        .map(com.rtms.backend.identity.entity.User::getFullName).orElse(null));
         response.setVetTrainingDecision(admission.getVetTrainingDecision());
         response.setVetFeedback(admission.getVetFeedback());
         response.setVetReviewedAt(admission.getVetReviewedAt());
@@ -253,6 +268,9 @@ public class AdmissionQueryService {
         response.setTrainerReviewedAt(admission.getTrainerReviewedAt());
 
         response.setManagerId(admission.getManagerId());
+        response.setManagerName(admission.getManagerId() == null ? null
+                : userRepository.findById(admission.getManagerId())
+                        .map(com.rtms.backend.identity.entity.User::getFullName).orElse(null));
         response.setManagerDecision(admission.getManagerDecision());
         response.setManagerFeedback(admission.getManagerFeedback());
         response.setManagerReviewedAt(admission.getManagerReviewedAt());
@@ -317,7 +335,14 @@ public class AdmissionQueryService {
                                                     : List.of();
                                     exam.setMetrics(metrics);
                                     response.setInitialVetExam(exam);
+                                    if (response.getVeterinarianName() == null && exam.getVeterinarianName() != null) {
+                                        response.setVeterinarianName(exam.getVeterinarianName());
+                                    }
                                 });
+                        if (response.getVeterinarianName() == null && response.getVeterinarianId() != null) {
+                            response.setVeterinarianName(userRepository.findById(response.getVeterinarianId())
+                                    .map(com.rtms.backend.identity.entity.User::getFullName).orElse(null));
+                        }
                     });
         }
 
@@ -535,8 +560,7 @@ public class AdmissionQueryService {
         List<CareScheduleStatus> activeStatuses = List.of(
                 CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED,
                 CareScheduleStatus.IN_PROGRESS);
-        long total = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
-                vetId, activeStatuses);
+        long total = careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses);
         long active = careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses);
         long awaiting = careScheduleRepository.countActiveVetQueueItems(
                 vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));

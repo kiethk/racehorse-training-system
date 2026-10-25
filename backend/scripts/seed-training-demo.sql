@@ -9,18 +9,189 @@
 -- 5. Tuyet doi KHONG dung ID so cung (local ID != cloud ID)
 -- 6. Idempotent: kiem tra / xoa sach du lieu cu truoc khi nap
 -- 7. Toi uu mui gio 30 ngay va diem phong do (>= 7.0) de suy ra Specialty!
+-- 8. Moi plan di qua pg_temp.seed_plan: ngay buoi tap, bai tap, lot, groom deu theo dung luat cua app
+--    (BR-01/02/03/09/10), nen du lieu seed luon qua duoc cac rang buoc DB (migration V202610251100).
 -- =====================================================================
+
+-- Ngay cac buoi tap: duyet tung ngay tu p_start, lay ngay co thu nam trong p_days, du p_total buoi.
+-- (Session dates: walk day by day from p_start, keep days whose weekday is in p_days, until p_total sessions.)
+CREATE FUNCTION pg_temp.seed_dates(p_start DATE, p_days TEXT, p_total INT) RETURNS DATE[] AS $fn$
+DECLARE
+    v_dates DATE[] := '{}';
+    v_day DATE := p_start;
+BEGIN
+    WHILE COALESCE(ARRAY_LENGTH(v_dates, 1), 0) < p_total LOOP
+        IF position(upper(to_char(v_day, 'FMDAY')) IN p_days) > 0 THEN
+            v_dates := v_dates || v_day;
+        END IF;
+        v_day := v_day + 1;
+    END LOOP;
+    RETURN v_dates;
+END;
+$fn$ LANGUAGE plpgsql;
+
+-- Xep mot buoi tap vao lot: dung lai lot cung ngay + cung bai con cho va chua co groom nay (BR-10, BR-09), neu khong thi
+-- mo lot moi o khe 15 phut dau tien con trong khung gio vang 06:00-10:00 khong dung lot khac (BR-02, BR-03).
+-- (Place a session in a lot: reuse a lot of the same day + subject that has room and not this groom (BR-10, BR-09),
+-- otherwise open a new lot in the first free 15-minute slot of the 06:00-10:00 window overlapping no other lot (BR-02, BR-03).)
+CREATE FUNCTION pg_temp.seed_place(p_trainer BIGINT, p_date DATE, p_subject BIGINT, p_groom BIGINT, p_lot_status TEXT)
+RETURNS BIGINT AS $fn$
+DECLARE
+    v_minutes INT;
+    v_lot BIGINT;
+    v_start TIME := TIME '06:00';
+    v_end TIME;
+BEGIN
+    SELECT duration_minutes INTO v_minutes FROM subjects WHERE id = p_subject;
+
+    IF p_lot_status <> 'CANCELLED' THEN
+        SELECT l.id INTO v_lot
+        FROM training_lots l
+        WHERE l.trainer_id = p_trainer AND l.lot_date = p_date AND l.subject_id = p_subject AND l.status = p_lot_status
+          AND (SELECT count(*) FROM training_workouts w WHERE w.lot_id = l.id AND w.status <> 'CANCELLED') < l.max_capacity
+          AND NOT EXISTS (SELECT 1 FROM training_workouts w
+                          WHERE w.lot_id = l.id AND w.status <> 'CANCELLED' AND w.assigned_to_id = p_groom)
+        ORDER BY l.start_time LIMIT 1;
+        IF v_lot IS NOT NULL THEN
+            RETURN v_lot;
+        END IF;
+
+        LOOP
+            v_end := v_start + make_interval(mins => v_minutes);
+            IF v_end > TIME '10:00' OR v_end < v_start THEN
+                RAISE EXCEPTION 'No free slot in the golden window on % for subject % (seed has too many lots that day)',
+                    p_date, p_subject;
+            END IF;
+            EXIT WHEN NOT EXISTS (SELECT 1 FROM training_lots o
+                                  WHERE o.trainer_id = p_trainer AND o.lot_date = p_date AND o.status <> 'CANCELLED'
+                                    AND o.start_time < v_end AND o.end_time > v_start);
+            v_start := v_start + INTERVAL '15 minutes';
+        END LOOP;
+    END IF;
+
+    v_end := v_start + make_interval(mins => v_minutes);
+    INSERT INTO training_lots (trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at)
+    VALUES (p_trainer, p_subject, p_date, v_start, v_end, 6, p_lot_status, NOW(), NOW())
+    RETURNING id INTO v_lot;
+    RETURN v_lot;
+END;
+$fn$ LANGUAGE plpgsql;
+
+-- Tao mot plan tron ven: dung total_sessions buoi, xoay vong bai cua khoa, chi vao cac thu da chon, groom la groom cua chuong.
+-- p_status: COMPLETED (moi buoi da qua, co ket qua) | ACTIVE (buoi truoc hom nay co ket qua, tu hom nay tro di SCHEDULED)
+--           | UPCOMING (moi buoi SCHEDULED) | CANCELLED (moi buoi CANCELLED).
+-- p_profile: elite | good | steady | fatigue = kieu chi so cua con ngua. p_unrecorded: buoi da qua gan nhat chua ghi ket qua.
+-- (Creates a whole plan: exactly total_sessions sessions, rotating the course subjects, only on the chosen weekdays, with
+-- the stall groom. p_profile picks the horse metrics; p_unrecorded leaves the latest past session without a result.)
+CREATE FUNCTION pg_temp.seed_plan(p_horse BIGINT, p_course BIGINT, p_trainer BIGINT, p_fallback_groom BIGINT,
+                                  p_start DATE, p_days TEXT, p_status TEXT, p_profile TEXT, p_unrecorded BOOLEAN)
+RETURNS BIGINT AS $fn$
+DECLARE
+    v_total INT;
+    v_subjects BIGINT[];
+    v_dates DATE[];
+    v_groom BIGINT;
+    v_plan BIGINT;
+    v_lot BIGINT;
+    v_subject RECORD;
+    v_last_past INT := 0;
+    v_done BOOLEAN;
+    v_lot_status TEXT;
+    v_top NUMERIC; v_avg NUMERIC; v_hr INT; v_max_hr INT; v_rec_hr INT; v_rating INT;
+    i INT;
+BEGIN
+    SELECT total_sessions INTO v_total FROM courses WHERE id = p_course;
+    SELECT ARRAY_AGG(cs.subject_id ORDER BY cs.order_index) INTO v_subjects FROM course_subjects cs WHERE cs.course_id = p_course;
+    v_dates := pg_temp.seed_dates(p_start, p_days, v_total);
+
+    -- Groom cua chuong cua con ngua (BR: groom cua workout = groom chuong). (The groom of the horse stall.)
+    SELECT COALESCE(ss.groom_id, p_fallback_groom) INTO v_groom
+    FROM horses h LEFT JOIN stable_stalls ss ON ss.id = h.current_stall_id WHERE h.id = p_horse;
+
+    -- Trang thai plan phai khop voi ngay. (The plan status must match the dates.)
+    IF (p_status = 'COMPLETED' AND v_dates[v_total] >= CURRENT_DATE)
+       OR (p_status = 'ACTIVE' AND (v_dates[1] > CURRENT_DATE OR v_dates[v_total] < CURRENT_DATE))
+       OR (p_status = 'UPCOMING' AND v_dates[1] <= CURRENT_DATE) THEN
+        RAISE EXCEPTION 'Seed plan % of horse % does not fit its dates %..%', p_status, p_horse, v_dates[1], v_dates[v_total];
+    END IF;
+
+    INSERT INTO horse_training_plans (horse_id, course_id, trainer_id, start_date, end_date, status,
+                                      created_at, updated_at, training_days, groom_id)
+    VALUES (p_horse, p_course, p_trainer, v_dates[1], v_dates[v_total], p_status,
+            LEAST(v_dates[1], CURRENT_DATE)::TIMESTAMP - INTERVAL '3 days', NOW(), p_days, v_groom)
+    RETURNING id INTO v_plan;
+
+    FOR i IN 1..v_total LOOP
+        IF v_dates[i] < CURRENT_DATE THEN v_last_past := i; END IF;
+    END LOOP;
+
+    FOR i IN 1..v_total LOOP
+        SELECT s.id, s.target_distance_meters, s.duration_minutes INTO v_subject
+        FROM subjects s WHERE s.id = v_subjects[((i - 1) % ARRAY_LENGTH(v_subjects, 1)) + 1];
+
+        v_done := p_status = 'COMPLETED' OR (p_status = 'ACTIVE' AND v_dates[i] < CURRENT_DATE
+                                             AND NOT (p_unrecorded AND i = v_last_past));
+        v_lot_status := CASE WHEN p_status = 'CANCELLED' THEN 'CANCELLED'
+                             WHEN v_dates[i] < CURRENT_DATE AND v_done THEN 'COMPLETED'
+                             ELSE 'SCHEDULED' END;
+        v_lot := pg_temp.seed_place(p_trainer, v_dates[i], v_subject.id, v_groom, v_lot_status);
+
+        IF v_done THEN
+            -- Chi so theo kieu ngua; moi gia tri nam trong khoang app cho phep (HR 30-240, avg <= top, diem 1-10).
+            -- (Metrics by horse profile; every value is inside the range the app accepts.)
+            CASE p_profile
+                WHEN 'elite'   THEN v_top := 64.4 + (i % 3) * 0.4; v_avg := 55.1 + (i % 3) * 0.3;
+                                    v_hr := 145; v_max_hr := 178; v_rec_hr := 88; v_rating := 9 + (i % 2);
+                WHEN 'good'    THEN v_top := 61.5 + i * 0.2;       v_avg := 53.0 + i * 0.15;
+                                    v_hr := 142; v_max_hr := 175; v_rec_hr := 85; v_rating := 8 + (i % 2);
+                WHEN 'steady'  THEN v_top := 58.0;                 v_avg := 49.8;
+                                    v_hr := 140; v_max_hr := 170; v_rec_hr := 88; v_rating := 8;
+                ELSE                v_top := 54.2;                 v_avg := 45.0;
+                                    v_hr := 162; v_max_hr := 198; v_rec_hr := 124; v_rating := 3;
+            END CASE;
+
+            INSERT INTO training_workouts (
+                plan_id, horse_id, assigned_to_id, status, actual_distance_meters, actual_duration_minutes,
+                top_speed_kmh, average_speed_kmh, average_heart_rate, max_heart_rate, recovery_heart_rate,
+                performance_rating, trainer_feedback, created_at, updated_at, lot_id
+            ) VALUES (
+                v_plan, p_horse, v_groom, 'COMPLETED', v_subject.target_distance_meters, v_subject.duration_minutes - 4,
+                v_top, v_avg, v_hr, v_max_hr, v_rec_hr, v_rating,
+                CASE p_profile
+                    WHEN 'elite' THEN 'Outstanding burst and recovery rhythm. Stride efficiency at competition standard.'
+                    WHEN 'fatigue' THEN 'Showed sign of hind leg fatigue on final incline. Advised vet evaluation.'
+                    ELSE 'Steady cadence and good recovery throughout the session.' END,
+                v_dates[i] + TIME '10:10:00', v_dates[i] + TIME '10:10:00', v_lot
+            );
+
+            IF p_profile = 'fatigue' THEN
+                INSERT INTO horse_health_metrics (horse_id, recorded_at, heart_rate, temperature, weight, respiratory_rate,
+                                                  hydration_status, body_condition_score, notes, created_at)
+                VALUES (p_horse, v_dates[i] + TIME '10:30:00', 46.0, 38.6, 492.0, 22, 'MILD_DEHYDRATION', 5.0,
+                        '[DEMO-SEED] High recovery heart rate (124 bpm) observed post-uphill gallop. Potential fatigue alert.', NOW());
+            ELSE
+                INSERT INTO horse_health_metrics (horse_id, recorded_at, heart_rate, temperature, weight, respiratory_rate,
+                                                  hydration_status, body_condition_score, notes, created_at)
+                VALUES (p_horse, v_dates[i] + TIME '10:30:00', 37.5 + (i - 1) * 0.3, 38.0, 490.0 + (i - 1), 14,
+                        'OPTIMAL', 6.0, '[DEMO-SEED] Post-workout recovery check.', NOW());
+            END IF;
+        ELSE
+            INSERT INTO training_workouts (plan_id, horse_id, assigned_to_id, status, trainer_feedback, created_at, updated_at, lot_id)
+            VALUES (v_plan, p_horse, v_groom,
+                    CASE WHEN p_status = 'CANCELLED' THEN 'CANCELLED' ELSE 'SCHEDULED' END,
+                    CASE WHEN p_status = 'CANCELLED' THEN 'Session cancelled before commencement.' END,
+                    NOW(), NOW(), v_lot);
+        END IF;
+    END LOOP;
+    RETURN v_plan;
+END;
+$fn$ LANGUAGE plpgsql;
 
 DO $$
 DECLARE
     -- Trainer & Staff IDs (resolved via email)
     v_trainer1 BIGINT;
     v_groom_daniel BIGINT;
-    v_groom_olivia BIGINT;
-    v_groom_alex BIGINT;
-    v_groom_chris BIGINT;
-    v_groom_david BIGINT;
-    v_groom_emma BIGINT;
 
     -- Horses resolved via UELN (registration_number)
     v_horses BIGINT[];
@@ -54,14 +225,8 @@ DECLARE
     v_crs_full_season BIGINT;
 
     -- Iteration variables
-    v_plan_id BIGINT;
-    v_lot_id BIGINT;
-    v_lot_id2 BIGINT;
-    v_lot_id3 BIGINT;
-    v_lot_date DATE;
-    v_horse_id BIGINT;
-    v_groom_id BIGINT;
     v_i INT;
+    v_group INT;
     v_base_date DATE := CURRENT_DATE;
 
 BEGIN
@@ -72,18 +237,8 @@ BEGIN
     END IF;
 
     SELECT id INTO v_groom_daniel FROM users WHERE email = 'daniel.brooks@demo.rtms.example';
-    SELECT id INTO v_groom_olivia FROM users WHERE email = 'olivia.parker@demo.rtms.example';
-    SELECT id INTO v_groom_alex FROM users WHERE email = 'alex.carter@demo.rtms.example';
-    SELECT id INTO v_groom_chris FROM users WHERE email = 'chris.allen@demo.rtms.example';
-    SELECT id INTO v_groom_david FROM users WHERE email = 'david.moore@demo.rtms.example';
-    SELECT id INTO v_groom_emma FROM users WHERE email = 'emma.reed@demo.rtms.example';
 
     IF v_groom_daniel IS NULL THEN SELECT id INTO v_groom_daniel FROM users WHERE role_id = (SELECT id FROM roles WHERE name = 'GROOM') ORDER BY id LIMIT 1; END IF;
-    IF v_groom_olivia IS NULL THEN v_groom_olivia := v_groom_daniel; END IF;
-    IF v_groom_alex IS NULL THEN v_groom_alex := v_groom_daniel; END IF;
-    IF v_groom_chris IS NULL THEN v_groom_chris := v_groom_daniel; END IF;
-    IF v_groom_david IS NULL THEN v_groom_david := v_groom_daniel; END IF;
-    IF v_groom_emma IS NULL THEN v_groom_emma := v_groom_daniel; END IF;
 
     -- 2. RESOLVE HORSES BY AREA CODE ('A', 'B') & UELN (registration_number)
     SELECT ARRAY_AGG(h.id ORDER BY a.code, ss.stall_number)
@@ -194,68 +349,62 @@ BEGIN
     RETURNING id INTO v_sub_trial;
 
     -- 5. INSERT 6 COURSES FOR TRAINER1
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Novice Thoroughbred Foundation', 'Comprehensive foundational program for young or recovering racehorses to build aerobic base and gate composure.', 'Establish consistent stride cadence and calm gate behavior.', 6, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Novice Thoroughbred Foundation', 'Establish consistent stride cadence and calm gate behavior.', 6, NOW(), NOW())
     RETURNING id INTO v_crs_foundation;
 
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Advanced Sprint Acceleration', 'Specialized course designed to shave tenths of a second off initial breakout and final stretch sprint.', 'Maximize top speed and explosive acceleration under race pressure.', 6, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Advanced Sprint Acceleration', 'Maximize top speed and explosive acceleration under race pressure.', 6, NOW(), NOW())
     RETURNING id INTO v_crs_sprint;
 
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Classic Cup Endurance Mastery', 'Intensive stamina builder focusing on maintaining high cruising velocity over 1600m to 2400m distances.', 'Sustain top-tier aerobic stamina through distance races.', 6, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Classic Cup Endurance Mastery', 'Sustain top-tier aerobic stamina through distance races.', 6, NOW(), NOW())
     RETURNING id INTO v_crs_endurance;
 
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Barrier Discipline & Gate Mastery', 'Focused curriculum overcoming gate hesitation and perfecting instant start mechanics.', 'Eliminate hesitation and achieve sub-1.5s gate reaction time.', 4, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Barrier Discipline & Gate Mastery', 'Eliminate hesitation and achieve sub-1.5s gate reaction time.', 4, NOW(), NOW())
     RETURNING id INTO v_crs_gate;
 
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Championship Speed & Trial Protocol', 'Pre-competition peaking course to sharpen speed, tactical positioning, and time trial performance.', 'Peak fitness and official readiness score above 85.', 6, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Championship Speed & Trial Protocol', 'Peak fitness and official readiness score above 85.', 6, NOW(), NOW())
     RETURNING id INTO v_crs_championship;
 
-    INSERT INTO courses (trainer_id, created_by_id, name, description, target_goal, total_sessions, created_at, updated_at)
-    VALUES (v_trainer1, v_trainer1, 'Full-Season Athletic Conditioning', 'Well-rounded athletic cycle balancing endurance, power, high-speed furlongs, and structured hydro-recovery.', 'Maintain prime condition across the active racing season.', 8, NOW(), NOW())
+    INSERT INTO courses (trainer_id, created_by_id, name, target_goal, total_sessions, created_at, updated_at)
+    VALUES (v_trainer1, v_trainer1, 'Full-Season Athletic Conditioning', 'Maintain prime condition across the active racing season.', 8, NOW(), NOW())
     RETURNING id INTO v_crs_full_season;
 
-    -- Link Subjects to Courses (course_subjects)
+    -- Link Subjects to Courses (course_subjects): each subject once; the course repeats the list until total_sessions
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_foundation, v_sub_aerobic, 1, NOW()),
     (v_crs_foundation, v_sub_gate_load, 2, NOW()),
     (v_crs_foundation, v_sub_trot, 3, NOW()),
-    (v_crs_foundation, v_sub_aerobic, 4, NOW()),
-    (v_crs_foundation, v_sub_stride, 5, NOW()),
-    (v_crs_foundation, v_sub_cooling, 6, NOW());
+    (v_crs_foundation, v_sub_stride, 4, NOW()),
+    (v_crs_foundation, v_sub_cooling, 5, NOW());
 
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_sprint, v_sub_gate_sprint, 1, NOW()),
     (v_crs_sprint, v_sub_turn_sprint, 2, NOW()),
     (v_crs_sprint, v_sub_interval, 3, NOW()),
-    (v_crs_sprint, v_sub_turn_sprint, 4, NOW()),
-    (v_crs_sprint, v_sub_trial, 5, NOW()),
-    (v_crs_sprint, v_sub_cooling, 6, NOW());
+    (v_crs_sprint, v_sub_trial, 4, NOW()),
+    (v_crs_sprint, v_sub_cooling, 5, NOW());
 
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_endurance, v_sub_aerobic, 1, NOW()),
     (v_crs_endurance, v_sub_stride, 2, NOW()),
     (v_crs_endurance, v_sub_uphill, 3, NOW()),
-    (v_crs_endurance, v_sub_stride, 4, NOW()),
-    (v_crs_endurance, v_sub_uphill, 5, NOW()),
-    (v_crs_endurance, v_sub_cooling, 6, NOW());
+    (v_crs_endurance, v_sub_cooling, 4, NOW());
 
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_gate, v_sub_gate_load, 1, NOW()),
     (v_crs_gate, v_sub_gate_sprint, 2, NOW()),
-    (v_crs_gate, v_sub_gate_sprint, 3, NOW()),
-    (v_crs_gate, v_sub_turn_sprint, 4, NOW());
+    (v_crs_gate, v_sub_turn_sprint, 3, NOW());
 
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_championship, v_sub_turn_sprint, 1, NOW()),
     (v_crs_championship, v_sub_interval, 2, NOW()),
     (v_crs_championship, v_sub_uphill, 3, NOW()),
     (v_crs_championship, v_sub_trial, 4, NOW()),
-    (v_crs_championship, v_sub_trial, 5, NOW()),
-    (v_crs_championship, v_sub_cooling, 6, NOW());
+    (v_crs_championship, v_sub_cooling, 5, NOW());
 
     INSERT INTO course_subjects (course_id, subject_id, order_index, created_at) VALUES
     (v_crs_full_season, v_sub_aerobic, 1, NOW()),
@@ -271,383 +420,49 @@ BEGIN
     -- 16 Horses enrolled, leaving the last 2 horses (B08 & B09) NOT enrolled!
     -- =========================================================================
 
-    -- A. COMPLETED PLANS (Hoan thanh trong vong 8 - 22 ngay truoc, nam tron trong 30 ngay!)
-    -- Horses 1 to 16 each receive 1 completed plan with HIGH performance ratings (8, 9, 10)
-    -- để đủ điều kiện suy ra SPECIALTY (>= 7.0)!
+    -- A. COMPLETED PLANS: 16 horses in 4 groups (horse i is in group (i-1) % 4), each group on its own course and weekdays.
+    -- Groups start 30..27 days ago so every plan has ended before the ACTIVE/UPCOMING plans below begin, and the high ratings
+    -- (8-10) fall inside the 30-day window needed to infer SPECIALTY (>= 7.0).
     FOR v_i IN 1..LEAST(16, v_horse_count) LOOP
-        v_horse_id := v_horses[v_i];
-        v_groom_id := CASE (v_i % 6)
-            WHEN 1 THEN v_groom_daniel
-            WHEN 2 THEN v_groom_olivia
-            WHEN 3 THEN v_groom_alex
-            WHEN 4 THEN v_groom_chris
-            WHEN 5 THEN v_groom_david
-            ELSE v_groom_emma
-        END;
-
-        INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
-            created_at, updated_at, training_days, groom_id
-        ) VALUES (
-            v_horse_id,
-            CASE (v_i % 3) WHEN 1 THEN v_crs_foundation WHEN 2 THEN v_crs_endurance ELSE v_crs_sprint END,
-            v_trainer1,
-            v_base_date - INTERVAL '22 days',
-            v_base_date - INTERVAL '9 days',
-            'COMPLETED',
-            'Completed intense conditioning block with outstanding speed and stamina progression.',
-            v_base_date - INTERVAL '25 days',
-            v_base_date - INTERVAL '9 days',
-            'MONDAY,WEDNESDAY,FRIDAY',
-            v_groom_id
-        ) RETURNING id INTO v_plan_id;
-
-        FOR k IN 0..5 LOOP
-            v_lot_date := (v_base_date - INTERVAL '21 days')::DATE + (k * 2);
-
-            SELECT id INTO v_lot_id FROM training_lots
-            WHERE trainer_id = v_trainer1 AND lot_date = v_lot_date AND start_time = '06:00:00';
-
-            IF v_lot_id IS NULL THEN
-                INSERT INTO training_lots (trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at)
-                VALUES (
-                    v_trainer1, 
-                    CASE (v_i % 3) WHEN 0 THEN v_sub_interval WHEN 1 THEN v_sub_aerobic ELSE v_sub_stride END,
-                    v_lot_date, '06:00:00', '07:00:00', 6, 'COMPLETED', NOW(), NOW()
-                ) RETURNING id INTO v_lot_id;
-            END IF;
-
-            -- High performance rating: 8, 9, 10 so average rating is ~8.5 (>= 7.0 to trigger Specialty!)
-            INSERT INTO training_workouts (
-                plan_id, horse_id, assigned_to_id, status, actual_distance_meters, actual_duration_minutes,
-                top_speed_kmh, average_speed_kmh, average_heart_rate, max_heart_rate, recovery_heart_rate,
-                performance_rating, trainer_feedback, created_at, updated_at, lot_id
-            ) VALUES (
-                v_plan_id, v_horse_id, v_groom_id, 'COMPLETED',
-                CASE (v_i % 3) WHEN 0 THEN 1200 WHEN 1 THEN 1600 ELSE 2000 END,
-                56, 
-                61.5 + (k * 0.7), 53.0 + (k * 0.5), 142 + (k * 2), 175 + (k * 2), 85 - k,
-                CASE WHEN k >= 4 THEN 9 WHEN k >= 2 THEN 8 ELSE 8 END,
-                'Outstanding burst and recovery rhythm. Stride efficiency at competition standard.',
-                v_lot_date + TIME '07:10:00', v_lot_date + TIME '07:10:00', v_lot_id
-            );
-
-            INSERT INTO horse_health_metrics (
-                horse_id, recorded_at, heart_rate, temperature, weight, respiratory_rate,
-                hydration_status, body_condition_score, notes, created_at
-            ) VALUES (
-                v_horse_id, v_lot_date + TIME '07:30:00',
-                37.5 + (k * 0.3), 38.0, 490.0 + (k * 1.0), 14,
-                'OPTIMAL', 6.0, '[DEMO-SEED] Post-workout recovery check.', NOW()
-            );
-        END LOOP;
+        v_group := (v_i - 1) % 4;
+        PERFORM pg_temp.seed_plan(
+            v_horses[v_i],
+            CASE v_group WHEN 0 THEN v_crs_foundation WHEN 1 THEN v_crs_endurance WHEN 2 THEN v_crs_sprint ELSE v_crs_championship END,
+            v_trainer1, v_groom_daniel,
+            v_base_date - (30 - v_group),
+            CASE v_group WHEN 0 THEN 'FRIDAY,MONDAY,WEDNESDAY' WHEN 1 THEN 'THURSDAY,TUESDAY'
+                         WHEN 2 THEN 'MONDAY,THURSDAY' ELSE 'FRIDAY,TUESDAY' END,
+            'COMPLETED', CASE WHEN v_i % 2 = 0 THEN 'elite' ELSE 'good' END, false);
     END LOOP;
 
-    -- Secondary completed plans for Top 3 horses (completed 40 days ago, ensuring deep historical depth)
+    -- Secondary completed plans for the top 3 horses (45 days ago, historical depth)
     FOR v_i IN 1..LEAST(3, v_horse_count) LOOP
-        v_horse_id := v_horses[v_i];
-        INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
-            created_at, updated_at, training_days, groom_id
-        ) VALUES (
-            v_horse_id, v_crs_gate, v_trainer1,
-            v_base_date - INTERVAL '45 days', v_base_date - INTERVAL '37 days',
-            'COMPLETED',
-            'Pre-season gate orientation course completed successfully.',
-            v_base_date - INTERVAL '48 days', v_base_date - INTERVAL '37 days',
-            'TUESDAY,THURSDAY',
-            v_groom_daniel
-        ) RETURNING id INTO v_plan_id;
-
-        FOR k IN 0..3 LOOP
-            v_lot_date := (v_base_date - INTERVAL '45 days')::DATE + (k * 2);
-            SELECT id INTO v_lot_id FROM training_lots
-            WHERE trainer_id = v_trainer1 AND lot_date = v_lot_date AND start_time = '07:15:00';
-
-            IF v_lot_id IS NULL THEN
-                INSERT INTO training_lots (trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at)
-                VALUES (v_trainer1, v_sub_gate_sprint, v_lot_date, '07:15:00', '08:00:00', 4, 'COMPLETED', NOW(), NOW())
-                RETURNING id INTO v_lot_id;
-            END IF;
-
-            INSERT INTO training_workouts (
-                plan_id, horse_id, assigned_to_id, status, actual_distance_meters, actual_duration_minutes,
-                top_speed_kmh, average_speed_kmh, average_heart_rate, max_heart_rate, recovery_heart_rate,
-                performance_rating, trainer_feedback, created_at, updated_at, lot_id
-            ) VALUES (
-                v_plan_id, v_horse_id, v_groom_daniel, 'COMPLETED',
-                400, 40, 59.0, 48.5, 138, 168, 85,
-                8, 'Sub-1.5s barrier breakout achieved.',
-                v_lot_date + TIME '08:10:00', v_lot_date + TIME '08:10:00', v_lot_id
-            );
-        END LOOP;
+        PERFORM pg_temp.seed_plan(v_horses[v_i], v_crs_gate, v_trainer1, v_groom_daniel,
+                                  v_base_date - 45, 'THURSDAY,TUESDAY', 'COMPLETED', 'good', false);
     END LOOP;
 
     -- B. ACTIVE PLANS (4 plans: Nausicaa, Eagle Atena, Si Renesme, Enuma)
-    -- Group Lot: Nausicaa & Eagle Atena paired in Slot 1 (06:00 - 07:00)
-    -- Si Renesme in Slot 2 (07:15 - 08:15)
-    -- Enuma in Slot 3 (08:30 - 09:30) with Fatigue Risk Alert
-    -- ZERO OVERLAPS!
-    -- =========================================================================
-    DECLARE
-        v_plan_id_h1 BIGINT;
-        v_plan_id_h2 BIGINT;
-        v_plan_id_h3 BIGINT;
-        v_plan_id_h4 BIGINT;
-    BEGIN
-        INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
-            created_at, updated_at, training_days, groom_id
-        ) VALUES (
-            v_h_nausicaa, v_crs_sprint, v_trainer1,
-            v_base_date - INTERVAL '7 days', v_base_date + INTERVAL '14 days',
-            'ACTIVE', 'Peak sprint acceleration cycle before upcoming Class 1 Handicap.',
-            v_base_date - INTERVAL '10 days', v_base_date,
-            'MONDAY,WEDNESDAY,FRIDAY', v_groom_daniel
-        ) RETURNING id INTO v_plan_id_h1;
-
-        INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
-            created_at, updated_at, training_days, groom_id
-        ) VALUES (
-            v_h_eagle, v_crs_sprint, v_trainer1,
-            v_base_date - INTERVAL '7 days', v_base_date + INTERVAL '14 days',
-            'ACTIVE', 'Sprint acceleration pairing with Nausicaa By Nika.',
-            v_base_date - INTERVAL '10 days', v_base_date,
-            'MONDAY,WEDNESDAY,FRIDAY', v_groom_daniel
-        ) RETURNING id INTO v_plan_id_h2;
-
-        INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
-            created_at, updated_at, training_days, groom_id
-        ) VALUES (
-            v_h_si_renesme, v_crs_endurance, v_trainer1,
-            v_base_date - INTERVAL '5 days', v_base_date + INTERVAL '16 days',
-            'ACTIVE', 'Mid-season distance aerobic stamina build.',
-            v_base_date - INTERVAL '8 days', v_base_date,
-            'MONDAY,WEDNESDAY,FRIDAY', v_groom_olivia
-        ) RETURNING id INTO v_plan_id_h3;
-
-        INSERT INTO horse_training_plans (
-            horse_id, course_id, trainer_id, start_date, end_date, status, notes,
-            created_at, updated_at, training_days, groom_id
-        ) VALUES (
-            v_h_enuma, v_crs_championship, v_trainer1,
-            v_base_date - INTERVAL '6 days', v_base_date + INTERVAL '15 days',
-            'ACTIVE', 'High intensity championship prep. Monitored for potential muscular fatigue.',
-            v_base_date - INTERVAL '9 days', v_base_date,
-            'MONDAY,WEDNESDAY,FRIDAY', v_groom_olivia
-        ) RETURNING id INTO v_plan_id_h4;
-
-        FOR k IN 0..5 LOOP
-            v_lot_date := (v_base_date - INTERVAL '4 days')::DATE + (k * 2);
-
-            -- Slot 1: Shared Lot for Nausicaa & Eagle Atena
-            INSERT INTO training_lots (
-                trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at
-            ) VALUES (
-                v_trainer1, v_sub_turn_sprint, v_lot_date, '06:00:00', '07:00:00', 4,
-                CASE WHEN v_lot_date < v_base_date THEN 'COMPLETED' ELSE 'SCHEDULED' END,
-                NOW(), NOW()
-            ) RETURNING id INTO v_lot_id;
-
-            -- Slot 2: Lot for Si Renesme
-            INSERT INTO training_lots (
-                trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at
-            ) VALUES (
-                v_trainer1, v_sub_stride, v_lot_date, '07:15:00', '08:15:00', 4,
-                CASE WHEN v_lot_date < v_base_date THEN 'COMPLETED' ELSE 'SCHEDULED' END,
-                NOW(), NOW()
-            ) RETURNING id INTO v_lot_id2;
-
-            -- Slot 3: Lot for Enuma (Fatigue Risk Alert)
-            INSERT INTO training_lots (
-                trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at
-            ) VALUES (
-                v_trainer1, v_sub_uphill, v_lot_date, '08:30:00', '09:30:00', 4,
-                CASE WHEN v_lot_date < v_base_date THEN 'COMPLETED' ELSE 'SCHEDULED' END,
-                NOW(), NOW()
-            ) RETURNING id INTO v_lot_id3;
-
-            -- Workouts for Nausicaa (Rating 9/10!)
-            INSERT INTO training_workouts (
-                plan_id, horse_id, assigned_to_id, status, actual_distance_meters, actual_duration_minutes,
-                top_speed_kmh, average_speed_kmh, average_heart_rate, max_heart_rate, recovery_heart_rate,
-                performance_rating, trainer_feedback, created_at, updated_at, lot_id
-            ) VALUES (
-                v_plan_id_h1, v_h_nausicaa, v_groom_daniel,
-                CASE WHEN v_lot_date < v_base_date THEN 'COMPLETED' ELSE 'SCHEDULED' END,
-                CASE WHEN v_lot_date < v_base_date THEN 1000 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 55 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 64.4 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 55.1 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 145 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 178 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 88 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 9 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 'Exceptional bend exit and explosive acceleration.' ELSE NULL END,
-                NOW(), NOW(), v_lot_id
-            );
-
-            -- Workouts for Eagle Atena (Rating 8/10!)
-            INSERT INTO training_workouts (
-                plan_id, horse_id, assigned_to_id, status, actual_distance_meters, actual_duration_minutes,
-                top_speed_kmh, average_speed_kmh, average_heart_rate, max_heart_rate, recovery_heart_rate,
-                performance_rating, trainer_feedback, created_at, updated_at, lot_id
-            ) VALUES (
-                v_plan_id_h2, v_h_eagle, v_groom_daniel,
-                CASE WHEN v_lot_date < v_base_date THEN 'COMPLETED' ELSE 'SCHEDULED' END,
-                CASE WHEN v_lot_date < v_base_date THEN 1000 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 56 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 63.8 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 54.5 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 148 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 180 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 90 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 8 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 'Kept up very well with Nausicaa on turn 3.' ELSE NULL END,
-                NOW(), NOW(), v_lot_id
-            );
-
-            -- Workouts for Si Renesme (Rating 8/10!)
-            INSERT INTO training_workouts (
-                plan_id, horse_id, assigned_to_id, status, actual_distance_meters, actual_duration_minutes,
-                top_speed_kmh, average_speed_kmh, average_heart_rate, max_heart_rate, recovery_heart_rate,
-                performance_rating, trainer_feedback, created_at, updated_at, lot_id
-            ) VALUES (
-                v_plan_id_h3, v_h_si_renesme, v_groom_olivia,
-                CASE WHEN v_lot_date < v_base_date THEN 'COMPLETED' ELSE 'SCHEDULED' END,
-                CASE WHEN v_lot_date < v_base_date THEN 2000 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 60 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 58.0 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 49.8 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 140 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 170 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 88 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 8 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 'Steady cadence throughout 2000m.' ELSE NULL END,
-                NOW(), NOW(), v_lot_id2
-            );
-
-            -- Workouts for Enuma (Fatigue Risk Alert: rating 3/10)
-            INSERT INTO training_workouts (
-                plan_id, horse_id, assigned_to_id, status, actual_distance_meters, actual_duration_minutes,
-                top_speed_kmh, average_speed_kmh, average_heart_rate, max_heart_rate, recovery_heart_rate,
-                performance_rating, trainer_feedback, created_at, updated_at, lot_id
-            ) VALUES (
-                v_plan_id_h4, v_h_enuma, v_groom_olivia,
-                CASE WHEN v_lot_date < v_base_date THEN 'COMPLETED' ELSE 'SCHEDULED' END,
-                CASE WHEN v_lot_date < v_base_date THEN 1600 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 65 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 54.2 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 45.0 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 162 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 198 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 124 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 3 ELSE NULL END,
-                CASE WHEN v_lot_date < v_base_date THEN 'Showed sign of hind leg fatigue on final incline. Advised vet evaluation.' ELSE NULL END,
-                NOW(), NOW(), v_lot_id3
-            );
-
-            IF v_lot_date < v_base_date THEN
-                INSERT INTO horse_health_metrics (
-                    horse_id, recorded_at, heart_rate, temperature, weight, respiratory_rate,
-                    hydration_status, body_condition_score, notes, created_at
-                ) VALUES (
-                    v_h_enuma, v_lot_date + TIME '09:45:00',
-                    46.0, 38.6, 492.0, 22,
-                    'MILD_DEHYDRATION', 5.0,
-                    '[DEMO-SEED] High recovery heart rate (124 bpm) observed post-uphill gallop. Potential fatigue alert.',
-                    NOW()
-                );
-            END IF;
-
-        END LOOP;
-    END;
+    -- Nausicaa & Enuma take the same course and weekdays, so their sessions share a lot (they have different grooms).
+    -- Si Renesme keeps her latest past session unrecorded, so the "record result" flow can be demoed.
+    -- Enuma carries the fatigue risk alert.
+    PERFORM pg_temp.seed_plan(v_h_nausicaa, v_crs_sprint, v_trainer1, v_groom_daniel,
+                              v_base_date - 4, 'FRIDAY,MONDAY,WEDNESDAY', 'ACTIVE', 'elite', false);
+    PERFORM pg_temp.seed_plan(v_h_enuma, v_crs_sprint, v_trainer1, v_groom_daniel,
+                              v_base_date - 4, 'FRIDAY,MONDAY,WEDNESDAY', 'ACTIVE', 'fatigue', false);
+    PERFORM pg_temp.seed_plan(v_h_eagle, v_crs_championship, v_trainer1, v_groom_daniel,
+                              v_base_date - 4, 'FRIDAY,MONDAY,WEDNESDAY', 'ACTIVE', 'good', false);
+    PERFORM pg_temp.seed_plan(v_h_si_renesme, v_crs_endurance, v_trainer1, v_groom_daniel,
+                              v_base_date - 4, 'FRIDAY,MONDAY,WEDNESDAY', 'ACTIVE', 'steady', true);
 
     -- C. UPCOMING PLANS (2 plans: Douglas & Imperium)
-    -- =========================================================================
-    INSERT INTO horse_training_plans (
-        horse_id, course_id, trainer_id, start_date, end_date, status, notes,
-        created_at, updated_at, training_days, groom_id
-    ) VALUES (
-        v_h_douglas, v_crs_foundation, v_trainer1,
-        v_base_date + INTERVAL '5 days', v_base_date + INTERVAL '26 days',
-        'UPCOMING', 'Scheduled intake for spring foundation cycle.',
-        NOW(), NOW(), 'TUESDAY,THURSDAY', v_groom_alex
-    ) RETURNING id INTO v_plan_id;
+    PERFORM pg_temp.seed_plan(v_h_douglas, v_crs_foundation, v_trainer1, v_groom_daniel,
+                              v_base_date + 5, 'THURSDAY,TUESDAY', 'UPCOMING', 'good', false);
+    PERFORM pg_temp.seed_plan(v_h_imperium, v_crs_endurance, v_trainer1, v_groom_daniel,
+                              v_base_date + 7, 'FRIDAY,MONDAY,WEDNESDAY', 'UPCOMING', 'good', false);
 
-    FOR k IN 0..3 LOOP
-        v_lot_date := (v_base_date + INTERVAL '5 days')::DATE + (k * 2);
-        SELECT id INTO v_lot_id FROM training_lots
-        WHERE trainer_id = v_trainer1 AND lot_date = v_lot_date AND start_time = '06:00:00';
-
-        IF v_lot_id IS NULL THEN
-            INSERT INTO training_lots (trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at)
-            VALUES (v_trainer1, v_sub_aerobic, v_lot_date, '06:00:00', '07:00:00', 6, 'SCHEDULED', NOW(), NOW())
-            RETURNING id INTO v_lot_id;
-        END IF;
-
-        INSERT INTO training_workouts (
-            plan_id, horse_id, assigned_to_id, status, created_at, updated_at, lot_id
-        ) VALUES (
-            v_plan_id, v_h_douglas, v_groom_alex, 'SCHEDULED', NOW(), NOW(), v_lot_id
-        );
-    END LOOP;
-
-    INSERT INTO horse_training_plans (
-        horse_id, course_id, trainer_id, start_date, end_date, status, notes,
-        created_at, updated_at, training_days, groom_id
-    ) VALUES (
-        v_h_imperium, v_crs_endurance, v_trainer1,
-        v_base_date + INTERVAL '7 days', v_base_date + INTERVAL '28 days',
-        'UPCOMING', 'Scheduled long-distance conditioning for summer cup preparation.',
-        NOW(), NOW(), 'MONDAY,WEDNESDAY,FRIDAY', v_groom_alex
-    ) RETURNING id INTO v_plan_id;
-
-    FOR k IN 0..3 LOOP
-        v_lot_date := (v_base_date + INTERVAL '7 days')::DATE + (k * 2);
-        SELECT id INTO v_lot_id FROM training_lots
-        WHERE trainer_id = v_trainer1 AND lot_date = v_lot_date AND start_time = '07:15:00';
-
-        IF v_lot_id IS NULL THEN
-            INSERT INTO training_lots (trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at)
-            VALUES (v_trainer1, v_sub_stride, v_lot_date, '07:15:00', '08:15:00', 4, 'SCHEDULED', NOW(), NOW())
-            RETURNING id INTO v_lot_id;
-        END IF;
-
-        INSERT INTO training_workouts (
-            plan_id, horse_id, assigned_to_id, status, created_at, updated_at, lot_id
-        ) VALUES (
-            v_plan_id, v_h_imperium, v_groom_alex, 'SCHEDULED', NOW(), NOW(), v_lot_id
-        );
-    END LOOP;
-
-    -- D. CANCELLED PLAN (1 plan: AG Nobel Emir)
-    -- =========================================================================
-    INSERT INTO horse_training_plans (
-        horse_id, course_id, trainer_id, start_date, end_date, status, notes,
-        created_at, updated_at, training_days, groom_id
-    ) VALUES (
-        v_h_nobel, v_crs_sprint, v_trainer1,
-        v_base_date - INTERVAL '15 days', v_base_date + INTERVAL '5 days',
-        'CANCELLED', 'Plan cancelled due to minor hoof bruising during pasture turnout. Rest advised by vet.',
-        v_base_date - INTERVAL '18 days', v_base_date - INTERVAL '10 days',
-        'TUESDAY,THURSDAY', v_groom_alex
-    ) RETURNING id INTO v_plan_id;
-
-    INSERT INTO training_lots (
-        trainer_id, subject_id, lot_date, start_time, end_time, max_capacity, status, created_at, updated_at
-    ) VALUES (
-        v_trainer1, v_sub_gate_sprint, (v_base_date - INTERVAL '14 days')::DATE, '08:30:00', '09:30:00', 4,
-        'CANCELLED', NOW(), NOW()
-    ) RETURNING id INTO v_lot_id;
-
-    INSERT INTO training_workouts (
-        plan_id, horse_id, assigned_to_id, status, trainer_feedback, created_at, updated_at, lot_id
-    ) VALUES (
-        v_plan_id, v_h_nobel, v_groom_alex, 'CANCELLED', 'Session cancelled before commencement.', NOW(), NOW(), v_lot_id
-    );
+    -- D. CANCELLED PLAN (1 plan: AG Nobel Emir): every session and lot is cancelled
+    PERFORM pg_temp.seed_plan(v_h_nobel, v_crs_sprint, v_trainer1, v_groom_daniel,
+                              v_base_date - 3, 'THURSDAY,TUESDAY', 'CANCELLED', 'good', false);
 
     RAISE NOTICE 'TRAINING DEMO SEED COMPLETED SUCCESSFULLY FOR TRAINER ID %!', v_trainer1;
 END $$;

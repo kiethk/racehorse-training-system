@@ -21,6 +21,12 @@ export interface UnreadCountResponse {
   unreadCount: number;
 }
 
+export interface NotificationFeedResponse {
+  content: NotificationItem[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
 export interface NotificationPageResponse {
   content: NotificationItem[];
   totalElements: number;

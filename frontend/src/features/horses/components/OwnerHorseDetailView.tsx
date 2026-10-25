@@ -30,7 +30,7 @@ import { HorseMetricsRow } from '@/features/training/components/HorseMetricsRow'
 import { WorkoutHistoryTable } from '@/features/training/components/WorkoutHistoryTable';
 import type { Horse } from '@/features/stable/types';
 import type { HorseHealthMetric, HorsePedigree, HorseSpecialty } from '../types';
-import type { HorseAlert, HorseFitnessTrendItem, ReadinessAssessment } from '@/features/training/types';
+import type { HorseAlert, HorseFitnessTrendItem } from '@/features/training/types';
 import type { RaceRegistrationResponse } from '@/features/racing/types';
 import { displayError, formatDate } from '@/lib/display';
 
@@ -51,7 +51,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
 
   // Training data
   const [trend, setTrend] = useState<HorseFitnessTrendItem[]>([]);
-  const [readiness, setReadiness] = useState<ReadinessAssessment[]>([]);
   const [alerts, setAlerts] = useState<HorseAlert[]>([]);
 
   // Health data
@@ -73,7 +72,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         specialtyData,
         pedigreeData,
         trendData,
-        readinessData,
         alertData,
         metricsData,
         preventiveData,
@@ -83,7 +81,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         horseService.getSpecialty(horseId).catch(() => null),
         horseService.getPedigree(horseId).catch(() => null),
         trainingService.getFitnessTrend(horseId).catch(() => []),
-        trainingService.getReadinessHistory(horseId, false).catch(() => []),
         trainingService.getHorseAlerts(horseId).catch(() => []),
         horseService.getHealthMetrics(horseId).catch(() => []),
         horseService.getPreventiveCare(horseId).catch(() => []),
@@ -94,7 +91,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
       setSpecialty(specialtyData);
       setPedigree(pedigreeData);
       setTrend(trendData);
-      setReadiness(readinessData);
       setAlerts(alertData);
       setHealthMetrics(metricsData);
       setPreventiveCare(preventiveData);
@@ -258,7 +254,7 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
           <HorseMetricsRow trend={trend} rules={rules} />
 
           {/* Charts (Heart rate, speed, performance rating) */}
-          <FitnessTrendChart trend={trend} readiness={readiness} rules={rules} />
+          <FitnessTrendChart trend={trend} rules={rules} />
 
           {/* Completed Workouts Table */}
           <WorkoutHistoryTable trend={trend} rules={rules} loading={false} />

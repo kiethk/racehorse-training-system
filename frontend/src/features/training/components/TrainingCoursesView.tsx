@@ -12,10 +12,7 @@ export function TrainingCoursesView() {
 
   return (
     <ScreenLayout variant="list">
-      <PageHeader
-        title="Training"
-        description="Build subjects, combine them into courses, and enroll horses."
-      />
+      <PageHeader title="Training" />
       <Tabs
         tabs={[
           { id: 'courses', label: 'Training courses', icon: 'activity' },

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { planProgress } from '../lib/planProgress.ts';
 import { ratingDistribution, ratingTier, ratingTone } from '../lib/rating.ts';
 import { lotFillTone, PLAN_STATUS } from '../lib/status.ts';
-import { hourMarks, minutesOf, stripPosition } from '../lib/timeline.ts';
-import { rangeForPreset, rangeLabel, toIsoDate, tomorrowIso } from '../lib/dateRange.ts';
+import { clockOf, hourMarks, lotStartOptions, minutesOf, snapLotStart, stripPosition } from '../lib/timeline.ts';
+import { rangeForPreset, rangeLabel, shiftIsoDate, toIsoDate, tomorrowIso } from '../lib/dateRange.ts';
 
 describe('planProgress', () => {
   it('removes cancelled sessions from the denominator so the plan can reach 100%', () => {
@@ -100,6 +100,28 @@ describe('schedule timeline', () => {
   it('marks every full hour of the window', () => {
     assert.deepEqual(hourMarks('06:00:00', '10:00:00').map((m) => m.label), ['06:00', '07:00', '08:00', '09:00', '10:00']);
     assert.equal(hourMarks('06:00:00', '10:00:00')[2].percent, 50);
+  });
+
+  it('offers only quarter-hour starts that keep the lot inside the window', () => {
+    const options = lotStartOptions('06:00:00', '10:00:00', 60, 15);
+    assert.equal(options[0], '06:00');
+    assert.equal(options[1], '06:15');
+    assert.equal(options.at(-1), '09:00');
+    assert.equal(clockOf(405), '06:45');
+  });
+
+  it('snaps a dragged lot to the nearest step and keeps it inside the window', () => {
+    assert.equal(snapLotStart(429, 60, 15, '06:00:00', '10:00:00'), 435); // 07:09 -> 07:15
+    assert.equal(snapLotStart(427, 60, 15, '06:00:00', '10:00:00'), 420); // 07:07 -> 07:00
+    assert.equal(snapLotStart(300, 60, 15, '06:00:00', '10:00:00'), 360); // before 06:00 -> 06:00
+    assert.equal(snapLotStart(590, 60, 15, '06:00:00', '10:00:00'), 540); // would end after 10:00 -> 09:00
+  });
+});
+
+describe('shiftIsoDate', () => {
+  it('crosses month and year ends', () => {
+    assert.equal(shiftIsoDate('2026-10-31', 1), '2026-11-01');
+    assert.equal(shiftIsoDate('2027-01-01', -1), '2026-12-31');
   });
 });
 

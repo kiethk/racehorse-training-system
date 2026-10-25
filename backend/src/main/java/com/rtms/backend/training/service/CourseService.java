@@ -1,5 +1,6 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CourseDetailResponse;
 import com.rtms.backend.training.dto.CourseSubjectItemRequest;
@@ -14,7 +15,14 @@ import com.rtms.backend.training.repository.SubjectRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 public class CourseService {
@@ -50,12 +58,7 @@ public class CourseService {
     public CourseDetailResponse getCourseById(Long id, AuthenticatedUser currentUser) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Course not found with id: " + id));
-
-        if (currentUser != null && "HEAD_TRAINER".equals(currentUser.getRole())
-                && course.getTrainerId() != null && !course.getTrainerId().equals(currentUser.getUserId())) {
-            throw new RuntimeException("Course not found with id: " + id);
-        }
-
+        assertCanSee(course, currentUser);
         return new CourseDetailResponse(course, courseSubjectRepository.findCourseSubjectResponses(id));
     }
 
@@ -66,29 +69,36 @@ public class CourseService {
         return trainerId;
     }
 
+    /** Một Trainer chỉ thấy khóa của mình; khóa của người khác báo "không tìm thấy". (A trainer only sees their own courses; another trainer course is "not found".) */
+    private void assertCanSee(Course course, AuthenticatedUser currentUser) {
+        if (currentUser != null && "HEAD_TRAINER".equals(currentUser.getRole())
+                && course.getTrainerId() != null && !course.getTrainerId().equals(currentUser.getUserId())) {
+            throw new RuntimeException("Course not found with id: " + course.getId());
+        }
+    }
+
+    /**
+     * Tạo khóa cùng vòng xoay các bài. Chủ của khóa là người đang đăng nhập, không bao giờ do client chọn.
+     * (Creates a course with its subject rotation. The owner is the signed-in user, never chosen by the client.)
+     */
     @Transactional
     public CourseDetailResponse createCourse(CreateCourseRequest request, AuthenticatedUser currentUser) {
-        Long trainerId = request.getTrainerId() != null
-                ? request.getTrainerId()
-                : (currentUser != null ? currentUser.getUserId() : null);
+        Long trainerId = currentUser != null ? currentUser.getUserId() : null;
+        String name = request.getName().trim();
 
-        if (trainerId != null) {
-            if (courseRepository.existsByNameAndTrainerId(request.getName(), trainerId)) {
-                throw new IllegalArgumentException("A course named '" + request.getName() + "' already exists for this trainer!");
-            }
-        } else {
-            if (courseRepository.existsByName(request.getName())) {
-                throw new IllegalArgumentException("A course named '" + request.getName() + "' already exists!");
-            }
+        boolean taken = trainerId != null
+                ? courseRepository.existsByNameIgnoreCaseAndTrainerId(name, trainerId)
+                : courseRepository.existsByNameIgnoreCase(name);
+        if (taken) {
+            throw new IllegalArgumentException("A course named '" + name + "' already exists!");
         }
 
         Course course = new Course();
-        course.setName(request.getName());
-        course.setDescription(request.getDescription());
-        course.setTargetGoal(request.getTargetGoal());
+        course.setName(name);
+        course.setTargetGoal(blankToNull(request.getTargetGoal()));
         course.setTotalSessions(request.getTotalSessions());
         course.setTrainerId(trainerId);
-        course.setCreatedById(currentUser != null ? currentUser.getUserId() : trainerId);
+        course.setCreatedById(trainerId);
 
         Course savedCourse = courseRepository.save(course);
         addSubjects(savedCourse.getId(), request.getSubjects(), trainerId);
@@ -98,62 +108,92 @@ public class CourseService {
     }
 
     /**
-     * Gắn các bài tập vào khóa; thứ tự mặc định là 1, 2, 3... nếu request không nêu orderIndex.
-     * (Attaches subjects to the course; the default order is 1, 2, 3... when the request gives no orderIndex.)
+     * Gắn các bài vào khóa và ĐÁNH SỐ LẠI vòng xoay 1..n theo thứ tự client gửi (orderIndex chỉ dùng để sắp xếp). Nhờ vậy số
+     * thứ tự trùng, âm, thiếu hay có khoảng trống đều cho ra một vòng xoay hợp lệ thay vì một lỗi DB.
+     * (Attaches the subjects and RENUMBERS the rotation 1..n in the order the client sent (orderIndex only sorts). Duplicate,
+     * negative, missing or gapped numbers then give a valid rotation instead of a DB error.)
      */
     private void addSubjects(Long courseId, List<CourseSubjectItemRequest> items, Long courseTrainerId) {
-        if (items == null || items.isEmpty()) {
-            return;
+        Set<Long> seen = new HashSet<>();
+        for (CourseSubjectItemRequest item : items) {
+            // Khóa xoay vòng qua danh sách bài, nên mỗi bài chỉ có một lần.
+            // (The course rotates through the subject list, so each subject appears once.)
+            if (!seen.add(item.getSubjectId())) {
+                throw new IllegalArgumentException("Subject #" + item.getSubjectId() + " is already in this course!");
+            }
         }
 
-        int defaultIndex = 1;
-        for (CourseSubjectItemRequest item : items) {
-            // Kiểm tra bài tập có tồn tại trong ngân hàng không (check the subject exists in the bank)
-            if (!subjectRepository.existsById(item.getSubjectId())) {
-                throw new IllegalArgumentException("Subject not found with id: " + item.getSubjectId());
+        Map<Long, Subject> subjectsById = subjectRepository.findAllById(seen).stream()
+                .collect(Collectors.toMap(Subject::getId, Function.identity()));
+        for (Long subjectId : seen) {
+            Subject subject = subjectsById.get(subjectId);
+            if (subject == null) {
+                throw new IllegalArgumentException("Subject not found with id: " + subjectId);
             }
+            assertSubjectBelongsTo(subject, courseTrainerId);
+        }
 
-            if (courseTrainerId != null) {
-                subjectRepository.findById(item.getSubjectId()).ifPresent(sub -> {
-                    if (sub.getTrainerId() != null && !courseTrainerId.equals(sub.getTrainerId())) {
-                        throw new IllegalArgumentException("Subject '" + sub.getName() + "' (#" + item.getSubjectId()
-                                + ") does not belong to this trainer!");
-                    }
-                });
-            }
+        List<CourseSubjectItemRequest> inRotationOrder = IntStream.range(0, items.size())
+                .boxed()
+                .sorted(Comparator
+                        .comparing((Integer position) -> items.get(position).getOrderIndex() == null)
+                        .thenComparing(position -> items.get(position).getOrderIndex() == null
+                                ? 0 : items.get(position).getOrderIndex())
+                        .thenComparing(Comparator.naturalOrder()))
+                .map(items::get)
+                .toList();
 
+        int order = 1;
+        for (CourseSubjectItemRequest item : inRotationOrder) {
             CourseSubject courseSubject = new CourseSubject();
             courseSubject.setCourseId(courseId);
             courseSubject.setSubjectId(item.getSubjectId());
-            courseSubject.setOrderIndex(item.getOrderIndex() != null ? item.getOrderIndex() : defaultIndex++);
+            courseSubject.setOrderIndex(order++);
             courseSubjectRepository.save(courseSubject);
         }
     }
 
-    @Transactional
-    public CourseSubjectResponse addSubjectToCourse(Long courseId, CourseSubjectItemRequest request) {
-        if (!courseRepository.existsById(courseId)) {
-            throw new RuntimeException("Course not found with id: " + courseId);
+    private void assertSubjectBelongsTo(Subject subject, Long courseTrainerId) {
+        if (courseTrainerId != null && subject.getTrainerId() != null && !courseTrainerId.equals(subject.getTrainerId())) {
+            throw new IllegalArgumentException("Subject '" + subject.getName() + "' (#" + subject.getId()
+                    + ") does not belong to this trainer!");
         }
+    }
+
+    /**
+     * Thêm một bài vào CUỐI vòng xoay của khóa. Chỉ chủ khóa mới được thêm; khóa của người khác báo "không tìm thấy".
+     * (Adds a subject at the END of the course rotation. Only the owner may add; another trainer course is "not found".)
+     */
+    @Transactional
+    public CourseSubjectResponse addSubjectToCourse(Long courseId, CourseSubjectItemRequest request,
+                                                    AuthenticatedUser currentUser) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found with id: " + courseId));
+        assertCanSee(course, currentUser);
 
         Subject subject = subjectRepository.findById(request.getSubjectId())
                 .orElseThrow(() -> new IllegalArgumentException("Subject not found with id: " + request.getSubjectId()));
+        assertSubjectBelongsTo(subject, course.getTrainerId());
 
-        courseRepository.findById(courseId).ifPresent(course -> {
-            if (course.getTrainerId() != null && subject.getTrainerId() != null
-                    && !course.getTrainerId().equals(subject.getTrainerId())) {
-                throw new IllegalArgumentException("Subject '" + subject.getName() + "' does not belong to this course's trainer!");
-            }
-        });
+        if (courseSubjectRepository.existsByCourseIdAndSubjectId(courseId, subject.getId())) {
+            throw new IllegalArgumentException("Subject '" + subject.getName() + "' is already in this course!");
+        }
+        if (courseSubjectRepository.countByCourseId(courseId) >= TrainingLimits.MAX_COURSE_SUBJECTS) {
+            throw new IllegalArgumentException("A course can have at most " + TrainingLimits.MAX_COURSE_SUBJECTS + " subjects!");
+        }
 
         CourseSubject courseSubject = new CourseSubject();
         courseSubject.setCourseId(courseId);
-        courseSubject.setSubjectId(request.getSubjectId());
-        courseSubject.setOrderIndex(request.getOrderIndex());
+        courseSubject.setSubjectId(subject.getId());
+        courseSubject.setOrderIndex(courseSubjectRepository.findMaxOrderIndex(courseId) + 1);
 
         CourseSubject saved = courseSubjectRepository.save(courseSubject);
         return new CourseSubjectResponse(saved.getId(), subject.getId(), subject.getName(),
                 subject.getDescription(), subject.getSurfaceType(), subject.getTargetDistanceMeters(),
                 subject.getIntensityLevel(), saved.getOrderIndex(), subject.getDurationMinutes());
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text.trim();
     }
 }

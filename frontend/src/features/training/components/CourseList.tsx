@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, EmptyState, Icon, LinkButton, ListSkeleton, PageSection, Panel, Pill } from '@/components/ui';
-import { useAuth } from '@/context/AuthContext';
+import { Button, EmptyState, Icon, ListSkeleton, PageSection, Panel, Pill } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { trainingService } from '../services/trainingService';
@@ -27,25 +26,20 @@ function CourseCard({
           <Pill tone="primary" size="sm">{course.totalSessions} sessions</Pill>
         </div>
         {course.targetGoal && (
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary)]">
-            <Icon name="target" size={13} />
+          <p className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
+            <Icon name="target" size={13} className="shrink-0 text-[var(--color-text-muted)]" />
             {course.targetGoal}
           </p>
         )}
-        {course.description && (
-          <p className="line-clamp-3 text-xs text-[var(--color-text-secondary)]">{course.description}</p>
-        )}
       </div>
-      <div className="flex items-center justify-between gap-2 border-t border-[var(--color-border)] pt-3">
+      <div className="border-t border-[var(--color-border)] pt-3">
         <Button size="sm" onClick={onOpen} disabled={detailLoading}>View course details</Button>
-        <LinkButton href={`/trainer/plans/new?courseId=${course.id}`} variant="primary" size="sm">Enroll</LinkButton>
       </div>
     </Panel>
   );
 }
 
 export function CourseList() {
-  const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,10 +86,7 @@ export function CourseList() {
     setFormError(null);
     setSubmitting(true);
     try {
-      await trainingService.createCourse({
-        ...request,
-        trainerId: user?.userId,
-      });
+      await trainingService.createCourse(request);
       toast.success('Course created.');
       setShowForm(false);
       await load();
@@ -124,14 +115,10 @@ export function CourseList() {
   return (
     <PageSection
       title={`Training courses (${courses.length})`}
-      description="Create complete training courses with rotating subjects for horse enrollment."
       actions={
-        <>
-          <LinkButton href="/trainer/plans/new" size="sm">Enroll horses</LinkButton>
-          <Button variant="primary" size="sm" onClick={() => setShowForm((open) => !open)}>
-            {showForm ? 'Close form' : 'Create course'}
-          </Button>
-        </>
+        <Button variant="primary" size="sm" onClick={() => setShowForm((open) => !open)}>
+          {showForm ? 'Close form' : 'Create course'}
+        </Button>
       }
     >
       {showForm && (

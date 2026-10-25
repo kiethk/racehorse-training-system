@@ -17,8 +17,6 @@ import java.util.Set;
 public class JoinableCohortResponse {
 
     private String cohortStatus;          // UPCOMING | ACTIVE
-    private Long courseId;
-    private String courseName;
 
     /**
      * Ngày nên cho con ngựa mới bắt đầu.
@@ -56,16 +54,10 @@ public class JoinableCohortResponse {
      */
     private Integer lotCapacity;
 
-    private String note;
-
-    public JoinableCohortResponse(String cohortStatus, Long courseId, String courseName,
-                                  LocalDate suggestedStartDate, Set<TrainingDay> trainingDays,
-                                  Integer horseCount, Integer sharedSessions,
-                                  Integer totalSessions, Long waitDays,
-                                  Integer lotCapacity, String note) {
+    public JoinableCohortResponse(String cohortStatus, LocalDate suggestedStartDate, Set<TrainingDay> trainingDays,
+                                  Integer horseCount, Integer sharedSessions, Integer totalSessions,
+                                  Long waitDays, Integer lotCapacity) {
         this.cohortStatus = cohortStatus;
-        this.courseId = courseId;
-        this.courseName = courseName;
         this.suggestedStartDate = suggestedStartDate;
         this.trainingDays = trainingDays;
         this.horseCount = horseCount;
@@ -73,20 +65,16 @@ public class JoinableCohortResponse {
         this.totalSessions = totalSessions;
         this.waitDays = waitDays;
         this.lotCapacity = lotCapacity;
-        this.note = note;
     }
 
     public Integer getLotCapacity() { return lotCapacity; }
     public void setLotCapacity(Integer lotCapacity) { this.lotCapacity = lotCapacity; }
 
     public String getCohortStatus() { return cohortStatus; }
-    public Long getCourseId() { return courseId; }
-    public String getCourseName() { return courseName; }
     public LocalDate getSuggestedStartDate() { return suggestedStartDate; }
     public Set<TrainingDay> getTrainingDays() { return trainingDays; }
     public Integer getHorseCount() { return horseCount; }
     public Integer getSharedSessions() { return sharedSessions; }
     public Integer getTotalSessions() { return totalSessions; }
     public Long getWaitDays() { return waitDays; }
-    public String getNote() { return note; }
 }

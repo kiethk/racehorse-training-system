@@ -8,6 +8,8 @@ import type {
   CreateCourseRequest,
   JoinableCohortResponse,
   CreateHorseTrainingPlanRequest,
+  PlanPreviewRequest,
+  PlanPreviewResponse,
   HorseTrainingPlanDetailResponse,
   PlanSummaryResponse,
   CompleteWorkoutRequest,
@@ -16,8 +18,6 @@ import type {
   RescheduleLotRequest,
   HorseFitnessTrendItem,
   HorseAlert,
-  TrainerDashboardHorse,
-  ReadinessAssessment,
   TrainingRules,
 } from '../types';
 
@@ -62,6 +62,10 @@ export const trainingService = {
       `/api/training-plans/joinable-cohorts?courseId=${courseId}`,
     )).data,
 
+  /** Dry run of createPlan: the course period and which horses are free, busy or blocked. Nothing is saved. */
+  previewPlan: async (data: PlanPreviewRequest, signal?: AbortSignal): Promise<PlanPreviewResponse> =>
+    (await apiPost<ApiResponse<PlanPreviewResponse>>('/api/training-plans/preview', data, signal)).data,
+
   /** Enrols a group; the response holds one plan per horse. */
   createPlan: async (data: CreateHorseTrainingPlanRequest): Promise<HorseTrainingPlanDetailResponse[]> =>
     (await apiPost<ApiResponse<HorseTrainingPlanDetailResponse[]>>('/api/training-plans', data)).data,
@@ -101,10 +105,7 @@ export const trainingService = {
     await apiPut(`/api/workouts/${workoutId}/result`, data);
   },
 
-  // Dashboard, fitness and alerts
-  getDashboard: async (): Promise<TrainerDashboardHorse[]> =>
-    (await apiGet<ApiResponse<TrainerDashboardHorse[]>>('/api/training-plans/dashboard')).data,
-
+  // Fitness and alerts
   getFitnessTrend: async (horseId: number, from?: string, to?: string): Promise<HorseFitnessTrendItem[]> => {
     const params = new URLSearchParams();
     if (from) params.append('from', from);
@@ -116,8 +117,4 @@ export const trainingService = {
   getHorseAlerts: async (horseId: number): Promise<HorseAlert[]> =>
     (await apiGet<ApiResponse<HorseAlert[]>>(`/api/horses/${horseId}/alerts`)).data,
 
-  getReadinessHistory: async (horseId: number, includeAdmission = false): Promise<ReadinessAssessment[]> =>
-    (await apiGet<ApiResponse<ReadinessAssessment[]>>(
-      `/api/admissions/horses/${horseId}/readiness-history?includeAdmission=${includeAdmission}`,
-    )).data,
 };

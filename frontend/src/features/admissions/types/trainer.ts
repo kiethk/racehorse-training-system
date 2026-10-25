@@ -37,18 +37,14 @@ export interface RacingReadinessAssessment {
   id: number;
   horseId: number;
   readinessStatus: RacingReadinessStatus;
-  /** ALWAYS null at intake — the horse is in quarantine, fitness cannot be measured. */
-  fitnessScore: number | null;
   conformationScore: number | null;
   temperamentScore: number | null;
   gaitQualityScore: number | null;
   estimatedMonthsToRace: number | null;
   assessmentDate: string;
-  /** null at intake (CHECK chk_rra_valid_until). */
-  validUntil: string | null;
   remarks: string | null;
   trainerId: number | null;
-  /** NOT NULL = intake evaluation. null = periodic evaluation. */
+  /** The admission this evaluation was made for. */
   admissionId: number | null;
   createdAt: string;
 }

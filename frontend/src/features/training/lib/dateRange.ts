@@ -26,9 +26,13 @@ export function rangeForPreset(preset: DatePreset, today: Date, custom: DateRang
 
 /** Tomorrow, as YYYY-MM-DD in the user's time zone: the default first training day. */
 export function tomorrowIso(today: Date = new Date()): string {
-  const next = new Date(today);
-  next.setDate(next.getDate() + 1);
-  return toIsoDate(next);
+  return shiftIsoDate(toIsoDate(today), 1);
+}
+
+/** A YYYY-MM-DD date moved by a number of days (negative goes back). */
+export function shiftIsoDate(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return toIsoDate(new Date(year, month - 1, day + days));
 }
 
 const PRESET_LABEL: Record<Exclude<DatePreset, 'CUSTOM'>, string> = {

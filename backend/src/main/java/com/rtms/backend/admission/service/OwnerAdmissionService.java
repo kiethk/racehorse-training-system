@@ -17,6 +17,7 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.service.PedigreeBirthDateValidator;
 
 
+import java.util.Comparator;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -173,6 +174,10 @@ public class OwnerAdmissionService {
     public List<AdmissionSummaryResponse> getMyAdmissions(Long ownerId, AdmissionStatus status) {
         return admissions.findByOwnerIdOrderBySubmittedAtDesc(ownerId).stream()
                 .filter(admission -> status == null || admission.getStatus() == status)
+                .sorted(Comparator.comparing(
+                        AdmissionApplication::getSubmittedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ).reversed().thenComparing(Comparator.comparing(AdmissionApplication::getId).reversed()))
                 .map(admission -> {
                     CandidateHorseProfile candidate = findCandidate(admission.getId());
                     String imageUrl = documents.findByAdmissionId(admission.getId()).stream()

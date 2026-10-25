@@ -1,4 +1,4 @@
-import { Button, LinkButton } from '@/components/ui';
+import { BackLink } from '@/components/ui';
 import { cn } from '@/lib/cn';
 
 interface AdmissionDetailLayoutProps {
@@ -36,13 +36,9 @@ export function AdmissionDetailLayout({
   return (
     <div className="space-y-4">
       {onBack ? (
-        <Button variant="tertiary" size="sm" icon="arrow-left" onClick={onBack} className="-ml-2.5">
-          Back to admissions
-        </Button>
+        <BackLink onClick={onBack}>Back to admissions</BackLink>
       ) : (
-        <LinkButton variant="tertiary" size="sm" icon="arrow-left" href={returnTo ?? '/'} className="-ml-2.5">
-          Back to admissions
-        </LinkButton>
+        <BackLink href={returnTo ?? '/'}>Back to admissions</BackLink>
       )}
 
       {/* No overflow-hidden here: it would turn this card into the scroll container and stop the aside from sticking. */}

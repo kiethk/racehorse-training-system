@@ -12,5 +12,5 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
     List<Subject> findByCategory(SubjectCategory category);
     List<Subject> findByTrainerId(Long trainerId);
     List<Subject> findByTrainerIdAndCategory(Long trainerId, SubjectCategory category);
-    boolean existsByNameAndTrainerId(String name, Long trainerId);
+    boolean existsByNameIgnoreCaseAndTrainerId(String name, Long trainerId);
 }

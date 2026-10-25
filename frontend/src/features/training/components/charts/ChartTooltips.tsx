@@ -1,6 +1,6 @@
-import { formatDate, formatEnumLabel, formatNumber } from '@/lib/display';
+import { formatDate, formatNumber } from '@/lib/display';
 import { cn } from '@/lib/cn';
-import type { HorseFitnessTrendItem, ReadinessAssessment, TrainingRules } from '../../types';
+import type { HorseFitnessTrendItem, TrainingRules } from '../../types';
 
 export interface WorkoutHover {
   x: number;
@@ -36,29 +36,6 @@ export function WorkoutTooltip({ hover, rules }: { hover: WorkoutHover; rules: T
         </p>
         <p>Speed: avg {item.averageSpeedKmh ?? '—'} km/h | max {item.topSpeedKmh ?? '—'} km/h</p>
         {item.distanceMeters != null && <p>Distance: {formatNumber(item.distanceMeters)} m</p>}
-      </div>
-    </div>
-  );
-}
-
-export function ReadinessTooltip({ hover }: { hover: { x: number; y: number; assessment: ReadinessAssessment } }) {
-  const { assessment } = hover;
-  return (
-    <div className={cn(floating, 'border-[var(--color-primary)]')} style={{ left: hover.x, top: hover.y - 10 }}>
-      <p className="text-xs font-semibold text-[var(--color-primary)]">
-        Periodic readiness assessment · {formatDate(assessment.assessmentDate)}
-      </p>
-      <div className="mt-1 space-y-0.5 text-xs text-[var(--color-text-secondary)]">
-        <p>
-          Fitness score:{' '}
-          <strong className="text-[var(--color-primary)]">
-            {assessment.fitnessScore != null ? `${assessment.fitnessScore}/10` : 'Not rated'}
-          </strong>
-        </p>
-        <p>Status: <strong>{formatEnumLabel(assessment.readinessStatus)}</strong></p>
-        {assessment.estimatedMonthsToRace != null && (
-          <p>Estimated time to race readiness: {assessment.estimatedMonthsToRace} months</p>
-        )}
       </div>
     </div>
   );

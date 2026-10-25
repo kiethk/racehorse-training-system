@@ -1,23 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, FormField, Input, Modal, Notice } from '@/components/ui';
+import { Button, FormField, Modal, Notice, Select } from '@/components/ui';
 import { displayError, formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
-import { minutesOf } from '../lib/timeline';
+import { clockOf, lotStartOptions, minutesOf } from '../lib/timeline';
 import { trainingService } from '../services/trainingService';
 import type { TrainingLotResponse, TrainingRules } from '../types';
 
 const FORM_ID = 'reschedule-lot-form';
 
-function addMinutes(time: string, minutes: number): string {
-  const total = minutesOf(time) + minutes;
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-}
-
 /**
- * Moves a whole lot to a new start time. The golden-hour window is shown as a hint (from the backend rules) but
- * is NOT checked here: the backend validates the move and its message is shown when it refuses.
+ * Moves a whole lot to a new start time, picked from the quarter-hour starts that keep the lot inside the golden
+ * window. It is the keyboard alternative to dragging the lot on the timeline; the backend still checks overlaps.
  */
 export function RescheduleDialog({
   lot,
@@ -33,7 +28,6 @@ export function RescheduleDialog({
   onSuccess: () => Promise<void> | void;
 }) {
   const [startTime, setStartTime] = useState(lot ? lot.startTime.slice(0, 5) : '');
-  const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,18 +35,17 @@ export function RescheduleDialog({
   const target = lot;
 
   const duration = target.durationMinutes || 60;
-  const windowHint = rules ? ` Lots run between ${formatTime(rules.goldenHoursStart)} and ${formatTime(rules.goldenHoursEnd)}.` : '';
+  const options = rules
+    ? lotStartOptions(rules.goldenHoursStart, rules.goldenHoursEnd, duration, rules.lotStartStepMinutes)
+    : [startTime];
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      await trainingService.rescheduleLot(target.lotId, {
-        newStartTime: `${startTime}:00`,
-        reason: reason.trim() || undefined,
-      });
-      toast.success(`Lot #${target.lotId} rescheduled.`);
+      await trainingService.rescheduleLot(target.lotId, { newStartTime: `${startTime}:00` });
+      toast.success(`${target.subjectName} moved to ${startTime}.`);
       await onSuccess();
       onClose();
     } catch (cause) {
@@ -68,8 +61,8 @@ export function RescheduleDialog({
       onClose={onClose}
       size="sm"
       dismissible={!submitting}
-      title={`Reschedule lot #${target.lotId} (${target.subjectName})`}
-      description={`All ${target.occupied} horses in this lot will move to the new time slot.`}
+      title={`Reschedule ${target.subjectName}`}
+      description={`${formatTime(target.startTime)} – ${formatTime(target.endTime)} · ${target.occupied} horses move together`}
       footer={
         <>
           <Button onClick={onClose} disabled={submitting}>Cancel</Button>
@@ -79,22 +72,12 @@ export function RescheduleDialog({
     >
       <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
         {error && <Notice tone="error">{error}</Notice>}
-
-        <dl className="space-y-1 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-3 text-xs">
-          <div className="flex gap-1"><dt>Session duration:</dt><dd className="font-semibold">{duration} minutes</dd></div>
-          <div className="flex gap-1"><dt>Current time:</dt><dd className="font-semibold">{formatTime(target.startTime)} – {formatTime(target.endTime)}</dd></div>
-        </dl>
-
-        <FormField
-          label="New start time"
-          required
-          hint={`Estimated end time: ${startTime ? addMinutes(startTime, duration) : '—'}.${windowHint}`}
-        >
-          <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-        </FormField>
-
-        <FormField label="Reason for rescheduling">
-          <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="For example: weather conditions, track maintenance…" />
+        <FormField label="New start time" required hint={`Ends at ${clockOf(minutesOf(startTime) + duration)}`}>
+          <Select value={startTime} onChange={(e) => setStartTime(e.target.value)}>
+            {options.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </Select>
         </FormField>
       </form>
     </Modal>

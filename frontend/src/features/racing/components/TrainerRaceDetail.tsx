@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DetailSkeleton, EmptyState, Icon, LinkButton, Notice, PageHeader, Panel, ScreenLayout } from '@/components/ui';
+import { BackLink, DetailSkeleton, EmptyState, Icon, LinkButton, Notice, PageHeader, Panel, ScreenLayout } from '@/components/ui';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import { horseService } from '@/features/horses/services/horseService';
 import type { HorseSpecialty } from '@/features/horses/types';
@@ -57,16 +57,12 @@ export function TrainerRaceDetail({ id }: { id: number }) {
 
   return (
     <ScreenLayout variant="detail">
+      <BackLink href="/trainer/racing">Back to list</BackLink>
       <PageHeader
         title={data.raceName}
         description={<>Category: <strong>{data.raceCategory}</strong> · Submitted {formatDateTime(data.createdAt)}</>}
         breadcrumbs={[{ label: 'Race nominations', href: '/trainer/racing' }, { label: data.raceName }]}
-        actions={
-          <>
-            <RaceStatusPill status={data.status} size="md" />
-            <LinkButton href="/trainer/racing" icon="arrow-left">Back to list</LinkButton>
-          </>
-        }
+        actions={<RaceStatusPill status={data.status} size="md" />}
       />
 
       {data.status !== 'PENDING' && (

@@ -30,6 +30,7 @@ public interface AdmissionApplicationRepository
     List<AdmissionApplication> findByOwnerIdOrderByCreatedAtDesc(Long ownerId);
 
     List<AdmissionApplication> findByStatus(AdmissionStatus status);
+    boolean existsByOwnerIdAndStatusNotIn(Long ownerId, Collection<AdmissionStatus> statuses);
 
     @Query("""
             SELECT COUNT(a) > 0

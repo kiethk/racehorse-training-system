@@ -2,34 +2,45 @@ package com.rtms.backend.training.service;
 
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.config.FarmSchedulePolicy;
+import com.rtms.backend.config.TrainingLimits;
+import com.rtms.backend.identity.entity.User;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.training.dto.CreateHorseTrainingPlanRequest;
 import com.rtms.backend.training.dto.HorseEnrollmentRequest;
+import com.rtms.backend.training.dto.HorsePlanAvailability;
 import com.rtms.backend.training.dto.HorseStallInfo;
 import com.rtms.backend.training.dto.HorseTrainingPlanDetailResponse;
 import com.rtms.backend.training.dto.JoinableCohortResponse;
 import com.rtms.backend.training.dto.JoinableCohortRow;
 import com.rtms.backend.training.dto.PlanNamesRow;
+import com.rtms.backend.training.dto.PlanPreviewRequest;
+import com.rtms.backend.training.dto.PlanPreviewResponse;
 import com.rtms.backend.training.dto.PlanSummaryResponse;
 import com.rtms.backend.training.dto.PlanWorkoutItemResponse;
+import com.rtms.backend.training.dto.RunningPlanRow;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.HorseTrainingPlan;
 import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.enums.PlanAvailability;
 import com.rtms.backend.training.enums.TrainingDay;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
 import com.rtms.backend.training.repository.CourseRepository;
 import com.rtms.backend.training.repository.CourseSubjectRepository;
 import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -55,6 +66,8 @@ public class HorseTrainingPlanService {
     private final HorseRepository horseRepository;
     private final TrainingDecisionService trainingDecisionService;
     private final TrainingWorkoutService workoutService;
+    private final TrainingLotService lotService;
+    private final UserRepository userRepository;
 
     /**
      * CỐ Ý chỉ có MỘT constructor: một constructor dựng được object thiếu chức năng mà không báo lỗi là thứ
@@ -67,13 +80,17 @@ public class HorseTrainingPlanService {
                                     CourseSubjectRepository courseSubjectRepository,
                                     HorseRepository horseRepository,
                                     TrainingDecisionService trainingDecisionService,
-                                    TrainingWorkoutService workoutService) {
+                                    TrainingWorkoutService workoutService,
+                                    TrainingLotService lotService,
+                                    UserRepository userRepository) {
         this.planRepository = planRepository;
         this.courseRepository = courseRepository;
         this.courseSubjectRepository = courseSubjectRepository;
         this.horseRepository = horseRepository;
         this.trainingDecisionService = trainingDecisionService;
         this.workoutService = workoutService;
+        this.lotService = lotService;
+        this.userRepository = userRepository;
     }
 
     // =================================================================
@@ -143,21 +160,29 @@ public class HorseTrainingPlanService {
         Long trainerId = currentUser.getUserId();
         validateCreatePlanRequest(request);
 
-        Set<TrainingDay> selectedDays = new LinkedHashSet<>(request.getTrainingDays());
-        Course course = findCourse(request.getCourseId());
-        if (course.getTrainerId() != null && !course.getTrainerId().equals(trainerId)) {
-            throw new IllegalArgumentException("You can only enroll horses into your own training courses!");
-        }
+        // Khóa lịch của Trainer TRƯỚC khi đọc bất cứ thứ gì: hai request đồng thời (bấm đúp, hai tab) xếp hàng ở đây, nên request
+        // sau thấy plan của request trước và báo trùng lịch thay vì cùng tạo plan chồng nhau.
+        // (Lock the trainer schedule BEFORE reading anything: two simultaneous requests (a double click, two tabs) queue here, so
+        // the second sees the plans of the first and reports a clash instead of both creating overlapping plans.)
+        lotService.lockSchedule(trainerId);
+
+        Set<TrainingDay> selectedDays = TrainingCalendar.requireWeekdays(new LinkedHashSet<>(request.getTrainingDays()));
+        Course course = findOwnCourse(request.getCourseId(), trainerId);
+        assertCourseCanBePlanned(course);
         List<Subject> orderedSubjects = loadOrderedSubjects(course);
         List<EnrolledHorse> enrolled = enrollHorses(request.getHorses(), trainerId);
 
-        LocalDate endDate = calculateEndDate(request.getStartDate(), selectedDays, course.getTotalSessions());
-        assertNoOverlappingPlans(enrolled, request.getStartDate(), endDate);
+        // Cùng cách tính với previewPlan, nên ngày Trainer thấy trên màn hình đúng là ngày được lưu.
+        // (The same calculation as previewPlan, so the dates the trainer saw on screen are the dates stored.)
+        LocalDate startDate = TrainingCalendar.firstSessionOnOrAfter(request.getStartDate(), selectedDays);
+        assertTodayStillHasTime(startDate);
+        LocalDate endDate = TrainingCalendar.endDate(startDate, selectedDays, course.getTotalSessions());
+        assertNoOverlappingPlans(enrolled, startDate, endDate);
 
         Map<Long, HorseTrainingPlan> plansByHorse =
-                savePlans(request, course, trainerId, selectedDays, endDate, enrolled);
+                savePlans(request, course, trainerId, selectedDays, startDate, endDate, enrolled);
         Map<Long, List<PlanWorkoutItemResponse>> workoutsByHorse = workoutService.createWorkouts(
-                new TrainingWorkoutService.PlanSchedule(trainerId, request.getStartDate(), selectedDays,
+                new TrainingWorkoutService.PlanSchedule(trainerId, startDate, selectedDays,
                         course.getTotalSessions(), orderedSubjects),
                 enrolled, plansByHorse);
 
@@ -168,17 +193,58 @@ public class HorseTrainingPlanService {
         if (request.getHorses() == null || request.getHorses().isEmpty()) {
             throw new IllegalArgumentException("At least 1 horse must be enrolled!");
         }
-        if (request.getCourseId() == null) {
+        if (request.getHorses().size() > TrainingLimits.MAX_HORSES_PER_PLAN) {
+            throw new IllegalArgumentException(
+                    "You can enroll at most " + TrainingLimits.MAX_HORSES_PER_PLAN + " horses at a time!");
+        }
+        validateSchedule(request.getCourseId(), request.getStartDate(), request.getTrainingDays());
+    }
+
+    /** Ba trường đồng bộ, dùng chung cho tạo và xem trước. (The three sync fields, shared by create and preview.) */
+    private void validateSchedule(Long courseId, LocalDate startDate, List<TrainingDay> trainingDays) {
+        if (courseId == null) {
             throw new IllegalArgumentException("A training course must be selected!");
         }
-        if (request.getStartDate() == null) {
+        if (startDate == null) {
             throw new IllegalArgumentException("Start date must not be empty!");
+        }
+        // Lịch trong quá khứ sinh ra lot và buổi tập cho những ngày đã qua.
+        // (A past schedule creates lots and workouts for days already gone.)
+        if (startDate.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Start date cannot be in the past!");
+        }
+        // Lịch quá xa là gõ nhầm năm và sinh ra hàng trăm ngày lot vô nghĩa.
+        // (A date that far away is a mistyped year and generates hundreds of meaningless lot days.)
+        if (startDate.isAfter(LocalDate.now().plusDays(TrainingLimits.MAX_START_HORIZON_DAYS))) {
+            throw new IllegalArgumentException(
+                    "Start date cannot be more than " + TrainingLimits.MAX_START_HORIZON_DAYS + " days from today!");
         }
         // KHÔNG mặc định ngầm T2-4-6: giá trị này được LƯU vào DB và trở thành dữ liệu thật của hồ sơ.
         // (NO silent Mon-Wed-Fri default: this value is STORED in the DB and becomes real record data.)
-        if (request.getTrainingDays() == null || request.getTrainingDays().isEmpty()) {
-            throw new IllegalArgumentException(
-                    "At least 1 weekday must be selected for training (for example MONDAY, WEDNESDAY, FRIDAY)!");
+        TrainingCalendar.requireWeekdays(trainingDays == null ? null : new LinkedHashSet<>(trainingDays));
+    }
+
+    /**
+     * Khóa phải có số buổi trong giới hạn: khóa cũ nhập trước khi có giới hạn có thể có 0 buổi (plan không có buổi tập nào) hay
+     * hàng triệu buổi (vòng lặp tính lịch gần như không dừng).
+     * (A course must have a session count within the limits: an old course entered before the limits may have 0 sessions (a plan
+     * with no workout at all) or millions (a calendar loop that almost never ends).)
+     */
+    private void assertCourseCanBePlanned(Course course) {
+        Integer sessions = course.getTotalSessions();
+        if (sessions == null || sessions < TrainingLimits.MIN_COURSE_SESSIONS || sessions > TrainingLimits.MAX_COURSE_SESSIONS) {
+            throw new ApiException(HttpStatus.CONFLICT, "COURSE_INVALID_SESSIONS", String.format(
+                    "Course '%s' has %s sessions; a course needs between %d and %d sessions to be enrolled.",
+                    course.getName(), sessions, TrainingLimits.MIN_COURSE_SESSIONS, TrainingLimits.MAX_COURSE_SESSIONS));
+        }
+    }
+
+    /** Hôm nay hết khung giờ vàng thì không còn buổi nào để xếp. (After the golden window ends today there is nothing left to place.) */
+    private void assertTodayStillHasTime(LocalDate firstSessionDate) {
+        if (firstSessionDate.equals(LocalDate.now()) && !LocalTime.now().isBefore(FarmSchedulePolicy.GOLDEN_HOURS_END)) {
+            throw new ApiException(HttpStatus.CONFLICT, "TRAINING_WINDOW_OVER", String.format(
+                    "Today's training window (%s–%s) is over. Choose a later start date.",
+                    FarmSchedulePolicy.GOLDEN_HOURS_START, FarmSchedulePolicy.GOLDEN_HOURS_END));
         }
     }
 
@@ -187,11 +253,21 @@ public class HorseTrainingPlanService {
                 .orElseThrow(() -> new RuntimeException("Training course #" + courseId + " not found"));
     }
 
+    /** Khóa của chính Trainer này hoặc khóa dùng chung. (A course of this trainer, or a shared one.) */
+    private Course findOwnCourse(Long courseId, Long trainerId) {
+        Course course = findCourse(courseId);
+        if (course.getTrainerId() != null && !course.getTrainerId().equals(trainerId)) {
+            throw new IllegalArgumentException("You can only enroll horses into your own training courses!");
+        }
+        return course;
+    }
+
     /** Các bài tập của khóa theo đúng thứ tự, bằng một câu JOIN. (The course subjects in order, with one JOIN.) */
     private List<Subject> loadOrderedSubjects(Course course) {
         List<Subject> subjects = courseSubjectRepository.findSubjectsOfCourseInOrder(course.getId());
         if (subjects.isEmpty()) {
-            throw new IllegalStateException("This course has no subjects yet, so it cannot be assigned to horses!");
+            throw new ApiException(HttpStatus.CONFLICT, "COURSE_HAS_NO_SUBJECTS",
+                    "This course has no subjects yet, so it cannot be assigned to horses!");
         }
         return subjects;
     }
@@ -246,13 +322,13 @@ public class HorseTrainingPlanService {
      */
     private Long resolveGroom(Horse horse, HorseStallInfo stall, Long overrideGroomId, Long trainerId) {
         if (stall == null) {
-            throw new IllegalStateException(String.format(
+            throw new ApiException(HttpStatus.CONFLICT, "HORSE_NO_STALL", String.format(
                     "Horse '%s' has not been assigned to a stall. Assign a stall "
                   + "(PUT /api/horses/%d/assign-stall) before creating a training plan!",
                     horse.getName(), horse.getId()));
         }
         if (stall.areaTrainerId() == null) {
-            throw new IllegalStateException(String.format(
+            throw new ApiException(HttpStatus.CONFLICT, "AREA_NO_TRAINER", String.format(
                     "Area '%s' is not assigned to any trainer. Contact the club manager to assign the area!",
                     stall.areaCode()));
         }
@@ -266,9 +342,12 @@ public class HorseTrainingPlanService {
         // thông báo không hướng người dùng tới hành động họ không có quyền làm.
         // (The groom comes from the stall and may be overridden. Since V63 assigning a groom to a stall is the
         // manager job, so the message does not send the user to an action they cannot perform.)
+        if (overrideGroomId != null) {
+            assertIsActiveGroom(overrideGroomId);
+        }
         Long groomId = (overrideGroomId != null) ? overrideGroomId : stall.stallGroomId();
         if (groomId == null) {
-            throw new IllegalStateException(String.format(
+            throw new ApiException(HttpStatus.CONFLICT, "STALL_NO_GROOM", String.format(
                     "Stall '%s' of horse '%s' has no groom assigned. Contact the club manager to assign one, "
                   + "or choose a groom directly for the workouts when creating the plan!",
                     stall.stallCode(), horse.getName()));
@@ -276,40 +355,53 @@ public class HorseTrainingPlanService {
         return groomId;
     }
 
+    /** Groom ghi đè phải là một tài khoản Groom đang hoạt động. (An override groom must be an active groom account.) */
+    private void assertIsActiveGroom(Long groomId) {
+        User user = userRepository.findById(groomId).orElse(null);
+        if (user == null || !user.isActive() || user.getRole() == null || !"GROOM".equals(user.getRole().getName())) {
+            throw new IllegalArgumentException("User #" + groomId + " is not an active groom!");
+        }
+    }
+
     /**
-     * BR-01: không chồng khoảng ngày với kế hoạch đang chạy. Một truy vấn cho cả nhóm; báo con ngựa đầu tiên
-     * (theo thứ tự ghi danh) bị vướng.
-     * (BR-01: no date overlap with a running plan. One query for the whole group; reports the first horse in
-     * enrollment order that clashes.)
+     * BR-01: không chồng khoảng ngày với kế hoạch đang chạy hoặc sắp chạy. Một truy vấn cho cả nhóm, và báo MỌI con bị
+     * vướng cùng MỌI kế hoạch bị chồng trong một lần: báo từng cái một khiến Trainer dời ngày ra sau cái này rồi lại
+     * đụng cái kế tiếp.
+     * (BR-01: no date overlap with a running or upcoming plan. One query for the whole group, and EVERY clashing horse
+     * with EVERY overlapped plan is reported at once: reporting one at a time makes the trainer move past one plan
+     * only to hit the next.)
      */
     private void assertNoOverlappingPlans(List<EnrolledHorse> enrolled, LocalDate startDate, LocalDate endDate) {
         List<Long> horseIds = enrolled.stream().map(en -> en.horse().getId()).toList();
-        List<HorseTrainingPlan> overlapping = planRepository.findOverlappingPlans(
-                horseIds, List.of(TrainingPlanStatus.ACTIVE, TrainingPlanStatus.UPCOMING), startDate, endDate);
-        if (overlapping.isEmpty()) {
+        Map<Long, List<RunningPlanRow>> conflictsByHorse = planRepository.findRunningPlans(horseIds, startDate).stream()
+                .filter(plan -> plan.overlaps(startDate, endDate))
+                .collect(Collectors.groupingBy(RunningPlanRow::horseId));
+        if (conflictsByHorse.isEmpty()) {
             return;
         }
 
-        Map<Long, HorseTrainingPlan> latestByHorse = new HashMap<>();
-        overlapping.forEach(plan -> latestByHorse.putIfAbsent(plan.getHorseId(), plan));
+        String details = enrolled.stream()
+                .filter(en -> conflictsByHorse.containsKey(en.horse().getId()))
+                .map(en -> en.horse().getName() + ": " + describeConflicts(conflictsByHorse.get(en.horse().getId())))
+                .collect(Collectors.joining("; "));
+        throw new ApiException(HttpStatus.CONFLICT, "PLAN_SCHEDULE_CONFLICT", String.format(
+                "Schedule conflict: the planned period %s to %s overlaps existing plans. %s.",
+                startDate, endDate, details));
+    }
 
-        for (EnrolledHorse en : enrolled) {
-            HorseTrainingPlan existing = latestByHorse.get(en.horse().getId());
-            if (existing != null) {
-                throw new IllegalStateException(String.format(
-                        "Schedule conflict: horse '%s' already has a plan (%s) from %s to %s, "
-                      + "overlapping the planned period %s to %s!",
-                        en.horse().getName(), existing.getStatus(),
-                        existing.getStartDate(), existing.getEndDate(), startDate, endDate));
-            }
-        }
+    private static String describeConflicts(List<RunningPlanRow> conflicts) {
+        return conflicts.stream()
+                .map(plan -> String.format("%s (%s, %s to %s)",
+                        plan.courseName(), plan.status(), plan.startDate(), plan.endDate()))
+                .collect(Collectors.joining(", "));
     }
 
     /** Tạo plan cho từng con, lưu một lượt. (Creates a plan for each horse, saved in one batch.) */
     private Map<Long, HorseTrainingPlan> savePlans(CreateHorseTrainingPlanRequest request, Course course,
                                                    Long trainerId, Set<TrainingDay> selectedDays,
-                                                   LocalDate endDate, List<EnrolledHorse> enrolled) {
-        TrainingPlanStatus status = request.getStartDate().isAfter(LocalDate.now())
+                                                   LocalDate startDate, LocalDate endDate,
+                                                   List<EnrolledHorse> enrolled) {
+        TrainingPlanStatus status = startDate.isAfter(LocalDate.now())
                 ? TrainingPlanStatus.UPCOMING
                 : TrainingPlanStatus.ACTIVE;
 
@@ -319,12 +411,11 @@ public class HorseTrainingPlanService {
             plan.setHorseId(en.horse().getId());
             plan.setCourseId(course.getId());
             plan.setTrainerId(trainerId);
-            plan.setStartDate(request.getStartDate());
+            plan.setStartDate(startDate);
             plan.setEndDate(endDate);
             plan.setTrainingDays(selectedDays);        // KHUÔN MẪU (TEMPLATE)
             plan.setGroomId(en.groomId());             // KHUÔN MẪU (TEMPLATE)
             plan.setStatus(status);
-            plan.setNotes(request.getNotes());
             plans.add(plan);
         }
 
@@ -348,26 +439,148 @@ public class HorseTrainingPlanService {
         return result;
     }
 
+    // =================================================================
+    // XEM TRƯỚC KẾ HOẠCH (Previewing a plan)
+    // =================================================================
+
     /**
-     * Mô phỏng tiến trình để tìm ngày diễn ra buổi tập cuối cùng. Là hàm thuần để dùng lại ở cả BR-01 lẫn API
-     * gợi ý nhóm và để viết unit test không cần DB.
-     * (Simulates the progress to find the date of the last workout. A pure function, reused by BR-01 and the
-     * cohort suggestion API and unit-testable without a DB.)
+     * Cho Trainer thấy hậu quả TRƯỚC khi bấm tạo: khóa chạy từ ngày nào tới ngày nào, từng con trong khu rảnh hay bận
+     * (bận vì kế hoạch nào, rảnh lại từ ngày nào), và ngày sớm nhất cả nhóm đang chọn cùng rảnh. Không ghi gì xuống
+     * DB; createPlan vẫn kiểm lại lần cuối vì hai Trainer có thể thao tác cùng lúc.
+     * (Shows the trainer the outcome BEFORE creating: from which date to which date the course runs, whether each horse
+     * of the area is free or busy (busy with which plan, free again from when), and the earliest date the selected
+     * group is free together. Nothing is written; createPlan still checks once more because two trainers may act at
+     * the same time.)
+     *
+     * Số truy vấn là HẰNG SỐ, không phụ thuộc số ngựa: ngựa trong khu, chuồng, kế hoạch đang chạy, cộng một truy vấn
+     * lịch khám lại cho mỗi con đang bị chặn tập.
+     * (The number of queries is CONSTANT, independent of the horse count: area horses, stalls, running plans, plus one
+     * re-examination lookup per horse that is blocked from training.)
      */
-    static LocalDate calculateEndDate(LocalDate startDate,
-                                      Set<TrainingDay> selectedDays,
-                                      int totalSessions) {
-        LocalDate cursor = startDate;
-        int count = 0;
-        while (count < totalSessions) {
-            if (selectedDays.contains(TrainingDay.valueOf(cursor.getDayOfWeek().name()))) {
-                count++;
-            }
-            if (count < totalSessions) {
-                cursor = cursor.plusDays(1);
-            }
+    @Transactional(readOnly = true)
+    public PlanPreviewResponse previewPlan(PlanPreviewRequest request, AuthenticatedUser currentUser) {
+        Long trainerId = currentUser.getUserId();
+        validateSchedule(request.getCourseId(), request.getStartDate(), request.getTrainingDays());
+
+        Set<TrainingDay> days = TrainingCalendar.requireWeekdays(new LinkedHashSet<>(request.getTrainingDays()));
+        Course course = findOwnCourse(request.getCourseId(), trainerId);
+        assertCourseCanBePlanned(course);
+        int totalSessions = course.getTotalSessions();
+        LocalDate startDate = TrainingCalendar.firstSessionOnOrAfter(request.getStartDate(), days);
+        assertTodayStillHasTime(startDate);
+        LocalDate endDate = TrainingCalendar.endDate(startDate, days, totalSessions);
+        PlanWindow window = new PlanWindow(days, totalSessions, startDate, endDate);
+
+        List<Horse> horses = planRepository.findEnrollableHorses(trainerId);
+        if (horses.isEmpty()) {
+            return new PlanPreviewResponse(startDate, endDate, totalSessions, null,
+                    fullDates(course, trainerId, window, 0), List.of());
         }
-        return cursor;
+
+        List<Long> horseIds = horses.stream().map(Horse::getId).toList();
+        Map<Long, HorseStallInfo> stallByHorse = planRepository.findStallInfoByHorseIds(horseIds).stream()
+                .collect(Collectors.toMap(HorseStallInfo::horseId, Function.identity()));
+        Map<Long, List<RunningPlanRow>> plansByHorse = planRepository.findRunningPlans(horseIds, startDate).stream()
+                .collect(Collectors.groupingBy(RunningPlanRow::horseId));
+
+        List<HorsePlanAvailability> availability = horses.stream()
+                .map(horse -> availabilityOf(horse, stallByHorse.get(horse.getId()),
+                        plansByHorse.getOrDefault(horse.getId(), List.of()), window))
+                .toList();
+        LocalDate groupEarliestStart =
+                groupEarliestStart(request.getSelectedHorseIds(), availability, plansByHorse, window);
+        int groupSize = selectedEnrollable(request.getSelectedHorseIds(), availability).size();
+        return new PlanPreviewResponse(startDate, endDate, totalSessions, groupEarliestStart,
+                fullDates(course, trainerId, window, groupSize), availability);
+    }
+
+    /**
+     * Những ngày của khóa mà lịch của Trainer chắc chắn không còn chỗ cho nhóm này (xem TrainingLotService.findFullDates).
+     * Để xem trước nói thật điều mà việc tạo sẽ báo thành "schedule is full".
+     * (The days of the course on which the trainer schedule certainly has no room for this group (see
+     * TrainingLotService.findFullDates), so the preview says up front what creating would report as "schedule is full".)
+     */
+    private List<LocalDate> fullDates(Course course, Long trainerId, PlanWindow window, int groupSize) {
+        List<Subject> subjects = courseSubjectRepository.findSubjectsOfCourseInOrder(course.getId());
+        if (subjects.isEmpty()) {
+            return List.of();
+        }
+        List<LocalDate> dates = TrainingCalendar.sessionDates(window.startDate(), window.days(), window.totalSessions());
+        List<TrainingLotService.PlannedSession> sessions = new ArrayList<>();
+        for (int index = 0; index < dates.size(); index++) {
+            Subject subject = subjects.get(index % subjects.size());
+            sessions.add(new TrainingLotService.PlannedSession(dates.get(index), subject.getId(), subject.getDurationMinutes()));
+        }
+        return lotService.findFullDates(trainerId, sessions, groupSize);
+    }
+
+    /** Ngựa đang chọn mà ghi danh được (rảnh hoặc bận, không bị chặn hay thiếu Groom). (Selected horses that can enroll.) */
+    private List<Long> selectedEnrollable(List<Long> selectedHorseIds, List<HorsePlanAvailability> availability) {
+        if (selectedHorseIds == null || selectedHorseIds.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> selected = new HashSet<>(selectedHorseIds);
+        return availability.stream()
+                .filter(horse -> selected.contains(horse.horseId()))
+                .filter(horse -> horse.availability() == PlanAvailability.AVAILABLE
+                        || horse.availability() == PlanAvailability.BUSY)
+                .map(HorsePlanAvailability::horseId)
+                .toList();
+    }
+
+    /** Lịch đang xem trước, gói lại để khỏi truyền bốn tham số rời. (The previewed schedule, bundled instead of four loose parameters.) */
+    private record PlanWindow(Set<TrainingDay> days, int totalSessions, LocalDate startDate, LocalDate endDate) {
+    }
+
+    /**
+     * Thứ tự xét giống thứ tự createPlan báo lỗi: bị chặn tập, rồi thiếu Groom, rồi trùng lịch.
+     * (Checked in the same order createPlan fails: blocked, then no groom, then overlapping plans.)
+     */
+    private HorsePlanAvailability availabilityOf(Horse horse, HorseStallInfo stall,
+                                                 List<RunningPlanRow> runningPlans, PlanWindow window) {
+        String stallCode = stall == null ? null : stall.stallCode();
+        if (!horse.canTrain()) {
+            return new HorsePlanAvailability(horse.getId(), horse.getName(), horse.getBreed(), stallCode,
+                    PlanAvailability.BLOCKED, "Blocked by the vet: " + trainingDecisionService.describeRest(horse),
+                    List.of(), null);
+        }
+        if (stall == null || stall.stallGroomId() == null) {
+            return new HorsePlanAvailability(horse.getId(), horse.getName(), horse.getBreed(), stallCode,
+                    PlanAvailability.NO_GROOM,
+                    "Stall " + stallCode + " has no groom assigned. Contact the club manager.",
+                    List.of(), null);
+        }
+
+        List<RunningPlanRow> conflicts = runningPlans.stream()
+                .filter(plan -> plan.overlaps(window.startDate(), window.endDate()))
+                .toList();
+        if (conflicts.isEmpty()) {
+            return new HorsePlanAvailability(horse.getId(), horse.getName(), horse.getBreed(), stallCode,
+                    PlanAvailability.AVAILABLE, null, List.of(), null);
+        }
+        LocalDate earliest = TrainingCalendar.earliestFreeStart(
+                window.startDate(), window.days(), window.totalSessions(), runningPlans);
+        return new HorsePlanAvailability(horse.getId(), horse.getName(), horse.getBreed(), stallCode,
+                PlanAvailability.BUSY, "Already enrolled in a plan during this period", conflicts, earliest);
+    }
+
+    /**
+     * Ngày sớm nhất mọi con đang chọn cùng rảnh TRỌN khóa: gộp kế hoạch bận của cả nhóm rồi tìm như với một con. Con
+     * bị chặn tập hay thiếu Groom không chọn được nên bị bỏ qua; null khi nhóm không còn con nào ghi danh được.
+     * (The earliest date every selected horse is free for the WHOLE course: the busy plans of the group are merged and
+     * searched as for one horse. Blocked or groomless horses cannot be selected and are skipped; null when no
+     * enrollable horse is left in the group.)
+     */
+    private LocalDate groupEarliestStart(List<Long> selectedHorseIds, List<HorsePlanAvailability> availability,
+                                         Map<Long, List<RunningPlanRow>> plansByHorse, PlanWindow window) {
+        List<Long> group = selectedEnrollable(selectedHorseIds, availability);
+        if (group.isEmpty()) {
+            return null;
+        }
+        List<RunningPlanRow> busy = group.stream()
+                .flatMap(horseId -> plansByHorse.getOrDefault(horseId, List.of()).stream())
+                .toList();
+        return TrainingCalendar.earliestFreeStart(window.startDate(), window.days(), window.totalSessions(), busy);
     }
 
     // =================================================================
@@ -465,22 +678,9 @@ public class HorseTrainingPlanService {
         }
 
         long waitDays = ChronoUnit.DAYS.between(today, suggested);
-
-        // Hiển thị thẳng cho người dùng nên dùng từ thường, không dùng thuật ngữ nội bộ. sharedSessions là số
-        // buổi CÙNG NGÀY CÙNG BÀI, không bảo đảm chung lot: nhóm vẫn bị tách nếu vượt sức chứa (BR-10) hoặc
-        // hai con cùng Groom (BR-09).
-        // (Shown directly to the user, so plain words and no internal jargon. sharedSessions counts workouts on
-        // the SAME DAY with the SAME SUBJECT, not a guarantee of the same lot: the group still splits when it
-        // exceeds capacity (BR-10) or two horses share a groom (BR-09).)
-        String note = upcoming
-                ? String.format("Train together for all %d/%d sessions", sharedSessions, totalSessions)
-                : String.format("Train together for %d/%d sessions, the last %d sessions are separate",
-                        sharedSessions, totalSessions, totalSessions - sharedSessions);
-
         return Optional.of(new JoinableCohortResponse(
-                upcoming ? "UPCOMING" : "ACTIVE", course.getId(), course.getName(), suggested, days,
-                row.horseCount().intValue(), sharedSessions, totalSessions, waitDays,
-                FarmSchedulePolicy.DEFAULT_LOT_CAPACITY, note));
+                upcoming ? "UPCOMING" : "ACTIVE", suggested, days, row.horseCount().intValue(),
+                sharedSessions, totalSessions, waitDays, FarmSchedulePolicy.DEFAULT_LOT_CAPACITY));
     }
 
     private record AlignedPoint(LocalDate date, int sessionIndex) {}
@@ -498,7 +698,7 @@ public class HorseTrainingPlanService {
         LocalDate cursor = cohortStart;
         int index = 0;
         while (index < totalSessions) {
-            if (days.contains(TrainingDay.valueOf(cursor.getDayOfWeek().name()))) {
+            if (TrainingCalendar.isTrainingDay(cursor, days)) {
                 if (index % subjectCount == 0 && !cursor.isBefore(minDate)) {
                     return new AlignedPoint(cursor, index);
                 }

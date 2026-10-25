@@ -93,6 +93,8 @@ export async function openAuthenticatedEventStream(
 
 let accessToken: string | null = null;
 
+export const AUTH_UNAUTHORIZED_EVENT = 'rtms:auth-unauthorized';
+
 export function getAccessToken(): string | null {
   return accessToken;
 }
@@ -120,9 +122,15 @@ export async function refreshAccessToken(): Promise<boolean> {
         }
       }
       setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT));
+      }
       return false;
     } catch {
       setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT));
+      }
       return false;
     } finally {
       refreshPromise = null;
@@ -190,12 +198,14 @@ export async function apiGetBlob(path: string, signal?: AbortSignal): Promise<Bl
   return res.blob();
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+/** `signal` lets a caller cancel a request whose answer is no longer wanted, such as a superseded preview. */
+export async function apiPost<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await doFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) {
     throw await responseError(res);

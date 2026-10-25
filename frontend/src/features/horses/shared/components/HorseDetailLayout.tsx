@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { Button, LinkButton } from '@/components/ui';
+import { BackLink } from '@/components/ui';
 import { cn } from '@/lib/cn';
 
 export interface HorseDetailLayoutProps {
@@ -53,25 +53,9 @@ export function HorseDetailLayout({
   return (
     <div className="space-y-4">
       {onBack ? (
-        <Button
-          variant="tertiary"
-          size="sm"
-          icon="arrow-left"
-          onClick={onBack}
-          className="-ml-2.5"
-        >
-          {backLabel}
-        </Button>
+        <BackLink onClick={onBack}>{backLabel}</BackLink>
       ) : (
-        <LinkButton
-          variant="tertiary"
-          size="sm"
-          icon="arrow-left"
-          href={returnTo}
-          className="-ml-2.5"
-        >
-          {backLabel}
-        </LinkButton>
+        <BackLink href={returnTo}>{backLabel}</BackLink>
       )}
 
       {header && (
