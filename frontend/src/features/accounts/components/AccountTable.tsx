@@ -154,6 +154,20 @@ export function AccountTable({
     },
   ];
 
+  const getBlockingReason = (account: AccountSummary | null): string | null => {
+    if (!account) return null;
+    if (account.role === 'GROOM' && account.assignedStallCodes && account.assignedStallCodes.length > 0) {
+      return `This Groom is currently assigned to stalls (${account.assignedStallCodes.join(', ')}). All stalls must be unassigned or transferred before deactivation.`;
+    }
+    if (account.role === 'HEAD_TRAINER' && account.managedAreaCodes && account.managedAreaCodes.length > 0) {
+      return `This Head Trainer currently manages regular areas (${account.managedAreaCodes.join(', ')}). All regular areas must be reassigned before deactivation.`;
+    }
+    return null;
+  };
+
+  const blockingReason = getBlockingReason(confirmToggle);
+  const isBlocked = !!blockingReason;
+
   return (
     <>
       <DataTable
@@ -168,18 +182,41 @@ export function AccountTable({
       />
       <ConfirmDialog
         open={!!confirmToggle}
-        title="Deactivate User Account"
+        title={isBlocked ? 'Cannot Deactivate Account' : 'Deactivate User Account'}
         description={
-          <>
-            Are you sure you want to deactivate <strong>{confirmToggle?.fullName}</strong>?
-            They will immediately lose the ability to sign in to the platform.
-          </>
+          isBlocked ? (
+            <div className="space-y-3">
+              <p>
+                You cannot deactivate <strong>{confirmToggle?.fullName}</strong> because they still have active assignments:
+              </p>
+              <div className="p-3 rounded-lg bg-[var(--color-bg-warning-subtle,#fffbeb)] border border-[var(--color-border-warning,#fef3c7)] text-xs text-[var(--color-warning-text,#92400e)] font-medium leading-relaxed">
+                ⚠️ {blockingReason}
+              </div>
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Please reassign or unassign these responsibilities first before deactivating this account.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p>
+                Are you sure you want to deactivate <strong>{confirmToggle?.fullName}</strong>?
+                They will immediately lose the ability to sign in to the platform.
+              </p>
+              {confirmToggle?.role === 'HORSE_OWNER' && (confirmToggle.ownedHorsesCount ?? 0) > 0 && (
+                <p className="text-xs text-[var(--color-warning)] font-medium">
+                  Note: If this Owner has active racehorses or pending admission applications, the system will verify those before deactivating.
+                </p>
+              )}
+            </div>
+          )
         }
-        confirmLabel="Deactivate Account"
+        confirmLabel={isBlocked ? 'Cannot Deactivate' : 'Deactivate Account'}
+        cancelLabel={isBlocked ? 'Close' : 'Cancel'}
+        confirmDisabled={isBlocked}
         tone="danger"
         loading={loadingActionId === confirmToggle?.userId}
         onConfirm={async () => {
-          if (confirmToggle) {
+          if (confirmToggle && !isBlocked) {
             await onToggleStatus(confirmToggle.userId, confirmToggle.active);
             setConfirmToggle(null);
           }

@@ -36,7 +36,6 @@ export function AccountManagementView() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
-  const [successMsg, setSuccessMsg] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -85,8 +84,6 @@ export function AccountManagementView() {
       setAccounts((prev) =>
         prev.map((acc) => (acc.userId === userId ? { ...acc, active: !currentStatus } : acc))
       );
-      setSuccessMsg('Account status updated successfully.');
-      setTimeout(() => setSuccessMsg(''), 5000);
       toast.success('Account status updated');
     } catch (err: unknown) {
       toast.error(displayError(err, 'Unable to update account status.'));
@@ -178,7 +175,6 @@ export function AccountManagementView() {
         }
       />
 
-      {successMsg && <Notice tone="success">{successMsg}</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
 
       {/* Metric KPI Cards with 1-click filtering */}
@@ -301,8 +297,7 @@ export function AccountManagementView() {
         headTrainers={headTrainers}
         onUpdated={() => {
           void fetchAccounts();
-          setSuccessMsg('Account profile updated successfully.');
-          setTimeout(() => setSuccessMsg(''), 5000);
+          toast.success('Account profile updated successfully.');
         }}
       />
     </ScreenLayout>

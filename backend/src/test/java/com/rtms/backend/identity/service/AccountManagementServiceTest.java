@@ -17,6 +17,18 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import com.rtms.backend.admission.enums.AdmissionStatus;
+import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
+import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.identity.entity.GroomProfile;
+import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.notification.service.NotificationService;
+import com.rtms.backend.stable.entity.Area;
+import com.rtms.backend.stable.entity.StableStall;
+import com.rtms.backend.stable.enums.AreaType;
+import com.rtms.backend.stable.repository.AreaRepository;
+import com.rtms.backend.stable.repository.StableStallRepository;
 import static org.mockito.Mockito.*;
 
 class AccountManagementServiceTest {
@@ -30,6 +42,11 @@ class AccountManagementServiceTest {
     private VeterinarianProfileRepository vetProfileRepository;
     private TrainerProfileRepository trainerProfileRepository;
     private Validator validator;
+    private AreaRepository areaRepository;
+    private StableStallRepository stableStallRepository;
+    private CareScheduleRepository careScheduleRepository;
+    private AdmissionApplicationRepository admissionApplicationRepository;
+    private NotificationService notificationService;
 
     private AccountManagementService accountService;
 
@@ -44,6 +61,11 @@ class AccountManagementServiceTest {
         vetProfileRepository = mock(VeterinarianProfileRepository.class);
         trainerProfileRepository = mock(TrainerProfileRepository.class);
         validator = mock(Validator.class);
+        areaRepository = mock(AreaRepository.class);
+        stableStallRepository = mock(StableStallRepository.class);
+        careScheduleRepository = mock(CareScheduleRepository.class);
+        admissionApplicationRepository = mock(AdmissionApplicationRepository.class);
+        notificationService = mock(NotificationService.class);
 
         when(validator.validate(any())).thenReturn(Collections.emptySet());
 
@@ -56,7 +78,12 @@ class AccountManagementServiceTest {
                 groomProfileRepository,
                 vetProfileRepository,
                 trainerProfileRepository,
-                validator
+                validator,
+                areaRepository,
+                stableStallRepository,
+                careScheduleRepository,
+                admissionApplicationRepository,
+                notificationService
         );
     }
 
@@ -195,5 +222,241 @@ class AccountManagementServiceTest {
 
         assertFalse(res.isActive());
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateAccountStatus_groomWithAssignedStalls_throwsConflict() {
+        Long currentAdminId = 1L;
+        Long groomId = 5L;
+
+        User user = new User();
+        user.setId(groomId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("GROOM");
+        user.setRole(role);
+
+        StableStall stall1 = new StableStall();
+        stall1.setStallCode("A-01");
+        StableStall stall2 = new StableStall();
+        stall2.setStallCode("A-02");
+
+        when(userRepository.findById(groomId)).thenReturn(Optional.of(user));
+        when(stableStallRepository.findByGroomId(groomId)).thenReturn(List.of(stall1, stall2));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                accountService.updateAccountStatus(currentAdminId, groomId, false)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Cannot deactivate Groom while they are assigned to stalls: [A-01, A-02]"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateAccountStatus_headTrainerWithAssignedAreas_throwsConflict() {
+        Long currentAdminId = 1L;
+        Long trainerId = 6L;
+
+        User user = new User();
+        user.setId(trainerId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("HEAD_TRAINER");
+        user.setRole(role);
+
+        Area area = new Area();
+        area.setCode("Area A");
+
+        when(userRepository.findById(trainerId)).thenReturn(Optional.of(user));
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, trainerId)).thenReturn(List.of(area));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                accountService.updateAccountStatus(currentAdminId, trainerId, false)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Cannot deactivate Head Trainer while they are assigned to areas: [Area A]"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateAccountStatus_headTrainerWithoutAreas_unassignsGroomsAndDeactivates() {
+        Long currentAdminId = 1L;
+        Long trainerId = 6L;
+
+        User user = new User();
+        user.setId(trainerId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("HEAD_TRAINER");
+        user.setRole(role);
+
+        GroomProfile reportingGroom = new GroomProfile();
+        reportingGroom.setUserId(20L);
+        reportingGroom.setTrainerId(trainerId);
+
+        when(userRepository.findById(trainerId)).thenReturn(Optional.of(user));
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, trainerId)).thenReturn(Collections.emptyList());
+        when(groomProfileRepository.findByTrainerId(trainerId)).thenReturn(List.of(reportingGroom));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AccountSummaryResponse res = accountService.updateAccountStatus(currentAdminId, trainerId, false);
+
+        assertFalse(res.isActive());
+        assertNull(reportingGroom.getTrainerId());
+        verify(groomProfileRepository).save(reportingGroom);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateAccountStatus_horseOwnerWithPendingAdmissions_throwsConflict() {
+        Long currentAdminId = 1L;
+        Long ownerId = 7L;
+
+        User user = new User();
+        user.setId(ownerId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("HORSE_OWNER");
+        user.setRole(role);
+
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(user));
+        when(admissionApplicationRepository.existsByOwnerIdAndStatusNotIn(eq(ownerId), any())).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                accountService.updateAccountStatus(currentAdminId, ownerId, false)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("pending admission applications in progress"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateAccountStatus_horseOwnerWithActiveHorses_throwsConflict() {
+        Long currentAdminId = 1L;
+        Long ownerId = 7L;
+
+        User user = new User();
+        user.setId(ownerId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("HORSE_OWNER");
+        user.setRole(role);
+
+        Horse horse1 = new Horse();
+        horse1.setName("Thunderbolt");
+        horse1.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(user));
+        when(admissionApplicationRepository.existsByOwnerIdAndStatusNotIn(eq(ownerId), any())).thenReturn(false);
+        when(horseRepository.findByOwnerId(ownerId)).thenReturn(List.of(horse1));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                accountService.updateAccountStatus(currentAdminId, ownerId, false)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("horses active in the facility: [Thunderbolt]"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateAccountStatus_veterinarianWithPendingSchedules_throwsConflict() {
+        Long currentAdminId = 1L;
+        Long vetId = 8L;
+
+        User user = new User();
+        user.setId(vetId);
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("VETERINARIAN");
+        user.setRole(role);
+
+        when(userRepository.findById(vetId)).thenReturn(Optional.of(user));
+        when(careScheduleRepository.existsByVeterinarianIdAndStatusIn(eq(vetId), any())).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                accountService.updateAccountStatus(currentAdminId, vetId, false)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("pending or in-progress care schedules"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateAccountStatus_lastClubManager_throwsConflict() {
+        Long currentAdminId = 1L;
+        Long targetManagerId = 2L;
+
+        User targetManager = new User();
+        targetManager.setId(targetManagerId);
+        targetManager.setActive(true);
+        Role role = new Role();
+        role.setName("CLUB_MANAGER");
+        targetManager.setRole(role);
+
+        when(userRepository.findById(targetManagerId)).thenReturn(Optional.of(targetManager));
+        when(userRepository.countActiveClubManagers()).thenReturn(1L);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                accountService.updateAccountStatus(currentAdminId, targetManagerId, false)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("last active Club Manager in the system"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateAccountStatus_clubManager_notifiesOtherManagers() {
+        Long currentAdminId = 1L;
+        Long targetManagerId = 2L;
+
+        User admin1 = new User();
+        admin1.setId(currentAdminId);
+        admin1.setFullName("Admin One");
+
+        User targetManager = new User();
+        targetManager.setId(targetManagerId);
+        targetManager.setFullName("Target Manager");
+        targetManager.setActive(true);
+        Role role = new Role();
+        role.setName("CLUB_MANAGER");
+        targetManager.setRole(role);
+
+        User anotherManager = new User();
+        anotherManager.setId(3L);
+        anotherManager.setFullName("Manager Three");
+
+        when(userRepository.findById(currentAdminId)).thenReturn(Optional.of(admin1));
+        when(userRepository.findById(targetManagerId)).thenReturn(Optional.of(targetManager));
+        when(userRepository.countActiveClubManagers()).thenReturn(3L);
+        when(userRepository.findActiveClubManagers()).thenReturn(List.of(admin1, targetManager, anotherManager));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AccountSummaryResponse res = accountService.updateAccountStatus(currentAdminId, targetManagerId, false);
+
+        assertFalse(res.isActive());
+        verify(notificationService).createNotification(
+                eq(1L),
+                eq("Manager Account Deactivated"),
+                contains("Target Manager was deactivated by Admin One"),
+                eq("SECURITY_ALERT"),
+                eq("USER"),
+                eq(targetManagerId),
+                anyString()
+        );
+        verify(notificationService).createNotification(
+                eq(3L),
+                eq("Manager Account Deactivated"),
+                contains("Target Manager was deactivated by Admin One"),
+                eq("SECURITY_ALERT"),
+                eq("USER"),
+                eq(targetManagerId),
+                anyString()
+        );
     }
 }

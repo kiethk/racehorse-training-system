@@ -15,8 +15,16 @@ import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
+import com.rtms.backend.admission.enums.AdmissionStatus;
+import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
+import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.identity.entity.GroomProfile;
+import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.notification.service.NotificationService;
 import jakarta.validation.Validator;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -43,6 +51,9 @@ public class AccountManagementService {
     private final Validator validator;
     private final AreaRepository areaRepository;
     private final StableStallRepository stableStallRepository;
+    private final CareScheduleRepository careScheduleRepository;
+    private final AdmissionApplicationRepository admissionApplicationRepository;
+    private final NotificationService notificationService;
 
     public AccountManagementService(
             UserRepository userRepository,
@@ -55,7 +66,7 @@ public class AccountManagementService {
             TrainerProfileRepository trainerProfileRepository,
             Validator validator) {
         this(userRepository, roleRepository, horseRepository, passwordEncoder, staffManagementService,
-                groomProfileRepository, vetProfileRepository, trainerProfileRepository, validator, null, null);
+                groomProfileRepository, vetProfileRepository, trainerProfileRepository, validator, null, null, null, null, null);
     }
 
     public AccountManagementService(
@@ -70,6 +81,26 @@ public class AccountManagementService {
             Validator validator,
             AreaRepository areaRepository,
             StableStallRepository stableStallRepository) {
+        this(userRepository, roleRepository, horseRepository, passwordEncoder, staffManagementService,
+                groomProfileRepository, vetProfileRepository, trainerProfileRepository, validator, areaRepository, stableStallRepository, null, null, null);
+    }
+
+    @Autowired
+    public AccountManagementService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            HorseRepository horseRepository,
+            PasswordEncoder passwordEncoder,
+            StaffManagementService staffManagementService,
+            GroomProfileRepository groomProfileRepository,
+            VeterinarianProfileRepository vetProfileRepository,
+            TrainerProfileRepository trainerProfileRepository,
+            Validator validator,
+            AreaRepository areaRepository,
+            StableStallRepository stableStallRepository,
+            CareScheduleRepository careScheduleRepository,
+            AdmissionApplicationRepository admissionApplicationRepository,
+            NotificationService notificationService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.horseRepository = horseRepository;
@@ -81,6 +112,9 @@ public class AccountManagementService {
         this.validator = validator;
         this.areaRepository = areaRepository;
         this.stableStallRepository = stableStallRepository;
+        this.careScheduleRepository = careScheduleRepository;
+        this.admissionApplicationRepository = admissionApplicationRepository;
+        this.notificationService = notificationService;
     }
 
     // ── READ ALL ─────────────────────────────────────────────────────────────
@@ -315,7 +349,7 @@ public class AccountManagementService {
         return getAccountDetail(userId);
     }
 
-    // ── STATUS TOGGLE (WITH SELF-LOCKOUT PROTECTION) ──────────────────────────
+    // ── STATUS TOGGLE (WITH ROLE-SPECIFIC DEACTIVATION PRECHECKS) ─────────────
 
     @Transactional
     public AccountSummaryResponse updateAccountStatus(Long currentUserId, Long targetUserId, boolean active) {
@@ -327,8 +361,16 @@ public class AccountManagementService {
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
+        if (!active && user.isActive()) {
+            validateDeactivationPrerequisites(user, currentUserId);
+        }
+
         user.setActive(active);
         user = userRepository.save(user);
+
+        if (!active && user.getRole() != null && "CLUB_MANAGER".equals(user.getRole().getName())) {
+            notifyManagersOfDeactivation(user, currentUserId);
+        }
 
         // Fetch single owner count if owner
         Map<Long, Long> singleCountMap = new HashMap<>();
@@ -338,6 +380,131 @@ public class AccountManagementService {
         }
 
         return mapToAccountSummary(user, singleCountMap);
+    }
+
+    private void validateDeactivationPrerequisites(User user, Long currentUserId) {
+        Long targetUserId = user.getId();
+        String roleName = user.getRole() != null ? user.getRole().getName() : "";
+
+        // 1. Self-lockout check
+        if (currentUserId != null && currentUserId.equals(targetUserId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot deactivate your own administrator account.");
+        }
+
+        switch (roleName) {
+            case "CLUB_MANAGER": {
+                long activeManagers = userRepository.countActiveClubManagers();
+                if (activeManagers <= 1) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Cannot deactivate the last active Club Manager in the system.");
+                }
+                break;
+            }
+            case "GROOM": {
+                if (stableStallRepository != null) {
+                    List<StableStall> assignedStalls = stableStallRepository.findByGroomId(targetUserId);
+                    if (!assignedStalls.isEmpty()) {
+                        String stallCodes = assignedStalls.stream()
+                                .map(StableStall::getStallCode)
+                                .sorted()
+                                .collect(Collectors.joining(", "));
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Cannot deactivate Groom while they are assigned to stalls: [" + stallCodes + "]. Please unassign or reassign these stalls first.");
+                    }
+                }
+                break;
+            }
+            case "HEAD_TRAINER": {
+                if (areaRepository != null) {
+                    List<Area> regularAreas = areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, targetUserId);
+                    if (!regularAreas.isEmpty()) {
+                        String areaCodes = regularAreas.stream()
+                                .map(Area::getCode)
+                                .sorted()
+                                .collect(Collectors.joining(", "));
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Cannot deactivate Head Trainer while they are assigned to areas: [" + areaCodes + "]. Please reassign or unassign these areas first.");
+                    }
+                }
+                // When trainer manages no regular areas, auto-unassign subordinate reporting grooms
+                if (groomProfileRepository != null) {
+                    List<GroomProfile> reportingGrooms = groomProfileRepository.findByTrainerId(targetUserId);
+                    for (GroomProfile groom : reportingGrooms) {
+                        groom.setTrainerId(null);
+                        groomProfileRepository.save(groom);
+                    }
+                }
+                break;
+            }
+            case "HORSE_OWNER": {
+                if (admissionApplicationRepository != null) {
+                    boolean hasPendingAdmissions = admissionApplicationRepository.existsByOwnerIdAndStatusNotIn(
+                            targetUserId,
+                            List.of(AdmissionStatus.APPROVED, AdmissionStatus.REJECTED)
+                    );
+                    if (hasPendingAdmissions) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Cannot deactivate Horse Owner while they have pending admission applications in progress. Please approve, reject, or cancel these applications first.");
+                    }
+                }
+
+                if (horseRepository != null) {
+                    List<Horse> horses = horseRepository.findByOwnerId(targetUserId);
+                    List<String> activeHorses = horses.stream()
+                            .filter(h -> h.getCurrentStallId() != null || h.getCurrentStatus() == HorseStatus.ELIGIBLE)
+                            .map(Horse::getName)
+                            .distinct()
+                            .sorted()
+                            .toList();
+
+                    if (!activeHorses.isEmpty()) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Cannot deactivate Horse Owner while they have horses active in the facility: [" +
+                                        String.join(", ", activeHorses) + "]. Please discharge or transfer these horses first.");
+                    }
+                }
+                break;
+            }
+            case "VETERINARIAN": {
+                if (careScheduleRepository != null) {
+                    boolean hasPendingSchedules = careScheduleRepository.existsByVeterinarianIdAndStatusIn(
+                            targetUserId,
+                            List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
+                    );
+                    if (hasPendingSchedules) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Cannot deactivate Veterinarian while they have pending or in-progress care schedules. Please reassign their schedules before deactivating.");
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    private void notifyManagersOfDeactivation(User deactivatedUser, Long currentUserId) {
+        if (notificationService == null) return;
+        String actorName = "A Club Manager";
+        if (currentUserId != null) {
+            actorName = userRepository.findById(currentUserId)
+                    .map(User::getFullName)
+                    .orElse("A Club Manager");
+        }
+
+        List<User> activeManagers = userRepository.findActiveClubManagers();
+        for (User manager : activeManagers) {
+            if (manager.getId().equals(deactivatedUser.getId())) {
+                continue;
+            }
+            notificationService.createNotification(
+                    manager.getId(),
+                    "Manager Account Deactivated",
+                    "Manager account " + deactivatedUser.getFullName() + " was deactivated by " + actorName + ".",
+                    "SECURITY_ALERT",
+                    "USER",
+                    deactivatedUser.getId(),
+                    "manager-deactivation-" + deactivatedUser.getId() + "-" + System.currentTimeMillis()
+            );
+        }
     }
 
     // ── PRIVATE MAPPING HELPERS ──────────────────────────────────────────────
