@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.repository.AreaRepository;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -120,7 +121,12 @@ public class HorseService {
                     .toList();
         }
 
-        return horses;
+        return horses.stream()
+                .sorted(Comparator.comparing(
+                        Horse::getCreatedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ).reversed().thenComparing(Comparator.comparing(Horse::getId).reversed()))
+                .toList();
     }
 
     public List<Horse> getAllHorses(AuthenticatedUser currentUser) {

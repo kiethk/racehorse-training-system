@@ -101,6 +101,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
 
     List<CareSchedule> findByVeterinarianIdAndStatus(Long veterinarianId, CareScheduleStatus status);
     List<CareSchedule> findByVeterinarianId(Long veterinarianId);
+    boolean existsByVeterinarianIdAndStatusIn(Long veterinarianId, Collection<CareScheduleStatus> statuses);
 
     @Query("SELECT cs FROM CareSchedule cs WHERE (:status IS NULL OR cs.status = :status) "
             + "AND (:careType IS NULL OR cs.careType = :careType) "
