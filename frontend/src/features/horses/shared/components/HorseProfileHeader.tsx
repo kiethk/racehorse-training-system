@@ -37,6 +37,11 @@ export function HorseProfileHeader({
               <HorseSpecialtyBadges specialty={specialty} size="sm" />
             </div>
           )}
+          {horse?.currentStatus === 'INACTIVE' && horse.statusReason && (
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              <span className="font-medium text-[var(--color-text-muted)]">Reason:</span> {horse.statusReason}
+            </p>
+          )}
           {actions && <div className="flex flex-wrap items-center gap-2 pt-1">{actions}</div>}
         </div>
       </div>
