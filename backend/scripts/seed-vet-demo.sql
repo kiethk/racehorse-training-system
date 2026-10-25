@@ -418,6 +418,29 @@ BEGIN
             WHERE hr2.horse_id = hr.horse_id AND hr2.training_decision = 'BLOCKED'
        );
 
+    -- 11b. Chan tap keo theo (giong TrainingDecisionService.block): huy buoi tap chua dien ra, huy lot da rong, huy plan
+    -- dang chay. Khong lam buoc nay thi seed de lai ngua BLOCKED van co plan ACTIVE/UPCOMING.
+    -- (Cascade of a block, like TrainingDecisionService.block: cancel not-yet-held workouts, cancel emptied lots, cancel
+    -- running plans. Without it the seed leaves BLOCKED horses with an ACTIVE/UPCOMING plan.)
+    UPDATE training_workouts w
+       SET status = 'CANCELLED', updated_at = v_now
+      FROM training_lots l, horses h
+     WHERE l.id = w.lot_id AND h.id = w.horse_id
+       AND h.training_decision = 'BLOCKED'
+       AND w.status = 'SCHEDULED' AND l.lot_date >= CURRENT_DATE;
+
+    UPDATE training_lots l
+       SET status = 'CANCELLED', updated_at = v_now
+     WHERE l.status = 'SCHEDULED'
+       AND NOT EXISTS (SELECT 1 FROM training_workouts w WHERE w.lot_id = l.id AND w.status <> 'CANCELLED')
+       AND EXISTS (SELECT 1 FROM training_workouts w WHERE w.lot_id = l.id);
+
+    UPDATE horse_training_plans p
+       SET status = 'CANCELLED', updated_at = v_now
+      FROM horses h
+     WHERE h.id = p.horse_id AND h.training_decision = 'BLOCKED'
+       AND p.status IN ('ACTIVE', 'UPCOMING');
+
     RAISE NOTICE '[VET-DEMO] seed complete: 16 care_schedule, 14 health_records, 45 metrics, 8 plans, 10 prescriptions, 5 injuries.';
 END;
 $$;

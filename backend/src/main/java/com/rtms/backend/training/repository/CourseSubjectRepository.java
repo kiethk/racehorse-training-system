@@ -15,6 +15,10 @@ public interface CourseSubjectRepository extends JpaRepository<CourseSubject, Lo
 
     long countByCourseId(Long courseId);
 
+    /** Vị trí cuối của vòng xoay, 0 khi khóa chưa có bài nào. (The last position of the rotation, 0 when the course has no subject yet.) */
+    @Query("SELECT COALESCE(MAX(cs.orderIndex), 0) FROM CourseSubject cs WHERE cs.courseId = :courseId")
+    int findMaxOrderIndex(@Param("courseId") Long courseId);
+
     boolean existsByCourseIdAndSubjectId(Long courseId, Long subjectId);
 
     /**

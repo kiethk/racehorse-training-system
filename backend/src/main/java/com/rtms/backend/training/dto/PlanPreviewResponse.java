@@ -12,10 +12,14 @@ import java.util.List;
  * @param groupEarliestStart ngày sớm nhất mọi ngựa đang chọn cùng rảnh trọn khóa; null khi chưa chọn con nào ghi danh
  *                          được (the earliest date every selected horse is free for the whole course; null when no
  *                          enrollable horse is selected)
+ * @param scheduleFullDates  những buổi của khóa rơi vào ngày mà khung giờ vàng của Trainer chắc chắn không còn chỗ cho nhóm
+ *                          đang chọn; rỗng nghĩa là chưa thấy ngày nào hết chỗ (the course sessions on days where the trainer
+ *                          golden window certainly has no room for the selected group; empty means no full day was found)
  */
 public record PlanPreviewResponse(LocalDate firstSessionDate,
                                   LocalDate endDate,
                                   int totalSessions,
                                   LocalDate groupEarliestStart,
+                                  List<LocalDate> scheduleFullDates,
                                   List<HorsePlanAvailability> horses) {
 }

@@ -17,6 +17,7 @@ import {
 import { cn } from '@/lib/cn';
 import { CATEGORY_OPTIONS, intensityOption, surfaceLabel } from '../lib/subjectOptions';
 import type { CreateCourseRequest, Subject, SubjectCategory } from '../types';
+import { useTrainingRules } from '../hooks/useTrainingRules';
 import { subjectDragDrop } from './subjectDragDrop';
 
 const DEFAULT_SESSIONS = 12;
@@ -49,6 +50,7 @@ function CourseFormContent({
   onSubmit,
   onCancel,
 }: CourseFormProps) {
+  const rules = useTrainingRules();
   const [name, setName] = useState('');
   const [targetGoal, setTargetGoal] = useState('');
   const [totalSessions, setTotalSessions] = useState(DEFAULT_SESSIONS);
@@ -81,10 +83,19 @@ function CourseFormContent({
     },
   });
 
+  const sessionsError =
+    !Number.isInteger(totalSessions) || totalSessions < 1 || (rules && totalSessions > rules.maxCourseSessions)
+      ? `Enter a whole number from 1 to ${rules?.maxCourseSessions ?? 60}.`
+      : null;
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!name.trim() || totalSessions <= 0) {
+    if (!name.trim() || sessionsError) {
       setValidation('Enter a course name and a valid number of sessions.');
+      return;
+    }
+    if (rules && rotation.length > rules.maxCourseSubjects) {
+      setValidation(`A course can have at most ${rules.maxCourseSubjects} subjects.`);
       return;
     }
     if (rotation.length === 0) {
@@ -121,13 +132,15 @@ function CourseFormContent({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Sprint 2YO Foundation"
+                maxLength={255}
                 disabled={submitting}
               />
             </FormField>
-            <FormField label="Total sessions" required>
+            <FormField label="Total sessions" required error={sessionsError ?? undefined}>
               <Input
                 type="number"
                 min={1}
+                max={rules?.maxCourseSessions}
                 value={totalSessions}
                 onChange={(e) => setTotalSessions(Number(e.target.value))}
                 disabled={submitting}
@@ -140,6 +153,7 @@ function CourseFormContent({
               value={targetGoal}
               onChange={(e) => setTargetGoal(e.target.value)}
               placeholder="e.g. Prepare for short-distance races"
+              maxLength={1000}
               disabled={submitting}
             />
           </FormField>

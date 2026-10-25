@@ -17,11 +17,32 @@ import java.util.Set;
  */
 public final class TrainingCalendar {
 
+    private static final int DAYS_IN_WEEK = 7;
+
     private TrainingCalendar() {
     }
 
     public static boolean isTrainingDay(LocalDate date, Set<TrainingDay> trainingDays) {
         return trainingDays.contains(TrainingDay.valueOf(date.getDayOfWeek().name()));
+    }
+
+    /**
+     * Mọi hàm bên dưới lặp tới khi gặp một ngày tập, nên tập thứ phải chứa ít nhất một thứ hợp lệ; nếu không (rỗng, hoặc chỉ
+     * có null) vòng lặp không bao giờ dừng.
+     * (Every function below loops until it meets a training day, so the set must hold at least one real weekday; otherwise
+     * (empty, or only null) the loop never ends.)
+     */
+    public static Set<TrainingDay> requireWeekdays(Set<TrainingDay> trainingDays) {
+        Set<TrainingDay> days = new java.util.LinkedHashSet<>();
+        if (trainingDays != null) {
+            days.addAll(trainingDays);
+        }
+        days.remove(null);
+        if (days.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "At least 1 weekday must be selected for training (for example MONDAY, WEDNESDAY, FRIDAY)!");
+        }
+        return days;
     }
 
     /**
@@ -36,10 +57,29 @@ public final class TrainingCalendar {
      */
     public static LocalDate firstSessionOnOrAfter(LocalDate date, Set<TrainingDay> trainingDays) {
         LocalDate cursor = date;
-        while (!isTrainingDay(cursor, trainingDays)) {
+        for (int attempt = 0; attempt < DAYS_IN_WEEK; attempt++) {
+            if (isTrainingDay(cursor, trainingDays)) {
+                return cursor;
+            }
             cursor = cursor.plusDays(1);
         }
-        return cursor;
+        throw new IllegalArgumentException("No weekday is selected for training!");
+    }
+
+    /**
+     * Ngày của từng buổi tập, theo thứ tự, từ ngày bắt đầu. totalSessions đã được giới hạn ở TrainingLimits.
+     * (The date of every session, in order, from the start date. totalSessions is bounded by TrainingLimits.)
+     */
+    public static List<LocalDate> sessionDates(LocalDate startDate, Set<TrainingDay> trainingDays, int totalSessions) {
+        List<LocalDate> dates = new java.util.ArrayList<>();
+        LocalDate cursor = startDate;
+        while (dates.size() < totalSessions) {
+            if (isTrainingDay(cursor, trainingDays)) {
+                dates.add(cursor);
+            }
+            cursor = cursor.plusDays(1);
+        }
+        return dates;
     }
 
     /**
