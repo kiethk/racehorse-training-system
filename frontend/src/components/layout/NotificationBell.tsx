@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/features/notifications/context/NotificationContext';
@@ -12,9 +12,13 @@ import { cn } from '@/lib/cn';
 
 export function NotificationBell() {
   const { user } = useAuth();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, refreshNotifications, markAsRead, markAllAsRead } = useNotifications();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (open) void refreshNotifications();
+  }, [open, refreshNotifications]);
 
   // Marking as read is best-effort here; the next poll reconciles the list.
   const markReadQuietly = async (id: number) => {
