@@ -78,6 +78,7 @@ public class AuditActivityResolver {
     private static final Pattern INCIDENTS = Pattern.compile("^/api/(incidents|groom-incident-reports)/?.*$");
 
     // Pattern definitions - Horses
+    private static final Pattern HORSES_STATUS = Pattern.compile("^/api/horses/(\\d+)/status/?$");
     private static final Pattern HORSES_DETAIL = Pattern.compile("^/api/horses/(\\d+)/?$");
     private static final Pattern HORSES_BASE = Pattern.compile("^/api/horses/?$");
 
@@ -419,6 +420,15 @@ public class AuditActivityResolver {
         }
 
         // 6. Horse Management
+        if ((m = HORSES_STATUS.matcher(normalizedPath)).matches()) {
+            Long id = parseId(m.group(1));
+            return new ResolvedActivity(
+                    "Change Horse Status",
+                    "Horse",
+                    id,
+                    "Updated lifecycle status for horse #" + id + statusSuffix
+            );
+        }
         if ((m = HORSES_DETAIL.matcher(normalizedPath)).matches()) {
             Long id = parseId(m.group(1));
             return new ResolvedActivity(

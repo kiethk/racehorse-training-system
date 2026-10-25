@@ -17,6 +17,25 @@ import org.springframework.transaction.annotation.Transactional;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.repository.AreaRepository;
 
+import com.rtms.backend.config.ApiException;
+import com.rtms.backend.horse.dto.HorseStatusChangeRequest;
+import com.rtms.backend.medical.entity.CareSchedule;
+import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.notification.service.NotificationService;
+import com.rtms.backend.stable.entity.GroomDailyTask;
+import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
+import com.rtms.backend.training.entity.HorseTrainingPlan;
+import com.rtms.backend.training.entity.TrainingWorkout;
+import com.rtms.backend.training.enums.TrainingDecision;
+import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.WorkoutStatus;
+import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import com.rtms.backend.training.repository.TrainingWorkoutRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -31,15 +50,39 @@ public class HorseService {
     private final StableStallRepository stableStallRepository;
     private final TrainingWorkoutService workoutService;
     private final AreaRepository areaRepository;
+    private final TrainingWorkoutRepository workoutRepository;
+    private final HorseTrainingPlanRepository planRepository;
+    private final CareScheduleRepository careScheduleRepository;
+    private final GroomDailyTaskRepository groomDailyTaskRepository;
+    private final NotificationService notificationService;
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
                         TrainingWorkoutService workoutService,
                         AreaRepository areaRepository) {
+        this(horseRepository, stableStallRepository, workoutService, areaRepository,
+                null, null, null, null, null);
+    }
+
+    @Autowired
+    public HorseService(HorseRepository horseRepository,
+                        StableStallRepository stableStallRepository,
+                        TrainingWorkoutService workoutService,
+                        AreaRepository areaRepository,
+                        TrainingWorkoutRepository workoutRepository,
+                        HorseTrainingPlanRepository planRepository,
+                        CareScheduleRepository careScheduleRepository,
+                        GroomDailyTaskRepository groomDailyTaskRepository,
+                        NotificationService notificationService) {
         this.horseRepository = horseRepository;
         this.stableStallRepository = stableStallRepository;
         this.workoutService = workoutService;
         this.areaRepository = areaRepository;
+        this.workoutRepository = workoutRepository;
+        this.planRepository = planRepository;
+        this.careScheduleRepository = careScheduleRepository;
+        this.groomDailyTaskRepository = groomDailyTaskRepository;
+        this.notificationService = notificationService;
     }
 
     /** Giữ chữ ký 3 tham số cho các lời gọi đã có. */
@@ -238,6 +281,161 @@ public class HorseService {
         stableStallRepository.save(newStall);
 
         horse.setCurrentStallId(stallId);
+        return horseRepository.save(horse);
+    }
+
+    /**
+     * Updates a horse's lifecycle status (ELIGIBLE <-> INACTIVE) with full cascade safety.
+     * - Admin (CLUB_MANAGER) has full authority.
+     * - Groom (GROOM) can only report ELIGIBLE -> INACTIVE for horses currently assigned to their stall.
+     */
+    @Transactional
+    public Horse changeHorseStatus(Long horseId, HorseStatusChangeRequest request, AuthenticatedUser currentUser) {
+        Horse horse = horseRepository.findById(horseId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found with id: " + horseId));
+
+        HorseStatus currentStatus = horse.getCurrentStatus();
+        HorseStatus targetStatus = request.status();
+
+        if (currentStatus == targetStatus) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NO_STATUS_CHANGE", "Horse already has status " + targetStatus);
+        }
+
+        // 1. Role & Permission checks
+        String role = currentUser.getRole();
+        if ("CLUB_MANAGER".equals(role)) {
+            // Manager has full authority over permitted transitions
+        } else if ("GROOM".equals(role)) {
+            // Groom can only report ELIGIBLE -> INACTIVE for horses in their stall
+            if (currentStatus != HorseStatus.ELIGIBLE || targetStatus != HorseStatus.INACTIVE) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
+                        "Grooms are only permitted to report a horse as INACTIVE.");
+            }
+            if (horse.getCurrentStallId() == null ||
+                    !stableStallRepository.existsByIdAndGroomId(horse.getCurrentStallId(), currentUser.getUserId())) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
+                        "You are only permitted to update horses assigned to your stalls.");
+            }
+        } else {
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "You do not have permission to change horse status.");
+        }
+
+        // 2. Status Transition validation: only ELIGIBLE <-> INACTIVE
+        if ((currentStatus != HorseStatus.ELIGIBLE && currentStatus != HorseStatus.INACTIVE) ||
+                (targetStatus != HorseStatus.ELIGIBLE && targetStatus != HorseStatus.INACTIVE)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_STATUS_TRANSITION",
+                    "Manual status changes are only permitted between ELIGIBLE and INACTIVE. Candidate and Rejected horses must follow the admission process.");
+        }
+
+        String effectiveReason = request.resolveEffectiveReason();
+        String reasonCode = request.resolveReasonCode();
+        if (effectiveReason.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "REASON_REQUIRED", "Reason is required when changing horse status.");
+        }
+
+        // 3. Cascade operations when transitioning to INACTIVE
+        if (targetStatus == HorseStatus.INACTIVE) {
+            // 3.1. Vacate stall & set to AVAILABLE
+            if (horse.getCurrentStallId() != null) {
+                stableStallRepository.findById(horse.getCurrentStallId()).ifPresent(stall -> {
+                    stall.setStatus(StallStatus.AVAILABLE);
+                    stableStallRepository.save(stall);
+                });
+                horse.setCurrentStallId(null);
+            }
+
+            // 3.2. Cancel upcoming workouts
+            if (workoutRepository != null) {
+                List<TrainingWorkout> futureWorkouts = workoutRepository
+                        .findFutureScheduledByHorsesForUpdate(List.of(horseId), LocalDate.now());
+                if (!futureWorkouts.isEmpty()) {
+                    for (TrainingWorkout w : futureWorkouts) {
+                        w.setStatus(WorkoutStatus.CANCELLED);
+                    }
+                    workoutRepository.saveAll(futureWorkouts);
+                }
+            }
+
+            // 3.3. Cancel active and upcoming training plans
+            if (planRepository != null) {
+                List<HorseTrainingPlan> activePlans = planRepository
+                        .findByHorseIdAndStatusInOrderByEndDateDesc(horseId, List.of(TrainingPlanStatus.ACTIVE, TrainingPlanStatus.UPCOMING));
+                if (!activePlans.isEmpty()) {
+                    activePlans.forEach(p -> p.setStatus(TrainingPlanStatus.CANCELLED));
+                    planRepository.saveAll(activePlans);
+                }
+            }
+
+            // 3.4. Cancel pending and scheduled medical appointments
+            if (careScheduleRepository != null) {
+                List<CareSchedule> pendingCares = careScheduleRepository.findByHorseIdAndStatusIn(
+                        horseId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));
+                if (!pendingCares.isEmpty()) {
+                    for (CareSchedule cs : pendingCares) {
+                        cs.setStatus(CareScheduleStatus.CANCELLED);
+                        cs.setCancelReason("Horse marked INACTIVE: " + effectiveReason);
+                    }
+                    careScheduleRepository.saveAll(pendingCares);
+                }
+            }
+
+            // 3.5. Block training
+            horse.setTrainingDecision(TrainingDecision.BLOCKED);
+            horse.setTrainingDecisionReason(effectiveReason);
+
+            // 3.6. Clean uncompleted groom daily tasks
+            if (groomDailyTaskRepository != null) {
+                List<GroomDailyTask> uncompletedTasks = groomDailyTaskRepository.findByHorseIdAndIsCompletedFalse(horseId);
+                if (!uncompletedTasks.isEmpty()) {
+                    groomDailyTaskRepository.deleteAll(uncompletedTasks);
+                }
+            }
+
+            // 3.7. Notify horse owner
+            if (notificationService != null && horse.getOwnerId() != null) {
+                notificationService.createNotification(
+                        horse.getOwnerId(),
+                        "Horse Status Updated: " + horse.getName(),
+                        String.format("Your horse %s has been marked as INACTIVE. Reason: %s", horse.getName(), effectiveReason),
+                        "HORSE_STATUS_CHANGE",
+                        "HORSE",
+                        horse.getId(),
+                        null
+                );
+            }
+        } else if (targetStatus == HorseStatus.ELIGIBLE) {
+            // Restore to ELIGIBLE: assign to a regular stall
+            StableStall regularStall;
+            if (request.stallId() != null) {
+                regularStall = stableStallRepository
+                        .findAvailableRegularStallByIdForUpdate(request.stallId())
+                        .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "STALL_UNAVAILABLE",
+                                "The selected regular stall is no longer available."));
+            } else {
+                regularStall = stableStallRepository
+                        .findFirstAvailableRegularStallForUpdate()
+                        .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "NO_AVAILABLE_STALL",
+                                "Cannot restore horse: No regular stalls are currently available. Please free a stall before restoring this horse."));
+            }
+
+            regularStall.setStatus(StallStatus.OCCUPIED);
+            stableStallRepository.save(regularStall);
+
+            horse.setCurrentStallId(regularStall.getId());
+
+            // Reassign future workouts to the new stall's groom
+            if (workoutService != null && regularStall.getGroomId() != null) {
+                workoutService.reassignFutureWorkoutsToGroom(horseId, regularStall.getGroomId());
+            }
+
+            horse.setTrainingDecision(TrainingDecision.ALLOWED);
+            horse.setTrainingDecisionReason(null);
+        }
+
+        // 4. Update status, statusReason, and statusReasonCode
+        horse.setCurrentStatus(targetStatus);
+        horse.setStatusReason(effectiveReason);
+        horse.setStatusReasonCode(reasonCode);
         return horseRepository.save(horse);
     }
 }

@@ -42,6 +42,9 @@ export const stableApi = {
     return (await apiGet<ApiResponse<StableStall[]>>(url)).data;
   },
 
+  getAvailableRegularStalls: async (): Promise<StableStall[]> =>
+    (await apiGet<ApiResponse<StableStall[]>>('/api/stalls?areaType=REGULAR&status=AVAILABLE')).data,
+
   /** mine=true -> only horses in the block the Trainer is responsible for (BE-2.1). */
   /**
    * mine       -> horses in the Trainer's block (already assigned to a stall).
