@@ -1,6 +1,11 @@
 package com.rtms.backend.training.dto;
 
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.training.enums.TrainingDay;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -31,10 +36,14 @@ import java.util.List;
 public class CreateHorseTrainingPlanRequest {
 
     /** Danh sách chiến mã ghi danh cùng lúc. Tối thiểu 1 con. (List of horses enrolled together. At least 1 horse.) */
-    private List<HorseEnrollmentRequest> horses;
+    @NotEmpty(message = "At least 1 horse must be enrolled")
+    @Size(max = TrainingLimits.MAX_HORSES_PER_PLAN, message = "You can enroll at most 30 horses at a time")
+    private List<@NotNull(message = "A horse entry is empty") @Valid HorseEnrollmentRequest> horses;
 
+    @NotNull(message = "A training course must be selected")
     private Long courseId;
 
+    @NotNull(message = "Start date is required")
     private LocalDate startDate;
 
     /**
@@ -44,7 +53,9 @@ public class CreateHorseTrainingPlanRequest {
      * (The weekdays to train on, for example ["MONDAY","WEDNESDAY","FRIDAY"]. REQUIRED: there is no silent Mon-Wed-Fri default any more,
      *  because this value is now STORED in the DB and becomes real record data.)
      */
-    private List<TrainingDay> trainingDays;
+    @NotEmpty(message = "Select at least one training weekday")
+    @Size(max = 7, message = "There are only 7 weekdays")
+    private List<@NotNull(message = "A training weekday is empty") TrainingDay> trainingDays;
 
     public List<HorseEnrollmentRequest> getHorses() { return horses; }
     public void setHorses(List<HorseEnrollmentRequest> horses) { this.horses = horses; }

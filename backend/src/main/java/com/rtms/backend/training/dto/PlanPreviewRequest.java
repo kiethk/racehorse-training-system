@@ -1,6 +1,9 @@
 package com.rtms.backend.training.dto;
 
 import com.rtms.backend.training.enums.TrainingDay;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -13,14 +16,19 @@ import java.util.List;
  */
 public class PlanPreviewRequest {
 
+    @NotNull(message = "A training course must be selected")
     private Long courseId;
 
+    @NotNull(message = "Start date is required")
     private LocalDate startDate;
 
-    private List<TrainingDay> trainingDays;
+    @NotEmpty(message = "Select at least one training weekday")
+    @Size(max = 7, message = "There are only 7 weekdays")
+    private List<@NotNull(message = "A training weekday is empty") TrainingDay> trainingDays;
 
     /** Ngựa đang được chọn; có thể rỗng. (Horses currently selected; may be empty.) */
-    private List<Long> selectedHorseIds;
+    @Size(max = 200, message = "Too many horses selected")
+    private List<@NotNull(message = "A selected horse is empty") Long> selectedHorseIds;
 
     public Long getCourseId() { return courseId; }
     public void setCourseId(Long courseId) { this.courseId = courseId; }

@@ -1,6 +1,7 @@
 package com.rtms.backend.training.service;
 
 import com.rtms.backend.config.FarmSchedulePolicy;
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CreateSubjectRequest;
 import com.rtms.backend.training.entity.Subject;
@@ -14,8 +15,8 @@ import java.util.List;
 @Service
 public class SubjectService {
 
-    public static final int MIN_DURATION_MINUTES = 15;
-    public static final int MAX_DURATION_MINUTES = 240;
+    public static final int MIN_DURATION_MINUTES = TrainingLimits.MIN_SUBJECT_DURATION_MINUTES;
+    public static final int MAX_DURATION_MINUTES = TrainingLimits.MAX_SUBJECT_DURATION_MINUTES;
     private static final int DEFAULT_DURATION_MINUTES = 60;
 
     private final SubjectRepository subjectRepository;
@@ -69,25 +70,31 @@ public class SubjectService {
         return createSubject(request, null);
     }
 
+    /**
+     * Tạo một bài tập. Chủ của bài là người đang đăng nhập, không bao giờ do client chọn. Hình dạng của request (tên không
+     * rỗng, cự ly, enum, độ dài) đã được kiểm ở Bean Validation; ở đây chỉ còn luật cần tra DB.
+     * (Creates a subject. The owner is the signed-in user, never chosen by the client. The shape of the request (non-blank
+     * name, distance, enums, length) is already checked by Bean Validation; only the rules that need the DB remain here.)
+     */
     @Transactional
     public Subject createSubject(CreateSubjectRequest request, AuthenticatedUser currentUser) {
         if (request.getCategory() == null) {
             throw new IllegalArgumentException("Category is required!");
         }
 
-        Long trainerId = request.getTrainerId() != null
-                ? request.getTrainerId()
-                : (currentUser != null ? currentUser.getUserId() : null);
+        Long trainerId = currentUser != null ? currentUser.getUserId() : null;
+        String name = request.getName().trim();
 
-        if (trainerId != null && subjectRepository.existsByNameAndTrainerId(request.getName(), trainerId)) {
-            throw new IllegalArgumentException("A subject named '" + request.getName() + "' already exists for this trainer!");
+        if (trainerId != null && subjectRepository.existsByNameIgnoreCaseAndTrainerId(name, trainerId)) {
+            throw new IllegalArgumentException("A subject named '" + name + "' already exists for this trainer!");
         }
 
         Subject subject = new Subject();
         subject.setTrainerId(trainerId);
         subject.setCategory(request.getCategory());
-        subject.setName(request.getName());
-        subject.setDescription(request.getDescription());
+        subject.setName(name);
+        subject.setDescription(request.getDescription() == null || request.getDescription().isBlank()
+                ? null : request.getDescription().trim());
         subject.setSurfaceType(request.getSurfaceType());
         subject.setTargetDistanceMeters(request.getTargetDistanceMeters());
         subject.setIntensityLevel(request.getIntensityLevel());

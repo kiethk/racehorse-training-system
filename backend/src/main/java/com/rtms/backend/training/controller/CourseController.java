@@ -8,6 +8,7 @@ import com.rtms.backend.training.dto.CreateCourseRequest;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.service.CourseService;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -43,7 +44,7 @@ public class CourseController {
     @PreAuthorize("hasAuthority('COURSE_CREATE')")
     @PostMapping
     public ApiResponse<CourseDetailResponse> createCourse(
-            @RequestBody CreateCourseRequest request,
+            @Valid @RequestBody CreateCourseRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(courseService.createCourse(request, currentUser));
     }
@@ -51,7 +52,8 @@ public class CourseController {
     @PreAuthorize("hasAuthority('COURSE_CREATE')")
     @PostMapping("/{id}/subjects")
     public ApiResponse<CourseSubjectResponse> addSubjectToCourse(@PathVariable Long id,
-                                                                 @RequestBody CourseSubjectItemRequest request) {
-        return ApiResponse.success(courseService.addSubjectToCourse(id, request));
+                                                                 @Valid @RequestBody CourseSubjectItemRequest request,
+                                                                 @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(courseService.addSubjectToCourse(id, request, currentUser));
     }
 }

@@ -178,7 +178,8 @@ export function EnrollmentForm() {
     selectedHorseIds.length === 0 ? 'Select at least one horse.'
       : startDate < today ? 'The start date cannot be in the past.'
         : selectedBusy.length > 0 ? 'Some selected horses are busy in this period.'
-          : null;
+          : preview && !scheduleStale && preview.scheduleFullDates.length > 0 ? 'Your schedule is full on some training days.'
+            : null;
 
   return (
     <ScreenLayout variant="form">

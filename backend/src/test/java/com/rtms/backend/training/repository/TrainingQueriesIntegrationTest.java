@@ -214,6 +214,17 @@ class TrainingQueriesIntegrationTest {
         workout.setHorseId(horse.getId());
         workout.setAssignedToId(groom.getId());
         workout.setStatus(status);
+        if (status == WorkoutStatus.COMPLETED) {
+            // The database requires a full result on a COMPLETED workout (chk_workouts_completed_has_result).
+            workout.setActualDistanceMeters(BigDecimal.valueOf(800));
+            workout.setActualDurationMinutes(BigDecimal.valueOf(40));
+            workout.setTopSpeedKmh(BigDecimal.valueOf(60));
+            workout.setAverageSpeedKmh(BigDecimal.valueOf(50));
+            workout.setAverageHeartRate(140);
+            workout.setMaxHeartRate(180);
+            workout.setRecoveryHeartRate(90);
+            workout.setPerformanceRating(8);
+        }
         return workouts.saveAndFlush(workout);
     }
 
@@ -529,8 +540,9 @@ class TrainingQueriesIntegrationTest {
     private TrainingWorkout completedWorkout(TrainingLot lot, Horse horse, Integer rating, BigDecimal actualDistance) {
         TrainingWorkout workout = workout(lot, horse, WorkoutStatus.COMPLETED);
         workout.setPerformanceRating(rating);
-        workout.setActualDistanceMeters(actualDistance);
-        workout.setTopSpeedKmh(BigDecimal.valueOf(60));
+        if (actualDistance != null) {
+            workout.setActualDistanceMeters(actualDistance);
+        }
         return workouts.saveAndFlush(workout);
     }
 
@@ -558,10 +570,9 @@ class TrainingQueriesIntegrationTest {
     }
 
     @Test
-    void specialtyWorkoutsJoinSurfaceAndFallBackToTheTargetDistance() {
+    void specialtyWorkoutsJoinTheSurfaceAndUseTheRecordedDistance() {
         Subject endurance = subjectOf(SubjectCategory.ENDURANCE, SurfaceType.DIRT, BigDecimal.valueOf(1600));
-        // No actual distance recorded: the subject target distance (1600) is used
-        completedWorkout(lotOf(endurance, today.minusDays(3)), horse1, 7, null);
+        completedWorkout(lotOf(endurance, today.minusDays(3)), horse1, 7, BigDecimal.valueOf(1500));
 
         List<SpecialtyWorkoutRow> rows = workouts.findSpecialtyWorkouts(List.of(horse1.getId()), today.minusDays(90));
 
@@ -572,23 +583,22 @@ class TrainingQueriesIntegrationTest {
         assertEquals(8, fixtureRow.performanceRating());
         SpecialtyWorkoutRow fallbackRow = rows.stream()
                 .filter(r -> r.surfaceType() == SurfaceType.DIRT).findFirst().orElseThrow();
-        assertEquals(0, BigDecimal.valueOf(1600).compareTo(fallbackRow.distanceMeters()));
+        assertEquals(0, BigDecimal.valueOf(1500).compareTo(fallbackRow.distanceMeters()));
         assertEquals(horse1.getId(), fallbackRow.horseId());
     }
 
     @Test
-    void specialtyWorkoutsLeaveOutRecoveryUnratedUnfinishedAndOldOnes() {
+    void specialtyWorkoutsLeaveOutRecoveryUnfinishedAndOldOnes() {
         Subject recovery = subjectOf(SubjectCategory.RECOVERY, SurfaceType.SYNTHETIC, BigDecimal.valueOf(500));
         Subject speed = subjectOf(SubjectCategory.SPEED, SurfaceType.TURF, BigDecimal.valueOf(1000));
         completedWorkout(lotOf(recovery, today.minusDays(2)), horse1, 9, null);          // recovery category
-        completedWorkout(lotOf(speed, today.minusDays(3)), horse1, null, null);           // no rating
         workout(lotOf(speed, today.minusDays(4)), horse1, WorkoutStatus.SCHEDULED);       // not completed
         completedWorkout(lotOf(speed, today.minusDays(120)), horse1, 9, null);           // before the window
         completedWorkout(lotOf(speed, today.minusDays(5)), horse2, 9, null);             // another horse
 
         List<SpecialtyWorkoutRow> rows = workouts.findSpecialtyWorkouts(List.of(horse1.getId()), today.minusDays(90));
 
-        assertEquals(1, rows.size(), "Only the fixture's rated, completed, non-recovery, in-window workout is left");
+        assertEquals(1, rows.size(), "Only the fixture's completed, non-recovery, in-window workout is left");
         assertEquals(SurfaceType.TURF, rows.get(0).surfaceType());
         assertEquals(0, BigDecimal.valueOf(800).compareTo(rows.get(0).distanceMeters()));
     }

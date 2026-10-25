@@ -207,21 +207,35 @@ class SubjectServiceTest {
     }
 
     @Test
-    @DisplayName("Creates a subject with trainerId from request")
-    void testCreateSubject_WithTrainerId() {
-        CreateSubjectRequest req = validRequest();
-        req.setTrainerId(9L);
-
+    @DisplayName("The owner of a new subject is the signed-in trainer")
+    void testCreateSubject_OwnerIsTheSignedInTrainer() {
+        com.rtms.backend.security.AuthenticatedUser trainer =
+                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
         when(subjectRepository.save(any(Subject.class))).thenAnswer(inv -> {
             Subject s = inv.getArgument(0);
             s.setId(100L);
             return s;
         });
 
-        Subject created = subjectService.createSubject(req);
+        Subject created = subjectService.createSubject(validRequest(), trainer);
 
         assertNotNull(created);
         assertEquals(9L, created.getTrainerId());
         verify(subjectRepository).save(any(Subject.class));
+    }
+
+    @Test
+    @DisplayName("A name is trimmed and a duplicate is found whatever its case")
+    void testCreateSubject_DuplicateNameIgnoresCaseAndSpaces() {
+        com.rtms.backend.security.AuthenticatedUser trainer =
+                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+        CreateSubjectRequest req = validRequest();
+        req.setName("  45-MINUTE heart-rate run ");
+        when(subjectRepository.existsByNameIgnoreCaseAndTrainerId("45-MINUTE heart-rate run", 9L)).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> subjectService.createSubject(req, trainer));
+        assertTrue(ex.getMessage().contains("already exists"));
+        verify(subjectRepository, never()).save(any());
     }
 }

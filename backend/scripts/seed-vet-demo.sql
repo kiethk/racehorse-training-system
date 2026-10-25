@@ -39,6 +39,8 @@ DECLARE
         '380005252372019'   -- 12 GRESIA             (D)
     ];
     v_horses BIGINT[];
+    v_sched  BIGINT[];
+    v_hr     BIGINT[];
 
     -- Body regions (resolved via code)
     v_br_foreleg_left  BIGINT;
@@ -92,13 +94,29 @@ BEGIN
         RAISE EXCEPTION 'horse_body_regions codes missing! Run baseline seed first.';
     END IF;
 
-    -- 4. IDEMPOTENT CLEANUP: chi xoa du lieu cua script nay (marker [VET-DEMO])
-    DELETE FROM prescriptions     WHERE instructions  LIKE '[VET-DEMO]%';
-    DELETE FROM treatment_plans   WHERE instructions  LIKE '[VET-DEMO]%';
-    DELETE FROM injury_records    WHERE description   LIKE '[VET-DEMO]%';
-    DELETE FROM horse_health_metrics WHERE notes      LIKE '[VET-DEMO]%';
-    DELETE FROM health_records    WHERE notes         LIKE '[VET-DEMO]%';
-    DELETE FROM care_schedule     WHERE description   LIKE '[VET-DEMO]%';
+    -- 4. IDEMPOTENT CLEANUP: xoa du lieu cua script nay (marker [VET-DEMO]) va moi dong phat sinh tu no
+    -- (care_schedule con qua source_schedule_id, health_records / incident reports do app tao tu lich demo).
+    WITH RECURSIVE tree AS (
+        SELECT id FROM care_schedule WHERE description LIKE '[VET-DEMO]%'
+        UNION
+        SELECT c.id FROM care_schedule c JOIN tree t ON c.source_schedule_id = t.id
+    )
+    SELECT array_agg(id) INTO v_sched FROM tree;
+    v_sched := COALESCE(v_sched, ARRAY[]::BIGINT[]);
+
+    SELECT COALESCE(array_agg(id), ARRAY[]::BIGINT[]) INTO v_hr
+      FROM health_records
+     WHERE notes LIKE '[VET-DEMO]%' OR care_schedule_id = ANY (v_sched);
+
+    DELETE FROM prescriptions WHERE instructions LIKE '[VET-DEMO]%'
+        OR treatment_plan_id IN (SELECT id FROM treatment_plans
+                                  WHERE instructions LIKE '[VET-DEMO]%' OR health_record_id = ANY (v_hr));
+    DELETE FROM treatment_plans   WHERE instructions LIKE '[VET-DEMO]%' OR health_record_id = ANY (v_hr);
+    DELETE FROM injury_records    WHERE description  LIKE '[VET-DEMO]%' OR health_record_id = ANY (v_hr);
+    DELETE FROM horse_health_metrics WHERE notes     LIKE '[VET-DEMO]%';
+    DELETE FROM horse_incident_reports WHERE care_schedule_id = ANY (v_sched);
+    DELETE FROM health_records    WHERE id = ANY (v_hr);
+    DELETE FROM care_schedule     WHERE id = ANY (v_sched);
 
     -- ================================================================
     -- 5. care_schedule: 10 ROUTINE/FOLLOW_UP + 6 URGENT/FOLLOW_UP
@@ -417,6 +435,29 @@ BEGIN
             SELECT max(hr2.examined_at) FROM health_records hr2
             WHERE hr2.horse_id = hr.horse_id AND hr2.training_decision = 'BLOCKED'
        );
+
+    -- 11b. Chan tap keo theo (giong TrainingDecisionService.block): huy buoi tap chua dien ra, huy lot da rong, huy plan
+    -- dang chay. Khong lam buoc nay thi seed de lai ngua BLOCKED van co plan ACTIVE/UPCOMING.
+    -- (Cascade of a block, like TrainingDecisionService.block: cancel not-yet-held workouts, cancel emptied lots, cancel
+    -- running plans. Without it the seed leaves BLOCKED horses with an ACTIVE/UPCOMING plan.)
+    UPDATE training_workouts w
+       SET status = 'CANCELLED', updated_at = v_now
+      FROM training_lots l, horses h
+     WHERE l.id = w.lot_id AND h.id = w.horse_id
+       AND h.training_decision = 'BLOCKED'
+       AND w.status = 'SCHEDULED' AND l.lot_date >= CURRENT_DATE;
+
+    UPDATE training_lots l
+       SET status = 'CANCELLED', updated_at = v_now
+     WHERE l.status = 'SCHEDULED'
+       AND NOT EXISTS (SELECT 1 FROM training_workouts w WHERE w.lot_id = l.id AND w.status <> 'CANCELLED')
+       AND EXISTS (SELECT 1 FROM training_workouts w WHERE w.lot_id = l.id);
+
+    UPDATE horse_training_plans p
+       SET status = 'CANCELLED', updated_at = v_now
+      FROM horses h
+     WHERE h.id = p.horse_id AND h.training_decision = 'BLOCKED'
+       AND p.status IN ('ACTIVE', 'UPCOMING');
 
     RAISE NOTICE '[VET-DEMO] seed complete: 16 care_schedule, 14 health_records, 45 metrics, 8 plans, 10 prescriptions, 5 injuries.';
 END;

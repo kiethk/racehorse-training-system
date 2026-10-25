@@ -28,7 +28,6 @@ export interface Subject {
 }
 
 export interface CreateSubjectRequest {
-  trainerId?: number;
   category: SubjectCategory;
   name: string;
   description?: string;
@@ -66,7 +65,6 @@ export interface CourseDetailResponse {
 }
 
 export interface CreateCourseRequest {
-  trainerId?: number;
   name: string;
   targetGoal?: string;
   totalSessions: number;
@@ -119,6 +117,8 @@ export interface PlanPreviewResponse {
   totalSessions: number;
   /** Earliest date every selected horse is free for the whole course; null when none is selected. */
   groupEarliestStart: string | null;
+  /** Training days on which the trainer's golden window cannot fit the group; the plan cannot be created. */
+  scheduleFullDates: string[];
   horses: HorsePlanAvailability[];
 }
 
@@ -278,6 +278,9 @@ export interface TrainingRules {
   lotStartStepMinutes: number;
   minSubjectDurationMinutes: number;
   maxSubjectDurationMinutes: number;
+  maxCourseSessions: number;
+  maxCourseSubjects: number;
+  maxHorsesPerPlan: number;
   /** A maximum heart rate above this raises an alert. */
   maxHeartRateLimit: number;
   /** A recovery heart rate above this raises an alert. */

@@ -12,6 +12,7 @@ import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseTrainingPlanService;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -84,7 +85,7 @@ public class HorseTrainingPlanController {
     @PreAuthorize("hasAuthority('TRAINING_PLAN_CREATE')")
     @PostMapping
     public ApiResponse<List<HorseTrainingPlanDetailResponse>> createPlan(
-            @RequestBody CreateHorseTrainingPlanRequest request,
+            @Valid @RequestBody CreateHorseTrainingPlanRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(planService.createPlan(request, currentUser));
     }
@@ -98,7 +99,7 @@ public class HorseTrainingPlanController {
     @PreAuthorize("hasAuthority('TRAINING_PLAN_CREATE')")
     @PostMapping("/preview")
     public ApiResponse<PlanPreviewResponse> previewPlan(
-            @RequestBody PlanPreviewRequest request,
+            @Valid @RequestBody PlanPreviewRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(planService.previewPlan(request, currentUser));
     }
