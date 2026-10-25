@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Button, EmptyState, ListSkeleton, Modal, PageSection, Panel, Pill } from '@/components/ui';
-import { useAuth } from '@/context/AuthContext';
 import { displayError, formatNumber } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { categoryLabel, intensityOption, surfaceLabel } from '../lib/subjectOptions';
@@ -58,7 +57,6 @@ function SubjectDetailModal({ subject, onClose }: { subject: Subject | null; onC
 }
 
 export function SubjectList() {
-  const { user } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,10 +86,7 @@ export function SubjectList() {
     setFormError(null);
     setSubmitting(true);
     try {
-      await trainingService.createSubject({
-        ...request,
-        trainerId: user?.userId,
-      });
+      await trainingService.createSubject(request);
       toast.success('Subject created.');
       setShowForm(false);
       await load();

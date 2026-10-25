@@ -75,6 +75,12 @@ class HorseTrainingPlanServiceTest {
     @Mock
     private TrainingWorkoutService workoutService;
 
+    @Mock
+    private TrainingLotService lotService;
+
+    @Mock
+    private com.rtms.backend.identity.repository.UserRepository userRepository;
+
     private HorseTrainingPlanService planService;
 
     private final AuthenticatedUser trainerUser = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
@@ -90,7 +96,9 @@ class HorseTrainingPlanServiceTest {
                 courseSubjectRepository,
                 horseRepository,
                 trainingDecisionService,
-                workoutService
+                workoutService,
+                lotService,
+                userRepository
         );
     }
 
@@ -159,7 +167,7 @@ class HorseTrainingPlanServiceTest {
     @Test
     @DisplayName("1. Creates plans for a group of 2 horses and hands the schedule to the workout service")
     void testCreatePlan_Success() {
-        LocalDate startDate = LocalDate.now();
+        LocalDate startDate = LocalDate.now().plusDays(1);
         LocalDate secondSession = startDate.plusDays(2);
         Subject warmUp = subject(50L, "Warm-up 30 min");
         stubCourse(100L, 2, warmUp);
@@ -187,9 +195,8 @@ class HorseTrainingPlanServiceTest {
         assertEquals(2, responses.size(), "One response per horse");
         assertEquals(1L, responses.get(0).getPlan().getHorseId());
         assertEquals(2L, responses.get(1).getPlan().getHorseId());
-        assertEquals(TrainingPlanStatus.ACTIVE, responses.get(0).getPlan().getStatus(),
-                "A plan that starts today or earlier is ACTIVE");
-        // Hai buổi, hôm nay và hai ngày sau (two sessions, today and two days later)
+        assertEquals(TrainingPlanStatus.UPCOMING, responses.get(0).getPlan().getStatus());
+        // Hai buổi, ngày mai và hai ngày sau đó (two sessions, tomorrow and two days after)
         assertEquals(secondSession, responses.get(0).getPlan().getEndDate());
         assertEquals(4L, responses.get(0).getPlan().getGroomId(), "Groom is taken from the stall");
 
@@ -230,12 +237,89 @@ class HorseTrainingPlanServiceTest {
         when(planRepository.saveAllAndFlush(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(workoutService.createWorkouts(any(), anyList(), anyMap())).thenReturn(new LinkedHashMap<>());
 
-        CreateHorseTrainingPlanRequest request = request(100L, LocalDate.now(), 1L);
+        com.rtms.backend.identity.entity.Role groomRole = new com.rtms.backend.identity.entity.Role();
+        groomRole.setName("GROOM");
+        com.rtms.backend.identity.entity.User groomUser = new com.rtms.backend.identity.entity.User();
+        groomUser.setRole(groomRole);
+        groomUser.setActive(true);
+        when(userRepository.findById(77L)).thenReturn(Optional.of(groomUser));
+
+        CreateHorseTrainingPlanRequest request = request(100L, NEXT_MONDAY, 1L);
         request.getHorses().get(0).setGroomId(77L);
 
         List<HorseTrainingPlanDetailResponse> responses = planService.createPlan(request, trainerUser);
 
         assertEquals(77L, responses.get(0).getPlan().getGroomId());
+    }
+
+    @Test
+    @DisplayName("1d. An override that is not an active groom is rejected")
+    void testCreatePlan_GroomOverride_NotAGroom() {
+        stubCourse(100L, 1, subject(50L, "Warm-up"));
+        stubHorses(List.of(horse(1L, "White Dragon")), new HorseStallInfo(1L, "A1", 4L, "A", 9L));
+        when(userRepository.findById(77L)).thenReturn(Optional.empty());
+
+        CreateHorseTrainingPlanRequest request = request(100L, NEXT_MONDAY, 1L);
+        request.getHorses().get(0).setGroomId(77L);
+
+        assertThrows(IllegalArgumentException.class, () -> planService.createPlan(request, trainerUser));
+        verify(planRepository, never()).saveAllAndFlush(anyList());
+    }
+
+    @Test
+    @DisplayName("1e. A course with an invalid session count cannot be enrolled")
+    void testCreatePlan_CourseSessionsOutOfRange() {
+        when(courseRepository.findById(100L)).thenReturn(Optional.of(course(100L, 0)));
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> planService.createPlan(request(100L, NEXT_MONDAY, 1L), trainerUser));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("COURSE_INVALID_SESSIONS", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("1f. Start dates in the past or too far away are rejected")
+    void testCreatePlan_StartDateOutOfRange() {
+        assertThrows(IllegalArgumentException.class,
+                () -> planService.createPlan(request(100L, LocalDate.now().minusDays(1), 1L), trainerUser));
+        assertThrows(IllegalArgumentException.class,
+                () -> planService.createPlan(request(100L, LocalDate.now().plusDays(4000), 1L), trainerUser));
+        verifyNoInteractions(courseRepository, planRepository);
+    }
+
+    @Test
+    @DisplayName("1g. More horses than the limit are rejected")
+    void testCreatePlan_TooManyHorses() {
+        Long[] ids = new Long[com.rtms.backend.config.TrainingLimits.MAX_HORSES_PER_PLAN + 1];
+        for (int i = 0; i < ids.length; i++) {
+            ids[i] = i + 1L;
+        }
+        assertThrows(IllegalArgumentException.class,
+                () -> planService.createPlan(request(100L, NEXT_MONDAY, ids), trainerUser));
+        verifyNoInteractions(courseRepository, planRepository);
+    }
+
+    @Test
+    @DisplayName("1h. A plan starting today is ACTIVE while the window is open, and refused once it is over")
+    void testCreatePlan_StartingToday() {
+        LocalDate today = LocalDate.now();
+        stubCourse(100L, 1, subject(50L, "Warm-up"));
+        stubHorses(List.of(horse(1L, "White Dragon")), new HorseStallInfo(1L, "A1", 4L, "A", 9L));
+        CreateHorseTrainingPlanRequest request = request(100L, today, 1L);
+        request.setTrainingDays(List.of(trainingDayOf(today)));
+
+        if (java.time.LocalTime.now().isBefore(com.rtms.backend.config.FarmSchedulePolicy.GOLDEN_HOURS_END)) {
+            when(planRepository.findRunningPlans(any(), any())).thenReturn(Collections.emptyList());
+            when(planRepository.saveAllAndFlush(anyList())).thenAnswer(inv -> inv.getArgument(0));
+            when(workoutService.createWorkouts(any(), anyList(), anyMap())).thenReturn(new LinkedHashMap<>());
+
+            assertEquals(TrainingPlanStatus.ACTIVE,
+                    planService.createPlan(request, trainerUser).get(0).getPlan().getStatus());
+        } else {
+            ApiException ex = assertThrows(ApiException.class, () -> planService.createPlan(request, trainerUser));
+            assertEquals("TRAINING_WINDOW_OVER", ex.getErrorCode());
+            verify(planRepository, never()).saveAllAndFlush(anyList());
+        }
     }
 
     @Test
@@ -270,8 +354,9 @@ class HorseTrainingPlanServiceTest {
         when(courseRepository.findById(10L)).thenReturn(Optional.of(course(10L, 1)));
         when(courseSubjectRepository.findSubjectsOfCourseInOrder(10L)).thenReturn(List.of());
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> planService.createPlan(request(10L, LocalDate.now(), 1L), trainerUser));
+        ApiException ex = assertThrows(ApiException.class,
+                () -> planService.createPlan(request(10L, NEXT_MONDAY, 1L), trainerUser));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         assertTrue(ex.getMessage().contains("no subjects"));
     }
 
@@ -317,8 +402,9 @@ class HorseTrainingPlanServiceTest {
         stubCourse(10L, 1, subject(1L, "Warm-up"));
         stubHorses(List.of(horse(3L, "Free Horse")));   // no stall info row
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> planService.createPlan(request(10L, LocalDate.now(), 3L), trainerUser));
+        ApiException ex = assertThrows(ApiException.class,
+                () -> planService.createPlan(request(10L, NEXT_MONDAY, 3L), trainerUser));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         assertTrue(ex.getMessage().contains("has not been assigned to a stall"));
     }
 
@@ -338,8 +424,9 @@ class HorseTrainingPlanServiceTest {
         stubCourse(10L, 1, subject(1L, "Warm-up"));
         stubHorses(List.of(horse(3L, "Orphan Horse")), new HorseStallInfo(3L, "C1", 4L, "C", null));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> planService.createPlan(request(10L, LocalDate.now(), 3L), trainerUser));
+        ApiException ex = assertThrows(ApiException.class,
+                () -> planService.createPlan(request(10L, NEXT_MONDAY, 3L), trainerUser));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         assertTrue(ex.getMessage().contains("not assigned to any trainer"));
     }
 
@@ -349,8 +436,9 @@ class HorseTrainingPlanServiceTest {
         stubCourse(10L, 1, subject(1L, "Warm-up"));
         stubHorses(List.of(horse(3L, "Groomless Horse")), new HorseStallInfo(3L, "A3", null, "A", 9L));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> planService.createPlan(request(10L, LocalDate.now(), 3L), trainerUser));
+        ApiException ex = assertThrows(ApiException.class,
+                () -> planService.createPlan(request(10L, NEXT_MONDAY, 3L), trainerUser));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         assertTrue(ex.getMessage().contains("no groom assigned"));
     }
 
