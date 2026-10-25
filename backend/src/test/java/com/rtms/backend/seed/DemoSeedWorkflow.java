@@ -452,9 +452,18 @@ abstract class DemoSeedWorkflow {
         Long vt01 = staffIds.get("VT01");
         Long vt02 = staffIds.get("VT02");
         Long vt03 = staffIds.get("VT03");
+        Long tr01 = staffIds.get("TR01");
+        Long tr02 = staffIds.get("TR02");
+        Long tr03 = staffIds.get("TR03");
+
         jdbc.update("""
             UPDATE admission_applications a
-            SET veterinarian_id = CASE
+            SET trainer_id = CASE
+                WHEN ar.code IN ('A', 'B') THEN ?
+                WHEN ar.code IN ('C', 'D') THEN ?
+                ELSE ?
+            END,
+            veterinarian_id = CASE
                 WHEN ar.code IN ('A', 'B') THEN ?
                 WHEN ar.code IN ('C', 'D') THEN ?
                 ELSE ?
@@ -464,7 +473,24 @@ abstract class DemoSeedWorkflow {
             JOIN stable_stalls s ON h.current_stall_id = s.id
             JOIN areas ar ON s.area_id = ar.id
             WHERE a.horse_id = h.id AND a.status = 'APPROVED'
-        """, vt01, vt02, vt03);
+        """, tr01, tr02, tr03, vt01, vt02, vt03);
+
+        if (tr01 != null) {
+            jdbc.update("""
+                UPDATE admission_applications
+                SET trainer_id = ?
+                WHERE status = 'TRAINER_REVIEW'
+            """, tr01);
+        }
+
+        if (tr01 != null && tr02 != null) {
+            jdbc.update("""
+                UPDATE admission_applications a
+                SET trainer_id = CASE WHEN h.name ILIKE '%PANERAI%' THEN ? ELSE ? END
+                FROM horses h
+                WHERE a.horse_id = h.id AND a.status = 'MANAGER_REVIEW'
+            """, tr01, tr02);
+        }
 
         jdbc.update("""
             UPDATE care_schedule cs
@@ -478,6 +504,13 @@ abstract class DemoSeedWorkflow {
             SET veterinarian_id = cs.veterinarian_id
             FROM care_schedule cs
             WHERE hr.care_schedule_id = cs.id
+        """);
+
+        jdbc.update("""
+            UPDATE racing_readiness_assessments rra
+            SET trainer_id = a.trainer_id
+            FROM admission_applications a
+            WHERE rra.admission_id = a.id AND a.trainer_id IS NOT NULL
         """);
     }
 

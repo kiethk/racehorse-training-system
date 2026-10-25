@@ -121,5 +121,11 @@ BEGIN
     FROM care_schedule cs
     WHERE hr.care_schedule_id = cs.id AND cs.veterinarian_id IS NOT NULL;
 
+    -- 8. Sync racing_readiness_assessments to match assigned Trainer
+    UPDATE racing_readiness_assessments rra
+    SET trainer_id = a.trainer_id
+    FROM admission_applications a
+    WHERE rra.admission_id = a.id AND a.trainer_id IS NOT NULL;
+
     RAISE NOTICE 'Staff rebalance completed successfully!';
 END $$;
