@@ -11,7 +11,11 @@ let pdfjs: Promise<PdfJs> | null = null;
 export function loadPdfJs(): Promise<PdfJs> {
   pdfjs ??= import('pdfjs-dist').then((module) => {
     // Parsing runs in a worker so a big PDF never blocks the page.
-    module.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+    if (typeof window !== 'undefined') {
+      module.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+    } else {
+      module.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+    }
     return module;
   }).catch((error) => {
     pdfjs = null; // Allow a retry after a failed download.

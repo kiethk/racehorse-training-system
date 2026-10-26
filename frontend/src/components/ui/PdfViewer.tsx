@@ -24,6 +24,18 @@ interface PageInfo {
   height: number;
 }
 
+interface PdfDocumentProxyLike {
+  numPages: number;
+  getPage: (pageNumber: number) => Promise<{
+    getViewport: (options: { scale: number }) => { width: number; height: number };
+    render: (options: {
+      canvasContext: CanvasRenderingContext2D;
+      viewport: { width: number; height: number };
+    }) => { promise: Promise<void>; cancel: () => void };
+  }>;
+  destroy: () => Promise<void>;
+}
+
 export function PdfViewer({
   blob,
   title,
@@ -36,6 +48,7 @@ export function PdfViewer({
   const [numPages, setNumPages] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pageInfoList, setPageInfoList] = useState<PageInfo[]>([]);
+  const docRef = useRef<PdfDocumentProxyLike | null>(null);
   const renderTasksRef = useRef<Map<number, { cancel: () => void }>>(new Map());
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
 
@@ -60,8 +73,12 @@ export function PdfViewer({
         });
 
         const doc = await loadingTask.promise;
-        if (!active) return;
+        if (!active) {
+          void doc.destroy();
+          return;
+        }
 
+        docRef.current = doc as unknown as PdfDocumentProxyLike;
         setNumPages(doc.numPages);
         const pages: PageInfo[] = [];
         for (let i = 1; i <= doc.numPages; i++) {
@@ -88,18 +105,19 @@ export function PdfViewer({
     return () => {
       active = false;
       controller.abort();
+      if (docRef.current) {
+        void docRef.current.destroy();
+        docRef.current = null;
+      }
     };
   }, [blob, onError]);
 
   // Render pages onto canvases whenever zoom, pageInfoList, or blob changes
   const renderAllPages = useCallback(async () => {
-    if (pageInfoList.length === 0) return;
+    const doc = docRef.current;
+    if (pageInfoList.length === 0 || !doc) return;
 
     try {
-      const { getDocument } = await loadPdfJs();
-      const arrayBuffer = await blob.arrayBuffer();
-      const doc = await getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-
       // Cancel previous render tasks
       renderTasksRef.current.forEach((task) => task.cancel());
       renderTasksRef.current.clear();
@@ -145,7 +163,7 @@ export function PdfViewer({
     } catch {
       // Document re-render error handled silently
     }
-  }, [blob, pageInfoList, zoom]);
+  }, [pageInfoList, zoom]);
 
   useEffect(() => {
     void renderAllPages();
@@ -190,8 +208,7 @@ export function PdfViewer({
               icon="minus"
               aria-label="Zoom out PDF"
               disabled={zoom <= 50}
-              onClick={() => onZoomChange(Math.max(50, zoom - 25))}
-            />
+              onClick={() => onZoomChange(Math.max(50, zoom - 25))}\n            />
             <span className="w-12 text-center font-mono font-medium" aria-live="polite">
               {zoom}%
             </span>
@@ -238,8 +255,7 @@ export function PdfViewer({
                   className="block max-w-none"
                 />
               </div>
-              {numPages > 1 && (
-                <span className="text-[11px] font-medium text-[var(--color-text-muted)]">
+              {numPages > 1 && (\n                <span className="text-[11px] font-medium text-[var(--color-text-muted)]">
                   Page {info.pageNumber} of {numPages}
                 </span>
               )}

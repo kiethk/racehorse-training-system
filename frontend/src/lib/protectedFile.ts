@@ -154,10 +154,10 @@ export function useProtectedFileUrl(source: string | null | undefined): { url: s
 }
 
 /**
- * `useProtectedFileUrl` for a list of files, e.g. every photo in a gallery. Returns one entry per source:
- * `url` is null while loading or when loading failed (`failed` tells the two apart).
+ * `useProtectedFileUrl` for a list of files, e.g. every photo in a gallery. Returns one entry per source:\
+ * `url` is null while loading or when loading failed (`failed` tells the two apart).\
  */
-export function useProtectedFileUrls(sources: readonly string[]): Record<string, { url: string | null; failed: boolean }> {
+export function useProtectedFileUrls(sources: readonly string[]): Record<string, { url: string | null; failed: boolean }> {\
   const key = sources.join('\n');
   const [loaded, setLoaded] = useState<{ key: string; urls: Record<string, string | null> }>({ key: '', urls: {} });
 
@@ -204,18 +204,157 @@ export function useProtectedFileUrls(sources: readonly string[]): Record<string,
   ]));
 }
 
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (m) => {
+    switch (m) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return m;
+    }
+  });
+}
+
 /**
- * Opens a stored file in a new browser tab. The tab is opened first, inside the click, so the
- * browser does not treat it as a pop-up; the file is then loaded with the access token.
+ * In Chromium browsers, navigating top-level window directly to a `blob:` URL of a PDF
+ * (e.g. `tab.location.href = blobUrl`) triggers an automatic force-download instead of viewing.
+ * Embedding the blob URL inside a full-window iframe renders Chromium's native PDF plugin
+ * inline with all viewer controls without triggering the forced download.
  */
-export async function openProtectedFile(source: string): Promise<void> {
+function renderViewerInTab(tab: Window, objectUrl: string, title: string, isPdf: boolean): void {
+  const safeTitle = escapeHtml(title || 'Document Preview');
+  try {
+    tab.document.title = title || 'Document Preview';
+    if (isPdf) {
+      tab.document.body.style.margin = '0';
+      tab.document.body.style.padding = '0';
+      tab.document.body.style.width = '100%';
+      tab.document.body.style.height = '100%';
+      tab.document.body.style.overflow = 'hidden';
+      tab.document.body.style.backgroundColor = '#525659';
+      tab.document.body.innerHTML = `
+        <iframe
+          src="${objectUrl}"
+          title="${safeTitle}"
+          style="width:100%;height:100%;border:none;display:block;"
+        ></iframe>
+      `;
+    } else {
+      tab.document.body.style.margin = '0';
+      tab.document.body.style.padding = '0';
+      tab.document.body.style.width = '100%';
+      tab.document.body.style.height = '100%';
+      tab.document.body.style.overflow = 'auto';
+      tab.document.body.style.backgroundColor = '#0f172a';
+      tab.document.body.style.display = 'flex';
+      tab.document.body.style.alignItems = 'center';
+      tab.document.body.style.justifyContent = 'center';
+      tab.document.body.innerHTML = `
+        <img
+          src="${objectUrl}"
+          alt="${safeTitle}"
+          style="max-width:100%;max-height:100%;object-fit:contain;padding:16px;"
+        />
+      `;
+    }
+  } catch {
+    try {
+      tab.location.href = objectUrl;
+    } catch {
+      // ignore
+    }
+  }
+}
+
+/**
+ * Opens a local or existing blob URL in a new tab without triggering Chromium auto-download.
+ */
+export function openBlobInTab(blobUrl: string, title: string = 'Document Preview', isPdf?: boolean): void {
   const tab = window.open('', '_blank');
+  if (!tab) return;
+  const determinedIsPdf = isPdf !== undefined
+    ? isPdf
+    : (title.toLowerCase().endsWith('.pdf') || blobUrl.toLowerCase().includes('.pdf'));
+  renderViewerInTab(tab, blobUrl, title, determinedIsPdf);
+}
+
+/**
+ * Opens a stored file in a new browser tab. The tab is opened first inside the click event
+ * to avoid pop-up blocking, displays a loading state, and then renders the preview inline.
+ */
+export async function openProtectedFile(source: string, title?: string): Promise<void> {
+  const tab = window.open('', '_blank');
+  const docTitle = title || 'Document Preview';
+
+  if (tab) {
+    try {
+      tab.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>${escapeHtml(docTitle)}</title>
+            <style>
+              html, body {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background-color: #0f172a;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                color: #94a3b8;
+              }
+              .loader { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+              .spinner {
+                width: 28px;
+                height: 28px;
+                border: 3px solid rgba(255,255,255,0.15);
+                border-top-color: #38bdf8;
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+              }
+              @keyframes spin { to { transform: rotate(360deg); } }
+            </style>
+          </head>
+          <body>
+            <div class="loader">
+              <div class="spinner"></div>
+              <div>Loading preview…</div>
+            </div>
+          </body>
+        </html>
+      `);
+      tab.document.close();
+    } catch {
+      // ignore write errors
+    }
+  }
+
   try {
     const objectUrl = await fetchProtectedBlobUrl(source);
-    if (tab) tab.location.href = objectUrl;
-    else window.open(objectUrl, '_blank');
+    if (!tab || tab.closed) return;
+    const isPdf = (title && title.toLowerCase().endsWith('.pdf'))
+      || source.toLowerCase().includes('.pdf')
+      || (!source.toLowerCase().includes('photo') && !/\.(jpe?g|png|webp)$/i.test(source));
+    renderViewerInTab(tab, objectUrl, docTitle, isPdf);
   } catch (error) {
-    tab?.close();
+    if (tab && !tab.closed) {
+      try {
+        tab.document.body.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#f87171;font-family:sans-serif;text-align:center;padding:20px;">
+            Unable to load document preview.
+          </div>
+        `;
+      } catch {
+        // ignore
+      }
+    }
     throw error;
   }
 }

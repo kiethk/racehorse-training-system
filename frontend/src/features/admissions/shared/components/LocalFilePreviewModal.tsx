@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { PdfViewer } from '@/components/ui/PdfViewer';
+import { openBlobInTab } from '@/lib/protectedFile';
 
 interface LocalFilePreviewModalProps {
   file: File;
@@ -66,10 +67,14 @@ export function LocalFilePreviewModal({ file, previewUrl, onClose }: LocalFilePr
             <Icon name="download" />
             Download
           </a>
-          <a href={previewUrl} target="_blank" rel="noreferrer" className={actionClass}>
+          <button
+            type="button"
+            onClick={() => openBlobInTab(previewUrl, file.name, isPdf)}
+            className={actionClass}
+          >
             <Icon name="external-link" />
             Open in new tab
-          </a>
+          </button>
           {!isPdf && (
             <div className="ml-auto flex items-center gap-1">
               <Button
