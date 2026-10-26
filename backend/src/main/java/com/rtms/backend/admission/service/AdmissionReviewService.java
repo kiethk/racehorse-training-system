@@ -21,6 +21,7 @@ import com.rtms.backend.training.enums.TrainingDecision;
 
 
 import com.rtms.backend.config.ApiException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +39,7 @@ public class AdmissionReviewService {
     private final CareScheduleService careScheduleService;
     private final HealthRecordRepository healthRecordRepository;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public AdmissionReviewService(AdmissionApplicationRepository admissions,
             CareScheduleRepository careSchedules,
             HorseRepository horses, StableStallRepository stalls,
