@@ -78,16 +78,17 @@ export const ownerAdmissionApi = {
     if (!result?.success) throw new Error(result?.message || 'Unable to submit admission.');
     return result.data;
   },
-  upload: async (id: number, file: File, documentType: string, recordDate?: string, note?: string) => {
+  /** Edit details and replace/add documents while no groom has reviewed the application (409 afterwards). */
+  update: async (id: number, candidate: CreateOwnerAdmissionRequest, uploads: { documentType: string; file: File }[]) => {
     const body = new FormData();
-    body.append('file', file);
-    body.append('documentType', documentType);
-    if (recordDate) body.append('recordDate', recordDate);
-    if (note) body.append('note', note);
-    // Through the shared client: it sends the access token and refreshes it once on 401.
-    const json = await apiUpload<ApiResponse<AdmissionDocument>>(`/api/owner/admissions/${id}/documents`, body);
-    if (!json?.success) throw new Error(json?.message || 'Document upload failed');
-    return json.data;
+    body.append('candidate', new Blob([JSON.stringify(candidate)], { type: 'application/json' }));
+    if (uploads.length > 0) {
+      body.append('documentTypes', new Blob([JSON.stringify(uploads.map(u => u.documentType))], { type: 'application/json' }));
+      uploads.forEach(upload => body.append('files', upload.file));
+    }
+    const result = await apiUpload<ApiResponse<OwnerAdmissionDetail>>(`/api/owner/admissions/${id}`, body, 'PUT');
+    if (!result?.success) throw new Error(result?.message || 'Unable to update the application.');
+    return result.data;
   },
   scanOcr: async (file: File, documentType: string) => {
     const body = new FormData();

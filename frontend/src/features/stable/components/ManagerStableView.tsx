@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, ConfirmDialog, EmptyState, IconButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, Tabs } from '@/components/ui';
+import { Button, ConfirmDialog, EmptyState, IconButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, SegmentedControl, Tabs } from '@/components/ui';
 import type { Area, AreaType, StableStall } from '../types';
 import type { AssignmentDraft, AssignmentTarget, DragStaff } from '../types/manager';
 import { useManagerStable } from '../hooks/useManagerStable';
-import { areaView, compareAreas, editCount, horseMap, overlayDraft, personName, planAssignment } from '../lib/managerAssignments';
+import { areaView, compareAreas, editCount, horseMap, overlayDraft, personName, planAssignment, staffLocations, trainerChangeReason } from '../lib/managerAssignments';
+import { toast } from '@/lib/toast';
 import { StallDetailPanel } from '../shared/components/StallDetailPanel';
+import { StableMapView } from '../shared/components/StableMapView';
+import { blockNumberOf } from '../shared/lib/stallLayout';
 import { AreaCard } from './AreaCard';
 import { StableStaffPanel } from './StableStaffPanel';
 import { StaffAssignmentPicker } from './StaffAssignmentPicker';
@@ -32,6 +35,8 @@ function ManagerStableContent() {
   const [pendingAction, setPendingAction] = useState<{ run: () => void } | null>(null);
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Area | null>(null);
+  // Cards hold the drag-and-drop staffing; the map shows the same (draft) state as a plan or 3D barn.
+  const [layout, setLayout] = useState<'cards' | 'map'>('cards');
   const count = data && draft ? editCount(data, draft) : 0;
   const dirty = count > 0;
   const busy = loading || saving || creating || deleting;
@@ -61,12 +66,26 @@ function ManagerStableContent() {
       if (next.changes.some(c => c.before !== 'Unassigned')) setPreview(next);
       else stage(next.draft);
     } catch (error) {
+      // Shown as a toast too: the inline notice sits at the top of the page, often out of view (e.g. on the map).
       setActionError((error as Error).message); cancelDrag();
+      toast.error('Assignment not possible', (error as Error).message);
     }
   };
   const assign = (target: AssignmentTarget, staff: DragStaff) => {
     if (target.kind !== staff.kind) return;
     propose(target, staff.personId, staff);
+  };
+  /**
+   * A trainer runs whole areas, so putting one on an area that already has a trainer swaps their areas.
+   * With two other areas it is ambiguous which one to swap, so the picker lets the Manager choose.
+   */
+  const assignTrainer = (areaId: number, personId: number) => {
+    if (!data || !draft || draft.trainers[areaId] === personId) return;
+    const others = staffLocations(data, draft, 'trainer', personId).filter(t => t.areaId !== areaId);
+    const target: AssignmentTarget = { kind: 'trainer', areaId };
+    if (draft.trainers[areaId] != null && others.length > 1) { setPicker(target); return; }
+    const source = draft.trainers[areaId] != null ? others[0] : undefined;
+    assign(target, { kind: 'trainer', personId, source });
   };
   const pick = (target: AssignmentTarget) => {
     if (selectedStaff?.kind === target.kind) assign(target, selectedStaff);
@@ -82,10 +101,13 @@ function ManagerStableContent() {
   const totalStalls = views.reduce((n, v) => n + v.stalls.length, 0);
   const projected = data && draft ? overlayDraft(data, draft) : null;
   const selected = projected?.stalls.find(s => s.id === selectedStall?.id) ?? null;
+  const mapAreas = projected ? projected.areas.filter(a => a.type === activeTab) : [];
 
   return (
     <ScreenLayout variant="dashboard">
       <PageHeader title="Stable" actions={<div className="flex items-center gap-2">
+        <SegmentedControl<'cards' | 'map'> label="Layout" value={layout} onChange={(next) => { setLayout(next); setSelectedStaff(null); cancelDrag(); }}
+          options={[{ value: 'cards', label: 'Cards', icon: 'grid' }, { value: 'map', label: 'Map', icon: 'layers' }]} />
         <Button size="sm" variant="secondary" icon="refresh" disabled={busy} loading={loading && !!data}
           onClick={() => guard(() => { void reload(); })}>Refresh</Button>
         <Button size="sm" variant="primary" icon="plus" disabled={busy || needsReload || !data} loading={creating}
@@ -114,9 +136,61 @@ function ManagerStableContent() {
             onClick={() => setAttentionOnly(v => !v)}>Needs attention{attention > 0 ? ` (${attention})` : ''}</Button>
         </div>
         {selectedStaff && <div className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--color-primary-soft)] px-3 py-2 text-sm text-[var(--color-primary)]" role="status">
-          <span>{personName(data, selectedStaff.kind, selectedStaff.personId)} · Choose {selectedStaff.kind === 'trainer' ? 'an area' : 'a block'}</span>
+          <span>
+            {personName(data, selectedStaff.kind, selectedStaff.personId)} · Choose {selectedStaff.kind === 'trainer' ? 'an area' : 'a block'}
+            {selectedStaff.kind === 'trainer' && (() => {
+              const locked = data.areas.filter(a => a.type === 'REGULAR' && trainerChangeReason(data, a.id)).map(a => `Area ${a.code}`);
+              return locked.length > 0
+                ? <span className="block text-xs text-[var(--color-text-secondary)]">Trainer cannot change while an area has horses or unfinished training: {locked.join(', ')}</span>
+                : null;
+            })()}
+          </span>
           <IconButton icon="x" label="Cancel staff selection" size="sm" onClick={() => setSelectedStaff(null)} />
         </div>}
+        {layout === 'map' && projected ? (
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_15rem]">
+          <StableMapView
+            lens="trainer"
+            areas={mapAreas}
+            stalls={projected.stalls}
+            horseByStallId={horses}
+            selectedStallId={selectedStall?.id ?? null}
+            onSelectStall={(stall) => {
+              // With a person picked in the staff list, clicking a stall assigns them (trainer: its area; groom: its block).
+              if (stall && selectedStaff) {
+                if (selectedStaff.kind === 'trainer') assignTrainer(stall.areaId, selectedStaff.personId);
+                else pick({ kind: 'groom', areaId: stall.areaId, blockNumber: blockNumberOf(stall.stallNumber) });
+                return;
+              }
+              setSelectedStall(stall);
+            }}
+            onMoveGroom={editDisabled ? undefined : (area, groomId, toBlockNumber) => {
+              const from = projected.stalls.find(st => st.areaId === area.id && st.groomId === groomId);
+              assign({ kind: 'groom', areaId: area.id, blockNumber: toBlockNumber }, {
+                kind: 'groom',
+                personId: groomId,
+                source: from ? { kind: 'groom', areaId: area.id, blockNumber: blockNumberOf(from.stallNumber) } : undefined,
+              });
+            }}
+            onPickTrainer={editDisabled ? undefined : (area) => {
+              // With a trainer picked in the staff list, assign them straight away; otherwise choose one.
+              if (selectedStaff?.kind === 'trainer') assignTrainer(area.id, selectedStaff.personId);
+              else setPicker({ kind: 'trainer', areaId: area.id });
+            }}
+            personName={(kind, id) => personName(projected, kind, id)}
+            legendNote={dirty ? 'Unsaved staffing changes are shown on the map.' : undefined}
+            emptyTitle="No areas yet"
+            cellFooter={(stall) => (
+              <span className="block truncate text-xs text-[var(--color-text-secondary)]">
+                {stall.groomId ? personName(projected, 'groom', stall.groomId) : <span className="italic text-[var(--color-text-muted)]">No groom</span>}
+              </span>
+            )}
+          />
+          <StableStaffPanel key={`map-${activeTab}`} data={data} draft={draft} activeTab={activeTab} disabled={editDisabled}
+            selected={selectedStaff} canReturn={canReturn} onSelect={setSelectedStaff}
+            onReturn={staff => { if (staff.source) propose(staff.source, null); }} />
+          </div>
+        ) : (
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_15rem]">
           <div className="min-w-0">
             {displayed.length ? <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -131,6 +205,7 @@ function ManagerStableContent() {
             selected={selectedStaff} canReturn={canReturn} onSelect={setSelectedStaff}
             onReturn={staff => { if (staff.source) propose(staff.source, null); }} />
         </div>
+        )}
         {dirty && <Panel className="sticky bottom-4 z-10 flex items-center justify-between gap-3 px-4 py-3 shadow-[var(--shadow-popover)]">
           <div className="flex items-center gap-2 text-sm"><Pill tone="primary" size="sm">{count}</Pill>Pending {count === 1 ? 'change' : 'changes'}</div>
           <div className="flex gap-2">
@@ -160,7 +235,22 @@ function ManagerStableContent() {
         }} />
       <Modal open={selected != null} title="Stall details" onClose={() => setSelectedStall(null)}>
         {selected && projected && <StallDetailPanel stall={selected} area={projected.areas.find(a => a.id === selected.areaId)}
-          horse={horses.get(selected.id)} hint="">
+          horse={horses.get(selected.id)} hint=""
+          actions={<>
+            {projected.areas.find(a => a.id === selected.areaId)?.type === 'REGULAR' && (
+              <Button variant="secondary" icon="user" disabled={editDisabled}
+                onClick={() => { setSelectedStall(null); setPicker({ kind: 'trainer', areaId: selected.areaId }); }}>
+                Change trainer
+              </Button>
+            )}
+            <Button variant="secondary" icon="users" disabled={editDisabled}
+              onClick={() => {
+                setSelectedStall(null);
+                setPicker({ kind: 'groom', areaId: selected.areaId, blockNumber: blockNumberOf(selected.stallNumber) });
+              }}>
+              Change groom
+            </Button>
+          </>}>
           <dl className="space-y-2 text-sm"><div className="flex justify-between gap-3"><dt className="text-[var(--color-text-secondary)]">Groom</dt>
             <dd className="text-right">{personName(projected, 'groom', selected.groomId)}</dd></div>
             {projected.areas.find(a => a.id === selected.areaId)?.type === 'REGULAR' && <div className="flex justify-between gap-3">

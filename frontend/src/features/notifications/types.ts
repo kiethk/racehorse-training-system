@@ -4,6 +4,10 @@ export type NotificationType =
   | 'CARE_SCHEDULE_URGENT_ASSIGNED'
   | 'URGENT_CASE_CLOSED'
   | 'ROUTINE_ASSIGNED'
+  | 'ADMISSION_NEW_FOR_GROOM'
+  | 'ADMISSION_GROOM_ASSIGNED'
+  | 'HORSE_EDIT_REQUESTED'
+  | 'HORSE_EDIT_REVIEWED'
   | string;
 
 export interface NotificationItem {

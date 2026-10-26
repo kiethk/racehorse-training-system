@@ -151,105 +151,105 @@ export function GroomStableView() {
         actions={<Button variant="secondary" size="sm" icon="refresh" onClick={() => loadAll()}>Refresh</Button>}
       />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
-        <StableMapView
-          lens="groom"
-          areas={visibleAreas}
-          stalls={stalls}
-          horseByStallId={horseByStallId}
-          ownStallIds={ownStallIds}
-          // Grooms only see their own stalls; the rest of the barn is drawn as locked frames.
-          lockOthers
-          emptyTitle="You are not assigned to any stall yet"
-          emptyDescription="The Club Manager assigns stalls to grooms. Your stalls will appear here once assigned."
-          selectedStallId={selectedStallId}
-          onSelectStall={selectStall}
-          // Grooms cannot read the staff directory (USER_VIEW), so only their own figure is named.
-          personName={personName}
-          currentUserId={user?.userId}
-          cellFooter={(stall, horse) => {
-            if (!horse || !ownStallIds.has(stall.id)) return null;
-            const horseTasks = tasksByHorseId.get(horse.id) ?? [];
-            if (horseTasks.length === 0) {
-              return <span className="block truncate text-xs text-[var(--color-text-muted)]">No tasks today</span>;
-            }
-            const done = horseTasks.filter(isDone).length;
-            return (
-              <span className="block space-y-1">
-                <ProgressBar
-                  value={done}
-                  max={horseTasks.length}
-                  size="sm"
-                  tone={done === horseTasks.length ? 'success' : 'primary'}
-                  label={`${done} of ${horseTasks.length} tasks done today`}
-                />
-                <span className="block text-xs text-[var(--color-text-secondary)]">{done}/{horseTasks.length} tasks</span>
-              </span>
-            );
-          }}
-        />
-
-        <StallDetailPanel
-          stall={selectedStall}
-          area={areas.find((area) => area.id === selectedStall?.areaId)}
-          horse={selectedHorse}
-          specialty={specialty && specialty.horseId === selectedHorseId ? specialty.value : null}
-          hint="Your stalls are highlighted on the map. Pick one to see today's tasks and open incidents."
-          actions={
-            selectedHorse && selectedIsOwn ? (
-              <>
-                <LinkButton href={`/groom/incidents/new?horseId=${selectedHorse.id}`} variant="warning" icon="alert-triangle">
-                  Report incident
-                </LinkButton>
-                <LinkButton href="/groom/tasks" variant="secondary" icon="list">
-                  Open daily tasks
-                </LinkButton>
-              </>
-            ) : undefined
+      <StableMapView
+        lens="groom"
+        areas={visibleAreas}
+        stalls={stalls}
+        horseByStallId={horseByStallId}
+        ownStallIds={ownStallIds}
+        // Grooms only see their own stalls; the rest of the barn is drawn as locked frames.
+        lockOthers
+        emptyTitle="You are not assigned to any stall yet"
+        emptyDescription="The Club Manager assigns stalls to grooms. Your stalls will appear here once assigned."
+        selectedStallId={selectedStallId}
+        onSelectStall={selectStall}
+        // Grooms cannot read the staff directory (USER_VIEW), so only their own figure is named.
+        personName={personName}
+        currentUserId={user?.userId}
+        cellFooter={(stall, horse) => {
+          if (!horse || !ownStallIds.has(stall.id)) return null;
+          const horseTasks = tasksByHorseId.get(horse.id) ?? [];
+          if (horseTasks.length === 0) {
+            return <span className="block truncate text-xs text-[var(--color-text-muted)]">No tasks today</span>;
           }
-        >
-          {selectedHorse && selectedIsOwn && (
-            <>
-              <section className="space-y-2">
-                <SectionTitle>Today&apos;s tasks</SectionTitle>
-                {ownHorseTasks.length === 0 ? (
-                  <p className="text-xs italic text-[var(--color-text-muted)]">Nothing is scheduled for this horse today.</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {ownHorseTasks.map((task) => (
-                      <li key={`${task.source}-${task.refId}`} className="flex items-start gap-2 text-xs">
-                        <span className="font-metric w-10 shrink-0 font-semibold text-[var(--color-text-primary)]">
-                          {task.startTime.substring(0, 5)}
-                        </span>
-                        <span className="min-w-0 flex-1 text-[var(--color-text-secondary)]">{task.title}</span>
-                        <Pill size="sm" tone={isDone(task) ? 'success' : 'neutral'}>{isDone(task) ? 'Done' : 'To do'}</Pill>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+          const done = horseTasks.filter(isDone).length;
+          return (
+            <span className="block space-y-1">
+              <ProgressBar
+                value={done}
+                max={horseTasks.length}
+                size="sm"
+                tone={done === horseTasks.length ? 'success' : 'primary'}
+                label={`${done} of ${horseTasks.length} tasks done today`}
+              />
+              <span className="block text-xs text-[var(--color-text-secondary)]">{done}/{horseTasks.length} tasks</span>
+            </span>
+          );
+        }}
+        detail={selectedStall ? (
+          <StallDetailPanel
+            onClose={() => selectStall(null)}
+            stall={selectedStall}
+            area={areas.find((area) => area.id === selectedStall?.areaId)}
+            horse={selectedHorse}
+            specialty={specialty && specialty.horseId === selectedHorseId ? specialty.value : null}
+            hint="Your stalls are highlighted on the map. Pick one to see today's tasks and open incidents."
+            actions={
+              selectedHorse && selectedIsOwn ? (
+                <>
+                  <LinkButton href={`/groom/incidents/new?horseId=${selectedHorse.id}`} variant="warning" icon="alert-triangle">
+                    Report incident
+                  </LinkButton>
+                  <LinkButton href="/groom/tasks" variant="secondary" icon="list">
+                    Open daily tasks
+                  </LinkButton>
+                </>
+              ) : undefined
+            }
+          >
+            {selectedHorse && selectedIsOwn && (
+              <>
+                <section className="space-y-2">
+                  <SectionTitle>Today&apos;s tasks</SectionTitle>
+                  {ownHorseTasks.length === 0 ? (
+                    <p className="text-xs italic text-[var(--color-text-muted)]">Nothing is scheduled for this horse today.</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {ownHorseTasks.map((task) => (
+                        <li key={`${task.source}-${task.refId}`} className="flex items-start gap-2 text-xs">
+                          <span className="font-metric w-10 shrink-0 font-semibold text-[var(--color-text-primary)]">
+                            {task.startTime.substring(0, 5)}
+                          </span>
+                          <span className="min-w-0 flex-1 text-[var(--color-text-secondary)]">{task.title}</span>
+                          <Pill size="sm" tone={isDone(task) ? 'success' : 'neutral'}>{isDone(task) ? 'Done' : 'To do'}</Pill>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
 
-              <section className="space-y-2">
-                <SectionTitle>Open incidents</SectionTitle>
-                {openIncidents.length === 0 ? (
-                  <p className="text-xs italic text-[var(--color-text-muted)]">No open incident for this horse.</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {openIncidents.map((report) => (
-                      <li key={report.id} className="flex items-start gap-2 text-xs">
-                        <span className="min-w-0 flex-1 text-[var(--color-text-secondary)]">{report.title}</span>
-                        <Pill size="sm" tone={report.status === 'IN_REVIEW' ? 'info' : 'warning'}>
-                          {report.status === 'IN_REVIEW' ? 'With the vet' : 'Reported'}
-                        </Pill>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            </>
-          )}
-        </StallDetailPanel>
-      </div>
+                <section className="space-y-2">
+                  <SectionTitle>Open incidents</SectionTitle>
+                  {openIncidents.length === 0 ? (
+                    <p className="text-xs italic text-[var(--color-text-muted)]">No open incident for this horse.</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {openIncidents.map((report) => (
+                        <li key={report.id} className="flex items-start gap-2 text-xs">
+                          <span className="min-w-0 flex-1 text-[var(--color-text-secondary)]">{report.title}</span>
+                          <Pill size="sm" tone={report.status === 'IN_REVIEW' ? 'info' : 'warning'}>
+                            {report.status === 'IN_REVIEW' ? 'With the vet' : 'Reported'}
+                          </Pill>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </>
+            )}
+          </StallDetailPanel>
+        ) : null}
+      />
     </ScreenLayout>
   );
 }

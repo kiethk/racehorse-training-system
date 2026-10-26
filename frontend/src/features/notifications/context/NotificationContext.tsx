@@ -27,7 +27,14 @@ interface NotificationContextValue {
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
-const ASSIGNMENT_TYPES = new Set(['ADMISSION_VET_ASSIGNED', 'ADMISSION_TRAINER_ASSIGNED']);
+const ASSIGNMENT_TYPES = new Set([
+  'ADMISSION_VET_ASSIGNED',
+  'ADMISSION_TRAINER_ASSIGNED',
+  'ADMISSION_NEW_FOR_GROOM',
+  'ADMISSION_GROOM_ASSIGNED',
+  'HORSE_EDIT_REQUESTED',
+  'HORSE_EDIT_REVIEWED',
+]);
 /** Long enough to read the message and reach the View button. */
 const ACTION_TOAST_MS = 8000;
 const POLL_MS = 30000;
@@ -159,7 +166,7 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
           duration: ACTION_TOAST_MS,
         });
       } else {
-        toast.info(`You have ${fresh.length} new horse assignments`, 'Open the notification bell to review them.');
+        toast.info(`You have ${fresh.length} new notifications`, 'Open the notification bell to review them.');
       }
     },
     [toastedStorageKey, openNotification]

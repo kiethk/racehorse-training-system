@@ -59,6 +59,11 @@ import java.util.List;
 @Service
 public class AdmissionQueryService {
 
+    /** Admission lists run oldest first (FIFO); id breaks ties so paging stays stable. */
+    static final Comparator<AdmissionApplication> OLDEST_FIRST = Comparator
+            .comparing(AdmissionApplication::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(AdmissionApplication::getId);
+
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final CandidateHorseProfileRepository candidateHorseProfileRepository;
     private final AdmissionDocumentRepository admissionDocumentRepository;
@@ -140,10 +145,7 @@ public class AdmissionQueryService {
                 .collect(Collectors.toMap(AdmissionDocument::getAdmissionId, d -> d,
                         (left, right) -> left.getId() <= right.getId() ? left : right));
         return admissions.stream()
-                .sorted(Comparator.comparing(
-                        AdmissionApplication::getSubmittedAt,
-                        Comparator.nullsLast(Comparator.naturalOrder())
-                ).reversed().thenComparing(Comparator.comparing(AdmissionApplication::getId).reversed()))
+                .sorted(OLDEST_FIRST)
                 .map(admission -> {
             CandidateHorseProfile candidate = candidates.get(admission.getId());
             if (candidate == null) throw new IllegalStateException("Candidate horse profile not found");
@@ -179,7 +181,7 @@ public class AdmissionQueryService {
         return new TrainerAdmissionQueueResponse(pending, reviewed);
     }
 
-    public GroomAdmissionQueueResponse getGroomQueue(String candidateName, AdmissionStatus status,
+    public GroomAdmissionQueueResponse getGroomQueue(Long groomId, String candidateName, AdmissionStatus status,
             java.time.LocalDate submittedFrom, java.time.LocalDate submittedTo, int page, int size) {
         if (page < 0)
             throw new IllegalArgumentException("Page must be zero or greater");
@@ -191,8 +193,11 @@ public class AdmissionQueryService {
                 ? ""
                 : candidateName.trim();
         var pageable = PageRequest.of(page, pageSize,
-                Sort.by(Sort.Order.desc("submittedAt"), Sort.Order.desc("id")));
+                Sort.by(Sort.Order.asc("createdAt"), Sort.Order.asc("id")));
         Page<AdmissionApplication> result = admissionApplicationRepository.findGroomQueue(
+                groomId,
+                stableStallRepository.isQuarantineGroom(groomId),
+                AdmissionStatus.GROOM_REVIEW,
                 status != null,
                 status == null ? AdmissionStatus.GROOM_REVIEW : status,
                 !nameFilter.isEmpty(),
@@ -444,8 +449,7 @@ public class AdmissionQueryService {
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         return admissionApplicationRepository.findAllById(assignedIds).stream()
                 .filter(a -> status == null || a.getStatus() == status)
-                .sorted(Comparator.comparing(AdmissionApplication::getSubmittedAt).reversed()
-                        .thenComparing(AdmissionApplication::getId).reversed())
+                .sorted(OLDEST_FIRST)
                 .map(this::toSummaryResponse)
                 .toList();
     }
@@ -453,19 +457,23 @@ public class AdmissionQueryService {
     public List<AdmissionSummaryResponse> getAdmissionsForTrainer(Long trainerId, AdmissionStatus status) {
         return admissionApplicationRepository.findByTrainerId(trainerId).stream()
                 .filter(a -> status == null || a.getStatus() == status)
-                .sorted(Comparator.comparing(AdmissionApplication::getSubmittedAt).reversed()
-                        .thenComparing(AdmissionApplication::getId).reversed())
+                .sorted(OLDEST_FIRST)
                 .map(this::toSummaryResponse)
                 .toList();
     }
 
     public List<AdmissionSummaryResponse> getAdmissionsForGroom(Long groomId, AdmissionStatus status) {
-        return admissionApplicationRepository.findByGroomId(groomId).stream()
-                .filter(a -> status == null || a.getStatus() == status)
-                .sorted(Comparator.comparing(AdmissionApplication::getSubmittedAt).reversed()
-                        .thenComparing(AdmissionApplication::getId).reversed())
+        return admissionApplicationRepository.findVisibleToGroom(groomId,
+                        stableStallRepository.isQuarantineGroom(groomId), AdmissionStatus.GROOM_REVIEW,
+                        status != null, status == null ? AdmissionStatus.GROOM_REVIEW : status).stream()
                 .map(this::toSummaryResponse)
                 .toList();
+    }
+
+    /** Server-side read check for grooms; same scope as the queue (see AdmissionApplicationRepository.findGroomQueue). */
+    public boolean isVisibleToGroom(Long admissionId, Long groomId) {
+        return admissionApplicationRepository.isVisibleToGroom(admissionId, groomId,
+                stableStallRepository.isQuarantineGroom(groomId), AdmissionStatus.GROOM_REVIEW);
     }
 
     /** Removes capacity/final-manager data that is unrelated to a Vet's assigned clinical work. */

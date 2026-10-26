@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { cn } from '@/lib/cn';
 
 type Tone = 'default' | 'primary' | 'danger' | 'warning';
@@ -10,6 +10,7 @@ interface PanelProps extends HTMLAttributes<HTMLDivElement> {
   tone?: Tone;
   /** Hover lift for a panel that acts as a link or button. */
   interactive?: boolean;
+  ref?: Ref<HTMLDivElement>;
 }
 
 const tones: Record<Tone, string> = {

@@ -57,7 +57,7 @@ export function TaskBlock({ block, onComplete }: { block: TaskBlockData; onCompl
           <Pill tone="success" size="sm">Completed</Pill>
         ) : (
           <Button variant="primary" size="sm" icon="check" onClick={() => onComplete(block)}>
-            {block.pending.length > 1 ? `Complete all (${block.pending.length})` : 'Complete'}
+            {block.pending.length > 1 ? `Complete (${block.pending.length})` : 'Complete'}
           </Button>
         )}
       </div>

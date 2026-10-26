@@ -28,6 +28,7 @@ class StableAssignmentServiceTest {
     EntityManager em;
     StableAssignmentService service;
     AreaTrainerAssignmentPolicy trainerPolicy;
+    com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
     List<Area> allAreas;
     List<StableStall> allStalls;
     List<User> staff;
@@ -52,7 +53,9 @@ class StableAssignmentServiceTest {
         when(stalls.save(any(StableStall.class))).thenAnswer(i -> i.getArgument(0));
         when(profiles.findById(anyLong())).thenReturn(Optional.empty());
         trainerPolicy = mock(AreaTrainerAssignmentPolicy.class);
-        service = new StableAssignmentService(areas, stalls, users, profiles, horses, workouts, em, trainerPolicy);
+        admissionAllocation = mock(com.rtms.backend.admission.service.AdmissionGroomReviewService.class);
+        service = new StableAssignmentService(areas, stalls, users, profiles, horses, workouts, em, trainerPolicy,
+                admissionAllocation);
     }
 
     Area area(long id, AreaType type, Long trainer) {

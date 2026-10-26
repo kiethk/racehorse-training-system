@@ -8,6 +8,8 @@ import type { UrgentAssignmentAlert } from '../types';
 interface Props {
   alert: UrgentAssignmentAlert | null;
   onOpenCase: (alert: UrgentAssignmentAlert) => void;
+  /** Hides the alert for now; the notifier shows it again after the snooze period. */
+  onDismiss: (alert: UrgentAssignmentAlert) => void;
 }
 
 function Detail({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
@@ -19,23 +21,27 @@ function Detail({ label, children, className }: { label: string; children: React
   );
 }
 
-export function UrgentAssignmentModal({ alert, onOpenCase }: Props) {
+export function UrgentAssignmentModal({ alert, onOpenCase, onDismiss }: Props) {
   if (!alert) return null;
 
   return (
     <Modal
       open
-      // The assignment is automatic and must be acknowledged by opening the case.
-      dismissible={false}
-      onClose={() => undefined}
+      // The assignment is automatic; closing only snoozes the reminder, the case stays assigned.
+      onClose={() => onDismiss(alert)}
       size="lg"
       tone="danger"
       title="Urgent case assigned"
       description="You have been assigned to this case automatically; no confirmation is required. The horse is blocked from training until the examination is complete."
       footer={(
-        <Button variant="destructive" iconRight="chevron-right" className="w-full" onClick={() => onOpenCase(alert)}>
-          Open urgent case
-        </Button>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => onDismiss(alert)}>
+            Remind me later
+          </Button>
+          <Button variant="destructive" iconRight="chevron-right" onClick={() => onOpenCase(alert)}>
+            Open urgent case
+          </Button>
+        </div>
       )}
     >
       <div className="space-y-4">
