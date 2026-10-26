@@ -1498,4 +1498,3 @@ class AiToolExecutionServiceTest {
         assertEquals("/manager/admissions", map.get("actionUrl"));
     }
 }
-}
