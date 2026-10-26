@@ -36,6 +36,10 @@ interface StableMapViewProps extends StableFloorPlanProps {
   currentUserId?: number | null;
   /** When given, horses can be dragged onto empty stalls in the 3D view. */
   onMoveHorse?: (horse: Horse, to: StableStall) => void;
+  /** When given, grooms can be dragged onto another block of the shown area in the 3D view. */
+  onMoveGroom?: (area: Area, groomId: number, toBlockNumber: number) => void;
+  /** When given, clicking the trainer figure in the 3D view lets the viewer change the area's trainer. */
+  onPickTrainer?: (area: Area) => void;
   /** Extra note after the colour key. */
   legendNote?: ReactNode;
   /**
@@ -46,7 +50,7 @@ interface StableMapViewProps extends StableFloorPlanProps {
 }
 
 /** The stable map with two views of the same data: the 2D plan (default, accessible) and the 3D barn. */
-export function StableMapView({ personName, currentUserId, onMoveHorse, legendNote, detail, ...plan }: StableMapViewProps) {
+export function StableMapView({ personName, currentUserId, onMoveHorse, onMoveGroom, onPickTrainer, legendNote, detail, ...plan }: StableMapViewProps) {
   const { areas, stalls, horseByStallId, selectedStallId, onSelectStall, ownStallIds, lockOthers, lens } = plan;
   const [view, setView] = useState<StableView>('plan');
   const [unavailable, setUnavailable] = useState(false);
@@ -189,6 +193,8 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
               viewMode={viewMode}
               resetSignal={resetSignal}
               onMoveHorse={onMoveHorse}
+              onMoveGroom={onMoveGroom ? (groomId, block) => onMoveGroom(area, groomId, block) : undefined}
+              onTrainerClick={onPickTrainer && area.type === 'REGULAR' ? () => onPickTrainer(area) : undefined}
               onUnavailable={handleUnavailable}
               onHint={setHint}
             />
@@ -201,9 +207,11 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
             </div>
             <div className="flex items-start gap-2">
             <p data-scene-overlay className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] shadow-[var(--shadow-panel)]">
-              {hint ?? (onMoveHorse
-                ? 'Drag to orbit · Scroll to zoom · Click a stall · Drag a horse to an empty stall'
-                : 'Drag to orbit · Scroll to zoom · Click a stall or a groom in the key')}
+              {hint ?? (onMoveGroom
+                ? 'Drag to orbit · Scroll to zoom · Drag a groom to another block · Click the trainer to change them'
+                : onMoveHorse
+                  ? 'Drag to orbit · Scroll to zoom · Click a stall · Drag a horse to an empty stall'
+                  : 'Drag to orbit · Scroll to zoom · Click a stall or a groom in the key')}
             </p>
             {fullscreen && (
               <span data-scene-overlay className="pointer-events-auto">

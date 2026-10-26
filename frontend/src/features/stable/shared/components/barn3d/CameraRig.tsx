@@ -45,8 +45,10 @@ export function CameraRig({ viewMode, focus, width, depth, centerX, locked }: Ca
     const top = viewMode === 'top';
     const footprintWidth = top ? width : width * 0.8 + depth * 0.6;
     const footprintHeight = top ? depth : (width * 0.6 + depth * 0.8) * 0.62;
-    // Small margins so the barn fills the panel; the overlays sit over the empty corners.
-    const zoom = Math.min(size.width / (footprintWidth * 1.0), size.height / (footprintHeight * 1.08));
+    // Small side margins so the barn fills the panel; vertically keep clear of the top bar and the bottom key
+    // (about 56 px each), so no stall sits under an overlay when the whole barn is framed.
+    const usableHeight = Math.max(size.height - 112, size.height * 0.6);
+    const zoom = Math.min(size.width / (footprintWidth * 1.0), usableHeight / (footprintHeight * 1.04));
     return THREE.MathUtils.clamp(zoom, 6, 120);
   }, [size.width, size.height, width, depth, viewMode]);
 
