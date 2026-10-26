@@ -244,14 +244,39 @@ public class AccountManagementService {
                             Comparator.nullsLast(Comparator.naturalOrder())
                     ).reversed().thenComparing(Comparator.comparing(Horse::getId).reversed()))
                     .toList();
+
+            Map<Long, String> stallCodeById = Map.of();
+            if (stableStallRepository != null) {
+                List<Long> stallIds = ownedHorses.stream()
+                        .map(Horse::getCurrentStallId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList();
+                if (!stallIds.isEmpty()) {
+                    stallCodeById = stableStallRepository.findAllById(stallIds).stream()
+                            .filter(s -> s.getStallCode() != null)
+                            .collect(Collectors.toMap(StableStall::getId, StableStall::getStallCode, (a, b) -> a));
+                }
+            }
+
+            final Map<Long, String> finalStallMap = stallCodeById;
             List<AccountDetailResponse.OwnedHorseSummary> horseSummaries = ownedHorses.stream()
-                    .map(h -> new AccountDetailResponse.OwnedHorseSummary(
-                            h.getId(),
-                            h.getName(),
-                            h.getRegistrationNumber(),
-                            h.getCurrentStatus() != null ? h.getCurrentStatus().name() : null,
-                            h.getStableLocation()
-                    ))
+                    .map(h -> {
+                        String stallLocation = null;
+                        if (h.getCurrentStallId() != null) {
+                            stallLocation = finalStallMap.get(h.getCurrentStallId());
+                        }
+                        if (stallLocation == null || stallLocation.isBlank()) {
+                            stallLocation = h.getStableLocation();
+                        }
+                        return new AccountDetailResponse.OwnedHorseSummary(
+                                h.getId(),
+                                h.getName(),
+                                h.getRegistrationNumber(),
+                                h.getCurrentStatus() != null ? h.getCurrentStatus().name() : null,
+                                stallLocation
+                        );
+                    })
                     .collect(Collectors.toList());
             response.setOwnedHorses(horseSummaries);
         }

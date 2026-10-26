@@ -10,5 +10,6 @@ import com.rtms.backend.horse.entity.Horse;
 public enum HorseStatus {
     CANDIDATE,
     ELIGIBLE,
-    REJECTED
+    REJECTED,
+    INACTIVE
 }

@@ -3,7 +3,7 @@ import type { IconName } from './Icon';
 import { Icon } from './Icon';
 
 /** A horse's lifecycle in the club. Health is not tracked here — see trainingDecision. */
-export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED';
+export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED' | 'INACTIVE';
 
 type Tone = 'success' | 'warning' | 'danger' | 'info' | 'isolated' | 'primary' | 'neutral';
 
@@ -55,6 +55,7 @@ const horseStatusMap: Record<HorseStatus, { tone: Tone; icon: IconName; label: s
   CANDIDATE: { tone: 'info', icon: 'clipboard', label: 'Candidate' },
   ELIGIBLE: { tone: 'success', icon: 'check', label: 'Eligible' },
   REJECTED: { tone: 'neutral', icon: 'x', label: 'Rejected' },
+  INACTIVE: { tone: 'danger', icon: 'minus', label: 'Inactive' },
 };
 
 export function Pill({
@@ -92,7 +93,7 @@ export function StatusBadge({
   status: HorseStatus;
   size?: 'sm' | 'md';
 }) {
-  const c = horseStatusMap[status];
+  const c = horseStatusMap[status] ?? { tone: 'neutral' as Tone, icon: 'info' as IconName, label: String(status) };
   return (
     <Pill tone={c.tone} icon={c.icon} size={size}>
       {c.label}

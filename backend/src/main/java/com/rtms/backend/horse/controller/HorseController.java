@@ -176,4 +176,15 @@ public class HorseController {
         return ApiResponse.success(admissionService.getAdmissionsForHorse(id, currentUser));
     }
 
+    @PreAuthorize("hasAuthority('HORSE_STATUS_UPDATE') or hasRole('CLUB_MANAGER') or hasRole('GROOM')")
+    @PutMapping("/{id}/status")
+    public ApiResponse<HorseResponse> changeStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody com.rtms.backend.horse.dto.HorseStatusChangeRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        Horse horse = horseService.changeHorseStatus(id, request, currentUser);
+        Map<Long, String> imageUrls = photoService.resolveImageUrls(List.of(id), BASE_URL);
+        return ApiResponse.success(new HorseResponse(horse, imageUrls.get(id)));
+    }
+
 }
