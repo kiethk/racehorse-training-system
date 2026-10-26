@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Button,
@@ -17,66 +17,34 @@ import {
   Skeleton,
   StatusBadge,
 } from '@/components/ui';
-import { horseService } from '../services/horseService';
+import { useHorses } from '../hooks/useHorses';
 import { HorseSpecialtyBadges } from '../shared/components/HorseSpecialtyBadges';
-import type { Horse } from '@/features/stable/types';
-import type { HorseSpecialty } from '../types';
-import { displayError, formatDate } from '@/lib/display';
-
-interface HorseWithSpecialty {
-  horse: Horse;
-  specialty?: HorseSpecialty | null;
-}
+import { formatDate } from '@/lib/display';
 
 export function OwnerHorsesView() {
-  const [items, setItems] = useState<HorseWithSpecialty[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const horses = await horseService.listMine();
-      // Fetch specialties in parallel
-      const withSpecialty = await Promise.all(
-        horses.map(async (horse) => {
-          try {
-            const specialty = await horseService.getSpecialty(horse.id);
-            return { horse, specialty };
-          } catch {
-            return { horse, specialty: null };
-          }
-        })
-      );
-      setItems(withSpecialty);
-    } catch (err) {
-      setError(displayError(err, 'Unable to load your horses.'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Load all owned horses with specialties in a single optimized request
+  const { horses, loading, error, reload } = useHorses({
+    mine: true,
+    includeSpecialty: true,
+  });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const filteredItems = useMemo(() => {
-    return items.filter(({ horse }) => {
+  const filteredHorses = useMemo(() => {
+    return horses.filter((horse) => {
+      const query = search.trim().toLowerCase();
       const matchesSearch =
-        search.trim() === '' ||
-        horse.name.toLowerCase().includes(search.toLowerCase()) ||
-        (horse.breed && horse.breed.toLowerCase().includes(search.toLowerCase()));
+        query === '' ||
+        horse.name.toLowerCase().includes(query) ||
+        Boolean(horse.breed && horse.breed.toLowerCase().includes(query));
 
       const matchesStatus =
         statusFilter === 'ALL' || horse.currentStatus === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
-  }, [items, search, statusFilter]);
+  }, [horses, search, statusFilter]);
 
   return (
     <ScreenLayout variant="detail">
@@ -110,7 +78,7 @@ export function OwnerHorsesView() {
           variant="secondary"
           size="sm"
           icon="refresh"
-          onClick={loadData}
+          onClick={reload}
           disabled={loading}
         >
           Refresh
@@ -140,16 +108,16 @@ export function OwnerHorsesView() {
             icon="alert-triangle"
             title="Failed to load horses"
             description={error}
-            action={<Button size="sm" icon="refresh" onClick={loadData}>Try again</Button>}
+            action={<Button size="sm" icon="refresh" onClick={reload}>Try again</Button>}
           />
         </Panel>
-      ) : filteredItems.length === 0 ? (
+      ) : filteredHorses.length === 0 ? (
         <Panel padded>
           <EmptyState
             icon="horse"
-            title={items.length === 0 ? "You do not have any registered horses" : "No matching horses found"}
+            title={horses.length === 0 ? "You do not have any registered horses" : "No matching horses found"}
             description={
-              items.length === 0
+              horses.length === 0
                 ? "Once horses are accepted into the academy under your ownership, they will appear here."
                 : "Try adjusting your search query or status filter."
             }
@@ -157,7 +125,7 @@ export function OwnerHorsesView() {
         </Panel>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredItems.map(({ horse, specialty }) => (
+          {filteredHorses.map((horse) => (
             <Link
               key={horse.id}
               href={`/owner/horses/${horse.id}`}
@@ -190,7 +158,7 @@ export function OwnerHorsesView() {
                       <Icon name="star" size={12} />
                       Racing Specialty:
                     </div>
-                    <HorseSpecialtyBadges specialty={specialty} size="sm" />
+                    <HorseSpecialtyBadges specialty={horse.specialty} size="sm" />
                   </div>
 
                   {/* Health or training warning if blocked */}
