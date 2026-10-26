@@ -1,5 +1,6 @@
 'use client';
 
+import './pdfPolyfill';
 import { useEffect, useState } from 'react';
 import { apiGetBlob } from '@/services/api';
 
@@ -38,7 +39,9 @@ export async function renderPdfFirstPage(pdf: Blob, width: number, signal?: Abor
     const canvas = window.document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
-    await page.render({ canvas, viewport }).promise;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not create canvas 2d context.');
+    await page.render({ canvasContext: ctx, canvas, viewport }).promise;
     signal?.throwIfAborted();
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Could not draw the PDF page.'))), 'image/png');

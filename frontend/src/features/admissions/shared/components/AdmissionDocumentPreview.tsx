@@ -99,12 +99,12 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
           <button
             type="button"
             onClick={() => {
-              if (file?.url) {
-                openBlobInTab(file.url, filename, file.kind === 'pdf');
-              } else {
+              if (document?.fileUrl) {
                 openProtectedFile(document.fileUrl, filename).catch((err) => {
                   toast.error(displayError(err, 'Unable to open file in new tab.'));
                 });
+              } else if (file?.url) {
+                openBlobInTab(file.url, filename, file.kind === 'pdf');
               }
             }}
             className={actionClass}

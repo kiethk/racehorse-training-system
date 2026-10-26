@@ -1,5 +1,6 @@
 'use client';
 
+import '@/lib/pdfPolyfill';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { loadPdfJs } from '@/lib/pdfThumbnail';
 import { Button } from './Button';
@@ -30,6 +31,7 @@ interface PdfDocumentProxyLike {
     getViewport: (options: { scale: number }) => { width: number; height: number };
     render: (options: {
       canvasContext: CanvasRenderingContext2D;
+      canvas?: HTMLCanvasElement;
       viewport: { width: number; height: number };
     }) => { promise: Promise<void>; cancel: () => void };
   }>;
@@ -144,6 +146,7 @@ export function PdfViewer({
 
         const renderTask = page.render({
           canvasContext: ctx,
+          canvas,
           viewport,
         });
 

@@ -1,3 +1,22 @@
+if (typeof Uint8Array !== "undefined" && !Uint8Array.prototype.toHex) {
+  Uint8Array.prototype.toHex = function () {
+    let hex = "";
+    for (let i = 0; i < this.length; i++) {
+      hex += this[i].toString(16).padStart(2, "0");
+    }
+    return hex;
+  };
+}
+if (typeof Uint8Array !== "undefined" && !Uint8Array.fromHex) {
+  Uint8Array.fromHex = function (hex) {
+    if (hex.length % 2 !== 0) throw new TypeError("Invalid hex string length");
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+      bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+    }
+    return bytes;
+  };
+}
 /**
  * @licstart The following is the entire license notice for the
  * JavaScript code in this page
