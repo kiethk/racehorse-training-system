@@ -22,7 +22,7 @@ import { trainingService } from '@/features/training/services/trainingService';
 import { racingService } from '@/features/racing/services/racingService';
 import { useTrainingRules } from '@/features/training/hooks/useTrainingRules';
 import { HorseSpecialtyBadges } from '../shared/components/HorseSpecialtyBadges';
-import { HorsePedigreeCard } from './HorsePedigreeCard';
+import { HorseOverviewPedigreeTable } from './HorseOverviewPedigreeTable';
 import { HorseHealthSummary } from './HorseHealthSummary';
 import { HorseRacingHistory } from './HorseRacingHistory';
 import { FitnessTrendChart } from '@/features/training/components/FitnessTrendChart';
@@ -200,51 +200,7 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
 
       {/* Tab 1: Overview & Pedigree */}
       {activeTab === 'overview' && (
-        <div className="space-y-4">
-          <Panel padded>
-            <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
-              <Icon name="info" size={16} className="text-[var(--color-primary)]" />
-              Key Details
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-[13px]">
-              <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
-                <span className="text-[var(--color-text-muted)]">Horse ID:</span>
-                <span className="font-semibold text-[var(--color-text-primary)]">#{horse.id}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
-                <span className="text-[var(--color-text-muted)]">Current Status:</span>
-                <StatusBadge status={horse.currentStatus} size="sm" />
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
-                <span className="text-[var(--color-text-muted)]">Training Clearance:</span>
-                <Pill tone={horse.trainingDecision === 'ALLOWED' ? 'success' : 'danger'} size="sm">
-                  {horse.trainingDecision || 'ALLOWED'}
-                </Pill>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
-                <span className="text-[var(--color-text-muted)]">Registration No:</span>
-                <span className="font-medium text-[var(--color-text-primary)]">
-                  {horse.registrationNumber || pedigree?.registrationNumber || 'None'}
-                </span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
-                <span className="text-[var(--color-text-muted)]">Registry:</span>
-                <span className="font-medium text-[var(--color-text-primary)]">
-                  {pedigree?.registryName || 'Not recorded'}
-                </span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">
-                <span className="text-[var(--color-text-muted)]">Stable Location:</span>
-                <span className="font-medium text-[var(--color-text-primary)]">
-                  {horse.currentStallId ? `Stall #${horse.currentStallId}` : 'Unassigned'}
-                </span>
-              </div>
-            </div>
-          </Panel>
-
-          {/* Pedigree Ancestry Card */}
-          <HorsePedigreeCard pedigree={pedigree} />
-        </div>
+        <HorseOverviewPedigreeTable horse={horse} pedigree={pedigree} />
       )}
 
       {/* Tab 2: Training & Fitness */}
