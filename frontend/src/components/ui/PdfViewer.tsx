@@ -208,7 +208,8 @@ export function PdfViewer({
               icon="minus"
               aria-label="Zoom out PDF"
               disabled={zoom <= 50}
-              onClick={() => onZoomChange(Math.max(50, zoom - 25))}\n            />
+              onClick={() => onZoomChange(Math.max(50, zoom - 25))}
+            />
             <span className="w-12 text-center font-mono font-medium" aria-live="polite">
               {zoom}%
             </span>
@@ -255,7 +256,8 @@ export function PdfViewer({
                   className="block max-w-none"
                 />
               </div>
-              {numPages > 1 && (\n                <span className="text-[11px] font-medium text-[var(--color-text-muted)]">
+              {numPages > 1 && (
+                <span className="text-[11px] font-medium text-[var(--color-text-muted)]">
                   Page {info.pageNumber} of {numPages}
                 </span>
               )}

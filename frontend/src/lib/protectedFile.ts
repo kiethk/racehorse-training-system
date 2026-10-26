@@ -154,10 +154,10 @@ export function useProtectedFileUrl(source: string | null | undefined): { url: s
 }
 
 /**
- * `useProtectedFileUrl` for a list of files, e.g. every photo in a gallery. Returns one entry per source:\
- * `url` is null while loading or when loading failed (`failed` tells the two apart).\
+ * `useProtectedFileUrl` for a list of files, e.g. every photo in a gallery. Returns one entry per source:
+ * `url` is null while loading or when loading failed (`failed` tells the two apart).
  */
-export function useProtectedFileUrls(sources: readonly string[]): Record<string, { url: string | null; failed: boolean }> {\
+export function useProtectedFileUrls(sources: readonly string[]): Record<string, { url: string | null; failed: boolean }> {
   const key = sources.join('\n');
   const [loaded, setLoaded] = useState<{ key: string; urls: Record<string, string | null> }>({ key: '', urls: {} });
 

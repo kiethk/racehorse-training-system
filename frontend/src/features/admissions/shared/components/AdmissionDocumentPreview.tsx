@@ -111,7 +111,14 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
           >
             <Icon name="external-link" />Open in new tab
           </button>
-          {file?.kind === 'image' && !error && (\n            <div className=\"ml-auto flex items-center gap-1\">\n              <Button type=\"button\" size=\"sm\" variant=\"tertiary\" icon=\"minus\" aria-label=\"Zoom out\" disabled={zoom === 100} onClick={() => setZoom((value) => value - 25)} />\n              <span className=\"w-11 text-center text-xs\" aria-live=\"polite\">{zoom}%</span>\n              <Button type=\"button\" size=\"sm\" variant=\"tertiary\" icon=\"plus\" aria-label=\"Zoom in\" disabled={zoom === 200} onClick={() => setZoom((value) => value + 25)} />\n              <Button type=\"button\" size=\"sm\" variant=\"tertiary\" onClick={() => setZoom(100)}>Fit</Button>\n            </div>\n          )}
+          {file?.kind === 'image' && !error && (
+            <div className="ml-auto flex items-center gap-1">
+              <Button type="button" size="sm" variant="tertiary" icon="minus" aria-label="Zoom out" disabled={zoom === 100} onClick={() => setZoom((value) => value - 25)} />
+              <span className="w-11 text-center text-xs" aria-live="polite">{zoom}%</span>
+              <Button type="button" size="sm" variant="tertiary" icon="plus" aria-label="Zoom in" disabled={zoom === 200} onClick={() => setZoom((value) => value + 25)} />
+              <Button type="button" size="sm" variant="tertiary" onClick={() => setZoom(100)}>Fit</Button>
+            </div>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto overscroll-contain bg-[var(--color-surface-muted)]" aria-busy={!file && !error}>

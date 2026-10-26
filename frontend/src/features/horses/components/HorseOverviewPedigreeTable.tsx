@@ -29,7 +29,7 @@ export function HorseOverviewPedigreeTable({ horse, pedigree }: HorseOverviewPed
   const sireName = pedigree?.sire?.name || pedigree?.sireName || (hasSire ? 'External Sire' : 'Not recorded');
   const sireBreed = pedigree?.sire?.breed || (hasSire && !pedigree?.sire ? 'External ancestor' : null);
   const sireDob = pedigree?.sire?.dateOfBirth ? formatDate(pedigree.sire.dateOfBirth) : null;
-  const sireUeln = pedigree?.sireRegistrationNumber || pedigree?.sire?.registrationNumber || (hasSire ? 'Not recorded' : '—');
+  const sireUeln = pedigree?.sireRegistrationNumber || (hasSire ? 'Not recorded' : '—');
   const sireStatusBadge = pedigree?.sire?.currentStatus ? (
     <StatusBadge status={pedigree.sire.currentStatus as HorseStatus} size="sm" />
   ) : hasSire ? (
@@ -40,7 +40,7 @@ export function HorseOverviewPedigreeTable({ horse, pedigree }: HorseOverviewPed
   const damName = pedigree?.dam?.name || pedigree?.damName || (hasDam ? 'External Dam' : 'Not recorded');
   const damBreed = pedigree?.dam?.breed || (hasDam && !pedigree?.dam ? 'External ancestor' : null);
   const damDob = pedigree?.dam?.dateOfBirth ? formatDate(pedigree.dam.dateOfBirth) : null;
-  const damUeln = pedigree?.damRegistrationNumber || pedigree?.dam?.registrationNumber || (hasDam ? 'Not recorded' : '—');
+  const damUeln = pedigree?.damRegistrationNumber || (hasDam ? 'Not recorded' : '—');
   const damStatusBadge = pedigree?.dam?.currentStatus ? (
     <StatusBadge status={pedigree.dam.currentStatus as HorseStatus} size="sm" />
   ) : hasDam ? (
@@ -144,7 +144,7 @@ export function HorseOverviewPedigreeTable({ horse, pedigree }: HorseOverviewPed
         <Tr className="bg-[var(--color-surface-muted)]">
           <Th colSpan={4} className="py-2.5 px-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
             <div className="flex items-center gap-1.5">
-              <Icon name="git-merge" size={14} className="text-[var(--color-primary)]" />
+              <Icon name="git-branch" size={14} className="text-[var(--color-primary)]" />
               <span>Pedigree & Lineage</span>
             </div>
           </Th>
