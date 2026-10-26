@@ -13,6 +13,7 @@ import com.rtms.backend.admission.entity.AdmissionDocument;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
 import com.rtms.backend.admission.enums.AdmissionDocumentType;
 import com.rtms.backend.admission.enums.AdmissionStatus;
+import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
@@ -251,16 +252,68 @@ class OwnerAdmissionServiceTest {
     }
 
     @Test
-    void documentUploadRefusedOnceGroomClaimsApplication() {
+    void documentUploadRefusedOnceGroomCompletesReview() {
         var application = new AdmissionApplication();
         application.setId(3L); application.setOwnerId(7L);
         application.setGroomId(99L);
+        application.setGroomDecision(ReviewDecision.APPROVED);
         when(admissions.findByIdForUpdate(3L)).thenReturn(Optional.of(application));
         var file = new MockMultipartFile("file", "photo.png", "image/png", new byte[]{1,2,3});
         assertThrows(ResponseStatusException.class, () ->
                 service.upload(7L, 3L, AdmissionDocumentType.HORSE_PHOTO,
                         null, null, file));
         verifyNoInteractions(files, documents);
+    }
+
+    @Test
+    void documentUploadAllowedWhileGroomInReviewEvenIfAssigned() {
+        var application = new AdmissionApplication();
+        application.setId(3L); application.setOwnerId(7L);
+        application.setGroomId(99L);
+        application.setStatus(AdmissionStatus.GROOM_REVIEW);
+        when(admissions.findByIdForUpdate(3L)).thenReturn(Optional.of(application));
+        when(files.store(any(), any())).thenReturn("admissions/3/photo.png");
+        when(documents.findByAdmissionIdAndDocumentType(3L, AdmissionDocumentType.HORSE_PHOTO))
+                .thenReturn(java.util.Collections.emptyList());
+        var savedDoc = new AdmissionDocument();
+        savedDoc.setId(101L);
+        savedDoc.setAdmissionId(3L);
+        savedDoc.setDocumentType(AdmissionDocumentType.HORSE_PHOTO);
+        savedDoc.setFileUrl("admissions/3/photo.png");
+        when(documents.save(any(AdmissionDocument.class))).thenReturn(savedDoc);
+
+        var file = new MockMultipartFile("file", "photo.png", "image/png", new byte[]{1,2,3});
+        var resp = service.upload(7L, 3L, AdmissionDocumentType.HORSE_PHOTO, null, null, file);
+        assertNotNull(resp);
+        assertEquals(101L, resp.getId());
+    }
+
+    @Test
+    void documentUploadOverwritesExistingDocumentOfSameType() {
+        var application = new AdmissionApplication();
+        application.setId(3L); application.setOwnerId(7L);
+        application.setStatus(AdmissionStatus.GROOM_REVIEW);
+        when(admissions.findByIdForUpdate(3L)).thenReturn(Optional.of(application));
+        when(files.store(any(), any())).thenReturn("admissions/3/new_photo.png");
+
+        var existingDoc = new AdmissionDocument();
+        existingDoc.setId(50L);
+        existingDoc.setAdmissionId(3L);
+        existingDoc.setDocumentType(AdmissionDocumentType.HORSE_PHOTO);
+        existingDoc.setFileUrl("admissions/3/old_photo.png");
+
+        when(documents.findByAdmissionIdAndDocumentType(3L, AdmissionDocumentType.HORSE_PHOTO))
+                .thenReturn(java.util.List.of(existingDoc));
+        when(documents.save(any(AdmissionDocument.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var file = new MockMultipartFile("file", "new_photo.png", "image/png", new byte[]{4,5,6});
+        var resp = service.upload(7L, 3L, AdmissionDocumentType.HORSE_PHOTO, null, "updated note", file);
+
+        assertNotNull(resp);
+        assertEquals(50L, resp.getId());
+        assertEquals("/api/admissions/3/documents/50/file", resp.getFileUrl());
+        assertEquals("admissions/3/new_photo.png", existingDoc.getFileUrl());
+        verify(files).delete("admissions/3/old_photo.png");
     }
 
     @Test

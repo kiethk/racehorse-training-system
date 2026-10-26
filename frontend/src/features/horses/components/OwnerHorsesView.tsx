@@ -171,7 +171,7 @@ export function OwnerHorsesView() {
                   {/* Header info */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <HorseAvatar name={horse.name} size={48} rounded="md" />
+                      <HorseAvatar name={horse.name} image={horse.imageUrl} size={48} rounded="md" />
                       <div>
                         <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)] group-hover:text-[var(--color-primary)] transition-colors">
                           {horse.name}

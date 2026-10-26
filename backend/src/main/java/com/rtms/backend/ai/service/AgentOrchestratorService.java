@@ -27,22 +27,22 @@ import java.time.Duration;
 import java.util.*;
 
 /**
- * Điều phối viên chính cho AI Chat Agent sử dụng mô hình LLM từ Groq Cloud API.
+ * Điều phối viên chính cho AI Chat Agent sử dụng mô hình LLM (OpenAI / GPT-4o / Compatible API).
  * 1. Tiếp nhận câu hỏi và quản lý ngữ cảnh hội thoại lưu trữ bền vững (Database Persistence).
  * 2. Cung cấp danh mục công cụ động (Dynamic Tool Scoping) theo vai trò.
- * 3. Tiếp nhận Tool Calls từ Groq, ủy quyền cho AiToolExecutionService thực thi.
- * 4. Bơm kết quả Tool Result ngược lại cho Groq để tổng hợp câu trả lời tự nhiên.
+ * 3. Tiếp nhận Tool Calls từ mô hình AI, ủy quyền cho AiToolExecutionService thực thi.
+ * 4. Bơm kết quả Tool Result ngược lại cho AI để tổng hợp câu trả lời tự nhiên.
  * 5. Lưu vết hội thoại và công cụ thực thi vào DB phục vụ Audit Trail.
  */
 @Service
-public class GroqAgentOrchestratorService {
+public class AgentOrchestratorService {
 
-    private static final Logger log = LoggerFactory.getLogger(GroqAgentOrchestratorService.class);
+    private static final Logger log = LoggerFactory.getLogger(AgentOrchestratorService.class);
     private static final int MAX_REACT_ITERATIONS = 4;
 
-    private final String groqBaseUrl;
-    private final String groqApiKey;
-    private final String groqModel;
+    private final String aiBaseUrl;
+    private final String aiApiKey;
+    private final String aiModel;
     private final DynamicToolRegistryService toolRegistryService;
     private final AiToolExecutionService toolExecutionService;
     private final AiConversationService conversationService;
@@ -50,17 +50,17 @@ public class GroqAgentOrchestratorService {
     private final HttpClient httpClient;
 
     @Autowired
-    public GroqAgentOrchestratorService(
-            @Value("${groq.api.base-url:https://api.groq.com/openai/v1}") String groqBaseUrl,
-            @Value("${groq.api.key:}") String groqApiKey,
-            @Value("${groq.api.model:qwen/qwen3.8-27b}") String groqModel,
+    public AgentOrchestratorService(
+            @Value("${ai.api.base-url:${groq.api.base-url:https://api.openai.com/v1}}") String aiBaseUrl,
+            @Value("${ai.api.key:${groq.api.key:}}") String aiApiKey,
+            @Value("${ai.api.model:${groq.api.model:gpt-4o-mini}}") String aiModel,
             DynamicToolRegistryService toolRegistryService,
             AiToolExecutionService toolExecutionService,
             @Autowired(required = false) AiConversationService conversationService,
             ObjectMapper objectMapper) {
-        this.groqBaseUrl = groqBaseUrl != null && !groqBaseUrl.isBlank() ? groqBaseUrl.trim() : "https://api.groq.com/openai/v1";
-        this.groqApiKey = groqApiKey != null ? groqApiKey.trim() : "";
-        this.groqModel = groqModel != null && !groqModel.isBlank() ? groqModel.trim() : "qwen/qwen3.8-27b";
+        this.aiBaseUrl = aiBaseUrl != null && !aiBaseUrl.isBlank() ? aiBaseUrl.trim() : "https://api.openai.com/v1";
+        this.aiApiKey = aiApiKey != null ? aiApiKey.trim() : "";
+        this.aiModel = aiModel != null && !aiModel.isBlank() ? aiModel.trim() : "gpt-4o-mini";
         this.toolRegistryService = toolRegistryService;
         this.toolExecutionService = toolExecutionService;
         this.conversationService = conversationService;
@@ -70,25 +70,25 @@ public class GroqAgentOrchestratorService {
                 .build();
     }
 
-    public GroqAgentOrchestratorService(
-            String groqBaseUrl,
-            String groqApiKey,
-            String groqModel,
+    public AgentOrchestratorService(
+            String aiBaseUrl,
+            String aiApiKey,
+            String aiModel,
             DynamicToolRegistryService toolRegistryService,
             AiToolExecutionService toolExecutionService,
             ObjectMapper objectMapper) {
-        this(groqBaseUrl, groqApiKey, groqModel, toolRegistryService, toolExecutionService, null, objectMapper);
+        this(aiBaseUrl, aiApiKey, aiModel, toolRegistryService, toolExecutionService, null, objectMapper);
     }
 
     @PostConstruct
     public void init() {
-        if (this.groqApiKey.isBlank()) {
-            log.warn("GroqAgentOrchestratorService: GROQ_API_KEY chưa được cấu hình.");
+        if (this.aiApiKey.isBlank()) {
+            log.warn("AgentOrchestratorService: AI_API_KEY chưa được cấu hình.");
         } else {
-            String masked = this.groqApiKey.length() > 8
-                    ? this.groqApiKey.substring(0, 7) + "..." + this.groqApiKey.substring(this.groqApiKey.length() - 4)
+            String masked = this.aiApiKey.length() > 8
+                    ? this.aiApiKey.substring(0, 7) + "..." + this.aiApiKey.substring(this.aiApiKey.length() - 4)
                     : "***";
-            log.info("GroqAgentOrchestratorService: Đã nạp thành công GROQ_API_KEY [{}] với model [{}]", masked, groqModel);
+            log.info("AgentOrchestratorService: Đã nạp thành công AI_API_KEY [{}] với model [{}]", masked, aiModel);
         }
     }
 
@@ -113,9 +113,9 @@ public class GroqAgentOrchestratorService {
             }
         }
 
-        if (groqApiKey == null || groqApiKey.isBlank()) {
-            log.warn("GroqAgentOrchestratorService: GROQ_API_KEY chưa được cấu hình.");
-            String fallbackReply = "Chưa cấu hình GROQ_API_KEY. Vui lòng thiết lập biến môi trường GROQ_API_KEY trong Run Configuration của IDE hoặc application.properties để sử dụng trợ lý AI.";
+        if (aiApiKey == null || aiApiKey.isBlank()) {
+            log.warn("AgentOrchestratorService: AI_API_KEY chưa được cấu hình.");
+            String fallbackReply = "Chưa cấu hình AI_API_KEY. Vui lòng thiết lập biến môi trường AI_API_KEY trong Run Configuration của IDE hoặc application.properties để sử dụng trợ lý AI.";
             if (conversationService != null && conversationId != null) {
                 conversationService.saveMessage(conversationId, "assistant", fallbackReply, null);
             }
@@ -180,16 +180,16 @@ public class GroqAgentOrchestratorService {
 
         while (iterations < MAX_REACT_ITERATIONS) {
             iterations++;
-            Map<String, Object> groqResponse = callGroqChatCompletions(messages, tools);
+            Map<String, Object> aiResponse = callAiChatCompletions(messages, tools);
 
-            if (groqResponse == null || !groqResponse.containsKey("choices")) {
-                finalAnswer = "Xin lỗi, hiện tại không thể kết nối đến máy chủ AI Groq. Vui lòng thử lại sau.";
+            if (aiResponse == null || !aiResponse.containsKey("choices")) {
+                finalAnswer = "Xin lỗi, hiện tại không thể kết nối đến máy chủ AI. Vui lòng thử lại sau.";
                 break;
             }
 
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) groqResponse.get("choices");
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) aiResponse.get("choices");
             if (choices == null || choices.isEmpty()) {
-                finalAnswer = "Không nhận được phản hồi hợp lệ từ Groq AI.";
+                finalAnswer = "Không nhận được phản hồi hợp lệ từ máy chủ AI.";
                 break;
             }
 
@@ -250,7 +250,7 @@ public class GroqAgentOrchestratorService {
                             "content", resultJson
                     ));
                 } catch (Exception e) {
-                    log.error("Lỗi khi serialize kết quả tool result cho Groq: {}", e.getMessage());
+                    log.error("Lỗi khi serialize kết quả tool result cho AI model: {}", e.getMessage());
                     messages.add(Map.of(
                             "role", "tool",
                             "tool_call_id", toolCallId != null ? toolCallId : "",
@@ -272,7 +272,7 @@ public class GroqAgentOrchestratorService {
                         "role", "user",
                         "content", "Dựa trên dữ liệu từ các công cụ đã thực thi ở trên, hãy tổng hợp câu trả lời chi tiết và rõ ràng cho tôi. Trình bày bằng bảng Markdown, gạch đầu dòng phân tích cụ thể, và điều hướng liên kết phù hợp. Tuyệt đối không chỉ trả lời ngắn ngủi hoặc chung chung."
                 ));
-                Map<String, Object> summaryResponse = callGroqChatCompletions(summaryMessages, null);
+                Map<String, Object> summaryResponse = callAiChatCompletions(summaryMessages, null);
                 if (summaryResponse != null && summaryResponse.containsKey("choices")) {
                     List<Map<String, Object>> choices = (List<Map<String, Object>>) summaryResponse.get("choices");
                     if (choices != null && !choices.isEmpty()) {
@@ -478,13 +478,13 @@ public class GroqAgentOrchestratorService {
         };
     }
 
-    private Map<String, Object> callGroqChatCompletions(List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
+    private Map<String, Object> callAiChatCompletions(List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
         try {
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", groqModel);
+            body.put("model", aiModel);
             body.put("messages", messages);
 
-            if (groqModel != null && (groqModel.contains("luna") || groqModel.startsWith("o1") || groqModel.startsWith("o3"))) {
+            if (aiModel != null && (aiModel.contains("luna") || aiModel.startsWith("o1") || aiModel.startsWith("o3"))) {
                 body.put("reasoning_effort", "none");
             } else {
                 body.put("temperature", 0.2);
@@ -498,9 +498,9 @@ public class GroqAgentOrchestratorService {
             String jsonPayload = objectMapper.writeValueAsString(body);
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(groqBaseUrl + "/chat/completions"))
+                    .uri(URI.create(aiBaseUrl + "/chat/completions"))
                     .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + groqApiKey)
+                    .header("Authorization", "Bearer " + aiApiKey)
                     .timeout(Duration.ofSeconds(25))
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();
@@ -510,11 +510,11 @@ public class GroqAgentOrchestratorService {
             if (httpResponse.statusCode() >= 200 && httpResponse.statusCode() < 300) {
                 return objectMapper.readValue(httpResponse.body(), new TypeReference<>() {});
             } else {
-                log.error("Groq API error HTTP [{}]: {}", httpResponse.statusCode(), httpResponse.body());
+                log.error("AI API error HTTP [{}]: {}", httpResponse.statusCode(), httpResponse.body());
                 return Map.of();
             }
         } catch (Exception e) {
-            log.error("Ngoại lệ khi gọi Groq API: {}", e.getMessage());
+            log.error("Ngoại lệ khi gọi AI API: {}", e.getMessage());
             return Map.of();
         }
     }

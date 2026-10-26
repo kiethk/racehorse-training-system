@@ -14,6 +14,9 @@ public interface AdmissionDocumentRepository
 
     List<AdmissionDocument> findByAdmissionId(Long admissionId);
 
+    List<AdmissionDocument> findByAdmissionIdAndDocumentType(
+            Long admissionId, AdmissionDocumentType documentType);
+
     /** Batch lookup: all documents of a given type for a set of admission IDs. */
     List<AdmissionDocument> findByAdmissionIdInAndDocumentType(
             Collection<Long> admissionIds, AdmissionDocumentType documentType);

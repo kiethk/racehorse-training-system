@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
-class GroqAgentOrchestratorServiceTest {
+class AgentOrchestratorServiceTest {
 
     private DynamicToolRegistryService toolRegistryService;
     private AiToolExecutionService toolExecutionService;
@@ -32,12 +32,12 @@ class GroqAgentOrchestratorServiceTest {
     }
 
     @Test
-    @DisplayName("Fallback an toàn khi chưa cấu hình GROQ_API_KEY")
+    @DisplayName("Fallback an toàn khi chưa cấu hình AI_API_KEY")
     void testProcessChat_NoApiKey_GracefulFallback() {
-        GroqAgentOrchestratorService service = new GroqAgentOrchestratorService(
-                "https://api.groq.com/openai/v1",
+        AgentOrchestratorService service = new AgentOrchestratorService(
+                "https://api.openai.com/v1",
                 "", // Không có API key
-                "qwen/qwen3.8-27b",
+                "gpt-4o-mini",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper
@@ -49,7 +49,7 @@ class GroqAgentOrchestratorServiceTest {
         AiChatResponseDto response = service.processChat(request, user);
 
         assertNotNull(response);
-        assertTrue(response.reply().contains("GROQ_API_KEY"));
+        assertTrue(response.reply().contains("AI_API_KEY"));
         assertTrue(response.executedTools().isEmpty());
     }
 
@@ -60,10 +60,10 @@ class GroqAgentOrchestratorServiceTest {
                 Map.of("type", "function", "function", Map.of("name", "getMyHorses"))
         ));
 
-        GroqAgentOrchestratorService service = new GroqAgentOrchestratorService(
-                "https://api.groq.com/openai/v1",
-                "gsk_test_mock_key_12345",
-                "qwen/qwen3.8-27b",
+        AgentOrchestratorService service = new AgentOrchestratorService(
+                "https://api.openai.com/v1",
+                "sk-test_mock_key_12345",
+                "gpt-4o-mini",
                 toolRegistryService,
                 toolExecutionService,
                 objectMapper

@@ -22,13 +22,13 @@ const OCR_DOCUMENTS: { type: AdmissionDocumentType; label: string; description: 
   {
     type: 'REGISTRATION_DOCUMENT',
     label: 'Registration document / Horse passport',
-    description: 'Auto-extracts: Horse name, UELN (15 characters), Breed, Date of birth, Sex, Registry name.',
+    description: 'Auto-extracts horse identity & registration details.',
     required: true,
   },
   {
     type: 'PEDIGREE_CERTIFICATE',
     label: 'Pedigree certificate',
-    description: 'Auto-extracts: Sire name, Sire UELN, Dam name, Dam UELN, Pedigree notes.',
+    description: 'Auto-extracts sire, dam & pedigree lineage.',
     required: true,
   },
 ];
@@ -55,12 +55,12 @@ const FIELDS: { key: Exclude<keyof CreateOwnerAdmissionRequest, 'sex'>; label: s
   { key: 'name', label: 'Horse name', required: true },
   { key: 'breed', label: 'Breed' },
   { key: 'dateOfBirth', label: 'Date of birth', type: 'date' },
-  { key: 'registrationNumber', label: 'UELN / registration number', hint: '15 characters (e.g. 704001SC0000001 or VNM22SC00000001).' },
+  { key: 'registrationNumber', label: 'UELN / registration number', hint: '15 characters (e.g. 704001000000001 or VNM001000000001).' },
   { key: 'registryName', label: 'Registry name' },
   { key: 'sireName', label: 'Sire name' },
-  { key: 'sireRegistrationNumber', label: 'Sire UELN', hint: '15 characters (e.g. 704001RT0000001 or VNM18RT00000001).' },
+  { key: 'sireRegistrationNumber', label: 'Sire UELN', hint: '15 characters (e.g. 704001000000001 or VNM001000000001).' },
   { key: 'damName', label: 'Dam name' },
-  { key: 'damRegistrationNumber', label: 'Dam UELN', hint: '15 characters (e.g. 704001GB0000001 or VNM19GB00000001).' },
+  { key: 'damRegistrationNumber', label: 'Dam UELN', hint: '15 characters (e.g. 704001000000001 or VNM001000000001).' },
 ];
 const SEX_FIELD = { key: 'sex', label: 'Sex', required: true } as const;
 const FORM_FIELDS = [...FIELDS.slice(0, 2), SEX_FIELD, ...FIELDS.slice(2)];
@@ -72,8 +72,8 @@ type FieldErrors = Partial<Record<keyof CreateOwnerAdmissionRequest, string>>;
 
 function normalizeUeln(raw?: string | null): string | null {
   if (!raw) return null;
-  const trimmed = raw.trim();
-  return trimmed ? trimmed.toUpperCase() : null;
+  const cleaned = raw.replace(/[\s\-_.]/g, '');
+  return cleaned ? cleaned.toUpperCase() : null;
 }
 
 function validateField(key: keyof CreateOwnerAdmissionRequest, raw: string, input?: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) {
@@ -81,9 +81,9 @@ function validateField(key: keyof CreateOwnerAdmissionRequest, raw: string, inpu
   if (key === 'name' && !value) return 'Enter the horse name.';
   if (key === 'sex' && !isHorseSex(value)) return 'Select Male or Female.';
   if (key.toLowerCase().includes('registration') && value) {
-    const normalized = value.toUpperCase();
-    if (!/^[0-9]{6}[A-Z0-9]{9}$/.test(normalized) && !/^[A-Z]{3}[A-Z0-9]{12}$/.test(normalized)) {
-      return 'Enter a valid 15-character UELN (e.g. 704001SC0000001 or VNM22SC00000001), or leave this field empty.';
+    const normalized = value.replace(/[\s\-_.]/g, '').toUpperCase();
+    if (!/^([0-9]{3}|[A-Z]{3})[A-Z0-9]{12}$/.test(normalized)) {
+      return 'Enter a valid 15-character UELN (e.g. 704001000000001 or VNM001000000001), or leave this field empty.';
     }
   }
   if (key === 'dateOfBirth' && input?.validity.badInput) return 'Enter a valid date of birth.';
@@ -627,15 +627,15 @@ export function OwnerAdmissionForm() {
             <div className="space-y-2">
               <label
                 htmlFor={`file-${doc.type}`}
-                className={`flex cursor-pointer flex-col items-center justify-center rounded-[var(--radius-sm)] border-2 border-dashed p-4 text-center transition-colors ${
+                className={`flex cursor-pointer flex-col items-center justify-center rounded-[var(--radius-sm)] border border-dashed py-3.5 px-3 text-center transition-colors ${
                   isDragging
                     ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
                     : 'border-[var(--color-border-strong)] bg-[var(--color-surface-subtle)] hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-muted)]'
                 } ${isAnyScanning ? 'cursor-not-allowed opacity-60' : ''}`}
               >
-                <Icon name="upload" size={26} className="mb-1 text-[var(--color-primary)]" />
-                <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                  Drag and drop file here, or <span className="text-[var(--color-primary)] underline">browse files</span>
+                <Icon name="upload" size={20} className="mb-1 text-[var(--color-primary)]" />
+                <span className="text-xs font-medium text-[var(--color-text-primary)]">
+                  Choose file or drag & drop here
                 </span>
                 <span className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
                   PDF, JPEG, PNG, WebP · Up to 10 MB
@@ -833,47 +833,34 @@ export function OwnerAdmissionForm() {
         )}
 
         {/* STEP 1: SMART OCR HERO SECTION */}
-        <section aria-labelledby="step-1-ocr-title" className="space-y-4 rounded-[var(--radius-lg)] border-2 border-[var(--color-primary)] bg-[var(--color-primary-subtle)] p-5 sm:p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-[var(--color-border)] pb-3">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary)] text-white">
-                <Icon name="sparkles" size={18} />
+        <section aria-labelledby="step-1-ocr-title" className="space-y-3.5 rounded-[var(--radius-lg)] border border-[var(--color-primary)] bg-[var(--color-surface)] p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
+                <Icon name="sparkles" size={16} />
               </span>
               <div>
-                <h2 id="step-1-ocr-title" className="text-base font-bold text-[var(--color-text-primary)]">
-                  Step 1: Quick upload with Smart OCR
+                <h2 id="step-1-ocr-title" className="text-sm font-bold text-[var(--color-text-primary)]">
+                  Smart OCR Upload
                 </h2>
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  Upload your registration document or pedigree certificate to automatically extract and auto-fill horse details below.
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  Upload registration or pedigree to auto-fill details below.
                 </p>
               </div>
             </div>
-            <span className="inline-flex self-start sm:self-auto items-center gap-1.5 rounded-full bg-[var(--color-primary-soft)] px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
-              <Icon name="sparkles" size={13} />
-              Auto-fills 10+ fields
-            </span>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              onClick={scrollToManualForm}
+              className="text-xs text-[var(--color-primary)]"
+            >
+              Enter manually &darr;
+            </Button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
             {OCR_DOCUMENTS.map(renderHeroOcrDocument)}
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs text-[var(--color-text-secondary)]">
-            <div className="flex items-center gap-1.5">
-              <span>Don&apos;t have scanned files ready?</span>
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                onClick={scrollToManualForm}
-                className="text-xs font-semibold text-[var(--color-primary)]"
-              >
-                Skip scanning and enter details manually below &darr;
-              </Button>
-            </div>
-            <span className="font-medium text-[var(--color-text-muted)]">
-              Data precedence: Registration document is the primary authority for horse identity
-            </span>
           </div>
         </section>
 

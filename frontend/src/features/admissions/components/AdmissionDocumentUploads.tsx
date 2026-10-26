@@ -42,10 +42,16 @@ export function AdmissionDocumentUploads({ admissionId, documents, locked, onUpl
     const [open, setOpen] = useState(false);
     const [selectedType, setSelectedType] = useState<AdmissionDocumentType | ''>('');
     const [draftActive, setDraftActive] = useState(false);
+
+    const uploadedTypes = new Set(documents.map(d => d.documentType));
     const completed = DOCUMENT_SECTIONS.filter(
-        section => section.required && documents.some(document => document.documentType === section.type),
+        section => section.required && uploadedTypes.has(section.type),
     ).length;
+    const missingRequired = DOCUMENT_SECTIONS.filter(
+        section => section.required && !uploadedTypes.has(section.type),
+    );
     const selectedSection = DOCUMENT_SECTIONS.find(section => section.type === selectedType);
+    const isSelectedUploaded = selectedSection ? uploadedTypes.has(selectedSection.type) : false;
 
     function cancel() {
         setOpen(false);
@@ -58,15 +64,45 @@ export function AdmissionDocumentUploads({ admissionId, documents, locked, onUpl
         setOpen(false);
     }
 
+    function startUpload(type: AdmissionDocumentType) {
+        setSelectedType(type);
+        setOpen(true);
+    }
+
     return (
         <div className="space-y-3">
-            <p role="status" className="text-sm text-[var(--color-text-secondary)]">
-                Required documents: {completed}/4 uploaded.
-            </p>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-                Your admission is already submitted. Adding documents is optional.
-            </p>
-            {locked && <p className="text-sm">Documents are locked for review.</p>}
+            <div className="space-y-1 text-sm text-[var(--color-text-secondary)]">
+                <p role="status" className="font-medium text-[var(--color-text-primary)]">
+                    Required documents: {completed}/4 uploaded
+                </p>
+                <p className="text-xs">
+                    {locked
+                        ? 'Documents are locked after Groom completes review.'
+                        : 'You can upload missing files or re-upload to overwrite existing files until Groom approves.'}
+                </p>
+            </div>
+
+            {/* Quick list of missing required documents if any */}
+            {!locked && missingRequired.length > 0 && !open && (
+                <div className="space-y-1.5 rounded-[var(--radius-sm)] border border-amber-300 bg-amber-50 dark:border-amber-700/50 dark:bg-amber-950/20 p-2.5 text-xs">
+                    <p className="font-semibold text-amber-900 dark:text-amber-200">
+                        Missing required documents:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                        {missingRequired.map(section => (
+                            <Button
+                                key={section.type}
+                                size="sm"
+                                variant="secondary"
+                                className="text-xs h-7 px-2"
+                                onClick={() => startUpload(section.type)}
+                            >
+                                + Upload {section.label}
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <Button
                 type="button"
@@ -77,7 +113,7 @@ export function AdmissionDocumentUploads({ admissionId, documents, locked, onUpl
                 aria-controls="admission-document-upload-panel"
                 onClick={() => setOpen(current => !current)}
             >
-                {open ? 'Hide upload form' : draftActive ? 'Continue document upload' : 'Add document'}
+                {open ? 'Hide upload form' : draftActive ? 'Continue document upload' : 'Upload / Replace document'}
             </Button>
 
             <div id="admission-document-upload-panel" hidden={!open} className="max-w-xl space-y-4 rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
@@ -93,11 +129,14 @@ export function AdmissionDocumentUploads({ admissionId, documents, locked, onUpl
                         onChange={event => setSelectedType(event.target.value as AdmissionDocumentType | '')}
                     >
                         <option value="">Choose a document type</option>
-                        {DOCUMENT_SECTIONS.map(section => (
-                            <option key={section.type} value={section.type}>
-                                {section.label}{section.required ? ' (required at submission)' : ' (optional at submission)'}
-                            </option>
-                        ))}
+                        {DOCUMENT_SECTIONS.map(section => {
+                            const uploaded = uploadedTypes.has(section.type);
+                            return (
+                                <option key={section.type} value={section.type}>
+                                    {section.label} — {uploaded ? 'Uploaded (re-upload to overwrite)' : section.required ? 'Not uploaded (Required)' : 'Not uploaded (Optional)'}
+                                </option>
+                            );
+                        })}
                     </Select>
                 </FormField>
 
@@ -106,6 +145,7 @@ export function AdmissionDocumentUploads({ admissionId, documents, locked, onUpl
                         key={selectedSection.type}
                         admissionId={admissionId}
                         section={selectedSection}
+                        isUploaded={isSelectedUploaded}
                         locked={locked}
                         onUploaded={onUploaded}
                         onDone={discardDraft}
@@ -127,6 +167,7 @@ export function AdmissionDocumentUploads({ admissionId, documents, locked, onUpl
 function DocumentUploadSection({
     admissionId,
     section,
+    isUploaded,
     locked,
     onUploaded,
     onDone,
@@ -136,6 +177,7 @@ function DocumentUploadSection({
 }: {
     admissionId: number;
     section: (typeof DOCUMENT_SECTIONS)[number];
+    isUploaded: boolean;
     locked: boolean;
     onUploaded: () => Promise<void>;
     onDone: () => void;
@@ -144,7 +186,6 @@ function DocumentUploadSection({
     onDiscard: () => void;
 }) {
     const [file, setFile] = useState<File | null>(null);
-    // Local preview of a picked image or rendered pdf thumbnail
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [rawPdfUrl, setRawPdfUrl] = useState<string | null>(null);
     const [activePdfPreview, setActivePdfPreview] = useState<{ file: File; url: string } | null>(null);
@@ -323,9 +364,16 @@ function DocumentUploadSection({
             disabled={locked || busy}
             className="min-w-0 space-y-4 rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
         >
-            <legend className="px-1 text-sm font-semibold">
-                {section.label}
-            </legend>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <legend className="px-1 text-sm font-semibold">
+                    {section.label}
+                </legend>
+                {isUploaded && (
+                    <span className="text-xs font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
+                        Already uploaded (new file will overwrite old file)
+                    </span>
+                )}
+            </div>
 
             <label className="block max-w-xs space-y-1 text-sm">
                 <span>Select file <span aria-hidden="true" className="text-[var(--color-danger)]">*</span></span>
@@ -439,7 +487,7 @@ function DocumentUploadSection({
                     loading={busy}
                     onClick={upload}
                 >
-                    Upload {section.label.toLowerCase()}
+                    {isUploaded ? `Upload & replace ${section.label.toLowerCase()}` : `Upload ${section.label.toLowerCase()}`}
                 </Button>
                 <Button
                     type="button"

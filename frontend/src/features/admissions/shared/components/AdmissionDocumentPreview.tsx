@@ -3,6 +3,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { openProtectedFile } from '@/lib/protectedFile';
+import { toast } from '@/lib/toast';
+import { displayError } from '@/lib/display';
 import { admissionsApi } from '../../services/api';
 import type { AdmissionDocument } from '../../types';
 
@@ -11,7 +14,7 @@ type LoadedFile = { url: string; kind: 'image' | 'pdf' | 'unsupported' };
 export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: {
   document: AdmissionDocument;
   label: string;
-  fileUrl: string;
+  fileUrl?: string;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -74,7 +77,21 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
 
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--color-border)] px-4 py-2 sm:px-5">
           {file && <a href={file.url} download={filename} className={actionClass}><Icon name="download" />Download</a>}
-          <a href={file && file.kind !== 'unsupported' ? file.url : fileUrl} target="_blank" rel="noreferrer" className={actionClass}><Icon name="external-link" />Open in new tab</a>
+          <button
+            type="button"
+            onClick={() => {
+              if (file?.url) {
+                window.open(file.url, '_blank');
+              } else {
+                openProtectedFile(document.fileUrl).catch((err) => {
+                  toast.error(displayError(err, 'Unable to open file in new tab.'));
+                });
+              }
+            }}
+            className={actionClass}
+          >
+            <Icon name="external-link" />Open in new tab
+          </button>
           {file?.kind === 'image' && !error && (
             <div className="ml-auto flex items-center gap-1">
               <Button type="button" size="sm" variant="tertiary" icon="minus" aria-label="Zoom out" disabled={zoom === 100} onClick={() => setZoom((value) => value - 25)} />

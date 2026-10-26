@@ -154,7 +154,7 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
       <Panel padded className="space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <HorseAvatar name={horse.name} size={64} rounded="md" />
+            <HorseAvatar name={horse.name} image={horse.imageUrl} size={64} rounded="md" />
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
@@ -204,7 +204,7 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
           <Panel padded>
             <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
               <Icon name="info" size={16} className="text-[var(--color-primary)]" />
-              General Physical & Identity Information
+              Key Details
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-[13px]">
               <div className="flex justify-between py-1.5 border-b border-[var(--color-border-subtle)]">

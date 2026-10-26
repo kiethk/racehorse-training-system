@@ -184,7 +184,7 @@ class DynamicToolRegistryServiceTest {
     }
 
     @Test
-    @DisplayName("getFunctionSpecsForRole tạo Function Spec đúng chuẩn JSON Schema cho Groq/OpenAI")
+    @DisplayName("getFunctionSpecsForRole tạo Function Spec đúng chuẩn JSON Schema cho AI / OpenAI Function Calling")
     void testGetFunctionSpecsForRole() {
         List<Map<String, Object>> specs = registryService.getFunctionSpecsForRole("HEAD_TRAINER");
         assertNotNull(specs);
