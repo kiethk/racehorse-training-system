@@ -7,6 +7,7 @@ import { Button, FormField, Input, Modal, Notice, Pill, Select, Textarea } from 
 import { healthApi } from '../services/healthApi';
 import { displayError, formatDate } from '@/lib/display';
 import type { InjuryRecord, CorrectInjuryRequest } from '../types';
+import { resolveInjuryWorldPosition, resolveInjuryNormal, isNormalizedPoint } from '@/features/vet/lib/injuryZones';
 
 // The 3D canvas (three.js + GLB) must stay out of the server bundle.
 const UrgentHorseInjuryViewer = dynamic(
@@ -59,17 +60,35 @@ function InjuryCorrectionModalContent({
     normalX: number;
     normalY: number;
     normalZ: number;
-  } | null>(injury.positionX != null
-    ? {
-        positionX: injury.positionX,
-        positionY: injury.positionY ?? 0,
-        positionZ: injury.positionZ ?? 0,
-        zoneId: injury.zoneId ?? '',
-        normalX: injury.normalX ?? 0,
-        normalY: injury.normalY ?? 1,
-        normalZ: injury.normalZ ?? 0,
-      }
-    : null);
+    needsSurfaceSnap?: boolean;
+  } | null>(() => {
+    if (injury.positionX == null) return null;
+    const needsSurfaceSnap =
+      injury.normalX == null ||
+      isNormalizedPoint({
+        x: Number(injury.positionX),
+        y: Number(injury.positionY),
+        z: Number(injury.positionZ),
+      });
+    const resolved = resolveInjuryWorldPosition(injury);
+    const normal =
+      injury.normalX != null && injury.normalY != null && injury.normalZ != null
+        ? resolveInjuryNormal(
+            [Number(injury.normalX), Number(injury.normalY), Number(injury.normalZ)],
+            resolved,
+          )
+        : resolveInjuryNormal(undefined, resolved);
+    return {
+      positionX: resolved[0],
+      positionY: resolved[1],
+      positionZ: resolved[2],
+      zoneId: injury.zoneId ?? '',
+      normalX: normal[0],
+      normalY: normal[1],
+      normalZ: normal[2],
+      needsSurfaceSnap,
+    };
+  });
 
   const handleCorrect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,11 +133,10 @@ function InjuryCorrectionModalContent({
         };
       }
       await healthApi.correctInjury(horseId, injury.id, payload);
-      setIsEditing(false);
       onSuccess();
       onClose();
     } catch (err) {
-      setError(displayError(err, 'Failed to update injury record.'));
+      setError(displayError(err, 'Failed to save correction'));
     } finally {
       setSubmitting(false);
     }
@@ -126,65 +144,155 @@ function InjuryCorrectionModalContent({
 
   return (
     <Modal
-      open
+      open={true}
       onClose={onClose}
-      dismissible={!submitting}
-      title={isEditing ? 'Correct injury record' : 'Injury & condition details'}
-      description={`Record #${injury.id} · Horse #${horseId}`}
-      size="md"
+      title={`Correct Injury Record #${injury.id}`}
+      description="Medical audit trail: all updates create an immutable correction event."
+      size="xl"
       footer={
-        <>
+        <div className="flex items-center justify-between gap-3">
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            Close
+            Cancel
           </Button>
-          {isEditing ? (
-            <Button type="submit" form={FORM_ID} variant="primary" icon="check" loading={submitting}>
-              Save correction
+          {!isEditing ? (
+            <Button variant="primary" onClick={() => setIsEditing(true)}>
+              Edit Record
             </Button>
           ) : (
-            <Button variant="primary" icon="plus" onClick={() => setIsEditing(true)}>
-              Edit record
+            <Button
+              type="submit"
+              form={FORM_ID}
+              variant="primary"
+              loading={submitting}
+              disabled={submitting}
+            >
+              Save Correction
             </Button>
           )}
-        </>
+        </div>
       }
     >
       <div className="space-y-4">
         {error && <Notice tone="error">{error}</Notice>}
 
-        <div className="space-y-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-bold text-[var(--color-text-primary)]">{injury.injuryType}</span>
-            <div className="flex gap-2">
-              <Pill tone={injury.severity === 'CRITICAL' || injury.severity === 'HIGH' ? 'danger' : 'warning'}>
-                {injury.severity}
-              </Pill>
-              <Pill tone={injury.status === 'ACTIVE' ? 'info' : 'success'}>{injury.status}</Pill>
+        {/* Read-only summary panel when not editing */}
+        {!isEditing ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-xs bg-[var(--color-surface-subtle)] p-3 rounded-[var(--radius-sm)] border border-[var(--color-border)]">
+              <div>
+                <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-semibold">
+                  Injury Type
+                </span>
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  {injury.injuryType}
+                </span>
+              </div>
+              <div>
+                <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-semibold">
+                  Severity
+                </span>
+                <Pill
+                  tone={
+                    injury.severity === 'CRITICAL'
+                      ? 'danger'
+                      : injury.severity === 'HIGH'
+                        ? 'warning'
+                        : 'neutral'
+                  }
+                  size="sm"
+                >
+                  {injury.severity}
+                </Pill>
+              </div>
+              <div>
+                <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-semibold">
+                  Status
+                </span>
+                <Pill
+                  tone={
+                    injury.status === 'ACTIVE'
+                      ? 'danger'
+                      : injury.status === 'RECOVERED'
+                        ? 'success'
+                        : 'neutral'
+                  }
+                  size="sm"
+                >
+                  {injury.status}
+                </Pill>
+              </div>
+              <div>
+                <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-semibold">
+                  Diagnosed At
+                </span>
+                <span className="text-[var(--color-text-primary)]">
+                  {injury.diagnosedAt ? formatDate(injury.diagnosedAt) : 'Undated'}
+                </span>
+              </div>
+              {injury.expectedRecoveryDate && (
+                <div>
+                  <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-semibold">
+                    Expected Recovery
+                  </span>
+                  <span className="text-[var(--color-text-primary)]">
+                    {formatDate(injury.expectedRecoveryDate)}
+                  </span>
+                </div>
+              )}
             </div>
+
+            {injury.description && (
+              <div className="text-xs">
+                <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-semibold">
+                  Clinical Notes
+                </span>
+                <p className="mt-0.5 text-[var(--color-text-secondary)]">{injury.description}</p>
+              </div>
+            )}
+
+            {/* Read-only 3D preview */}
+            {markerDraft && (
+              <div className="space-y-1">
+                <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-semibold">
+                  3D Injury Location
+                </span>
+                <UrgentHorseInjuryViewer
+                  injuries={[
+                    {
+                      id: String(injury.id),
+                      position: [markerDraft.positionX, markerDraft.positionY, markerDraft.positionZ],
+                      normal: [markerDraft.normalX, markerDraft.normalY, markerDraft.normalZ],
+                      needsSurfaceSnap: markerDraft.needsSurfaceSnap,
+                      zoneId: markerDraft.zoneId || undefined,
+                      label: injury.injuryType,
+                      severity: injury.severity,
+                      status: injury.status,
+                    },
+                  ]}
+                  isAddMode={false}
+                  readOnly={true}
+                />
+              </div>
+            )}
           </div>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {injury.description || 'No detailed clinical description provided.'}
-          </p>
-          <p className="border-t border-[var(--color-border)] pt-2 text-xs text-[var(--color-text-muted)]">
-            Diagnosed: {formatDate(injury.diagnosedAt)}
-          </p>
-        </div>
+        ) : (
+          /* Edit form with interactive repositioning */
+          <form id={FORM_ID} onSubmit={handleCorrect} className="space-y-3">
+            <Notice tone="info">
+              Veterinary audit requirement: provide a reason explaining this correction.
+            </Notice>
 
-        {isEditing && (
-          <form id={FORM_ID} onSubmit={handleCorrect} className="space-y-4 border-t border-[var(--color-border)] pt-4">
-            <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)]">Audit correction details</h3>
-
-            {/* Marker reposition on the 3D model (optional) */}
-            <div className="space-y-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
-              <div className="flex items-center justify-between gap-2">
+            {/* 3D Reposition canvas */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                  3D marker placement
+                  3D Marker Location
                 </span>
                 <Button
                   type="button"
+                  variant={reposition ? 'tertiary' : 'secondary'}
                   size="sm"
-                  variant={reposition ? 'warning' : 'secondary'}
-                  onClick={() => setReposition(!reposition)}
+                  onClick={() => setReposition((r) => !r)}
                   disabled={!markerDraft && !reposition}
                   title={
                     markerDraft
@@ -209,6 +317,8 @@ function InjuryCorrectionModalContent({
                         {
                           id: 'draft',
                           position: [markerDraft.positionX, markerDraft.positionY, markerDraft.positionZ],
+                          normal: [markerDraft.normalX, markerDraft.normalY, markerDraft.normalZ],
+                          needsSurfaceSnap: markerDraft.needsSurfaceSnap,
                           zoneId: markerDraft.zoneId || undefined,
                           label: 'New position',
                         },

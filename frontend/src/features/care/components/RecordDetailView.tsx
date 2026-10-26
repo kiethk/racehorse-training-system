@@ -1,21 +1,26 @@
 'use client';
+import { hydrationStatusLabel } from '@/features/health/lib/hydrationStatus';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Button, FilterChips, Icon, Modal, Notice, Panel, Pill, Spinner } from '@/components/ui';
 import { BackLink } from '@/components/ui/BackLink';
-import { Button, Icon, Notice, Panel, Pill, Spinner } from '@/components/ui';
+import { LinkButton } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/states';
 import dynamic from 'next/dynamic';
 import { careService } from '../services/careService';
 import { healthApi } from '@/features/health/services/healthApi';
 import type { HealthRecord } from '@/features/health/types';
 import type { InjuryRecord } from '@/features/health/types';
 import type { InjuryMarkerData } from '@/features/vet/components/UrgentHorseInjuryViewer';
-import { zoneById } from '@/features/vet/lib/injuryZones';
+import { zoneById, resolveInjuryWorldPosition, resolveInjuryNormal, isNormalizedPoint } from '@/features/vet/lib/injuryZones';
 import { TreatmentPlanModal } from '../shared/components/TreatmentPlanModal';
 import { PrescriptionModal } from './PrescriptionModal';
 import type { CareScheduleDetailResponse, TreatmentPlan } from '../types';
+import type { HorsePreventiveStatus } from '../types/preventive';
 import type { HorseHealthMetric } from '@/features/horses/types';
 import { displayError, formatDate, formatDateTime } from '@/lib/display';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { HorseAvatar } from '@/components/ui/HorseAvatar';
 
 // The 3D canvas (three.js + GLB) must stay out of the server bundle.
 const UrgentHorseInjuryViewer = dynamic(
@@ -40,6 +45,30 @@ export interface RecordDetailViewProps {
   onScheduleUpdated?: () => void;
 }
 
+/** Newest examination first. */
+function sortByExamined(records: HealthRecord[]) {
+  return [...records].sort((a, b) => {
+    const ta = a.examinedAt ? new Date(a.examinedAt).getTime() : 0;
+    const tb = b.examinedAt ? new Date(b.examinedAt).getTime() : 0;
+    return tb - ta;
+  });
+}
+
+/** Pill tone for an injury status that the backend actually stores. */
+function injuryStatusTone(status: string | null) {
+  if (status === 'ACTIVE') return 'danger';
+  if (status === 'RECOVERED') return 'success';
+  return 'neutral';
+}
+
+/** Pill tone for a PreventiveDueStatus value (OK/DUE_SOON/OVERDUE/MISSING/NONE). */
+function preventiveTone(status: string) {
+  if (status === 'OVERDUE' || status === 'MISSING') return 'danger';
+  if (status === 'DUE_SOON') return 'warning';
+  if (status === 'NONE') return 'neutral';
+  return 'success';
+}
+
 export function RecordDetailView({
   scheduleId = null,
   recordId = null,
@@ -53,11 +82,17 @@ export function RecordDetailView({
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<CareScheduleDetailResponse | null>(null);
   const [fullRecord, setFullRecord] = useState<HealthRecord | null>(null);
+  const [horseRecords, setHorseRecords] = useState<HealthRecord[]>([]);
+  const [activeRecordId, setActiveRecordId] = useState<number | null>(null);
+  /** The horse's current training decision (may differ from the record's exam-time decision). */
+  const [currentDecision, setCurrentDecision] = useState<string | null>(null);
   const [plans, setPlans] = useState<TreatmentPlan[]>([]);
   const [metrics, setMetrics] = useState<HorseHealthMetric[]>([]);
   const [injuries, setInjuries] = useState<InjuryRecord[]>([]);
+  const [preventive, setPreventive] = useState<HorsePreventiveStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [showInjuryMap, setShowInjuryMap] = useState(false);
   const [activePlanForPrescription, setActivePlanForPrescription] = useState<{
     id: number;
     name: string;
@@ -78,6 +113,19 @@ export function RecordDetailView({
         const recs = await healthApi.getHealthRecords(horseId);
         rec = recs.find((r) => r.id === recordId) ?? null;
         if (!rec) throw new Error('Clinical record not found for this horse.');
+        // Same layout serves every record of the horse through the selector.
+        const sorted = sortByExamined(recs);
+        setHorseRecords(sorted);
+        setActiveRecordId(recordId);
+      }
+
+      // Horse mode (no specific record): open the most recent examination.
+      if (rec == null && recordId == null && scheduleId == null && horseId != null) {
+        const recs = await healthApi.getHealthRecords(horseId).catch(() => []);
+        const sorted = sortByExamined(recs || []);
+        setHorseRecords(sorted);
+        rec = sorted[0] ?? null;
+        setActiveRecordId(rec?.id ?? null);
       }
 
       if (det == null && rec == null && scheduleId != null) {
@@ -120,6 +168,17 @@ export function RecordDetailView({
         } catch {
           setInjuries([]);
         }
+        try {
+          setPreventive(await healthApi.getPreventiveStatus(resolvedHorseId));
+        } catch {
+          setPreventive(null);
+        }
+        try {
+          const sum = await healthApi.getHealthSummary(resolvedHorseId);
+          setCurrentDecision(sum?.trainingDecision ?? null);
+        } catch {
+          setCurrentDecision(null);
+        }
       }
 
       const plansFor = rec?.id ?? det?.healthRecord?.id ?? null;
@@ -135,37 +194,101 @@ export function RecordDetailView({
     Promise.resolve().then(() => void load());
   }, [load]);
 
+  /** Switch to another record of the same horse inside the shared layout. */
+  const selectRecord = useCallback(
+    async (id: number) => {
+      const rec = horseRecords.find((r) => r.id === id);
+      if (!rec) return;
+      setActiveRecordId(id);
+      setFullRecord(rec);
+      setDetail(null);
+      if (rec.careScheduleId != null) {
+        try {
+          setDetail(await careService.getScheduleDetail(rec.careScheduleId));
+        } catch {
+          // The record alone is still fully viewable.
+        }
+      }
+      setPlans(await careService.getTreatmentPlans(id).catch(() => []));
+    },
+    [horseRecords],
+  );
+
+  const backLabel = backHref.includes('health')
+    ? 'Back to Health'
+    : backHref.includes('routine')
+      ? 'Back to Routine Care'
+      : backHref.includes('schedule')
+        ? 'Back to Schedule'
+        : 'Back to dashboard';
+
+  // Horse mode with no records at all: a clear empty state instead of a bare warning.
   if (!loading && !error && !detail?.schedule && !fullRecord) {
+    if (horseId != null && recordId == null && scheduleId == null && record == null) {
+      return (
+        <div className="space-y-4">
+          {!onHideBack && <BackLink href={backHref}>{backLabel}</BackLink>}
+          <Panel padded className="py-10">
+            <EmptyState
+              icon="clipboard"
+              title="No clinical records for this horse"
+              description="This horse has no clinical examination on file yet. Schedule a routine examination to create the first record."
+              action={
+                <LinkButton href="/veterinarian/routine" icon="calendar">
+                  Open Routine Care
+                </LinkButton>
+              }
+            />
+          </Panel>
+        </div>
+      );
+    }
     return <Notice tone="warning">No clinical record to display.</Notice>;
   }
 
   const resolvedHorseId = detail?.schedule?.horseId ?? fullRecord?.horseId ?? null;
-  const recordIdShown = detail?.healthRecord?.id ?? fullRecord?.id ?? null;
+  const resolvedHorseName = detail?.horse?.name || horseName || (resolvedHorseId != null ? `#${resolvedHorseId}` : '—');
+  const recordIdShown = activeRecordId ?? detail?.healthRecord?.id ?? fullRecord?.id ?? null;
+  const trainingDecision = detail?.healthRecord?.trainingDecision ?? fullRecord?.trainingDecision ?? null;
+  const restrictionDetails = detail?.healthRecord?.restrictionDetails ?? fullRecord?.restrictionDetails ?? null;
   // Only injuries actually captured on the 3D model have coordinates; the rest
   // stay in the tag list without a marker instead of being dropped at origin.
   const markerData: InjuryMarkerData[] = injuries
     .filter((i) => i.positionX != null)
-    .map((i) => ({
-      id: String(i.id),
-      position: [i.positionX ?? 0, i.positionY ?? 0, i.positionZ ?? 0],
-      zoneId: i.zoneId ?? undefined,
-      label: (i.zoneId && zoneById(i.zoneId)?.label) || i.injuryType,
-    }));
+    .map((i) => {
+      const worldPos = resolveInjuryWorldPosition(i);
+      const normal =
+        i.normalX != null && i.normalY != null && i.normalZ != null
+          ? resolveInjuryNormal([Number(i.normalX), Number(i.normalY), Number(i.normalZ)], worldPos)
+          : resolveInjuryNormal(undefined, worldPos);
+      // Seeded markers carry no real surface hit; their coordinates need the
+      // runtime snap instead of trusting the stale bbox mapping.
+      const needsSurfaceSnap =
+        i.normalX == null ||
+        isNormalizedPoint({
+          x: Number(i.positionX),
+          y: Number(i.positionY),
+          z: Number(i.positionZ),
+        });
+      return {
+        id: String(i.id),
+        position: worldPos,
+        normal,
+        needsSurfaceSnap,
+        zoneId: i.zoneId ?? undefined,
+        label: (i.zoneId && zoneById(i.zoneId)?.label) || i.injuryType,
+        severity: i.severity ?? undefined,
+        status: i.status ?? undefined,
+        diagnosedAt: i.diagnosedAt ?? undefined,
+        description: i.description ?? undefined,
+      };
+    });
+
+  const latestMetric = metrics.length > 0 ? metrics[metrics.length - 1] : null;
 
   return (
     <div className="space-y-4">
-      {!onHideBack && (
-        <BackLink
-          href={backHref}
-          label={
-            backHref.includes('health?')
-              ? 'Back to health profile'
-              : backHref.includes('routine')
-                ? 'Back to Routine Care'
-                : 'Back to dashboard'
-          }
-        />
-      )}
+      {!onHideBack && <BackLink href={backHref}>{backLabel}</BackLink>}
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -182,87 +305,95 @@ export function RecordDetailView({
         </Notice>
       ) : (
         <div className="space-y-4">
-          {/* Header metadata summary */}
-          <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-4 rounded-[var(--radius-sm)] bg-[var(--color-surface-muted)] text-[12px]">
-            <div>
-              <span className="text-[var(--color-text-muted)] block">Horse:</span>
-              <span className="font-semibold text-[var(--color-text-primary)]">
-                {detail?.horse?.name || horseName || (resolvedHorseId != null ? `#${resolvedHorseId}` : '—')}
-              </span>
-            </div>
-            {detail?.schedule && (
-              <>
+          {/* 1. Patient information header (Admission-style) */}
+          <Panel padded className="border-l-4 border-l-[var(--color-medical)]">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3.5">
+                <HorseAvatar name={resolvedHorseName} image={null} size={50} rounded="md" />
                 <div>
-                  <span className="text-[var(--color-text-muted)] block">Care Type:</span>
-                  <span className="font-medium text-[var(--color-text-primary)]">
-                    {detail.schedule.careType}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[var(--color-text-muted)] block">Status:</span>
-                  <Pill
-                    tone={
-                      detail.schedule.status === 'COMPLETED'
-                        ? 'success'
-                        : detail.schedule.status === 'IN_PROGRESS'
-                        ? 'warning'
-                        : 'info'
-                    }
-                    size="sm"
-                  >
-                    {detail.schedule.status}
-                  </Pill>
-                </div>
-              </>
-            )}
-            <div>
-              <span className="text-[var(--color-text-muted)] block">Veterinarian:</span>
-              <span className="font-medium text-[var(--color-text-primary)]">
-                {detail?.veterinarian?.fullName || 'Assigned Staff'}
-              </span>
-            </div>
-          </div>
-
-          {/* Health Record Section */}
-          {recordIdShown ? (
-            <Panel padded className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border-subtle)] pb-2">
-                <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
-                  <Icon name="clipboard" size={16} className="text-[var(--color-primary)]" />
-                  Clinical Record #{recordIdShown}
-                  {fullRecord?.recordType && (
-                    <Pill tone="neutral" size="sm">
-                      {fullRecord.recordType}
-                    </Pill>
-                  )}
-                </h2>
-                <div className="flex items-center gap-2">
-                  {fullRecord?.examinedAt && (
-                    <span className="text-[12px] text-[var(--color-text-muted)]">
-                      {formatDateTime(fullRecord.examinedAt)}
-                    </span>
-                  )}
-                  <Pill
-                    tone={
-                      (detail?.healthRecord?.trainingDecision ?? fullRecord?.trainingDecision) ===
-                      'BLOCKED'
-                        ? 'danger'
-                        : 'success'
-                    }
-                    size="sm"
-                  >
-                    Training: {detail?.healthRecord?.trainingDecision ?? fullRecord?.trainingDecision}
-                  </Pill>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
+                      {resolvedHorseName}
+                    </h1>
+                    {detail?.horse?.breed && (
+                      <span className="text-xs text-[var(--color-text-muted)] font-medium">
+                        ({detail.horse.breed})
+                      </span>
+                    )}
+                    {(() => {
+                      // Synced with the Health list status: the horse's current decision,
+                      // falling back to the record's own decision when the summary is unavailable.
+                      const decision = currentDecision ?? trainingDecision ?? null;
+                      return decision ? (
+                        <Pill tone={decision === 'BLOCKED' ? 'danger' : 'success'} size="md">
+                          {decision}
+                        </Pill>
+                      ) : null;
+                    })()}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--color-text-secondary)]">
+                    {fullRecord?.examinedAt && (
+                      <span className="inline-flex items-center gap-1">
+                        <Icon name="calendar" size={12} />
+                        Examined: {formatDateTime(fullRecord.examinedAt)}
+                      </span>
+                    )}
+                    {fullRecord?.recordType && (
+                      <span>
+                        Type: <strong>{fullRecord.recordType}</strong>
+                      </span>
+                    )}
+                    {detail?.schedule && (
+                      <span className="font-mono text-[11px]">Schedule #{detail.schedule.id}</span>
+                    )}
+                    {detail?.veterinarian?.fullName && (
+                      <span>
+                        Veterinarian: <strong>{detail.veterinarian.fullName}</strong>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
+            </div>
+          </Panel>
 
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 text-[13px]">
+          {/* Training restriction notice (only what the backend stored) */}
+          {restrictionDetails && (
+            <Notice tone="warning" title="Training Restriction Details">
+              {restrictionDetails}
+            </Notice>
+          )}
+
+          {/* Record selector — every record of the horse through the same layout */}
+          {horseRecords.length > 1 && (
+            <FilterChips
+              label="Record"
+              options={horseRecords.map((r) => ({
+                value: String(r.id),
+                label: `#${r.id} · ${r.examinedAt ? formatDate(r.examinedAt) : 'Undated'}`,
+              }))}
+              value={String(activeRecordId ?? '')}
+              onChange={(v) => void selectRecord(Number(v))}
+            />
+          )}
+
+          {/* 2. Clinical record content */}
+          {recordIdShown ? (
+            <Panel padded className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
+                <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
+                  <Icon name="clipboard" size={16} className="text-[var(--color-primary)]" />
+                  Clinical Record #{recordIdShown}
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 text-sm">
                 <div>
                   <span className="text-[var(--color-text-muted)] text-[11px] uppercase font-semibold block">
                     Symptoms:
                   </span>
                   <p className="text-[var(--color-text-primary)]">
-                    {detail?.healthRecord?.symptoms || fullRecord?.symptoms || 'None reported.'}
+                    {fullRecord?.symptoms || 'None reported.'}
                   </p>
                 </div>
                 <div>
@@ -292,7 +423,7 @@ export function RecordDetailView({
               </div>
 
               {fullRecord?.productOrService && (
-                <div className="text-[13px]">
+                <div className="text-sm">
                   <span className="text-[var(--color-text-muted)] text-[11px] uppercase font-semibold block">
                     Product / Service:
                   </span>
@@ -301,120 +432,221 @@ export function RecordDetailView({
               )}
 
               {fullRecord?.notes && (
-                <div className="text-[13px]">
+                <div className="text-sm">
                   <span className="text-[var(--color-text-muted)] text-[11px] uppercase font-semibold block">
                     Notes:
                   </span>
                   <p className="text-[var(--color-text-secondary)]">{fullRecord.notes}</p>
                 </div>
               )}
-
-              {(detail?.healthRecord?.restrictionDetails || fullRecord?.restrictionDetails) && (
-                <Notice tone="warning" title="Training Restriction Details">
-                  {detail?.healthRecord?.restrictionDetails || fullRecord?.restrictionDetails}
-                </Notice>
-              )}
             </Panel>
           ) : (
-            <Panel padded className="text-[13px] text-[var(--color-text-muted)] italic">
+            <Panel padded className="text-sm text-[var(--color-text-muted)] italic">
               No clinical health record has been completed for this schedule yet.
             </Panel>
           )}
 
-          {/* Injury map (3D) with per-injury tag list */}
-          {resolvedHorseId != null && (
-            <Panel padded className="space-y-3">
-              <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
+          {/* 3. Vitals (latest telemetry) */}
+          <Panel padded className="space-y-3">
+            <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
+              <Icon name="heart-pulse" size={16} className="text-[var(--color-medical)]" />
+              Vitals
+            </h2>
+            {latestMetric ? (
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 text-xs">
+                {latestMetric.heartRate != null && (
+                  <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                    <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                      Heart Rate
+                    </span>
+                    <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                      {latestMetric.heartRate} bpm
+                    </span>
+                  </div>
+                )}
+                {latestMetric.temperature != null && (
+                  <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                    <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                      Temperature
+                    </span>
+                    <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                      {latestMetric.temperature} °C
+                    </span>
+                  </div>
+                )}
+                {latestMetric.respiratoryRate != null && (
+                  <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                    <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                      Respiration
+                    </span>
+                    <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                      {latestMetric.respiratoryRate} rpm
+                    </span>
+                  </div>
+                )}
+                {latestMetric.weight != null && (
+                  <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                    <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                      Weight
+                    </span>
+                    <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                      {latestMetric.weight} kg
+                    </span>
+                  </div>
+                )}
+                {latestMetric.hydrationStatus && (
+                  <div className="col-span-2 sm:col-span-4 text-xs">
+                    <span className="text-[var(--color-text-muted)]">Hydration: </span>
+                    <span className="font-semibold">{hydrationStatusLabel(latestMetric.hydrationStatus)}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-[var(--color-text-muted)] py-2 text-center">No vitals recorded yet.</p>
+            )}
+          </Panel>
+
+          {/* 4. Injury — list + button opening the 3D map modal */}
+          <Panel padded className="space-y-3">
+            <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
+              <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
                 <Icon name="alert-triangle" size={16} className="text-[var(--color-danger)]" />
-                Injury Map (3D)
+                Injury
               </h2>
-              <UrgentHorseInjuryViewer injuries={markerData} isAddMode={false} readOnly />
+              {markerData.length > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon="activity"
+                  onClick={() => setShowInjuryMap(true)}
+                  className="transition-all active:scale-[0.98]"
+                >
+                  View 3D Injury Map
+                </Button>
+              )}
+            </div>
 
-              {injuries.length === 0 ? (
-                <p className="text-xs text-[var(--color-text-muted)] py-2 text-center">
-                  No injury records for this horse.
-                </p>
-              ) : (
-                <div className="space-y-1.5">
-                  {injuries.map((inj) => {
-                    const isOpen = expandedMarkerId === String(inj.id);
-                    const hasMarker = inj.positionX != null;
-                    const zoneLabel = (inj.zoneId && zoneById(inj.zoneId)?.label) || 'Unmapped zone';
-                    return (
-                      <div
-                        key={inj.id}
-                        className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)]"
+            {injuries.length === 0 ? (
+              <p className="text-xs text-[var(--color-text-muted)] py-2 text-center">
+                No injury records for this horse.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {injuries.map((inj) => {
+                  const isOpen = expandedMarkerId === String(inj.id);
+                  const hasMarker = inj.positionX != null;
+                  const zoneLabel = (inj.zoneId && zoneById(inj.zoneId)?.label) || 'Unmapped zone';
+                  return (
+                    <div
+                      key={inj.id}
+                      className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)]"
+                    >
+                      <Button
+                        type="button"
+                        variant="tertiary"
+                        size="sm"
+                        aria-expanded={isOpen}
+                        onClick={() => setExpandedMarkerId(isOpen ? null : String(inj.id))}
+                        className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs font-medium hover:bg-[var(--color-surface-muted)]"
                       >
-                        <Button
-                          type="button"
-                          variant="tertiary"
-                          size="sm"
-                          aria-expanded={isOpen}
-                          onClick={() => setExpandedMarkerId(isOpen ? null : String(inj.id))}
-                          className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs font-medium hover:bg-[var(--color-surface-muted)]"
-                        >
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} size={12} className="text-[var(--color-text-muted)] shrink-0" />
-                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-danger)]" aria-hidden />
-                            <span className="truncate font-semibold">
-                              {inj.injuryType}
-                            </span>
-                            <span className="text-[var(--color-text-secondary)]">
-                              · {zoneLabel}
-                            </span>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} size={12} className="text-[var(--color-text-muted)] shrink-0" />
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-danger)]" aria-hidden />
+                          <span className="truncate font-semibold">
+                            {inj.injuryType}
                           </span>
-                          <span className="flex shrink-0 items-center gap-2">
-                            {!hasMarker && (
-                              <span className="text-[10px] text-[var(--color-text-muted)]">no 3D marker</span>
-                            )}
-                            <Pill tone={inj.status === 'ACTIVE' ? 'danger' : 'success'} size="sm">
-                              {inj.status}
-                            </Pill>
+                          <span className="text-[var(--color-text-secondary)]">
+                            · {zoneLabel}
                           </span>
-                        </Button>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          {!hasMarker && (
+                            <span className="text-[10px] text-[var(--color-text-muted)]">no 3D marker</span>
+                          )}
+                          <Pill tone={injuryStatusTone(inj.status)} size="sm">
+                            {inj.status}
+                          </Pill>
+                        </span>
+                      </Button>
 
-                        {isOpen && (
-                          <div className="space-y-1.5 border-t border-[var(--color-border)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
-                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {isOpen && (
+                        <div className="space-y-1.5 border-t border-[var(--color-border)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+                          <div className="flex flex-wrap gap-x-4 gap-y-1">
+                            <span>
+                              <span className="font-semibold text-[var(--color-text-primary)]">Severity:</span>{' '}
+                              {inj.severity || 'Not recorded'}
+                            </span>
+                            <span>
+                              <span className="font-semibold text-[var(--color-text-primary)]">Diagnosed:</span>{' '}
+                              {formatDate(inj.diagnosedAt)}
+                            </span>
+                            {inj.recoveredAt && (
                               <span>
-                                <span className="font-semibold text-[var(--color-text-primary)]">Severity:</span>{' '}
-                                {inj.severity || 'Not recorded'}
+                                <span className="font-semibold text-[var(--color-text-primary)]">Recovered:</span>{' '}
+                                {formatDate(inj.recoveredAt)}
                               </span>
-                              <span>
-                                <span className="font-semibold text-[var(--color-text-primary)]">Diagnosed:</span>{' '}
-                                {formatDate(inj.diagnosedAt)}
-                              </span>
-                              {inj.recoveredAt && (
-                                <span>
-                                  <span className="font-semibold text-[var(--color-text-primary)]">Recovered:</span>{' '}
-                                  {formatDate(inj.recoveredAt)}
-                                </span>
-                              )}
-                            </div>
-                            {inj.expectedRecoveryDate && (
-                              <div>
-                                <span className="font-semibold text-[var(--color-text-primary)]">Expected recovery:</span>{' '}
-                                {formatDate(inj.expectedRecoveryDate)}
-                              </div>
-                            )}
-                            {inj.description && (
-                              <p className="leading-relaxed">{inj.description}</p>
                             )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Panel>
-          )}
+                          {inj.expectedRecoveryDate && (
+                            <div>
+                              <span className="font-semibold text-[var(--color-text-primary)]">Expected recovery:</span>{' '}
+                              {formatDate(inj.expectedRecoveryDate)}
+                            </div>
+                          )}
+                          {inj.description && (
+                            <p className="leading-relaxed">{inj.description}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
 
-          {/* Treatment Plans & Prescriptions */}
+          {/* 5. Preventive care (backend protocol statuses) */}
+          <Panel padded className="space-y-3">
+            <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
+              <Icon name="shield" size={16} className="text-[var(--color-medical)]" />
+              Preventive Care
+            </h2>
+            {preventive && preventive.protocols.length > 0 ? (
+              <div className="space-y-2">
+                {preventive.protocols.map((p) => (
+                  <div
+                    key={p.protocolId}
+                    className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5"
+                  >
+                    <div className="min-w-0 flex-1 pr-2">
+                      <div className="font-semibold text-xs text-[var(--color-text-primary)] truncate">
+                        {p.name}{' '}
+                        <span className="text-[var(--color-text-muted)] font-mono text-[10px]">
+                          ({p.code})
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">
+                        Due: <strong>{p.nextDueOn ? formatDate(p.nextDueOn) : 'Immediate'}</strong>
+                      </div>
+                    </div>
+                    <Pill tone={preventiveTone(p.status)} size="sm">
+                      {p.status}
+                    </Pill>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-[var(--color-text-muted)] py-2 text-center">
+                No preventive protocol coverage data.
+              </p>
+            )}
+          </Panel>
+
+          {/* 6. Treatment Plans & Prescriptions */}
           {recordIdShown != null && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
                   <Icon name="pill" size={16} className="text-[var(--color-primary)]" />
                   Treatment Plans &amp; Prescriptions ({plans.length})
                 </h2>
@@ -429,19 +661,19 @@ export function RecordDetailView({
               </div>
 
               {plans.length === 0 ? (
-                <Panel padded className="text-center py-6 text-[13px] text-[var(--color-text-muted)]">
+                <Panel padded className="text-center py-6 text-sm text-[var(--color-text-muted)]">
                   No active treatment plans assigned to this record.
                 </Panel>
               ) : (
                 <div className="space-y-3">
                   {plans.map((p) => (
                     <Panel key={p.id} padded className="space-y-2.5 border-l-4 border-l-[var(--color-primary)]">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border-subtle)] pb-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
                         <div>
-                          <span className="font-bold text-[14px] text-[var(--color-text-primary)]">
+                          <span className="font-bold text-sm text-[var(--color-text-primary)]">
                             {p.treatmentName}
                           </span>
-                          <span className="text-[12px] text-[var(--color-text-muted)] ml-2">
+                          <span className="text-xs text-[var(--color-text-muted)] ml-2">
                             ({formatDate(p.startDate)} – {formatDate(p.endDate)})
                           </span>
                         </div>
@@ -462,12 +694,12 @@ export function RecordDetailView({
                         </div>
                       </div>
 
-                      <p className="text-[13px] text-[var(--color-text-secondary)]">
+                      <p className="text-sm text-[var(--color-text-secondary)]">
                         {p.instructions}
                       </p>
 
                       {p.prescriptions && p.prescriptions.length > 0 && (
-                        <div className="mt-2.5 pt-2 border-t border-[var(--color-border-subtle)]">
+                        <div className="mt-2.5 pt-2 border-t border-[var(--color-border)]">
                           <span className="text-[11px] font-semibold text-[var(--color-text-muted)] uppercase block mb-1.5">
                             Prescribed Medications:
                           </span>
@@ -475,7 +707,7 @@ export function RecordDetailView({
                             {p.prescriptions.map((rx) => (
                               <div
                                 key={rx.id}
-                                className="flex flex-wrap items-center justify-between text-[12px] bg-[var(--color-surface-muted)] px-2.5 py-1.5 rounded"
+                                className="flex flex-wrap items-center justify-between text-xs bg-[var(--color-surface-muted)] px-2.5 py-1.5 rounded"
                               >
                                 <div>
                                   <strong className="text-[var(--color-text-primary)]">
@@ -500,38 +732,13 @@ export function RecordDetailView({
             </div>
           )}
 
-          {/* Health metrics + trend chart */}
+          {/* 7. Health metrics trend chart */}
           {metrics.length > 0 && (
             <Panel padded className="space-y-3">
-              <h2 className="text-[14px] font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
+              <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
                 <Icon name="activity" size={16} className="text-[var(--color-primary)]" />
-                Health Metrics &amp; Trend
+                Health Metrics Trend
               </h2>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 text-[12px]">
-                {(() => {
-                  const last = metrics[metrics.length - 1];
-                  return (
-                    <>
-                      <div>
-                        <span className="text-[var(--color-text-muted)] block">Heart rate</span>
-                        <span className="font-semibold">{last.heartRate ?? '—'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[var(--color-text-muted)] block">Temp (°C)</span>
-                        <span className="font-semibold">{last.temperature ?? '—'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[var(--color-text-muted)] block">Weight (kg)</span>
-                        <span className="font-semibold">{last.weight ?? '—'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[var(--color-text-muted)] block">Resp. rate</span>
-                        <span className="font-semibold">{last.respiratoryRate ?? '—'}</span>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={metrics.map((m) => ({ ...m, date: formatDate(m.recordedAt) }))}>
@@ -551,13 +758,33 @@ export function RecordDetailView({
         </div>
       )}
 
+      {/* 3D injury map modal — opened from the Injury section button */}
+      {showInjuryMap && (
+        <Modal
+          open={showInjuryMap}
+          onClose={() => setShowInjuryMap(false)}
+          title={`3D Injury Map — ${resolvedHorseName}`}
+          description="Red dots mark injury locations. Select a tag to toggle the condition details."
+          size="lg"
+          footer={
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={() => setShowInjuryMap(false)}>
+                Close
+              </Button>
+            </div>
+          }
+        >
+          <UrgentHorseInjuryViewer injuries={markerData} isAddMode={false} readOnly />
+        </Modal>
+      )}
+
       {/* Sub-modals */}
       {recordIdShown != null && (
         <TreatmentPlanModal
           open={showPlanModal}
           onClose={() => setShowPlanModal(false)}
           healthRecordId={recordIdShown}
-          horseName={detail?.horse?.name ?? horseName}
+          horseName={resolvedHorseName}
           onSuccess={() => {
             void load();
             onScheduleUpdated?.();
