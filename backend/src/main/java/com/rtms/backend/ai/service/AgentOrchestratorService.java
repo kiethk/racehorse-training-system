@@ -474,6 +474,12 @@ public class AgentOrchestratorService {
             case "tenHuanLuyenVien" -> "Huấn luyện viên";
             case "trangThai" -> "Trạng thái";
             case "quyetDinhTapLuyen" -> "Quyết định tập luyện";
+            case "chienLuocCuLyVaSanDua" -> "Chiến lược cự ly và sân đua";
+            case "dieuChinhBaiTapKeTiep" -> "Điều chỉnh bài tập kế tiếp";
+            case "caTrucCapCuu" -> "Ca trực cấp cứu";
+            case "suCoChuongTrai48h" -> "Sự cố chuồng trại 48h";
+            case "tongQuanSoLuong" -> "Tổng quan số lượng";
+            case "chiTietCacDon" -> "Chi tiết các đơn";
             default -> key;
         };
     }

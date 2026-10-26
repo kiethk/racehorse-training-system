@@ -338,6 +338,7 @@ public class AiToolExecutionService {
             case "analyzeWorkoutLoadAndOvertrainingRisk" -> handleAnalyzeWorkoutLoadAndOvertrainingRisk(args);
             case "recommendOptimalRaceDistanceAndTrack" -> handleRecommendOptimalRaceDistanceAndTrack(args);
             case "recommendNextWorkoutAdjustment" -> handleRecommendNextWorkoutAdjustment(args);
+            case "recommendTrainerStrategy" -> handleRecommendTrainerStrategy(args);
 
             // VETERINARIAN Tools
             case "searchClinicalKnowledge" -> handleSearchClinicalKnowledge(args, currentUser);
@@ -349,6 +350,7 @@ public class AiToolExecutionService {
             case "getRecentIncidentReports" -> handleGetRecentIncidentReports();
             case "getPendingAdmissionExams" -> handleGetPendingAdmissionExams(currentUser);
             case "getUrgentCareAlerts" -> handleGetUrgentCareAlerts(currentUser);
+            case "getUrgentCareAndIncidentAlerts" -> handleGetUrgentCareAndIncidentAlerts(currentUser);
             case "getHorseVitalSignsTrend" -> handleGetHorseVitalSignsTrend(args);
             case "analyzeIncidentPatternsAndRecurringRisks" -> handleAnalyzeIncidentPatternsAndRecurringRisks(args);
             case "recommendClinicalInterventionPlan" -> handleRecommendClinicalInterventionPlan(args, currentUser);
@@ -374,6 +376,7 @@ public class AiToolExecutionService {
             case "getClubHorsesDirectory" -> handleGetClubHorsesDirectory(args);
             case "getRecentAuditLogs" -> handleGetRecentAuditLogs(args);
             case "getAdmissionPipelineDetails" -> handleGetAdmissionPipelineDetails(args);
+            case "getAdmissionPipelineOverview" -> handleGetAdmissionPipelineOverview(args);
             case "analyzeStableCapacityAndStallBottlenecks" -> handleAnalyzeStableCapacityAndStallBottlenecks();
             case "recommendGroomWorkloadRebalancing" -> handleRecommendGroomWorkloadRebalancing();
 
@@ -1336,6 +1339,23 @@ public class AiToolExecutionService {
         return result;
     }
 
+private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+        Object raceObj = handleRecommendOptimalRaceDistanceAndTrack(args);
+        Object workoutObj = handleRecommendNextWorkoutAdjustment(args);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenNgua", horse.getName());
+        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("chienLuocCuLyVaSanDua", raceObj);
+        result.put("dieuChinhBaiTapKeTiep", workoutObj);
+        result.put("actionUrl", "/trainer/racing");
+        return result;
+    }
+
     // =================================================================
     // VETERINARIAN Handlers
     // =================================================================
@@ -1629,6 +1649,17 @@ public class AiToolExecutionService {
             item.put("actionUrl", "/veterinarian/urgent");
             result.add(item);
         }
+        return result;
+    }
+
+private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUser) {
+        Object urgentCare = handleGetUrgentCareAlerts(currentUser);
+        Object recentIncidents = handleGetRecentIncidentReports();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("caTrucCapCuu", urgentCare);
+        result.put("suCoChuongTrai48h", recentIncidents);
+        result.put("actionUrl", "/veterinarian/urgent");
         return result;
     }
 
@@ -2596,6 +2627,17 @@ public class AiToolExecutionService {
 
             result.add(item);
         }
+        return result;
+    }
+
+private Object handleGetAdmissionPipelineOverview(Map<String, Object> args) {
+        Object overview = handleGetAdmissionRequestsOverview();
+        Object details = handleGetAdmissionPipelineDetails(args);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tongQuanSoLuong", overview);
+        result.put("chiTietCacDon", details);
+        result.put("actionUrl", "/manager/admissions");
         return result;
     }
 
