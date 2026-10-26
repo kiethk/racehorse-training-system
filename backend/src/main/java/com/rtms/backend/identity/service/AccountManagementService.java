@@ -21,6 +21,7 @@ import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.identity.entity.GroomProfile;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.notification.service.EmailService;
 import com.rtms.backend.notification.service.NotificationService;
 import jakarta.validation.Validator;
 
@@ -54,6 +55,7 @@ public class AccountManagementService {
     private final CareScheduleRepository careScheduleRepository;
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final NotificationService notificationService;
+    private final com.rtms.backend.notification.service.EmailService emailService;
 
     public AccountManagementService(
             UserRepository userRepository,
@@ -66,7 +68,7 @@ public class AccountManagementService {
             TrainerProfileRepository trainerProfileRepository,
             Validator validator) {
         this(userRepository, roleRepository, horseRepository, passwordEncoder, staffManagementService,
-                groomProfileRepository, vetProfileRepository, trainerProfileRepository, validator, null, null, null, null, null);
+                groomProfileRepository, vetProfileRepository, trainerProfileRepository, validator, null, null, null, null, null, null);
     }
 
     public AccountManagementService(
@@ -82,7 +84,27 @@ public class AccountManagementService {
             AreaRepository areaRepository,
             StableStallRepository stableStallRepository) {
         this(userRepository, roleRepository, horseRepository, passwordEncoder, staffManagementService,
-                groomProfileRepository, vetProfileRepository, trainerProfileRepository, validator, areaRepository, stableStallRepository, null, null, null);
+                groomProfileRepository, vetProfileRepository, trainerProfileRepository, validator, areaRepository, stableStallRepository, null, null, null, null);
+    }
+
+    public AccountManagementService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            HorseRepository horseRepository,
+            PasswordEncoder passwordEncoder,
+            StaffManagementService staffManagementService,
+            GroomProfileRepository groomProfileRepository,
+            VeterinarianProfileRepository vetProfileRepository,
+            TrainerProfileRepository trainerProfileRepository,
+            Validator validator,
+            AreaRepository areaRepository,
+            StableStallRepository stableStallRepository,
+            CareScheduleRepository careScheduleRepository,
+            AdmissionApplicationRepository admissionApplicationRepository,
+            NotificationService notificationService) {
+        this(userRepository, roleRepository, horseRepository, passwordEncoder, staffManagementService,
+                groomProfileRepository, vetProfileRepository, trainerProfileRepository, validator, areaRepository, stableStallRepository,
+                careScheduleRepository, admissionApplicationRepository, notificationService, null);
     }
 
     @Autowired
@@ -100,7 +122,8 @@ public class AccountManagementService {
             StableStallRepository stableStallRepository,
             CareScheduleRepository careScheduleRepository,
             AdmissionApplicationRepository admissionApplicationRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            @Autowired(required = false) EmailService emailService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.horseRepository = horseRepository;
@@ -115,6 +138,7 @@ public class AccountManagementService {
         this.careScheduleRepository = careScheduleRepository;
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.notificationService = notificationService;
+        this.emailService = emailService;
     }
 
     // ── READ ALL ─────────────────────────────────────────────────────────────
@@ -314,6 +338,9 @@ public class AccountManagementService {
         String roleName = request.getRole();
         if (STAFF_ROLES.contains(roleName)) {
             StaffCreationResponse staffResponse = staffManagementService.createStaff(request.toStaffCreationRequest());
+            if (emailService != null) {
+                emailService.sendStaffWelcomeEmail(staffResponse.getEmail(), staffResponse.getFullName(), staffResponse.getRole(), request.getPassword());
+            }
             return copyToAccountCreationResponse(staffResponse);
         }
 
@@ -330,6 +357,14 @@ public class AccountManagementService {
         user.setRole(role);
         user.setActive(true);
         user = userRepository.save(user);
+
+        if (emailService != null) {
+            if ("HORSE_OWNER".equals(roleName)) {
+                emailService.sendOwnerWelcomeEmail(user.getEmail(), user.getFullName());
+            } else {
+                emailService.sendStaffWelcomeEmail(user.getEmail(), user.getFullName(), role.getName(), request.getPassword());
+            }
+        }
 
         AccountCreationResponse response = new AccountCreationResponse();
         response.setUserId(user.getId());
