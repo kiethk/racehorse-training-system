@@ -20,37 +20,88 @@ function cacheBlobUrl(source: string, url: string): void {
   blobUrlCache.set(source, url);
 }
 
+async function ensureCorrectMimeType(rawBlob: Blob, source: string): Promise<Blob> {
+  // If rawBlob already has a specific image or pdf type (not generic octet-stream or empty), keep it
+  if (rawBlob.type && rawBlob.type !== 'application/octet-stream') {
+    return rawBlob;
+  }
+
+  const clean = source.split('?')[0].toLowerCase();
+  if (clean.endsWith('.pdf')) {
+    return new Blob([rawBlob], { type: 'application/pdf' });
+  }
+  if (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) {
+    return new Blob([rawBlob], { type: 'image/jpeg' });
+  }
+  if (clean.endsWith('.png')) {
+    return new Blob([rawBlob], { type: 'image/png' });
+  }
+  if (clean.endsWith('.webp')) {
+    return new Blob([rawBlob], { type: 'image/webp' });
+  }
+
+  // Sniff magic bytes from rawBlob header
+  try {
+    const buffer = await rawBlob.slice(0, 16).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+      return new Blob([rawBlob], { type: 'image/jpeg' });
+    }
+    if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+      return new Blob([rawBlob], { type: 'image/png' });
+    }
+    if (
+      bytes.length >= 12 &&
+      bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x45 &&
+      bytes[10] === 0x42 &&
+      bytes[11] === 0x50
+    ) {
+      return new Blob([rawBlob], { type: 'image/webp' });
+    }
+    if (bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+      return new Blob([rawBlob], { type: 'application/pdf' });
+    }
+  } catch {
+    // If arrayBuffer fails for any reason, continue to heuristics
+  }
+
+  // If path relates to horse photo or avatar, default to image/jpeg so <img> tag doesn't fail
+  if (clean.includes('/photo') || clean.includes('avatar') || clean.includes('horse-photo')) {
+    return new Blob([rawBlob], { type: 'image/jpeg' });
+  }
+
+  return rawBlob;
+}
+
 export async function fetchProtectedBlobUrl(source: string, signal?: AbortSignal): Promise<string> {
   const cached = blobUrlCache.get(source);
   if (cached) return cached;
 
+  if (signal?.aborted) {
+    throw new DOMException('The user aborted a request.', 'AbortError');
+  }
+
   const existing = inFlightRequests.get(source);
   if (existing) return existing;
 
-  const promise = apiGetBlob(source, signal)
-    .then((rawBlob) => {
-      let blob = rawBlob;
-      if (!blob.type || blob.type === 'application/octet-stream') {
-        const clean = source.split('?')[0].toLowerCase();
-        if (clean.endsWith('.pdf')) {
-          blob = new Blob([rawBlob], { type: 'application/pdf' });
-        } else if (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) {
-          blob = new Blob([rawBlob], { type: 'image/jpeg' });
-        } else if (clean.endsWith('.png')) {
-          blob = new Blob([rawBlob], { type: 'image/png' });
-        } else if (clean.endsWith('.webp')) {
-          blob = new Blob([rawBlob], { type: 'image/webp' });
-        }
-      }
+  // Global fetch is decoupled from individual component abort signals so unmounting one component
+  // does not abort concurrent or subsequent requests sharing this URL or break the cache.
+  const promise = (async () => {
+    try {
+      const rawBlob = await apiGetBlob(source);
+      const blob = await ensureCorrectMimeType(rawBlob, source);
       const url = URL.createObjectURL(blob);
       cacheBlobUrl(source, url);
-      inFlightRequests.delete(source);
       return url;
-    })
-    .catch((err) => {
+    } finally {
       inFlightRequests.delete(source);
-      throw err;
-    });
+    }
+  })();
 
   inFlightRequests.set(source, promise);
   return promise;
@@ -79,21 +130,21 @@ export function useProtectedFileUrl(source: string | null | undefined): { url: s
       return;
     }
 
-    const controller = new AbortController();
-    fetchProtectedBlobUrl(source, controller.signal)
+    let active = true;
+    fetchProtectedBlobUrl(source)
       .then((url) => {
-        if (!controller.signal.aborted) {
+        if (active) {
           setLoaded({ source, url });
         }
       })
       .catch(() => {
-        if (!controller.signal.aborted) {
+        if (active) {
           setLoaded({ source, url: null });
         }
       });
 
     return () => {
-      controller.abort();
+      active = false;
     };
   }, [source, direct]);
 
@@ -112,7 +163,7 @@ export function useProtectedFileUrls(sources: readonly string[]): Record<string,
 
   useEffect(() => {
     const list = key ? key.split('\n') : [];
-    const controller = new AbortController();
+    let active = true;
 
     list.forEach((source) => {
       if (blobUrlCache.has(source)) {
@@ -124,26 +175,25 @@ export function useProtectedFileUrls(sources: readonly string[]): Record<string,
         return;
       }
 
-      fetchProtectedBlobUrl(source, controller.signal)
+      fetchProtectedBlobUrl(source)
         .then((url) => {
-          if (controller.signal.aborted) return;
+          if (!active) return;
           setLoaded((current) => ({
             key,
             urls: { ...(current.key === key ? current.urls : {}), [source]: url },
           }));
         })
         .catch(() => {
-          if (!controller.signal.aborted) {
-            setLoaded((current) => ({
-              key,
-              urls: { ...(current.key === key ? current.urls : {}), [source]: null },
-            }));
-          }
+          if (!active) return;
+          setLoaded((current) => ({
+            key,
+            urls: { ...(current.key === key ? current.urls : {}), [source]: null },
+          }));
         });
     });
 
     return () => {
-      controller.abort();
+      active = false;
     };
   }, [key]);
 
