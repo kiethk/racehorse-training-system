@@ -15,6 +15,8 @@ import com.rtms.backend.identity.repository.TrainerProfileRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.security.JwtUtil;
+import com.rtms.backend.notification.service.EmailService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +31,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.regex.Pattern;
 
 @Service
 public class AuthService {
@@ -42,6 +45,10 @@ public class AuthService {
     private final TrainerProfileRepository trainerProfileRepository;
     private final GroomProfileRepository groomProfileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final com.rtms.backend.notification.service.EmailService emailService;
+
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^(0|\\+84)[3|5|7|8|9][0-9]{8}$|^[+]?[0-9]{9,15}$");
 
     public static final long GRACE_PERIOD_SECONDS = 30L;
 
@@ -58,6 +65,21 @@ public class AuthService {
             TrainerProfileRepository trainerProfileRepository,
             GroomProfileRepository groomProfileRepository,
             RefreshTokenRepository refreshTokenRepository) {
+        this(userRepository, roleRepository, passwordEncoder, jwtUtil,
+                veterinarianProfileRepository, trainerProfileRepository, groomProfileRepository, refreshTokenRepository,
+                null);
+    }
+
+    @Autowired
+    public AuthService(UserRepository userRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            JwtUtil jwtUtil,
+            VeterinarianProfileRepository veterinarianProfileRepository,
+            TrainerProfileRepository trainerProfileRepository,
+            GroomProfileRepository groomProfileRepository,
+            RefreshTokenRepository refreshTokenRepository,
+            @Autowired(required = false) EmailService emailService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -66,6 +88,7 @@ public class AuthService {
         this.trainerProfileRepository = trainerProfileRepository;
         this.groomProfileRepository = groomProfileRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.emailService = emailService;
     }
 
     @Transactional
@@ -96,18 +119,22 @@ public class AuthService {
         return new LoginResult(accessToken, rawRefreshToken, loginResponse);
     }
 
-    public record RefreshResult(String accessToken, String refreshToken) {}
+    public record RefreshResult(String accessToken, String refreshToken) {
+    }
 
     @Transactional
     public RefreshResult refresh(String rawRefreshToken) {
         String hash = hashToken(rawRefreshToken);
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "Invalid refresh token"));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN",
+                        "Invalid refresh token"));
 
         if (refreshToken.getRevokedAt() != null) {
-            boolean withinGracePeriod = refreshToken.getRevokedAt().isAfter(LocalDateTime.now().minusSeconds(GRACE_PERIOD_SECONDS));
+            boolean withinGracePeriod = refreshToken.getRevokedAt()
+                    .isAfter(LocalDateTime.now().minusSeconds(GRACE_PERIOD_SECONDS));
             if (!withinGracePeriod) {
-                throw new ApiException(HttpStatus.UNAUTHORIZED, "REVOKED_REFRESH_TOKEN", "Refresh token has been revoked");
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "REVOKED_REFRESH_TOKEN",
+                        "Refresh token has been revoked");
             }
         }
 
@@ -188,25 +215,47 @@ public class AuthService {
     }
 
     public OwnerRegistrationResponse registerOwner(OwnerRegistrationRequest request) {
-        if (request.getFullName() == null || request.getFullName().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Full name is required");
-        }
-        if (request.getEmail() == null || request.getEmail().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required");
-        }
-        if (request.getPassword() == null || request.getPassword().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password is required");
+        if (request == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Registration details are required");
         }
 
-        String email = request.getEmail().trim().toLowerCase();
-        String fullName = request.getFullName().trim();
+        String fullName = request.getFullName() == null ? "" : request.getFullName().trim();
+        if (fullName.length() < 2 || fullName.length() > 100) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_NAME",
+                    "Full name must be between 2 and 100 characters");
+        }
+
+        String rawEmail = request.getEmail() == null ? "" : request.getEmail().trim();
+        if (rawEmail.isEmpty() || rawEmail.length() > 255 || !EMAIL_PATTERN.matcher(rawEmail).matches()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_EMAIL", "A valid email address is required");
+        }
+        String email = rawEmail.toLowerCase(java.util.Locale.ROOT);
+
+        String password = request.getPassword() == null ? "" : request.getPassword();
+        byte[] passwordBytes = password.getBytes(StandardCharsets.UTF_8);
+        if (password.length() < 8 || passwordBytes.length > 72) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD",
+                    "Password must be at least 8 characters and at most 72 bytes");
+        }
+
         String phone = request.getPhone() == null || request.getPhone().isBlank()
-                ? null : request.getPhone().trim();
+                ? null
+                : request.getPhone().trim();
+        if (phone != null) {
+            if (phone.length() > 20 || !PHONE_PATTERN.matcher(phone).matches()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PHONE", "Invalid phone number format");
+            }
+        }
+
         String address = request.getAddress() == null || request.getAddress().isBlank()
-                ? null : request.getAddress().trim();
+                ? null
+                : request.getAddress().trim();
+        if (address != null && address.length() > 255) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ADDRESS", "Address must be at most 255 characters");
+        }
 
         if (userRepository.findByEmail(email).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
+            throw new ApiException(HttpStatus.CONFLICT, "EMAIL_EXISTS",
                     "An account with this email already exists");
         }
 
@@ -216,13 +265,17 @@ public class AuthService {
         User user = new User();
         user.setFullName(fullName);
         user.setEmail(email);
-        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setPasswordHash(passwordEncoder.encode(password));
         user.setRole(ownerRole);
         user.setPhone(phone);
         user.setAddress(address);
         user.setActive(true);
 
         User saved = userRepository.save(user);
+
+        if (emailService != null) {
+            emailService.sendOwnerWelcomeEmail(saved.getEmail(), saved.getFullName());
+        }
 
         return new OwnerRegistrationResponse(
                 saved.getId(),
