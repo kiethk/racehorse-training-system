@@ -60,17 +60,23 @@ public class OwnerAdmissionService {
     private final FileStorageService fileStorage;
     private final AdmissionUelnPolicy uelnPolicy;
     private final PedigreeBirthDateValidator birthDates;
+    private final com.rtms.backend.stable.repository.StableStallRepository stalls;
+    private final com.rtms.backend.notification.service.NotificationService notifications;
 
     public OwnerAdmissionService(AdmissionApplicationRepository admissions,
             CandidateHorseProfileRepository candidates, AdmissionDocumentRepository documents,
             FileStorageService fileStorage, AdmissionUelnPolicy uelnPolicy,
-            PedigreeBirthDateValidator birthDates) {
+            PedigreeBirthDateValidator birthDates,
+            com.rtms.backend.stable.repository.StableStallRepository stalls,
+            com.rtms.backend.notification.service.NotificationService notifications) {
         this.admissions = admissions;
         this.candidates = candidates;
         this.documents = documents;
         this.fileStorage = fileStorage;
         this.uelnPolicy = uelnPolicy;
         this.birthDates = birthDates;
+        this.stalls = stalls;
+        this.notifications = notifications;
     }
 
     /** The transaction creates exactly one new Application and one new immutable snapshot. */
@@ -103,6 +109,7 @@ public class OwnerAdmissionService {
         snapshot.setDamRegistrationNumber(damUeln);
         snapshot.setPedigreeNotes(trimNullable(request.pedigreeNotes()));
         candidates.save(snapshot);
+        notifyQuarantineGrooms(application, snapshot.getName());
 
         return toDetail(application, snapshot, List.of());
     }
@@ -167,17 +174,31 @@ public class OwnerAdmissionService {
 
             savedDocuments.add(documents.save(document));
         }
+        notifyQuarantineGrooms(application, snapshot.getName());
         return toDetail(application, snapshot, savedDocuments);
+    }
+
+    /**
+     * Scenario A: every quarantine groom may pick up a new admission, so all of them hear about it.
+     * Written in the submit transaction, so a rolled-back submission leaves no notification behind.
+     */
+    private void notifyQuarantineGrooms(AdmissionApplication application, String horseName) {
+        String type = com.rtms.backend.notification.service.NotificationTypes.ADMISSION_NEW_FOR_GROOM;
+        String refType = com.rtms.backend.notification.service.NotificationTypes.REFERENCE_ADMISSION;
+        for (Long groomId : stalls.findQuarantineGroomIds()) {
+            notifications.createNotification(groomId, "New admission to review",
+                    horseName + " was submitted for admission and is waiting for groom review.",
+                    type, refType, application.getId(),
+                    com.rtms.backend.notification.entity.Notification.buildDeduplicationKey(
+                            groomId, refType, application.getId(), type));
+        }
     }
 
     @Transactional(readOnly = true)
     public List<AdmissionSummaryResponse> getMyAdmissions(Long ownerId, AdmissionStatus status) {
         return admissions.findByOwnerIdOrderBySubmittedAtDesc(ownerId).stream()
                 .filter(admission -> status == null || admission.getStatus() == status)
-                .sorted(Comparator.comparing(
-                        AdmissionApplication::getSubmittedAt,
-                        Comparator.nullsLast(Comparator.naturalOrder())
-                ).reversed().thenComparing(Comparator.comparing(AdmissionApplication::getId).reversed()))
+                .sorted(AdmissionQueryService.OLDEST_FIRST)
                 .map(admission -> {
                     CandidateHorseProfile candidate = findCandidate(admission.getId());
                     String imageUrl = documents.findByAdmissionId(admission.getId()).stream()
@@ -202,39 +223,6 @@ public class OwnerAdmissionService {
     public List<AdmissionDocumentResponse> getMyDocuments(Long ownerId, Long admissionId) {
         ownedAdmission(ownerId, admissionId);
         return documents.findByAdmissionId(admissionId).stream().map(this::toDocumentResponse).toList();
-    }
-
-    @Transactional
-    public AdmissionDocumentResponse upload(Long ownerId, Long admissionId,
-            AdmissionDocumentType type, LocalDate recordDate, String note, MultipartFile file) {
-        AdmissionApplication application = admissions.findByIdForUpdate(admissionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
-        assertOwner(ownerId, application);
-        // No document changes after Groom has claimed/started reviewing this application.
-        if (application.getStatus() != AdmissionStatus.GROOM_REVIEW
-                || application.getGroomId() != null
-                || application.getGroomDecision() != null
-                || application.getGroomReviewedAt() != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Admission documents are locked after Groom starts review");
-        }
-        if (note != null && note.length() > 2000) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Document note is too long");
-        }
-        String key = fileStorage.store(file, admissionFolder(admissionId));
-        try {
-            AdmissionDocument document = new AdmissionDocument();
-            document.setAdmissionId(admissionId);
-            document.setDocumentType(type);
-            document.setFileUrl(key);
-            document.setOriginalFileName(safeOriginalFileName(file.getOriginalFilename()));
-            document.setRecordDate(recordDate);
-            document.setNote(trimNullable(note));
-            return toDocumentResponse(documents.save(document));
-        } catch (RuntimeException ex) {
-            fileStorage.delete(key);
-            throw ex;
-        }
     }
 
     @Transactional(readOnly = true)
@@ -263,8 +251,8 @@ public class OwnerAdmissionService {
             case "CLUB_MANAGER" -> true;
             case "HORSE_OWNER" -> java.util.Objects.equals(admission.getOwnerId(), viewer.getUserId());
             case "HEAD_TRAINER" -> java.util.Objects.equals(admission.getTrainerId(), viewer.getUserId());
-            case "GROOM" -> java.util.Objects.equals(admission.getGroomId(), viewer.getUserId())
-                    || admission.getStatus() == AdmissionStatus.GROOM_REVIEW;
+            case "GROOM" -> admissions.isVisibleToGroom(admissionId, viewer.getUserId(),
+                    stalls.isQuarantineGroom(viewer.getUserId()), AdmissionStatus.GROOM_REVIEW);
             default -> false;
         };
         if (!allowed) throw new org.springframework.security.access.AccessDeniedException("Admission is not assigned to you");

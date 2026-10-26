@@ -8,6 +8,7 @@ import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
 import { admissionsApi } from '../services/api';
 import { formatDateTime, formatDate, formatEnumLabel } from '@/lib/display';
+import { toast } from '@/lib/toast';
 import { formatHorseSex } from '@/features/horses/lib/sex';
 import { Pill } from '@/components/ui/StatusBadge';
 import type { AdmissionDetailResponse } from '../types';
@@ -79,10 +80,15 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
     setReopening(true);
     setError(null);
     try {
-      await admissionsApi.reopenExpiredArrival(admissionId);
+      const updated = await admissionsApi.reopenExpiredArrival(admissionId);
       await load();
+      toast.success('Arrival window reopened', updated.status === 'WAITING_FOR_ARRIVAL'
+        ? `Quarantine stall ${updated.quarantineStallCode ?? ''} is reserved again.`
+        : 'The admission is queued and gets the next free quarantine stall automatically.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to reopen the arrival window.');
+      const message = cause instanceof Error ? cause.message : 'Unable to reopen the arrival window.';
+      setError(message);
+      toast.error('Arrival window not reopened', message);
     } finally {
       setReopening(false);
     }

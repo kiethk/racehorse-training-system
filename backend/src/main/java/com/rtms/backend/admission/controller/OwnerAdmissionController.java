@@ -5,7 +5,6 @@ import com.rtms.backend.admission.dto.AdmissionSummaryResponse;
 import com.rtms.backend.admission.dto.AdmissionUelnAvailabilityResponse;
 import com.rtms.backend.admission.dto.CreateOwnerAdmissionRequest;
 import com.rtms.backend.admission.dto.OwnerAdmissionDetailResponse;
-import com.rtms.backend.admission.enums.AdmissionDocumentType;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.common.dto.ApiResponse;
 
@@ -20,7 +19,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
-import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -83,19 +81,5 @@ public class OwnerAdmissionController {
     public ApiResponse<List<AdmissionDocumentResponse>> documents(
             @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser owner) {
         return ApiResponse.success(service.getMyDocuments(owner.getUserId(), id));
-    }
-
-    @PostMapping(value = "/{id}/documents", consumes = "multipart/form-data")
-    @PreAuthorize("hasAuthority('ADMISSION_DOCUMENT_CREATE') and principal.role == 'HORSE_OWNER'")
-    public ResponseEntity<ApiResponse<AdmissionDocumentResponse>> upload(
-            @PathVariable Long id,
-            @AuthenticationPrincipal AuthenticatedUser owner,
-            @RequestParam AdmissionDocumentType documentType,
-            @RequestParam(required = false) LocalDate recordDate,
-            @RequestParam(required = false) String note,
-            @RequestPart("file") MultipartFile file) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(service.upload(owner.getUserId(), id, documentType,
-                        recordDate, note, file)));
     }
 }

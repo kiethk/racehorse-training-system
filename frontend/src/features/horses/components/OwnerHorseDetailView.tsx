@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Button,
+  ConfirmDialog,
   EmptyState,
   HorseAvatar,
   Icon,
@@ -29,7 +30,11 @@ import { FitnessTrendChart } from '@/features/training/components/FitnessTrendCh
 import { HorseMetricsRow } from '@/features/training/components/HorseMetricsRow';
 import { WorkoutHistoryTable } from '@/features/training/components/WorkoutHistoryTable';
 import type { Horse } from '@/features/stable/types';
-import type { HorseHealthMetric, HorsePedigree, HorseSpecialty } from '../types';
+import type { HorseDocumentSlot, HorseEditRequest, HorseHealthMetric, HorsePedigree, HorseSpecialty } from '../types';
+import { horseEditRequestService } from '../services/horseEditRequestService';
+import { DocumentSlotGrid } from './DocumentSlotGrid';
+import { EditHorseRequestModal } from './EditHorseRequestModal';
+import { toast } from '@/lib/toast';
 import type { HorseAlert, HorseFitnessTrendItem } from '@/features/training/types';
 import type { RaceRegistrationResponse } from '@/features/racing/types';
 import { displayError, formatDate } from '@/lib/display';
@@ -60,6 +65,13 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
   // Racing data
   const [raceRegistrations, setRaceRegistrations] = useState<RaceRegistrationResponse[]>([]);
 
+  // Documents and change requests
+  const [documentSlots, setDocumentSlots] = useState<HorseDocumentSlot[]>([]);
+  const [latestRequest, setLatestRequest] = useState<HorseEditRequest | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,6 +88,8 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         metricsData,
         preventiveData,
         racingData,
+        slotData,
+        requestData,
       ] = await Promise.all([
         horseService.getById(horseId),
         horseService.getSpecialty(horseId).catch(() => null),
@@ -85,6 +99,8 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         horseService.getHealthMetrics(horseId).catch(() => []),
         horseService.getPreventiveCare(horseId).catch(() => []),
         racingService.listMine(horseId).catch(() => []),
+        horseEditRequestService.documents(horseId).catch(() => []),
+        horseEditRequestService.latest(horseId).catch(() => null),
       ]);
 
       setHorse(horseData);
@@ -95,6 +111,8 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
       setHealthMetrics(metricsData);
       setPreventiveCare(preventiveData);
       setRaceRegistrations(racingData);
+      setDocumentSlots(slotData);
+      setLatestRequest(requestData);
     } catch (cause) {
       setError(displayError(cause, 'Unable to load horse details.'));
     } finally {
@@ -105,6 +123,22 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  const cancelRequest = async () => {
+    if (!latestRequest) return;
+    setCancelling(true);
+    try {
+      setLatestRequest(await horseEditRequestService.cancel(horseId, latestRequest.id));
+      setConfirmCancel(false);
+      toast.success('Change request cancelled', 'You can submit a new one at any time.');
+    } catch (cause) {
+      const message = displayError(cause, 'Unable to cancel the change request.');
+      setConfirmCancel(false);
+      toast.error('Change request not cancelled', message);
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -134,6 +168,8 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
       </ScreenLayout>
     );
   }
+
+  const pendingRequest = latestRequest?.status === 'PENDING';
 
   return (
     <ScreenLayout variant="detail">
@@ -175,6 +211,17 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
             <span className="text-[13px] font-medium text-[var(--color-text-primary)]">
               {horse.currentStallId ? `Stall #${horse.currentStallId}` : 'Not assigned to a stall'}
             </span>
+            {horse.currentStatus === 'ELIGIBLE' && (
+              <Button
+                size="sm"
+                icon="file-text"
+                disabled={pendingRequest}
+                title={pendingRequest ? 'A change request is already waiting for review.' : undefined}
+                onClick={() => setEditing(true)}
+              >
+                Edit details
+              </Button>
+            )}
           </div>
         </div>
 
@@ -186,6 +233,20 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
           </span>
           <HorseSpecialtyBadges specialty={specialty} size="md" />
         </div>
+
+        {pendingRequest && latestRequest && (
+          <Notice tone="info" title="Changes awaiting groom review">
+            <span className="block">
+              Submitted on {formatDate(latestRequest.createdAt)}. The horse keeps its current details until the groom approves.
+            </span>
+            <Button size="sm" variant="secondary" className="mt-2" onClick={() => setConfirmCancel(true)}>Cancel request</Button>
+          </Notice>
+        )}
+        {latestRequest?.status === 'REJECTED' && (
+          <Notice tone="warning" title="Your last change request was rejected">
+            {latestRequest.reviewFeedback || 'No reason was given.'}
+          </Notice>
+        )}
 
         {/* Veterinary Training Restriction Notice */}
         {horse.trainingDecision === 'BLOCKED' && (
@@ -244,6 +305,14 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
 
           {/* Pedigree Ancestry Card */}
           <HorsePedigreeCard pedigree={pedigree} />
+
+          <Panel padded>
+            <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
+              <Icon name="file-text" size={16} className="text-[var(--color-primary)]" />
+              Documents
+            </h3>
+            <DocumentSlotGrid slots={documentSlots} />
+          </Panel>
         </div>
       )}
 
@@ -274,6 +343,32 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
       {activeTab === 'racing' && (
         <HorseRacingHistory registrations={raceRegistrations} />
       )}
+
+      {editing && (
+        <EditHorseRequestModal
+          open
+          horse={horse}
+          pedigree={pedigree}
+          slots={documentSlots}
+          onClose={() => setEditing(false)}
+          onSubmitted={(request) => {
+            setEditing(false);
+            setLatestRequest(request);
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={confirmCancel}
+        title="Cancel this change request?"
+        description="The groom will no longer see it, and the files you uploaded with it are discarded."
+        confirmLabel="Cancel request"
+        cancelLabel="Keep request"
+        tone="danger"
+        loading={cancelling}
+        onConfirm={() => void cancelRequest()}
+        onCancel={() => { if (!cancelling) setConfirmCancel(false); }}
+      />
     </ScreenLayout>
   );
 }

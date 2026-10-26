@@ -61,7 +61,7 @@ if (-not $PsqlPath) {
     if ($cmd) { $PsqlPath = $cmd.Source }
 }
 if (-not $PsqlPath) {
-    $found = Get-ChildItem -Path 'C:\Program Files\PostgreSQL\*\bin\psql.exe' -ErrorAction SilentlyContinue |
+    $found = Get-ChildItem -Path 'E:\postgresql\*\bin\psql.exe' -ErrorAction SilentlyContinue |
         Sort-Object { [int]($_.Directory.Parent.Name -replace '\D', '') } | Select-Object -Last 1
     if ($found) { $PsqlPath = $found.FullName }
 }

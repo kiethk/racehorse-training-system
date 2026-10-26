@@ -48,6 +48,7 @@ class StableAssignmentPostgresTest {
     @Autowired GroomProfileRepository profiles;
     @Autowired HorseRepository horses;
     @Autowired TrainingWorkoutService workouts;
+    @Autowired com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
     @Autowired EntityManager em;
     @Autowired AreaTrainerAssignmentPolicy trainerPolicy;
     @Autowired com.rtms.backend.identity.service.StaffManagementService staffManagement;
@@ -125,7 +126,8 @@ class StableAssignmentPostgresTest {
         return jdbc.queryForObject("SELECT groom_id FROM stable_stalls WHERE area_id=? AND stall_number=?", Long.class, area, number);
     }
     StableAssignmentService independentService(GroomProfileRepository profileRepository) {
-        return new StableAssignmentService(areas, stalls, users, profileRepository, horses, workouts, em, trainerPolicy);
+        return new StableAssignmentService(areas, stalls, users, profileRepository, horses, workouts, em, trainerPolicy,
+                admissionAllocation);
     }
     String emptyAssignmentJson(long target, long groom) {
         return "{\"groomAssignments\":[{\"areaId\":" + target + ",\"blockNumber\":1,\"groomId\":" + groom

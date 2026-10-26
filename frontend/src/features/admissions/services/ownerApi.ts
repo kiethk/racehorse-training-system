@@ -78,17 +78,6 @@ export const ownerAdmissionApi = {
     if (!result?.success) throw new Error(result?.message || 'Unable to submit admission.');
     return result.data;
   },
-  upload: async (id: number, file: File, documentType: string, recordDate?: string, note?: string) => {
-    const body = new FormData();
-    body.append('file', file);
-    body.append('documentType', documentType);
-    if (recordDate) body.append('recordDate', recordDate);
-    if (note) body.append('note', note);
-    // Through the shared client: it sends the access token and refreshes it once on 401.
-    const json = await apiUpload<ApiResponse<AdmissionDocument>>(`/api/owner/admissions/${id}/documents`, body);
-    if (!json?.success) throw new Error(json?.message || 'Document upload failed');
-    return json.data;
-  },
   scanOcr: async (file: File, documentType: string) => {
     const body = new FormData();
     body.append('file', file);

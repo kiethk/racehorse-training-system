@@ -10,10 +10,9 @@ import { admissionsApi } from '../services/api';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
-import { AdmissionInfoSection, AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { AdmissionInfoSection, InfoRow } from '../shared/components/AdmissionInfoSection';
 import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
-import { AdmissionDocumentUploads } from './AdmissionDocumentUploads';
 
 const reviewFeedback = [
   { label: 'Groom', field: 'groomFeedback', stage: 0 },
@@ -63,7 +62,6 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
 
   const candidate = detail.candidate;
   const photo = detail.documents.find(document => document.documentType === 'HORSE_PHOTO');
-  const locked = detail.status !== 'GROOM_REVIEW';
   const activeStage = currentReviewStage(detail.status);
   const feedback = reviewFeedback.flatMap(({ label, field }) => {
     const value = detail[field]?.trim();
@@ -142,13 +140,6 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
               },
             ]}
           />
-        )}
-        sidebar={locked ? undefined : (
-          <AdmissionSideCard title="Additional supporting documents">
-            <p className="text-[var(--color-text-secondary)]">You can add documents while your application is in Groom review.</p>
-            <AdmissionDocumentUploads admissionId={admissionId} documents={detail.documents} locked={locked}
-              onUploaded={async () => { setDetail(await ownerAdmissionApi.detail(admissionId)); }} />
-          </AdmissionSideCard>
         )}
       />
     </div>
