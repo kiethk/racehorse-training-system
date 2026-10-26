@@ -66,7 +66,7 @@ const SEX_FIELD = { key: 'sex', label: 'Sex', required: true } as const;
 const FORM_FIELDS = [...FIELDS.slice(0, 2), SEX_FIELD, ...FIELDS.slice(2)];
 
 type AdmissionFormState = Omit<CreateOwnerAdmissionRequest, 'sex'> & { sex: HorseSex | '' };
-type Selection = { file?: File; recordDate: string; note: string };
+type Selection = { file?: File };
 type DocumentErrors = Partial<Record<AdmissionDocumentType, string>>;
 type FieldErrors = Partial<Record<keyof CreateOwnerAdmissionRequest, string>>;
 
@@ -117,8 +117,6 @@ export function OwnerAdmissionForm() {
   const fileInputs = useRef<Partial<Record<AdmissionDocumentType, HTMLInputElement | null>>>({});
   const fieldInputs = useRef<Partial<Record<keyof CreateOwnerAdmissionRequest, HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>>>({});
   const optionalDocuments = useRef<HTMLDetailsElement>(null);
-  const recordInputs = useRef<Partial<Record<AdmissionDocumentType, HTMLInputElement | null>>>({});
-  const metadataDetails = useRef<Partial<Record<AdmissionDocumentType, HTMLDetailsElement | null>>>({});
 
   const [form, setForm] = useState<AdmissionFormState>({ name: '', sex: '' });
   const [selections, setSelections] = useState<Partial<Record<AdmissionDocumentType, Selection>>>({});
@@ -128,7 +126,6 @@ export function OwnerAdmissionForm() {
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
   const [documentErrors, setDocumentErrors] = useState<DocumentErrors>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [recordErrors, setRecordErrors] = useState<DocumentErrors>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -162,7 +159,7 @@ export function OwnerAdmissionForm() {
   }, []);
 
   function updateSelection(type: AdmissionDocumentType, update: Partial<Selection>) {
-    setSelections(current => ({ ...current, [type]: { recordDate: '', note: '', ...current[type], ...update } }));
+    setSelections(current => ({ ...current, [type]: { ...current[type], ...update } }));
   }
 
   async function triggerOcrScan(file: File, type: AdmissionDocumentType) {
@@ -346,19 +343,13 @@ export function OwnerAdmissionForm() {
     }
   }
 
-  function focusDocument(type: AdmissionDocumentType, recordDate = false) {
+  function focusDocument(type: AdmissionDocumentType) {
     if (!DOCUMENTS.find(section => section.type === type)?.required && optionalDocuments.current) {
       optionalDocuments.current.open = true;
     }
-    if (recordDate) {
-      const details = metadataDetails.current[type];
-      if (details) details.open = true;
-      recordInputs.current[type]?.focus();
-    } else {
-      const element = fileInputs.current[type];
-      element?.focus();
-      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    const element = fileInputs.current[type];
+    element?.focus();
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function changeField(key: keyof CreateOwnerAdmissionRequest, value: string) {
@@ -440,8 +431,6 @@ export function OwnerAdmissionForm() {
       .map(section => ({
         documentType: section.type,
         file: selections[section.type]!.file!,
-        recordDate: selections[section.type]?.recordDate || undefined,
-        note: selections[section.type]?.note?.trim() || undefined,
       }));
 
     setBusy(true);
@@ -655,41 +644,6 @@ export function OwnerAdmissionForm() {
             </div>
           )}
         </div>
-
-        {/* Date / Note details */}
-        <details ref={element => { metadataDetails.current[doc.type] = element; }} className="mt-3 text-xs">
-          <summary className="cursor-pointer text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
-            {selection?.recordDate || selection?.note ? 'Edit record date or note' : '+ Add record date or note (optional)'}
-          </summary>
-          <div className="mt-2.5 space-y-2.5 rounded bg-[var(--color-surface-muted)] p-2.5">
-            <label className="block space-y-1">
-              <span>Record date (optional)</span>
-              <Input
-                id={`record-${doc.type}`}
-                type="date"
-                value={selection?.recordDate || ''}
-                ref={element => { recordInputs.current[doc.type] = element; }}
-                disabled={isAnyScanning}
-                aria-invalid={Boolean(recordErrors[doc.type])}
-                onBlur={event => setRecordErrors(current => ({ ...current, [doc.type]: event.target.validity.badInput ? 'Enter a valid date.' : '' }))}
-                onChange={event => {
-                  updateSelection(doc.type, { recordDate: event.target.value });
-                  setRecordErrors(current => ({ ...current, [doc.type]: '' }));
-                }}
-              />
-              {recordErrors[doc.type] && <span role="alert" className="block text-xs text-[var(--color-danger)]">{recordErrors[doc.type]}</span>}
-            </label>
-            <FormField label="Note (optional)">
-              <Textarea
-                rows={2}
-                maxLength={2000}
-                value={selection?.note || ''}
-                disabled={isAnyScanning}
-                onChange={event => updateSelection(doc.type, { note: event.target.value })}
-              />
-            </FormField>
-          </div>
-        </details>
       </fieldset>
     );
   };
@@ -780,39 +734,6 @@ export function OwnerAdmissionForm() {
             Clear file error
           </Button>
         ) : null}
-        <details ref={element => { metadataDetails.current[section.type] = element; }} className="text-sm">
-          <summary className="cursor-pointer rounded text-[var(--color-text-secondary)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
-            {selection?.recordDate || selection?.note ? 'Edit date or note' : 'Add date or note (optional)'}
-          </summary>
-          <div className="mt-3 space-y-3">
-            <label className="block space-y-1">
-              <span>Record date (optional)</span>
-              <Input
-                id={`record-${section.type}`}
-                type="date"
-                value={selection?.recordDate || ''}
-                ref={element => { recordInputs.current[section.type] = element; }}
-                disabled={isAnyScanning}
-                aria-invalid={Boolean(recordErrors[section.type])}
-                onBlur={event => setRecordErrors(current => ({ ...current, [section.type]: event.target.validity.badInput ? 'Enter a valid date.' : '' }))}
-                onChange={event => {
-                  updateSelection(section.type, { recordDate: event.target.value });
-                  setRecordErrors(current => ({ ...current, [section.type]: '' }));
-                }}
-              />
-              {recordErrors[section.type] && <span role="alert" className="block text-sm text-[var(--color-danger)]">{recordErrors[section.type]}</span>}
-            </label>
-            <FormField label="Note (optional)">
-              <Textarea
-                rows={2}
-                maxLength={2000}
-                value={selection?.note || ''}
-                disabled={isAnyScanning}
-                onChange={event => updateSelection(section.type, { note: event.target.value })}
-              />
-            </FormField>
-          </div>
-        </details>
       </fieldset>
     );
   };

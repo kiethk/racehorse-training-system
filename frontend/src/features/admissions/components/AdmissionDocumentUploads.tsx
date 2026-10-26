@@ -1,6 +1,6 @@
 'use client';
 
-import { FileInput, Input, Select, Textarea } from '@/components/ui/Input';
+import { FileInput, Select } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
@@ -119,7 +119,7 @@ export function AdmissionDocumentUploads({ admissionId, documents, locked, onUpl
             <div id="admission-document-upload-panel" hidden={!open} className="max-w-xl space-y-4 rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
                 {draftActive && (
                     <p className="text-sm text-[var(--color-text-secondary)]">
-                        Your selected file and optional details are saved in this form. Hiding it will keep this draft.
+                        Your selected file is saved in this form. Hiding it will keep this draft.
                     </p>
                 )}
                 <FormField label="Document type">
@@ -192,19 +192,13 @@ function DocumentUploadSection({
     const [viewingPreview, setViewingPreview] = useState(false);
     const previewRef = useRef<string | null>(null);
     const rawPdfRef = useRef<string | null>(null);
-    const [recordDate, setRecordDate] = useState('');
-    const [note, setNote] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [fileValidationError, setFileValidationError] = useState('');
-    const [dateError, setDateError] = useState('');
     const [inputKey, setInputKey] = useState(0);
-    const recordDateInput = useRef<HTMLInputElement>(null);
-    const metadataDetails = useRef<HTMLDetailsElement>(null);
     const id = useId();
     const fileHintId = `${id}-file-hint`;
     const fileErrorId = `${id}-file-error`;
-    const dateErrorId = `${id}-date-error`;
     const imageOnly = section.type === 'HORSE_PHOTO';
     const acceptedTypes = imageOnly
         ? ['image/jpeg', 'image/png', 'image/webp']
@@ -250,8 +244,8 @@ function DocumentUploadSection({
         }
     }
 
-    function updateDraftState(nextFile: File | null, nextDate = recordDate, nextNote = note, nextDateError = Boolean(dateError)) {
-        onDraftChange(Boolean(nextFile || nextDate || nextNote || nextDateError));
+    function updateDraftState(nextFile: File | null) {
+        onDraftChange(Boolean(nextFile));
     }
 
     function selectFile(candidate?: File) {
@@ -287,26 +281,8 @@ function DocumentUploadSection({
         updateDraftState(candidate);
     }
 
-    function changeRecordDate(value: string) {
-        setRecordDate(value);
-        updateDraftState(file, value, note, false);
-    }
-
-    function changeNote(value: string) {
-        setNote(value);
-        updateDraftState(file, recordDate, value);
-    }
-
     async function upload() {
         if (!file || busy || locked) return;
-        const dateInput = recordDateInput.current;
-        if (dateError || dateInput?.validity.badInput) {
-            if (metadataDetails.current) metadataDetails.current.open = true;
-            setDateError('Enter a valid record date.');
-            dateInput?.focus();
-            return;
-        }
-
         setBusy(true);
         setError('');
         let uploaded = false;
@@ -316,8 +292,6 @@ function DocumentUploadSection({
                 admissionId,
                 file,
                 section.type,
-                recordDate || undefined,
-                note.trim() || undefined,
             );
             uploaded = true;
         } catch (cause) {
@@ -330,8 +304,6 @@ function DocumentUploadSection({
         }
 
         choose(null);
-        setRecordDate('');
-        setNote('');
         onDraftChange(false);
         setInputKey(current => current + 1);
 
@@ -349,83 +321,108 @@ function DocumentUploadSection({
 
     const isPdf = file ? (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) : false;
 
-    const handleOpenPreview = () => {
-        if (!file) return;
-        if (isPdf) {
-            const url = rawPdfUrl || URL.createObjectURL(file);
-            setActivePdfPreview({ file, url });
-        } else if (previewUrl) {
-            setViewingPreview(true);
-        }
-    };
-
     return (
-        <fieldset
-            disabled={locked || busy}
-            className="min-w-0 space-y-4 rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
-        >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <legend className="px-1 text-sm font-semibold">
-                    {section.label}
-                </legend>
-                {isUploaded && (
-                    <span className="text-xs font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
-                        Already uploaded (new file will overwrite old file)
-                    </span>
+        <fieldset disabled={busy} className="space-y-4">
+            <legend className="text-base font-semibold text-[var(--color-text-primary)]">
+                {isUploaded ? `Replace ${section.label}` : `Upload ${section.label}`}{' '}
+                {section.required ? (
+                    <span aria-hidden="true" className="text-[var(--color-danger)]">*</span>
+                ) : (
+                    <span className="text-sm font-normal text-[var(--color-text-secondary)]">(Optional)</span>
                 )}
-            </div>
+            </legend>
 
-            <label className="block max-w-xs space-y-1 text-sm">
+            {isUploaded && (
+                <div className="rounded-[var(--radius-sm)] border border-[var(--color-primary)] bg-[var(--color-primary-soft)] p-2.5 text-xs text-[var(--color-primary)]">
+                    This document was previously uploaded. Uploading a new file will overwrite the existing version upon approval.
+                </div>
+            )}
+
+            {error && (
+                <p role="alert" className="text-sm text-[var(--color-danger)]">{error}</p>
+            )}
+
+            <div className="space-y-1">
+                <label htmlFor={`file-${section.type}`} className="block space-y-1 text-sm">
                 <span>Select file <span aria-hidden="true" className="text-[var(--color-danger)]">*</span></span>
                 <FileInput
                     key={inputKey}
+                    id={`file-${section.type}`}
                     accept={imageOnly ? '.jpg,.jpeg,.png,.webp' : '.pdf,.jpg,.jpeg,.png,.webp'}
-                    aria-required="true"
+                    disabled={locked || busy}
+                    aria-describedby={[fileHintId, fileValidationError ? fileErrorId : ''].filter(Boolean).join(' ') || undefined}
                     aria-invalid={Boolean(fileValidationError)}
-                    aria-describedby={`${fileHintId}${fileValidationError ? ` ${fileErrorId}` : ''}${error ? ` ${fileErrorId}-server` : ''}`}
+                    className={file ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)]'}
                     onChange={event => selectFile(event.target.files?.[0])}
                 />
-                <span id={fileHintId} className="block text-xs leading-5 text-[var(--color-text-muted)]">
-                    {imageOnly ? 'JPEG, PNG or WebP' : 'PDF, JPEG, PNG or WebP'} · Up to 10 MB
-                </span>
-                {fileValidationError && <span id={fileErrorId} role="alert" className="block text-sm text-[var(--color-danger)]">{fileValidationError}</span>}
-                {error && <span id={`${fileErrorId}-server`} role="alert" className="block text-sm text-[var(--color-danger)]">{error}</span>}
-            </label>
+                </label>
+                <p id={fileHintId} className="text-xs text-[var(--color-text-secondary)]">
+                    {imageOnly ? 'JPEG, PNG or WebP' : 'PDF, JPEG, PNG or WebP'} up to 10 MB.
+                </p>
+                {fileValidationError && (
+                    <p id={fileErrorId} role="alert" className="text-sm text-[var(--color-danger)]">{fileValidationError}</p>
+                )}
+            </div>
 
             {file && (
-                <div className="flex min-h-11 flex-wrap items-center justify-between gap-2 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] p-3 text-sm">
                     <span className="flex min-w-0 items-center gap-3">
                         {previewUrl ? (
                             <ImageThumbnail
                                 src={previewUrl}
                                 alt={file.name}
-                                onClick={handleOpenPreview}
-                                className="h-16 w-16 shrink-0"
+                                onClick={() => {
+                                    if (isPdf) {
+                                        setActivePdfPreview({ file, url: rawPdfUrl || previewUrl });
+                                    } else {
+                                        setViewingPreview(true);
+                                    }
+                                }}
+                                className="h-14 w-14 shrink-0 rounded border border-[var(--color-border)] cursor-pointer"
                             />
                         ) : (
-                            <button
+                            <Button
                                 type="button"
-                                onClick={handleOpenPreview}
-                                className="flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] text-xs font-semibold text-[var(--color-text-muted)] hover:border-[var(--color-primary)]"
+                                variant="secondary"
+                                onClick={() => {
+                                    if (isPdf) {
+                                        setActivePdfPreview({ file, url: rawPdfUrl || '' });
+                                    } else {
+                                        setViewingPreview(true);
+                                    }
+                                }}
+                                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] text-xs font-semibold text-[var(--color-text-muted)] hover:border-[var(--color-primary)] cursor-pointer"
                             >
                                 {isPdf ? 'PDF' : 'FILE'}
-                            </button>
+                            </Button>
                         )}
-                        <div className="min-w-0">
+                        <span className="min-w-0">
                             <span className="block truncate font-medium text-[var(--color-text-primary)]">{file.name}</span>
-                            <button
-                                type="button"
-                                onClick={handleOpenPreview}
-                                className="text-xs text-[var(--color-primary)] hover:underline focus-visible:outline-none"
-                            >
-                                {isPdf ? 'Preview full PDF' : 'Preview image'}
-                            </button>
-                        </div>
+                            <span className="block text-xs text-[var(--color-text-secondary)]">
+                                {(file.size / (1024 * 1024)).toFixed(2)} MB ·{' '}
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    onClick={() => {
+                                        if (isPdf) {
+                                            setActivePdfPreview({ file, url: rawPdfUrl || previewUrl || '' });
+                                        } else {
+                                            setViewingPreview(true);
+                                        }
+                                    }}
+                                    className="p-0 text-xs text-[var(--color-primary)]"
+                                >
+                                    {isPdf ? 'Preview full PDF' : 'Preview image'}
+                                </Button>
+                            </span>
+                        </span>
                     </span>
                     <Button
                         type="button"
-                        className="min-h-11"
-                        aria-label={`Remove selected ${section.label.toLowerCase()}`}
+                        size="sm"
+                        disabled={busy}
+                        aria-label={`Remove ${section.label}`}
                         onClick={() => {
                             choose(null);
                             setError('');
@@ -438,45 +435,6 @@ function DocumentUploadSection({
                     </Button>
                 </div>
             )}
-
-            <details ref={metadataDetails} className="text-sm">
-                <summary className="block min-h-11 cursor-pointer rounded py-2 text-[var(--color-text-secondary)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
-                    {recordDate || note ? 'Edit date or note' : 'Add date or note (optional)'}
-                </summary>
-                <div className="mt-3 space-y-3">
-                    <label className="block space-y-1">
-                        <span>Record date (optional)</span>
-                        <Input
-                            type="date"
-                            value={recordDate}
-                            ref={recordDateInput}
-                            aria-invalid={Boolean(dateError)}
-                            aria-describedby={dateError ? dateErrorId : undefined}
-                            onBlur={event => {
-                                if (event.target.validity.badInput) {
-                                    setDateError('Enter a valid record date.');
-                                    onDraftChange(true);
-                                } else setDateError('');
-                            }}
-                            onChange={event => {
-                                changeRecordDate(event.target.value);
-                                setDateError('');
-                            }}
-                        />
-                        {dateError && (
-                            <span id={dateErrorId} role="alert" className="block text-sm text-[var(--color-danger)]">{dateError}</span>
-                        )}
-                    </label>
-                    <FormField label="Note (optional)">
-                      <Textarea
-                            rows={2}
-                            maxLength={2000}
-                            value={note}
-                            onChange={event => changeNote(event.target.value)}
-                        />
-                    </FormField>
-                </div>
-            </details>
 
             <div className="flex flex-wrap gap-2">
                 <Button
@@ -495,9 +453,9 @@ function DocumentUploadSection({
                     disabled={busy}
                     onClick={onCancel}
                 >
-                    {draftActiveLabel(file, recordDate, note, Boolean(dateError)) ? 'Hide and keep draft' : 'Cancel'}
+                    {draftActiveLabel(file) ? 'Hide and keep draft' : 'Cancel'}
                 </Button>
-                {draftActiveLabel(file, recordDate, note, Boolean(dateError)) && (
+                {draftActiveLabel(file) && (
                     <Button
                         type="button"
                         variant="destructive"
@@ -528,6 +486,6 @@ function DocumentUploadSection({
     );
 }
 
-function draftActiveLabel(file: File | null, recordDate: string, note: string, hasDateError: boolean): boolean {
-    return Boolean(file || recordDate || note || hasDateError);
+function draftActiveLabel(file: File | null): boolean {
+    return Boolean(file);
 }
