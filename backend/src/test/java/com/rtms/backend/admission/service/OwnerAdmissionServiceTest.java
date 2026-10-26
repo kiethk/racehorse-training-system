@@ -353,4 +353,79 @@ class OwnerAdmissionServiceTest {
         when(admissions.isVisibleToGroom(5L, 41L, false, AdmissionStatus.GROOM_REVIEW)).thenReturn(true);
         assertDoesNotThrow(() -> service.assertViewerCanRead(5L, groom));
     }
+
+    // ── Edit before groom review ─────────────────────────────────────────────
+
+    private AdmissionApplication editable(Long ownerId) {
+        var application = new AdmissionApplication();
+        application.setId(3L);
+        application.setOwnerId(ownerId);
+        application.setStatus(AdmissionStatus.GROOM_REVIEW);
+        when(admissions.findByIdForUpdate(3L)).thenReturn(Optional.of(application));
+        var snapshot = new com.rtms.backend.admission.entity.CandidateHorseProfile();
+        snapshot.setAdmissionId(3L);
+        snapshot.setRegistrationNumber("250001AB1234567");
+        when(candidates.findByAdmissionId(3L)).thenReturn(Optional.of(snapshot));
+        return application;
+    }
+
+    @Test
+    void ownerCanEditBeforeGroomReviewAndReplaceADocumentAfterCommit() {
+        editable(7L);
+        var old = new AdmissionDocument();
+        old.setId(10L); old.setAdmissionId(3L);
+        old.setDocumentType(AdmissionDocumentType.HORSE_PHOTO); old.setFileUrl("local:old.png");
+        when(documents.findByAdmissionId(3L)).thenReturn(List.of(old));
+        when(files.store(any(), any())).thenReturn("local:new.png");
+        var photo = new MockMultipartFile("files", "new.png", "image/png", new byte[]{1});
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            var result = service.updateBeforeGroomReview(7L, 3L, request(),
+                    List.of(AdmissionDocumentType.HORSE_PHOTO), List.of(photo));
+
+            assertEquals("Pegasus", result.candidate().name());
+            verify(documents).deleteAll(List.of(old));
+            verify(documents).save(argThat(d -> "local:new.png".equals(d.getFileUrl())));
+            // UELN unchanged: this admission must not conflict with itself.
+            verify(uelnPolicy, never()).assertAvailableForSubmission(any());
+            verify(files, never()).delete("local:old.png");
+            org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            verify(files).delete("local:old.png");
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void editIsRefusedOnceAGroomHasReviewedOrForAnotherOwner() {
+        AdmissionApplication application = editable(7L);
+        assertThrows(AccessDeniedException.class,
+                () -> service.updateBeforeGroomReview(8L, 3L, request(), null, null));
+
+        application.setGroomId(99L);
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.updateBeforeGroomReview(7L, 3L, request(), null, null));
+        assertEquals(409, error.getStatusCode().value());
+        verify(candidates, never()).save(any());
+        verifyNoInteractions(files);
+    }
+
+    @Test
+    void changingTheUelnChecksThatTheNewOneIsFree() {
+        editable(7L).getId();
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            var changed = new CreateOwnerAdmissionRequest("Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
+                    HorseSex.MALE, "250001AB7654321", "SIRE", "Sire", null, "Dam", null, null);
+            service.updateBeforeGroomReview(7L, 3L, changed, null, null);
+            verify(uelnPolicy).assertAvailableForSubmission("250001AB7654321");
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
 }

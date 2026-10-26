@@ -10,7 +10,8 @@ import { admissionsApi } from '../services/api';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
-import { AdmissionInfoSection, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { AdmissionInfoSection, AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { EditAdmissionModal } from './EditAdmissionModal';
 import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 
@@ -39,6 +40,7 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
   const [detail, setDetail] = useState<OwnerAdmissionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -95,6 +97,16 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
         returnTo="/owner/admissions"
         header={<AdmissionDetailHeader detail={{ ...detail, ownerId: user?.userId, ownerName: user?.fullName }} horsePhotoUrl={photo ? admissionsApi.assetUrl(photo.fileUrl) : undefined} />}
         pipeline={<AdmissionPipeline detail={detail} />}
+        sidebar={detail.status === 'GROOM_REVIEW' ? (
+          <AdmissionSideCard title="Waiting for groom review">
+            <p className="text-[var(--color-text-secondary)]">
+              You can still change the horse details and replace or add documents until a groom reviews this application.
+            </p>
+            <Button type="button" variant="primary" icon="file-text" className="w-full" onClick={() => setEditing(true)}>
+              Edit application
+            </Button>
+          </AdmissionSideCard>
+        ) : undefined}
         content={(
           <AdmissionDetailTabs
             tabs={[
@@ -142,6 +154,13 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
           />
         )}
       />
+      {editing && (
+        <EditAdmissionModal
+          detail={detail}
+          onClose={() => setEditing(false)}
+          onSaved={(updated) => { setDetail(updated); setEditing(false); }}
+        />
+      )}
     </div>
   );
 }

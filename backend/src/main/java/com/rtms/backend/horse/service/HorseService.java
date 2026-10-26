@@ -404,7 +404,9 @@ public class HorseService {
                 );
             }
         } else if (targetStatus == HorseStatus.ELIGIBLE) {
-            // Restore to ELIGIBLE: assign to a regular stall
+            // Restore to ELIGIBLE: assign to a regular stall. Take the shared stall-row locks first so the
+            // fair pick cannot race another allocation for the same "least loaded" groom.
+            stableStallRepository.lockAdmissionCapacityStallsForUpdate();
             StableStall regularStall;
             if (request.stallId() != null) {
                 regularStall = stableStallRepository
@@ -413,7 +415,7 @@ public class HorseService {
                                 "The selected regular stall is no longer available."));
             } else {
                 regularStall = stableStallRepository
-                        .findFirstAvailableRegularStallForUpdate()
+                        .findFairAvailableStallForUpdate("REGULAR")
                         .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "NO_AVAILABLE_STALL",
                                 "Cannot restore horse: No regular stalls are currently available. Please free a stall before restoring this horse."));
             }

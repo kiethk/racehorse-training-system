@@ -5,6 +5,7 @@ import com.rtms.backend.admission.dto.AdmissionSummaryResponse;
 import com.rtms.backend.admission.dto.AdmissionUelnAvailabilityResponse;
 import com.rtms.backend.admission.dto.CreateOwnerAdmissionRequest;
 import com.rtms.backend.admission.dto.OwnerAdmissionDetailResponse;
+import com.rtms.backend.admission.enums.AdmissionDocumentType;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.common.dto.ApiResponse;
 
@@ -81,5 +82,24 @@ public class OwnerAdmissionController {
     public ApiResponse<List<AdmissionDocumentResponse>> documents(
             @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser owner) {
         return ApiResponse.success(service.getMyDocuments(owner.getUserId(), id));
+    }
+
+    /**
+     * Edit the candidate details and replace or add documents while no groom has reviewed the
+     * application yet; 409 once the review has started.
+     */
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(
+            "hasAuthority('ADMISSION_APPLICATION_CREATE')"
+            + " and hasAuthority('ADMISSION_DOCUMENT_CREATE')"
+            + " and principal.role == 'HORSE_OWNER'"
+    )
+    public ApiResponse<OwnerAdmissionDetailResponse> update(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser owner,
+            @Valid @RequestPart("candidate") CreateOwnerAdmissionRequest request,
+            @RequestPart(value = "documentTypes", required = false) List<AdmissionDocumentType> documentTypes,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        return ApiResponse.success(service.updateBeforeGroomReview(owner.getUserId(), id, request, documentTypes, files));
     }
 }

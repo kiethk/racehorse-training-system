@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { EmptyState, IconButton, Notice, Panel, Pill, SegmentedControl, Spinner } from '@/components/ui';
 import type { Area, Horse, StableStall } from '../../types';
 import { AreaPicker } from './AreaPicker';
@@ -38,10 +38,15 @@ interface StableMapViewProps extends StableFloorPlanProps {
   onMoveHorse?: (horse: Horse, to: StableStall) => void;
   /** Extra note after the colour key. */
   legendNote?: ReactNode;
+  /**
+   * Details of the selected stall. The map always uses the full width: in 3D this floats over the right
+   * edge of the barn (also in full screen); in the plan it opens a side column only while something is selected.
+   */
+  detail?: ReactNode;
 }
 
 /** The stable map with two views of the same data: the 2D plan (default, accessible) and the 3D barn. */
-export function StableMapView({ personName, currentUserId, onMoveHorse, legendNote, ...plan }: StableMapViewProps) {
+export function StableMapView({ personName, currentUserId, onMoveHorse, legendNote, detail, ...plan }: StableMapViewProps) {
   const { areas, stalls, horseByStallId, selectedStallId, onSelectStall, ownStallIds, lockOthers, lens } = plan;
   const [view, setView] = useState<StableView>('plan');
   const [unavailable, setUnavailable] = useState(false);
@@ -49,6 +54,20 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
   const [resetSignal, setResetSignal] = useState(0);
   const [pickedAreaId, setPickedAreaId] = useState<number | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const barnPanel = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  // The canvas resizes itself to the panel, so fullscreen simply makes the barn fill the screen.
+  useEffect(() => {
+    const sync = () => setFullscreen(document.fullscreenElement === barnPanel.current && barnPanel.current != null);
+    document.addEventListener('fullscreenchange', sync);
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void barnPanel.current?.requestFullscreen?.();
+  };
 
   // Restored after mount: localStorage does not exist on the server render.
   useEffect(() => {
@@ -121,6 +140,7 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
               options={[{ value: 'isometric', label: 'Isometric' }, { value: 'top', label: 'Top' }]}
             />
             <IconButton icon="rotate" label="Show the whole barn" size="sm" variant="secondary" onClick={() => setResetSignal((n) => n + 1)} />
+            <IconButton icon="maximize" label="Full screen" size="sm" variant="secondary" onClick={toggleFullscreen} />
           </div>
         )}
       </div>
@@ -134,13 +154,25 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
       <StableLegend>{legendNote ?? ownNote}</StableLegend>
 
       {!is3d ? (
-        <StableFloorPlan {...plan} />
+        detail ? (
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+            <StableFloorPlan {...plan} />
+            {detail}
+          </div>
+        ) : (
+          <StableFloorPlan {...plan} />
+        )
       ) : !area ? (
         <Panel padded>
           <EmptyState icon="building" title={plan.emptyTitle ?? 'No stable areas to show'} description={plan.emptyDescription} />
         </Panel>
       ) : (
-        <Panel className="relative h-[clamp(28rem,calc(100vh-18rem),44rem)] overflow-hidden">
+        <Panel
+          ref={barnPanel}
+          className={fullscreen
+            ? 'relative h-screen w-screen overflow-hidden rounded-none'
+            : 'relative h-[clamp(34rem,calc(100vh-13rem),60rem)] overflow-hidden'}
+        >
           {areaStalls.length === 0 ? (
             <EmptyState icon="building" title={`${area.name} has no stalls yet`} />
           ) : (
@@ -167,12 +199,27 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, legendNo
               {area.type === 'QUARANTINE' && <Pill tone="warning" size="sm" icon="shield">Quarantine</Pill>}
               <span className="text-xs text-[var(--color-text-muted)]">{occupied} of {lockOthers ? 'your ' : ''}{countedStalls.length} occupied</span>
             </div>
+            <div className="flex items-start gap-2">
             <p data-scene-overlay className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] shadow-[var(--shadow-panel)]">
               {hint ?? (onMoveHorse
                 ? 'Drag to orbit · Scroll to zoom · Click a stall · Drag a horse to an empty stall'
                 : 'Drag to orbit · Scroll to zoom · Click a stall or a groom in the key')}
             </p>
+            {fullscreen && (
+              <span data-scene-overlay className="pointer-events-auto">
+                <IconButton icon="minimize" label="Exit full screen" size="sm" variant="secondary" onClick={toggleFullscreen} />
+              </span>
+            )}
+            </div>
           </div>
+          {detail && (
+            <div
+              data-scene-overlay
+              className="absolute bottom-3 right-3 top-14 z-10 w-[min(22rem,calc(100%-1.5rem))] overflow-y-auto overscroll-contain rounded-[var(--radius-lg)] shadow-[var(--shadow-popover)]"
+            >
+              {detail}
+            </div>
+          )}
         </Panel>
       )}
     </div>

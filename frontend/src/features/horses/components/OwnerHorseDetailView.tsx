@@ -33,7 +33,9 @@ import type { Horse } from '@/features/stable/types';
 import type { HorseDocumentSlot, HorseEditRequest, HorseHealthMetric, HorsePedigree, HorseSpecialty } from '../types';
 import { horseEditRequestService } from '../services/horseEditRequestService';
 import { DocumentSlotGrid } from './DocumentSlotGrid';
-import { EditHorseRequestModal } from './EditHorseRequestModal';
+import { EditHorseRequestModal, initialFields } from './EditHorseRequestModal';
+import { normalizeFields } from '../lib/horseEdit';
+import type { HorseDocumentType } from '../types';
 import { toast } from '@/lib/toast';
 import type { HorseAlert, HorseFitnessTrendItem } from '@/features/training/types';
 import type { RaceRegistrationResponse } from '@/features/racing/types';
@@ -71,6 +73,9 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
   const [editing, setEditing] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  // Documents picked directly on the page (no popup), sent as a documents-only change request.
+  const [pageFiles, setPageFiles] = useState<Partial<Record<HorseDocumentType, File>>>({});
+  const [submittingFiles, setSubmittingFiles] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -140,6 +145,24 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
     }
   };
 
+  const submitPageFiles = async () => {
+    if (!horse) return;
+    setSubmittingFiles(true);
+    try {
+      const uploads = (Object.entries(pageFiles) as [HorseDocumentType, File][])
+        .map(([documentType, file]) => ({ documentType, file }));
+      // Details are sent unchanged, so only the documents are up for review.
+      const request = await horseEditRequestService.submit(horse.id, normalizeFields(initialFields(horse, pedigree)), uploads);
+      setLatestRequest(request);
+      setPageFiles({});
+      toast.success('Documents sent for review', 'They replace the current ones once the groom approves.');
+    } catch (cause) {
+      toast.error('Documents not sent', displayError(cause, 'Unable to submit the documents.'));
+    } finally {
+      setSubmittingFiles(false);
+    }
+  };
+
   if (loading) {
     return (
       <ScreenLayout variant="detail">
@@ -170,6 +193,10 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
   }
 
   const pendingRequest = latestRequest?.status === 'PENDING';
+  const canEdit = horse.currentStatus === 'ELIGIBLE' && !pendingRequest;
+  const editBlockedReason = horse.currentStatus !== 'ELIGIBLE'
+    ? 'Details and documents can be edited once the horse is eligible.'
+    : pendingRequest ? 'A change request is already waiting for groom review.' : null;
 
   return (
     <ScreenLayout variant="detail">
@@ -211,16 +238,18 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
             <span className="text-[13px] font-medium text-[var(--color-text-primary)]">
               {horse.currentStallId ? `Stall #${horse.currentStallId}` : 'Not assigned to a stall'}
             </span>
-            {horse.currentStatus === 'ELIGIBLE' && (
-              <Button
-                size="sm"
-                icon="file-text"
-                disabled={pendingRequest}
-                title={pendingRequest ? 'A change request is already waiting for review.' : undefined}
-                onClick={() => setEditing(true)}
-              >
-                Edit details
-              </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              icon="file-text"
+              disabled={!canEdit}
+              title={editBlockedReason ?? undefined}
+              onClick={() => setEditing(true)}
+            >
+              Edit horse profile
+            </Button>
+            {editBlockedReason && (
+              <span className="max-w-[16rem] text-[11px] text-[var(--color-text-muted)] sm:text-right">{editBlockedReason}</span>
             )}
           </div>
         </div>
@@ -307,11 +336,35 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
           <HorsePedigreeCard pedigree={pedigree} />
 
           <Panel padded>
-            <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
+            <h3 className="mb-1 text-[14px] font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
               <Icon name="file-text" size={16} className="text-[var(--color-primary)]" />
               Documents
             </h3>
-            <DocumentSlotGrid slots={documentSlots} />
+            <p className="mb-3 text-xs text-[var(--color-text-muted)]">
+              {editBlockedReason ?? 'Replace a document or add a missing one. Changes apply after the groom approves them.'}
+            </p>
+            <DocumentSlotGrid
+              slots={documentSlots}
+              chosen={pageFiles}
+              onChoose={canEdit ? (type, file) => setPageFiles((prev) => {
+                const next = { ...prev };
+                if (file) next[type] = file; else delete next[type];
+                return next;
+              }) : undefined}
+            />
+            {Object.keys(pageFiles).length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-3">
+                <span className="text-sm text-[var(--color-text-secondary)]">
+                  {Object.keys(pageFiles).length} document change(s) ready. The groom reviews them before they apply.
+                </span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="tertiary" disabled={submittingFiles} onClick={() => setPageFiles({})}>Discard</Button>
+                  <Button size="sm" variant="primary" loading={submittingFiles} onClick={() => void submitPageFiles()}>
+                    Submit for review
+                  </Button>
+                </div>
+              </div>
+            )}
           </Panel>
         </div>
       )}

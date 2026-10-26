@@ -1,10 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, FileInput, Icon, Pill } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/display';
 import { AdmissionDocumentPreview } from '@/features/admissions/shared/components/AdmissionDocumentPreview';
+import { LocalFilePreviewModal } from '@/features/admissions/shared/components/LocalFilePreviewModal';
+import { LocalDocumentThumb, StoredDocumentThumb } from './DocumentThumb';
 import { buildSlotStates, documentTypeLabel, validateDocumentFile, type SlotState } from '../lib/horseEdit';
 import type { HorseDocumentSlot, HorseDocumentType } from '../types';
 
@@ -13,6 +15,8 @@ interface DocumentSlotGridProps {
   /** Files picked in this form, not uploaded yet. Omit for a read-only grid. */
   chosen?: Partial<Record<HorseDocumentType, File>>;
   onChoose?: (type: HorseDocumentType, file: File | null) => void;
+  /** Show only these document types (e.g. the ones a change request touches) instead of all eight. */
+  onlyTypes?: ReadonlySet<HorseDocumentType>;
 }
 
 /**
@@ -20,11 +24,13 @@ interface DocumentSlotGridProps {
  * upload target. A new file stays local until the change request is submitted, and only becomes
  * the horse's document once the groom approves it.
  */
-export function DocumentSlotGrid({ slots, chosen, onChoose }: DocumentSlotGridProps) {
+export function DocumentSlotGrid({ slots, chosen, onChoose, onlyTypes }: DocumentSlotGridProps) {
   const editable = Boolean(onChoose);
   const [errors, setErrors] = useState<Partial<Record<HorseDocumentType, string>>>({});
   const [preview, setPreview] = useState<HorseDocumentSlot | null>(null);
-  const states = buildSlotStates(slots, chosen ?? {});
+  const [localPreview, setLocalPreview] = useState<File | null>(null);
+  const states = buildSlotStates(slots, chosen ?? {})
+    .filter((state) => !onlyTypes || onlyTypes.has(stateType(state)));
 
   const pick = (type: HorseDocumentType, file: File | undefined) => {
     if (!file) return;
@@ -44,7 +50,9 @@ export function DocumentSlotGrid({ slots, chosen, onChoose }: DocumentSlotGridPr
             error={errors[stateType(state)]}
             onPick={(file) => pick(stateType(state), file)}
             onUndo={() => onChoose?.(stateType(state), null)}
+            file={chosen?.[stateType(state)] ?? null}
             onView={setPreview}
+            onPreviewLocal={setLocalPreview}
           />
         ))}
       </ul>
@@ -64,21 +72,37 @@ export function DocumentSlotGrid({ slots, chosen, onChoose }: DocumentSlotGridPr
           onClose={() => setPreview(null)}
         />
       )}
+      {localPreview && <LocalPreview file={localPreview} onClose={() => setLocalPreview(null)} />}
     </>
   );
+}
+
+/** Lightbox for a file picked but not submitted yet; the object URL lives only while it is open. */
+function LocalPreview({ file, onClose }: { file: File; onClose: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+  return url ? <LocalFilePreviewModal file={file} previewUrl={url} onClose={onClose} /> : null;
 }
 
 function stateType(state: SlotState): HorseDocumentType {
   return state.kind === 'current' ? state.slot.documentType : state.type;
 }
 
-function SlotTile({ state, editable, error, onPick, onUndo, onView }: {
+function SlotTile({ state, editable, error, file, onPick, onUndo, onView, onPreviewLocal }: {
   state: SlotState;
   editable: boolean;
   error?: string;
+  /** The picked file behind a pending tile. */
+  file: File | null;
   onPick: (file: File | undefined) => void;
   onUndo: () => void;
   onView: (slot: HorseDocumentSlot) => void;
+  onPreviewLocal: (file: File) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const type = stateType(state);
@@ -109,12 +133,25 @@ function SlotTile({ state, editable, error, onPick, onUndo, onView }: {
           {state.kind === 'pending' && (
             <p className="truncate text-xs text-[var(--color-text-muted)]">{state.fileName}</p>
           )}
-          {state.kind === 'empty' && <p className="text-xs text-[var(--color-text-muted)]">No file yet</p>}
         </div>
         {state.kind === 'pending' && (
           <Pill tone="info" size="sm">{state.replaces ? 'Replacement' : 'New'}</Pill>
         )}
       </div>
+
+      {state.kind === 'current' && state.slot.fileUrl && (
+        <StoredDocumentThumb fileUrl={state.slot.fileUrl} documentType={type}
+          fileName={state.slot.originalFileName} onOpen={() => onView(state.slot)} />
+      )}
+      {state.kind === 'pending' && file && (
+        <LocalDocumentThumb file={file} onOpen={() => onPreviewLocal(file)} />
+      )}
+      {state.kind === 'empty' && (
+        <div className="flex h-44 flex-col items-center justify-center gap-1 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
+          <Icon name={type === 'HORSE_PHOTO' ? 'image' : 'file-text'} size={24} />
+          No file yet
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {state.kind === 'current' && (

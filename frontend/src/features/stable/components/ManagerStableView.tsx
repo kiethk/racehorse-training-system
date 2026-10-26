@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, ConfirmDialog, EmptyState, IconButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, Tabs } from '@/components/ui';
+import { Button, ConfirmDialog, EmptyState, IconButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, SegmentedControl, Tabs } from '@/components/ui';
 import type { Area, AreaType, StableStall } from '../types';
 import type { AssignmentDraft, AssignmentTarget, DragStaff } from '../types/manager';
 import { useManagerStable } from '../hooks/useManagerStable';
 import { areaView, compareAreas, editCount, horseMap, overlayDraft, personName, planAssignment } from '../lib/managerAssignments';
 import { StallDetailPanel } from '../shared/components/StallDetailPanel';
+import { StableMapView } from '../shared/components/StableMapView';
 import { AreaCard } from './AreaCard';
 import { StableStaffPanel } from './StableStaffPanel';
 import { StaffAssignmentPicker } from './StaffAssignmentPicker';
@@ -32,6 +33,8 @@ function ManagerStableContent() {
   const [pendingAction, setPendingAction] = useState<{ run: () => void } | null>(null);
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Area | null>(null);
+  // Cards hold the drag-and-drop staffing; the map shows the same (draft) state as a plan or 3D barn.
+  const [layout, setLayout] = useState<'cards' | 'map'>('cards');
   const count = data && draft ? editCount(data, draft) : 0;
   const dirty = count > 0;
   const busy = loading || saving || creating || deleting;
@@ -82,10 +85,13 @@ function ManagerStableContent() {
   const totalStalls = views.reduce((n, v) => n + v.stalls.length, 0);
   const projected = data && draft ? overlayDraft(data, draft) : null;
   const selected = projected?.stalls.find(s => s.id === selectedStall?.id) ?? null;
+  const mapAreas = projected ? projected.areas.filter(a => a.type === activeTab) : [];
 
   return (
     <ScreenLayout variant="dashboard">
       <PageHeader title="Stable" actions={<div className="flex items-center gap-2">
+        <SegmentedControl<'cards' | 'map'> label="Layout" value={layout} onChange={(next) => { setLayout(next); setSelectedStaff(null); cancelDrag(); }}
+          options={[{ value: 'cards', label: 'Cards', icon: 'grid' }, { value: 'map', label: 'Map', icon: 'layers' }]} />
         <Button size="sm" variant="secondary" icon="refresh" disabled={busy} loading={loading && !!data}
           onClick={() => guard(() => { void reload(); })}>Refresh</Button>
         <Button size="sm" variant="primary" icon="plus" disabled={busy || needsReload || !data} loading={creating}
@@ -117,6 +123,24 @@ function ManagerStableContent() {
           <span>{personName(data, selectedStaff.kind, selectedStaff.personId)} · Choose {selectedStaff.kind === 'trainer' ? 'an area' : 'a block'}</span>
           <IconButton icon="x" label="Cancel staff selection" size="sm" onClick={() => setSelectedStaff(null)} />
         </div>}
+        {layout === 'map' && projected ? (
+          <StableMapView
+            lens="trainer"
+            areas={mapAreas}
+            stalls={projected.stalls}
+            horseByStallId={horses}
+            selectedStallId={selectedStall?.id ?? null}
+            onSelectStall={setSelectedStall}
+            personName={(kind, id) => personName(projected, kind, id)}
+            legendNote={dirty ? 'Unsaved staffing changes are shown on the map.' : undefined}
+            emptyTitle="No areas yet"
+            cellFooter={(stall) => (
+              <span className="block truncate text-xs text-[var(--color-text-secondary)]">
+                {stall.groomId ? personName(projected, 'groom', stall.groomId) : <span className="italic text-[var(--color-text-muted)]">No groom</span>}
+              </span>
+            )}
+          />
+        ) : (
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_15rem]">
           <div className="min-w-0">
             {displayed.length ? <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -131,6 +155,7 @@ function ManagerStableContent() {
             selected={selectedStaff} canReturn={canReturn} onSelect={setSelectedStaff}
             onReturn={staff => { if (staff.source) propose(staff.source, null); }} />
         </div>
+        )}
         {dirty && <Panel className="sticky bottom-4 z-10 flex items-center justify-between gap-3 px-4 py-3 shadow-[var(--shadow-popover)]">
           <div className="flex items-center gap-2 text-sm"><Pill tone="primary" size="sm">{count}</Pill>Pending {count === 1 ? 'change' : 'changes'}</div>
           <div className="flex gap-2">

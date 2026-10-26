@@ -21,7 +21,7 @@ public class GroomProfile {
     @Column(name = "trainer_id")
     private Long trainerId;
 
-    /** Lần gần nhất Groom nhận một ngựa mới vào chuồng của mình; NULL = chưa từng nhận (V202610261100). */
+    /** Lần gần nhất Groom nhận một ngựa mới vào chuồng của mình; NULL = chưa từng nhận (V202610261300). */
     @Column(name = "last_horse_assigned_at")
     private java.time.LocalDateTime lastHorseAssignedAt;
 

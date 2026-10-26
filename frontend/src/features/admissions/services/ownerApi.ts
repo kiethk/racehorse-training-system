@@ -78,6 +78,18 @@ export const ownerAdmissionApi = {
     if (!result?.success) throw new Error(result?.message || 'Unable to submit admission.');
     return result.data;
   },
+  /** Edit details and replace/add documents while no groom has reviewed the application (409 afterwards). */
+  update: async (id: number, candidate: CreateOwnerAdmissionRequest, uploads: { documentType: string; file: File }[]) => {
+    const body = new FormData();
+    body.append('candidate', new Blob([JSON.stringify(candidate)], { type: 'application/json' }));
+    if (uploads.length > 0) {
+      body.append('documentTypes', new Blob([JSON.stringify(uploads.map(u => u.documentType))], { type: 'application/json' }));
+      uploads.forEach(upload => body.append('files', upload.file));
+    }
+    const result = await apiUpload<ApiResponse<OwnerAdmissionDetail>>(`/api/owner/admissions/${id}`, body, 'PUT');
+    if (!result?.success) throw new Error(result?.message || 'Unable to update the application.');
+    return result.data;
+  },
   scanOcr: async (file: File, documentType: string) => {
     const body = new FormData();
     body.append('file', file);

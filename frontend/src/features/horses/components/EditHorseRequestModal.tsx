@@ -20,7 +20,7 @@ interface EditHorseRequestModalProps {
   onSubmitted: (request: HorseEditRequest) => void;
 }
 
-function initialFields(horse: Horse, pedigree: HorsePedigree | null): HorseEditFields {
+export function initialFields(horse: Horse, pedigree: HorsePedigree | null): HorseEditFields {
   return {
     name: horse.name ?? '',
     breed: horse.breed ?? '',
