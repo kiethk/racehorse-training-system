@@ -28,7 +28,20 @@ export async function fetchProtectedBlobUrl(source: string, signal?: AbortSignal
   if (existing) return existing;
 
   const promise = apiGetBlob(source, signal)
-    .then((blob) => {
+    .then((rawBlob) => {
+      let blob = rawBlob;
+      if (!blob.type || blob.type === 'application/octet-stream') {
+        const clean = source.split('?')[0].toLowerCase();
+        if (clean.endsWith('.pdf')) {
+          blob = new Blob([rawBlob], { type: 'application/pdf' });
+        } else if (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) {
+          blob = new Blob([rawBlob], { type: 'image/jpeg' });
+        } else if (clean.endsWith('.png')) {
+          blob = new Blob([rawBlob], { type: 'image/png' });
+        } else if (clean.endsWith('.webp')) {
+          blob = new Blob([rawBlob], { type: 'image/webp' });
+        }
+      }
       const url = URL.createObjectURL(blob);
       cacheBlobUrl(source, url);
       inFlightRequests.delete(source);

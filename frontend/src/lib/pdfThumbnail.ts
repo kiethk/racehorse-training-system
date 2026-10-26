@@ -8,7 +8,7 @@ type PdfJs = typeof import('pdfjs-dist');
 let pdfjs: Promise<PdfJs> | null = null;
 
 /** pdf.js is large, so it is only downloaded the first time a PDF thumbnail is needed. */
-function loadPdfJs(): Promise<PdfJs> {
+export function loadPdfJs(): Promise<PdfJs> {
   pdfjs ??= import('pdfjs-dist').then((module) => {
     // Parsing runs in a worker so a big PDF never blocks the page.
     module.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
