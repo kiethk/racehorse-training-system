@@ -5,7 +5,6 @@ import {
   Button,
   DataTable,
   FilterBar,
-  FilterChips,
   FormField,
   MetricCard,
   Notice,
@@ -25,14 +24,26 @@ import type {
 import { CompleteVaccinationModal } from './CompleteVaccinationModal';
 import { DueStatusPill } from './preventiveDisplay';
 
-type Filter = 'ACTION' | 'OVERDUE' | 'DUE_SOON' | 'OK';
+type Filter = 'ALL' | 'ACTION' | 'OVERDUE' | 'DUE_SOON' | 'OK';
 
+// "All" lists every real status; NONE (protocol not applicable) is never a row. An empty list would make the
+// server fall back to its default "needs action" set, so All is sent explicitly.
 const FILTER_STATUSES: Record<Filter, PreventiveDueStatus[]> = {
+  ALL: ['OVERDUE', 'MISSING', 'DUE_SOON', 'OK'],
   ACTION: ['OVERDUE', 'MISSING', 'DUE_SOON'],
   OVERDUE: ['OVERDUE', 'MISSING'],
   DUE_SOON: ['DUE_SOON'],
   OK: ['OK'],
 };
+const FILTER_OPTIONS: { value: Filter; label: string }[] = [
+  { value: 'ALL', label: 'All' },
+  { value: 'ACTION', label: 'Needs action' },
+  { value: 'OVERDUE', label: 'Overdue' },
+  { value: 'DUE_SOON', label: 'Due soon' },
+  { value: 'OK', label: 'Up to date' },
+];
+/** Most urgent first, matching the order the server returns rows in. */
+const URGENCY: Record<PreventiveDueStatus, number> = { OVERDUE: 0, MISSING: 1, DUE_SOON: 2, OK: 3, NONE: 4 };
 const PAGE_SIZE = 20;
 const SEARCH_DELAY_MS = 300;
 
@@ -45,7 +56,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
   const [rows, setRows] = useState<PreventiveDueHorse[]>([]);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<PreventiveDueSummary | null>(null);
-  const [filter, setFilter] = useState<Filter>('ACTION');
+  const [filter, setFilter] = useState<Filter>('ALL');
   const [protocolId, setProtocolId] = useState<number | undefined>();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -92,6 +103,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
     {
       id: 'horse',
       header: 'Horse',
+      sortValue: (row) => row.horseName?.toLowerCase(),
       render: (row) => (
         <div className="flex items-center gap-2">
           <span className="font-semibold">{row.horseName}</span>
@@ -109,9 +121,11 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
     {
       id: 'nextDue',
       header: 'Next due',
+      // "Now" (no date yet) sorts before any dated dose.
+      sortValue: (row) => row.earliestDueOn ?? '',
       render: (row) => <span className="whitespace-nowrap">{row.earliestDueOn ? formatDate(row.earliestDueOn) : 'Now'}</span>,
     },
-    { id: 'status', header: 'Status', render: (row) => <DueStatusPill status={row.worstStatus} /> },
+    { id: 'status', header: 'Status', sortValue: (row) => URGENCY[row.worstStatus], render: (row) => <DueStatusPill status={row.worstStatus} /> },
   ];
   if (canRecord) {
     columns.push({
@@ -161,17 +175,11 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
             ))}
           </Select>
         </FormField>
-        <FilterChips<Filter>
-          label="Status"
-          value={filter}
-          onChange={changeFilter}
-          options={[
-            { value: 'ACTION', label: 'Needs action' },
-            { value: 'OVERDUE', label: 'Overdue' },
-            { value: 'DUE_SOON', label: 'Due soon' },
-            { value: 'OK', label: 'Up to date' },
-          ]}
-        />
+        <FormField label="Status" className="w-48">
+          <Select value={filter} onChange={(e) => changeFilter(e.target.value as Filter)}>
+            {FILTER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </Select>
+        </FormField>
         <Button type="button" variant="secondary" icon="refresh" onClick={load} disabled={loading}>Refresh</Button>
       </FilterBar>
 
@@ -184,7 +192,9 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
         loading={loading}
         ariaLabel="Horses needing preventive care"
         emptyTitle={search ? 'No horse matches this search' : 'Nothing here'}
-        emptyDescription={filter === 'OK' ? 'No horse is up to date for this filter yet.' : 'Every horse is covered for this filter.'}
+        emptyDescription={filter === 'ALL'
+          ? 'No horse has a preventive care record for this filter yet.'
+          : filter === 'OK' ? 'No horse is up to date for this filter yet.' : 'Every horse is covered for this filter.'}
         pagination={{ page, pageSize: PAGE_SIZE, total, onPageChange: setPage, disabled: loading }}
       />
 

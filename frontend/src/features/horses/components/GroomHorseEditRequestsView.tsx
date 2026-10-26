@@ -125,12 +125,10 @@ export function GroomHorseEditRequestsView() {
   ];
 
   const title = 'Horse change requests';
-  const description = 'Owners ask to update details or documents of horses in your stalls. Changes apply only after you approve them.';
-
-  if (loading && !items) return <AdmissionListLayout title={title} description={description}><ListSkeleton rows={8} /></AdmissionListLayout>;
+  if (loading && !items) return <AdmissionListLayout title={title} ><ListSkeleton rows={8} /></AdmissionListLayout>;
   if (error && !items) {
     return (
-      <AdmissionListLayout title={title} description={description}>
+      <AdmissionListLayout title={title} >
         <EmptyState icon="alert-triangle" title="Unable to load change requests" description={error}
           action={<Button size="sm" onClick={() => void load()}>Retry</Button>} />
       </AdmissionListLayout>
@@ -139,7 +137,7 @@ export function GroomHorseEditRequestsView() {
 
   const filtered = (items?.length ?? 0) > 0;
   return (
-    <AdmissionListLayout title={title} description={description}>
+    <AdmissionListLayout title={title} >
       <AdmissionFilterBar
         search={draft.search}
         searchLabel="Search"

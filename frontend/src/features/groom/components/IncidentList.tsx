@@ -133,9 +133,6 @@ export function IncidentList() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             Incident Reports
           </h1>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            Monitor unusual horse health conditions and veterinary follow-up.
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
