@@ -1,4 +1,5 @@
 'use client';
+import { hydrationStatusLabel } from '@/features/health/lib/hydrationStatus';
 
 import { EmptyState, MetricCard, Panel } from '@/components/ui';
 import type { HorseHealthMetric } from '@/features/horses/types';
@@ -41,7 +42,7 @@ export function HorseVitalsPanel({ metrics }: { metrics: HorseHealthMetric[] }) 
       <dl className="grid grid-cols-2 gap-3 border-t border-[var(--color-border)] pt-3 text-sm sm:grid-cols-3">
         <div>
           <dt className="text-xs text-[var(--color-text-muted)]">Hydration</dt>
-          <dd className="font-medium text-[var(--color-text-primary)]">{latest.hydrationStatus || '—'}</dd>
+          <dd className="font-medium text-[var(--color-text-primary)]">{hydrationStatusLabel(latest.hydrationStatus) || '—'}</dd>
         </div>
         <div>
           <dt className="text-xs text-[var(--color-text-muted)]">Body condition score</dt>

@@ -11,6 +11,7 @@ import { HorseAvatar } from "@/components/ui/HorseAvatar";
 import { Icon } from "@/components/ui/Icon";
 import { EmptyState, ListSkeleton } from "@/components/ui/states";
 import { Notice } from "@/components/ui/Notice";
+import { useAuth } from "@/context/AuthContext";
 import { admissionsApi } from "@/features/admissions/services/api";
 import { stableApi } from "@/features/stable/services/stableService";
 import { CreateRoutineModal } from "@/features/care/shared/components/CreateRoutineModal";
@@ -33,6 +34,9 @@ function getTodayLocalDate(): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Watchlist rows shown before the "View all" toggle. */
+const WATCHLIST_PREVIEW_COUNT = 4;
+
 function formatAppointmentTime(scheduledAt?: string | null): string {
   if (!scheduledAt) return "--:--";
   const date = new Date(scheduledAt);
@@ -46,6 +50,7 @@ function formatAppointmentTime(scheduledAt?: string | null): string {
 
 export function VetDashboardView() {
   const router = useRouter();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +62,9 @@ export function VetDashboardView() {
 
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
 
+  // The watchlist can hold the whole quarantine row; collapsed to a few rows by default.
+  const [showAllWatchlist, setShowAllWatchlist] = useState(false);
+
   const todayLocal = useMemo(() => getTodayLocalDate(), []);
 
   const loadData = useCallback(async () => {
@@ -64,11 +72,13 @@ export function VetDashboardView() {
       setLoading(true);
       setError(null);
 
+      // The vet's command center reflects only their own clinical work;
+      // the BLOCKED watchlist stays stable-wide (a horse state, not an assignment).
       const [summaryRes, todayRes, urgentRes, horsesRes, stallsRes] =
         await Promise.all([
           admissionsApi.getVetQueueSummary(),
-          admissionsApi.getCareSchedules({ date: todayLocal, size: 50 }),
-          admissionsApi.getCareSchedules({ careType: "URGENT", size: 50 }),
+          admissionsApi.getCareSchedules({ date: todayLocal, size: 50, veterinarianId: user?.userId }),
+          admissionsApi.getCareSchedules({ careType: "URGENT", size: 50, veterinarianId: user?.userId }),
           stableApi.getHorses(),
           stableApi.getStalls(),
         ]);
@@ -87,7 +97,7 @@ export function VetDashboardView() {
     } finally {
       setLoading(false);
     }
-  }, [todayLocal]);
+  }, [todayLocal, user]);
 
   useEffect(() => {
     let active = true;
@@ -505,7 +515,8 @@ export function VetDashboardView() {
               </div>
             ) : (
               <div className="space-y-3">
-                {blockedHorses.map((item) => (
+                {/* Collapsed by default: the watchlist can hold the whole quarantine row; expand to see all */}
+                {(showAllWatchlist ? blockedHorses : blockedHorses.slice(0, WATCHLIST_PREVIEW_COUNT)).map((item) => (
                   <div
                     key={item.id}
                     className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm"
@@ -557,6 +568,20 @@ export function VetDashboardView() {
                     </div>
                   </div>
                 ))}
+
+                {blockedHorses.length > WATCHLIST_PREVIEW_COUNT && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={showAllWatchlist ? "chevron-right" : "chevron-down"}
+                    onClick={() => setShowAllWatchlist((v) => !v)}
+                    className="w-full transition-all active:scale-[0.98]"
+                  >
+                    {showAllWatchlist
+                      ? "Show less"
+                      : `View all (${blockedHorses.length} blocked horses)`}
+                  </Button>
+                )}
               </div>
             )}
           </Panel>

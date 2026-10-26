@@ -1674,7 +1674,7 @@ public class AiToolExecutionService {
                 item.put("thanNhiet", m.getTemperature() != null ? m.getTemperature() + " °C" : "N/A");
                 item.put("nhipTim", m.getHeartRate() != null ? m.getHeartRate() + " bpm" : "N/A");
                 item.put("nhipTho", m.getRespiratoryRate() != null ? m.getRespiratoryRate() + " nhịp/phút" : "N/A");
-                item.put("nhanXet", m.getNotes() != null ? m.getNotes() : (m.getHydrationStatus() != null ? m.getHydrationStatus() : "Chỉ số ổn định"));
+                item.put("nhanXet", m.getNotes() != null ? m.getNotes() : (m.getHydrationStatus() != null ? m.getHydrationStatus().name().toLowerCase().replace('_', ' ') : "Chỉ số ổn định"));
                 result.add(item);
             }
             return result;
@@ -1690,7 +1690,7 @@ public class AiToolExecutionService {
             item.put("thanNhiet", m.getTemperature() != null ? m.getTemperature() + " °C" : "N/A");
             item.put("nhipTim", m.getHeartRate() != null ? m.getHeartRate() + " bpm" : "N/A");
             item.put("nhipTho", m.getRespiratoryRate() != null ? m.getRespiratoryRate() + " nhịp/phút" : "N/A");
-            item.put("nhanXet", m.getNotes() != null ? m.getNotes() : (m.getHydrationStatus() != null ? m.getHydrationStatus() : "Chỉ số ổn định"));
+            item.put("nhanXet", m.getNotes() != null ? m.getNotes() : (m.getHydrationStatus() != null ? m.getHydrationStatus().name().toLowerCase().replace('_', ' ') : "Chỉ số ổn định"));
             result.add(item);
         }
         return result;

@@ -13,11 +13,13 @@ import { admissionsApi } from '@/features/admissions/services/api';
 import { stableApi } from '@/features/stable/services/stableService';
 import type { CareSchedule, CareScheduleStatus } from '@/features/admissions/types';
 import type { Horse, StableStall } from '@/features/stable/types';
+import { useAuth } from '@/context/AuthContext';
 import { CreateRoutineModal } from './CreateRoutineModal';
 import { filterRoutineSchedules } from '@/features/routine/utils/routineValidation';
 
 export function RoutineChecksWorkspace() {
   const router = useRouter();
+  const { user } = useAuth();
   const [schedules, setSchedules] = useState<CareSchedule[]>([]);
   const [horses, setHorses] = useState<Horse[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
@@ -36,8 +38,9 @@ export function RoutineChecksWorkspace() {
       setLoading(true);
       setError(null);
 
+      // The vet works only on the schedules assigned to them.
       const [schedulePage, horseList, stallList] = await Promise.all([
-        admissionsApi.getCareSchedules({ careType: 'ROUTINE', size: 100 }),
+        admissionsApi.getCareSchedules({ careType: 'ROUTINE', size: 100, veterinarianId: user?.userId }),
         stableApi.getHorses(),
         stableApi.getStalls(),
       ]);
@@ -50,7 +53,7 @@ export function RoutineChecksWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let active = true;

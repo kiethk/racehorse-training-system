@@ -26,13 +26,18 @@ export default async function VetClinicalRecordPage({
   const recordId = toNumber(sp.recordId);
   const horseId = toNumber(sp.horseId);
   const horseName = typeof sp.horseName === 'string' && sp.horseName ? sp.horseName : undefined;
+  const fromSchedule = sp.back === 'schedule';
 
   const backHref =
-    horseId != null
+    recordId != null && horseId != null
       ? `/veterinarian/health?horseId=${horseId}`
-      : scheduleId != null
-        ? '/veterinarian/routine'
-        : '/veterinarian';
+      : horseId != null
+        ? '/veterinarian/health'
+        : fromSchedule
+          ? '/veterinarian/schedule'
+          : scheduleId != null
+            ? '/veterinarian/routine'
+            : '/veterinarian';
 
   return (
     <RoleGuard allowedRoles={['VETERINARIAN']}>

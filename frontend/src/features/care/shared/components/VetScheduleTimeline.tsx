@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui/Icon';
 import { FilterChips, Select, Input, PageHeader, MetricCard, Notice } from '@/components/ui';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { useAuth } from '@/context/AuthContext';
 import { admissionsApi } from '@/features/admissions/services/api';
 import { stableApi } from '@/features/stable/services/stableService';
 import { formatLocalDateIso } from '@/lib/display';
@@ -22,6 +23,7 @@ import {
 
 export function VetScheduleTimeline() {
   const router = useRouter();
+  const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return formatLocalDateIso();
   });
@@ -41,8 +43,9 @@ export function VetScheduleTimeline() {
       setLoading(true);
       setError(null);
 
+      // The vet works only on the schedules assigned to them.
       const [schedulePage, horseList, stallList] = await Promise.all([
-        admissionsApi.getCareSchedules({ date: selectedDate, size: 50 }),
+        admissionsApi.getCareSchedules({ date: selectedDate, size: 50, veterinarianId: user?.userId }),
         stableApi.getHorses(),
         stableApi.getStalls(),
       ]);
@@ -56,7 +59,7 @@ export function VetScheduleTimeline() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, user]);
 
   useEffect(() => {
     let active = true;

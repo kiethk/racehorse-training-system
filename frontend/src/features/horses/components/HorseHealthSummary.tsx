@@ -1,4 +1,5 @@
 'use client';
+import { hydrationStatusLabel } from '@/features/health/lib/hydrationStatus';
 
 import { EmptyState, Icon, MetricCard, Notice, Panel, Pill } from '@/components/ui';
 import { HorseAlertList } from '@/features/training/components/HorseAlertList';
@@ -58,7 +59,7 @@ export function HorseHealthSummary({
               <div className="flex flex-wrap items-center justify-between gap-2 text-[var(--color-text-muted)] border-b border-[var(--color-border-subtle)] pb-2">
                 <span>Recorded: <strong>{formatDate(latestMetric.recordedAt)}</strong></span>
                 {latestMetric.hydrationStatus && (
-                  <span>Hydration: <strong className="text-[var(--color-text-primary)]">{latestMetric.hydrationStatus}</strong></span>
+                  <span>Hydration: <strong className="text-[var(--color-text-primary)]">{hydrationStatusLabel(latestMetric.hydrationStatus)}</strong></span>
                 )}
                 {latestMetric.bodyConditionScore != null && (
                   <span>BCS: <strong className="text-[var(--color-text-primary)]">{latestMetric.bodyConditionScore}/9</strong></span>

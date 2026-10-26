@@ -6,6 +6,7 @@ import { Input, Select } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import type { MetricField } from './constants';
 import { metricConfigs } from './constants';
+import { HYDRATION_STATUS_LABELS, HYDRATION_STATUS_OPTIONS } from '@/features/health/lib/hydrationStatus';
 
 export interface VitalsSectionProps {
   metrics: Record<MetricField, string>;
@@ -125,11 +126,11 @@ export function VitalsSection({ metrics, setMetrics, fieldErrors, isFormDisabled
               onChange={(e) => setMetrics((curr) => ({ ...curr, hydrationStatus: e.target.value }))}
             >
               <option value="">Not recorded</option>
-              <option value="Normal (CRT < 2s, pink)">Normal (CRT &lt; 2s, pink)</option>
-              <option value="Mild dehydration">Mild dehydration</option>
-              <option value="Moderate dehydration">Moderate dehydration</option>
-              <option value="Severe dehydration">Severe dehydration</option>
-              <option value="Abnormal CRT / mucous membranes">Abnormal mucous membranes / CRT</option>
+              {HYDRATION_STATUS_OPTIONS.map((value) => (
+                <option key={value} value={value}>
+                  {HYDRATION_STATUS_LABELS[value]}
+                </option>
+              ))}
             </Select>
           </FormField>
         </div>

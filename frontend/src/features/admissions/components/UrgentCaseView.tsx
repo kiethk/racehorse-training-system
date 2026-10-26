@@ -14,6 +14,12 @@ import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import {
+  zoneById,
+  resolveInjuryWorldPosition,
+  resolveInjuryNormal,
+  worldToNormalized,
+} from '@/features/vet/lib/injuryZones';
 import { admissionsApi } from '../services/api';
 import { healthApi } from '@/features/health/services/healthApi';
 
@@ -86,6 +92,8 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     normal: [number, number, number];
     zoneId?: string;
     label: string;
+    description?: string;
+    severity?: string;
   };
 
   const [injuryMarkers, setInjuryMarkers] = useState<InjuryMarker[]>([]);
@@ -98,14 +106,35 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     zoneId: string;
   }) => {
     const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `marker-${Date.now()}`;
+    const zone = hit.zoneId ? zoneById(hit.zoneId) : undefined;
+    const zoneName = zone?.label || 'Chấn thương';
+    const label = `${zoneName} (#${injuryMarkers.length + 1})`;
     setInjuryMarkers((prev) => [
       ...prev,
-      { id, position: hit.position, normal: hit.normal, zoneId: hit.zoneId, label: `Marker ${prev.length + 1}` },
+      {
+        id,
+        position: hit.position,
+        normal: hit.normal,
+        zoneId: hit.zoneId,
+        label,
+        description: '',
+        severity: 'MODERATE',
+      },
     ]);
     setFindings((prev) => {
-      const line = `- 3D injury marker at [${hit.position.map((n) => n.toFixed(2)).join(', ')}]`;
+      const line = `- 3D injury marker [${zoneName}] at [${hit.position.map((n) => n.toFixed(2)).join(', ')}]`;
       return prev ? `${prev}\n${line}` : line;
     });
+  };
+
+  const handleDeleteMarker = (id: string) => {
+    setInjuryMarkers((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  const handleUpdateMarker = (id: string, updates: Partial<InjuryMarker>) => {
+    setInjuryMarkers((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+    );
   };
 
   useEffect(() => {
@@ -153,21 +182,25 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           .then((injuries) => {
             if (!active) return;
             setInjuryMarkers(
-              injuries.map((inj, idx) => ({
-                id: String(inj.id),
-                position: [
-                  Number(inj.positionX ?? 0),
-                  Number(inj.positionY ?? 0),
-                  Number(inj.positionZ ?? 0),
-                ] as [number, number, number],
-                normal: [
-                  Number(inj.normalX ?? 0),
-                  Number(inj.normalY ?? 1),
-                  Number(inj.normalZ ?? 0),
-                ] as [number, number, number],
-                zoneId: inj.zoneId ?? undefined,
-                label: inj.zoneId ? `Injury ${idx + 1}` : `Marker ${idx + 1}`,
-              })),
+              injuries.map((inj, idx) => {
+                const worldPos = resolveInjuryWorldPosition(inj);
+                const normal =
+                  inj.normalX != null && inj.normalY != null && inj.normalZ != null
+                    ? resolveInjuryNormal(
+                        [Number(inj.normalX), Number(inj.normalY), Number(inj.normalZ)],
+                        worldPos,
+                      )
+                    : resolveInjuryNormal(undefined, worldPos);
+                return {
+                  id: String(inj.id),
+                  position: worldPos,
+                  normal,
+                  zoneId: inj.zoneId ?? undefined,
+                  label: (inj.zoneId && zoneById(inj.zoneId)?.label) || `Injury ${idx + 1}`,
+                  description: inj.description ?? undefined,
+                  severity: inj.severity ?? 'MODERATE',
+                };
+              }),
             );
           })
           .catch(() => {
@@ -316,16 +349,16 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           ? injuryMarkers.map((m) => ({
               injuryType: 'UNSPECIFIED',
               bodyRegionId: 1,
-              severity: 'MODERATE',
-              description: m.label,
+              severity: m.severity || 'MODERATE',
+              description: m.description?.trim() || m.label,
               diagnosedAt: new Date().toISOString(),
               positionX: m.position[0],
               positionY: m.position[1],
               positionZ: m.position[2],
               zoneId: m.zoneId ?? null,
-              localX: null,
-              localY: null,
-              localZ: null,
+              localX: Number(worldToNormalized(m.position).x.toFixed(4)),
+              localY: Number(worldToNormalized(m.position).y.toFixed(4)),
+              localZ: Number(worldToNormalized(m.position).z.toFixed(4)),
               normalX: m.normal[0],
               normalY: m.normal[1],
               normalZ: m.normal[2],
@@ -605,21 +638,114 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
               {anatomyTab === 'anatomy3d' ? (
                 <div className="space-y-4">
-                  {urgentCase.status === 'IN_PROGRESS' && (
-                    <Button
-                      type="button"
-                      variant={isAddMode ? 'primary' : 'secondary'}
-                      onClick={() => setIsAddMode((prev) => !prev)}
-                    >
-                      {isAddMode ? 'Adding marker: click horse' : 'Add injury marker'}
-                    </Button>
-                  )}
+                  <div className="flex items-center justify-between">
+                    {urgentCase.status === 'IN_PROGRESS' && (
+                      <Button
+                        type="button"
+                        variant={isAddMode ? 'primary' : 'secondary'}
+                        onClick={() => setIsAddMode((prev) => !prev)}
+                        icon={isAddMode ? 'target' : 'plus'}
+                      >
+                        {isAddMode ? 'Adding marker: click horse' : 'Add injury marker'}
+                      </Button>
+                    )}
+                    <span className="text-xs text-[var(--color-text-secondary)]">
+                      {injuryMarkers.length} marker{injuryMarkers.length === 1 ? '' : 's'} placed
+                    </span>
+                  </div>
+
                   <UrgentHorseInjuryViewer
                     injuries={injuryMarkers}
                     isAddMode={isAddMode}
                     readOnly={urgentCase.status !== 'IN_PROGRESS'}
                     onPointerHit={handleInjuryHit}
+                    onDeleteInjury={handleDeleteMarker}
+                    onUpdateInjury={handleUpdateMarker}
                   />
+
+                  {/* Marked Injuries Management Panel */}
+                  <div className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+                    <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
+                      <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                        <Icon name="alert-triangle" size={14} className="text-[var(--color-danger)]" />
+                        <span>Marked Injuries ({injuryMarkers.length})</span>
+                      </h4>
+                      {injuryMarkers.length > 0 && urgentCase.status === 'IN_PROGRESS' && (
+                        <Button
+                          type="button"
+                          variant="tertiary"
+                          size="sm"
+                          onClick={() => setInjuryMarkers([])}
+                          className="text-[11px] text-[var(--color-danger)] hover:bg-[var(--color-danger-subtle)]"
+                        >
+                          Clear all markers
+                        </Button>
+                      )}
+                    </div>
+
+                    {injuryMarkers.length === 0 ? (
+                      <p className="py-4 text-center text-xs text-[var(--color-text-muted)]">
+                        No injury markers placed yet. Click &quot;Add injury marker&quot; above and click on the 3D horse model to mark injuries.
+                      </p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {injuryMarkers.map((marker, index) => {
+                          const zoneName = (marker.zoneId && zoneById(marker.zoneId)?.label) || 'Unspecified';
+                          return (
+                            <div
+                              key={marker.id}
+                              className="flex flex-col gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-danger)] text-[10px] font-bold text-white">
+                                    {index + 1}
+                                  </span>
+                                  <span className="text-xs font-semibold text-[var(--color-text-primary)]">
+                                    {marker.label}
+                                  </span>
+                                  <span className="rounded bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-secondary)]">
+                                    Zone: {zoneName}
+                                  </span>
+                                </div>
+                                {urgentCase.status === 'IN_PROGRESS' && (
+                                  <Button
+                                    type="button"
+                                    variant="tertiary"
+                                    size="sm"
+                                    icon="x"
+                                    onClick={() => handleDeleteMarker(marker.id)}
+                                    className="h-7 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-subtle)]"
+                                    title="Delete this marker"
+                                  >
+                                    Delete
+                                  </Button>
+                                )}
+                              </div>
+
+                              <div className="space-y-1">
+                                <label
+                                  htmlFor={`marker-note-${marker.id}`}
+                                  className="block text-[11px] font-medium text-[var(--color-text-secondary)]"
+                                >
+                                  Clinical Note / Description:
+                                </label>
+                                <Input
+                                  id={`marker-note-${marker.id}`}
+                                  type="text"
+                                  placeholder="Enter clinical observation, swelling, pain response, wound details..."
+                                  value={marker.description || ''}
+                                  disabled={urgentCase.status !== 'IN_PROGRESS'}
+                                  onChange={(e) => handleUpdateMarker(marker.id, { description: e.target.value })}
+                                  className="text-xs"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
               <form onSubmit={handleSubmit} className="space-y-6">

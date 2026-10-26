@@ -33,6 +33,16 @@ export interface HorseHealthSummary {
   lastDiagnosis?: string;
   activeInjuryCount: number;
   nextScheduledCare?: string;
+  /** Open urgent case of this horse (reported but not yet examined), if any. */
+  pendingUrgentScheduleId?: number | null;
+  /** Who reported the incident behind the pending urgent case. */
+  pendingUrgentReportedByName?: string | null;
+  /** Which vet the pending urgent case is assigned to. */
+  pendingUrgentVetId?: number | null;
+  pendingUrgentVetName?: string | null;
+  /** A block coming from the admission intake (quarantine), with its submitting owner. */
+  pendingAdmissionId?: number | null;
+  pendingAdmissionOwnerName?: string | null;
 }
 
 export interface CorrectInjuryRequest {

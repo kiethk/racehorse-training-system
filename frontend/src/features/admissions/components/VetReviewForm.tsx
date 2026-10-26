@@ -465,7 +465,7 @@ export function VetReviewForm({
       respiratoryRate: randomRr,
       weight: randomWeight,
       bodyConditionScore: randomBcs,
-      hydrationStatus: 'Normal (CRT < 2s, pink)',
+      hydrationStatus: 'NORMAL',
       notes: randomObservation,
     });
 

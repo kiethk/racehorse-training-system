@@ -13,5 +13,11 @@ public record HorseHealthSummaryResponse(
         LocalDateTime lastExaminedAt,
         String lastDiagnosis,
         int activeInjuryCount,
-        LocalDateTime nextScheduledCare
+        LocalDateTime nextScheduledCare,
+        Long pendingUrgentScheduleId,
+        String pendingUrgentReportedByName,
+        Long pendingUrgentVetId,
+        String pendingUrgentVetName,
+        Long pendingAdmissionId,
+        String pendingAdmissionOwnerName
 ) {}
