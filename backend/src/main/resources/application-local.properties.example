@@ -15,7 +15,7 @@ ai.api.base-url=https://api.openai.com/v1
 ai.api.key=YOUR_OPENAI_API_KEY_HERE
 ai.api.model=gpt-4o-mini
 
-# Cấu hình gửi Mail thật qua Gmail SMTP (Chỉ cần điền tài khoản & App Password)
+
 spring.mail.host=smtp.gmail.com
 spring.mail.port=587
 spring.mail.username=email_cua_ban@gmail.com
