@@ -25,6 +25,7 @@ const reviewFeedback = [
 function currentReviewStage(status: OwnerAdmissionDetail['status']): number | null {
   switch (status) {
     case 'GROOM_REVIEW': return 0;
+    case 'WAITING_FOR_STALL': return 1;
     case 'WAITING_FOR_ARRIVAL': return 2;
     case 'ARRIVAL_EXPIRED': return 3;
     case 'VET_REVIEW': return 4;
@@ -77,11 +78,6 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
     <div className="space-y-5">
       {created && <Notice tone="success">Admission and supporting documents submitted for Groom review.</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
-      {detail.status === 'GROOM_REVIEW' && detail.quarantineFull && (
-        <Notice tone="info" title="Quarantine area temporarily full">
-          Your application will be reviewed as soon as a quarantine stall frees up. No action is needed.
-        </Notice>
-      )}
       {detail.status === 'REJECTED' && (
         <Notice tone="error" title="Application rejected">
           {feedback.length > 0 ? (

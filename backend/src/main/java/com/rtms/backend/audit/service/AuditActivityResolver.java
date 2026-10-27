@@ -21,6 +21,7 @@ public class AuditActivityResolver {
     // Pattern definitions - Admissions
     private static final Pattern ADMISSION_GROOM_REVIEW = Pattern.compile("^/api/admissions/(\\d+)/groom-review/?$");
     private static final Pattern ADMISSION_ARRIVAL_CONFIRM = Pattern.compile("^/api/admissions/(\\d+)/confirm-arrival/?$");
+    private static final Pattern ADMISSION_WAITING_STALL = Pattern.compile("^/api/admissions/(\\d+)/process-waiting-stall/?$");
     private static final Pattern ADMISSION_VET_REVIEW = Pattern.compile("^/api/admissions/(\\d+)/vet-review/?$");
     private static final Pattern ADMISSION_TRAINER_REVIEW = Pattern.compile("^/api/admissions/(\\d+)/trainer-assessment/?$");
     private static final Pattern ADMISSION_MANAGER_REVIEW = Pattern.compile("^/api/admissions/(\\d+)/manager-review/?$");
@@ -109,6 +110,15 @@ public class AuditActivityResolver {
                     "AdmissionApplication",
                     id,
                     "Confirmed physical arrival of horse into quarantine for application #" + id + statusSuffix
+            );
+        }
+        if ((m = ADMISSION_WAITING_STALL.matcher(normalizedPath)).matches()) {
+            Long id = parseId(m.group(1));
+            return new ResolvedActivity(
+                    "Move To Waiting For Stall",
+                    "AdmissionApplication",
+                    id,
+                    "Moved application #" + id + " to waiting queue for regular stall assignment" + statusSuffix
             );
         }
         if ((m = ADMISSION_VET_REVIEW.matcher(normalizedPath)).matches()) {

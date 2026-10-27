@@ -47,6 +47,7 @@ export interface HorsePedigree {
 
 export type AdmissionStatus =
   | 'GROOM_REVIEW'
+  | 'WAITING_FOR_STALL'
   | 'WAITING_FOR_ARRIVAL'
   | 'ARRIVAL_EXPIRED'
   | 'VET_REVIEW'

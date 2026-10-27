@@ -56,8 +56,9 @@ INSERT INTO seed_check VALUES
  $q$ SELECT id FROM admission_applications WHERE groom_decision = 'REJECTED' AND (status <> 'REJECTED' OR horse_id IS NOT NULL) $q$),
 ('Waiting for arrival with a deadline already passed',
  $q$ SELECT id FROM admission_applications WHERE status = 'WAITING_FOR_ARRIVAL' AND arrival_deadline_at <= pg_temp.clock() $q$),
-('Groom review without a review start time',
- $q$ SELECT id FROM admission_applications WHERE status = 'GROOM_REVIEW' AND groom_review_started_at IS NULL $q$),
+('Waiting for a stall while capacity is available',
+ $q$ SELECT id FROM admission_applications WHERE status = 'WAITING_FOR_STALL'
+       AND (SELECT count(*) FROM stable_stalls s JOIN areas a ON a.id = s.area_id WHERE a.type = 'QUARANTINE' AND s.status = 'AVAILABLE') >= 1 $q$),
 ('Admission at or past vet review without its own intake exam',
  $q$ SELECT a.id FROM admission_applications a WHERE a.horse_id IS NOT NULL AND a.arrived_at IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM care_schedule c WHERE c.admission_id = a.id AND c.care_type = 'INITIAL') $q$),

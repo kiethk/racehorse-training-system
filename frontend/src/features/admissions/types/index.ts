@@ -1,6 +1,7 @@
 import type { VaccinationRequest } from '@/features/care/types/preventive';
 export type AdmissionStatus =
   | 'GROOM_REVIEW'
+  | 'WAITING_FOR_STALL'
   | 'WAITING_FOR_ARRIVAL'
   | 'ARRIVAL_EXPIRED'
   | 'VET_REVIEW'
@@ -143,23 +144,6 @@ export interface AdmissionDetailResponse {
     admissionCapacityAvailable: boolean;
     blockingReason: 'NO_QUARANTINE_STALL' | 'REGULAR_RESERVE_INSUFFICIENT' | null;
   };
-
-  /** Only for a groom viewing an admission in GROOM_REVIEW; null otherwise. */
-  groomReviewEligibility?: GroomReviewEligibility | null;
-}
-
-export type GroomApproveBlockedReason =
-  | 'NOT_IN_GROOM_POOL'
-  | 'OLDER_ADMISSION_FIRST'
-  | 'NO_QUARANTINE_STALL'
-  | 'REGULAR_RESERVE_INSUFFICIENT';
-
-/** What the viewing groom may do right now; approving reserves `targetStallCode`, one of their own stalls. */
-export interface GroomReviewEligibility {
-  canApprove: boolean;
-  canReject: boolean;
-  approveBlockedReason: GroomApproveBlockedReason | null;
-  targetStallCode: string | null;
 }
 
 /** Vital-sign measurement recorded during a health exam session. */

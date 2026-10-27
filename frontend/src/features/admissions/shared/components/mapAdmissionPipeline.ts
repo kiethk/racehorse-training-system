@@ -39,7 +39,7 @@ export interface PipelineMappingResult {
  * Pure mapper converting backend admission detail into 6 discrete pipeline steps:
  *  0. Submitted
  *  1. Groom Review
- *  2. Arrival (WAITING_FOR_ARRIVAL as current with the reserved stall as note)
+ *  2. Arrival (handles WAITING_FOR_STALL as current with "Waiting for stall" note)
  *  3. Vet Review
  *  4. Trainer Review
  *  5. Manager Review
@@ -70,12 +70,13 @@ export function mapAdmissionPipeline(detail: PipelineDetailInput): PipelineMappi
   // Indices:
   // 0: Submitted
   // 1: Groom Review
-  // 2: Arrival (WAITING_FOR_ARRIVAL and ARRIVAL_EXPIRED)
+  // 2: Arrival (includes WAITING_FOR_STALL and WAITING_FOR_ARRIVAL)
   // 3: Vet Review
   // 4: Trainer Review
   // 5: Manager Review
   const statusOrder: Record<AdmissionStatus, number> = {
     GROOM_REVIEW: 1,
+    WAITING_FOR_STALL: 2,
     WAITING_FOR_ARRIVAL: 2,
     ARRIVAL_EXPIRED: 2,
     VET_REVIEW: 3,
@@ -103,6 +104,7 @@ export function mapAdmissionPipeline(detail: PipelineDetailInput): PipelineMappi
 
   // Step 2: Arrival
   // Handles:
+  // - WAITING_FOR_STALL: current, note "Waiting for stall"
   // - WAITING_FOR_ARRIVAL: current, note "Stall <code...>"
   // - ARRIVAL_EXPIRED: warning, note "Arrival expired"
   // - Past arrived: completed
@@ -116,6 +118,9 @@ export function mapAdmissionPipeline(detail: PipelineDetailInput): PipelineMappi
     step2State = 'pending';
   } else if (detail.arrivedAt || statusProgress > 2) {
     step2State = 'completed';
+  } else if (status === 'WAITING_FOR_STALL') {
+    step2State = 'current';
+    step2Note = 'Waiting for stall';
   } else if (status === 'WAITING_FOR_ARRIVAL') {
     step2State = 'current';
     if (detail.quarantineStallCode) {

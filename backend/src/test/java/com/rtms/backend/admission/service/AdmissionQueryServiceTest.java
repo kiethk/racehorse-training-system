@@ -55,7 +55,6 @@ class AdmissionQueryServiceTest {
     private UserRepository users;
     private CareScheduleRepository careSchedules;
     private StableStallRepository stalls;
-    private AdmissionGroomPoolService groomPool;
     private AdmissionQueryService service;
 
     @BeforeEach
@@ -78,8 +77,7 @@ class AdmissionQueryServiceTest {
                 healthMetrics,
                 mock(FileStorageService.class),
                 users,
-                careSchedules,
-                groomPool = mock(AdmissionGroomPoolService.class));
+                careSchedules);
     }
 
     @Test
@@ -147,9 +145,8 @@ class AdmissionQueryServiceTest {
     void groomQueueTrimsNameUsesInclusiveDateRangeAndCapsPageSize() {
         var page = PageRequest.of(2, 10,
                 Sort.by(Sort.Order.asc("createdAt"), Sort.Order.asc("id")));
-        LocalDateTime cutoff = LocalDateTime.of(2026, 1, 7, 9, 0);
-        when(groomPool.viewFor(7L)).thenReturn(new AdmissionGroomPoolService.PoolView(false, true, cutoff));
-        when(admissions.findGroomQueue(eq(7L), eq(false), eq(true), eq(cutoff), eq(AdmissionStatus.GROOM_REVIEW), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
+        when(stalls.isQuarantineGroom(7L)).thenReturn(true);
+        when(admissions.findGroomQueue(eq(7L), eq(true), eq(AdmissionStatus.GROOM_REVIEW), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
                 eq(true), any(), eq(true), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), page, 0));
 
@@ -159,7 +156,7 @@ class AdmissionQueryServiceTest {
         assertEquals(10, response.size());
         assertEquals(2, response.page());
         var pageable = org.mockito.ArgumentCaptor.forClass(Pageable.class);
-        verify(admissions).findGroomQueue(eq(7L), eq(false), eq(true), eq(cutoff), eq(AdmissionStatus.GROOM_REVIEW), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
+        verify(admissions).findGroomQueue(eq(7L), eq(true), eq(AdmissionStatus.GROOM_REVIEW), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
                 eq(true), eq(LocalDateTime.of(2026, 1, 2, 0, 0)),
                 eq(true), eq(LocalDateTime.of(2026, 1, 9, 0, 0)), pageable.capture());
         // BR-04: oldest admission first, id as a stable tie-breaker for paging.
@@ -199,91 +196,6 @@ class AdmissionQueryServiceTest {
 
         verify(admissions, never()).findAll();
         verify(admissions, never()).findByStatus(any());
-    }
-
-    // ── Groom review eligibility ───────────────────────────────────────────
-
-    private static final LocalDateTime POOL_CUTOFF = LocalDateTime.of(2026, 10, 26, 10, 0);
-
-    /** An admission in GROOM_REVIEW with what getAdmissionDetail needs; capacity counts pass the policy. */
-    private void groomReviewDetail(long id) {
-        AdmissionApplication app = new AdmissionApplication();
-        app.setId(id);
-        app.setStatus(AdmissionStatus.GROOM_REVIEW);
-        app.setGroomReviewStartedAt(POOL_CUTOFF.plusHours(2));
-        when(admissions.findById(id)).thenReturn(Optional.of(app));
-        CandidateHorseProfile profile = new CandidateHorseProfile();
-        profile.setName("Candidate");
-        when(candidates.findByAdmissionId(id)).thenReturn(Optional.of(profile));
-        when(documents.findByAdmissionId(id)).thenReturn(List.of());
-        when(stalls.countAvailableQuarantineStalls()).thenReturn(2L);
-        when(stalls.countAvailableRegularStalls()).thenReturn(5L);
-        when(stalls.countOccupiedQuarantineStalls()).thenReturn(1L);
-    }
-
-    private void groomSees(boolean leastLoaded, long oldestId) {
-        when(groomPool.viewFor(7L)).thenReturn(new AdmissionGroomPoolService.PoolView(leastLoaded, true, POOL_CUTOFF));
-        when(admissions.findPoolIdsInApprovalOrder(anyBoolean(), anyBoolean(), any(), eq(AdmissionStatus.GROOM_REVIEW), any()))
-                .thenReturn(List.of(oldestId));
-    }
-
-    @Test
-    void groomDetailShowsTheStallApprovingWouldReserve() {
-        groomReviewDetail(1L);
-        groomSees(true, 1L);
-        StableStall own = new StableStall(); own.setStallCode("QA-03");
-        when(stalls.findFirstAvailableQuarantineStallOfGroom(7L)).thenReturn(Optional.of(own));
-
-        var eligibility = service.getGroomAdmissionDetail(1L, 7L).getGroomReviewEligibility();
-
-        assertEquals(new com.rtms.backend.admission.dto.GroomReviewEligibility(true, true, null, "QA-03"), eligibility);
-        verify(stalls, never()).findFirstAvailableQuarantineStallOfGroomForUpdate(any());
-    }
-
-    @Test
-    void groomDetailExplainsWhyApprovalIsBlocked() {
-        groomReviewDetail(1L);
-        groomSees(true, 99L);
-        assertEquals("OLDER_ADMISSION_FIRST",
-                service.getGroomAdmissionDetail(1L, 7L).getGroomReviewEligibility().approveBlockedReason());
-
-        groomSees(true, 1L);
-        when(stalls.countAvailableRegularStalls()).thenReturn(1L);
-        assertEquals("REGULAR_RESERVE_INSUFFICIENT",
-                service.getGroomAdmissionDetail(1L, 7L).getGroomReviewEligibility().approveBlockedReason());
-
-        when(stalls.countAvailableRegularStalls()).thenReturn(5L);
-        when(stalls.findFirstAvailableQuarantineStallOfGroom(7L)).thenReturn(Optional.empty());
-        var noStall = service.getGroomAdmissionDetail(1L, 7L).getGroomReviewEligibility();
-        assertEquals("NO_QUARANTINE_STALL", noStall.approveBlockedReason());
-        assertEquals(true, noStall.canReject());
-    }
-
-    @Test
-    void groomOutsideThePoolCanNeitherApproveNorReject() {
-        groomReviewDetail(1L);
-        // Eligible but busier, and the admission has not waited past the cutoff yet.
-        groomSees(false, 1L);
-
-        var eligibility = service.getGroomAdmissionDetail(1L, 7L).getGroomReviewEligibility();
-
-        assertEquals(new com.rtms.backend.admission.dto.GroomReviewEligibility(false, false, "NOT_IN_GROOM_POOL", null),
-                eligibility);
-    }
-
-    @Test
-    void groomDetailHasNoEligibilityOutsideGroomReview() {
-        AdmissionApplication app = new AdmissionApplication();
-        app.setId(2L);
-        app.setStatus(AdmissionStatus.WAITING_FOR_ARRIVAL);
-        when(admissions.findById(2L)).thenReturn(Optional.of(app));
-        CandidateHorseProfile profile = new CandidateHorseProfile();
-        profile.setName("Candidate");
-        when(candidates.findByAdmissionId(2L)).thenReturn(Optional.of(profile));
-        when(documents.findByAdmissionId(2L)).thenReturn(List.of());
-
-        assertEquals(null, service.getGroomAdmissionDetail(2L, 7L).getGroomReviewEligibility());
-        verifyNoInteractions(groomPool);
     }
 
     /** Đơn nào cũng phải có CandidateHorseProfile, nếu không toSummaryResponse ném lỗi. */

@@ -157,6 +157,7 @@ public class AdmissionManagerReviewService {
 
         admissionGroomReviewService.notifyGroomAssigned(admission, regularStall,
                 horse.getName() + " was approved and moved to stall " + regularStall.getStallCode() + ", which you look after.");
+        admissionGroomReviewService.allocateWaitingAdmissions();
         return admission;
     }
 
@@ -214,6 +215,8 @@ public class AdmissionManagerReviewService {
         admission.setManagerReviewedAt(LocalDateTime.now());
         admission.setStatus(AdmissionStatus.REJECTED);
 
-        return admissionApplicationRepository.save(admission);
+        admission = admissionApplicationRepository.save(admission);
+        admissionGroomReviewService.allocateWaitingAdmissions();
+        return admission;
     }
 }

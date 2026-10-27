@@ -61,16 +61,14 @@ public class OwnerAdmissionService {
     private final AdmissionUelnPolicy uelnPolicy;
     private final PedigreeBirthDateValidator birthDates;
     private final com.rtms.backend.stable.repository.StableStallRepository stalls;
-    private final AdmissionGroomPoolService groomPool;
-    private final AdmissionGroomPoolNotifier poolNotifier;
+    private final com.rtms.backend.notification.service.NotificationService notifications;
 
     public OwnerAdmissionService(AdmissionApplicationRepository admissions,
             CandidateHorseProfileRepository candidates, AdmissionDocumentRepository documents,
             FileStorageService fileStorage, AdmissionUelnPolicy uelnPolicy,
             PedigreeBirthDateValidator birthDates,
             com.rtms.backend.stable.repository.StableStallRepository stalls,
-            AdmissionGroomPoolService groomPool,
-            AdmissionGroomPoolNotifier poolNotifier) {
+            com.rtms.backend.notification.service.NotificationService notifications) {
         this.admissions = admissions;
         this.candidates = candidates;
         this.documents = documents;
@@ -78,8 +76,7 @@ public class OwnerAdmissionService {
         this.uelnPolicy = uelnPolicy;
         this.birthDates = birthDates;
         this.stalls = stalls;
-        this.groomPool = groomPool;
-        this.poolNotifier = poolNotifier;
+        this.notifications = notifications;
     }
 
     /** The transaction creates exactly one new Application and one new immutable snapshot. */
@@ -112,7 +109,7 @@ public class OwnerAdmissionService {
         snapshot.setDamRegistrationNumber(damUeln);
         snapshot.setPedigreeNotes(trimNullable(request.pedigreeNotes()));
         candidates.save(snapshot);
-        poolNotifier.notifySubmitted(application, snapshot.getName());
+        notifyQuarantineGrooms(application, snapshot.getName());
 
         return toDetail(application, snapshot, List.of());
     }
@@ -177,7 +174,7 @@ public class OwnerAdmissionService {
 
             savedDocuments.add(documents.save(document));
         }
-        poolNotifier.notifySubmitted(application, snapshot.getName());
+        notifyQuarantineGrooms(application, snapshot.getName());
         return toDetail(application, snapshot, savedDocuments);
     }
 
@@ -279,6 +276,22 @@ public class OwnerAdmissionService {
         });
     }
 
+    /**
+     * Scenario A: every quarantine groom may pick up a new admission, so all of them hear about it.
+     * Written in the submit transaction, so a rolled-back submission leaves no notification behind.
+     */
+    private void notifyQuarantineGrooms(AdmissionApplication application, String horseName) {
+        String type = com.rtms.backend.notification.service.NotificationTypes.ADMISSION_NEW_FOR_GROOM;
+        String refType = com.rtms.backend.notification.service.NotificationTypes.REFERENCE_ADMISSION;
+        for (Long groomId : stalls.findQuarantineGroomIds()) {
+            notifications.createNotification(groomId, "New admission to review",
+                    horseName + " was submitted for admission and is waiting for groom review.",
+                    type, refType, application.getId(),
+                    com.rtms.backend.notification.entity.Notification.buildDeduplicationKey(
+                            groomId, refType, application.getId(), type));
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<AdmissionSummaryResponse> getMyAdmissions(Long ownerId, AdmissionStatus status) {
         return admissions.findByOwnerIdOrderBySubmittedAtDesc(ownerId).stream()
@@ -336,11 +349,8 @@ public class OwnerAdmissionService {
             case "CLUB_MANAGER" -> true;
             case "HORSE_OWNER" -> java.util.Objects.equals(admission.getOwnerId(), viewer.getUserId());
             case "HEAD_TRAINER" -> java.util.Objects.equals(admission.getTrainerId(), viewer.getUserId());
-            case "GROOM" -> {
-                AdmissionGroomPoolService.PoolView pool = groomPool.viewFor(viewer.getUserId());
-                yield admissions.isVisibleToGroom(admissionId, viewer.getUserId(),
-                        pool.leastLoaded(), pool.eligible(), pool.fallbackCutoff(), AdmissionStatus.GROOM_REVIEW);
-            }
+            case "GROOM" -> admissions.isVisibleToGroom(admissionId, viewer.getUserId(),
+                    stalls.isQuarantineGroom(viewer.getUserId()), AdmissionStatus.GROOM_REVIEW);
             default -> false;
         };
         if (!allowed) throw new org.springframework.security.access.AccessDeniedException("Admission is not assigned to you");
@@ -370,15 +380,7 @@ public class OwnerAdmissionService {
                 c.getDamName(), c.getDamRegistrationNumber(), c.getPedigreeNotes());
         return new OwnerAdmissionDetailResponse(a.getId(), a.getStatus(), a.getSubmittedAt(),
                 candidate, docs.stream().map(this::toDocumentResponse).toList(),
-                a.getGroomFeedback(), a.getVetFeedback(), a.getTrainerFeedback(), a.getManagerFeedback(),
-                a.getStatus() == AdmissionStatus.GROOM_REVIEW && quarantineFull());
-    }
-
-    /** No groom can take a new horse: nobody has a free quarantine stall, or the regular reserve is too low. */
-    private boolean quarantineFull() {
-        if (groomPool.eligibleGroomIds().isEmpty()) return true;
-        return AdmissionCapacityPolicy.blockingReason(stalls.countAvailableQuarantineStalls(),
-                stalls.countAvailableRegularStalls(), stalls.countOccupiedQuarantineStalls()) != null;
+                a.getGroomFeedback(), a.getVetFeedback(), a.getTrainerFeedback(), a.getManagerFeedback());
     }
 
     private CandidateHorseProfile findCandidate(Long admissionId) {

@@ -80,14 +80,15 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
     setReopening(true);
     setError(null);
     try {
-      await admissionsApi.reopenExpiredArrival(admissionId);
+      const updated = await admissionsApi.reopenExpiredArrival(admissionId);
       await load();
-      toast.success('Admission returned to groom review',
-        'A groom with a free quarantine stall reviews it again and reserves one of their stalls.');
+      toast.success('Arrival window reopened', updated.status === 'WAITING_FOR_ARRIVAL'
+        ? `Quarantine stall ${updated.quarantineStallCode ?? ''} is reserved again.`
+        : 'The admission is queued and gets the next free quarantine stall automatically.');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Unable to reopen the arrival window.';
       setError(message);
-      toast.error('Admission not returned to groom review', message);
+      toast.error('Arrival window not reopened', message);
     } finally {
       setReopening(false);
     }
@@ -413,8 +414,8 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
 
             {detail.status === 'ARRIVAL_EXPIRED' && (
               <AdmissionSideCard title="Arrival window expired" tone="warning">
-                <p className="text-[var(--color-text-secondary)]">The quarantine reservation was released. Reopening returns the admission to groom review; the groom who approves it reserves one of their stalls and a new 14-day window starts.</p>
-                <Button type="button" className="w-full" loading={reopening} onClick={() => void reopenExpiredArrival()}>Return to groom review</Button>
+                <p className="text-[var(--color-text-secondary)]">The quarantine reservation was released. Reopening attempts to reserve an available quarantine stall and starts a new 14-day window.</p>
+                <Button type="button" className="w-full" loading={reopening} onClick={() => void reopenExpiredArrival()}>Reopen arrival window</Button>
               </AdmissionSideCard>
             )}
 

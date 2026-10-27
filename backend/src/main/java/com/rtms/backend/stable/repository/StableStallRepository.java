@@ -40,6 +40,15 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
 
     List<StableStall> findByAreaIdAndGroomId(Long areaId, Long groomId);
 
+    /** A "quarantine groom" looks after at least one active quarantine stall; only they review new admissions. */
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1 FROM stable_stalls ss JOIN areas a ON a.id = ss.area_id
+                WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
+                  AND ss.groom_id = :groomId)
+            """, nativeQuery = true)
+    boolean isQuarantineGroom(@Param("groomId") Long groomId);
+
     @Query(value = """
             SELECT DISTINCT ss.groom_id FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
@@ -49,50 +58,6 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             ORDER BY ss.groom_id
             """, nativeQuery = true)
     List<Long> findQuarantineGroomIds();
-
-    /**
-     * One row per active groom of a quarantine stall: {groomId, load, free}. Load counts their quarantine
-     * stalls holding a horse (OCCUPIED or RESERVED); free counts their AVAILABLE quarantine stalls.
-     * Other area types are left out, so a groom's regular stalls never weigh on the quarantine pool.
-     */
-    @Query(value = """
-            SELECT ss.groom_id,
-                   COUNT(*) FILTER (WHERE ss.status IN ('OCCUPIED', 'RESERVED')) AS horse_load,
-                   COUNT(*) FILTER (WHERE ss.status = 'AVAILABLE') AS free_stalls
-            FROM stable_stalls ss
-            JOIN areas a ON a.id = ss.area_id
-            JOIN users u ON u.id = ss.groom_id
-            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
-              AND u.is_active = TRUE
-            GROUP BY ss.groom_id
-            ORDER BY ss.groom_id
-            """, nativeQuery = true)
-    List<Object[]> findQuarantineGroomLoads();
-
-    /** Read-only twin of {@link #findFirstAvailableQuarantineStallOfGroomForUpdate}, for showing the groom what they would get. */
-    @Query(value = """
-            SELECT ss.*
-            FROM stable_stalls ss
-            JOIN areas a ON a.id = ss.area_id
-            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
-              AND ss.groom_id = :groomId AND ss.status = 'AVAILABLE'
-            ORDER BY a.code ASC, ss.stall_number ASC
-            LIMIT 1
-            """, nativeQuery = true)
-    Optional<StableStall> findFirstAvailableQuarantineStallOfGroom(@Param("groomId") Long groomId);
-
-    /** The groom's first free quarantine stall (area code, then stall number), locked for a reservation. */
-    @Query(value = """
-            SELECT ss.*
-            FROM stable_stalls ss
-            JOIN areas a ON a.id = ss.area_id
-            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
-              AND ss.groom_id = :groomId AND ss.status = 'AVAILABLE'
-            ORDER BY a.code ASC, ss.stall_number ASC
-            LIMIT 1
-            FOR UPDATE OF ss
-            """, nativeQuery = true)
-    Optional<StableStall> findFirstAvailableQuarantineStallOfGroomForUpdate(@Param("groomId") Long groomId);
 
     @Query(value = """
             SELECT ss.*

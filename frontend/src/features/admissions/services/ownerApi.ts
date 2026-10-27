@@ -23,8 +23,6 @@ export type OwnerAdmissionDetail = {
   candidate: CandidateForm; documents: AdmissionDocument[];
   groomFeedback: string | null; vetFeedback: string | null;
   trainerFeedback: string | null; managerFeedback: string | null;
-  /** GROOM_REVIEW only: no groom can take a new horse right now. */
-  quarantineFull: boolean;
 };
 
 export interface OcrExtractionData {
