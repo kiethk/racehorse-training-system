@@ -30,8 +30,6 @@ import org.springframework.http.HttpStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
-import com.rtms.backend.identity.repository.UserRepository;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -74,7 +72,7 @@ class MedicalServicesIntegrityTest {
                 horseRepository,
                 healthRecordRepository,
                 careScheduleRepository,
-                auditLogRepository, Mockito.mock(UserRepository.class)
+                auditLogRepository, org.mockito.Mockito.mock(com.rtms.backend.identity.repository.UserRepository.class)
         );
 
         healthRecordService = new HealthRecordService(

@@ -35,7 +35,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -76,7 +75,7 @@ class CareScheduleDirectAssignmentTest {
                 mock(EntityManager.class),
                 mock(NotificationService.class),
                 new TrainingDecisionService(horses, schedules, workoutService),
-                Mockito.mock(PreventiveVaccinationService.class));
+                org.mockito.Mockito.mock(PreventiveVaccinationService.class));
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(schedules.findScheduledForHorse(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
         when(schedules.findScheduledForVet(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
@@ -199,7 +198,7 @@ class CareScheduleDirectAssignmentTest {
         assertEquals(2L, incident.getHandledById());
         assertNotNull(incident.getHandledAt());
         verify(incidents).save(incident);
-        verify(events).publishEvent(any(UrgentAssignmentCommittedEvent.class));
+        verify(events).publishEvent(any(com.rtms.backend.event.UrgentAssignmentCommittedEvent.class));
     }
 
     @Test

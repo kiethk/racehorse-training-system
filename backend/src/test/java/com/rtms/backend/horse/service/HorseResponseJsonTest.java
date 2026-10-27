@@ -25,12 +25,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
-import com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository;
-import com.rtms.backend.horse.repository.HorseRepository;
-import com.rtms.backend.stable.repository.AreaRepository;
-import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.service.TrainingWorkoutService;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -64,7 +58,7 @@ class HorseResponseJsonTest {
     @BeforeEach
     void setUp() {
         photoService = new HorsePhotoService(admissionRepo, documentRepo, storage,
-                mock(HorseEditRequestDocumentRepository.class));
+                mock(com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository.class));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -169,21 +163,21 @@ class HorseResponseJsonTest {
     @DisplayName("HorseService.getHorseById: Owner of different horse is rejected with AccessDeniedException")
     void horseService_ownerCannotViewOtherHorse_accessDenied() {
         // Build a minimal HorseService to test the access check without wiring the full context.
-        HorseRepository horseRepo =
-                mock(HorseRepository.class);
-        StableStallRepository stallRepo =
-                mock(StableStallRepository.class);
-        TrainingWorkoutService workoutSvc =
-                mock(TrainingWorkoutService.class);
-        AreaRepository areaRepo =
-                mock(AreaRepository.class);
+        com.rtms.backend.horse.repository.HorseRepository horseRepo =
+                mock(com.rtms.backend.horse.repository.HorseRepository.class);
+        com.rtms.backend.stable.repository.StableStallRepository stallRepo =
+                mock(com.rtms.backend.stable.repository.StableStallRepository.class);
+        com.rtms.backend.training.service.TrainingWorkoutService workoutSvc =
+                mock(com.rtms.backend.training.service.TrainingWorkoutService.class);
+        com.rtms.backend.stable.repository.AreaRepository areaRepo =
+                mock(com.rtms.backend.stable.repository.AreaRepository.class);
 
         HorseService horseService = new HorseService(horseRepo, stallRepo, workoutSvc, areaRepo);
 
         Horse h = horse(10L, "Rival");
         h.setOwnerId(999L); // owned by someone else
 
-        when(horseRepo.findById(10L)).thenReturn(Optional.of(h));
+        when(horseRepo.findById(10L)).thenReturn(java.util.Optional.of(h));
 
         AuthenticatedUser owner = new AuthenticatedUser(1L, "owner@test.com", "HORSE_OWNER");
 

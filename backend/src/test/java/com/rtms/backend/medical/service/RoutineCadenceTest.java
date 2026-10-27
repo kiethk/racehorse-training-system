@@ -45,7 +45,6 @@ import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -300,7 +299,7 @@ class RoutineCadenceTest {
         String value = horseId + "|" + admissionId + "|ROUTINE|" + requestedAt + "|" + description;
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
+            return java.util.HexFormat.of().formatHex(digest);
         } catch (Exception impossible) {
             throw new IllegalStateException(impossible);
         }

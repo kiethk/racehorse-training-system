@@ -24,8 +24,6 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import com.rtms.backend.medical.entity.CareSchedule;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -88,7 +86,7 @@ class HorseIncidentReportHandlerNameTest {
 
         assertEquals("Hannah Reed", joined.getHandlerName());
         assertNull(unassignedCase.getHandlerName(), "the urgent case has no vet yet");
-        verify(schedules, times(1)).findAllById(argThat(ids -> Set.copyOf((Collection<Long>) ids).equals(Set.of(94L, 95L))));
+        verify(schedules, times(1)).findAllById(argThat(ids -> java.util.Set.copyOf((Collection<Long>) ids).equals(java.util.Set.of(94L, 95L))));
     }
 
     @Test
@@ -139,8 +137,8 @@ class HorseIncidentReportHandlerNameTest {
         return report;
     }
 
-    private static CareSchedule schedule(long id, Long vetId) {
-        CareSchedule schedule = new CareSchedule();
+    private static com.rtms.backend.medical.entity.CareSchedule schedule(long id, Long vetId) {
+        com.rtms.backend.medical.entity.CareSchedule schedule = new com.rtms.backend.medical.entity.CareSchedule();
         schedule.setId(id);
         schedule.setVeterinarianId(vetId);
         return schedule;

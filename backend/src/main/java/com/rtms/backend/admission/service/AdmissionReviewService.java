@@ -28,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.Objects;
 
 /** Compatibility adapter for Admission Vet UI delegating to CareScheduleService */
 @Service
@@ -78,8 +77,8 @@ public class AdmissionReviewService {
                             admissionId, CareType.INITIAL)
                             .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE", "No active examination found")));
         }
-        if (!Objects.equals(schedule.getAdmissionId(), admissionId)
-                || !Objects.equals(schedule.getHorseId(), before.getHorseId())
+        if (!java.util.Objects.equals(schedule.getAdmissionId(), admissionId)
+                || !java.util.Objects.equals(schedule.getHorseId(), before.getHorseId())
                 || (before.getStatus() == AdmissionStatus.VET_REVIEW && schedule.getCareType() != CareType.INITIAL)) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE", "Examination does not belong to this admission review");
         }
@@ -90,14 +89,14 @@ public class AdmissionReviewService {
 
             if (assignedVetId == null) {
                 schedule.setVeterinarianId(actorId);
-                schedule.setScheduledAt(LocalDateTime.now());
+                schedule.setScheduledAt(java.time.LocalDateTime.now());
                 schedule.setStatus(CareScheduleStatus.SCHEDULED);
                 careSchedules.save(schedule);
                 careScheduleService.startCareSchedule(schedule.getId(), actorId);
-            } else if (Objects.equals(assignedVetId, actorId)) {
+            } else if (java.util.Objects.equals(assignedVetId, actorId)) {
                 schedule.setVeterinarianId(actorId);
                 if (schedule.getScheduledAt() == null) {
-                    schedule.setScheduledAt(LocalDateTime.now());
+                    schedule.setScheduledAt(java.time.LocalDateTime.now());
                 }
                 schedule.setStatus(CareScheduleStatus.SCHEDULED);
                 careSchedules.save(schedule);

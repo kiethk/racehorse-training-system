@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import org.springframework.dao.DataIntegrityViolationException;
 
 @Service
 public class NotificationService {
@@ -80,7 +79,7 @@ public class NotificationService {
 
         try {
             return Optional.of(notificationRepository.save(notification));
-        } catch (DataIntegrityViolationException e) {
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
             log.debug("Concurrent insert collision for key {}. Retrieving existing notification.", deduplicationKey);
             if (deduplicationKey != null) {
                 Optional<Notification> existing = notificationRepository.findByDeduplicationKey(deduplicationKey);

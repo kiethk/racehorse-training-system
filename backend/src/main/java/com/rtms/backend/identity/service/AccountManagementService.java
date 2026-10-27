@@ -35,7 +35,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.nio.charset.StandardCharsets;
 
 @Service
 public class AccountManagementService {
@@ -56,7 +55,7 @@ public class AccountManagementService {
     private final CareScheduleRepository careScheduleRepository;
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final NotificationService notificationService;
-    private final EmailService emailService;
+    private final com.rtms.backend.notification.service.EmailService emailService;
 
     public AccountManagementService(
             UserRepository userRepository,
@@ -327,7 +326,7 @@ public class AccountManagementService {
                     violations.stream().sorted(Comparator.comparing(v -> v.getPropertyPath().toString())).findFirst().orElseThrow().getMessage());
         }
 
-        if (request.getPassword().getBytes(StandardCharsets.UTF_8).length > 72) {
+        if (request.getPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at most 72 UTF-8 bytes");
         }
 

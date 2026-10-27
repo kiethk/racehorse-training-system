@@ -193,7 +193,7 @@ class RaceRegistrationServiceTest {
         Long areaId = 2L;
 
         Horse horse = createEligibleHorse(horseId, stallId);
-        horse.setTrainingDecision(TrainingDecision.BLOCKED); // Thú y chặn tập (blocked by the vet)
+        horse.setTrainingDecision(com.rtms.backend.training.enums.TrainingDecision.BLOCKED); // Thú y chặn tập (blocked by the vet)
 
         StableStall stall = new StableStall();
         stall.setId(stallId);

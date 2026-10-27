@@ -19,9 +19,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
-import com.rtms.backend.horse.entity.HorseEditRequestDocument;
-import com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,7 +35,7 @@ class HorsePhotoServiceTest {
     @Mock
     private FileStorageService storage;
     @Mock
-    private HorseEditRequestDocumentRepository editDocuments;
+    private com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository editDocuments;
 
     private HorsePhotoService service;
 
@@ -216,13 +213,13 @@ class HorsePhotoServiceTest {
     @Test
     @DisplayName("BR-05: a photo approved through an edit request wins over the admission photo")
     void approvedEditPhotoWinsOverAdmissionPhoto() {
-        var edited = new HorseEditRequestDocument();
+        var edited = new com.rtms.backend.horse.entity.HorseEditRequestDocument();
         edited.setHorseId(10L);
         edited.setDocumentType(AdmissionDocumentType.HORSE_PHOTO);
         edited.setFileUrl("local:edited.png");
         edited.setCurrent(true);
         when(editDocuments.findFirstByHorseIdAndDocumentTypeAndCurrentTrue(10L, AdmissionDocumentType.HORSE_PHOTO))
-                .thenReturn(Optional.of(edited));
+                .thenReturn(java.util.Optional.of(edited));
         Resource bytes = new ByteArrayResource(new byte[]{1});
         when(storage.load("local:edited.png")).thenReturn(bytes);
         when(storage.mediaType("local:edited.png")).thenReturn(MediaType.IMAGE_PNG);
@@ -236,7 +233,7 @@ class HorsePhotoServiceTest {
     @Test
     @DisplayName("BR-05: a horse whose only photo came from an edit request still gets an image URL")
     void editedPhotoAloneProducesImageUrl() {
-        var edited = new HorseEditRequestDocument();
+        var edited = new com.rtms.backend.horse.entity.HorseEditRequestDocument();
         edited.setHorseId(10L);
         when(editDocuments.findByHorseIdInAndDocumentTypeAndCurrentTrue(List.of(10L), AdmissionDocumentType.HORSE_PHOTO))
                 .thenReturn(List.of(edited));

@@ -42,7 +42,6 @@ import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -88,7 +87,7 @@ class CareScheduleHardeningTests {
                 mock(EntityManager.class),
                 notificationService,
                 new TrainingDecisionService(horses, schedules, workoutService),
-                Mockito.mock(PreventiveVaccinationService.class)
+                org.mockito.Mockito.mock(PreventiveVaccinationService.class)
         );
 
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -195,7 +194,7 @@ class CareScheduleHardeningTests {
                 anyString(),
                 anyString()
         );
-        verify(events).publishEvent(any(UrgentAssignmentCommittedEvent.class));
+        verify(events).publishEvent(any(com.rtms.backend.event.UrgentAssignmentCommittedEvent.class));
     }
 
     @Test

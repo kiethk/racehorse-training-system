@@ -16,7 +16,6 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import org.springframework.data.jpa.domain.Specification;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -59,26 +58,26 @@ class AuditLogServiceReadTest {
     void defaultRequest_returnsPaginatedLogs() {
         AuditLog log = makeLog(1L, null, "POST", "/api/horses", 201, LocalDateTime.now());
         Page<AuditLog> page = new PageImpl<>(List.of(log));
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(page);
 
         Pageable pageable = PageRequest.of(0, 20);
         Page<AuditLogResponse> result = service.getAuditLogs(null, null, null, null, null, null, pageable);
 
         assertEquals(1, result.getTotalElements());
-        verify(repository).findAll(any(Specification.class), any(Pageable.class));
+        verify(repository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class));
     }
 
     // 2. Sorted newest first — service forces createdAt DESC sort
     @Test
     void getAuditLogs_forcesSortByCreatedAtDesc() {
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
         service.getAuditLogs(null, null, null, null, null, null, PageRequest.of(0, 20));
 
         verify(repository).findAll(
-                (Specification<AuditLog>) any(Specification.class),
+                (org.springframework.data.jpa.domain.Specification<AuditLog>) any(org.springframework.data.jpa.domain.Specification.class),
                 argThat((Pageable p) -> p.getSort().getOrderFor("createdAt") != null
                         && p.getSort().getOrderFor("createdAt").isDescending())
         );
@@ -87,34 +86,34 @@ class AuditLogServiceReadTest {
     // 3. Filter by userId
     @Test
     void filterByUserId_passedToRepository() {
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
         service.getAuditLogs(7L, null, null, null, null, null, PageRequest.of(0, 20));
 
-        verify(repository).findAll(any(Specification.class), any(Pageable.class));
+        verify(repository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class));
     }
 
     // 4. Filter by httpMethod
     @Test
     void filterByHttpMethod_passedToRepository() {
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
         service.getAuditLogs(null, "POST", null, null, null, null, PageRequest.of(0, 20));
 
-        verify(repository).findAll(any(Specification.class), any(Pageable.class));
+        verify(repository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class));
     }
 
     // 5. Lowercase method input normalizes to uppercase
     @Test
     void filterByHttpMethod_lowercaseNormalized() {
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
         service.getAuditLogs(null, "patch", null, null, null, null, PageRequest.of(0, 20));
 
-        verify(repository).findAll(any(Specification.class), any(Pageable.class));
+        verify(repository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class));
     }
 
     // 6. Invalid method rejected with 400
@@ -129,47 +128,47 @@ class AuditLogServiceReadTest {
     // 7. Filter by statusCode
     @Test
     void filterByStatusCode_passedToRepository() {
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
         service.getAuditLogs(null, null, 403, null, null, null, PageRequest.of(0, 20));
 
-        verify(repository).findAll(any(Specification.class), any(Pageable.class));
+        verify(repository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class));
     }
 
     // 8. Filter by from
     @Test
     void filterByFrom_passedToRepository() {
         LocalDateTime from = LocalDateTime.now().minusDays(1);
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
         service.getAuditLogs(null, null, null, from, null, null, PageRequest.of(0, 20));
 
-        verify(repository).findAll(any(Specification.class), any(Pageable.class));
+        verify(repository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class));
     }
 
     // 9. Filter by to
     @Test
     void filterByTo_passedToRepository() {
         LocalDateTime to = LocalDateTime.now();
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
         service.getAuditLogs(null, null, null, null, to, null, PageRequest.of(0, 20));
 
-        verify(repository).findAll(any(Specification.class), any(Pageable.class));
+        verify(repository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class));
     }
 
     // 10. Search matches requestPath case-insensitively (search term passed to repo)
     @Test
     void filterBySearch_passedToRepository() {
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
         service.getAuditLogs(null, null, null, null, null, "horses", PageRequest.of(0, 20));
 
-        verify(repository).findAll(any(Specification.class), any(Pageable.class));
+        verify(repository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class));
     }
 
     // 11. Null audit user maps safely (no NPE)
@@ -177,7 +176,7 @@ class AuditLogServiceReadTest {
     void nullUser_mapsSafely() {
         AuditLog log = makeLog(1L, null, "DELETE", "/api/horses/1", 200, LocalDateTime.now());
         Page<AuditLog> page = new PageImpl<>(List.of(log));
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(page);
 
         Page<AuditLogResponse> result = service.getAuditLogs(null, null, null, null, null, null, PageRequest.of(0, 20));
@@ -192,7 +191,7 @@ class AuditLogServiceReadTest {
     // 12. Empty result returns empty page
     @Test
     void noMatch_returnsEmptyPage() {
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
         Page<AuditLogResponse> result = service.getAuditLogs(null, null, null, null, null, null, PageRequest.of(0, 20));

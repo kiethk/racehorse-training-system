@@ -18,7 +18,6 @@ import javax.imageio.ImageIO;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Set;
-import org.springframework.http.MediaType;
 
 @Service
 public class MyProfileService {
@@ -97,7 +96,7 @@ public class MyProfileService {
         }
     }
 
-    public record Photo(Resource resource, MediaType mediaType) {}
+    public record Photo(Resource resource, org.springframework.http.MediaType mediaType) {}
     private static String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }
     private static ResponseStatusException bad(String message) { return new ResponseStatusException(HttpStatus.BAD_REQUEST, message); }
 }

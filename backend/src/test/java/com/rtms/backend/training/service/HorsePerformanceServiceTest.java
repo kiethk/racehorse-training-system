@@ -31,7 +31,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import com.rtms.backend.stable.repository.StableStallRepository;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,7 +56,7 @@ class HorsePerformanceServiceTest {
     private HorseSpecialtyService specialtyService;
 
     @Mock
-    private StableStallRepository stallRepository;
+    private com.rtms.backend.stable.repository.StableStallRepository stallRepository;
 
     private HorsePerformanceService service;
 

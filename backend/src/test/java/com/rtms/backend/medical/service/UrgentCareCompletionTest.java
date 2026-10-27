@@ -44,8 +44,6 @@ import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.List;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -85,7 +83,7 @@ class UrgentCareCompletionTest {
                 veterinarianProfileRepository, auditLogRepository, eventPublisher, entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                Mockito.mock(PreventiveVaccinationService.class));
+                org.mockito.Mockito.mock(PreventiveVaccinationService.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -183,7 +181,7 @@ class UrgentCareCompletionTest {
         stubCompletion();
         incident.setGroomId(55L);
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
-                .thenReturn(List.of(incident));
+                .thenReturn(java.util.List.of(incident));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequest(TrainingDecision.ALLOWED), vet.getId());
@@ -228,12 +226,12 @@ class UrgentCareCompletionTest {
         when(horseRepository.findTrainerIdByHorseId(horse.getId())).thenReturn(Optional.of(88L));
         stubCompletion();
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
-                .thenReturn(List.of(incident, second, third));
+                .thenReturn(java.util.List.of(incident, second, third));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequest(TrainingDecision.ALLOWED), vet.getId());
 
-        for (HorseIncidentReport r : List.of(incident, second, third)) {
+        for (HorseIncidentReport r : java.util.List.of(incident, second, third)) {
             assertEquals(IncidentStatus.RESOLVED, r.getStatus());
             assertEquals(vet.getId(), r.getHandledById());
             assertNotNull(r.getHandledAt());
@@ -261,7 +259,7 @@ class UrgentCareCompletionTest {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         stubCompletion();
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
-                .thenReturn(List.of(incident));
+                .thenReturn(java.util.List.of(incident));
 
         var response = careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequest(TrainingDecision.ALLOWED), vet.getId());
@@ -277,7 +275,7 @@ class UrgentCareCompletionTest {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         stubCompletion();
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
-                .thenReturn(List.of());
+                .thenReturn(java.util.List.of());
         when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
@@ -314,11 +312,11 @@ class UrgentCareCompletionTest {
 
         when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
         when(incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(urgentSchedule.getId()))
-                .thenReturn(List.of(incident, merged));
+                .thenReturn(java.util.List.of(incident, merged));
 
         var reports = careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), vet.getId());
 
-        assertEquals(List.of(30L, 31L), reports.stream().map(r -> r.id()).toList());
+        assertEquals(java.util.List.of(30L, 31L), reports.stream().map(r -> r.id()).toList());
     }
 
     @Test
@@ -327,7 +325,7 @@ class UrgentCareCompletionTest {
         incident.setReportedAt(LocalDateTime.now());
         when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
         when(incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(urgentSchedule.getId()))
-                .thenReturn(List.of());
+                .thenReturn(java.util.List.of());
         when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
 
         var reports = careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), vet.getId());
@@ -413,7 +411,7 @@ class UrgentCareCompletionTest {
                 eq(10L), eq(CareType.URGENT), anyList(), eq(100L))).thenReturn(true);
         incident.setGroomId(55L);
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
-                .thenReturn(List.of(incident));
+                .thenReturn(java.util.List.of(incident));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
                 completeRequest(TrainingDecision.ALLOWED), vet.getId());

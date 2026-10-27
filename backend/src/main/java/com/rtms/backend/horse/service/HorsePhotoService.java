@@ -20,9 +20,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import com.rtms.backend.horse.entity.HorseEditRequestDocument;
-import com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository;
-import java.util.HashSet;
 
 /**
  * Resolves HORSE_PHOTO documents for horses without exposing admission internals.
@@ -52,12 +49,12 @@ public class HorsePhotoService {
     private final AdmissionApplicationRepository admissionRepo;
     private final AdmissionDocumentRepository documentRepo;
     private final FileStorageService storage;
-    private final HorseEditRequestDocumentRepository editDocuments;
+    private final com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository editDocuments;
 
     public HorsePhotoService(AdmissionApplicationRepository admissionRepo,
                              AdmissionDocumentRepository documentRepo,
                              FileStorageService storage,
-                             HorseEditRequestDocumentRepository editDocuments) {
+                             com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository editDocuments) {
         this.admissionRepo = admissionRepo;
         this.documentRepo = documentRepo;
         this.storage = storage;
@@ -78,7 +75,7 @@ public class HorsePhotoService {
         // An approved edit request may have replaced (or added) the photo.
         Set<Long> withEditedPhoto = editDocuments
                 .findByHorseIdInAndDocumentTypeAndCurrentTrue(horseIds, AdmissionDocumentType.HORSE_PHOTO).stream()
-                .map(HorseEditRequestDocument::getHorseId)
+                .map(com.rtms.backend.horse.entity.HorseEditRequestDocument::getHorseId)
                 .collect(Collectors.toSet());
 
         // Step 1: Find admissions for these horses; pick latest per horse.
@@ -110,7 +107,7 @@ public class HorsePhotoService {
                         (a, b) -> a.getId() > b.getId() ? a : b));
 
         // Step 3: Build horseId → imageUrl.
-        Set<Long> withPhoto = new HashSet<>(withEditedPhoto);
+        Set<Long> withPhoto = new java.util.HashSet<>(withEditedPhoto);
         latestPerHorse.entrySet().stream()
                 .filter(e -> photoByAdmission.containsKey(e.getValue().getId()))
                 .forEach(e -> withPhoto.add(e.getKey()));

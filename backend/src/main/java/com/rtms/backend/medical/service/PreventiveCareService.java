@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.HexFormat;
 
 /**
  * Legacy route adapter: all work is stored and scheduled through CareSchedule.
@@ -188,7 +187,7 @@ public class PreventiveCareService {
         String value = horseId + "|" + admissionId + "|ROUTINE|" + requestedAt + "|" + description;
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
+            return java.util.HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException(impossible);
         }

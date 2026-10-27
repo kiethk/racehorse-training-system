@@ -21,7 +21,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import com.rtms.backend.admission.service.AdmissionGroomReviewService;
 
 @Service
 public class StableAssignmentService {
@@ -37,13 +36,13 @@ public class StableAssignmentService {
     private final TrainingWorkoutService workouts;
     private final EntityManager em;
     private final AreaTrainerAssignmentPolicy trainerPolicy;
-    private final AdmissionGroomReviewService admissionAllocation;
+    private final com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
 
     public StableAssignmentService(AreaRepository areas, StableStallRepository stalls,
                                    UserRepository users, GroomProfileRepository profiles,
                                    HorseRepository horses, TrainingWorkoutService workouts, EntityManager em,
                                    AreaTrainerAssignmentPolicy trainerPolicy,
-                                   AdmissionGroomReviewService admissionAllocation) {
+                                   com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation) {
         this.areas = areas;
         this.stalls = stalls;
         this.users = users;

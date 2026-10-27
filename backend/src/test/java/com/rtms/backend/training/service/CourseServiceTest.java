@@ -24,7 +24,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
-import com.rtms.backend.config.TrainingLimits;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -471,7 +470,7 @@ class CourseServiceTest {
         course.setTrainerId(9L);
         when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
         when(subjectRepository.findById(20L)).thenReturn(Optional.of(subject(20L, 9L)));
-        when(courseSubjectRepository.countByCourseId(5L)).thenReturn((long) TrainingLimits.MAX_COURSE_SUBJECTS);
+        when(courseSubjectRepository.countByCourseId(5L)).thenReturn((long) com.rtms.backend.config.TrainingLimits.MAX_COURSE_SUBJECTS);
 
         CourseSubjectItemRequest req = new CourseSubjectItemRequest();
         req.setSubjectId(20L);

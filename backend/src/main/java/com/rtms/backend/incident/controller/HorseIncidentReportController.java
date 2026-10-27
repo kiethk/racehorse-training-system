@@ -16,8 +16,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import com.rtms.backend.config.ApiException;
-import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping({"/api/incidents", "/api/groom-incident-reports"})
@@ -59,8 +57,8 @@ public class HorseIncidentReportController {
             @PathVariable Long id,
             @RequestBody HandleIncidentRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        throw new ApiException(
-                HttpStatus.CONFLICT,
+        throw new com.rtms.backend.config.ApiException(
+                org.springframework.http.HttpStatus.CONFLICT,
                 "INCIDENT_CLOSE_VIA_CARE_SCHEDULE",
                 "Incident reports are resolved only by completing the urgent care schedule");
     }

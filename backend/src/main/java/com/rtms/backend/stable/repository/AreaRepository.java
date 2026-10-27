@@ -9,8 +9,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
-import jakarta.persistence.LockModeType;
-import org.springframework.data.jpa.repository.Lock;
 
 @Repository
 public interface AreaRepository extends JpaRepository<Area, Long> {
@@ -26,7 +24,7 @@ public interface AreaRepository extends JpaRepository<Area, Long> {
     List<Area> findByType(AreaType type);
 
     /** Unassigned REGULAR areas in generated order: A..Z, AA.., excluding soft-deleted rows. */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Area a WHERE a.type = 'REGULAR' AND a.trainerId IS NULL ORDER BY LENGTH(a.code), a.code ASC")
     List<Area> findUnassignedRegularAreasOrdered();
 

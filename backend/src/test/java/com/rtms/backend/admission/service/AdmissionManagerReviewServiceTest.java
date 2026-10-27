@@ -25,11 +25,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
-import com.rtms.backend.identity.repository.GroomProfileRepository;
-import com.rtms.backend.medical.service.PreventiveStatusService;
-import java.time.LocalDate;
-import org.mockito.ArgumentMatchers;
-import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -54,10 +49,10 @@ class AdmissionManagerReviewServiceTest {
     private AdmissionGroomReviewService admissionGroomReviewService;
 
     @Mock
-    private PreventiveStatusService preventiveStatusService;
+    private com.rtms.backend.medical.service.PreventiveStatusService preventiveStatusService;
 
     @Mock
-    private GroomProfileRepository groomProfileRepository;
+    private com.rtms.backend.identity.repository.GroomProfileRepository groomProfileRepository;
 
     private AdmissionManagerReviewService service;
 
@@ -153,7 +148,7 @@ class AdmissionManagerReviewServiceTest {
 
         // Phác đồ bắt buộc còn MISSING sau khám nhập trại được hẹn tiêm ngày hôm sau.
         verify(preventiveStatusService).upsertMilestone(10L, "preventive:approval:1", 5L,
-                LocalDate.now().plusDays(1));
+                java.time.LocalDate.now().plusDays(1));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -449,7 +444,7 @@ class AdmissionManagerReviewServiceTest {
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.empty());
 
-        var error = assertThrows(ResponseStatusException.class,
+        var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.review(1L, 5L, approveRequest(20L)));
         assertEquals(409, error.getStatusCode().value());
 
@@ -467,7 +462,7 @@ class AdmissionManagerReviewServiceTest {
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.empty());
 
-        var error = assertThrows(ResponseStatusException.class,
+        var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.review(1L, 5L, approveRequest(null)));
         assertEquals(409, error.getStatusCode().value());
 
@@ -577,9 +572,9 @@ class AdmissionManagerReviewServiceTest {
         var order = inOrder(stableStallRepository);
         order.verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
         order.verify(stableStallRepository).findFairAvailableStallForUpdate("REGULAR");
-        verify(groomProfileRepository).touchLastHorseAssignedAt(ArgumentMatchers.eq(33L), any());
-        verify(admissionGroomReviewService).notifyGroomAssigned(ArgumentMatchers.same(admission),
-                ArgumentMatchers.same(regularStall), ArgumentMatchers.anyString());
+        verify(groomProfileRepository).touchLastHorseAssignedAt(org.mockito.ArgumentMatchers.eq(33L), any());
+        verify(admissionGroomReviewService).notifyGroomAssigned(org.mockito.ArgumentMatchers.same(admission),
+                org.mockito.ArgumentMatchers.same(regularStall), org.mockito.ArgumentMatchers.anyString());
         verify(admissionGroomReviewService).allocateWaitingAdmissions();
     }
 

@@ -46,8 +46,6 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import com.rtms.backend.stable.entity.StableStall;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -320,8 +318,8 @@ abstract class DemoSeedWorkflow {
             int block = s.get("blockNumber").asInt();
             var baseline = stalls.findByAreaId(area.getId()).stream()
                     .filter(st -> st.getStallNumber() > (block-1)*3 && st.getStallNumber() <= block*3)
-                    .sorted(Comparator.comparing(StableStall::getStallNumber))
-                    .map(StableStall::getGroomId).toList();
+                    .sorted(Comparator.comparing(com.rtms.backend.stable.entity.StableStall::getStallNumber))
+                    .map(com.rtms.backend.stable.entity.StableStall::getGroomId).toList();
             BlockGroomAssignmentDto edit = new BlockGroomAssignmentDto(area.getId(),block,staffIds.get(text(s,"key")));
             edit.setExpectedGroomIds(baseline);
             groomEdits.add(edit);
@@ -573,7 +571,7 @@ abstract class DemoSeedWorkflow {
         report.put("staffIds",staffIds);report.put("admissionIds",admissionIds);report.put("ownerIds",ownerIds);
         report.put("ownerCount",ownerIds.isEmpty()?1:8); report.put("ownerScopeHttpChecks",ownerChecks);
         report.put("admissionStatuses",jdbc.queryForList("SELECT status,count(*) AS total FROM admission_applications GROUP BY status ORDER BY status"));
-        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
             Path output=Path.of(cloudMode()?"target/cloud-seed/result.json":"target/demo-seed/result.json");Files.createDirectories(output.getParent());
             json.writerWithDefaultPrettyPrinter().writeValue(output.toFile(),report);
             json.writerWithDefaultPrettyPrinter().writeValue(resultPath().toFile(),report);
@@ -601,7 +599,7 @@ abstract class DemoSeedWorkflow {
             Long first=((Number)mine.getFirst().get("id")).longValue();
             Long foreign=((Number)other.get("id")).longValue(), foreignHorse=((Number)other.get("horse_id")).longValue();
             mvc.perform(get("/api/owner/admissions/"+first).header("Authorization","Bearer "+access)).andExpect(status().isOk());
-            boolean outsideTransaction=!TransactionSynchronizationManager.isActualTransactionActive();
+            boolean outsideTransaction=!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive();
             if (outsideTransaction) {
                 mvc.perform(get("/api/owner/admissions/"+foreign).header("Authorization","Bearer "+access)).andExpect(status().isForbidden());
                 mvc.perform(get("/api/owner/admissions/"+foreign+"/documents").header("Authorization","Bearer "+access)).andExpect(status().isForbidden());

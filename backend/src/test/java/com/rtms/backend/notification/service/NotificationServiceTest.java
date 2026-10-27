@@ -139,12 +139,12 @@ class NotificationServiceTest {
 
         assertEquals(1L, notificationService.getUnreadCount(userId));
 
-        NotificationResponse updated = notificationService.markAsRead(5L, userId);
+        com.rtms.backend.notification.dto.NotificationResponse updated = notificationService.markAsRead(5L, userId);
         assertTrue(updated.isRead());
         assertTrue(n.isRead());
         verify(notificationRepository).save(n);
 
         // User khác không mark được notification của người này
-        assertThrows(ApiException.class, () -> notificationService.markAsRead(5L, 999L));
+        assertThrows(com.rtms.backend.config.ApiException.class, () -> notificationService.markAsRead(5L, 999L));
     }
 }

@@ -40,8 +40,6 @@ import java.util.Set;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.springframework.dao.DataAccessException;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -229,7 +227,7 @@ class AdmissionReadmissionPostgresTest {
         assertEquals(HorseSex.FEMALE, created.candidate().sex());
         assertEquals("FEMALE", jdbc.queryForObject(
                 "SELECT sex FROM candidate_horse_profiles WHERE admission_id = ?", String.class, created.admissionId()));
-        assertThrows(DataIntegrityViolationException.class,
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE candidate_horse_profiles SET sex = 'OTHER' WHERE admission_id = ?", created.admissionId()));
         assertEquals("YES", jdbc.queryForObject("""
                 SELECT is_nullable FROM information_schema.columns
@@ -275,9 +273,9 @@ class AdmissionReadmissionPostgresTest {
         mvc.perform(get("/api/owner/admissions/{id}", created.admissionId()).with(authentication(auth)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.candidate.sex").value("FEMALE"));
 
-        assertThrows(DataIntegrityViolationException.class,
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
                 () -> jdbc.update("UPDATE horses SET sex = 'GELDING' WHERE id = ?", horse.getId()));
-        var locked = assertThrows(DataAccessException.class,
+        var locked = assertThrows(org.springframework.dao.DataAccessException.class,
                 () -> jdbc.update("UPDATE candidate_horse_profiles SET sex = 'MALE' WHERE admission_id = ?", created.admissionId()));
         assertTrue(locked.getMessage().contains("snapshot is locked"));
         assertEquals(HorseSex.FEMALE, owners.getMyAdmission(ownerIds.getFirst(), created.admissionId()).candidate().sex());

@@ -1,10 +1,4 @@
 package com.rtms.backend.identity.dto;
-import com.rtms.backend.identity.entity.User;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
-import java.util.HexFormat;
 
 public class LoginResponse {
     private Long userId;
@@ -15,9 +9,9 @@ public class LoginResponse {
     private String phone;
     private String address;
     private String avatarUrl;
-    private LocalDateTime createdAt;
+    private java.time.LocalDateTime createdAt;
 
-    public static LoginResponse fromUser(User user, Object profile) {
+    public static LoginResponse fromUser(com.rtms.backend.identity.entity.User user, Object profile) {
         LoginResponse result = new LoginResponse(user.getId(), user.getFullName(), user.getEmail(), user.getRole().getName(), profile);
         result.phone = user.getPhone();
         result.address = user.getAddress();
@@ -25,9 +19,9 @@ public class LoginResponse {
         String key = user.getAvatarUrl();
         if (key != null && !key.isBlank()) {
             try {
-                byte[] version = MessageDigest.getInstance("SHA-256").digest(key.getBytes(StandardCharsets.UTF_8));
-                result.avatarUrl = "/api/auth/me/avatar?v=" + HexFormat.of().formatHex(version, 0, 12);
-            } catch (NoSuchAlgorithmException impossible) {
+                byte[] version = java.security.MessageDigest.getInstance("SHA-256").digest(key.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                result.avatarUrl = "/api/auth/me/avatar?v=" + java.util.HexFormat.of().formatHex(version, 0, 12);
+            } catch (java.security.NoSuchAlgorithmException impossible) {
                 throw new IllegalStateException(impossible);
             }
         }
@@ -61,7 +55,7 @@ public class LoginResponse {
     public String getPhone() { return phone; }
     public String getAddress() { return address; }
     public String getAvatarUrl() { return avatarUrl; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
+    public java.time.LocalDateTime getCreatedAt() { return createdAt; }
 
     public String getAccessToken() { return accessToken; }
     public void setAccessToken(String accessToken) { this.accessToken = accessToken; }

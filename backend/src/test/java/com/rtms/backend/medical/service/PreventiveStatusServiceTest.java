@@ -33,11 +33,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import com.rtms.backend.admission.entity.AdmissionApplication;
-import com.rtms.backend.admission.enums.AdmissionStatus;
-import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
-import com.rtms.backend.medical.enums.RescheduleReason;
-import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,7 +51,7 @@ class PreventiveStatusServiceTest {
     @Mock PrescriptionRepository prescriptions;
     @Mock CareScheduleRepository schedules;
     @Mock HorseRepository horses;
-    @Mock AdmissionApplicationRepository admissions;
+    @Mock com.rtms.backend.admission.repository.AdmissionApplicationRepository admissions;
 
     private final PreventiveProtocol ei = protocol(1L, "EI", 180, 14, true);
     private final PreventiveProtocol tetanus = protocol(2L, "TETANUS", 365, 30, true);
@@ -285,12 +280,12 @@ class PreventiveStatusServiceTest {
 
     @Test
     void newMilestoneIsLinkedToTheHorsesLatestLiveAdmissionSoTheVetQueueCanOpenIt() {
-        var rejected = new AdmissionApplication();
+        var rejected = new com.rtms.backend.admission.entity.AdmissionApplication();
         rejected.setId(8L);
-        rejected.setStatus(AdmissionStatus.REJECTED);
-        var approved = new AdmissionApplication();
+        rejected.setStatus(com.rtms.backend.admission.enums.AdmissionStatus.REJECTED);
+        var approved = new com.rtms.backend.admission.entity.AdmissionApplication();
         approved.setId(5L);
-        approved.setStatus(AdmissionStatus.APPROVED);
+        approved.setStatus(com.rtms.backend.admission.enums.AdmissionStatus.APPROVED);
         when(admissions.findByHorseIdOrderBySubmittedAtDesc(HORSE)).thenReturn(List.of(rejected, approved));
         dose(1L, TODAY);
         dose(2L, TODAY);
@@ -310,7 +305,7 @@ class PreventiveStatusServiceTest {
         CareSchedule milestone = service.deferMilestone(HORSE, "preventive:30", ACTOR, TODAY.plusDays(8)).orElseThrow();
 
         assertEquals(TODAY.plusDays(8).atTime(14, 0), milestone.getRequestedAt());
-        assertEquals(RescheduleReason.UNDER_TREATMENT, milestone.getRescheduleReason());
+        assertEquals(com.rtms.backend.medical.enums.RescheduleReason.UNDER_TREATMENT, milestone.getRescheduleReason());
         assertEquals(CareScheduleStatus.REQUESTED, milestone.getStatus());
     }
 
@@ -339,7 +334,7 @@ class PreventiveStatusServiceTest {
     }
 
     private static Map<Long, PreventiveDueStatus> byProtocol(List<PreventiveProtocolStatus> statuses) {
-        Map<Long, PreventiveDueStatus> map = new HashMap<>();
+        Map<Long, PreventiveDueStatus> map = new java.util.HashMap<>();
         statuses.forEach(status -> map.put(status.protocolId(), status.status()));
         return map;
     }

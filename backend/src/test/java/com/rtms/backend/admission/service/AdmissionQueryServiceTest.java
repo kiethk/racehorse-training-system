@@ -26,6 +26,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.rtms.backend.admission.dto.AdmissionDetailResponse;
 import com.rtms.backend.admission.dto.InitialVetExamResponse;
 import com.rtms.backend.identity.entity.User;
@@ -36,16 +42,6 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import org.mockito.ArgumentCaptor;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -86,8 +82,8 @@ class AdmissionQueryServiceTest {
 
     @Test
     void managerListBatchesAll54RowsAndPreservesOrderNullStallsAndFirstPhoto() {
-        var rows = new ArrayList<AdmissionApplication>();
-        var profiles = new ArrayList<CandidateHorseProfile>();
+        var rows = new java.util.ArrayList<AdmissionApplication>();
+        var profiles = new java.util.ArrayList<CandidateHorseProfile>();
         for (long id=1; id<=54; id++) {
             var row = new AdmissionApplication(); row.setId(id); row.setStatus(AdmissionStatus.APPROVED);
             row.setTrainerId(7L); row.setSubmittedAt(LocalDateTime.of(2026,3,1,9,0));
@@ -96,7 +92,7 @@ class AdmissionQueryServiceTest {
             profile.setBreed("Arabian"); profiles.add(profile);
         }
         rows.getFirst().setQuarantineStallId(500L);
-        Collections.reverse(profiles);
+        java.util.Collections.reverse(profiles);
         var stall = new StableStall(); stall.setId(500L); stall.setStallCode("Q-A01");
         var later = new AdmissionDocument(); later.setId(12L); later.setAdmissionId(1L);
         var first = new AdmissionDocument(); first.setId(11L); first.setAdmissionId(1L);
@@ -159,7 +155,7 @@ class AdmissionQueryServiceTest {
 
         assertEquals(10, response.size());
         assertEquals(2, response.page());
-        var pageable = ArgumentCaptor.forClass(Pageable.class);
+        var pageable = org.mockito.ArgumentCaptor.forClass(Pageable.class);
         verify(admissions).findGroomQueue(eq(7L), eq(true), eq(AdmissionStatus.GROOM_REVIEW), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
                 eq(true), eq(LocalDateTime.of(2026, 1, 2, 0, 0)),
                 eq(true), eq(LocalDateTime.of(2026, 1, 9, 0, 0)), pageable.capture());
@@ -267,7 +263,7 @@ class AdmissionQueryServiceTest {
 
         HorseHealthMetric metric = new HorseHealthMetric();
         metric.setHealthRecordId(healthRecordId);
-        metric.setHeartRate(BigDecimal.valueOf(42));
+        metric.setHeartRate(java.math.BigDecimal.valueOf(42));
         metric.setRecordedAt(LocalDateTime.of(2026, 3, 2, 14, 15));
         when(healthMetrics.findByHealthRecordIdOrderByRecordedAtAsc(healthRecordId))
                 .thenReturn(List.of(metric));
@@ -285,7 +281,7 @@ class AdmissionQueryServiceTest {
         assertEquals("Clear lungs, sound gait", exam.getFindings());
         assertNotNull(exam.getMetrics());
         assertEquals(1, exam.getMetrics().size());
-        assertEquals(BigDecimal.valueOf(42), exam.getMetrics().get(0).heartRate());
+        assertEquals(java.math.BigDecimal.valueOf(42), exam.getMetrics().get(0).heartRate());
     }
 
     @Test

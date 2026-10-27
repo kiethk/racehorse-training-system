@@ -30,9 +30,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import com.rtms.backend.horse.dto.HorseAdmissionHistoryResponse;
-import com.rtms.backend.horse.dto.HorseStatusChangeRequest;
-import com.rtms.backend.horse.service.HorseAdmissionService;
 
 @RestController
 @RequestMapping("/api/horses")
@@ -44,11 +41,11 @@ public class HorseController {
     private final HorsePerformanceService performanceService;
     private final HorseSpecialtyService specialtyService;
     private final HorsePhotoService photoService;
-    private final HorseAdmissionService admissionService;
+    private final com.rtms.backend.horse.service.HorseAdmissionService admissionService;
 
     public HorseController(HorseService horseService, HorsePerformanceService performanceService,
                            HorseSpecialtyService specialtyService, HorsePhotoService photoService,
-                           HorseAdmissionService admissionService) {
+                           com.rtms.backend.horse.service.HorseAdmissionService admissionService) {
         this.horseService = horseService;
         this.performanceService = performanceService;
         this.specialtyService = specialtyService;
@@ -173,7 +170,7 @@ public class HorseController {
      */
     @PreAuthorize("hasAuthority('HORSE_VIEW')")
     @GetMapping("/{id}/admissions")
-    public ApiResponse<List<HorseAdmissionHistoryResponse>> getAdmissions(
+    public ApiResponse<List<com.rtms.backend.horse.dto.HorseAdmissionHistoryResponse>> getAdmissions(
             @PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(admissionService.getAdmissionsForHorse(id, currentUser));
@@ -183,7 +180,7 @@ public class HorseController {
     @PutMapping("/{id}/status")
     public ApiResponse<HorseResponse> changeStatus(
             @PathVariable Long id,
-            @Valid @RequestBody HorseStatusChangeRequest request,
+            @Valid @RequestBody com.rtms.backend.horse.dto.HorseStatusChangeRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         Horse horse = horseService.changeHorseStatus(id, request, currentUser);
         Map<Long, String> imageUrls = photoService.resolveImageUrls(List.of(id), BASE_URL);

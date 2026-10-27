@@ -26,7 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import com.rtms.backend.stable.repository.StableStallRepository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -50,7 +49,7 @@ class CareScheduleVetQueueQueryTest {
     @Autowired private UserRepository users;
     @Autowired private RoleRepository roles;
     @Autowired private HorseRepository horses;
-    @Autowired private StableStallRepository stableStalls;
+    @Autowired private com.rtms.backend.stable.repository.StableStallRepository stableStalls;
 
     private Long vetId;
     private Long horseId;

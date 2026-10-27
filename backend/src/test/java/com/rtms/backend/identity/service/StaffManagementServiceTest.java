@@ -30,10 +30,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
-import jakarta.validation.Validator;
-import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -51,8 +47,8 @@ class StaffManagementServiceTest {
     private StableStallRepository stableStallRepository;
     private StaffManagementService staffService;
     private AreaTrainerAssignmentPolicy trainerAssignmentPolicy;
-    private EntityManager em;
-    private Validator validator;
+    private jakarta.persistence.EntityManager em;
+    private jakarta.validation.Validator validator;
 
     @BeforeEach
     void setUp() {
@@ -65,15 +61,15 @@ class StaffManagementServiceTest {
         areaRepository = mock(AreaRepository.class);
         stableStallRepository = mock(StableStallRepository.class);
         trainerAssignmentPolicy = mock(AreaTrainerAssignmentPolicy.class);
-        em = mock(EntityManager.class);
-        var query = mock(Query.class);
+        em = mock(jakarta.persistence.EntityManager.class);
+        var query = mock(jakarta.persistence.Query.class);
         when(em.createNativeQuery(anyString())).thenReturn(query);
         when(query.setParameter(anyString(), any())).thenReturn(query);
-        validator = mock(Validator.class);
+        validator = mock(jakarta.validation.Validator.class);
         when(trainerAssignmentPolicy.check(anyLong())).thenAnswer(i ->
                 new AreaTrainerChangeCheck(i.getArgument(0), null, true, List.of()));
         when(stableStallRepository.findBlockForUpdate(anyLong(), eq(1), eq(12))).thenAnswer(i ->
-                IntStream.rangeClosed(1,12).mapToObj(n -> stall(n,i.getArgument(0),n,null)).toList());
+                java.util.stream.IntStream.rangeClosed(1,12).mapToObj(n -> stall(n,i.getArgument(0),n,null)).toList());
 
         staffService = new StaffManagementService(
                 userRepository, roleRepository, passwordEncoder,

@@ -15,7 +15,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import com.rtms.backend.stable.dto.BlockGroomAssignmentDto;
 
 @RestController
 @RequestMapping("/api/stalls")
@@ -104,7 +103,7 @@ public class StableStallController {
     @PreAuthorize("hasAuthority('STALL_GROOM_ASSIGN')")
     public ApiResponse<StableStall> assignGroom(
             @PathVariable Long id,
-            @RequestBody BlockGroomAssignmentDto request) {
+            @RequestBody com.rtms.backend.stable.dto.BlockGroomAssignmentDto request) {
         return ApiResponse.success(stableStallService.assignGroom(id, request));
     }
 

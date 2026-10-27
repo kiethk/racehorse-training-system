@@ -46,12 +46,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import com.rtms.backend.config.FarmSchedulePolicy;
-import com.rtms.backend.config.TrainingLimits;
-import com.rtms.backend.identity.entity.Role;
-import com.rtms.backend.identity.entity.User;
-import com.rtms.backend.identity.repository.UserRepository;
-import java.time.LocalTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -85,7 +79,7 @@ class HorseTrainingPlanServiceTest {
     private TrainingLotService lotService;
 
     @Mock
-    private UserRepository userRepository;
+    private com.rtms.backend.identity.repository.UserRepository userRepository;
 
     private HorseTrainingPlanService planService;
 
@@ -243,9 +237,9 @@ class HorseTrainingPlanServiceTest {
         when(planRepository.saveAllAndFlush(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(workoutService.createWorkouts(any(), anyList(), anyMap())).thenReturn(new LinkedHashMap<>());
 
-        Role groomRole = new Role();
+        com.rtms.backend.identity.entity.Role groomRole = new com.rtms.backend.identity.entity.Role();
         groomRole.setName("GROOM");
-        User groomUser = new User();
+        com.rtms.backend.identity.entity.User groomUser = new com.rtms.backend.identity.entity.User();
         groomUser.setRole(groomRole);
         groomUser.setActive(true);
         when(userRepository.findById(77L)).thenReturn(Optional.of(groomUser));
@@ -296,7 +290,7 @@ class HorseTrainingPlanServiceTest {
     @Test
     @DisplayName("1g. More horses than the limit are rejected")
     void testCreatePlan_TooManyHorses() {
-        Long[] ids = new Long[TrainingLimits.MAX_HORSES_PER_PLAN + 1];
+        Long[] ids = new Long[com.rtms.backend.config.TrainingLimits.MAX_HORSES_PER_PLAN + 1];
         for (int i = 0; i < ids.length; i++) {
             ids[i] = i + 1L;
         }
@@ -314,7 +308,7 @@ class HorseTrainingPlanServiceTest {
         CreateHorseTrainingPlanRequest request = request(100L, today, 1L);
         request.setTrainingDays(List.of(trainingDayOf(today)));
 
-        if (LocalTime.now().isBefore(FarmSchedulePolicy.GOLDEN_HOURS_END)) {
+        if (java.time.LocalTime.now().isBefore(com.rtms.backend.config.FarmSchedulePolicy.GOLDEN_HOURS_END)) {
             when(planRepository.findRunningPlans(any(), any())).thenReturn(Collections.emptyList());
             when(planRepository.saveAllAndFlush(anyList())).thenAnswer(inv -> inv.getArgument(0));
             when(workoutService.createWorkouts(any(), anyList(), anyMap())).thenReturn(new LinkedHashMap<>());

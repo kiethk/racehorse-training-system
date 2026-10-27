@@ -7,9 +7,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import com.rtms.backend.identity.entity.User;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Danh bạ nhân sự — CHỈ ĐỌC.
@@ -54,9 +51,9 @@ public class UserDirectoryController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('USER_VIEW')")
     public ApiResponse<UserSummaryResponse> getUserById(@PathVariable Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "User not found with id: " + id));
+        com.rtms.backend.identity.entity.User user = userRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "User not found with id: " + id));
 
         return ApiResponse.success(new UserSummaryResponse(
                 user.getId(),

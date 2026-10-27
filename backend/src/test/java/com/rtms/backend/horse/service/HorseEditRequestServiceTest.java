@@ -37,8 +37,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.function.Executable;
-import org.springframework.http.HttpStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -172,7 +170,7 @@ class HorseEditRequestServiceTest {
 
     @Test
     void submitRunsTheSharedParentSexRule() {
-        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "The sire must be a male horse"))
+        doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "The sire must be a male horse"))
                 .when(pedigreeService).validateParentSexesByUeln("999999SIR000001", null);
 
         assertEquals(400, status(() -> service.submit(OWNER, HORSE, fields("Mercury", "999999SIR000001"), null, null)));
@@ -322,7 +320,7 @@ class HorseEditRequestServiceTest {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static int status(Executable call) {
+    private static int status(org.junit.jupiter.api.function.Executable call) {
         return assertThrows(ResponseStatusException.class, call).getStatusCode().value();
     }
 

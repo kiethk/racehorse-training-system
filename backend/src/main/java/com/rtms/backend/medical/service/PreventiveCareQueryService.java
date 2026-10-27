@@ -36,7 +36,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashMap;
 
 /** Dữ liệu đọc cho hub Preventive Care (docs/preventive-care-flow.md mục 6, 7). */
 @Service
@@ -169,7 +168,7 @@ public class PreventiveCareQueryService {
     public List<PreventiveCoverageResponse> coverage() {
         List<Long> horseIds = horses.findByCurrentStatusInOrderByNameAsc(HORSES_IN_SCOPE).stream()
                 .map(Horse::getId).toList();
-        Map<Long, Map<PreventiveDueStatus, Integer>> counts = new HashMap<>();
+        Map<Long, Map<PreventiveDueStatus, Integer>> counts = new java.util.HashMap<>();
         preventiveStatus.statusFor(horseIds).values().stream().flatMap(List::stream).forEach(status ->
                 counts.computeIfAbsent(status.protocolId(), id -> new EnumMap<>(PreventiveDueStatus.class))
                         .merge(status.status(), 1, Integer::sum));

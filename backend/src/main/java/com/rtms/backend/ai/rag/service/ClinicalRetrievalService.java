@@ -11,9 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Types;
 
 /**
  * Dịch vụ truy xuất tri thức y khoa lâm sàng (RAG Retrieval Service).
@@ -110,8 +107,8 @@ public class ClinicalRetrievalService {
                             ps.setLong(4, horseId);
                             ps.setLong(5, horseId);
                         } else {
-                            ps.setNull(4, Types.BIGINT);
-                            ps.setNull(5, Types.BIGINT);
+                            ps.setNull(4, java.sql.Types.BIGINT);
+                            ps.setNull(5, java.sql.Types.BIGINT);
                         }
                         ps.setString(6, vectorString);
                         ps.setDouble(7, minSimilarity);
@@ -197,7 +194,7 @@ public class ClinicalRetrievalService {
         }
     }
 
-    private ClinicalChunkResponseDto mapChunk(ResultSet rs) throws SQLException {
+    private ClinicalChunkResponseDto mapChunk(java.sql.ResultSet rs) throws java.sql.SQLException {
         Long embeddingId = rs.getLong("embedding_id");
         String title = rs.getString("doc_title");
         String category = rs.getString("doc_category");

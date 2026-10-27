@@ -24,8 +24,8 @@ import com.rtms.backend.stable.dto.TodayTaskItemResponse;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
-import com.rtms.backend.incident.enums.IncidentSeverity;
-import com.rtms.backend.incident.enums.IncidentStatus;
+import com.rtms.backend.stable.enums.IncidentSeverity;
+import com.rtms.backend.stable.enums.IncidentStatus;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.enums.TaskSource;
 import com.rtms.backend.stable.enums.GroomTaskType;
@@ -1002,8 +1002,8 @@ class AiToolExecutionServiceTest {
         rep.setReportedById(400L);
         rep.setHorseId(10L);
         rep.setTitle("Móng chân trái sau nứt nhẹ");
-        rep.setSeverity(IncidentSeverity.LOW);
-        rep.setStatus(IncidentStatus.REPORTED);
+        rep.setSeverity(com.rtms.backend.incident.enums.IncidentSeverity.LOW);
+        rep.setStatus(com.rtms.backend.incident.enums.IncidentStatus.REPORTED);
         rep.setReportedAt(LocalDateTime.now().minusDays(1));
         when(horseIncidentReportRepository.findByReportedById(400L)).thenReturn(List.of(rep));
 

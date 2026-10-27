@@ -15,7 +15,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.List;
 import java.util.Set;
-import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -116,7 +115,7 @@ class AdmissionUelnPolicyTest {
 
     @Test
     void availabilityCheckRejectsInvalidFormatBeforeReadingDatabase() {
-        var error = assertThrows(ResponseStatusException.class,
+        var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> policy.checkAvailability("INVALID_UELN_123"));
         assertEquals(400, error.getStatusCode().value());
         verifyNoInteractions(entityManager, admissions, horses);

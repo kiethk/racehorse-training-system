@@ -29,12 +29,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
-import com.rtms.backend.notification.service.NotificationService;
-import com.rtms.backend.notification.service.NotificationTypes;
-import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.stable.repository.StableStallRepository;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -47,8 +41,8 @@ class OwnerAdmissionServiceTest {
     private FileStorageService files;
     private AdmissionUelnPolicy uelnPolicy;
     private HorseRepository horses;
-    private StableStallRepository stalls;
-    private NotificationService notifications;
+    private com.rtms.backend.stable.repository.StableStallRepository stalls;
+    private com.rtms.backend.notification.service.NotificationService notifications;
     private OwnerAdmissionService service;
     private AtomicLong sequence;
 
@@ -60,8 +54,8 @@ class OwnerAdmissionServiceTest {
         files = mock(FileStorageService.class);
         uelnPolicy = mock(AdmissionUelnPolicy.class);
         horses = mock(HorseRepository.class);
-        stalls = mock(StableStallRepository.class);
-        notifications = mock(NotificationService.class);
+        stalls = mock(com.rtms.backend.stable.repository.StableStallRepository.class);
+        notifications = mock(com.rtms.backend.notification.service.NotificationService.class);
         service = new OwnerAdmissionService(admissions, candidates, documents, files, uelnPolicy,
                 new PedigreeBirthDateValidator(horses), stalls, notifications);
         sequence = new AtomicLong(100);
@@ -336,7 +330,7 @@ class OwnerAdmissionServiceTest {
 
         for (Long groomId : List.of(31L, 32L)) {
             verify(notifications).createNotification(eq(groomId), anyString(), anyString(),
-                    eq(NotificationTypes.ADMISSION_NEW_FOR_GROOM),
+                    eq(com.rtms.backend.notification.service.NotificationTypes.ADMISSION_NEW_FOR_GROOM),
                     eq("ADMISSION"), eq(detail.admissionId()),
                     eq(groomId + ":ADMISSION_" + detail.admissionId() + ":ADMISSION_NEW_FOR_GROOM"));
         }
@@ -348,12 +342,12 @@ class OwnerAdmissionServiceTest {
         AdmissionApplication admission = new AdmissionApplication();
         admission.setId(5L);
         admission.setStatus(AdmissionStatus.GROOM_REVIEW);
-        when(admissions.findById(5L)).thenReturn(Optional.of(admission));
+        when(admissions.findById(5L)).thenReturn(java.util.Optional.of(admission));
         when(stalls.isQuarantineGroom(41L)).thenReturn(false);
         when(admissions.isVisibleToGroom(5L, 41L, false, AdmissionStatus.GROOM_REVIEW)).thenReturn(false);
-        var groom = new AuthenticatedUser(41L, "g@x", "GROOM");
+        var groom = new com.rtms.backend.security.AuthenticatedUser(41L, "g@x", "GROOM");
 
-        assertThrows(AccessDeniedException.class,
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
                 () -> service.assertViewerCanRead(5L, groom));
 
         when(admissions.isVisibleToGroom(5L, 41L, false, AdmissionStatus.GROOM_REVIEW)).thenReturn(true);
@@ -368,7 +362,7 @@ class OwnerAdmissionServiceTest {
         application.setOwnerId(ownerId);
         application.setStatus(AdmissionStatus.GROOM_REVIEW);
         when(admissions.findByIdForUpdate(3L)).thenReturn(Optional.of(application));
-        var snapshot = new CandidateHorseProfile();
+        var snapshot = new com.rtms.backend.admission.entity.CandidateHorseProfile();
         snapshot.setAdmissionId(3L);
         snapshot.setRegistrationNumber("250001AB1234567");
         when(candidates.findByAdmissionId(3L)).thenReturn(Optional.of(snapshot));
@@ -384,8 +378,8 @@ class OwnerAdmissionServiceTest {
         when(documents.findByAdmissionId(3L)).thenReturn(List.of(old));
         when(files.store(any(), any())).thenReturn("local:new.png");
         var photo = new MockMultipartFile("files", "new.png", "image/png", new byte[]{1});
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
             var result = service.updateBeforeGroomReview(7L, 3L, request(),
                     List.of(AdmissionDocumentType.HORSE_PHOTO), List.of(photo));
@@ -396,12 +390,12 @@ class OwnerAdmissionServiceTest {
             // UELN unchanged: this admission must not conflict with itself.
             verify(uelnPolicy, never()).assertAvailableForSubmission(any());
             verify(files, never()).delete("local:old.png");
-            TransactionSynchronizationManager.getSynchronizations()
-                    .forEach(TransactionSynchronization::afterCommit);
+            org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
             verify(files).delete("local:old.png");
         } finally {
-            TransactionSynchronizationManager.setActualTransactionActive(false);
-            TransactionSynchronizationManager.clearSynchronization();
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
         }
     }
 
@@ -422,16 +416,16 @@ class OwnerAdmissionServiceTest {
     @Test
     void changingTheUelnChecksThatTheNewOneIsFree() {
         editable(7L).getId();
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
             var changed = new CreateOwnerAdmissionRequest("Pegasus", "Thoroughbred", LocalDate.of(2022, 4, 2),
                     HorseSex.MALE, "250001AB7654321", "SIRE", "Sire", null, "Dam", null, null);
             service.updateBeforeGroomReview(7L, 3L, changed, null, null);
             verify(uelnPolicy).assertAvailableForSubmission("250001AB7654321");
         } finally {
-            TransactionSynchronizationManager.setActualTransactionActive(false);
-            TransactionSynchronizationManager.clearSynchronization();
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
         }
     }
 }

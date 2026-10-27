@@ -17,7 +17,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import java.util.Optional;
-import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -26,7 +25,7 @@ class PreventiveCareServiceTest {
     @Mock CareScheduleRepository schedules;
     @Mock HorseRepository horses;
     @Mock CareScheduleService care;
-    @Mock AdmissionApplicationRepository admissions;
+    @Mock com.rtms.backend.admission.repository.AdmissionApplicationRepository admissions;
     private final AuthenticatedUser vet = new AuthenticatedUser(7L, "vet@example.com", "VETERINARIAN");
 
     @Test
