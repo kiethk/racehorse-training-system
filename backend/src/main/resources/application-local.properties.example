@@ -12,17 +12,11 @@ spring.config.import=optional:file:./.env.cloud[.properties],optional:file:./bac
 # AI Provider (OpenAI-compatible) — local override
 # Get your key from the team or generate your own at https://platform.openai.com/api-keys
 ai.api.base-url=https://api.openai.com/v1
-groq.api.base-url=${ai.api.base-url}
 ai.api.key=YOUR_OPENAI_API_KEY_HERE
-groq.api.key=${ai.api.key}
 ai.api.model=gpt-4o-mini
-groq.api.model=${ai.api.model}
 
-# Cấu hình gửi Mail thật qua Gmail SMTP
+# Cấu hình gửi Mail thật qua Gmail SMTP (Chỉ cần điền tài khoản & App Password)
 spring.mail.host=smtp.gmail.com
 spring.mail.port=587
 spring.mail.username=email_cua_ban@gmail.com
 spring.mail.password=16_ky_tu_app_password_vua_copy
-spring.mail.properties.mail.smtp.auth=true
-spring.mail.properties.mail.smtp.starttls.enable=true
-spring.mail.properties.mail.smtp.starttls.required=true
