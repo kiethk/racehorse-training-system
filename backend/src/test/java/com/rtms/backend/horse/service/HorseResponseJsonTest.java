@@ -57,7 +57,8 @@ class HorseResponseJsonTest {
 
     @BeforeEach
     void setUp() {
-        photoService = new HorsePhotoService(admissionRepo, documentRepo, storage);
+        photoService = new HorsePhotoService(admissionRepo, documentRepo, storage,
+                mock(com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository.class));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

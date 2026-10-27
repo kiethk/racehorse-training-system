@@ -21,7 +21,7 @@ import {
   toVaccinationRequests,
   validateVaccinationDrafts,
   type VaccinationDraft,
-} from '@/features/care/shared/components/ExamVaccinationSection';
+} from '@/features/care/components/preventive/ExamVaccinationSection';
 import type {
   CareType,
   CareSchedule,

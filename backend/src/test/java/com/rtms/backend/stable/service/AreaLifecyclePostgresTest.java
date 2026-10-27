@@ -90,6 +90,12 @@ class AreaLifecyclePostgresTest {
 
     @Test void softDeleteHidesOrmAndEveryNativeAllocationQuery() {
         long target = stall(quarantine);
+        // Only staffed stalls count as admission capacity, so give the fixture stalls a groom first.
+        Long groom = jdbc.queryForObject("""
+                SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id
+                WHERE r.name = 'GROOM' ORDER BY u.id LIMIT 1
+                """, Long.class);
+        jdbc.update("UPDATE stable_stalls SET groom_id = ? WHERE area_id IN (?, ?)", groom, quarantine, area);
         long available = stalls.countAvailableQuarantineStalls();
         long regularAvailable = stalls.countAvailableRegularStalls();
         assertTrue(lifecycle.check(quarantine).canDelete());
@@ -110,8 +116,8 @@ class AreaLifecyclePostgresTest {
             assertTrue(stalls.findAvailableRegularStallByIdForUpdate(stall(area)).isEmpty());
             assertTrue(stalls.findBlockForUpdate(quarantine, 1, 3).isEmpty());
             assertFalse(stalls.lockAdmissionCapacityStallsForUpdate().stream().anyMatch(s -> fixtureAreas.contains(s.getAreaId())));
-            assertFalse(stalls.findFirstAvailableQuarantineStallForUpdate().map(s -> s.getAreaId().equals(quarantine)).orElse(false));
-            assertFalse(stalls.findFirstAvailableRegularStallForUpdate().map(s -> s.getAreaId().equals(area)).orElse(false));
+            assertFalse(stalls.findFairAvailableStallForUpdate("QUARANTINE").map(s -> s.getAreaId().equals(quarantine)).orElse(false));
+            assertFalse(stalls.findFairAvailableStallForUpdate("REGULAR").map(s -> s.getAreaId().equals(area)).orElse(false));
         });
         assertEquals(12, jdbc.queryForObject("SELECT COUNT(*) FROM stable_stalls WHERE area_id=? AND deleted_at IS NOT NULL", Integer.class, quarantine));
         assertEquals(404, assertThrows(ResponseStatusException.class, () -> lifecycle.delete(quarantine)).getStatusCode().value());

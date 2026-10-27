@@ -2,6 +2,8 @@ package com.rtms.backend.config;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import jakarta.persistence.PersistenceException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
@@ -20,6 +22,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiResponse<Object>> handleApiException(ApiException ex) {
@@ -95,6 +99,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({DataAccessException.class, PersistenceException.class})
     public ResponseEntity<ApiResponse<Object>> handlePersistenceException(RuntimeException ex) {
+        // The client only sees a generic message, so the cause (constraint name, SQLState) must reach the log.
+        log.error("Unhandled persistence error", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Unexpected server error", "INTERNAL_ERROR"));
     }
@@ -107,6 +113,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
+        log.error("Unhandled server error", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Unexpected server error", "INTERNAL_ERROR"));
     }

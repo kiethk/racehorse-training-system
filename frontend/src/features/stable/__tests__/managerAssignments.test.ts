@@ -151,3 +151,21 @@ describe('Manager Stable assignment draft', () => {
     assert.deepEqual(['Q-AA', 'Q-Z'].map(code => ({ ...data.areas[2], code })).sort(compareAreas).map(a => a.code), ['Q-Z', 'Q-AA']);
   });
 });
+
+describe('Trainer swap between areas', () => {
+  it('putting a trainer from another area on an area swaps the two trainers', () => {
+    const data = fixture();
+    const { draft, changes } = planAssignment(data, createDraft(data), trainer(1), 2,
+      { kind: 'trainer', personId: 2, source: trainer(2) });
+    assert.equal(draft.trainers[1], 2);
+    assert.equal(draft.trainers[2], 1);
+    assert.equal(changes.length, 2);
+  });
+
+  it('without a source the trainer is only added, keeping their own area', () => {
+    const data = fixture();
+    const { draft } = planAssignment(data, createDraft(data), trainer(1), 2);
+    assert.equal(draft.trainers[1], 2);
+    assert.equal(draft.trainers[2], 2);
+  });
+});

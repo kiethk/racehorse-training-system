@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
@@ -42,17 +42,16 @@ export function ReportIncidentDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (open) {
-      setTitle(initialTitle);
-      setDescription(initialDescription);
-      setSeverity(initialSeverity);
-      setFile(null);
-      setError(null);
-    }
-  }, [open, initialTitle, initialDescription, initialSeverity]);
-
   if (!open) return null;
+
+  const handleClose = () => {
+    setTitle(initialTitle);
+    setDescription(initialDescription);
+    setSeverity(initialSeverity);
+    setFile(null);
+    setError(null);
+    onClose();
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,8 +84,8 @@ export function ReportIncidentDialog({
       }
 
       toast.success('Incident reported to veterinary team.');
+      handleClose();
       onSuccess?.();
-      onClose();
     } catch (err) {
       setError(displayError(err, 'Unable to report incident.'));
     } finally {
@@ -97,13 +96,13 @@ export function ReportIncidentDialog({
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={handleClose}
       dismissible={!submitting}
       title="Report health incident to veterinarian"
       description={`Submit an urgent incident report for ${horseName ?? `Horse #${horseId}`}. This will notify the veterinary team.`}
       footer={(
         <>
-          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+          <Button variant="secondary" onClick={handleClose} disabled={submitting}>
             Cancel
           </Button>
           <Button variant="destructive" type="submit" form="report-incident-form" loading={submitting}>

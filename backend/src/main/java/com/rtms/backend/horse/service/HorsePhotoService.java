@@ -49,13 +49,16 @@ public class HorsePhotoService {
     private final AdmissionApplicationRepository admissionRepo;
     private final AdmissionDocumentRepository documentRepo;
     private final FileStorageService storage;
+    private final com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository editDocuments;
 
     public HorsePhotoService(AdmissionApplicationRepository admissionRepo,
                              AdmissionDocumentRepository documentRepo,
-                             FileStorageService storage) {
+                             FileStorageService storage,
+                             com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository editDocuments) {
         this.admissionRepo = admissionRepo;
         this.documentRepo = documentRepo;
         this.storage = storage;
+        this.editDocuments = editDocuments;
     }
 
     /**
@@ -69,6 +72,12 @@ public class HorsePhotoService {
     public Map<Long, String> resolveImageUrls(Collection<Long> horseIds, String baseUrl) {
         if (horseIds == null || horseIds.isEmpty()) return Map.of();
 
+        // An approved edit request may have replaced (or added) the photo.
+        Set<Long> withEditedPhoto = editDocuments
+                .findByHorseIdInAndDocumentTypeAndCurrentTrue(horseIds, AdmissionDocumentType.HORSE_PHOTO).stream()
+                .map(com.rtms.backend.horse.entity.HorseEditRequestDocument::getHorseId)
+                .collect(Collectors.toSet());
+
         // Step 1: Find admissions for these horses; pick latest per horse.
         List<AdmissionApplication> admissions = admissionRepo.findByHorseIdIn(horseIds);
 
@@ -80,7 +89,7 @@ public class HorsePhotoService {
                         Function.identity(),
                         (a, b) -> a.getId() > b.getId() ? a : b));
 
-        if (latestPerHorse.isEmpty()) return Map.of();
+        if (latestPerHorse.isEmpty()) return photoUrls(withEditedPhoto, baseUrl);
 
         Set<Long> admissionIds = latestPerHorse.values().stream()
                 .map(AdmissionApplication::getId)
@@ -98,11 +107,15 @@ public class HorsePhotoService {
                         (a, b) -> a.getId() > b.getId() ? a : b));
 
         // Step 3: Build horseId → imageUrl.
-        return latestPerHorse.entrySet().stream()
+        Set<Long> withPhoto = new java.util.HashSet<>(withEditedPhoto);
+        latestPerHorse.entrySet().stream()
                 .filter(e -> photoByAdmission.containsKey(e.getValue().getId()))
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        e -> baseUrl + "/" + e.getKey() + "/photo"));
+                .forEach(e -> withPhoto.add(e.getKey()));
+        return photoUrls(withPhoto, baseUrl);
+    }
+
+    private static Map<Long, String> photoUrls(Set<Long> horseIds, String baseUrl) {
+        return horseIds.stream().collect(Collectors.toMap(Function.identity(), id -> baseUrl + "/" + id + "/photo"));
     }
 
     /**
@@ -115,9 +128,17 @@ public class HorsePhotoService {
      * @throws ResponseStatusException 404 when no HORSE_PHOTO exists for this horse.
      */
     public PhotoResult resolvePhoto(Long horseId) {
+        var edited = editDocuments.findFirstByHorseIdAndDocumentTypeAndCurrentTrue(horseId, AdmissionDocumentType.HORSE_PHOTO);
+        if (edited.isPresent()) {
+            String key = edited.get().getFileUrl();
+            return new PhotoResult(storage.load(key), storage.mediaType(key));
+        }
         AdmissionDocument photo = findPhotoDocument(horseId);
         Resource resource = storage.load(photo.getFileUrl());
-        MediaType mediaType = storage.mediaType(photo.getFileUrl());
+        MediaType mediaType = storage.mediaType(photo.getFileUrl(), photo.getOriginalFileName());
+        if (mediaType == null || MediaType.APPLICATION_OCTET_STREAM.equals(mediaType)) {
+            mediaType = MediaType.IMAGE_JPEG;
+        }
         return new PhotoResult(resource, mediaType);
     }
 

@@ -13,6 +13,7 @@ import {
   Panel,
   Pill,
   ScreenLayout,
+  SegmentedControl,
 } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { horseService } from '@/features/horses/services/horseService';
@@ -22,6 +23,7 @@ import { compareAreas } from '../lib/managerAssignments';
 import { stableApi } from '../services/stableService';
 import { StallCell } from '../shared/components/StallCell';
 import { StallDetailPanel } from '../shared/components/StallDetailPanel';
+import { StableMapView } from '../shared/components/StableMapView';
 import type { Area, Horse, StableStall, UserSummary } from '../types';
 
 interface BlockInfo {
@@ -54,12 +56,16 @@ export function TrainerStableView() {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
+  // The map (plan + 3D barn) is the default; the cards show the block/groom layout.
+  const [layout, setLayout] = useState<'map' | 'cards'>('map');
   const [specialty, setSpecialty] = useState<{ horseId: number; value: HorseSpecialty } | null>(null);
 
-  const loadData = useCallback(async () => {
-    try {
+  const loadData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
       setLoading(true);
       setError(null);
+    }
+    try {
       const [areaList, stallList, horseList, trainerList, groomList] = await Promise.all([
         stableApi.getAreas('REGULAR'),
         stableApi.getStalls(),
@@ -156,6 +162,17 @@ export function TrainerStableView() {
     [areaViews],
   );
 
+  const myStalls = useMemo(() => {
+    const ids = new Set(myAreas.map((area) => area.id));
+    return stalls.filter((stall) => ids.has(stall.areaId));
+  }, [myAreas, stalls]);
+
+  const personName = useCallback(
+    (kind: 'groom' | 'trainer', id: number) =>
+      (kind === 'groom' ? groomById.get(id) : trainerById.get(id))?.fullName ?? null,
+    [groomById, trainerById],
+  );
+
   // Selected stall details
   const selectedHorse = selectedStall ? horseByStallId.get(selectedStall.id) : undefined;
   const selectedGroom = selectedStall?.groomId ? groomById.get(selectedStall.groomId) : undefined;
@@ -181,23 +198,31 @@ export function TrainerStableView() {
       <PageHeader
         title="Stable"
         actions={
+          <div className="flex items-center gap-2">
+          <SegmentedControl<'map' | 'cards'>
+            label="Layout"
+            value={layout}
+            onChange={(next) => { setLayout(next); setSelectedStall(null); }}
+            options={[{ value: 'map', label: 'Map', icon: 'layers' }, { value: 'cards', label: 'Cards', icon: 'grid' }]}
+          />
           <Button
             size="sm"
             variant="secondary"
             icon="refresh"
             disabled={loading}
             loading={loading && areas.length > 0}
-            onClick={() => void loadData()}
+            onClick={() => void loadData(true)}
           >
             Refresh
           </Button>
+          </div>
         }
       />
 
       {error && (
         <Notice tone="error">
           {error}{' '}
-          <Button variant="link" size="sm" onClick={() => void loadData()}>
+          <Button variant="link" size="sm" onClick={() => void loadData(true)}>
             Retry
           </Button>
         </Notice>
@@ -212,12 +237,57 @@ export function TrainerStableView() {
             title="No training areas assigned"
             description="You are currently not assigned to manage any regular stable areas. Please contact the Club Manager to assign areas to your account."
             action={
-              <Button size="sm" icon="refresh" onClick={() => void loadData()}>
+              <Button size="sm" icon="refresh" onClick={() => void loadData(true)}>
                 Refresh
               </Button>
             }
           />
         </Panel>
+      ) : layout === 'map' ? (
+          <StableMapView
+            lens="trainer"
+            areas={myAreas}
+            stalls={myStalls}
+            horseByStallId={horseByStallId}
+            selectedStallId={selectedStall?.id ?? null}
+            onSelectStall={setSelectedStall}
+            personName={personName}
+            currentUserId={user?.userId}
+            emptyTitle="No training areas assigned"
+            emptyDescription="You are currently not assigned to manage any regular stable areas."
+            cellFooter={(stall) => (
+              <span className="block truncate text-xs text-[var(--color-text-secondary)]">
+                {stall.groomId ? groomById.get(stall.groomId)?.fullName ?? `Groom #${stall.groomId}` : (
+                  <span className="italic text-[var(--color-text-muted)]">No groom</span>
+                )}
+              </span>
+            )}
+            detail={selectedStall ? (
+              <StallDetailPanel
+                onClose={() => setSelectedStall(null)}
+                stall={selectedStall}
+                area={selectedArea}
+                horse={selectedHorse}
+                specialty={specialty && specialty.horseId === selectedHorse?.id ? specialty.value : null}
+                hint="Pick a stall on the map to see its horse and the groom who looks after it."
+              >
+                {selectedStall && (
+                  <dl className="space-y-2 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-[var(--color-text-secondary)]">Assigned Groom</dt>
+                      <dd className="text-right font-medium text-[var(--color-text-primary)]">
+                        {selectedGroom?.fullName ?? (selectedStall.groomId ? `Groom #${selectedStall.groomId}` : 'Unassigned')}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-[var(--color-text-secondary)]">Assigned Trainer</dt>
+                      <dd className="text-right font-medium text-[var(--color-text-primary)]">{selectedTrainer?.fullName ?? 'Unassigned'}</dd>
+                    </div>
+                  </dl>
+                )}
+              </StallDetailPanel>
+            ) : null}
+          />
       ) : (
         <div className="space-y-4">
           {/* Summary Stats Bar */}
@@ -355,7 +425,7 @@ export function TrainerStableView() {
 
       {/* Read-Only Stall Detail Modal */}
       <Modal
-        open={selectedStall !== null}
+        open={layout === 'cards' && selectedStall !== null}
         title={`Stall ${selectedStall?.stallCode ?? ''} details`}
         onClose={() => setSelectedStall(null)}
       >

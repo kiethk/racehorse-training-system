@@ -194,7 +194,7 @@ class HorseStatusChangeTest {
         stall.setStatus(StallStatus.AVAILABLE);
 
         when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.of(stall));
+        when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.of(stall));
         when(horseRepository.save(any(Horse.class))).thenAnswer(inv -> inv.getArgument(0));
 
         HorseStatusChangeRequest request = new HorseStatusChangeRequest(HorseStatus.ELIGIBLE, "Horse returned to training");
@@ -218,7 +218,7 @@ class HorseStatusChangeTest {
         horse.setCurrentStatus(HorseStatus.INACTIVE);
 
         when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.empty());
+        when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.empty());
 
         HorseStatusChangeRequest request = new HorseStatusChangeRequest(HorseStatus.ELIGIBLE, "Horse returned to training");
         ApiException ex = assertThrows(ApiException.class, () ->

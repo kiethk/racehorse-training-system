@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { EmptyState, HorseAvatar, Panel, Pill } from '@/components/ui';
+import { EmptyState, HorseAvatar, IconButton, Panel, Pill } from '@/components/ui';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import type { HorseSpecialty } from '@/features/horses/types';
 import type { Area, Horse, StableStall } from '../../types';
@@ -17,10 +17,12 @@ interface StallDetailPanelProps {
   actions?: ReactNode;
   /** Shown before any stall is picked. */
   hint: string;
+  /** Adds a close button to the header (used when the panel floats over the map). */
+  onClose?: () => void;
 }
 
 /** The side panel next to the floor plan. Sticks under the top bar while the map scrolls. */
-export function StallDetailPanel({ stall, area, horse, specialty, children, actions, hint }: StallDetailPanelProps) {
+export function StallDetailPanel({ stall, area, horse, specialty, children, actions, hint, onClose }: StallDetailPanelProps) {
   if (!stall) {
     return (
       <Panel className="xl:sticky xl:top-[var(--sticky-top)]">
@@ -44,15 +46,18 @@ export function StallDetailPanel({ stall, area, horse, specialty, children, acti
           <p className="truncate text-xs text-[var(--color-text-muted)]">{area?.name ?? 'Unknown area'}</p>
         </div>
         {/* Occupancy only: whether the horse may train is shown once, with the horse below. */}
-        <Pill size="sm" tone={occupancy === 'Occupied' ? 'success' : occupancy === 'Reserved' ? 'info' : 'neutral'}>
-          {occupancy}
-        </Pill>
+        <div className="flex shrink-0 items-center gap-1">
+          <Pill size="sm" tone={occupancy === 'Occupied' ? 'success' : occupancy === 'Reserved' ? 'info' : 'neutral'}>
+            {occupancy}
+          </Pill>
+          {onClose && <IconButton icon="x" label="Close stall details" size="sm" variant="tertiary" onClick={onClose} />}
+        </div>
       </div>
 
       {horse ? (
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-            <HorseAvatar name={horse.name} size={44} rounded="md" />
+            <HorseAvatar name={horse.name} image={horse.imageUrl} size={44} rounded="md" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{horse.name}</p>
               <p className="truncate text-xs text-[var(--color-text-secondary)]">{horse.breed ?? 'Breed not recorded'}</p>

@@ -4,6 +4,7 @@ import type {
   HorsePreventiveStatus,
   HorseVaccinationRequest,
   HorseVaccinationResult,
+  PagedResult,
   PreventiveCoverage,
   PreventiveDueHorse,
   PreventiveDueStatus,
@@ -12,7 +13,7 @@ import type {
   RescheduleRequest,
   RescheduleResponse,
 } from '../types/preventive';
-import { normalizeDueItem, unwrapArray, unwrapData } from '../lib/unwrapResponse';
+import { unwrapArray, unwrapData } from '../lib/unwrapResponse';
 
 export const preventiveCareService = {
   listProtocols: async (): Promise<PreventiveProtocol[]> => {
@@ -25,18 +26,17 @@ export const preventiveCareService = {
     statuses?: PreventiveDueStatus[];
     protocolId?: number;
     search?: string;
-    withinDays?: number;
     page: number;
     size: number;
-  }): Promise<PreventiveDueHorse[]> => {
+  }): Promise<PagedResult<PreventiveDueHorse>> => {
     const qs = new URLSearchParams();
-    params?.statuses?.forEach((status) => qs.append('status', status));
-    if (params?.withinDays != null) qs.set('withinDays', String(params.withinDays));
-    if (params?.protocolId != null) qs.set('protocolId', String(params.protocolId));
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    const res = await apiGet<unknown>(`/api/preventive-care/due${query}`);
-    const rawItems = unwrapArray<Record<string, unknown>>(res);
-    return rawItems.map(normalizeDueItem);
+    params.statuses?.forEach((status) => qs.append('status', status));
+    if (params.protocolId != null) qs.set('protocolId', String(params.protocolId));
+    if (params.search?.trim()) qs.set('search', params.search.trim());
+    qs.set('page', String(params.page));
+    qs.set('size', String(params.size));
+    const res = await apiGet<unknown>(`/api/preventive-care/due?${qs.toString()}`);
+    return unwrapData<PagedResult<PreventiveDueHorse>>(res);
   },
 
   dueSummary: async (): Promise<PreventiveDueSummary> => {
@@ -54,10 +54,7 @@ export const preventiveCareService = {
     return unwrapData<HorsePreventiveStatus>(res);
   },
 
-  recordForHorse: async (
-    horseId: number,
-    data: HorseVaccinationRequest,
-  ): Promise<HorseVaccinationResult> => {
+  recordForHorse: async (horseId: number, data: HorseVaccinationRequest): Promise<HorseVaccinationResult> => {
     const res = await apiPost<unknown>(`/api/horses/${horseId}/vaccinations`, data);
     return unwrapData<HorseVaccinationResult>(res);
   },

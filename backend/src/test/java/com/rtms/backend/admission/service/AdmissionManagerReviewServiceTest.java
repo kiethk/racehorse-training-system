@@ -51,6 +51,12 @@ class AdmissionManagerReviewServiceTest {
     @Mock
     private com.rtms.backend.medical.service.PreventiveStatusService preventiveStatusService;
 
+    @Mock
+    private com.rtms.backend.identity.repository.GroomProfileRepository groomProfileRepository;
+
+    @Mock
+    private AdmissionNotificationService admissionNotificationService;
+
     private AdmissionManagerReviewService service;
 
     // ─── Shared helpers ───────────────────────────────────────────────────────
@@ -101,7 +107,9 @@ class AdmissionManagerReviewServiceTest {
                 horseRepository,
                 careScheduleRepository,
                 admissionGroomReviewService,
-                preventiveStatusService);
+                preventiveStatusService,
+                groomProfileRepository,
+                admissionNotificationService);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -161,7 +169,7 @@ class AdmissionManagerReviewServiceTest {
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.of(regularStall));
+        when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.of(regularStall));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(qStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -431,7 +439,7 @@ class AdmissionManagerReviewServiceTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("Chuồng REGULAR được chọn thủ công không còn AVAILABLE: ném IllegalStateException, không lưu gì")
+    @DisplayName("Chuồng REGULAR được chọn thủ công không còn AVAILABLE hoặc chưa có Groom: 409, không lưu gì")
     void approve_selectedStallUnavailable_throwsAndNoSave() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
@@ -440,25 +448,27 @@ class AdmissionManagerReviewServiceTest {
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findAvailableRegularStallByIdForUpdate(20L)).thenReturn(Optional.empty());
 
-        assertThrows(IllegalStateException.class,
+        var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.review(1L, 5L, approveRequest(20L)));
+        assertEquals(409, error.getStatusCode().value());
 
         verify(admissionApplicationRepository, never()).save(any());
         verify(horseRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Không có chuồng REGULAR nào AVAILABLE cho tự động chọn: ném IllegalStateException")
+    @DisplayName("Không có chuồng REGULAR có Groom nào AVAILABLE cho tự động chọn: 409")
     void approve_noAvailableRegularStall_throws() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.empty());
+        when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.empty());
 
-        assertThrows(IllegalStateException.class,
+        var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.review(1L, 5L, approveRequest(null)));
+        assertEquals(409, error.getStatusCode().value());
 
         verify(admissionApplicationRepository, never()).save(any());
         verify(horseRepository, never()).save(any());
@@ -546,75 +556,48 @@ class AdmissionManagerReviewServiceTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("Approve: Releases Q stall and processes oldest waiting admission")
-    void managerApprove_releasesQStall_andProcessesOldestWaitingAdmission() {
+    @DisplayName("Approve: releases Q stall, stamps the regular groom, notifies them and lets the stall queue move")
+    void managerApprove_releasesQStall_andRunsAllocation() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         StableStall regularStall = buildStall(20L, StallStatus.AVAILABLE);
+        regularStall.setGroomId(33L);
         StableStall quarantineStall = buildStall(99L, StallStatus.OCCUPIED);
-
-        AdmissionApplication waitingAdmission = new AdmissionApplication();
-        waitingAdmission.setId(100L);
-        waitingAdmission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
 
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.of(regularStall));
+        when(stableStallRepository.findFairAvailableStallForUpdate("REGULAR")).thenReturn(Optional.of(regularStall));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(quarantineStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL))
-                .thenReturn(Optional.of(waitingAdmission));
 
         service.review(1L, 5L, approveRequest(null));
 
-        verify(stableStallRepository).save(quarantineStall);
         assertEquals(StallStatus.AVAILABLE, quarantineStall.getStatus());
-        verify(admissionGroomReviewService).processWaitingForStall(100L);
+        var order = inOrder(stableStallRepository);
+        order.verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
+        order.verify(stableStallRepository).findFairAvailableStallForUpdate("REGULAR");
+        verify(groomProfileRepository).touchLastHorseAssignedAt(org.mockito.ArgumentMatchers.eq(33L), any());
+        verify(admissionGroomReviewService).notifyGroomAssigned(org.mockito.ArgumentMatchers.same(admission),
+                org.mockito.ArgumentMatchers.same(regularStall), org.mockito.ArgumentMatchers.anyString());
+        verify(admissionGroomReviewService).allocateWaitingAdmissions();
     }
 
     @Test
-    @DisplayName("Reject: Releases Q stall and processes oldest waiting admission")
-    void managerReject_releasesQStall_andProcessesWaitingAdmission() {
+    @DisplayName("Reject: releases Q stall and lets the stall queue move")
+    void managerReject_releasesQStall_andRunsAllocation() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         StableStall quarantineStall = buildStall(99L, StallStatus.OCCUPIED);
 
-        AdmissionApplication waitingAdmission = new AdmissionApplication();
-        waitingAdmission.setId(200L);
-        waitingAdmission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
-
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(99L)).thenReturn(Optional.of(quarantineStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL))
-                .thenReturn(Optional.of(waitingAdmission));
 
-        service.review(1L, 5L, rejectRequest("Not a good fit"));
+        service.review(1L, 5L, rejectRequest("  Not a good fit  "));
 
-        verify(stableStallRepository).save(quarantineStall);
         assertEquals(StallStatus.AVAILABLE, quarantineStall.getStatus());
-        verify(admissionGroomReviewService).processWaitingForStall(200L);
-    }
-
-    @Test
-    @DisplayName("Review: Does not call Groom processing if no waiting admission")
-    void managerReview_whenNoWaitingAdmission_doesNotCallGroomProcessing() {
-        AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
-        Horse horse = buildHorse(HorseStatus.CANDIDATE);
-        StableStall regularStall = buildStall(20L, StallStatus.AVAILABLE);
-        StableStall quarantineStall = buildStall(99L, StallStatus.OCCUPIED);
-
-        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findFirstAvailableRegularStallForUpdate()).thenReturn(Optional.of(regularStall));
-        when(stableStallRepository.findById(99L)).thenReturn(Optional.of(quarantineStall));
-        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL))
-                .thenReturn(Optional.empty());
-
-        service.review(1L, 5L, approveRequest(null));
-
-        verify(admissionGroomReviewService, never()).processWaitingForStall(any());
+        assertEquals("Not a good fit", admission.getManagerFeedback());
+        verify(admissionGroomReviewService).allocateWaitingAdmissions();
     }
 }

@@ -34,12 +34,14 @@ class HorsePhotoServiceTest {
     private AdmissionDocumentRepository documentRepo;
     @Mock
     private FileStorageService storage;
+    @Mock
+    private com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository editDocuments;
 
     private HorsePhotoService service;
 
     @BeforeEach
     void setUp() {
-        service = new HorsePhotoService(admissionRepo, documentRepo, storage);
+        service = new HorsePhotoService(admissionRepo, documentRepo, storage, editDocuments);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -165,7 +167,7 @@ class HorsePhotoServiceTest {
 
         Resource fakeResource = new ByteArrayResource(new byte[]{1, 2, 3});
         when(storage.load("local:horse.jpg")).thenReturn(fakeResource);
-        when(storage.mediaType("local:horse.jpg")).thenReturn(MediaType.IMAGE_JPEG);
+        when(storage.mediaType("local:horse.jpg", null)).thenReturn(MediaType.IMAGE_JPEG);
 
         HorsePhotoService.PhotoResult result = service.resolvePhoto(5L);
 
@@ -174,10 +176,28 @@ class HorsePhotoServiceTest {
 
         // storage.load and storage.mediaType each called exactly once with the same key
         verify(storage, times(1)).load("local:horse.jpg");
-        verify(storage, times(1)).mediaType("local:horse.jpg");
+        verify(storage, times(1)).mediaType("local:horse.jpg", null);
         // document lookup is not duplicated
         verify(admissionRepo, times(1)).findByHorseIdIn(any());
         verify(documentRepo, times(1)).findByAdmissionIdInAndDocumentType(any(), any());
+    }
+
+    @Test
+    @DisplayName("resolvePhoto: when storage returns octet-stream, falls back to image/jpeg")
+    void resolvePhoto_octetStreamFallback_returnsJpeg() {
+        when(admissionRepo.findByHorseIdIn(List.of(5L)))
+                .thenReturn(List.of(admission(100L, 5L)));
+        when(documentRepo.findByAdmissionIdInAndDocumentType(any(), eq(AdmissionDocumentType.HORSE_PHOTO)))
+                .thenReturn(List.of(photo(200L, 100L, "local:horse-uuid")));
+
+        Resource fakeResource = new ByteArrayResource(new byte[]{1, 2, 3});
+        when(storage.load("local:horse-uuid")).thenReturn(fakeResource);
+        when(storage.mediaType("local:horse-uuid", null)).thenReturn(MediaType.APPLICATION_OCTET_STREAM);
+
+        HorsePhotoService.PhotoResult result = service.resolvePhoto(5L);
+
+        assertSame(fakeResource, result.resource());
+        assertEquals(MediaType.IMAGE_JPEG, result.mediaType());
     }
 
     @Test
@@ -190,7 +210,7 @@ class HorsePhotoServiceTest {
 
         assertEquals(404, ex.getStatusCode().value());
         verify(storage, never()).load(any());
-        verify(storage, never()).mediaType(any());
+        verify(storage, never()).mediaType(any(), any());
     }
 
     @Test
@@ -206,5 +226,37 @@ class HorsePhotoServiceTest {
 
         assertEquals(404, ex.getStatusCode().value());
         verify(storage, never()).load(any());
+    }
+
+    @Test
+    @DisplayName("BR-05: a photo approved through an edit request wins over the admission photo")
+    void approvedEditPhotoWinsOverAdmissionPhoto() {
+        var edited = new com.rtms.backend.horse.entity.HorseEditRequestDocument();
+        edited.setHorseId(10L);
+        edited.setDocumentType(AdmissionDocumentType.HORSE_PHOTO);
+        edited.setFileUrl("local:edited.png");
+        edited.setCurrent(true);
+        when(editDocuments.findFirstByHorseIdAndDocumentTypeAndCurrentTrue(10L, AdmissionDocumentType.HORSE_PHOTO))
+                .thenReturn(java.util.Optional.of(edited));
+        Resource bytes = new ByteArrayResource(new byte[]{1});
+        when(storage.load("local:edited.png")).thenReturn(bytes);
+        when(storage.mediaType("local:edited.png")).thenReturn(MediaType.IMAGE_PNG);
+
+        HorsePhotoService.PhotoResult result = service.resolvePhoto(10L);
+
+        assertSame(bytes, result.resource());
+        verifyNoInteractions(admissionRepo, documentRepo);
+    }
+
+    @Test
+    @DisplayName("BR-05: a horse whose only photo came from an edit request still gets an image URL")
+    void editedPhotoAloneProducesImageUrl() {
+        var edited = new com.rtms.backend.horse.entity.HorseEditRequestDocument();
+        edited.setHorseId(10L);
+        when(editDocuments.findByHorseIdInAndDocumentTypeAndCurrentTrue(List.of(10L), AdmissionDocumentType.HORSE_PHOTO))
+                .thenReturn(List.of(edited));
+        when(admissionRepo.findByHorseIdIn(List.of(10L))).thenReturn(List.of());
+
+        assertEquals(Map.of(10L, "/api/horses/10/photo"), service.resolveImageUrls(List.of(10L), "/api/horses"));
     }
 }

@@ -86,7 +86,7 @@ public class AuthController {
     @Operation(security = {})
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<OwnerRegistrationResponse>> register(
-            @RequestBody OwnerRegistrationRequest request) {
+            @jakarta.validation.Valid @RequestBody OwnerRegistrationRequest request) {
         OwnerRegistrationResponse response = authService.registerOwner(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response));

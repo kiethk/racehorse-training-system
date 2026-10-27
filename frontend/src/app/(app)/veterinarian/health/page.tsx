@@ -379,7 +379,7 @@ function HealthRecordsContent() {
             {/* Patient Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--color-border)] pb-4">
               <div className="flex items-start gap-3.5">
-                <HorseAvatar name={selectedHorse.name} image={null} size={50} rounded="md" />
+                <HorseAvatar name={selectedHorse.name} image={selectedHorse.imageUrl} size={50} rounded="md" />
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
@@ -1023,7 +1023,7 @@ function HealthRecordsContent() {
                     header: 'Horse',
                     render: (row: HorseListItem) => (
                       <div className="flex items-center gap-2.5">
-                        <HorseAvatar name={row.horse.name} image={null} size={32} rounded="md" />
+                        <HorseAvatar name={row.horse.name} image={row.horse.imageUrl} size={32} rounded="md" />
                         <div>
                           <div className="font-semibold text-sm text-[var(--color-text-primary)]">
                             {row.horse.name}

@@ -1,5 +1,6 @@
 'use client';
 
+import './pdfPolyfill';
 import { useEffect, useState } from 'react';
 import { apiGetBlob } from '@/services/api';
 
@@ -8,10 +9,14 @@ type PdfJs = typeof import('pdfjs-dist');
 let pdfjs: Promise<PdfJs> | null = null;
 
 /** pdf.js is large, so it is only downloaded the first time a PDF thumbnail is needed. */
-function loadPdfJs(): Promise<PdfJs> {
+export function loadPdfJs(): Promise<PdfJs> {
   pdfjs ??= import('pdfjs-dist').then((module) => {
     // Parsing runs in a worker so a big PDF never blocks the page.
-    module.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+    if (typeof window !== 'undefined') {
+      module.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+    } else {
+      module.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+    }
     return module;
   }).catch((error) => {
     pdfjs = null; // Allow a retry after a failed download.
@@ -34,7 +39,9 @@ export async function renderPdfFirstPage(pdf: Blob, width: number, signal?: Abor
     const canvas = window.document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
-    await page.render({ canvas, viewport }).promise;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not create canvas 2d context.');
+    await page.render({ canvasContext: ctx, canvas, viewport }).promise;
     signal?.throwIfAborted();
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Could not draw the PDF page.'))), 'image/png');

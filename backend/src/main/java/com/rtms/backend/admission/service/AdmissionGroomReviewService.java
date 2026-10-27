@@ -17,6 +17,7 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.notification.entity.Notification;
+import com.rtms.backend.identity.repository.GroomProfileRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.stable.entity.StableStall;
@@ -37,6 +38,8 @@ import java.util.List;
 @Service
 public class AdmissionGroomReviewService {
     private static final int ARRIVAL_WINDOW_DAYS = 14;
+    public static final int MAX_FEEDBACK_LENGTH = 2000;
+    private static final String QUARANTINE = "QUARANTINE";
 
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final CandidateHorseProfileRepository candidateHorseProfileRepository;
@@ -47,6 +50,8 @@ public class AdmissionGroomReviewService {
     private final CareScheduleService careScheduleService;
     private final NotificationService notificationService;
     private final PedigreeBirthDateValidator birthDates;
+    private final GroomProfileRepository groomProfileRepository;
+    private final AdmissionNotificationService admissionNotificationService;
 
     public AdmissionGroomReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
@@ -57,7 +62,9 @@ public class AdmissionGroomReviewService {
             CareScheduleRepository careScheduleRepository,
             CareScheduleService careScheduleService,
             NotificationService notificationService,
-            PedigreeBirthDateValidator birthDates) {
+            PedigreeBirthDateValidator birthDates,
+            GroomProfileRepository groomProfileRepository,
+            AdmissionNotificationService admissionNotificationService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.stableStallRepository = stableStallRepository;
@@ -67,6 +74,8 @@ public class AdmissionGroomReviewService {
         this.careScheduleService = careScheduleService;
         this.notificationService = notificationService;
         this.birthDates = birthDates;
+        this.groomProfileRepository = groomProfileRepository;
+        this.admissionNotificationService = admissionNotificationService;
     }
 
     @Transactional
@@ -77,52 +86,65 @@ public class AdmissionGroomReviewService {
         if (admission.getStatus() != AdmissionStatus.GROOM_REVIEW) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Admission is not awaiting Groom review");
         }
+        if (!stableStallRepository.isQuarantineGroom(groomId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only grooms of a quarantine stall can review new admissions");
+        }
         if (request.getDecision() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Decision is required");
         }
 
-        String feedback = request.getFeedback() == null ? null : request.getFeedback().trim();
-        if (feedback == null || feedback.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Feedback is required for Groom review");
-        }
-
+        String feedback = normalizeFeedback(request.getFeedback());
         if (request.getDecision() == ReviewDecision.REJECTED) {
+            if (feedback == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Feedback is required to reject an admission");
+            }
             return reject(admission, groomId, feedback);
         }
         if (request.getDecision() != ReviewDecision.APPROVED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported Groom decision");
         }
 
+        // Every approval joins the stall queue; allocation then serves it in submission order,
+        // so a fresh approval never overtakes admissions that were already waiting.
         stampGroomReview(admission, groomId, ReviewDecision.APPROVED, feedback);
-        return reserveQuarantineStallIfCapacityAvailable(admission);
+        admission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
+        admissionApplicationRepository.save(admission);
+        allocateWaitingAdmissions();
+        return admission;
     }
 
+    /**
+     * Gives free quarantine stalls to WAITING_FOR_STALL admissions, oldest first, until capacity
+     * runs out. Never throws for lack of capacity: callers such as the Manager review must not be
+     * rolled back because the queue could not move.
+     * <p>
+     * Lock order: all admission stalls first, then admissions with SKIP LOCKED. Other flows lock an
+     * admission before stalls, but this loop never waits for an admission row, so no wait cycle forms;
+     * a skipped admission is served by the next run (at the latest the scheduler).
+     *
+     * @return how many admissions received a stall
+     */
     @Transactional
-    public AdmissionApplication processWaitingForStall(Long admissionId) {
-        return processWaitingForStall(admissionId, null);
-    }
-
-    @Transactional
-    public AdmissionApplication processWaitingForStall(Long admissionId, Long groomId) {
-        AdmissionApplication admission = admissionApplicationRepository.findByIdForUpdate(admissionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
-
-        if (admission.getStatus() != AdmissionStatus.WAITING_FOR_STALL) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Admission is not waiting for stall capacity");
+    public int allocateWaitingAdmissions() {
+        // The capacity counts below are native SQL and must see changes made earlier in this transaction.
+        admissionApplicationRepository.flush();
+        stableStallRepository.lockAdmissionCapacityStallsForUpdate();
+        int allocated = 0;
+        while (hasAdmissionCapacity()) {
+            AdmissionApplication next = admissionApplicationRepository.findNextWaitingForStallForUpdate().orElse(null);
+            if (next == null) break;
+            StableStall stall = stableStallRepository.findFairAvailableStallForUpdate(QUARANTINE).orElse(null);
+            if (stall == null) break;
+            reserve(next, stall);
+            allocated++;
         }
-        if (groomId != null && !java.util.Objects.equals(admission.getGroomId(), groomId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the Groom handling this admission can retry allocation");
-        }
-        return reserveQuarantineStallIfCapacityAvailable(admission);
+        return allocated;
     }
 
     @Transactional
     public AdmissionApplication confirmArrival(Long admissionId, Long groomId) {
         AdmissionApplication admission = admissionApplicationRepository.findByIdForUpdate(admissionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
-        if (!java.util.Objects.equals(admission.getGroomId(), groomId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the Groom handling this admission can confirm arrival");
-        }
         if (admission.getStatus() != AdmissionStatus.WAITING_FOR_ARRIVAL) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Admission is not waiting for horse arrival");
         }
@@ -136,6 +158,10 @@ public class AdmissionGroomReviewService {
         StableStall quarantineStall = stableStallRepository
                 .findQuarantineStallByIdForUpdate(admission.getQuarantineStallId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Reserved quarantine stall no longer exists"));
+        // The stall's current groom, not the reviewer: a block can change hands while the horse travels.
+        if (!java.util.Objects.equals(quarantineStall.getGroomId(), groomId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the groom of the reserved quarantine stall can confirm arrival");
+        }
         if (quarantineStall.getStatus() != StallStatus.RESERVED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Reserved quarantine stall is no longer available");
         }
@@ -147,10 +173,12 @@ public class AdmissionGroomReviewService {
         birthDates.validateByUeln(candidate.getDateOfBirth(),
                 candidate.getSireRegistrationNumber(), candidate.getDamRegistrationNumber());
 
+        Horse horse = findReusableHorseOrCreateNew(admission, candidate);
+        assertArrivalDoesNotCollide(admission, horse, quarantineStall);
+
         quarantineStall.setStatus(StallStatus.OCCUPIED);
         stableStallRepository.save(quarantineStall);
 
-        Horse horse = findReusableHorseOrCreateNew(admission, candidate);
         applyCandidateSnapshot(horse, admission, candidate, quarantineStall);
         horse = horseRepository.save(horse);
         updatePedigree(horse.getId(), candidate);
@@ -172,8 +200,9 @@ public class AdmissionGroomReviewService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Admission arrival reservation has not expired");
         }
         admission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
-        AdmissionApplication saved = admissionApplicationRepository.save(admission);
-        return reserveQuarantineStallIfCapacityAvailable(saved);
+        admissionApplicationRepository.save(admission);
+        allocateWaitingAdmissions();
+        return admission;
     }
 
     @Transactional
@@ -182,6 +211,7 @@ public class AdmissionGroomReviewService {
         List<AdmissionApplication> due = admissionApplicationRepository
                 .findByStatusAndArrivalDeadlineAtLessThanEqualOrderByArrivalDeadlineAtAscIdAsc(
                         AdmissionStatus.WAITING_FOR_ARRIVAL, now);
+        boolean released = false;
         for (AdmissionApplication candidate : due) {
             AdmissionApplication admission = admissionApplicationRepository.findByIdForUpdate(candidate.getId())
                     .orElse(null);
@@ -189,33 +219,76 @@ public class AdmissionGroomReviewService {
                     || admission.getArrivalDeadlineAt() == null || admission.getArrivalDeadlineAt().isAfter(now)) {
                 continue;
             }
+            String horseName = resolveCandidateHorseName(admission.getId());
             expireArrivalReservation(admission);
             admissionApplicationRepository.save(admission);
+            admissionNotificationService.notifyOwnerArrivalExpired(admission, horseName);
+            released = true;
+        }
+        if (released) {
+            allocateWaitingAdmissions();
         }
     }
 
     private AdmissionApplication reject(AdmissionApplication admission, Long groomId, String feedback) {
         stampGroomReview(admission, groomId, ReviewDecision.REJECTED, feedback);
         admission.setStatus(AdmissionStatus.REJECTED);
-        return admissionApplicationRepository.save(admission);
+        admission = admissionApplicationRepository.save(admission);
+        admissionNotificationService.notifyOwnerRejected(
+                admission, resolveCandidateHorseName(admission.getId()), "Quarantine Groom Review", feedback);
+        return admission;
     }
 
-    private AdmissionApplication reserveQuarantineStallIfCapacityAvailable(AdmissionApplication admission) {
-        stableStallRepository.lockAdmissionCapacityStallsForUpdate();
-        if (!hasAdmissionCapacity()) {
-            admission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
-            return admissionApplicationRepository.save(admission);
-        }
-        StableStall quarantineStall = stableStallRepository
-                .findFirstAvailableQuarantineStallForUpdate()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No quarantine stall available"));
+    private void reserve(AdmissionApplication admission, StableStall quarantineStall) {
+        LocalDateTime now = LocalDateTime.now();
         quarantineStall.setStatus(StallStatus.RESERVED);
         stableStallRepository.save(quarantineStall);
         admission.setQuarantineStallId(quarantineStall.getId());
-        admission.setArrivalDeadlineAt(LocalDateTime.now().plusDays(ARRIVAL_WINDOW_DAYS));
+        admission.setArrivalDeadlineAt(now.plusDays(ARRIVAL_WINDOW_DAYS));
         admission.setArrivedAt(null);
         admission.setStatus(AdmissionStatus.WAITING_FOR_ARRIVAL);
-        return admissionApplicationRepository.save(admission);
+        // Flush so the next loop iteration's native queries see this stall and admission as taken.
+        admissionApplicationRepository.saveAndFlush(admission);
+        groomProfileRepository.touchLastHorseAssignedAt(quarantineStall.getGroomId(), now);
+        notifyGroomAssigned(admission, quarantineStall,
+                "Quarantine stall " + quarantineStall.getStallCode() + " is reserved for admission #" + admission.getId()
+                        + ". Confirm the horse's arrival before " + admission.getArrivalDeadlineAt().toLocalDate() + ".");
+        admissionNotificationService.notifyOwnerWaitingForArrival(
+                admission, resolveCandidateHorseName(admission.getId()), quarantineStall);
+    }
+
+    private String resolveCandidateHorseName(Long admissionId) {
+        if (admissionId == null) {
+            return "your horse";
+        }
+        return candidateHorseProfileRepository.findByAdmissionId(admissionId)
+                .map(CandidateHorseProfile::getName)
+                .filter(name -> !name.isBlank())
+                .orElse("your horse");
+    }
+
+    /** Scenario B: the groom now responsible for the admission's horse. Keyed per stall so a new stall notifies again. */
+    void notifyGroomAssigned(AdmissionApplication admission, StableStall stall, String message) {
+        notificationService.createNotification(
+                stall.getGroomId(),
+                "Admission assigned to you",
+                message,
+                NotificationTypes.ADMISSION_GROOM_ASSIGNED,
+                NotificationTypes.REFERENCE_ADMISSION,
+                admission.getId(),
+                Notification.buildDeduplicationKey(stall.getGroomId(), NotificationTypes.REFERENCE_ADMISSION,
+                        admission.getId(), NotificationTypes.ADMISSION_GROOM_ASSIGNED) + ":stall:" + stall.getId());
+    }
+
+    /** Trimmed feedback, or null when blank; rejects text longer than reviewers are allowed to write. */
+    public static String normalizeFeedback(String raw) {
+        String feedback = raw == null ? null : raw.trim();
+        if (feedback == null || feedback.isEmpty()) return null;
+        if (feedback.length() > MAX_FEEDBACK_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Feedback must be at most " + MAX_FEEDBACK_LENGTH + " characters");
+        }
+        return feedback;
     }
 
     private void expireArrivalReservation(AdmissionApplication admission) {
@@ -270,6 +343,23 @@ public class AdmissionGroomReviewService {
         }
 
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Horse with this UELN already exists");
+    }
+
+    /**
+     * Both cases would otherwise only surface as a unique-constraint failure at flush time
+     * (uq_horses_current_stall, uq_admission_active_horse), which the client sees as HTTP 500.
+     */
+    private void assertArrivalDoesNotCollide(AdmissionApplication admission, Horse horse, StableStall quarantineStall) {
+        horseRepository.findByCurrentStallId(quarantineStall.getId())
+                .filter(other -> !java.util.Objects.equals(other.getId(), horse.getId()))
+                .ifPresent(other -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Quarantine stall " + quarantineStall.getStallCode() + " is still linked to another horse");
+                });
+        if (horse.getId() != null && admissionApplicationRepository.existsByHorseIdAndIdNotAndStatusNotIn(
+                horse.getId(), admission.getId(), List.of(AdmissionStatus.APPROVED, AdmissionStatus.REJECTED))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This horse already has another active admission");
+        }
     }
 
     private void applyCandidateSnapshot(Horse horse, AdmissionApplication admission, CandidateHorseProfile candidate, StableStall quarantineStall) {
@@ -361,7 +451,10 @@ public class AdmissionGroomReviewService {
             schedule = careScheduleRepository.save(schedule);
         }
 
-        careScheduleService.assignRequestedSchedules();
+        // Only this admission's exam: the batch variant also processes every other horse's
+        // REQUESTED schedule, so any failure there would roll back the arrival itself.
+        // The rest stays with CareScheduleScheduler.
+        careScheduleService.assignRequestedSchedule(schedule);
 
         return careScheduleRepository
                 .findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(admissionId, CareType.INITIAL)

@@ -27,7 +27,14 @@ interface NotificationContextValue {
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
-const ASSIGNMENT_TYPES = new Set(['ADMISSION_VET_ASSIGNED', 'ADMISSION_TRAINER_ASSIGNED']);
+const ASSIGNMENT_TYPES = new Set([
+  'ADMISSION_VET_ASSIGNED',
+  'ADMISSION_TRAINER_ASSIGNED',
+  'ADMISSION_NEW_FOR_GROOM',
+  'ADMISSION_GROOM_ASSIGNED',
+  'HORSE_EDIT_REQUESTED',
+  'HORSE_EDIT_REVIEWED',
+]);
 /** Long enough to read the message and reach the View button. */
 const ACTION_TOAST_MS = 8000;
 const POLL_MS = 30000;
@@ -70,7 +77,7 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
   const [hasMore, setHasMore] = useState<boolean>(restored?.hasMore ?? false);
   const [lastSeenCursor, setLastSeenCursor] = useState<string>(restored?.lastSeenCursor ?? '');
   const [unreadCount, setUnreadCount] = useState<number>(0);
-
+  const openNotificationRef = useRef<(notification: NotificationItem) => Promise<void>>(() => Promise.resolve());
   const itemsRef = useRef<NotificationItem[]>(restored?.items ?? []);
   const nextPageCursorRef = useRef<string | null>(restored?.nextPageCursor ?? null);
   const hasMoreRef = useRef<boolean>(restored?.hasMore ?? false);
@@ -123,6 +130,7 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
     persist(next);
   }, [persist]);
 
+  const userRole = user?.role;
   const openNotification = useCallback(
     async (notification: NotificationItem) => {
       try {
@@ -130,11 +138,15 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
       } catch {
         // Best effort, like the bell: still take the user to the item.
       }
-      const href = getNotificationHref(notification, user?.role);
+      const href = getNotificationHref(notification, userRole);
       if (href) router.push(href);
     },
-    [markAsRead, router, user]
+    [markAsRead, router, userRole]
   );
+
+  useEffect(() => {
+    openNotificationRef.current = openNotification;
+  }, [openNotification]);
 
   const announceNewAssignments = useCallback(
     (unread: NotificationItem[]) => {
@@ -155,14 +167,14 @@ function NotificationProviderForUser({ children }: { children: React.ReactNode }
       if (fresh.length === 1) {
         const [only] = fresh;
         toast.info(only.title || 'New horse assignment', only.message, {
-          action: { label: 'View', onClick: () => void openNotification(only) },
+          action: { label: 'View', onClick: () => void openNotificationRef.current(only) },
           duration: ACTION_TOAST_MS,
         });
       } else {
-        toast.info(`You have ${fresh.length} new horse assignments`, 'Open the notification bell to review them.');
+        toast.info(`You have ${fresh.length} new notifications`, 'Open the notification bell to review them.');
       }
     },
-    [toastedStorageKey, openNotification]
+    [toastedStorageKey]
   );
 
   const poll = useCallback(async () => {

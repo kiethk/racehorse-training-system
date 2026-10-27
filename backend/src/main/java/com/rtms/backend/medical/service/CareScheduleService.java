@@ -879,7 +879,7 @@ public class CareScheduleService {
         }
     }
 
-    void assignRequestedSchedule(CareSchedule schedule) {
+    public void assignRequestedSchedule(CareSchedule schedule) {
         assignRequestedSchedule(schedule, null);
     }
 
