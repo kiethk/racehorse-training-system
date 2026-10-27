@@ -222,4 +222,6 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
            WHERE h.id = :horseId AND a.trainerId = :trainerId
            """)
     boolean existsHorseInTrainerArea(@Param("horseId") Long horseId, @Param("trainerId") Long trainerId);
+
+    long countByStatus(TrainingPlanStatus status);
 }

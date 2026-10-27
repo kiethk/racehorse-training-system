@@ -1,6 +1,6 @@
 import { apiGet } from '@/services/api';
 import type { ApiResponse } from '@/types/horse';
-import type { DashboardHorse, HealthTrend, PerformanceTrend } from '../types';
+import type { DashboardHorse, HealthTrend, PerformanceTrend, ManagerDashboardSummary } from '../types';
 
 /** The data of the role dashboards. The backend scopes every answer to the horses the signed-in user may see. */
 export const dashboardService = {
@@ -12,4 +12,7 @@ export const dashboardService = {
 
   getHealthTrend: async (): Promise<HealthTrend> =>
     (await apiGet<ApiResponse<HealthTrend>>('/api/health-metrics/trend')).data,
+
+  getManagerSummary: async (): Promise<ManagerDashboardSummary> =>
+    (await apiGet<ApiResponse<ManagerDashboardSummary>>('/api/dashboard/manager')).data,
 };

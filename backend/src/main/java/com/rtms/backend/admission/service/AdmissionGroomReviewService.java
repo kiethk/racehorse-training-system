@@ -51,6 +51,7 @@ public class AdmissionGroomReviewService {
     private final NotificationService notificationService;
     private final PedigreeBirthDateValidator birthDates;
     private final GroomProfileRepository groomProfileRepository;
+    private final AdmissionNotificationService admissionNotificationService;
 
     public AdmissionGroomReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
@@ -62,7 +63,8 @@ public class AdmissionGroomReviewService {
             CareScheduleService careScheduleService,
             NotificationService notificationService,
             PedigreeBirthDateValidator birthDates,
-            GroomProfileRepository groomProfileRepository) {
+            GroomProfileRepository groomProfileRepository,
+            AdmissionNotificationService admissionNotificationService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.stableStallRepository = stableStallRepository;
@@ -73,6 +75,7 @@ public class AdmissionGroomReviewService {
         this.notificationService = notificationService;
         this.birthDates = birthDates;
         this.groomProfileRepository = groomProfileRepository;
+        this.admissionNotificationService = admissionNotificationService;
     }
 
     @Transactional
@@ -216,8 +219,10 @@ public class AdmissionGroomReviewService {
                     || admission.getArrivalDeadlineAt() == null || admission.getArrivalDeadlineAt().isAfter(now)) {
                 continue;
             }
+            String horseName = resolveCandidateHorseName(admission.getId());
             expireArrivalReservation(admission);
             admissionApplicationRepository.save(admission);
+            admissionNotificationService.notifyOwnerArrivalExpired(admission, horseName);
             released = true;
         }
         if (released) {
@@ -228,7 +233,10 @@ public class AdmissionGroomReviewService {
     private AdmissionApplication reject(AdmissionApplication admission, Long groomId, String feedback) {
         stampGroomReview(admission, groomId, ReviewDecision.REJECTED, feedback);
         admission.setStatus(AdmissionStatus.REJECTED);
-        return admissionApplicationRepository.save(admission);
+        admission = admissionApplicationRepository.save(admission);
+        admissionNotificationService.notifyOwnerRejected(
+                admission, resolveCandidateHorseName(admission.getId()), "Quarantine Groom Review", feedback);
+        return admission;
     }
 
     private void reserve(AdmissionApplication admission, StableStall quarantineStall) {
@@ -245,6 +253,18 @@ public class AdmissionGroomReviewService {
         notifyGroomAssigned(admission, quarantineStall,
                 "Quarantine stall " + quarantineStall.getStallCode() + " is reserved for admission #" + admission.getId()
                         + ". Confirm the horse's arrival before " + admission.getArrivalDeadlineAt().toLocalDate() + ".");
+        admissionNotificationService.notifyOwnerWaitingForArrival(
+                admission, resolveCandidateHorseName(admission.getId()), quarantineStall);
+    }
+
+    private String resolveCandidateHorseName(Long admissionId) {
+        if (admissionId == null) {
+            return "your horse";
+        }
+        return candidateHorseProfileRepository.findByAdmissionId(admissionId)
+                .map(CandidateHorseProfile::getName)
+                .filter(name -> !name.isBlank())
+                .orElse("your horse");
     }
 
     /** Scenario B: the groom now responsible for the admission's horse. Keyed per stall so a new stall notifies again. */

@@ -10,6 +10,7 @@ package com.rtms.backend.horse.repository;
 
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.training.enums.TrainingDecision;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -142,4 +143,10 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
             WHERE h.id = :horseId
             """)
     Optional<Long> findTrainerIdByHorseId(@Param("horseId") Long horseId);
+
+    long countByCurrentStatus(HorseStatus status);
+
+    long countByCurrentStatusIn(Collection<HorseStatus> statuses);
+
+    long countByTrainingDecision(TrainingDecision decision);
 }
