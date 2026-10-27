@@ -67,22 +67,6 @@ public final class TrainingCalendar {
     }
 
     /**
-     * Ngày của từng buổi tập, theo thứ tự, từ ngày bắt đầu. totalSessions đã được giới hạn ở TrainingLimits.
-     * (The date of every session, in order, from the start date. totalSessions is bounded by TrainingLimits.)
-     */
-    public static List<LocalDate> sessionDates(LocalDate startDate, Set<TrainingDay> trainingDays, int totalSessions) {
-        List<LocalDate> dates = new java.util.ArrayList<>();
-        LocalDate cursor = startDate;
-        while (dates.size() < totalSessions) {
-            if (isTrainingDay(cursor, trainingDays)) {
-                dates.add(cursor);
-            }
-            cursor = cursor.plusDays(1);
-        }
-        return dates;
-    }
-
-    /**
      * Ngày diễn ra buổi tập cuối cùng khi khóa bắt đầu ở {@code startDate}.
      * (The date of the last workout when the course starts on {@code startDate}.)
      */

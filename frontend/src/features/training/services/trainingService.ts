@@ -70,6 +70,10 @@ export const trainingService = {
   createPlan: async (data: CreateHorseTrainingPlanRequest): Promise<HorseTrainingPlanDetailResponse[]> =>
     (await apiPost<ApiResponse<HorseTrainingPlanDetailResponse[]>>('/api/training-plans', data)).data,
 
+  /** Cancels an upcoming or running plan; sessions not held yet are cancelled. */
+  cancelPlan: async (id: number): Promise<HorseTrainingPlanDetailResponse> =>
+    (await apiPost<ApiResponse<HorseTrainingPlanDetailResponse>>(`/api/training-plans/${id}/cancel`, {})).data,
+
   getPlanById: async (id: number): Promise<HorseTrainingPlanDetailResponse> =>
     (await apiGet<ApiResponse<HorseTrainingPlanDetailResponse>>(`/api/training-plans/${id}`)).data,
 

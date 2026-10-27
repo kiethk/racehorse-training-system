@@ -1,4 +1,5 @@
 import { Pill, Tooltip } from '@/components/ui';
+import { cn } from '@/lib/cn';
 import { describeSpecialty } from '../../lib/specialty';
 import type { HorseSpecialty } from '../../types';
 
@@ -12,9 +13,12 @@ const triggerClassName =
 export function HorseSpecialtyBadges({
   specialty,
   size = 'sm',
+  stacked = false,
 }: {
   specialty: HorseSpecialty | null | undefined;
   size?: 'sm' | 'md';
+  /** One badge per line, for table columns. */
+  stacked?: boolean;
 }) {
   if (!specialty) return null;
 
@@ -37,7 +41,10 @@ export function HorseSpecialtyBadges({
   }
 
   return (
-    <ul className="flex flex-wrap items-center gap-1.5" aria-label="Racing specialty">
+    <ul
+      className={cn('flex gap-1.5', stacked ? 'flex-col items-start' : 'flex-wrap items-center')}
+      aria-label="Racing specialty"
+    >
       {view.badges.map((badge) => (
         <li key={badge.id}>
           <Tooltip content={badge.detail}>

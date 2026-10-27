@@ -1,7 +1,9 @@
 package com.rtms.backend.training.dto;
 
+import com.rtms.backend.training.entity.Subject;
 import com.rtms.backend.training.entity.TrainingLot;
 import com.rtms.backend.training.entity.TrainingWorkout;
+import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.enums.WorkoutStatus;
 
 import java.math.BigDecimal;
@@ -21,6 +23,8 @@ public class PlanWorkoutItemResponse {
     private LocalTime endTime;
     private Long subjectId;
     private String subjectName;
+    /** Mặt sân của bài tập trong lot. (Surface of the lot's subject.) */
+    private SurfaceType surfaceType;
     private Long horseId;
     private Long assignedGroomId;
     private String status;
@@ -52,14 +56,16 @@ public class PlanWorkoutItemResponse {
      */
     private Integer lotOccupancy;
 
-    public PlanWorkoutItemResponse(TrainingWorkout w, TrainingLot lot, String subjectName) {
+    /** subject có thể null nếu bài tập đã bị xóa. (subject may be null if the subject was deleted.) */
+    public PlanWorkoutItemResponse(TrainingWorkout w, TrainingLot lot, Subject subject) {
         this.workoutId = w.getId();
         this.lotId = lot.getId();
         this.lotDate = lot.getLotDate();
         this.startTime = lot.getStartTime();
         this.endTime = lot.getEndTime();
         this.subjectId = lot.getSubjectId();
-        this.subjectName = subjectName;
+        this.subjectName = subject != null ? subject.getName() : "#" + lot.getSubjectId();
+        this.surfaceType = subject != null ? subject.getSurfaceType() : null;
         this.horseId = w.getHorseId();
         this.assignedGroomId = w.getAssignedToId();
         this.status = w.getStatus().name();
@@ -82,10 +88,11 @@ public class PlanWorkoutItemResponse {
      */
     public PlanWorkoutItemResponse(Long workoutId, Long lotId, LocalDate lotDate,
                                    LocalTime startTime, LocalTime endTime,
-                                   Long subjectId, String subjectName,
+                                   Long subjectId, String subjectName, SurfaceType surfaceType,
                                    Long horseId, Long assignedGroomId, WorkoutStatus status,
-                                   BigDecimal actualDistanceMeters, Integer averageHeartRate,
-                                   Integer maxHeartRate, BigDecimal topSpeedKmh,
+                                   BigDecimal actualDistanceMeters, BigDecimal actualDurationMinutes,
+                                   BigDecimal averageSpeedKmh, Integer averageHeartRate,
+                                   Integer maxHeartRate, Integer recoveryHeartRate, BigDecimal topSpeedKmh,
                                    Integer performanceRating, String trainerFeedback,
                                    Long lotOccupancy) {
         this.workoutId = workoutId;
@@ -95,12 +102,16 @@ public class PlanWorkoutItemResponse {
         this.endTime = endTime;
         this.subjectId = subjectId;
         this.subjectName = subjectName;
+        this.surfaceType = surfaceType;
         this.horseId = horseId;
         this.assignedGroomId = assignedGroomId;
         this.status = status.name();
         this.actualDistanceMeters = actualDistanceMeters;
+        this.actualDurationMinutes = actualDurationMinutes;
+        this.averageSpeedKmh = averageSpeedKmh;
         this.averageHeartRate = averageHeartRate;
         this.maxHeartRate = maxHeartRate;
+        this.recoveryHeartRate = recoveryHeartRate;
         this.topSpeedKmh = topSpeedKmh;
         this.performanceRating = performanceRating;
         this.trainerFeedback = trainerFeedback;
@@ -117,6 +128,7 @@ public class PlanWorkoutItemResponse {
     public LocalTime getEndTime() { return endTime; }
     public Long getSubjectId() { return subjectId; }
     public String getSubjectName() { return subjectName; }
+    public SurfaceType getSurfaceType() { return surfaceType; }
     public Long getHorseId() { return horseId; }
     public Long getAssignedGroomId() { return assignedGroomId; }
     public String getStatus() { return status; }

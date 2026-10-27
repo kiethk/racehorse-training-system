@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FilterChips,
-  LinkButton,
   MetricCard,
   Notice,
   PageHeader,
@@ -12,14 +11,16 @@ import {
   Pill,
   ProgressBar,
   ScreenLayout,
+  LinkButton,
   SectionTitle,
+  Tooltip,
 } from '@/components/ui';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import { displayError, formatNumber } from '@/lib/display';
 import { RATING_LEGEND, ratingDistribution } from '@/features/training/lib/rating';
+import { cancelledLabel, planProgress } from '@/features/training/lib/planProgress';
 import { PLAN_STATUS } from '@/features/training/lib/status';
-import { RatingPill } from '@/features/training/components/RatingPill';
 import { StatusPill } from '@/features/training/components/StatusPill';
 import { dashboardService } from '../services/dashboardService';
 import type { DashboardHorse } from '../types';
@@ -27,6 +28,32 @@ import { HealthTrendCard } from './HealthTrendCard';
 import { PerformanceTrendCard } from './PerformanceTrendCard';
 
 type HorseFilter = 'ALL' | 'ACTIVE' | 'ALERT';
+
+/**
+ * The third line of the course cell: the bar and the held/planned count, counted the same way as on the Plan page.
+ * Cancelled sessions are named in the tooltip to keep the row short.
+ */
+function CourseProgress({ horse }: { horse: DashboardHorse }) {
+  const progress = planProgress(horse.completedSessions, horse.totalSessions, horse.cancelledSessions, horse.planStatus);
+  if (progress.allCancelled) {
+    return <p className="text-xs text-[var(--color-text-muted)]">All {progress.cancelled} sessions cancelled</p>;
+  }
+  if (progress.total === 0) return null;
+
+  const count = <span className="shrink-0">{progress.completed}/{progress.total}</span>;
+  return (
+    <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+      <ProgressBar label={`${horse.horseName} course progress`} value={progress.percent} size="sm" tone="info" className="flex-1" />
+      {progress.cancelled > 0 ? (
+        <Tooltip content={cancelledLabel(progress.cancelled)}>
+          <span tabIndex={0} className="shrink-0 rounded-[var(--radius-xs)] underline decoration-dotted outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">
+            {progress.completed}/{progress.total}
+          </span>
+        </Tooltip>
+      ) : count}
+    </div>
+  );
+}
 
 function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
   return [
@@ -51,56 +78,43 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
   {
     id: 'specialty',
     header: 'Specialty',
-    render: (horse) => <HorseSpecialtyBadges specialty={horse.specialty} />,
+    render: (horse) => <HorseSpecialtyBadges specialty={horse.specialty} stacked />,
   },
   {
+    // Course, plan status and progress share one column so the table fits without scrolling sideways.
     id: 'course',
     header: 'Training course',
-    render: (horse) =>
-      horse.planStatus === 'NONE'
-        ? <span className="text-[var(--color-text-muted)]">Not enrolled</span>
-        : <span className="text-[var(--color-text-secondary)]">{horse.courseName}</span>,
-  },
-  {
-    id: 'status',
-    header: 'Status',
-    sortValue: (horse) => PLAN_STATUS[horse.planStatus].label,
-    render: (horse) => <StatusPill status={PLAN_STATUS[horse.planStatus]} />,
-  },
-  {
-    id: 'progress',
-    header: 'Course progress',
-    className: 'min-w-40',
+    className: 'min-w-32',
     sortValue: (horse) => horse.progressPercent,
     render: (horse) =>
-      horse.totalSessions > 0 ? (
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
-            <span>{horse.completedSessions}/{horse.totalSessions} sessions</span>
-            <span className="font-semibold">{formatNumber(horse.progressPercent)}%</span>
-          </div>
-          <ProgressBar label={`${horse.horseName} course progress`} value={horse.progressPercent} size="sm" tone="info" />
-        </div>
+      horse.planStatus === 'NONE' ? (
+        <span className="text-[var(--color-text-muted)]">Not enrolled</span>
       ) : (
-        <span className="text-[var(--color-text-muted)]">—</span>
+        // Always three lines (course, status, progress) so every row reads the same way.
+        <div className="space-y-1">
+          <div className="text-[var(--color-text-secondary)]">{horse.courseName}</div>
+          <StatusPill status={PLAN_STATUS[horse.planStatus]} />
+          <CourseProgress horse={horse} />
+        </div>
       ),
   },
   {
-    id: 'latest',
-    header: 'Latest',
-    align: 'center',
-    sortValue: (horse) => horse.latestPerformanceRating,
-    render: (horse) => <RatingPill rating={horse.latestPerformanceRating} />,
-  },
-  {
-    id: 'average',
-    header: '30-day average',
-    align: 'center',
+    // The latest session rating and the 30-day average, each with its own label.
+    id: 'rating',
+    header: 'Performance',
     sortValue: (horse) => horse.avgPerformanceRating30d,
-    render: (horse) =>
-      horse.avgPerformanceRating30d != null
-        ? <span className="font-semibold">{formatNumber(horse.avgPerformanceRating30d, 1)}</span>
-        : <span className="text-[var(--color-text-muted)]">—</span>,
+    render: (horse) => (
+      <dl className="grid grid-cols-[auto_auto] items-center gap-x-2 gap-y-1 text-xs">
+        <dt className="whitespace-nowrap text-[var(--color-text-muted)]">Latest</dt>
+        <dd className="whitespace-nowrap font-semibold text-[var(--color-text-primary)]">
+          {horse.latestPerformanceRating != null ? `${horse.latestPerformanceRating}/10` : '—'}
+        </dd>
+        <dt className="whitespace-nowrap text-[var(--color-text-muted)]">30-day avg</dt>
+        <dd className="whitespace-nowrap font-semibold text-[var(--color-text-primary)]">
+          {horse.avgPerformanceRating30d != null ? `${formatNumber(horse.avgPerformanceRating30d, 1)}/10` : '—'}
+        </dd>
+      </dl>
+    ),
   },
   {
     id: 'alerts',
@@ -108,17 +122,23 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
     align: 'center',
     sortValue: (horse) => horse.alertsCount,
     render: (horse) =>
-      horse.alertsCount > 0
-        ? <Pill tone="danger" size="sm" icon="alert-triangle">{horse.alertsCount}</Pill>
-        : <Pill tone="success" size="sm" icon="check">Clear</Pill>,
+      horse.alertsCount > 0 ? (
+        <Tooltip content={horse.alertTitles.join(' · ')}>
+          <span tabIndex={0} className="inline-flex rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">
+            <Pill tone="danger" size="sm" icon="alert-triangle">{horse.alertsCount}</Pill>
+          </span>
+        </Tooltip>
+      ) : (
+        <Pill tone="success" size="sm" icon="check">Clear</Pill>
+      ),
   },
   {
     id: 'actions',
     header: <span className="sr-only">Actions</span>,
     align: 'right',
     render: (horse) => (
-      <LinkButton href={`${horseBasePath}/${horse.horseId}`} size="sm" icon="trending-up">
-        View details
+      <LinkButton href={`${horseBasePath}/${horse.horseId}`} size="sm" variant="secondary">
+        Details
       </LinkButton>
     ),
   },

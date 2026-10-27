@@ -184,7 +184,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getTrainerRiskAlerts",
-                        "Tổng hợp các cảnh báo nguy cơ chấn thương (nhịp tim cao, tụt phong độ, sự cố lặp lại) của các ngựa do HLV quản lý.",
+                        "Tổng hợp các cảnh báo nguy cơ chấn thương (nhịp tim cao, hồi phục tim kém, tụt phong độ) của các ngựa do HLV quản lý.",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")

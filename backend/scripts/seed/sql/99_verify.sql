@@ -168,7 +168,7 @@ INSERT INTO seed_check VALUES
  $q$ SELECT h.id FROM horses h WHERE h.training_decision = 'BLOCKED'
        AND (EXISTS (SELECT 1 FROM horse_training_plans p WHERE p.horse_id = h.id AND p.status IN ('ACTIVE', 'UPCOMING'))
             OR EXISTS (SELECT 1 FROM training_workouts w JOIN training_lots l ON l.id = w.lot_id
-                        WHERE w.horse_id = h.id AND w.status = 'SCHEDULED' AND l.lot_date >= pg_temp.today())) $q$),
+                        WHERE w.horse_id = h.id AND w.status = 'SCHEDULED' AND l.lot_date + l.end_time > pg_temp.clock())) $q$),
 ('Lot status does not match its sessions',
  $q$ SELECT l.id FROM training_lots l
      WHERE (l.status = 'COMPLETED' AND EXISTS (SELECT 1 FROM training_workouts w WHERE w.lot_id = l.id AND w.status = 'SCHEDULED'))

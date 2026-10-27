@@ -2,7 +2,6 @@ package com.rtms.backend.incident.repository;
 
 import com.rtms.backend.incident.entity.HorseIncidentReport;
 import com.rtms.backend.incident.enums.IncidentStatus;
-import com.rtms.backend.training.dto.IncidentCountRow;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -38,22 +37,7 @@ public interface HorseIncidentReportRepository extends JpaRepository<HorseIncide
 
     List<HorseIncidentReport> findByReportedAtAfterOrderByReportedAtDesc(LocalDateTime after);
 
-    long countByHorseIdAndReportedAtAfter(Long horseId, LocalDateTime after);
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM HorseIncidentReport r WHERE r.id = :id")
     Optional<HorseIncidentReport> findByIdForUpdate(@Param("id") Long id);
-
-    /**
-     * Số báo cáo sự cố của NHIỀU ngựa từ một mốc thời gian, bằng một câu GROUP BY.
-     */
-    @Query("""
-           SELECT new com.rtms.backend.training.dto.IncidentCountRow(r.horseId, COUNT(r))
-           FROM HorseIncidentReport r
-           WHERE r.horseId IN :horseIds AND r.reportedAt > :after
-           GROUP BY r.horseId
-           """)
-    List<IncidentCountRow> countIncidentsByHorseIds(
-            @Param("horseIds") Collection<Long> horseIds,
-            @Param("after") LocalDateTime after);
 }

@@ -137,6 +137,40 @@ public class HorseTrainingPlanService {
         }
     }
 
+    // =================================================================
+    // HỦY KẾ HOẠCH (Cancelling a plan)
+    // =================================================================
+
+    /**
+     * Trainer hủy một kế hoạch đang chạy hoặc sắp chạy: các buổi chưa diễn ra bị hủy, lot rỗng trả lại khe giờ, và
+     * kế hoạch luôn thành CANCELLED (đây là quyết định bỏ khóa, khác với việc hủy lẻ từng lot). Khoảng ngày của kế
+     * hoạch được giải phóng cho BR-01 nên ngựa có thể ghi danh khóa khác ngay.
+     * (The trainer cancels a running or upcoming plan: sessions not yet held are cancelled, empty lots free their slot,
+     * and the plan always becomes CANCELLED (a decision to drop the course, unlike cancelling single lots). The plan's
+     * date range is released for BR-01, so the horse can be enrolled in another course at once.)
+     *
+     * Buổi đã qua giờ mà chưa ghi kết quả được giữ lại để Trainer vẫn ghi được.
+     * (A session past its time without a result is kept so the trainer can still record it.)
+     */
+    @Transactional
+    public HorseTrainingPlanDetailResponse cancelPlan(Long id, AuthenticatedUser currentUser) {
+        Long trainerId = currentUser.getUserId();
+        lotService.lockSchedule(trainerId);            // cùng khóa với việc sửa lot (same lock as editing lots)
+        HorseTrainingPlan plan = planRepository.findById(id).orElseThrow(() -> planNotFound(id));
+        if (!plan.getTrainerId().equals(trainerId)) {
+            throw planNotFound(id);
+        }
+        if (plan.getStatus() != TrainingPlanStatus.UPCOMING && plan.getStatus() != TrainingPlanStatus.ACTIVE) {
+            throw new ApiException(HttpStatus.CONFLICT, "PLAN_NOT_RUNNING",
+                    "Only an upcoming or running plan can be cancelled; this plan is already " + plan.getStatus() + ".");
+        }
+
+        workoutService.cancelNotYetHeldWorkouts(id);
+        plan.setStatus(TrainingPlanStatus.CANCELLED);
+        planRepository.save(plan);
+        return getPlanById(id, currentUser);
+    }
+
     private RuntimeException planNotFound(Long id) {
         return new RuntimeException("Training plan #" + id + " not found");
     }
@@ -473,8 +507,7 @@ public class HorseTrainingPlanService {
 
         List<Horse> horses = planRepository.findEnrollableHorses(trainerId);
         if (horses.isEmpty()) {
-            return new PlanPreviewResponse(startDate, endDate, totalSessions, null,
-                    fullDates(course, trainerId, window, 0), List.of());
+            return new PlanPreviewResponse(startDate, endDate, totalSessions, null, List.of());
         }
 
         List<Long> horseIds = horses.stream().map(Horse::getId).toList();
@@ -489,29 +522,7 @@ public class HorseTrainingPlanService {
                 .toList();
         LocalDate groupEarliestStart =
                 groupEarliestStart(request.getSelectedHorseIds(), availability, plansByHorse, window);
-        int groupSize = selectedEnrollable(request.getSelectedHorseIds(), availability).size();
-        return new PlanPreviewResponse(startDate, endDate, totalSessions, groupEarliestStart,
-                fullDates(course, trainerId, window, groupSize), availability);
-    }
-
-    /**
-     * Những ngày của khóa mà lịch của Trainer chắc chắn không còn chỗ cho nhóm này (xem TrainingLotService.findFullDates).
-     * Để xem trước nói thật điều mà việc tạo sẽ báo thành "schedule is full".
-     * (The days of the course on which the trainer schedule certainly has no room for this group (see
-     * TrainingLotService.findFullDates), so the preview says up front what creating would report as "schedule is full".)
-     */
-    private List<LocalDate> fullDates(Course course, Long trainerId, PlanWindow window, int groupSize) {
-        List<Subject> subjects = courseSubjectRepository.findSubjectsOfCourseInOrder(course.getId());
-        if (subjects.isEmpty()) {
-            return List.of();
-        }
-        List<LocalDate> dates = TrainingCalendar.sessionDates(window.startDate(), window.days(), window.totalSessions());
-        List<TrainingLotService.PlannedSession> sessions = new ArrayList<>();
-        for (int index = 0; index < dates.size(); index++) {
-            Subject subject = subjects.get(index % subjects.size());
-            sessions.add(new TrainingLotService.PlannedSession(dates.get(index), subject.getId(), subject.getDurationMinutes()));
-        }
-        return lotService.findFullDates(trainerId, sessions, groupSize);
+        return new PlanPreviewResponse(startDate, endDate, totalSessions, groupEarliestStart, availability);
     }
 
     /** Ngựa đang chọn mà ghi danh được (rảnh hoặc bận, không bị chặn hay thiếu Groom). (Selected horses that can enroll.) */

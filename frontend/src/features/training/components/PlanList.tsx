@@ -17,7 +17,7 @@ import {
 } from '@/components/ui';
 import { displayError, formatDate } from '@/lib/display';
 import { useTrainerHorses } from '../hooks/useTrainerHorses';
-import { planProgress } from '../lib/planProgress';
+import { cancelledLabel, planProgress } from '../lib/planProgress';
 import { PLAN_STATUS } from '../lib/status';
 import { trainingService } from '../services/trainingService';
 import type { PlanStatus, PlanSummaryResponse } from '../types';
@@ -28,7 +28,7 @@ type StatusFilter = 'ALL' | PlanStatus;
 const FILTERS: StatusFilter[] = ['ALL', 'UPCOMING', 'ACTIVE', 'COMPLETED', 'CANCELLED'];
 
 function PlanRow({ plan }: { plan: PlanSummaryResponse }) {
-  const progress = planProgress(plan.completedSessions, plan.totalSessions, plan.cancelledSessions);
+  const progress = planProgress(plan.completedSessions, plan.totalSessions, plan.cancelledSessions, plan.status);
 
   return (
     <Panel padded>
@@ -46,13 +46,19 @@ function PlanRow({ plan }: { plan: PlanSummaryResponse }) {
 
         <div className="flex items-center gap-4">
           <div className="w-44 space-y-1">
-            <div className="flex justify-between text-xs text-[var(--color-text-secondary)]">
-              <span>{progress.completed}/{progress.total} sessions</span>
-              <span>{progress.percent}%</span>
-            </div>
-            <ProgressBar label={`${plan.horseName} plan progress`} value={progress.percent} size="sm" />
-            {progress.cancelled > 0 && (
-              <p className="text-xs text-[var(--color-text-muted)]">{progress.cancelled} sessions cancelled</p>
+            {progress.allCancelled ? (
+              <p className="text-xs text-[var(--color-text-muted)]">All {progress.cancelled} sessions cancelled</p>
+            ) : (
+              <>
+                <div className="flex justify-between text-xs text-[var(--color-text-secondary)]">
+                  <span>{progress.completed}/{progress.total} sessions</span>
+                  <span>{progress.percent}%</span>
+                </div>
+                <ProgressBar label={`${plan.horseName} plan progress`} value={progress.percent} size="sm" />
+                {progress.cancelled > 0 && (
+                  <p className="text-xs text-[var(--color-text-muted)]">{cancelledLabel(progress.cancelled)}</p>
+                )}
+              </>
             )}
           </div>
           <LinkButton href={`/trainer/plans/${plan.planId}`} size="sm">Details</LinkButton>

@@ -117,8 +117,6 @@ export interface PlanPreviewResponse {
   totalSessions: number;
   /** Earliest date every selected horse is free for the whole course; null when none is selected. */
   groupEarliestStart: string | null;
-  /** Training days on which the trainer's golden window cannot fit the group; the plan cannot be created. */
-  scheduleFullDates: string[];
   horses: HorsePlanAvailability[];
 }
 
@@ -154,6 +152,8 @@ export interface PlanWorkoutItemResponse {
   endTime: string;
   subjectId: number;
   subjectName: string;
+  /** Surface of the lot's subject; null if the subject was deleted. */
+  surfaceType: SurfaceType | null;
   horseId: number;
   /** The handler of THIS horse only — NOT "the lot's groom". */
   assignedGroomId: number | null;

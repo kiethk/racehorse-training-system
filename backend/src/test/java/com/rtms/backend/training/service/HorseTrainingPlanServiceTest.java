@@ -768,6 +768,58 @@ class HorseTrainingPlanServiceTest {
         verifyNoInteractions(planRepository);
     }
 
+    // =================================================================
+    // cancelPlan
+    // =================================================================
+
+    private HorseTrainingPlan ownPlan(TrainingPlanStatus status) {
+        HorseTrainingPlan plan = new HorseTrainingPlan();
+        plan.setId(27L);
+        plan.setTrainerId(9L);
+        plan.setStatus(status);
+        return plan;
+    }
+
+    @Test
+    @DisplayName("Cancelling a running plan cancels its pending sessions and always ends CANCELLED")
+    void testCancelPlan_RunningPlan() {
+        HorseTrainingPlan plan = ownPlan(TrainingPlanStatus.ACTIVE);
+        when(planRepository.findById(27L)).thenReturn(Optional.of(plan));
+        when(planRepository.findPlanNames(27L)).thenReturn(Optional.of(new PlanNamesRow("Wind God", "Sprint course")));
+        when(workoutService.buildWorkoutItems(27L)).thenReturn(List.of());
+
+        planService.cancelPlan(27L, trainerUser);
+
+        verify(lotService).lockSchedule(9L);
+        verify(workoutService).cancelNotYetHeldWorkouts(27L);
+        assertEquals(TrainingPlanStatus.CANCELLED, plan.getStatus());
+        verify(planRepository).save(plan);
+    }
+
+    @Test
+    @DisplayName("A plan already closed cannot be cancelled")
+    void testCancelPlan_ClosedPlanRefused() {
+        when(planRepository.findById(27L)).thenReturn(Optional.of(ownPlan(TrainingPlanStatus.COMPLETED)));
+
+        ApiException error = assertThrows(ApiException.class, () -> planService.cancelPlan(27L, trainerUser));
+
+        assertEquals("PLAN_NOT_RUNNING", error.getErrorCode());
+        verify(workoutService, never()).cancelNotYetHeldWorkouts(anyLong());
+    }
+
+    @Test
+    @DisplayName("Another trainer's plan is reported as not found and left untouched")
+    void testCancelPlan_OtherTrainersPlan() {
+        HorseTrainingPlan plan = ownPlan(TrainingPlanStatus.UPCOMING);
+        plan.setTrainerId(10L);
+        when(planRepository.findById(27L)).thenReturn(Optional.of(plan));
+
+        assertThrows(RuntimeException.class, () -> planService.cancelPlan(27L, trainerUser));
+
+        assertEquals(TrainingPlanStatus.UPCOMING, plan.getStatus());
+        verify(workoutService, never()).cancelNotYetHeldWorkouts(anyLong());
+    }
+
     private static TrainingDay trainingDayOf(LocalDate date) {
         return TrainingDay.valueOf(date.getDayOfWeek().name());
     }

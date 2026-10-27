@@ -4,7 +4,6 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.LotHorseNameRow;
-import com.rtms.backend.training.dto.LotLoadRow;
 import com.rtms.backend.training.dto.TrainingLotResponse;
 import com.rtms.backend.training.dto.TrainingLotRow;
 import com.rtms.backend.training.entity.Subject;
@@ -26,7 +25,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -56,13 +54,16 @@ public class TrainingLotService {
     private final TrainingLotRepository lotRepository;
     private final TrainingWorkoutRepository workoutRepository;
     private final SubjectRepository subjectRepository;
+    private final PlanCompletionService planCompletion;
 
     public TrainingLotService(TrainingLotRepository lotRepository,
                               TrainingWorkoutRepository workoutRepository,
-                              SubjectRepository subjectRepository) {
+                              SubjectRepository subjectRepository,
+                              PlanCompletionService planCompletion) {
         this.lotRepository = lotRepository;
         this.workoutRepository = workoutRepository;
         this.subjectRepository = subjectRepository;
+        this.planCompletion = planCompletion;
     }
 
     // =================================================================
@@ -388,7 +389,10 @@ public class TrainingLotService {
         return responseOf(lotId);
     }
 
-    /** Hủy lot và mọi buổi tập SCHEDULED bên trong. (Cancels a lot and all SCHEDULED workouts inside it.) */
+    /**
+     * Hủy lot và mọi buổi tập SCHEDULED bên trong; kế hoạch nào không còn buổi để tập thì được đóng.
+     * (Cancels a lot and all SCHEDULED workouts inside it; a plan left with no session to hold is closed.)
+     */
     @Transactional
     public TrainingLotResponse cancelLot(Long lotId, Long trainerId) {
         lockSchedule(trainerId);                       // khóa TRƯỚC khi đọc lot (lock BEFORE reading the lot)
@@ -400,9 +404,14 @@ public class TrainingLotService {
                 .toList();
         scheduled.forEach(w -> w.setStatus(WorkoutStatus.CANCELLED));
         workoutRepository.saveAll(scheduled);
+        workoutRepository.flush();   // để PlanCompletionService đếm đúng (so PlanCompletionService counts correctly)
 
         lot.setStatus(LotStatus.CANCELLED);
         lotRepository.save(lot);
+
+        planCompletion.closeFinishedPlans(scheduled.stream()
+                .map(TrainingWorkout::getPlanId)
+                .collect(Collectors.toSet()));
         return responseOf(lotId);
     }
 
@@ -456,60 +465,5 @@ public class TrainingLotService {
                 lotRepository.save(lot);
             }
         });
-    }
-
-    // =================================================================
-    // KIỂM TRA NGÀY ĐẦY CHO XEM TRƯỚC (Full-day check for the preview)
-    // =================================================================
-
-    /** Một buổi sẽ diễn ra: ngày, bài và độ dài. (A session that will take place: day, subject and length.) */
-    public record PlannedSession(LocalDate date, Long subjectId, int durationMinutes) {
-    }
-
-    /**
-     * Những ngày KHÔNG THỂ nhận nhóm này: kể cả khi ghép được vào mọi lot cùng bài còn chỗ, phần ngựa còn lại cần số lot mới mà
-     * khung giờ vàng không còn đủ phút. Đây là cận dưới nên chỉ báo ngày chắc chắn hết chỗ (không tính việc nhiều ngựa cùng một
-     * Groom phải tách lot); việc xếp thật vẫn do findOrCreateLot, và vẫn có thể báo đầy ở ngày không nằm trong danh sách này.
-     * (The days that CANNOT take this group: even joining every same-subject lot that has room, the remaining horses need new
-     * lots for which the golden window has too few minutes left. This is a lower bound, so it only reports days that are
-     * certainly full (it ignores horses of one groom having to split across lots); the real placement is still findOrCreateLot
-     * and may still report a full day that is not in this list.)
-     */
-    @Transactional(readOnly = true)
-    public List<LocalDate> findFullDates(Long trainerId, List<PlannedSession> sessions, int horseCount) {
-        if (sessions.isEmpty()) {
-            return List.of();
-        }
-        LocalDate first = sessions.get(0).date();
-        LocalDate last = sessions.get(sessions.size() - 1).date();
-        Map<LocalDate, List<LotLoadRow>> loadByDate = lotRepository.findLoadBetween(trainerId, first, last).stream()
-                .collect(Collectors.groupingBy(LotLoadRow::lotDate));
-
-        int horses = Math.max(horseCount, 1);
-        List<LocalDate> full = new ArrayList<>();
-        for (PlannedSession session : sessions) {
-            List<LotLoadRow> dayLots = loadByDate.getOrDefault(session.date(), List.of());
-            LocalTime notBefore = earliestStartOn(session.date());
-
-            long usedMinutes = dayLots.stream()
-                    .mapToLong(lot -> Duration.between(lot.startTime(), lot.endTime()).toMinutes())
-                    .sum();
-            long freeMinutes = Math.min(
-                    FarmSchedulePolicy.goldenWindowMinutes() - usedMinutes,
-                    Duration.between(notBefore, FarmSchedulePolicy.GOLDEN_HOURS_END).toMinutes());
-
-            long spare = dayLots.stream()
-                    .filter(lot -> lot.status() == LotStatus.SCHEDULED)
-                    .filter(lot -> lot.subjectId().equals(session.subjectId()))
-                    .filter(lot -> !lot.startTime().isBefore(notBefore))
-                    .mapToLong(lot -> Math.max(0, lot.maxCapacity() - lot.occupied()))
-                    .sum();
-            long remaining = Math.max(0, horses - spare);
-            long newLots = (remaining + FarmSchedulePolicy.DEFAULT_LOT_CAPACITY - 1) / FarmSchedulePolicy.DEFAULT_LOT_CAPACITY;
-            if (newLots * session.durationMinutes() > Math.max(freeMinutes, 0)) {
-                full.add(session.date());
-            }
-        }
-        return full;
     }
 }

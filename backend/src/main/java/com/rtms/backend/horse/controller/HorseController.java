@@ -8,7 +8,7 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.service.HorsePhotoService;
 import com.rtms.backend.horse.service.HorseService;
-import com.rtms.backend.training.service.HorsePerformanceService;
+import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.service.HorseSpecialtyService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
@@ -20,12 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.web.bind.annotation.*;
 
-import com.rtms.backend.notification.dto.HorseAlertResponse;
-import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
-import com.rtms.backend.training.dto.HorseSpecialtyResponse;
-import org.springframework.format.annotation.DateTimeFormat;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -38,16 +33,14 @@ public class HorseController {
     private static final String BASE_URL = "/api/horses";
 
     private final HorseService horseService;
-    private final HorsePerformanceService performanceService;
     private final HorseSpecialtyService specialtyService;
     private final HorsePhotoService photoService;
     private final com.rtms.backend.horse.service.HorseAdmissionService admissionService;
 
-    public HorseController(HorseService horseService, HorsePerformanceService performanceService,
+    public HorseController(HorseService horseService,
                            HorseSpecialtyService specialtyService, HorsePhotoService photoService,
                            com.rtms.backend.horse.service.HorseAdmissionService admissionService) {
         this.horseService = horseService;
-        this.performanceService = performanceService;
         this.specialtyService = specialtyService;
         this.photoService = photoService;
         this.admissionService = admissionService;
@@ -137,32 +130,8 @@ public class HorseController {
                 .body(photo.resource());
     }
 
-    @PreAuthorize("hasAuthority('HORSE_VIEW')")
-    @GetMapping("/{id}/fitness-trend")
-    public ApiResponse<List<HorseFitnessTrendItemResponse>> getFitnessTrend(
-            @PathVariable Long id,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(performanceService.getFitnessTrend(id, from, to, currentUser));
-    }
-
-    @PreAuthorize("hasAuthority('HORSE_VIEW')")
-    @GetMapping("/{id}/alerts")
-    public ApiResponse<List<HorseAlertResponse>> getAlerts(
-            @PathVariable Long id,
-            @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(performanceService.getHorseAlerts(id, currentUser));
-    }
-
-    /** Sở trường thi đấu suy ra từ các buổi tập; vai nào xem được ngựa thì xem được. (Racing specialty inferred from workouts.) */
-    @PreAuthorize("hasAuthority('HORSE_VIEW')")
-    @GetMapping("/{id}/specialty")
-    public ApiResponse<HorseSpecialtyResponse> getSpecialty(
-            @PathVariable Long id,
-            @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(specialtyService.getSpecialty(id, currentUser));
-    }
+    // Phong độ của một chiến mã (fitness-trend, alerts, specialty) nằm ở training HorsePerformanceController.
+    // (A horse's performance (fitness-trend, alerts, specialty) lives in training HorsePerformanceController.)
 
     /**
      * Retrieves the admission history linked to this horse by horseId.
