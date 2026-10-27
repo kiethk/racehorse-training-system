@@ -6,13 +6,27 @@ import { Button, FilterBar, FormField, SearchInput, Select } from '@/components/
 import type { HorseStatus } from '@/features/stable/types';
 import { cn } from '@/lib/cn';
 
-export interface HorseFilterBarProps {
+export interface StatusOption<S extends string> {
+  value: S;
+  label: string;
+}
+
+const HORSE_STATUS_OPTIONS: StatusOption<HorseStatus>[] = [
+  { value: 'CANDIDATE', label: 'Candidate' },
+  { value: 'ELIGIBLE', label: 'Eligible' },
+  { value: 'REJECTED', label: 'Rejected' },
+  { value: 'INACTIVE', label: 'Inactive' },
+];
+
+export interface HorseFilterBarProps<S extends string = HorseStatus> {
   search: string;
   onSearchChange: (value: string) => void;
   searchLabel?: string;
   searchPlaceholder?: string;
-  status: HorseStatus | '';
-  onStatusChange: (status: HorseStatus | '') => void;
+  status: S | '';
+  onStatusChange: (status: S | '') => void;
+  /** Statuses in the dropdown; defaults to the horse statuses (another list of horses passes its own, e.g. plan status). */
+  statusOptions?: StatusOption<S>[];
   onApply: () => void;
   onClear: () => void;
   children?: ReactNode;
@@ -21,21 +35,22 @@ export interface HorseFilterBarProps {
 
 /**
  * Controlled filter row for horse lists:
- * SearchInput + Status dropdown + optional extra controls (children) + Apply / Clear buttons.
+ * SearchInput + Status dropdown (horse statuses unless `statusOptions` is given) + optional extra controls (children) + Apply / Clear buttons.
  * Filters are applied on submit (clicking Apply or pressing Enter).
  */
-export function HorseFilterBar({
+export function HorseFilterBar<S extends string = HorseStatus>({
   search,
   onSearchChange,
   searchLabel = 'Search horses',
   searchPlaceholder = 'Search by name, registration or breed…',
   status,
   onStatusChange,
+  statusOptions = HORSE_STATUS_OPTIONS as StatusOption<S>[],
   onApply,
   onClear,
   children,
   className = '',
-}: HorseFilterBarProps) {
+}: HorseFilterBarProps<S>) {
   return (
     <FilterBar
       className={cn('[&_input]:min-h-9 [&_select]:min-h-9', className)}
@@ -58,13 +73,12 @@ export function HorseFilterBar({
           id="horse-status-filter"
           aria-label="Status"
           value={status}
-          onChange={(event) => onStatusChange(event.target.value as HorseStatus | '')}
+          onChange={(event) => onStatusChange(event.target.value as S | '')}
         >
           <option value="">All statuses</option>
-          <option value="CANDIDATE">Candidate</option>
-          <option value="ELIGIBLE">Eligible</option>
-          <option value="REJECTED">Rejected</option>
-          <option value="INACTIVE">Inactive</option>
+          {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
         </Select>
       </FormField>
 
