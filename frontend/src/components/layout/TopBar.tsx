@@ -3,7 +3,6 @@
 import { Icon } from '@/components/ui/Icon';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { NotificationBell } from './NotificationBell';
-import { AiChatTopBarButton } from '@/features/ai';
 
 export function TopBar({
   title,
@@ -35,7 +34,6 @@ export function TopBar({
       )}
       <p className="min-w-0 truncate text-sm font-semibold text-[var(--color-text-primary)]">{title}</p>
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        <AiChatTopBarButton />
         <NotificationBell />
       </div>
     </header>

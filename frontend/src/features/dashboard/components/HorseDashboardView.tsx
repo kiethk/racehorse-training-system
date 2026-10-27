@@ -269,6 +269,7 @@ export function HorseDashboardView({
           columns={columns}
           getRowKey={(horse) => horse.horseId}
           loading={loading}
+          pageSize={8}
           getSearchText={(horse) => `${horse.horseName} ${horse.courseName} ${horse.stallCode ?? ''}`}
           searchPlaceholder="Search horses…"
           emptyTitle={horses.length === 0 ? 'No horses yet' : 'No horses match the selected filters'}

@@ -28,8 +28,13 @@ export function getNotificationHref(item: NotificationItem, role: Role | undefin
   if (role === 'GROOM' && item.notificationType === 'HORSE_EDIT_REQUESTED') {
     return refId ? `/groom/horse-edit-requests/${refId}` : '/groom/horse-edit-requests';
   }
-  if (role === 'HORSE_OWNER' && item.notificationType === 'HORSE_EDIT_REVIEWED') {
-    return refId ? `/owner/horses/${refId}` : '/owner/horses';
+  if (role === 'HORSE_OWNER') {
+    if (item.referenceType === 'ADMISSION') {
+      return refId ? `/owner/admissions/${refId}` : '/owner/admissions';
+    }
+    if (item.referenceType === 'HORSE' || item.notificationType === 'HORSE_EDIT_REVIEWED') {
+      return refId ? `/owner/horses/${refId}` : '/owner/horses';
+    }
   }
 
   // 1. Phân công khám nhập chuồng (Admission Assignment)

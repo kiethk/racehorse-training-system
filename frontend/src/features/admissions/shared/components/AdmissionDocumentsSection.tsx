@@ -149,7 +149,7 @@ function DocumentRow({ document, image, onOpen, onOpenImage }: {
         size="sm"
         label={`Open ${fileName(document)} in new tab`}
         onClick={() => {
-          openProtectedFile(document.fileUrl).catch((error) => toast.error(displayError(error, 'Unable to open the file.')));
+          openProtectedFile(document.fileUrl, fileName(document)).catch((error) => toast.error(displayError(error, 'Unable to open the file.')));
         }}
         className="shrink-0"
       />

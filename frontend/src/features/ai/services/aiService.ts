@@ -4,8 +4,6 @@ import type {
   AiChatResponseDto,
   AiConversation,
   AiChatMessageDetail,
-  ActionCommitRequestDto,
-  ActionCommitResponseDto,
 } from '../types';
 
 /**
@@ -51,13 +49,6 @@ export async function sendChatMessage(request: AiChatRequestDto): Promise<AiChat
 }
 
 /**
- * Xác nhận thực thi hành động HITL (Commit) với Action Token và Idempotency Key.
- */
-export async function commitAction(request: ActionCommitRequestDto): Promise<ActionCommitResponseDto> {
-  return apiPost<ActionCommitResponseDto>('/api/v1/ai/actions/commit', request);
-}
-
-/**
  * Gửi tin nhắn và nhận phản hồi SSE streaming từ AI Agent.
  */
 export async function streamChatMessage(
@@ -73,21 +64,20 @@ export async function streamChatMessage(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    credentials: 'include',
     body: JSON.stringify(request),
     signal,
   });
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Lỗi kết nối streaming AI');
-    throw new Error(errorText || `API error: ${response.status}`);
+    throw new Error(`SSE streaming failed with status ${response.status}`);
   }
 
   const reader = response.body?.getReader();
   if (!reader) {
-    throw new Error('ReadableStream không được trình duyệt hỗ trợ');
+    throw new Error('Response body reader is unavailable');
   }
 
   const decoder = new TextDecoder('utf-8');
@@ -98,18 +88,19 @@ export async function streamChatMessage(
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
+    const lines = buffer.split('\n\n');
     buffer = lines.pop() || '';
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('data:')) {
-        const dataContent = trimmed.substring(5).trim();
-        if (dataContent === '[DONE]') {
-          return;
-        }
-        if (dataContent) {
-          onChunk(dataContent);
+    for (const chunk of lines) {
+      if (chunk.startsWith('data:')) {
+        const dataStr = chunk.slice(5).trim();
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed && typeof parsed.reply === 'string') {
+            onChunk(parsed.reply);
+          }
+        } catch {
+          onChunk(dataStr);
         }
       }
     }
