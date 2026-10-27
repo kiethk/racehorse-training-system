@@ -44,6 +44,7 @@ export function DonutChart({
     const fraction = total > 0 ? val / total : 0;
     const strokeDash = fraction * circumference;
     const offset = -accumulatedLength;
+    // eslint-disable-next-line react-hooks/immutability
     accumulatedLength += strokeDash;
 
     return {

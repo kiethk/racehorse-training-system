@@ -35,7 +35,8 @@ interface PdfDocumentProxyLike {
       viewport: { width: number; height: number };
     }) => { promise: Promise<void>; cancel: () => void };
   }>;
-  destroy: () => Promise<void>;
+  cleanup?: () => Promise<void>;
+  loadingTask?: { destroy: () => Promise<void> };
 }
 
 export function PdfViewer({
@@ -76,7 +77,7 @@ export function PdfViewer({
 
         const doc = await loadingTask.promise;
         if (!active) {
-          void doc.destroy();
+          void loadingTask.destroy();
           return;
         }
 
@@ -108,7 +109,7 @@ export function PdfViewer({
       active = false;
       controller.abort();
       if (docRef.current) {
-        void docRef.current.destroy();
+        void docRef.current.cleanup?.();
         docRef.current = null;
       }
     };

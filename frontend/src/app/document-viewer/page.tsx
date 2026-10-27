@@ -87,7 +87,7 @@ function ViewerContent() {
       {/* Top toolbar */}
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-700 bg-slate-800/90 px-4 backdrop-blur-sm">
         <div className="flex items-center gap-2 overflow-hidden pr-4">
-          <Icon name={isPdf ? 'file-text' : isImage ? 'image' : 'file'} size={18} className="text-sky-400 shrink-0" />
+          <Icon name={isPdf ? 'file-text' : isImage ? 'image' : 'file-text'} size={18} className="text-sky-400 shrink-0" />
           <h1 className="truncate text-sm font-medium text-slate-100" title={title}>
             {title}
           </h1>
