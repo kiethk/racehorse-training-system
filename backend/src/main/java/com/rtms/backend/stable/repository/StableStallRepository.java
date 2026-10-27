@@ -40,6 +40,25 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
 
     List<StableStall> findByAreaIdAndGroomId(Long areaId, Long groomId);
 
+    /** A "quarantine groom" looks after at least one active quarantine stall; only they review new admissions. */
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1 FROM stable_stalls ss JOIN areas a ON a.id = ss.area_id
+                WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
+                  AND ss.groom_id = :groomId)
+            """, nativeQuery = true)
+    boolean isQuarantineGroom(@Param("groomId") Long groomId);
+
+    @Query(value = """
+            SELECT DISTINCT ss.groom_id FROM stable_stalls ss
+            JOIN areas a ON a.id = ss.area_id
+            JOIN users u ON u.id = ss.groom_id
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
+              AND u.is_active = TRUE
+            ORDER BY ss.groom_id
+            """, nativeQuery = true)
+    List<Long> findQuarantineGroomIds();
+
     @Query(value = """
             SELECT ss.*
             FROM stable_stalls ss
@@ -55,7 +74,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
             WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
-              AND ss.status = 'AVAILABLE'
+              AND ss.status = 'AVAILABLE' AND ss.groom_id IS NOT NULL
             """, nativeQuery = true)
     long countAvailableQuarantineStalls();
 
@@ -73,33 +92,39 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
             WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'REGULAR'
-              AND ss.status = 'AVAILABLE'
+              AND ss.status = 'AVAILABLE' AND ss.groom_id IS NOT NULL
             """, nativeQuery = true)
     long countAvailableRegularStalls();
 
+    /**
+     * The AVAILABLE stall (with an assigned groom) of the given area type whose groom is the fairest
+     * next recipient: fewest horses (OCCUPIED + RESERVED stalls), then longest since the last new horse
+     * (never = first), then lowest groom id; within that groom, area code and stall number.
+     * <p>
+     * Callers must already hold {@link #lockAdmissionCapacityStallsForUpdate()}: the groom loads are read
+     * from the same rows, so without that lock two allocations could both pick the same "least loaded" groom.
+     */
     @Query(value = """
+            WITH groom_load AS (
+                SELECT ss.groom_id, COUNT(*) FILTER (WHERE ss.status IN ('OCCUPIED', 'RESERVED')) AS horses
+                FROM stable_stalls ss
+                JOIN areas a ON a.id = ss.area_id
+                WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND ss.groom_id IS NOT NULL
+                GROUP BY ss.groom_id
+            )
             SELECT ss.*
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
-            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'QUARANTINE'
-              AND ss.status = 'AVAILABLE'
-            ORDER BY a.code ASC, ss.stall_number ASC
+            JOIN groom_load gl ON gl.groom_id = ss.groom_id
+            LEFT JOIN groom_profiles gp ON gp.user_id = ss.groom_id
+            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = :areaType
+              AND ss.status = 'AVAILABLE' AND ss.groom_id IS NOT NULL
+            ORDER BY gl.horses ASC, gp.last_horse_assigned_at ASC NULLS FIRST, ss.groom_id ASC,
+                     a.code ASC, ss.stall_number ASC
             LIMIT 1
-            FOR UPDATE OF ss SKIP LOCKED
+            FOR UPDATE OF ss
             """, nativeQuery = true)
-    Optional<StableStall> findFirstAvailableQuarantineStallForUpdate();
-
-    @Query(value = """
-            SELECT ss.*
-            FROM stable_stalls ss
-            JOIN areas a ON a.id = ss.area_id
-            WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'REGULAR'
-              AND ss.status = 'AVAILABLE'
-            ORDER BY a.code ASC, ss.stall_number ASC
-            LIMIT 1
-            FOR UPDATE OF ss SKIP LOCKED
-            """, nativeQuery = true)
-    Optional<StableStall> findFirstAvailableRegularStallForUpdate();
+    Optional<StableStall> findFairAvailableStallForUpdate(@Param("areaType") String areaType);
 
     @Query(value = """
             SELECT ss.*
@@ -107,7 +132,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             JOIN areas a ON a.id = ss.area_id
             WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND ss.id = :stallId
               AND a.type = 'REGULAR'
-              AND ss.status = 'AVAILABLE'
+              AND ss.status = 'AVAILABLE' AND ss.groom_id IS NOT NULL
             FOR UPDATE OF ss
             """, nativeQuery = true)
     Optional<StableStall> findAvailableRegularStallByIdForUpdate(
@@ -126,7 +151,7 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             FROM stable_stalls ss
             JOIN areas a ON a.id = ss.area_id
             WHERE a.deleted_at IS NULL AND ss.deleted_at IS NULL AND a.type = 'REGULAR'
-              AND ss.status = 'AVAILABLE'
+              AND ss.status = 'AVAILABLE' AND ss.groom_id IS NOT NULL
             ORDER BY a.code ASC, ss.stall_number ASC
             """, nativeQuery = true)
     List<StableStall> findAllAvailableRegularStallsOrdered();

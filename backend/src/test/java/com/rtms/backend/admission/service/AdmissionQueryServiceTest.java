@@ -144,24 +144,28 @@ class AdmissionQueryServiceTest {
     @Test
     void groomQueueTrimsNameUsesInclusiveDateRangeAndCapsPageSize() {
         var page = PageRequest.of(2, 10,
-                Sort.by(Sort.Order.desc("submittedAt"), Sort.Order.desc("id")));
-        when(admissions.findGroomQueue(eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
+                Sort.by(Sort.Order.asc("createdAt"), Sort.Order.asc("id")));
+        when(stalls.isQuarantineGroom(7L)).thenReturn(true);
+        when(admissions.findGroomQueue(eq(7L), eq(true), eq(AdmissionStatus.GROOM_REVIEW), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
                 eq(true), any(), eq(true), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), page, 0));
 
-        GroomAdmissionQueueResponse response = service.getGroomQueue(" Mercury ", null,
+        GroomAdmissionQueueResponse response = service.getGroomQueue(7L, " Mercury ", null,
                 LocalDate.of(2026, 1, 2), LocalDate.of(2026, 1, 8), 2, 50);
 
         assertEquals(10, response.size());
         assertEquals(2, response.page());
-        verify(admissions).findGroomQueue(eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
+        var pageable = org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(admissions).findGroomQueue(eq(7L), eq(true), eq(AdmissionStatus.GROOM_REVIEW), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
                 eq(true), eq(LocalDateTime.of(2026, 1, 2, 0, 0)),
-                eq(true), eq(LocalDateTime.of(2026, 1, 9, 0, 0)), any(Pageable.class));
+                eq(true), eq(LocalDateTime.of(2026, 1, 9, 0, 0)), pageable.capture());
+        // BR-04: oldest admission first, id as a stable tie-breaker for paging.
+        assertEquals(Sort.by(Sort.Order.asc("createdAt"), Sort.Order.asc("id")), pageable.getValue().getSort());
     }
 
     @Test
     void groomQueueRejectsReversedDateRangeBeforeQuery() {
-        assertThrows(IllegalArgumentException.class, () -> service.getGroomQueue("", null,
+        assertThrows(IllegalArgumentException.class, () -> service.getGroomQueue(7L, "", null,
                 LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 8), 0, 10));
         verifyNoInteractions(admissions);
     }

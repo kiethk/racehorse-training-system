@@ -39,7 +39,9 @@ export function TrainerAdmissionsListView() {
     };
   }, [searchParams]);
 
-  const [queue, setQueue] = useState<TrainerAdmissionQueue>({ pending: [], reviewed: [] });
+  const [queue, setQueue] = useState<TrainerAdmissionQueue>({
+    pending: [], reviewed: [], activeHorseCount: 0, horseLimit: 0, atCapacity: false,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<TrainerQueueFilters>(urlFilters);
@@ -203,6 +205,14 @@ export function TrainerAdmissionsListView() {
 
       {error && (
         <Notice tone="error">{error}</Notice>
+      )}
+
+      {queue.atCapacity && (
+        <Notice tone="warning" title="Horse limit reached">
+          You are looking after {queue.activeHorseCount} horses (limit {queue.horseLimit}, counting horses in your
+          areas and admissions still in quarantine or awaiting approval). New admissions will not be assigned to you
+          until a place frees up.
+        </Notice>
       )}
 
       <AdmissionTable

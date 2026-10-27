@@ -38,7 +38,10 @@ public class AuditActivityResolver {
     private static final Pattern GROOM_DAILY_TASKS_DETAIL = Pattern.compile("^/api/groom-daily-tasks/(\\d+)/.*$");
     private static final Pattern GROOM_DAILY_TASKS_BASE = Pattern.compile("^/api/groom-daily-tasks/?$");
 
-    // Pattern definitions - Staff & Users
+    // Pattern definitions - Staff & Accounts & Users
+    private static final Pattern ACCOUNT_STATUS = Pattern.compile("^/api/accounts/(\\d+)/status/?$");
+    private static final Pattern ACCOUNT_DETAIL = Pattern.compile("^/api/accounts/(\\d+)/?$");
+    private static final Pattern ACCOUNT_BASE = Pattern.compile("^/api/accounts/?$");
     private static final Pattern STAFF_STATUS = Pattern.compile("^/api/staff/(\\d+)/status/?$");
     private static final Pattern STAFF_DETAIL = Pattern.compile("^/api/staff/(\\d+)/?$");
     private static final Pattern STAFF_BASE = Pattern.compile("^/api/staff/?$");
@@ -75,6 +78,7 @@ public class AuditActivityResolver {
     private static final Pattern INCIDENTS = Pattern.compile("^/api/(incidents|groom-incident-reports)/?.*$");
 
     // Pattern definitions - Horses
+    private static final Pattern HORSES_STATUS = Pattern.compile("^/api/horses/(\\d+)/status/?$");
     private static final Pattern HORSES_DETAIL = Pattern.compile("^/api/horses/(\\d+)/?$");
     private static final Pattern HORSES_BASE = Pattern.compile("^/api/horses/?$");
 
@@ -301,7 +305,33 @@ public class AuditActivityResolver {
             );
         }
 
-        // 4. Staff Management
+        // 4. Staff & Account Management
+        if ((m = ACCOUNT_STATUS.matcher(normalizedPath)).matches()) {
+            Long id = parseId(m.group(1));
+            return new ResolvedActivity(
+                    "Update Account Status",
+                    "User",
+                    id,
+                    "Manager changed active status for account #" + id + statusSuffix
+            );
+        }
+        if ((m = ACCOUNT_DETAIL.matcher(normalizedPath)).matches()) {
+            Long id = parseId(m.group(1));
+            return new ResolvedActivity(
+                    "Update Account Profile",
+                    "User",
+                    id,
+                    "Updated contact or profile information for account #" + id + statusSuffix
+            );
+        }
+        if (ACCOUNT_BASE.matcher(normalizedPath).matches() && "POST".equals(normalizedMethod)) {
+            return new ResolvedActivity(
+                    "Create Account",
+                    "User",
+                    null,
+                    "Manager created a new account" + statusSuffix
+            );
+        }
         if ((m = STAFF_STATUS.matcher(normalizedPath)).matches()) {
             Long id = parseId(m.group(1));
             return new ResolvedActivity(
@@ -390,6 +420,15 @@ public class AuditActivityResolver {
         }
 
         // 6. Horse Management
+        if ((m = HORSES_STATUS.matcher(normalizedPath)).matches()) {
+            Long id = parseId(m.group(1));
+            return new ResolvedActivity(
+                    "Change Horse Status",
+                    "Horse",
+                    id,
+                    "Updated lifecycle status for horse #" + id + statusSuffix
+            );
+        }
         if ((m = HORSES_DETAIL.matcher(normalizedPath)).matches()) {
             Long id = parseId(m.group(1));
             return new ResolvedActivity(
@@ -464,7 +503,7 @@ public class AuditActivityResolver {
         if (path.contains("/workouts")) return "TrainingWorkout";
         if (path.contains("/training-rules")) return "TrainingRule";
         if (path.contains("/horses")) return "Horse";
-        if (path.contains("/staff") || path.contains("/users")) return "Staff";
+        if (path.contains("/staff") || path.contains("/users") || path.contains("/accounts")) return "Staff";
         if (path.contains("/stalls") || path.contains("/areas")) return "Stable";
         if (path.contains("/care-schedules") || path.contains("/health-records") || path.contains("/preventive")) return "Medical";
         if (path.contains("/incidents")) return "IncidentReport";

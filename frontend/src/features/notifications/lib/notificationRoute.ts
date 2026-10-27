@@ -21,6 +21,17 @@ export function getNotificationHref(item: NotificationItem, role: Role | undefin
     return null;
   }
 
+  // Groom admission pool (new admission) and assignment (stall of this groom) open the admission itself.
+  if (role === 'GROOM' && item.referenceType === 'ADMISSION') {
+    return refId ? `/groom/admissions/${refId}` : '/groom/admissions';
+  }
+  if (role === 'GROOM' && item.notificationType === 'HORSE_EDIT_REQUESTED') {
+    return refId ? `/groom/horse-edit-requests/${refId}` : '/groom/horse-edit-requests';
+  }
+  if (role === 'HORSE_OWNER' && item.notificationType === 'HORSE_EDIT_REVIEWED') {
+    return refId ? `/owner/horses/${refId}` : '/owner/horses';
+  }
+
   // 1. Phân công khám nhập chuồng (Admission Assignment)
   if (item.notificationType === 'ADMISSION_VET_ASSIGNED') {
     return `/veterinarian/admissions`;

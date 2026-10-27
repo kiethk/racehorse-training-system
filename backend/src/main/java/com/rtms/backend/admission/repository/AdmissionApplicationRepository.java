@@ -30,6 +30,10 @@ public interface AdmissionApplicationRepository
     List<AdmissionApplication> findByOwnerIdOrderByCreatedAtDesc(Long ownerId);
 
     List<AdmissionApplication> findByStatus(AdmissionStatus status);
+    boolean existsByOwnerIdAndStatusNotIn(Long ownerId, Collection<AdmissionStatus> statuses);
+
+    /** Another unfinished admission already references this horse (see uq_admission_active_horse). */
+    boolean existsByHorseIdAndIdNotAndStatusNotIn(Long horseId, Long id, Collection<AdmissionStatus> statuses);
 
     @Query("""
             SELECT COUNT(a) > 0
@@ -43,11 +47,32 @@ public interface AdmissionApplicationRepository
 
     List<AdmissionApplication> findByGroomId(Long groomId);
 
-    Optional<AdmissionApplication> findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus status);
+    /**
+     * Head of the stall queue, locked. SKIP LOCKED: allocation already holds every stall lock, so it
+     * must never wait on an admission another transaction holds (that one locks admission then stalls).
+     */
+    @Query(value = """
+            SELECT * FROM admission_applications
+            WHERE status = 'WAITING_FOR_STALL'
+            ORDER BY created_at ASC, id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
+    Optional<AdmissionApplication> findNextWaitingForStallForUpdate();
 
     List<AdmissionApplication> findByStatusAndArrivalDeadlineAtLessThanEqualOrderByArrivalDeadlineAtAscIdAsc(
             AdmissionStatus status, LocalDateTime cutoff);
 
+    /**
+     * What a groom may see (server-side scope shared by the queue, the list and the detail check):
+     * <ul>
+     *   <li>quarantine grooms: every admission still in {@code poolStatus} (GROOM_REVIEW) — the review pool;</li>
+     *   <li>admissions the groom reviewed;</li>
+     *   <li>admissions whose reserved quarantine stall the groom looks after;</li>
+     *   <li>admissions whose horse currently stands in a stall the groom looks after.</li>
+     * </ul>
+     * The last two follow the stall's current groom, so reassigning a block moves visibility with it.
+     */
     @Query("""
             SELECT a FROM AdmissionApplication a
             JOIN CandidateHorseProfile c ON c.admissionId = a.id
@@ -55,8 +80,16 @@ public interface AdmissionApplicationRepository
               AND (:filterName = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :candidateName, '%')))
               AND (:filterFrom = false OR a.submittedAt >= :submittedFrom)
               AND (:filterTo = false OR a.submittedAt < :submittedToExclusive)
+              AND ((:quarantineGroom = true AND a.status = :poolStatus)
+                   OR a.groomId = :groomId
+                   OR EXISTS (SELECT 1 FROM StableStall qs WHERE qs.id = a.quarantineStallId AND qs.groomId = :groomId)
+                   OR EXISTS (SELECT 1 FROM Horse h, StableStall hs
+                              WHERE h.id = a.horseId AND hs.id = h.currentStallId AND hs.groomId = :groomId))
             """)
     Page<AdmissionApplication> findGroomQueue(
+            @Param("groomId") Long groomId,
+            @Param("quarantineGroom") boolean quarantineGroom,
+            @Param("poolStatus") AdmissionStatus poolStatus,
             @Param("filterStatus") boolean filterStatus,
             @Param("status") AdmissionStatus status,
             @Param("filterName") boolean filterName,
@@ -74,6 +107,39 @@ public interface AdmissionApplicationRepository
             WHERE a.id = :id
             """)
     Optional<AdmissionApplication> findByIdForUpdate(@Param("id") Long id);
+
+    /** Same scope as {@link #findGroomQueue}, unpaged, oldest first. */
+    @Query("""
+            SELECT a FROM AdmissionApplication a
+            WHERE (:filterStatus = false OR a.status = :status)
+              AND ((:quarantineGroom = true AND a.status = :poolStatus)
+                   OR a.groomId = :groomId
+                   OR EXISTS (SELECT 1 FROM StableStall qs WHERE qs.id = a.quarantineStallId AND qs.groomId = :groomId)
+                   OR EXISTS (SELECT 1 FROM Horse h, StableStall hs
+                              WHERE h.id = a.horseId AND hs.id = h.currentStallId AND hs.groomId = :groomId))
+            ORDER BY a.createdAt ASC, a.id ASC
+            """)
+    List<AdmissionApplication> findVisibleToGroom(
+            @Param("groomId") Long groomId,
+            @Param("quarantineGroom") boolean quarantineGroom,
+            @Param("poolStatus") AdmissionStatus poolStatus,
+            @Param("filterStatus") boolean filterStatus,
+            @Param("status") AdmissionStatus status);
+
+    @Query("""
+            SELECT COUNT(a) > 0 FROM AdmissionApplication a
+            WHERE a.id = :admissionId
+              AND ((:quarantineGroom = true AND a.status = :poolStatus)
+                   OR a.groomId = :groomId
+                   OR EXISTS (SELECT 1 FROM StableStall qs WHERE qs.id = a.quarantineStallId AND qs.groomId = :groomId)
+                   OR EXISTS (SELECT 1 FROM Horse h, StableStall hs
+                              WHERE h.id = a.horseId AND hs.id = h.currentStallId AND hs.groomId = :groomId))
+            """)
+    boolean isVisibleToGroom(
+            @Param("admissionId") Long admissionId,
+            @Param("groomId") Long groomId,
+            @Param("quarantineGroom") boolean quarantineGroom,
+            @Param("poolStatus") AdmissionStatus poolStatus);
 
     /**
      * Đơn đã sang bước Trainer nhưng chưa được gán ai (chưa có Trainer phù hợp
@@ -98,19 +164,19 @@ public interface AdmissionApplicationRepository
     List<AdmissionApplication> findByTrainerId(Long trainerId);
 
     /**
-     * (trainerId, horseId) của các đơn đang chờ Trainer duyệt — phần "việc đã
-     * giao nhưng chưa xong" trong tải của Trainer. Không tính phần này thì nhiều
-     * đơn hoàn tất cùng lúc sẽ dồn hết về một người.
+     * (trainerId, horseId) của các đơn đã giao cho Trainer mà chưa xong — phần
+     * "việc đã giao nhưng chưa xong" trong tải của Trainer. Không tính phần này
+     * thì nhiều đơn hoàn tất cùng lúc sẽ dồn hết về một người.
      */
     @Query("""
             SELECT a.trainerId, a.horseId
             FROM AdmissionApplication a
-            WHERE a.status = :status
+            WHERE a.status IN :statuses
               AND a.trainerId IN :trainerIds
               AND a.horseId IS NOT NULL
             """)
     List<Object[]> findAssignedHorsePairs(@Param("trainerIds") java.util.Collection<Long> trainerIds,
-                                          @Param("status") AdmissionStatus status);
+                                          @Param("statuses") Collection<AdmissionStatus> statuses);
 
     /**
      * Batch: the latest (by id desc) application that has a horseId in the given set.

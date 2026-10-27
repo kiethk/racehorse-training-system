@@ -5,7 +5,7 @@ export type PreventiveDueStatus = 'OK' | 'DUE_SOON' | 'OVERDUE' | 'MISSING' | 'N
 export type VaccinationSource = 'ADMINISTERED' | 'HISTORICAL';
 export type CareSchedulePurpose = 'FOLLOW_UP' | 'PREVENTIVE';
 export type RescheduleReason = 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'OTHER';
-export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED';
+export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED' | 'INACTIVE';
 
 export interface PreventiveProtocol {
   id: number;

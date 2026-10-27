@@ -78,9 +78,6 @@ export function TodayChecklist() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             Today&apos;s Task Checklist
           </h1>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            Daily care SOPs, workouts, and veterinary follow-ups for your assigned stalls.
-          </p>
         </div>
 
         <div className="flex items-center gap-2">

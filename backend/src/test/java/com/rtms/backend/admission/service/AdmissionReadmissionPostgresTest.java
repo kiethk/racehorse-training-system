@@ -179,8 +179,15 @@ class AdmissionReadmissionPostgresTest {
                 """, Long.class);
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
             var admission = admissions.findById(newAdmission.admissionId()).orElseThrow();
-            var stall = stalls.findFirstAvailableQuarantineStallForUpdate().orElseThrow();
+            var stall = stalls.findQuarantineStallByIdForUpdate(jdbc.queryForObject("""
+                    SELECT ss.id FROM stable_stalls ss JOIN areas a ON a.id = ss.area_id
+                    WHERE a.type = 'QUARANTINE' AND ss.status = 'AVAILABLE'
+                      AND ss.deleted_at IS NULL AND a.deleted_at IS NULL
+                    ORDER BY ss.id LIMIT 1
+                    """, Long.class)).orElseThrow();
             stall.setStatus(StallStatus.RESERVED);
+            // Arrival is confirmed by the reserved stall's groom (BR-03).
+            stall.setGroomId(groomId);
             stalls.saveAndFlush(stall);
             admission.setGroomId(groomId);
             admission.setQuarantineStallId(stall.getId());
@@ -235,8 +242,15 @@ class AdmissionReadmissionPostgresTest {
                 """, Long.class);
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
             var admission = admissions.findById(created.admissionId()).orElseThrow();
-            var stall = stalls.findFirstAvailableQuarantineStallForUpdate().orElseThrow();
+            var stall = stalls.findQuarantineStallByIdForUpdate(jdbc.queryForObject("""
+                    SELECT ss.id FROM stable_stalls ss JOIN areas a ON a.id = ss.area_id
+                    WHERE a.type = 'QUARANTINE' AND ss.status = 'AVAILABLE'
+                      AND ss.deleted_at IS NULL AND a.deleted_at IS NULL
+                    ORDER BY ss.id LIMIT 1
+                    """, Long.class)).orElseThrow();
             stall.setStatus(StallStatus.RESERVED);
+            // Arrival is confirmed by the reserved stall's groom (BR-03).
+            stall.setGroomId(groomId);
             stalls.saveAndFlush(stall);
             admission.setGroomId(groomId);
             admission.setQuarantineStallId(stall.getId());

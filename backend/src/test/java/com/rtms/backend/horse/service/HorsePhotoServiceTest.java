@@ -34,12 +34,14 @@ class HorsePhotoServiceTest {
     private AdmissionDocumentRepository documentRepo;
     @Mock
     private FileStorageService storage;
+    @Mock
+    private com.rtms.backend.horse.repository.HorseEditRequestDocumentRepository editDocuments;
 
     private HorsePhotoService service;
 
     @BeforeEach
     void setUp() {
-        service = new HorsePhotoService(admissionRepo, documentRepo, storage);
+        service = new HorsePhotoService(admissionRepo, documentRepo, storage, editDocuments);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -206,5 +208,37 @@ class HorsePhotoServiceTest {
 
         assertEquals(404, ex.getStatusCode().value());
         verify(storage, never()).load(any());
+    }
+
+    @Test
+    @DisplayName("BR-05: a photo approved through an edit request wins over the admission photo")
+    void approvedEditPhotoWinsOverAdmissionPhoto() {
+        var edited = new com.rtms.backend.horse.entity.HorseEditRequestDocument();
+        edited.setHorseId(10L);
+        edited.setDocumentType(AdmissionDocumentType.HORSE_PHOTO);
+        edited.setFileUrl("local:edited.png");
+        edited.setCurrent(true);
+        when(editDocuments.findFirstByHorseIdAndDocumentTypeAndCurrentTrue(10L, AdmissionDocumentType.HORSE_PHOTO))
+                .thenReturn(java.util.Optional.of(edited));
+        Resource bytes = new ByteArrayResource(new byte[]{1});
+        when(storage.load("local:edited.png")).thenReturn(bytes);
+        when(storage.mediaType("local:edited.png")).thenReturn(MediaType.IMAGE_PNG);
+
+        HorsePhotoService.PhotoResult result = service.resolvePhoto(10L);
+
+        assertSame(bytes, result.resource());
+        verifyNoInteractions(admissionRepo, documentRepo);
+    }
+
+    @Test
+    @DisplayName("BR-05: a horse whose only photo came from an edit request still gets an image URL")
+    void editedPhotoAloneProducesImageUrl() {
+        var edited = new com.rtms.backend.horse.entity.HorseEditRequestDocument();
+        edited.setHorseId(10L);
+        when(editDocuments.findByHorseIdInAndDocumentTypeAndCurrentTrue(List.of(10L), AdmissionDocumentType.HORSE_PHOTO))
+                .thenReturn(List.of(edited));
+        when(admissionRepo.findByHorseIdIn(List.of(10L))).thenReturn(List.of());
+
+        assertEquals(Map.of(10L, "/api/horses/10/photo"), service.resolveImageUrls(List.of(10L), "/api/horses"));
     }
 }

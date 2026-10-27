@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
-import { FormField } from '@/components/ui/FormField';
-import { Textarea } from '@/components/ui/Input';
 import { Notice } from '@/components/ui/Notice';
 import { admissionsApi } from '../services/api';
 import { formatDate, formatDateTime } from '@/lib/display';
+import { toast } from '@/lib/toast';
+import { ReviewDecisionDialog } from '../shared/components/ReviewDecisionDialog';
+import type { ReviewDecisionValue } from '../shared/lib/reviewDecision';
 import type { AdmissionDetailResponse } from '../types';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
@@ -31,10 +33,10 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
   const [detail, setDetail] = useState<AdmissionDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState('');
-  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [decision, setDecision] = useState<ReviewDecisionValue | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [confirmingArrival, setConfirmingArrival] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,42 +56,33 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
     void load();
   }, [load]);
 
-  const review = async (decision: 'APPROVED' | 'REJECTED') => {
-    if (!feedback.trim()) {
-      setFeedbackError('Feedback is required for every Groom decision.');
-      return;
-    }
-    setSubmitting(true);
-    setFeedbackError(null);
-    setNotice(null);
-    try {
-      const updated = await admissionsApi.groomReview(admissionId, { decision, feedback: feedback.trim() });
-      setDetail(updated);
-      onUpdated?.();
-      setNotice(updated.status === 'WAITING_FOR_STALL'
-        ? 'Groom approved this application. Capacity is not available yet, so it is waiting for a stall.'
-        : decision === 'REJECTED' ? 'Application rejected.' : 'Application approved. A quarantine stall is reserved for 14 days while waiting for arrival.');
-    } catch (cause) {
-      setNotice(null);
-      setError(cause instanceof Error ? cause.message : 'Unable to submit the Groom decision.');
-    } finally {
-      setSubmitting(false);
-    }
+  const closeDecision = () => {
+    if (submitting) return;
+    setDecision(null);
+    setDecisionError(null);
   };
 
-  const retryAllocation = async () => {
+  const review = async (choice: ReviewDecisionValue, feedback: string | undefined) => {
     setSubmitting(true);
-    setError(null);
-    setNotice(null);
+    setDecisionError(null);
     try {
-      const updated = await admissionsApi.retryQuarantineAllocation(admissionId);
+      const updated = await admissionsApi.groomReview(admissionId, { decision: choice, feedback });
       setDetail(updated);
+      setDecision(null);
       onUpdated?.();
-      setNotice(updated.status === 'WAITING_FOR_STALL'
-        ? 'Capacity is still unavailable. The application remains in the waiting queue.'
-        : 'A quarantine stall is reserved for 14 days while waiting for arrival.');
+      if (choice === 'REJECTED') {
+        toast.success('Admission rejected', 'The owner can see your reason on the application.');
+      } else if (updated.status === 'WAITING_FOR_STALL') {
+        toast.info('Admission approved and queued',
+          'No quarantine stall is free yet. A stall is assigned automatically in submission order.');
+      } else {
+        toast.success('Admission approved',
+          `Quarantine stall ${updated.quarantineStallCode ?? ''} is reserved until ${updated.arrivalDeadlineAt ? formatDateTime(updated.arrivalDeadlineAt) : 'the arrival deadline'}.`);
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to retry stall allocation.');
+      const message = cause instanceof Error ? cause.message : 'Unable to submit the Groom decision.';
+      setDecisionError(message);
+      toast.error('Decision not saved', message);
     } finally {
       setSubmitting(false);
     }
@@ -98,16 +91,23 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
   const confirmArrival = async () => {
     setSubmitting(true);
     setError(null);
-    setNotice(null);
     try {
       const updated = await admissionsApi.confirmArrival(admissionId);
       setDetail(updated);
+      setConfirmingArrival(false);
       onUpdated?.();
-      setNotice(updated.status === 'ARRIVAL_EXPIRED'
-        ? 'The arrival deadline has passed. The reservation was released; ask an authorized manager to reopen the admission.'
-        : 'Arrival confirmed and the horse was registered. Veterinary assignment is being scheduled with workload and overdue appointments taken into account.');
+      if (updated.status === 'ARRIVAL_EXPIRED') {
+        toast.warning('Arrival window expired',
+          'The reservation was released; ask an authorized manager to reopen the admission.');
+      } else {
+        toast.success('Arrival confirmed',
+          'The horse was registered and the initial veterinary exam is being scheduled.');
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to confirm horse arrival.');
+      const message = cause instanceof Error ? cause.message : 'Unable to confirm horse arrival.';
+      setConfirmingArrival(false);
+      setError(message);
+      toast.error('Arrival not confirmed', message);
     } finally {
       setSubmitting(false);
     }
@@ -131,7 +131,6 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
 
   return (
     <div className="space-y-5">
-      {notice && <Notice tone="success">{notice}</Notice>}
       {error && detail && <Notice tone="error">{error}</Notice>}
 
       <AdmissionDetailLayout
@@ -191,33 +190,25 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
             </AdmissionSideCard>
 
             {canReview && (
-              <AdmissionSideCard title="Groom decision" tone="primary" className="space-y-4">
-                <FormField
-                  label="Feedback"
-                  required
-                  error={feedbackError ?? undefined}
-                  hint={`Required for approval and rejection · ${feedback.length}/2000`}
-                >
-                  <Textarea
-                    value={feedback}
-                    onChange={(event) => { setFeedback(event.target.value); setFeedbackError(null); }}
-                    rows={4}
-                    maxLength={2000}
-                  />
-                </FormField>
+              <AdmissionSideCard title="Groom decision" tone="primary" className="space-y-3">
+                <p className="text-[var(--color-text-secondary)]">
+                  Approving places the admission in the stall queue. A quarantine stall is assigned automatically,
+                  oldest application first, as soon as capacity allows.
+                </p>
                 <div className="space-y-2">
-                  <Button type="button" variant="primary" className="w-full" loading={submitting} disabled={!feedback.trim() || !isReady} onClick={() => void review('APPROVED')}>Approve</Button>
-                  <Button type="button" variant="secondary" className="w-full" loading={submitting} disabled={!feedback.trim() || isReady} onClick={() => void review('APPROVED')}>Approve &amp; wait for stall</Button>
-                  <Button type="button" variant="destructive" className="w-full" loading={submitting} disabled={!feedback.trim()} onClick={() => void review('REJECTED')}>Reject</Button>
+                  <Button type="button" variant="primary" className="w-full" disabled={submitting} onClick={() => setDecision('APPROVED')}>Approve</Button>
+                  <Button type="button" variant="destructive" className="w-full" disabled={submitting} onClick={() => setDecision('REJECTED')}>Reject</Button>
                 </div>
               </AdmissionSideCard>
             )}
 
             {waiting && (
-              <AdmissionSideCard title="Waiting for stall" tone="warning">
-                <p className="text-[var(--color-text-secondary)]">Groom approved this admission, but capacity was unavailable. Retry when a quarantine stall becomes available.</p>
+              <AdmissionSideCard title="Queued for a quarantine stall">
+                <p className="text-[var(--color-text-secondary)]">
+                  Approved and waiting for capacity. The system assigns the next free quarantine stall automatically,
+                  in submission order. No action is needed.
+                </p>
                 <InfoRow label="Feedback" value={detail.groomFeedback || 'Not recorded'} />
-                <Button type="button" variant="warning" className="w-full" loading={submitting} onClick={() => void retryAllocation()}>Retry allocation</Button>
               </AdmissionSideCard>
             )}
 
@@ -227,7 +218,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
                   Quarantine stall {detail.quarantineStallCode || 'reserved'} is held until {detail.arrivalDeadlineAt ? formatDateTime(detail.arrivalDeadlineAt) : 'the 14-day arrival deadline'}.
                   Confirm only after the horse physically arrives. Confirmation creates the horse record and schedules veterinary review.
                 </p>
-                <Button type="button" variant="primary" className="w-full" loading={submitting} onClick={() => void confirmArrival()}>Mark horse arrived</Button>
+                <Button type="button" variant="primary" className="w-full" disabled={submitting} onClick={() => setConfirmingArrival(true)}>Mark horse arrived</Button>
               </AdmissionSideCard>
             )}
 
@@ -244,6 +235,28 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
             )}
           </>
         )}
+      />
+
+      <ReviewDecisionDialog
+        decision={decision}
+        title={decision === 'REJECTED' ? 'Reject admission?' : 'Approve admission?'}
+        description={decision === 'REJECTED'
+          ? 'The application closes and the owner sees your reason.'
+          : 'A quarantine stall is assigned automatically. If none is free, the admission joins the stall queue in submission order.'}
+        loading={submitting}
+        error={decisionError}
+        onConfirm={(choice, feedback) => void review(choice, feedback)}
+        onClose={closeDecision}
+      />
+
+      <ConfirmDialog
+        open={confirmingArrival}
+        title="Confirm the horse has arrived?"
+        description="This creates the horse record in the reserved quarantine stall and schedules the initial veterinary exam. It cannot be undone."
+        confirmLabel="Mark arrived"
+        loading={submitting}
+        onConfirm={() => void confirmArrival()}
+        onCancel={() => { if (!submitting) setConfirmingArrival(false); }}
       />
     </div>
   );

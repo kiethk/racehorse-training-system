@@ -108,3 +108,62 @@ export interface HorseHealthMetric {
   notes?: string | null;
 }
 
+
+// ── Horse edit requests (owner asks, groom of the horse's stall approves) ──
+
+export type HorseDocumentType =
+  | 'HORSE_PHOTO'
+  | 'REGISTRATION_DOCUMENT'
+  | 'PEDIGREE_CERTIFICATE'
+  | 'VACCINATION_RECORD'
+  | 'DEWORMING_RECORD'
+  | 'HEALTH_CERTIFICATE'
+  | 'PREVIOUS_MEDICAL_RECORD'
+  | 'PREVIOUS_INJURY_RECORD';
+
+/** The mutable facts an owner may ask to change. UELN, sex, birth date and registry are not editable. */
+export interface HorseEditFields {
+  name: string | null;
+  breed: string | null;
+  sireName: string | null;
+  sireRegistrationNumber: string | null;
+  damName: string | null;
+  damRegistrationNumber: string | null;
+}
+
+export type HorseEditRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export interface HorseEditRequestDocument {
+  id: number;
+  documentType: HorseDocumentType;
+  originalFileName: string | null;
+  fileUrl: string;
+}
+
+export interface HorseEditRequest {
+  id: number;
+  horseId: number;
+  horseName: string | null;
+  horseRegistrationNumber: string | null;
+  ownerId: number;
+  ownerName: string | null;
+  status: HorseEditRequestStatus;
+  original: HorseEditFields;
+  requested: HorseEditFields;
+  documents: HorseEditRequestDocument[];
+  reviewerId: number | null;
+  reviewerName: string | null;
+  reviewFeedback: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+/** One document type of a horse: its current file, or an empty slot. */
+export interface HorseDocumentSlot {
+  documentType: HorseDocumentType;
+  source: 'ADMISSION' | 'EDIT_REQUEST' | null;
+  documentId: number | null;
+  originalFileName: string | null;
+  fileUrl: string | null;
+  updatedAt: string | null;
+}

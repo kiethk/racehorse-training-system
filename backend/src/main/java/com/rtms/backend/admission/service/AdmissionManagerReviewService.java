@@ -15,6 +15,9 @@ import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.service.PreventiveStatusService;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
+import com.rtms.backend.identity.repository.GroomProfileRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +34,7 @@ public class AdmissionManagerReviewService {
     private final CareScheduleRepository careScheduleRepository;
     private final AdmissionGroomReviewService admissionGroomReviewService;
     private final PreventiveStatusService preventiveStatusService;
+    private final GroomProfileRepository groomProfileRepository;
 
     public AdmissionManagerReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
@@ -38,13 +42,15 @@ public class AdmissionManagerReviewService {
             HorseRepository horseRepository,
             CareScheduleRepository careScheduleRepository,
             AdmissionGroomReviewService admissionGroomReviewService,
-            PreventiveStatusService preventiveStatusService) {
+            PreventiveStatusService preventiveStatusService,
+            GroomProfileRepository groomProfileRepository) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.stableStallRepository = stableStallRepository;
         this.horseRepository = horseRepository;
         this.careScheduleRepository = careScheduleRepository;
         this.admissionGroomReviewService = admissionGroomReviewService;
         this.preventiveStatusService = preventiveStatusService;
+        this.groomProfileRepository = groomProfileRepository;
     }
 
     @Transactional
@@ -94,19 +100,21 @@ public class AdmissionManagerReviewService {
             Long managerId,
             ManagerReviewRequest request) {
 
-        // 1. Lock REGULAR stall
+        // 1. Lock REGULAR stall. Every allocation first takes the same stall-row locks, so two
+        //    approvals cannot both read the same groom loads and pick the same "least loaded" groom.
+        stableStallRepository.lockAdmissionCapacityStallsForUpdate();
         StableStall regularStall;
 
         if (request.getStallId() != null) {
             regularStall = stableStallRepository
                     .findAvailableRegularStallByIdForUpdate(request.getStallId())
-                    .orElseThrow(() -> new IllegalStateException(
-                            "Selected regular stall is no longer available"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Selected regular stall is no longer available or has no assigned groom"));
         } else {
             regularStall = stableStallRepository
-                    .findFirstAvailableRegularStallForUpdate()
-                    .orElseThrow(() -> new IllegalStateException(
-                            "No available regular stall"));
+                    .findFairAvailableStallForUpdate("REGULAR")
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                            "No available regular stall with an assigned groom"));
         }
 
         // 2. Update existing Horse
@@ -119,11 +127,12 @@ public class AdmissionManagerReviewService {
         // 3. Mark regular stall occupied
         regularStall.setStatus(StallStatus.OCCUPIED);
         stableStallRepository.save(regularStall);
+        groomProfileRepository.touchLastHorseAssignedAt(regularStall.getGroomId(), LocalDateTime.now());
 
         // 4. Update Admission
         admission.setManagerId(managerId);
         admission.setManagerDecision(ReviewDecision.APPROVED);
-        admission.setManagerFeedback(request.getFeedback());
+        admission.setManagerFeedback(AdmissionGroomReviewService.normalizeFeedback(request.getFeedback()));
         admission.setManagerReviewedAt(LocalDateTime.now());
         admission.setStatus(AdmissionStatus.APPROVED);
 
@@ -146,7 +155,9 @@ public class AdmissionManagerReviewService {
         preventiveStatusService.upsertMilestone(horse.getId(), "preventive:approval:" + admission.getId(),
                 managerId, LocalDate.now().plusDays(1));
 
-        processNextWaitingAdmission();
+        admissionGroomReviewService.notifyGroomAssigned(admission, regularStall,
+                horse.getName() + " was approved and moved to stall " + regularStall.getStallCode() + ", which you look after.");
+        admissionGroomReviewService.allocateWaitingAdmissions();
         return admission;
     }
 
@@ -156,8 +167,8 @@ public class AdmissionManagerReviewService {
             Long managerId,
             ManagerReviewRequest request) {
 
-        if (request.getFeedback() == null
-                || request.getFeedback().isBlank()) {
+        String feedback = AdmissionGroomReviewService.normalizeFeedback(request.getFeedback());
+        if (feedback == null) {
             throw new IllegalArgumentException(
                     "Feedback is required when rejecting an admission");
         }
@@ -200,19 +211,12 @@ public class AdmissionManagerReviewService {
 
         admission.setManagerId(managerId);
         admission.setManagerDecision(ReviewDecision.REJECTED);
-        admission.setManagerFeedback(request.getFeedback());
+        admission.setManagerFeedback(feedback);
         admission.setManagerReviewedAt(LocalDateTime.now());
         admission.setStatus(AdmissionStatus.REJECTED);
 
         admission = admissionApplicationRepository.save(admission);
-        processNextWaitingAdmission();
+        admissionGroomReviewService.allocateWaitingAdmissions();
         return admission;
-    }
-
-    private void processNextWaitingAdmission() {
-        admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL)
-                .ifPresent(waitingAdmission -> {
-                    admissionGroomReviewService.processWaitingForStall(waitingAdmission.getId());
-                });
     }
 }

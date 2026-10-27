@@ -16,7 +16,7 @@ import {
 } from 'react';
 import * as THREE from 'three';
 import type { Area, Horse, StableStall } from '../../../types';
-import { layoutArea, type AreaLayout } from '../../lib/stallLayout';
+import { blockNumberOf, layoutArea, type AreaLayout } from '../../lib/stallLayout';
 import { STALL_TONE_TOKEN, stallState, type StallTone } from '../StallCell';
 import { BarnStall, type DropState } from './BarnStall';
 import { BarnStructure } from './BarnStructure';
@@ -38,6 +38,7 @@ import {
 import { LabelLayer, LabelProjector, type LabelElements, type SceneLabel } from './SceneLabels';
 import { StaffFigure } from './StaffFigure';
 import { canReceiveHorse, useHorseDrag } from './useHorseDrag';
+import { groomDropBlock, useGroomDrag } from './useGroomDrag';
 
 export interface BarnSceneProps {
   area: Area;
@@ -58,6 +59,10 @@ export interface BarnSceneProps {
   resetSignal: number;
   /** Lets the viewer drag a horse onto an empty stall of this area. */
   onMoveHorse?: (horse: Horse, to: StableStall) => void;
+  /** Lets the viewer drag a groom onto another block of this area (Manager staffing). */
+  onMoveGroom?: (groomId: number, toBlockNumber: number) => void;
+  /** Clicking the trainer figure opens the trainer choice for this area (Manager staffing). */
+  onTrainerClick?: () => void;
   /** Called when WebGL is missing or the scene fails, so the screen can fall back to the plan. */
   onUnavailable: () => void;
   onHint: (hint: string | null) => void;
@@ -82,6 +87,8 @@ function BarnContents(props: ContentsProps) {
   const { area, layout, groomBadges, horseByStallId, selectedStallId, ownStallIds, colors, onMoveHorse, onHint } = props;
   const { hoveredGroomId, setHoveredGroomId, pinnedGroomId, setPinnedGroomId } = props;
   const { drag, startDrag, consumeClick } = useHorseDrag({ layout, horseByStallId, onMoveHorse, setLocked: props.setLocked });
+  const groomDrag = useGroomDrag({ layout, onMoveGroom: props.onMoveGroom, setLocked: props.setLocked });
+  const groomTargetBlock = groomDropBlock(groomDrag.drag);
   const { width, depth } = barnSize(layout.columns);
   const slotById = useMemo(() => new Map(layout.slots.map((slot) => [slot.stall.id, slot])), [layout]);
 
@@ -125,11 +132,15 @@ function BarnContents(props: ContentsProps) {
   // The cursor is styled on the canvas wrapper, never on document.body.
   const { setCursor } = props;
   useEffect(() => {
-    setCursor(drag?.active ? 'grabbing' : hoveredStallId != null ? 'pointer' : '');
-  }, [setCursor, drag?.active, hoveredStallId]);
+    setCursor(drag?.active || groomDrag.drag?.active ? 'grabbing' : hoveredStallId != null ? 'pointer' : '');
+  }, [setCursor, drag?.active, groomDrag.drag?.active, hoveredStallId]);
 
+  const { personName: nameOf } = props;
   useEffect(() => {
-    if (drag?.active) {
+    if (groomDrag.drag?.active) {
+      const name = nameOf('groom', groomDrag.drag.groomId) ?? `Groom #${groomDrag.drag.groomId}`;
+      onHint(groomTargetBlock != null ? `${name} → block ${groomTargetBlock}` : `Moving ${name} · drop on another block · Esc to cancel`);
+    } else if (drag?.active) {
       onHint(drag.target ? `${drag.horse.name} → stall ${drag.target.stall.stallCode}` : `Moving ${drag.horse.name} · Esc to cancel`);
     } else if (hoveredSlot) {
       const horse = horseByStallId.get(hoveredSlot.stall.id);
@@ -137,16 +148,19 @@ function BarnContents(props: ContentsProps) {
     } else {
       onHint(null);
     }
-  }, [drag, hoveredSlot, horseByStallId, onHint]);
+  }, [drag, groomDrag.drag, groomTargetBlock, nameOf, hoveredSlot, horseByStallId, onHint]);
 
   // Kept in a ref so `select` stays stable and the memoised stalls do not re-render on every parent render.
   const onSelectStall = useRef(props.onSelectStall);
   useEffect(() => { onSelectStall.current = props.onSelectStall; }, [props.onSelectStall]);
+  const consumeGroomClick = groomDrag.consumeClick;
   const select = useCallback((stallId: number) => {
-    if (consumeClick()) return;
+    const afterHorseDrag = consumeClick();
+    const afterGroomDrag = consumeGroomClick();
+    if (afterHorseDrag || afterGroomDrag) return;
     const slot = slotById.get(stallId);
     if (slot) onSelectStall.current(slot.stall);
-  }, [slotById, consumeClick]);
+  }, [slotById, consumeClick, consumeGroomClick]);
 
   const { personName, currentUserId, onLabels } = props;
 
@@ -277,7 +291,9 @@ function BarnContents(props: ContentsProps) {
         const inFocus = focusGroomId == null || slot.stall.groomId === focusGroomId;
         const dropState: DropState = drag?.active && drag.target?.stall.id === slot.stall.id
           ? canReceiveHorse(slot, drag, horseByStallId) ? 'valid' : 'invalid'
-          : null;
+          : groomTargetBlock != null && blockNumberOf(slot.stall.stallNumber) === groomTargetBlock
+            ? 'valid'
+            : null;
         return (
           <BarnStall
             key={slot.stall.id}
@@ -324,12 +340,19 @@ function BarnContents(props: ContentsProps) {
 
       {visibleBlocks.map((block) => {
         const [x, z] = blockStandPosition(block, layout.columns);
+        const dragging = block.groomId != null && groomDrag.drag?.active && groomDrag.drag.groomId === block.groomId;
+        const [fx, fz] = dragging && groomDrag.drag ? groomDrag.drag.point : [x, z];
         return (
           <StaffFigure
-            key={`block-${block.blockNumber}`}
+            // Keyed by the person, so a groom moved to another block walks there instead of reappearing.
+            key={block.groomId != null ? `groom-${block.groomId}` : `block-${block.blockNumber}`}
             kind="groom"
-            x={x}
-            z={z}
+            x={fx}
+            z={fz}
+            follow={dragging}
+            onPointerDown={props.onMoveGroom && block.groomId != null
+              ? groomDrag.startDrag(block.groomId, block.blockNumber, [x, z])
+              : undefined}
             color={block.groomId != null ? groomColors.get(block.groomId) ?? null : null}
             highlighted={block.groomId != null && block.groomId === highlightedGroomId}
             faded={focusGroomId != null && block.groomId !== focusGroomId}
@@ -349,6 +372,8 @@ function BarnContents(props: ContentsProps) {
           highlighted={false}
           faded={focusGroomId != null}
           colors={colors}
+          onClick={props.onTrainerClick}
+          onHover={props.onTrainerClick ? (active) => props.setCursor(active ? 'pointer' : '') : undefined}
         />
       )}
 
@@ -386,7 +411,17 @@ export default function BarnScene(props: BarnSceneProps) {
   const invalidateScene = useRef<(() => void) | null>(null);
   const [hoveredGroomId, setHoveredGroomId] = useState<number | null>(null);
   const [pinnedGroomId, setPinnedGroomId] = useState<number | null>(null);
+  // The key folds itself in the top view, where it would cover the front row of stalls.
+  const [keyFold, setKeyFold] = useState({ viewMode: props.viewMode, collapsed: props.viewMode === 'top' });
+  if (keyFold.viewMode !== props.viewMode) setKeyFold({ viewMode: props.viewMode, collapsed: props.viewMode === 'top' });
   const { stalls, personName } = props;
+  // Esc leaves the focus on one groom, like clicking empty space or "Show everyone".
+  useEffect(() => {
+    if (pinnedGroomId == null) return;
+    const leave = (event: KeyboardEvent) => { if (event.key === 'Escape') setPinnedGroomId(null); };
+    window.addEventListener('keydown', leave);
+    return () => window.removeEventListener('keydown', leave);
+  }, [pinnedGroomId]);
   const layout = useMemo(() => layoutArea(stalls), [stalls]);
   const groomBadges = useMemo(() => groomBadgesFor(layout, colors, personName), [layout, colors, personName]);
   useEffect(() => { preloadHorseModel(); }, []);
@@ -407,7 +442,7 @@ export default function BarnScene(props: BarnSceneProps) {
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         // Rendered inside <canvas> as plain HTML fallback; a failed WebGL context throws into the boundary instead.
         fallback={<span>3D view of {props.area.name}</span>}
-        onPointerMissed={() => props.onSelectStall(null)}
+        onPointerMissed={() => { props.onSelectStall(null); setPinnedGroomId(null); }}
       >
         <BarnContents
           {...props}
@@ -434,6 +469,9 @@ export default function BarnScene(props: BarnSceneProps) {
         focusedId={pinnedGroomId}
         onFocus={(id) => setPinnedGroomId((pinned) => (pinned === id ? null : id))}
         onHover={setHoveredGroomId}
+        onClearFocus={() => { setPinnedGroomId(null); setHoveredGroomId(null); }}
+        collapsed={keyFold.collapsed}
+        onToggleCollapsed={() => setKeyFold((fold) => ({ ...fold, collapsed: !fold.collapsed }))}
       />
     </SceneErrorBoundary>
   );

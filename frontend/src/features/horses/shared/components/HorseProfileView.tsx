@@ -25,6 +25,10 @@ export interface HorseProfileContext {
 
 type ProfileContent = ReactNode | ((profile: HorseProfileContext) => ReactNode);
 
+export interface HorseProfileActionsContext extends HorseProfileContext {
+  reload: () => void;
+}
+
 export interface HorseProfileViewProps {
   horseId: number;
   /** Href for the back link rendered by HorseDetailLayout. */
@@ -32,7 +36,7 @@ export interface HorseProfileViewProps {
   /** Label for the back link. Defaults to 'Back to horses'. */
   backLabel?: string;
   /** Optional actions rendered in the top header banner. */
-  headerActions?: ReactNode;
+  headerActions?: ReactNode | ((context: HorseProfileActionsContext) => ReactNode);
   /** Optional sidebar column content (e.g. action cards). */
   sidebar?: ReactNode;
   /** Extra actor tabs appear after the shared Overview tab; overview is reserved. */
@@ -154,12 +158,17 @@ function HorseProfileContent({
     ...actorTabs.filter((tab) => tab.id !== 'overview'),
   ];
 
+  const renderedActions =
+    typeof headerActions === 'function'
+      ? headerActions({ ...profile, reload })
+      : headerActions;
+
   return (
     <HorseDetailLayout
       returnTo={returnTo}
       backLabel={backLabel}
       header={
-        <HorseProfileHeader horse={horse} horseId={horseId} specialty={specialty} actions={headerActions} />
+        <HorseProfileHeader horse={horse} horseId={horseId} specialty={specialty} actions={renderedActions} />
       }
       sidebar={sidebar}
       content={

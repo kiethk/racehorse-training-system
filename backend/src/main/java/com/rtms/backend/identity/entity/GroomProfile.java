@@ -21,6 +21,10 @@ public class GroomProfile {
     @Column(name = "trainer_id")
     private Long trainerId;
 
+    /** Lần gần nhất Groom nhận một ngựa mới vào chuồng của mình; NULL = chưa từng nhận (V202610261300). */
+    @Column(name = "last_horse_assigned_at")
+    private java.time.LocalDateTime lastHorseAssignedAt;
+
     // ĐÃ XOÁ (V46): field shift kiểu GroomShift — enum chết, xem V46 để biết lý do
 
     public Long getUserId() { return userId; }
@@ -28,4 +32,7 @@ public class GroomProfile {
 
     public Long getTrainerId() { return trainerId; }
     public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
+
+    public java.time.LocalDateTime getLastHorseAssignedAt() { return lastHorseAssignedAt; }
+    public void setLastHorseAssignedAt(java.time.LocalDateTime lastHorseAssignedAt) { this.lastHorseAssignedAt = lastHorseAssignedAt; }
 }

@@ -44,7 +44,7 @@ export function getNavigationForRole(role: Role): NavSection[] {
           id: 'administration',
           label: 'Administration',
           items: [
-            { id: 'staff', label: 'Staff', icon: 'users', href: '/manager/staff' },
+            { id: 'accounts', label: 'Accounts', icon: 'users', href: '/manager/accounts' },
             { id: 'access-control', label: 'Access Control', icon: 'shield', href: '/manager/access-control' },
             { id: 'audit-log', label: 'Audit Log', icon: 'file-text', href: '/manager/audit-log' },
             { id: 'reports', label: 'Reports', icon: 'trending-up' },
@@ -100,6 +100,7 @@ export function getNavigationForRole(role: Role): NavSection[] {
             { id: 'care-tasks', label: 'Daily Tasks', icon: 'list', href: '/groom/tasks' },
             { id: 'incidents', label: 'Incidents', icon: 'alert-triangle', href: '/groom/incidents' },
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/groom/admissions' },
+            { id: 'horse-edit-requests', label: 'Change Requests', icon: 'file-text', href: '/groom/horse-edit-requests' },
             { id: 'stable', label: 'Stable', icon: 'building', href: '/groom/stable' },
           ],
         },

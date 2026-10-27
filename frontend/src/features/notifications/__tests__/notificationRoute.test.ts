@@ -58,3 +58,18 @@ describe('Notification routing for veterinarian care-schedule notifications', ()
     assert.equal(getNotificationHref(item, 'VETERINARIAN'), null);
   });
 });
+
+describe('Notification routing for groom and owner workflow notifications', () => {
+  const item = (notificationType: string, referenceType: string, referenceId: number): NotificationItem =>
+    ({ id: 9, read: false, createdAt: '2026-10-25T00:00:00Z', title: 't', message: 'm', notificationType, referenceType, referenceId });
+
+  it('opens the admission for a new pool admission and for an assignment', () => {
+    assert.equal(getNotificationHref(item('ADMISSION_NEW_FOR_GROOM', 'ADMISSION', 12), 'GROOM'), '/groom/admissions/12');
+    assert.equal(getNotificationHref(item('ADMISSION_GROOM_ASSIGNED', 'ADMISSION', 13), 'GROOM'), '/groom/admissions/13');
+  });
+
+  it('opens the edit request for the groom and the horse for the owner', () => {
+    assert.equal(getNotificationHref(item('HORSE_EDIT_REQUESTED', 'HORSE_EDIT_REQUEST', 5), 'GROOM'), '/groom/horse-edit-requests/5');
+    assert.equal(getNotificationHref(item('HORSE_EDIT_REVIEWED', 'HORSE', 40), 'HORSE_OWNER'), '/owner/horses/40');
+  });
+});

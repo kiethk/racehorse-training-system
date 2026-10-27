@@ -360,4 +360,21 @@ class HorsePedigreeServiceTest {
         assertNull(saved.getSireId(), "Old sireId must not be preserved when changing to a new external sire");
         assertEquals("New External Sire", saved.getSireName());
     }
+
+    @org.junit.jupiter.api.Test
+    void sireMustBeMaleAndDamFemaleWhenTheirSexIsKnown() {
+        com.rtms.backend.horse.entity.Horse mare = new com.rtms.backend.horse.entity.Horse();
+        mare.setSex(com.rtms.backend.horse.enums.HorseSex.FEMALE);
+        com.rtms.backend.horse.entity.Horse stallion = new com.rtms.backend.horse.entity.Horse();
+        stallion.setSex(com.rtms.backend.horse.enums.HorseSex.MALE);
+        com.rtms.backend.horse.entity.Horse unknown = new com.rtms.backend.horse.entity.Horse();
+
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> pedigreeService.validateParentSexes(mare, null));
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> pedigreeService.validateParentSexes(null, stallion));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> pedigreeService.validateParentSexes(stallion, mare));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> pedigreeService.validateParentSexes(unknown, unknown));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> pedigreeService.validateParentSexes(null, null));
+    }
 }

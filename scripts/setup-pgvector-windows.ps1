@@ -28,7 +28,7 @@ Write-Host "==========================================================" -Foregro
 Write-Host ""
 
 # 1. Phat hien thu muc PostgreSQL
-$pgBasePath = "C:\Program Files\PostgreSQL"
+$pgBasePath = "E:\postgresql"
 if (-not (Test-Path $pgBasePath)) {
     Write-Host "[ERROR] Khong tim thay thu muc: $pgBasePath" -ForegroundColor Red
     Write-Host "Vui long cai dat PostgreSQL tren may truoc khi chay script." -ForegroundColor Yellow
