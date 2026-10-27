@@ -1,5 +1,6 @@
 package com.rtms.backend.scheduler;
 
+import com.rtms.backend.admission.service.AdmissionGroomPoolNotifier;
 import com.rtms.backend.admission.service.AdmissionGroomReviewService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -8,9 +9,12 @@ import org.springframework.stereotype.Component;
 public class AdmissionArrivalScheduler {
 
     private final AdmissionGroomReviewService admissionGroomReviewService;
+    private final AdmissionGroomPoolNotifier groomPoolNotifier;
 
-    public AdmissionArrivalScheduler(AdmissionGroomReviewService admissionGroomReviewService) {
+    public AdmissionArrivalScheduler(AdmissionGroomReviewService admissionGroomReviewService,
+            AdmissionGroomPoolNotifier groomPoolNotifier) {
         this.admissionGroomReviewService = admissionGroomReviewService;
+        this.groomPoolNotifier = groomPoolNotifier;
     }
 
     @Scheduled(fixedRate = 60000)
@@ -18,9 +22,9 @@ public class AdmissionArrivalScheduler {
         admissionGroomReviewService.expireOverdueArrivalReservations();
     }
 
-    /** Safety net: every capacity change already triggers allocation, this catches anything skipped (e.g. SKIP LOCKED). */
-    @Scheduled(fixedRate = 60000, initialDelay = 30000)
-    public void allocateWaitingAdmissions() {
-        admissionGroomReviewService.allocateWaitingAdmissions();
+    /** Tells every groom with a free quarantine stall about admissions that waited past the fallback window. */
+    @Scheduled(fixedRate = 300000, initialDelay = 30000)
+    public void widenGroomPool() {
+        groomPoolNotifier.notifyWidenedPools();
     }
 }

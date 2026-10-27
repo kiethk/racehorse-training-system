@@ -47,18 +47,30 @@ public interface AdmissionApplicationRepository
 
     List<AdmissionApplication> findByGroomId(Long groomId);
 
+    /** Pool admissions past the fallback window whose widened pool has not been told yet, oldest first. */
+    List<AdmissionApplication> findByStatusAndGroomPoolWidenedAtIsNullAndGroomReviewStartedAtLessThanEqualOrderByGroomReviewStartedAtAscIdAsc(
+            AdmissionStatus status, LocalDateTime cutoff);
+
+    /** Admissions holding one of these quarantine stalls in the given status. */
+    List<AdmissionApplication> findByQuarantineStallIdInAndStatus(Collection<Long> stallIds, AdmissionStatus status);
+
     /**
-     * Head of the stall queue, locked. SKIP LOCKED: allocation already holds every stall lock, so it
-     * must never wait on an admission another transaction holds (that one locks admission then stalls).
+     * Ids of the pool admissions a groom sees, in approval order (oldest review start first). The pool
+     * part of {@link #findGroomQueue}; pass a one-row page to get the only admission they may approve.
      */
-    @Query(value = """
-            SELECT * FROM admission_applications
-            WHERE status = 'WAITING_FOR_STALL'
-            ORDER BY created_at ASC, id ASC
-            LIMIT 1
-            FOR UPDATE SKIP LOCKED
-            """, nativeQuery = true)
-    Optional<AdmissionApplication> findNextWaitingForStallForUpdate();
+    @Query("""
+            SELECT a.id FROM AdmissionApplication a
+            WHERE a.status = :poolStatus
+              AND (:leastLoaded = true
+                   OR (:eligible = true AND a.groomReviewStartedAt <= :fallbackCutoff))
+            ORDER BY a.groomReviewStartedAt ASC, a.id ASC
+            """)
+    List<Long> findPoolIdsInApprovalOrder(
+            @Param("leastLoaded") boolean leastLoaded,
+            @Param("eligible") boolean eligible,
+            @Param("fallbackCutoff") LocalDateTime fallbackCutoff,
+            @Param("poolStatus") AdmissionStatus poolStatus,
+            Pageable pageable);
 
     List<AdmissionApplication> findByStatusAndArrivalDeadlineAtLessThanEqualOrderByArrivalDeadlineAtAscIdAsc(
             AdmissionStatus status, LocalDateTime cutoff);
@@ -66,7 +78,9 @@ public interface AdmissionApplicationRepository
     /**
      * What a groom may see (server-side scope shared by the queue, the list and the detail check):
      * <ul>
-     *   <li>quarantine grooms: every admission still in {@code poolStatus} (GROOM_REVIEW) — the review pool;</li>
+     *   <li>the review pool (admissions in {@code poolStatus}, GROOM_REVIEW): all of it for the least-loaded
+     *       quarantine grooms, and admissions waiting since {@code fallbackCutoff} for every groom with a free
+     *       quarantine stall (see AdmissionGroomPoolService);</li>
      *   <li>admissions the groom reviewed;</li>
      *   <li>admissions whose reserved quarantine stall the groom looks after;</li>
      *   <li>admissions whose horse currently stands in a stall the groom looks after.</li>
@@ -80,7 +94,9 @@ public interface AdmissionApplicationRepository
               AND (:filterName = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :candidateName, '%')))
               AND (:filterFrom = false OR a.submittedAt >= :submittedFrom)
               AND (:filterTo = false OR a.submittedAt < :submittedToExclusive)
-              AND ((:quarantineGroom = true AND a.status = :poolStatus)
+              AND ((a.status = :poolStatus
+                    AND (:leastLoaded = true
+                         OR (:eligible = true AND a.groomReviewStartedAt <= :fallbackCutoff)))
                    OR a.groomId = :groomId
                    OR EXISTS (SELECT 1 FROM StableStall qs WHERE qs.id = a.quarantineStallId AND qs.groomId = :groomId)
                    OR EXISTS (SELECT 1 FROM Horse h, StableStall hs
@@ -88,7 +104,9 @@ public interface AdmissionApplicationRepository
             """)
     Page<AdmissionApplication> findGroomQueue(
             @Param("groomId") Long groomId,
-            @Param("quarantineGroom") boolean quarantineGroom,
+            @Param("leastLoaded") boolean leastLoaded,
+            @Param("eligible") boolean eligible,
+            @Param("fallbackCutoff") LocalDateTime fallbackCutoff,
             @Param("poolStatus") AdmissionStatus poolStatus,
             @Param("filterStatus") boolean filterStatus,
             @Param("status") AdmissionStatus status,
@@ -112,7 +130,9 @@ public interface AdmissionApplicationRepository
     @Query("""
             SELECT a FROM AdmissionApplication a
             WHERE (:filterStatus = false OR a.status = :status)
-              AND ((:quarantineGroom = true AND a.status = :poolStatus)
+              AND ((a.status = :poolStatus
+                    AND (:leastLoaded = true
+                         OR (:eligible = true AND a.groomReviewStartedAt <= :fallbackCutoff)))
                    OR a.groomId = :groomId
                    OR EXISTS (SELECT 1 FROM StableStall qs WHERE qs.id = a.quarantineStallId AND qs.groomId = :groomId)
                    OR EXISTS (SELECT 1 FROM Horse h, StableStall hs
@@ -121,7 +141,9 @@ public interface AdmissionApplicationRepository
             """)
     List<AdmissionApplication> findVisibleToGroom(
             @Param("groomId") Long groomId,
-            @Param("quarantineGroom") boolean quarantineGroom,
+            @Param("leastLoaded") boolean leastLoaded,
+            @Param("eligible") boolean eligible,
+            @Param("fallbackCutoff") LocalDateTime fallbackCutoff,
             @Param("poolStatus") AdmissionStatus poolStatus,
             @Param("filterStatus") boolean filterStatus,
             @Param("status") AdmissionStatus status);
@@ -129,7 +151,9 @@ public interface AdmissionApplicationRepository
     @Query("""
             SELECT COUNT(a) > 0 FROM AdmissionApplication a
             WHERE a.id = :admissionId
-              AND ((:quarantineGroom = true AND a.status = :poolStatus)
+              AND ((a.status = :poolStatus
+                    AND (:leastLoaded = true
+                         OR (:eligible = true AND a.groomReviewStartedAt <= :fallbackCutoff)))
                    OR a.groomId = :groomId
                    OR EXISTS (SELECT 1 FROM StableStall qs WHERE qs.id = a.quarantineStallId AND qs.groomId = :groomId)
                    OR EXISTS (SELECT 1 FROM Horse h, StableStall hs
@@ -138,7 +162,9 @@ public interface AdmissionApplicationRepository
     boolean isVisibleToGroom(
             @Param("admissionId") Long admissionId,
             @Param("groomId") Long groomId,
-            @Param("quarantineGroom") boolean quarantineGroom,
+            @Param("leastLoaded") boolean leastLoaded,
+            @Param("eligible") boolean eligible,
+            @Param("fallbackCutoff") LocalDateTime fallbackCutoff,
             @Param("poolStatus") AdmissionStatus poolStatus);
 
     /**

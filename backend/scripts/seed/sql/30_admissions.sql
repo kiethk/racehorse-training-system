@@ -199,8 +199,8 @@ BEGIN
 
         -- 1. Chủ ngựa nộp đơn: đơn + ảnh chụp hồ sơ ngựa + file đính kèm. (Owner submits: admission, snapshot, files.)
         v_t := pg_temp.ts(a.submitted);
-        INSERT INTO admission_applications (owner_id, status, submitted_at, created_at, updated_at)
-        VALUES (v_owner, 'GROOM_REVIEW', v_t, v_t, v_t) RETURNING id INTO v_adm;
+        INSERT INTO admission_applications (owner_id, status, submitted_at, groom_review_started_at, created_at, updated_at)
+        VALUES (v_owner, 'GROOM_REVIEW', v_t, v_t, v_t, v_t) RETURNING id INTO v_adm;
         INSERT INTO seed_admission_id VALUES (a.k, v_adm);
         INSERT INTO candidate_horse_profiles (admission_id, name, breed, date_of_birth, registration_number, registry_name,
                                               sire_name, sire_registration_number, dam_name, dam_registration_number,

@@ -17,6 +17,7 @@ import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
@@ -43,6 +45,7 @@ class OwnerAdmissionServiceTest {
     private HorseRepository horses;
     private com.rtms.backend.stable.repository.StableStallRepository stalls;
     private com.rtms.backend.notification.service.NotificationService notifications;
+    private AdmissionGroomPoolService groomPool;
     private OwnerAdmissionService service;
     private AtomicLong sequence;
 
@@ -56,8 +59,10 @@ class OwnerAdmissionServiceTest {
         horses = mock(HorseRepository.class);
         stalls = mock(com.rtms.backend.stable.repository.StableStallRepository.class);
         notifications = mock(com.rtms.backend.notification.service.NotificationService.class);
+        groomPool = mock(AdmissionGroomPoolService.class);
         service = new OwnerAdmissionService(admissions, candidates, documents, files, uelnPolicy,
-                new PedigreeBirthDateValidator(horses), stalls, notifications);
+                new PedigreeBirthDateValidator(horses), stalls, groomPool,
+                new AdmissionGroomPoolNotifier(groomPool, admissions, candidates, notifications));
         sequence = new AtomicLong(100);
         when(admissions.save(any())).thenAnswer(inv -> {
             AdmissionApplication app = inv.getArgument(0);
@@ -323,8 +328,9 @@ class OwnerAdmissionServiceTest {
     }
 
     @Test
-    void creatingAnAdmissionNotifiesEveryQuarantineGroomOnce() {
-        when(stalls.findQuarantineGroomIds()).thenReturn(List.of(31L, 32L));
+    @DisplayName("D8.5: a new submission notifies only the least-loaded grooms, once each")
+    void creatingAnAdmissionNotifiesTheLeastLoadedGroomsOnce() {
+        when(groomPool.leastLoadedGroomIds()).thenReturn(List.of(31L, 32L));
 
         var detail = service.create(9L, request());
 
@@ -335,6 +341,23 @@ class OwnerAdmissionServiceTest {
                     eq(groomId + ":ADMISSION_" + detail.admissionId() + ":ADMISSION_NEW_FOR_GROOM"));
         }
         verifyNoMoreInteractions(notifications);
+        verify(stalls, never()).findQuarantineGroomIds();
+    }
+
+    @Test
+    @DisplayName("D7: the owner sees quarantineFull while in GROOM_REVIEW and no groom can take the horse")
+    void ownerDetailFlagsFullQuarantine() {
+        when(groomPool.eligibleGroomIds()).thenReturn(List.of());
+        assertTrue(service.create(9L, request()).quarantineFull());
+
+        when(groomPool.eligibleGroomIds()).thenReturn(List.of(31L));
+        when(stalls.countAvailableQuarantineStalls()).thenReturn(2L);
+        when(stalls.countAvailableRegularStalls()).thenReturn(5L);
+        when(stalls.countOccupiedQuarantineStalls()).thenReturn(1L);
+        assertFalse(service.create(9L, request()).quarantineFull());
+
+        when(stalls.countAvailableRegularStalls()).thenReturn(1L);
+        assertTrue(service.create(9L, request()).quarantineFull());
     }
 
     @Test
@@ -343,14 +366,15 @@ class OwnerAdmissionServiceTest {
         admission.setId(5L);
         admission.setStatus(AdmissionStatus.GROOM_REVIEW);
         when(admissions.findById(5L)).thenReturn(java.util.Optional.of(admission));
-        when(stalls.isQuarantineGroom(41L)).thenReturn(false);
-        when(admissions.isVisibleToGroom(5L, 41L, false, AdmissionStatus.GROOM_REVIEW)).thenReturn(false);
+        LocalDateTime cutoff = LocalDateTime.of(2026, 10, 26, 9, 0);
+        when(groomPool.viewFor(41L)).thenReturn(new AdmissionGroomPoolService.PoolView(false, true, cutoff));
+        when(admissions.isVisibleToGroom(5L, 41L, false, true, cutoff, AdmissionStatus.GROOM_REVIEW)).thenReturn(false);
         var groom = new com.rtms.backend.security.AuthenticatedUser(41L, "g@x", "GROOM");
 
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
                 () -> service.assertViewerCanRead(5L, groom));
 
-        when(admissions.isVisibleToGroom(5L, 41L, false, AdmissionStatus.GROOM_REVIEW)).thenReturn(true);
+        when(admissions.isVisibleToGroom(5L, 41L, false, true, cutoff, AdmissionStatus.GROOM_REVIEW)).thenReturn(true);
         assertDoesNotThrow(() -> service.assertViewerCanRead(5L, groom));
     }
 

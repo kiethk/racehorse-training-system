@@ -14,7 +14,6 @@ import { AdmissionTable } from '../shared/components/AdmissionTable';
 const statuses: { value: AdmissionStatus | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
   { value: 'GROOM_REVIEW', label: 'Groom review' },
-  { value: 'WAITING_FOR_STALL', label: 'Waiting for stall' },
   { value: 'WAITING_FOR_ARRIVAL', label: 'Waiting for arrival' },
   { value: 'ARRIVAL_EXPIRED', label: 'Arrival expired' },
   { value: 'VET_REVIEW', label: 'Vet review' },

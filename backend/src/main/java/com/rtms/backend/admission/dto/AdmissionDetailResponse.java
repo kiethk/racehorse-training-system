@@ -25,6 +25,8 @@ public class AdmissionDetailResponse {
     private CandidateHorseProfile candidate;
     private List<AdmissionDocumentResponse> documents;
     private AdmissionCapacitySummary capacity;
+    /** Only for a groom viewing an admission in GROOM_REVIEW; null for every other viewer and status. */
+    private GroomReviewEligibility groomReviewEligibility;
 
     private Long groomId;
     private String groomName;
@@ -144,6 +146,12 @@ public class AdmissionDetailResponse {
     public AdmissionCapacitySummary getCapacity() { return capacity; }
 
     public void setCapacity(AdmissionCapacitySummary capacity) { this.capacity = capacity; }
+
+    public GroomReviewEligibility getGroomReviewEligibility() { return groomReviewEligibility; }
+
+    public void setGroomReviewEligibility(GroomReviewEligibility groomReviewEligibility) {
+        this.groomReviewEligibility = groomReviewEligibility;
+    }
 
     public Long getGroomId() {
         return groomId;

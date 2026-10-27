@@ -548,12 +548,12 @@ class AdmissionManagerReviewServiceTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // WAITING_FOR_STALL processing
+    // Quarantine stall release
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("Approve: releases Q stall, stamps the regular groom, notifies them and lets the stall queue move")
-    void managerApprove_releasesQStall_andRunsAllocation() {
+    @DisplayName("Approve: releases Q stall, stamps the regular groom and notifies them")
+    void managerApprove_releasesQStall() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         StableStall regularStall = buildStall(20L, StallStatus.AVAILABLE);
@@ -575,12 +575,12 @@ class AdmissionManagerReviewServiceTest {
         verify(groomProfileRepository).touchLastHorseAssignedAt(org.mockito.ArgumentMatchers.eq(33L), any());
         verify(admissionGroomReviewService).notifyGroomAssigned(org.mockito.ArgumentMatchers.same(admission),
                 org.mockito.ArgumentMatchers.same(regularStall), org.mockito.ArgumentMatchers.anyString());
-        verify(admissionGroomReviewService).allocateWaitingAdmissions();
+        verifyNoMoreInteractions(admissionGroomReviewService);
     }
 
     @Test
-    @DisplayName("Reject: releases Q stall and lets the stall queue move")
-    void managerReject_releasesQStall_andRunsAllocation() {
+    @DisplayName("Reject: releases Q stall without touching any other admission")
+    void managerReject_releasesQStall() {
         AdmissionApplication admission = buildAdmission(AdmissionStatus.MANAGER_REVIEW);
         Horse horse = buildHorse(HorseStatus.CANDIDATE);
         StableStall quarantineStall = buildStall(99L, StallStatus.OCCUPIED);
@@ -594,6 +594,6 @@ class AdmissionManagerReviewServiceTest {
 
         assertEquals(StallStatus.AVAILABLE, quarantineStall.getStatus());
         assertEquals("Not a good fit", admission.getManagerFeedback());
-        verify(admissionGroomReviewService).allocateWaitingAdmissions();
+        verifyNoInteractions(admissionGroomReviewService);
     }
 }

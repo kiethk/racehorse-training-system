@@ -11,13 +11,20 @@ import { formatDate, formatDateTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { ReviewDecisionDialog } from '../shared/components/ReviewDecisionDialog';
 import type { ReviewDecisionValue } from '../shared/lib/reviewDecision';
-import type { AdmissionDetailResponse } from '../types';
+import type { AdmissionDetailResponse, GroomApproveBlockedReason } from '../types';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
 import { AdmissionInfoSection, AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
+
+const APPROVE_BLOCKED_TEXT: Record<GroomApproveBlockedReason, string> = {
+  NOT_IN_GROOM_POOL: 'This admission is not in your review pool right now.',
+  OLDER_ADMISSION_FIRST: 'Review older admissions first. Approvals follow submission order.',
+  NO_QUARANTINE_STALL: 'You have no free quarantine stall.',
+  REGULAR_RESERVE_INSUFFICIENT: 'Regular-stall reserve is below the required quarantine turnover reserve.',
+};
 
 function date(value: string | null) {
   return value ? formatDate(value) : 'Not recorded';
@@ -72,17 +79,16 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
       onUpdated?.();
       if (choice === 'REJECTED') {
         toast.success('Admission rejected', 'The owner can see your reason on the application.');
-      } else if (updated.status === 'WAITING_FOR_STALL') {
-        toast.info('Admission approved and queued',
-          'No quarantine stall is free yet. A stall is assigned automatically in submission order.');
       } else {
         toast.success('Admission approved',
-          `Quarantine stall ${updated.quarantineStallCode ?? ''} is reserved until ${updated.arrivalDeadlineAt ? formatDateTime(updated.arrivalDeadlineAt) : 'the arrival deadline'}.`);
+          `Quarantine stall ${updated.quarantineStallCode ?? ''} is reserved for you until ${updated.arrivalDeadlineAt ? formatDateTime(updated.arrivalDeadlineAt) : 'the arrival deadline'}.`);
       }
     } catch (cause) {
+      // The pool may have moved since the page loaded (another groom approved first); reload what this groom may do now.
       const message = cause instanceof Error ? cause.message : 'Unable to submit the Groom decision.';
-      setDecisionError(message);
       toast.error('Decision not saved', message);
+      setDecision(null);
+      void load();
     } finally {
       setSubmitting(false);
     }
@@ -98,7 +104,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
       onUpdated?.();
       if (updated.status === 'ARRIVAL_EXPIRED') {
         toast.warning('Arrival window expired',
-          'The reservation was released; ask an authorized manager to reopen the admission.');
+          'The reservation was released; an authorized manager can return the admission to groom review.');
       } else {
         toast.success('Arrival confirmed',
           'The horse was registered and the initial veterinary exam is being scheduled.');
@@ -120,7 +126,12 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
   const candidate = detail.candidate;
   const horsePhoto = detail.documents.find((doc) => doc.documentType === 'HORSE_PHOTO');
   const canReview = detail.status === 'GROOM_REVIEW';
-  const waiting = detail.status === 'WAITING_FOR_STALL';
+  const eligibility = detail.groomReviewEligibility ?? null;
+  const canApprove = eligibility?.canApprove ?? false;
+  const canReject = eligibility?.canReject ?? true;
+  const approveBlockedText = eligibility?.approveBlockedReason
+    ? APPROVE_BLOCKED_TEXT[eligibility.approveBlockedReason]
+    : null;
   const capacity = detail.capacity;
   const isReady = capacity?.admissionCapacityAvailable ?? false;
   const blockingText = capacity?.blockingReason === 'NO_QUARANTINE_STALL'
@@ -192,23 +203,17 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
             {canReview && (
               <AdmissionSideCard title="Groom decision" tone="primary" className="space-y-3">
                 <p className="text-[var(--color-text-secondary)]">
-                  Approving places the admission in the stall queue. A quarantine stall is assigned automatically,
-                  oldest application first, as soon as capacity allows.
+                  {canApprove && eligibility?.targetStallCode
+                    ? `Approving reserves your quarantine stall ${eligibility.targetStallCode} for this horse. You will confirm its arrival.`
+                    : 'Approving reserves one of your own quarantine stalls for this horse. You will confirm its arrival.'}
                 </p>
+                {approveBlockedText && <Notice tone="warning">{approveBlockedText}</Notice>}
                 <div className="space-y-2">
-                  <Button type="button" variant="primary" className="w-full" disabled={submitting} onClick={() => setDecision('APPROVED')}>Approve</Button>
-                  <Button type="button" variant="destructive" className="w-full" disabled={submitting} onClick={() => setDecision('REJECTED')}>Reject</Button>
+                  <Button type="button" variant="primary" className="w-full" disabled={submitting || !canApprove} onClick={() => setDecision('APPROVED')}>Approve</Button>
+                  {canReject && (
+                    <Button type="button" variant="destructive" className="w-full" disabled={submitting} onClick={() => setDecision('REJECTED')}>Reject</Button>
+                  )}
                 </div>
-              </AdmissionSideCard>
-            )}
-
-            {waiting && (
-              <AdmissionSideCard title="Queued for a quarantine stall">
-                <p className="text-[var(--color-text-secondary)]">
-                  Approved and waiting for capacity. The system assigns the next free quarantine stall automatically,
-                  in submission order. No action is needed.
-                </p>
-                <InfoRow label="Feedback" value={detail.groomFeedback || 'Not recorded'} />
               </AdmissionSideCard>
             )}
 
@@ -224,11 +229,11 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
 
             {detail.status === 'ARRIVAL_EXPIRED' && (
               <AdmissionSideCard title="Arrival window expired" tone="warning">
-                <p className="text-[var(--color-text-secondary)]">The reserved quarantine stall was released after 14 days. An authorized manager can reopen the arrival window if needed.</p>
+                <p className="text-[var(--color-text-secondary)]">The reserved quarantine stall was released after 14 days. An authorized manager can return it to groom review if needed.</p>
               </AdmissionSideCard>
             )}
 
-            {!canReview && !waiting && detail.status !== 'WAITING_FOR_ARRIVAL' && detail.status !== 'ARRIVAL_EXPIRED' && (
+            {!canReview && detail.status !== 'WAITING_FOR_ARRIVAL' && detail.status !== 'ARRIVAL_EXPIRED' && (
               <AdmissionSideCard title="Groom decision">
                 <p className="text-[var(--color-text-secondary)]">This application is read-only at its current stage.</p>
               </AdmissionSideCard>
@@ -242,7 +247,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
         title={decision === 'REJECTED' ? 'Reject admission?' : 'Approve admission?'}
         description={decision === 'REJECTED'
           ? 'The application closes and the owner sees your reason.'
-          : 'A quarantine stall is assigned automatically. If none is free, the admission joins the stall queue in submission order.'}
+          : `Your quarantine stall ${eligibility?.targetStallCode ?? ''} is reserved for this horse for 14 days, and you confirm its arrival.`}
         loading={submitting}
         error={decisionError}
         onConfirm={(choice, feedback) => void review(choice, feedback)}

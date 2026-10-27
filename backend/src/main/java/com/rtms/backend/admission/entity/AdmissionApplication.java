@@ -38,6 +38,14 @@ public class AdmissionApplication {
     @Column(name = "groom_reviewed_at")
     private LocalDateTime groomReviewedAt;
 
+    /** When the admission last entered GROOM_REVIEW: orders the groom pool and starts its widening clock. */
+    @Column(name = "groom_review_started_at")
+    private LocalDateTime groomReviewStartedAt;
+
+    /** Set once every groom with a free quarantine stall has been told about this admission. */
+    @Column(name = "groom_pool_widened_at")
+    private LocalDateTime groomPoolWidenedAt;
+
     @Column(name = "arrival_deadline_at")
     private LocalDateTime arrivalDeadlineAt;
 
@@ -105,6 +113,10 @@ public class AdmissionApplication {
 
         if (status == null) {
             status = AdmissionStatus.GROOM_REVIEW;
+        }
+
+        if (status == AdmissionStatus.GROOM_REVIEW && groomReviewStartedAt == null) {
+            groomReviewStartedAt = now;
         }
 
         createdAt = now;
@@ -179,6 +191,14 @@ public class AdmissionApplication {
     public void setGroomReviewedAt(LocalDateTime groomReviewedAt) {
         this.groomReviewedAt = groomReviewedAt;
     }
+
+    public LocalDateTime getGroomReviewStartedAt() { return groomReviewStartedAt; }
+
+    public void setGroomReviewStartedAt(LocalDateTime groomReviewStartedAt) { this.groomReviewStartedAt = groomReviewStartedAt; }
+
+    public LocalDateTime getGroomPoolWidenedAt() { return groomPoolWidenedAt; }
+
+    public void setGroomPoolWidenedAt(LocalDateTime groomPoolWidenedAt) { this.groomPoolWidenedAt = groomPoolWidenedAt; }
 
     public LocalDateTime getArrivalDeadlineAt() { return arrivalDeadlineAt; }
 

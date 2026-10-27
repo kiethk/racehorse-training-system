@@ -26,27 +26,22 @@ describe('AdmissionPipeline Mapper Unit Tests (6 Steps)', () => {
     }
   });
 
-  it('2. WAITING_FOR_STALL: Submitted & Groom Review are completed, Arrival is current with "Waiting for stall" note', () => {
+  it('2. Reopened after an expired arrival: back to GROOM_REVIEW as a fresh review, Arrival pending', () => {
+    // Reopening clears the previous groom review, so the step is current again, not completed.
     const res = mapAdmissionPipeline({
-      status: 'WAITING_FOR_STALL',
+      status: 'GROOM_REVIEW',
       submittedAt: '2026-10-01T08:00:00Z',
-      groomReviewedAt: '2026-10-01T09:00:00Z',
-      groomDecision: 'APPROVED',
+      groomReviewedAt: null,
+      groomDecision: null,
     });
 
     assert.equal(res.steps.length, 6);
-    assert.equal(res.steps[0].state, 'completed');
-    assert.equal(res.steps[1].state, 'completed');
-    assert.equal(res.steps[1].timestamp, '2026-10-01T09:00:00Z');
-
-    // Step 2 is Arrival
+    assert.equal(res.steps[1].state, 'current');
+    assert.equal(res.steps[1].timestamp, null);
     assert.equal(res.steps[2].id, 'arrival');
-    assert.equal(res.steps[2].state, 'current');
-    assert.equal(res.steps[2].note, 'Waiting for stall');
-    assert.equal(res.steps[2].timestamp, null); // Not arrived yet
-
-    assert.equal(res.steps[3].id, 'vet-review');
-    assert.equal(res.steps[3].state, 'pending');
+    assert.equal(res.steps[2].state, 'pending');
+    assert.equal(res.steps[2].note, undefined);
+    assert.equal(res.isArrivalExpired, false);
   });
 
   it('3. WAITING_FOR_ARRIVAL: Arrival is current with reserved stall note', () => {

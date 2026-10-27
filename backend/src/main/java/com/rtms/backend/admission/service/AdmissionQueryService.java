@@ -30,6 +30,7 @@ import com.rtms.backend.admission.dto.AdmissionDetailResponse;
 import com.rtms.backend.admission.dto.AdmissionDocumentResponse;
 import com.rtms.backend.admission.dto.AdmissionSummaryResponse;
 import com.rtms.backend.admission.dto.GroomAdmissionQueueResponse;
+import com.rtms.backend.admission.dto.GroomReviewEligibility;
 import com.rtms.backend.medical.dto.InitialExamScheduleResponse;
 import com.rtms.backend.admission.dto.TrainerAdmissionQueueResponse;
 import com.rtms.backend.admission.entity.AdmissionApplication;
@@ -73,6 +74,7 @@ public class AdmissionQueryService {
     private final FileStorageService fileStorage;
     private final UserRepository userRepository;
     private final CareScheduleRepository careScheduleRepository;
+    private final AdmissionGroomPoolService groomPool;
 
     @Autowired
     public AdmissionQueryService(
@@ -84,7 +86,8 @@ public class AdmissionQueryService {
             HorseHealthMetricRepository horseHealthMetricRepository,
             FileStorageService fileStorage,
             UserRepository userRepository,
-            CareScheduleRepository careScheduleRepository) {
+            CareScheduleRepository careScheduleRepository,
+            AdmissionGroomPoolService groomPool) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.admissionDocumentRepository = admissionDocumentRepository;
@@ -94,6 +97,7 @@ public class AdmissionQueryService {
         this.fileStorage = fileStorage;
         this.userRepository = userRepository;
         this.careScheduleRepository = careScheduleRepository;
+        this.groomPool = groomPool;
     }
 
     public AdmissionQueryService(
@@ -105,7 +109,8 @@ public class AdmissionQueryService {
             FileStorageService fileStorage,
             UserRepository userRepository) {
         this(admissionApplicationRepository, candidateHorseProfileRepository, admissionDocumentRepository,
-                stableStallRepository, healthRecordRepository, null, fileStorage, userRepository, null);
+                stableStallRepository, healthRecordRepository, null, fileStorage, userRepository, null,
+                new AdmissionGroomPoolService(stableStallRepository));
     }
 
     public AdmissionQueryService(
@@ -118,7 +123,8 @@ public class AdmissionQueryService {
             UserRepository userRepository,
             CareScheduleRepository careScheduleRepository) {
         this(admissionApplicationRepository, candidateHorseProfileRepository, admissionDocumentRepository,
-                stableStallRepository, healthRecordRepository, null, fileStorage, userRepository, careScheduleRepository);
+                stableStallRepository, healthRecordRepository, null, fileStorage, userRepository, careScheduleRepository,
+                new AdmissionGroomPoolService(stableStallRepository));
     }
 
     public List<AdmissionSummaryResponse> getAdmissions(AdmissionStatus status) {
@@ -194,9 +200,12 @@ public class AdmissionQueryService {
                 : candidateName.trim();
         var pageable = PageRequest.of(page, pageSize,
                 Sort.by(Sort.Order.asc("createdAt"), Sort.Order.asc("id")));
+        AdmissionGroomPoolService.PoolView pool = groomPool.viewFor(groomId);
         Page<AdmissionApplication> result = admissionApplicationRepository.findGroomQueue(
                 groomId,
-                stableStallRepository.isQuarantineGroom(groomId),
+                pool.leastLoaded(),
+                pool.eligible(),
+                pool.fallbackCutoff(),
                 AdmissionStatus.GROOM_REVIEW,
                 status != null,
                 status == null ? AdmissionStatus.GROOM_REVIEW : status,
@@ -463,17 +472,51 @@ public class AdmissionQueryService {
     }
 
     public List<AdmissionSummaryResponse> getAdmissionsForGroom(Long groomId, AdmissionStatus status) {
+        AdmissionGroomPoolService.PoolView pool = groomPool.viewFor(groomId);
         return admissionApplicationRepository.findVisibleToGroom(groomId,
-                        stableStallRepository.isQuarantineGroom(groomId), AdmissionStatus.GROOM_REVIEW,
+                        pool.leastLoaded(), pool.eligible(), pool.fallbackCutoff(), AdmissionStatus.GROOM_REVIEW,
                         status != null, status == null ? AdmissionStatus.GROOM_REVIEW : status).stream()
                 .map(this::toSummaryResponse)
                 .toList();
     }
 
+    /** The detail a groom sees, with what they may do with an admission still in GROOM_REVIEW. */
+    public AdmissionDetailResponse getGroomAdmissionDetail(Long admissionId, Long groomId) {
+        AdmissionDetailResponse response = getAdmissionDetail(admissionId);
+        if (response.getStatus() == AdmissionStatus.GROOM_REVIEW) {
+            AdmissionApplication admission = admissionApplicationRepository.findById(admissionId)
+                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Admission not found"));
+            response.setGroomReviewEligibility(groomReviewEligibility(admission, groomId, response.getCapacity()));
+        }
+        return response;
+    }
+
+    /** Mirrors the checks of AdmissionGroomReviewService.approve, without its locks. */
+    private GroomReviewEligibility groomReviewEligibility(AdmissionApplication admission, Long groomId,
+            AdmissionCapacitySummary capacity) {
+        AdmissionGroomPoolService.PoolView pool = groomPool.viewFor(groomId);
+        if (!pool.canSee(admission)) {
+            return new GroomReviewEligibility(false, false, "NOT_IN_GROOM_POOL", null);
+        }
+        List<Long> oldest = admissionApplicationRepository.findPoolIdsInApprovalOrder(
+                pool.leastLoaded(), pool.eligible(), pool.fallbackCutoff(), AdmissionStatus.GROOM_REVIEW,
+                PageRequest.of(0, 1));
+        if (!oldest.isEmpty() && !oldest.getFirst().equals(admission.getId())) {
+            return new GroomReviewEligibility(false, true, "OLDER_ADMISSION_FIRST", null);
+        }
+        if (capacity != null && capacity.blockingReason() != null) {
+            return new GroomReviewEligibility(false, true, capacity.blockingReason(), null);
+        }
+        return stableStallRepository.findFirstAvailableQuarantineStallOfGroom(groomId)
+                .map(stall -> new GroomReviewEligibility(true, true, null, stall.getStallCode()))
+                .orElseGet(() -> new GroomReviewEligibility(false, true, "NO_QUARANTINE_STALL", null));
+    }
+
     /** Server-side read check for grooms; same scope as the queue (see AdmissionApplicationRepository.findGroomQueue). */
     public boolean isVisibleToGroom(Long admissionId, Long groomId) {
+        AdmissionGroomPoolService.PoolView pool = groomPool.viewFor(groomId);
         return admissionApplicationRepository.isVisibleToGroom(admissionId, groomId,
-                stableStallRepository.isQuarantineGroom(groomId), AdmissionStatus.GROOM_REVIEW);
+                pool.leastLoaded(), pool.eligible(), pool.fallbackCutoff(), AdmissionStatus.GROOM_REVIEW);
     }
 
     /** Removes capacity/final-manager data that is unrelated to a Vet's assigned clinical work. */

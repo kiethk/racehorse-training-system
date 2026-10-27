@@ -2561,7 +2561,6 @@ public class AiToolExecutionService {
 
             String buocHienTai = a.getStatus() != null ? switch (a.getStatus()) {
                 case GROOM_REVIEW -> "Chờ Groom kiểm tra sơ bộ (GROOM_REVIEW)";
-                case WAITING_FOR_STALL -> "Chờ phân bổ chuồng cách ly (WAITING_FOR_STALL)";
                 case WAITING_FOR_ARRIVAL -> "Chờ ngựa đến trang trại (WAITING_FOR_ARRIVAL)";
                 case ARRIVAL_EXPIRED -> "Quá hạn vận chuyển tới chuồng (ARRIVAL_EXPIRED)";
                 case VET_REVIEW -> "Chờ Bác sĩ thú y khám ban đầu (VET_REVIEW)";

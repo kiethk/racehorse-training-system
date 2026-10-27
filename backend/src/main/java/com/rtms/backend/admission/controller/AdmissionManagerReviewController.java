@@ -66,6 +66,9 @@ public class AdmissionManagerReviewController {
         } else {
             ownerAdmissionService.assertViewerCanRead(id, currentUser);
         }
+        if ("GROOM".equals(currentUser.getRole())) {
+            return ApiResponse.success(admissionQueryService.getGroomAdmissionDetail(id, currentUser.getUserId()));
+        }
         return ApiResponse.success(admissionQueryService.getAdmissionDetail(id));
     }
 

@@ -67,4 +67,6 @@ export interface OwnerAdmissionDetail {
   vetFeedback: string | null;
   trainerFeedback: string | null;
   managerFeedback: string | null;
+  /** GROOM_REVIEW only: no groom can take a new horse right now. */
+  quarantineFull: boolean;
 }

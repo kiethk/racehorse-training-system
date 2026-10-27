@@ -16,7 +16,9 @@ public record OwnerAdmissionDetailResponse(
         String groomFeedback,
         String vetFeedback,
         String trainerFeedback,
-        String managerFeedback) {
+        String managerFeedback,
+        /* GROOM_REVIEW only: no groom can take a new horse right now (no free quarantine stall or regular reserve). */
+        boolean quarantineFull) {
 
     public record CandidateSnapshot(
             String name, String breed, LocalDate dateOfBirth, HorseSex sex,

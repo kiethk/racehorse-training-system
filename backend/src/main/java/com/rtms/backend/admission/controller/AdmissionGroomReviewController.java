@@ -60,7 +60,7 @@ public class AdmissionGroomReviewController {
                 currentUser.getUserId(),
                 request);
 
-        return ApiResponse.success(admissionQueryService.getAdmissionDetail(admission.getId()));
+        return ApiResponse.success(admissionQueryService.getGroomAdmissionDetail(admission.getId(), currentUser.getUserId()));
     }
 
     @PostMapping("/{id}/arrival-confirmation")
@@ -69,7 +69,7 @@ public class AdmissionGroomReviewController {
             @PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         AdmissionApplication admission = admissionGroomReviewService.confirmArrival(id, currentUser.getUserId());
-        return ApiResponse.success(admissionQueryService.getAdmissionDetail(admission.getId()));
+        return ApiResponse.success(admissionQueryService.getGroomAdmissionDetail(admission.getId(), currentUser.getUserId()));
     }
 
     @PostMapping("/{id}/arrival-reopen")
