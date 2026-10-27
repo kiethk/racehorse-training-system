@@ -231,8 +231,15 @@ public class CareScheduleService {
         boolean vetHasConflict = careScheduleRepository.findByVeterinarianIdAndStatus(
                         vetId, CareScheduleStatus.IN_PROGRESS).stream()
                 .anyMatch(other -> inProgressConflictsWithSlot(schedule, start, other));
-        if (vetHasConflict
-                || careScheduleRepository.existsByHorseIdAndStatus(schedule.getHorseId(), CareScheduleStatus.IN_PROGRESS)) {
+        boolean horseBusy = careScheduleRepository.existsByHorseIdAndStatus(schedule.getHorseId(), CareScheduleStatus.IN_PROGRESS);
+        if (horseBusy && schedule.getCareType() == CareType.URGENT) {
+            // An emergency must reach a horse whose in-progress visit is stale (past
+            // its booked duration); only a genuinely current examination blocks it.
+            horseBusy = careScheduleRepository
+                    .findByHorseIdAndStatusIn(schedule.getHorseId(), List.of(CareScheduleStatus.IN_PROGRESS)).stream()
+                    .anyMatch(other -> inProgressConflictsWithSlot(schedule, start, other));
+        }
+        if (vetHasConflict || horseBusy) {
             throw new ApiException(HttpStatus.CONFLICT, "SLOT_UNAVAILABLE", "Veterinarian or horse has an examination in progress");
         }
         List<CareSchedule> booked = new ArrayList<>(careScheduleRepository.findScheduledForVet(vetId, CareScheduleStatus.SCHEDULED));
@@ -288,7 +295,9 @@ public class CareScheduleService {
             }
             // Chặn tập luôn phải có điểm kết thúc: lần khám lại chính là mốc "tạm nghỉ đến".
             // Không có lịch thì ngựa bị khóa vô thời hạn cho tới khi ai đó nhớ ra mà tạo.
-            if (request.getNextSchedule() == null) {
+            boolean hasFollowUp = request.getNextSchedule() != null
+                    || (request.getNextSchedules() != null && !request.getNextSchedules().isEmpty());
+            if (!hasFollowUp) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "FOLLOW_UP_REQUIRED",
                         "A follow-up examination (nextSchedule) is required when training is BLOCKED");
             }
@@ -565,10 +574,26 @@ public class CareScheduleService {
             }
         }
 
-        // Atomic next schedule creation if provided
+        // Atomic next schedule creation if provided. Multiple follow-ups let vets
+        // rotate rechecks on consecutive days; each entry gets its own idempotency
+        // key (source_schedule_id is one-to-one and cannot anchor them all).
+        boolean createdFollowUp = false;
+        if (request.getNextSchedules() != null) {
+            int index = 0;
+            for (CreateNextScheduleRequest next : request.getNextSchedules()) {
+                String entryKey = next.getIdempotencyKey() != null && !next.getIdempotencyKey().isBlank()
+                        ? next.getIdempotencyKey().trim() : "entry-" + index;
+                createNextSchedule(next, vetId, completedSchedule,
+                        "completion:" + completedSchedule.getId() + ":" + entryKey, false);
+                index++;
+                createdFollowUp = true;
+            }
+        }
         if (request.getNextSchedule() != null) {
             createNextSchedule(request.getNextSchedule(), vetId, completedSchedule);
-        } else {
+            createdFollowUp = true;
+        }
+        if (!createdFollowUp) {
             createRoutineCadenceSchedule(vetId, completedSchedule);
         }
 
@@ -705,15 +730,25 @@ public class CareScheduleService {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
                     "Only the veterinarian who completed the source examination may schedule its follow-up care");
         }
-        return createNextSchedule(request, userId, source, true);
+        return createNextSchedule(request, userId, source, null, false);
     }
 
     private CareScheduleResponse createNextSchedule(CreateNextScheduleRequest request, Long userId, CareSchedule source) {
-        return createNextSchedule(request, userId, source, false);
+        return createNextSchedule(request, userId, source, "completion:" + source.getId(), true);
     }
 
+    /**
+     * @param operationKeyOverride khóa idempotency của lịch tạo ra; null → lấy từ request
+     *                             (standalone). Ca hoàn tất tạo 1 lịch dùng
+     *                             "completion:<sourceId>" (giữ nguyên hành vi cũ); hoàn tất
+     *                             tạo NHIỀU lịch tái khám đính kèm key của từng dòng để
+     *                             mỗi lịch có khóa riêng.
+     * @param linkedToSourceSchedule true khi lịch là follow-up DUY NHẤT của ca hoàn tất
+     *                               (unique index trên source_schedule_id); các chế độ khác
+     *                               để null vì không thể 2 dòng cùng source.
+     */
     private CareScheduleResponse createNextSchedule(CreateNextScheduleRequest request, Long userId,
-            CareSchedule source, boolean standalone) {
+            CareSchedule source, String operationKeyOverride, boolean linkedToSourceSchedule) {
         if (request == null) throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "nextSchedule is required");
         Long horseId = source == null ? request.getHorseId() : source.getHorseId();
         Long admissionId = source == null ? request.getAdmissionId() : source.getAdmissionId();
@@ -758,9 +793,9 @@ public class CareScheduleService {
         if (requestedAt == null || !requestedAt.isAfter(LocalDateTime.now())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "Requested schedule time must be in the future");
         }
-        String operationKey = standalone
-                ? request.getIdempotencyKey() == null ? null : request.getIdempotencyKey().trim()
-                : "completion:" + source.getId();
+        String operationKey = operationKeyOverride != null
+                ? operationKeyOverride
+                : (request.getIdempotencyKey() == null ? null : request.getIdempotencyKey().trim());
         if (operationKey == null || operationKey.isBlank() || operationKey.length() > 100) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "A valid idempotencyKey is required");
         }
@@ -776,9 +811,9 @@ public class CareScheduleService {
             }
         }
         String fingerprint = fingerprint(horseId, admissionId, requestedAt, description);
-        Optional<CareSchedule> existing = standalone
-                ? careScheduleRepository.findByRequestedByIdAndIdempotencyKey(userId, operationKey)
-                : careScheduleRepository.findBySourceScheduleId(source.getId());
+        Optional<CareSchedule> existing = linkedToSourceSchedule
+                ? careScheduleRepository.findBySourceScheduleId(source.getId())
+                : careScheduleRepository.findByRequestedByIdAndIdempotencyKey(userId, operationKey);
         if (existing.isPresent()) {
             if (!Objects.equals(existing.get().getRequestFingerprint(), fingerprint)) {
                 throw new ApiException(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT", "Idempotency key was already used with a different payload");
@@ -790,9 +825,9 @@ public class CareScheduleService {
         schedule.setHorseId(horse.getId());
         schedule.setAdmissionId(admissionId);
         // sourceScheduleId on the entity is the one-to-one completion-operation key.
-        // Standalone requests use (requestedById, idempotencyKey) so multiple distinct
+        // All other modes use (requestedById, idempotencyKey) so multiple distinct
         // follow-ups may be authorized by the same completed examination.
-        schedule.setSourceScheduleId(standalone ? null : source.getId());
+        schedule.setSourceScheduleId(linkedToSourceSchedule ? source.getId() : null);
         schedule.setRequestedById(userId);
         schedule.setIdempotencyKey(operationKey);
         schedule.setRequestFingerprint(fingerprint);
@@ -1124,7 +1159,10 @@ public class CareScheduleService {
                     if (schedule.getCareType() == CareType.INITIAL && schedule.getVeterinarianId() != null) {
                         return Objects.equals(v.getId(), schedule.getVeterinarianId());
                     }
-                    boolean activeExamBlocks = (schedule.getCareType() == CareType.URGENT || slot.toLocalDate().isEqual(LocalDate.now()))
+                    // For URGENT the in-progress conflict check below decides, so a
+                    // stale overdue exam never disqualifies the vet from an emergency.
+                    boolean activeExamBlocks = schedule.getCareType() != CareType.URGENT
+                            && slot.toLocalDate().isEqual(LocalDate.now())
                             && vetCache.hasInProgressByVet.computeIfAbsent(v.getId(),
                                     id -> careScheduleRepository.existsByVeterinarianIdAndStatus(id, CareScheduleStatus.IN_PROGRESS));
                     return !activeExamBlocks;
@@ -1166,7 +1204,17 @@ public class CareScheduleService {
     }
 
     private boolean inProgressConflictsWithSlot(CareSchedule schedule, LocalDateTime slot, CareSchedule inProgress) {
-        if (schedule.getCareType() == CareType.URGENT) return true;
+        // An urgent case is an emergency: it must reach a vet whose in-progress visit
+        // is stale (past its scheduled end) — otherwise day-old exams stuck in
+        // IN_PROGRESS would block every urgent assignment forever. A vet still
+        // examining within the booked duration is genuinely busy and is not interrupted.
+        if (schedule.getCareType() == CareType.URGENT) {
+            LocalDateTime startedAt = inProgress.getScheduledAt();
+            if (startedAt == null) return true;
+            int duration = inProgress.getDurationMinutes() > 0
+                    ? inProgress.getDurationMinutes() : DEFAULT_DURATION_MINUTES;
+            return startedAt.plusMinutes(duration).isAfter(LocalDateTime.now());
+        }
         LocalDateTime scheduledAt = inProgress.getScheduledAt();
         if (scheduledAt == null) return slot.toLocalDate().isEqual(LocalDate.now());
         int duration = inProgress.getDurationMinutes() > 0

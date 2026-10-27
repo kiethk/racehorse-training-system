@@ -44,7 +44,9 @@ class InjuryRecordServiceTest {
     void setUp() {
         injuryRecordService = new InjuryRecordService(
                 injuryRecordRepository, horseRepository, healthRecordRepository,
-                careScheduleRepository, auditLogRepository, userRepository);
+                careScheduleRepository, auditLogRepository, userRepository,
+                org.mockito.Mockito.mock(com.rtms.backend.incident.repository.HorseIncidentReportRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.admission.repository.AdmissionApplicationRepository.class));
 
         horse = new Horse();
         horse.setId(10L);

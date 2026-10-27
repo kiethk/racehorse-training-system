@@ -55,11 +55,11 @@ public class ClinicalVectorSyncListener {
             String diagnosis = event.diagnosis() != null ? event.diagnosis() : "";
 
             // 2. Đóng gói nội dung ngữ nghĩa để RAG vector hóa
-            String title = String.format("Bệnh án chiến mã %s (Record #%d)",
+            String title = String.format("Clinical record for horse %s (Record #%d)",
                     event.registrationNumber() != null ? event.registrationNumber() : event.horseId(),
                     event.healthRecordId());
 
-            String content = String.format("Chiến mã UELN: %s (ID: %d). Triệu chứng lâm sàng: %s. Chẩn đoán y khoa: %s.",
+            String content = String.format("Horse UELN: %s (ID: %d). Clinical symptoms: %s. Medical diagnosis: %s.",
                     event.registrationNumber(), event.horseId(), expandedSymptoms, diagnosis);
 
             // 3. Sinh vector embedding 1536 chiều

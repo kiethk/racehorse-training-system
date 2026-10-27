@@ -658,7 +658,9 @@ export function VetReviewForm({
 
     const nextScheduleRequest = followUpActive && followUpDate ? {
       horseId: horseId ?? undefined,
-      admissionId,
+      // Horses without an admission have admissionId 0; omit it so the backend
+      // compares null with null instead of rejecting with 409 ADMISSION_MISMATCH.
+      admissionId: admissionId || undefined,
       careType: 'ROUTINE' as const,
       scheduledDate: followUpDate,
       description: followUpDescription.trim() || 'Follow-up veterinary examination',
@@ -732,7 +734,7 @@ export function VetReviewForm({
 
   return (
     <>
-      <form onSubmit={handleFormSubmit} className="pb-24 md:pb-0">
+      <form onSubmit={handleFormSubmit} noValidate className="pb-24 md:pb-0">
         {/* Gate Warning when SCHEDULED */}
         {scheduleStatus === 'SCHEDULED' && (
           <div

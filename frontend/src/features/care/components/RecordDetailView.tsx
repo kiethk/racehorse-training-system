@@ -251,9 +251,21 @@ export function RecordDetailView({
   const recordIdShown = activeRecordId ?? detail?.healthRecord?.id ?? fullRecord?.id ?? null;
   const trainingDecision = detail?.healthRecord?.trainingDecision ?? fullRecord?.trainingDecision ?? null;
   const restrictionDetails = detail?.healthRecord?.restrictionDetails ?? fullRecord?.restrictionDetails ?? null;
+  // Injuries and vitals are fetched per horse; scope them to the record being
+  // viewed so an old record never shows a newer examination's data.
+  const recordInjuries = recordIdShown != null
+    ? injuries.filter((i) => i.healthRecordId === recordIdShown)
+    : injuries;
+  const recordMetrics = recordIdShown != null
+    ? metrics.filter((m) => m.healthRecordId === recordIdShown)
+    : metrics;
+  // Metric lists come newest-first, but sort explicitly so display never depends on API ordering.
+  const latestMetric = recordMetrics.length > 0
+    ? [...recordMetrics].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0]
+    : null;
   // Only injuries actually captured on the 3D model have coordinates; the rest
   // stay in the tag list without a marker instead of being dropped at origin.
-  const markerData: InjuryMarkerData[] = injuries
+  const markerData: InjuryMarkerData[] = recordInjuries
     .filter((i) => i.positionX != null)
     .map((i) => {
       const worldPos = resolveInjuryWorldPosition(i);
@@ -283,8 +295,6 @@ export function RecordDetailView({
         description: i.description ?? undefined,
       };
     });
-
-  const latestMetric = metrics.length > 0 ? metrics[metrics.length - 1] : null;
 
   return (
     <div className="space-y-4">
@@ -526,13 +536,13 @@ export function RecordDetailView({
               )}
             </div>
 
-            {injuries.length === 0 ? (
+            {recordInjuries.length === 0 ? (
               <p className="text-xs text-[var(--color-text-muted)] py-2 text-center">
-                No injury records for this horse.
+                No injuries recorded in this examination.
               </p>
             ) : (
               <div className="space-y-1.5">
-                {injuries.map((inj) => {
+                {recordInjuries.map((inj) => {
                   const isOpen = expandedMarkerId === String(inj.id);
                   const hasMarker = inj.positionX != null;
                   const zoneLabel = (inj.zoneId && zoneById(inj.zoneId)?.label) || 'Unmapped zone';

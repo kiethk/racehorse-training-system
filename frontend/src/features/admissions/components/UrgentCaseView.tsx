@@ -75,10 +75,13 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [treatment, setTreatment] = useState('');
   const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>('BLOCKED');
   const [restrictionDetails, setRestrictionDetails] = useState('');
-  // Blocking training requires a follow-up exam — "rest until" is that exam's date.
-  const [followUpDate, setFollowUpDate] = useState(() => businessDate(3));
-  const [followUpDescription, setFollowUpDescription] = useState('Follow-up after the urgent examination');
-  const [followUpKey, setFollowUpKey] = useState(newIdempotencyKey);
+  // Blocking training requires follow-up rechecks; a vet can book several on
+  // consecutive days so colleagues rotate the visits.
+  const [followUps, setFollowUps] = useState<Array<{ key: string; date: string; description: string }>>(() => [{
+    key: newIdempotencyKey(),
+    date: businessDate(3),
+    description: 'Follow-up after the urgent examination',
+  }]);
   const [notes, setNotes] = useState('');
   const [temperature, setTemperature] = useState('');
   const [heartRate, setHeartRate] = useState('');
@@ -154,9 +157,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     setTreatment('');
     setTrainingDecision('BLOCKED');
     setRestrictionDetails('');
-    setFollowUpDate(businessDate(3));
-    setFollowUpDescription('Follow-up after the urgent examination');
-    setFollowUpKey(newIdempotencyKey());
+    setFollowUps([{ key: newIdempotencyKey(), date: businessDate(3), description: 'Follow-up after the urgent examination' }]);
     setNotes('');
     setTemperature('');
     setHeartRate('');
@@ -276,21 +277,29 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
         findings: z.string().min(1, 'Examination findings are required.'),
         diagnosis: z.string().min(1, 'A clinical diagnosis is required.'),
         restrictionDetails: z.string().optional(),
-        followUpDate: z.string().optional(),
-        followUpDescription: z.string().optional(),
+        followUps: z.array(z.object({
+          key: z.string(),
+          date: z.string(),
+          description: z.string(),
+        })),
       })
       .superRefine((data, ctx) => {
         if (trainingDecision === 'BLOCKED') {
           if (!data.restrictionDetails?.trim()) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['restrictionDetails'], message: 'Restriction details are required when training is blocked.' });
           }
-          if (!data.followUpDate) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUpDate'], message: 'Select a follow-up date when training is blocked.' });
-          } else if (data.followUpDate < businessDate(1)) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUpDate'], message: 'The follow-up date must be tomorrow or later.' });
+          if (data.followUps.length === 0) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUps'], message: 'Schedule at least one follow-up examination when training is blocked.' });
           }
-          if (!data.followUpDescription?.trim()) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUpDescription'], message: 'A follow-up description is required.' });
+          for (const row of data.followUps) {
+            if (!row.date) {
+              ctx.addIssue({ code: z.ZodIssueCode.custom, path: [`followUpDate:${row.key}`], message: 'Select a follow-up date when training is blocked.' });
+            } else if (row.date < businessDate(1)) {
+              ctx.addIssue({ code: z.ZodIssueCode.custom, path: [`followUpDate:${row.key}`], message: 'The follow-up date must be tomorrow or later.' });
+            }
+            if (!row.description.trim()) {
+              ctx.addIssue({ code: z.ZodIssueCode.custom, path: [`followUpDescription:${row.key}`], message: 'A follow-up description is required.' });
+            }
           }
         }
       });
@@ -300,8 +309,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       findings: findings.trim(),
       diagnosis: diagnosis.trim(),
       restrictionDetails: restrictionDetails.trim(),
-      followUpDate,
-      followUpDescription: followUpDescription.trim(),
+      followUps,
     });
 
     if (parsed.success) {
@@ -365,15 +373,15 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
               meshName: 'Horse.001_M_Body_0',
             }))
           : undefined,
-      nextSchedule:
+      nextSchedules:
         trainingDecision === 'BLOCKED'
-          ? {
+          ? followUps.map((row) => ({
               horseId: urgentCase.horseId,
-              careType: 'ROUTINE',
-              scheduledDate: followUpDate,
-              description: followUpDescription.trim(),
-              idempotencyKey: followUpKey,
-            }
+              careType: 'ROUTINE' as const,
+              scheduledDate: row.date,
+              description: row.description.trim(),
+              idempotencyKey: row.key,
+            }))
           : undefined,
     };
 
@@ -748,7 +756,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   </div>
                 </div>
               ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} noValidate className="space-y-6">
                 {/* 1. Clinical Vitals (Integrated Labels, No Bottom Helper Text, No Out-of-Range Warnings) */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
@@ -961,12 +969,9 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                             onChange={() => {
                               setTrainingDecision(option.value);
                               if (option.value === 'ALLOWED') {
-                                setFieldErrors((prev) => ({
-                                  ...prev,
-                                  restrictionDetails: '',
-                                  followUpDate: '',
-                                  followUpDescription: '',
-                                }));
+                                setFieldErrors((prev) => Object.fromEntries(
+                                  Object.entries(prev).filter(([field]) => !field.startsWith('followUp')),
+                                ));
                               }
                             }}
                           />
@@ -1001,57 +1006,108 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                         )}
                       </div>
 
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <FormField label="Follow-up examination date" htmlFor="follow-up-date" required>
-                            <Input
-                              id="follow-up-date"
-                              type="date"
-                              min={businessDate(1)}
-                              value={followUpDate}
-                              onChange={(e) => {
-                                setFollowUpDate(e.target.value);
-                                if (fieldErrors.followUpDate) setFieldErrors((prev) => ({ ...prev, followUpDate: '' }));
-                              }}
-                            />
-                          </FormField>
-                          <div className="mt-1.5 flex gap-1.5">
-                            {[3, 7, 14].map((days) => (
-                              <Button
-                                type="button"
-                                key={days}
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => setFollowUpDate(businessDate(days))}
-                                className="transition-all active:scale-[0.97]"
-                              >
-                                +{days} days
-                              </Button>
-                            ))}
-                          </div>
-                          {fieldErrors.followUpDate && (
-                            <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUpDate}</p>
-                          )}
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-[var(--color-text-secondary)]">
+                            Follow-up recheck days
+                            <span className="ml-1 text-[var(--color-danger)]">*</span>
+                          </span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            icon="plus"
+                            onClick={() => setFollowUps((rows) => [
+                              ...rows,
+                              { key: newIdempotencyKey(), date: '', description: 'Follow-up after the urgent examination' },
+                            ])}
+                          >
+                            Add another day
+                          </Button>
                         </div>
+                        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                          Book several days so veterinarians can rotate the rechecks.
+                        </p>
+                        <div className="mt-2 space-y-3">
+                          {followUps.map((row, index) => (
+                            <div key={row.key} className="rounded-[var(--radius-sm)] border border-[var(--color-border)] p-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-[var(--color-text-primary)]">
+                                  Recheck #{index + 1}
+                                </span>
+                                {followUps.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="tertiary"
+                                    onClick={() => setFollowUps((rows) => rows.filter((r) => r.key !== row.key))}
+                                  >
+                                    Remove
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                                <div>
+                                  <FormField label="Examination date" htmlFor={`follow-up-date-${row.key}`} required>
+                                    <Input
+                                      id={`follow-up-date-${row.key}`}
+                                      type="date"
+                                      min={businessDate(1)}
+                                      value={row.date}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setFollowUps((rows) => rows.map((r) => (r.key === row.key ? { ...r, date: value } : r)));
+                                        if (fieldErrors[`followUpDate:${row.key}`]) {
+                                          setFieldErrors((prev) => ({ ...prev, [`followUpDate:${row.key}`]: '' }));
+                                        }
+                                      }}
+                                    />
+                                  </FormField>
+                                  <div className="mt-1.5 flex gap-1.5">
+                                    {[3, 7, 14].map((days) => (
+                                      <Button
+                                        type="button"
+                                        key={days}
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={() => setFollowUps((rows) => rows.map((r) => (r.key === row.key ? { ...r, date: businessDate(days) } : r)))}
+                                        className="transition-all active:scale-[0.97]"
+                                      >
+                                        +{days} days
+                                      </Button>
+                                    ))}
+                                  </div>
+                                  {fieldErrors[`followUpDate:${row.key}`] && (
+                                    <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors[`followUpDate:${row.key}`]}</p>
+                                  )}
+                                </div>
 
-                        <div>
-                          <FormField label="Follow-up clinical purpose" htmlFor="follow-up-desc" required>
-                            <Input
-                              id="follow-up-desc"
-                              type="text"
-                              value={followUpDescription}
-                              onChange={(e) => {
-                                setFollowUpDescription(e.target.value);
-                                if (fieldErrors.followUpDescription) {
-                                  setFieldErrors((prev) => ({ ...prev, followUpDescription: '' }));
-                                }
-                              }}
-                            />
-                          </FormField>
-                          {fieldErrors.followUpDescription && (
-                            <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUpDescription}</p>
-                          )}
+                                <div>
+                                  <FormField label="Clinical purpose" htmlFor={`follow-up-desc-${row.key}`} required>
+                                    <Input
+                                      id={`follow-up-desc-${row.key}`}
+                                      type="text"
+                                      value={row.description}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setFollowUps((rows) => rows.map((r) => (r.key === row.key ? { ...r, description: value } : r)));
+                                        if (fieldErrors[`followUpDescription:${row.key}`]) {
+                                          setFieldErrors((prev) => ({ ...prev, [`followUpDescription:${row.key}`]: '' }));
+                                        }
+                                      }}
+                                    />
+                                  </FormField>
+                                  {fieldErrors[`followUpDescription:${row.key}`] && (
+                                    <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors[`followUpDescription:${row.key}`]}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
+                        {fieldErrors.followUps && (
+                          <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUps}</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1121,6 +1177,16 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       <dd className="mt-1 text-[var(--color-text-secondary)] leading-relaxed">
                         {completedData.treatment}
                       </dd>
+                    </div>
+                  )}
+                  {(completedData.nextSchedules?.length || 0) > 0 && (
+                    <div className="sm:col-span-2">
+                      <dt className="font-semibold text-[var(--color-text-muted)]">Scheduled Follow-ups</dt>
+                      {completedData.nextSchedules?.map((row) => (
+                        <dd key={row.idempotencyKey} className="mt-1 text-[var(--color-text-primary)] font-semibold">
+                          {row.scheduledDate} — {row.description}
+                        </dd>
+                      ))}
                     </div>
                   )}
                   {completedData.nextSchedule && (

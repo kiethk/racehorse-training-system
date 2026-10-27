@@ -302,6 +302,8 @@ export interface CompleteCareScheduleRequest {
   notes?: string;
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
+  /** Multiple follow-up rechecks (rotating vets on consecutive days). */
+  nextSchedules?: CreateNextScheduleRequest[];
   vaccinations?: VaccinationRequest[];
   /** 7–10 days; only on a preventive visit without vaccinations. */
   deferVaccinationDays?: number;

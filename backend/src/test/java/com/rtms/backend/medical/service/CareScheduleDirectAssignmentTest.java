@@ -147,17 +147,81 @@ class CareScheduleDirectAssignmentTest {
     }
 
     @Test
-    void excludesVetWhoHasAnInProgressCareSchedule() {
-        CareSchedule requested = urgentRequest(99L);
+    void urgentCaseRespectsVetWithCurrentInProgressExam() {
+        CareSchedule requested = urgentSchedule(99L, 700L);
+        stubIncident(700L);
         User occupied = eligibleVet(1L);
         User free = eligibleVet(2L);
         when(users.findActiveVeterinarians()).thenReturn(List.of(occupied, free));
-        when(schedules.existsByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenReturn(true);
         lockEligible(occupied, free);
+        // Vet 1 is mid-examination right now: the booked duration has not elapsed.
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS))
+                .thenReturn(List.of(inProgressExam(1L, 10L, LocalDateTime.now().minusMinutes(5), 30)));
 
         service.assignRequestedSchedule(requested);
 
-        assertEquals(2L, requested.getVeterinarianId());
+        assertEquals(2L, requested.getVeterinarianId(),
+                "An urgent case must go to a free vet instead of interrupting an active examination");
+    }
+
+    @Test
+    void urgentCaseReachesVetWithStaleInProgressExam() {
+        CareSchedule requested = urgentSchedule(99L, 700L);
+        stubIncident(700L);
+        // Regression: day-old exams stuck in IN_PROGRESS must not block urgent
+        // assignments forever (they used to leave urgent cases unassigned).
+        User stale = eligibleVet(1L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(stale));
+        lockEligible(stale);
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS))
+                .thenReturn(List.of(inProgressExam(1L, 10L, LocalDateTime.now().minusDays(3), 30)));
+
+        service.assignRequestedSchedule(requested);
+
+        assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
+        assertEquals(1L, requested.getVeterinarianId(),
+                "A stale overdue in-progress exam must not disqualify the vet from an emergency");
+    }
+
+    private CareSchedule urgentSchedule(Long horseId, Long incidentId) {
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setName("Horse " + horseId);
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        when(horses.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(500L);
+        schedule.setHorseId(horseId);
+        schedule.setCareType(CareType.URGENT);
+        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setDurationMinutes(30);
+        schedule.setSourceIncidentId(incidentId);
+        return schedule;
+    }
+
+    private HorseIncidentReport stubIncident(Long incidentId) {
+        HorseIncidentReport incident = new HorseIncidentReport();
+        incident.setId(incidentId);
+        incident.setGroomId(8L);
+        incident.setHorseId(99L);
+        incident.setTitle("Acute lameness");
+        incident.setSeverity(IncidentSeverity.CRITICAL);
+        incident.setStatus(IncidentStatus.REPORTED);
+        incident.setReportedAt(LocalDateTime.now());
+        when(incidents.findByIdForUpdate(incidentId)).thenReturn(Optional.of(incident));
+        return incident;
+    }
+
+    private CareSchedule inProgressExam(Long veterinarianId, Long horseId, LocalDateTime startedAt, int minutes) {
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(veterinarianId * 1000 + horseId);
+        schedule.setVeterinarianId(veterinarianId);
+        schedule.setHorseId(horseId);
+        schedule.setCareType(CareType.ROUTINE);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setDurationMinutes(minutes);
+        schedule.setScheduledAt(startedAt);
+        return schedule;
     }
 
     @Test
