@@ -1,4 +1,4 @@
-import { Icon, ProgressBar } from '@/components/ui';
+import { Icon, ProgressBar, Tooltip } from '@/components/ui';
 import type { HorseSpecialty } from '@/features/horses/types';
 import { formatEnumLabel, formatNumber } from '@/lib/display';
 import { HorseInfoSection } from './HorseInfoSection';
@@ -8,7 +8,21 @@ export function HorseSpecialtySection({ specialty }: { specialty: HorseSpecialty
   const hasWorkouts = specialty?.distanceStats.some((stat) => stat.workoutCount > 0);
 
   return (
-    <HorseInfoSection title="Racing profile" icon="flag">
+    <HorseInfoSection
+      title="Racing profile"
+      icon="flag"
+      aside={(
+        <Tooltip content="Workouts in the last 90 days, recovery sessions excluded">
+          <span
+            tabIndex={0}
+            aria-label="Which workouts are counted"
+            className="inline-flex rounded-full text-[var(--color-text-muted)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+          >
+            <Icon name="info" size={16} />
+          </span>
+        </Tooltip>
+      )}
+    >
       {hasWorkouts && specialty ? (
         <div className="space-y-4">
           {specialty.distanceStats.filter((stat) => stat.workoutCount > 0).map((stat) => (

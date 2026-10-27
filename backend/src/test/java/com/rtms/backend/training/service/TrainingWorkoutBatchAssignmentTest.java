@@ -13,7 +13,8 @@ class TrainingWorkoutBatchAssignmentTest {
     private final TrainingWorkoutRepository repository = mock(TrainingWorkoutRepository.class);
     private final TrainingWorkoutService service = new TrainingWorkoutService(repository,
             mock(HorseTrainingPlanRepository.class), mock(TrainingLotRepository.class),
-            mock(SubjectRepository.class), mock(TrainingLotService.class), mock(WorkoutResultSimulationService.class));
+            mock(SubjectRepository.class), mock(TrainingLotService.class), mock(WorkoutResultSimulationService.class),
+            mock(PlanCompletionService.class));
 
     private TrainingWorkout workout(long horse, long groom, WorkoutStatus status) {
         var w = new TrainingWorkout(); w.setId(horse); w.setHorseId(horse); w.setLotId(1L);

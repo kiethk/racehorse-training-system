@@ -9,6 +9,7 @@ import com.rtms.backend.training.entity.TrainingLot;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.LotStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
+import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
 import com.rtms.backend.training.repository.SubjectRepository;
 import com.rtms.backend.training.repository.TrainingLotRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -26,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,6 +53,9 @@ class TrainingLotViewServiceTest {
     @Mock
     private SubjectRepository subjectRepository;
 
+    @Mock
+    private HorseTrainingPlanRepository planRepository;
+
     private TrainingLotService lotService;
 
     private final LocalDate from = LocalDate.of(2026, 11, 2);
@@ -63,7 +68,8 @@ class TrainingLotViewServiceTest {
 
     @BeforeEach
     void setUp() {
-        lotService = new TrainingLotService(lotRepository, workoutRepository, subjectRepository);
+        lotService = new TrainingLotService(lotRepository, workoutRepository, subjectRepository,
+                new PlanCompletionService(workoutRepository, planRepository));
     }
 
     private TrainingLotRow row(Long lotId, Long trainerId, long occupied) {
@@ -375,6 +381,7 @@ class TrainingLotViewServiceTest {
         TrainingLot lot = lot(10L, 9L, LotStatus.SCHEDULED);
         TrainingWorkout scheduled = new TrainingWorkout();
         scheduled.setStatus(WorkoutStatus.SCHEDULED);
+        scheduled.setPlanId(50L);
         TrainingWorkout completed = new TrainingWorkout();
         completed.setStatus(WorkoutStatus.COMPLETED);
         when(lotRepository.findById(10L)).thenReturn(Optional.of(lot));
@@ -388,6 +395,7 @@ class TrainingLotViewServiceTest {
         assertEquals(WorkoutStatus.COMPLETED, completed.getStatus(), "History is never rewritten");
         assertEquals(LotStatus.CANCELLED, lot.getStatus());
         verify(workoutRepository).saveAll(anyList());
+        verify(planRepository).findAllById(Set.of(50L));
     }
 
     @Test

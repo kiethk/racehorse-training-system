@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class TrainingLotServiceTest {
 
-    private final TrainingLotService lotService = new TrainingLotService(null, null, null);
+    private final TrainingLotService lotService = new TrainingLotService(null, null, null, null);
 
     @Test
     @DisplayName("findFirstFreeSlot: with no lot yet the first slot is 06:00")

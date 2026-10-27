@@ -2,8 +2,6 @@ package com.rtms.backend.training.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.training.dto.CourseDetailResponse;
-import com.rtms.backend.training.dto.CourseSubjectItemRequest;
-import com.rtms.backend.training.dto.CourseSubjectResponse;
 import com.rtms.backend.training.dto.CreateCourseRequest;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -37,6 +35,8 @@ public class CourseController {
     @GetMapping("/{id}")
     public ApiResponse<CourseDetailResponse> getCourseById(
             @PathVariable Long id,
+
+
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(courseService.getCourseById(id, currentUser));
     }
@@ -47,13 +47,5 @@ public class CourseController {
             @Valid @RequestBody CreateCourseRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(courseService.createCourse(request, currentUser));
-    }
-
-    @PreAuthorize("hasAuthority('COURSE_CREATE')")
-    @PostMapping("/{id}/subjects")
-    public ApiResponse<CourseSubjectResponse> addSubjectToCourse(@PathVariable Long id,
-                                                                 @Valid @RequestBody CourseSubjectItemRequest request,
-                                                                 @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(courseService.addSubjectToCourse(id, request, currentUser));
     }
 }

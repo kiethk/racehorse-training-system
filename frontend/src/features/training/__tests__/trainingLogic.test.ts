@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { planProgress } from '../lib/planProgress.ts';
+import { cancelledLabel, planProgress } from '../lib/planProgress.ts';
 import { ratingDistribution, ratingTier, ratingTone } from '../lib/rating.ts';
 import { lotFillTone, PLAN_STATUS } from '../lib/status.ts';
 import { clockOf, hourMarks, lotStartOptions, minutesOf, snapLotStart, stripPosition } from '../lib/timeline.ts';
@@ -8,18 +8,36 @@ import { rangeForPreset, rangeLabel, shiftIsoDate, toIsoDate, tomorrowIso } from
 
 describe('planProgress', () => {
   it('removes cancelled sessions from the denominator so the plan can reach 100%', () => {
-    const progress = planProgress(11, 12, 1);
+    const progress = planProgress(11, 12, 1, 'COMPLETED');
     assert.equal(progress.total, 11);
     assert.equal(progress.percent, 100);
   });
 
   it('never divides by zero for an empty plan or one whose sessions are all cancelled', () => {
-    assert.deepEqual(planProgress(0, 0, 0), { completed: 0, total: 0, cancelled: 0, percent: 0 });
-    assert.equal(planProgress(0, 4, 4).percent, 0);
+    assert.deepEqual(planProgress(0, 0, 0, 'COMPLETED'), { completed: 0, total: 0, cancelled: 0, percent: 0, allCancelled: false });
+    assert.equal(planProgress(0, 4, 4, 'COMPLETED').percent, 0);
+  });
+
+  it('flags a plan whose sessions are all cancelled', () => {
+    assert.equal(planProgress(0, 6, 6, 'COMPLETED').allCancelled, true);
+    assert.equal(planProgress(1, 6, 5, 'COMPLETED').allCancelled, false);
+  });
+
+  it('labels the cancelled count in the singular and plural', () => {
+    assert.equal(cancelledLabel(1), '1 session cancelled');
+    assert.equal(cancelledLabel(3), '3 sessions cancelled');
+  });
+
+  it('keeps cancelled sessions in the count of a cancelled plan', () => {
+    const progress = planProgress(3, 6, 3, 'CANCELLED');
+    assert.equal(progress.total, 6);
+    assert.equal(progress.percent, 50);
+    assert.equal(progress.allCancelled, false);
+    assert.equal(planProgress(0, 6, 6, 'CANCELLED').allCancelled, true);
   });
 
   it('caps the percentage at 100', () => {
-    assert.equal(planProgress(5, 3, 0).percent, 100);
+    assert.equal(planProgress(5, 3, 0, 'COMPLETED').percent, 100);
   });
 });
 

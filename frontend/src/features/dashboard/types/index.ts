@@ -13,6 +13,8 @@ export interface DashboardHorse {
   planStatus: PlanStatus | 'NONE';
   completedSessions: number;
   totalSessions: number;
+  /** Cancelled sessions; left out of the progress. */
+  cancelledSessions: number;
   progressPercent: number;
   latestPerformanceRating: number | null;
   avgPerformanceRating30d: number | null;

@@ -14,6 +14,8 @@ public class DashboardHorseResponse {
     private String planStatus; // "ACTIVE", "UPCOMING", "COMPLETED", "NONE"
     private Integer completedSessions;
     private Integer totalSessions;
+    /** Buổi bị hủy; không tính vào tiến độ. (Cancelled sessions; left out of the progress.) */
+    private Integer cancelledSessions;
     private Double progressPercent;
     private Integer latestPerformanceRating;
     private Double avgPerformanceRating30d;
@@ -96,6 +98,14 @@ public class DashboardHorseResponse {
 
     public void setTotalSessions(Integer totalSessions) {
         this.totalSessions = totalSessions;
+    }
+
+    public Integer getCancelledSessions() {
+        return cancelledSessions;
+    }
+
+    public void setCancelledSessions(Integer cancelledSessions) {
+        this.cancelledSessions = cancelledSessions;
     }
 
     public Double getProgressPercent() {

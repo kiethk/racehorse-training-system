@@ -6,9 +6,6 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.RoleRepository;
 import com.rtms.backend.identity.repository.UserRepository;
-import com.rtms.backend.incident.entity.HorseIncidentReport;
-import com.rtms.backend.incident.enums.IncidentSeverity;
-import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.AreaRepository;
@@ -20,7 +17,6 @@ import com.rtms.backend.training.dto.GroomConflictRow;
 import com.rtms.backend.training.dto.GroomWorkoutRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseStallInfo;
-import com.rtms.backend.training.dto.IncidentCountRow;
 import com.rtms.backend.training.dto.JoinableCohortRow;
 import com.rtms.backend.training.dto.LotHorseNameRow;
 import com.rtms.backend.training.dto.PerformanceSessionRow;
@@ -52,7 +48,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -86,7 +81,6 @@ class TrainingQueriesIntegrationTest {
     @Autowired private HorseTrainingPlanRepository plans;
     @Autowired private TrainingLotRepository lots;
     @Autowired private TrainingWorkoutRepository workouts;
-    @Autowired private HorseIncidentReportRepository incidents;
 
     private final LocalDate today = LocalDate.now();
 
@@ -445,6 +439,32 @@ class TrainingQueriesIntegrationTest {
         assertFalse(workouts.existsActiveWorkoutOfOwnerInLot(todayLot.getId(), groom.getId()));
     }
 
+    @Test
+    void notYetHeldWorkoutsOfAPlanSkipLotsThatHaveEnded() {
+        LocalDate today = todayLot.getLotDate();
+        TrainingWorkout tomorrow = workout(lot(today.plusDays(1), LocalTime.of(6, 0), LocalTime.of(7, 0)),
+                horse1, WorkoutStatus.SCHEDULED);
+        TrainingWorkout missedYesterday = workout(lot(today.minusDays(1), LocalTime.of(8, 0), LocalTime.of(9, 0)),
+                horse1, WorkoutStatus.SCHEDULED);
+
+        // Before today's lot ends (06:00-07:00): today's and tomorrow's sessions are still to come.
+        List<Long> early = workouts.findNotYetHeldByPlan(plan.getId(), today, LocalTime.of(6, 30)).stream()
+                .map(TrainingWorkout::getId).toList();
+        assertTrue(early.containsAll(List.of(workout1.getId(), workout2.getId(), tomorrow.getId())));
+        assertFalse(early.contains(missedYesterday.getId()), "A past session without a result is kept to record");
+        assertFalse(early.contains(done.getId()), "A completed session is never cancelled");
+
+        // After today's lot has ended only tomorrow's session is left.
+        assertEquals(List.of(tomorrow.getId()),
+                workouts.findNotYetHeldByPlan(plan.getId(), today, LocalTime.of(7, 0)).stream()
+                        .map(TrainingWorkout::getId).toList());
+
+        // The same rule per horse (training block, groom change): this morning's ended lot is not touched.
+        assertEquals(List.of(tomorrow.getId()),
+                workouts.findNotYetHeldByHorse(horse1.getId(), today, LocalTime.of(9, 0)).stream()
+                        .map(TrainingWorkout::getId).toList());
+    }
+
     // =================================================================
     // Lots
     // =================================================================
@@ -491,7 +511,7 @@ class TrainingQueriesIntegrationTest {
     }
 
     // =================================================================
-    // Courses and incidents
+    // Courses
     // =================================================================
 
     @Test
@@ -516,21 +536,6 @@ class TrainingQueriesIntegrationTest {
                 .anyMatch(s -> s.getId().equals(subject.getId())));
         assertTrue(subjects.findByCategory(SubjectCategory.RECOVERY).stream()
                 .noneMatch(s -> s.getId().equals(subject.getId())));
-    }
-
-    @Test
-    void incidentCountsAreGroupedPerHorse() {
-        incidents.saveAndFlush(new HorseIncidentReport(groom.getId(), horse1.getId(), "Limping", "Left foreleg",
-                null, IncidentSeverity.HIGH));
-        incidents.saveAndFlush(new HorseIncidentReport(groom.getId(), horse1.getId(), "Limping again", "Left foreleg",
-                null, IncidentSeverity.HIGH));
-
-        List<IncidentCountRow> counts = incidents.countIncidentsByHorseIds(
-                List.of(horse1.getId(), horse2.getId()), LocalDateTime.now().minusDays(14));
-
-        assertEquals(1, counts.size(), "Horse 2 has no incident and does not appear");
-        assertEquals(horse1.getId(), counts.get(0).horseId());
-        assertEquals(2L, counts.get(0).count());
     }
 
     // =================================================================

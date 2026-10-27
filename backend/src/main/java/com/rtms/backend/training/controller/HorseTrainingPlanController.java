@@ -8,9 +8,6 @@ import com.rtms.backend.training.dto.JoinableCohortResponse;
 import com.rtms.backend.training.dto.PlanPreviewRequest;
 import com.rtms.backend.training.dto.PlanPreviewResponse;
 import com.rtms.backend.training.dto.PlanSummaryResponse;
-import com.rtms.backend.training.dto.PerformanceTrendResponse;
-import com.rtms.backend.training.dto.DashboardHorseResponse;
-import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseTrainingPlanService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,34 +27,9 @@ import java.util.List;
 public class HorseTrainingPlanController {
 
     private final HorseTrainingPlanService planService;
-    private final HorsePerformanceService performanceService;
 
-    public HorseTrainingPlanController(HorseTrainingPlanService planService,
-                                       HorsePerformanceService performanceService) {
+    public HorseTrainingPlanController(HorseTrainingPlanService planService) {
         this.planService = planService;
-        this.performanceService = performanceService;
-    }
-
-    /**
-     * Dashboard tổng quan tiến độ và thể lực toàn khu của Trainer (FE-7.1).
-     * (Overview dashboard of progress and fitness for the trainer whole area (FE-7.1).)
-     */
-    @PreAuthorize("hasAuthority('TRAINING_PLAN_VIEW')")
-    @GetMapping("/dashboard")
-    public ApiResponse<List<DashboardHorseResponse>> getDashboard(
-            @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(performanceService.getDashboard(currentUser));
-    }
-
-    /**
-     * Biểu đồ phong độ chung của toàn khu trên dashboard: trung bình theo ngày, 30 ngày gần nhất.
-     * (Area-wide performance chart on the dashboard: daily averages over the last 30 days.)
-     */
-    @PreAuthorize("hasAuthority('TRAINING_PLAN_VIEW')")
-    @GetMapping("/dashboard/performance-trend")
-    public ApiResponse<PerformanceTrendResponse> getPerformanceTrend(
-            @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(performanceService.getPerformanceTrend(currentUser));
     }
 
     /**
@@ -88,6 +60,18 @@ public class HorseTrainingPlanController {
             @Valid @RequestBody CreateHorseTrainingPlanRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(planService.createPlan(request, currentUser));
+    }
+
+    /**
+     * Hủy một kế hoạch đang chạy hoặc sắp chạy. Dùng quyền TRAINING_PLAN_CREATE vì quản lý kế hoạch là việc của Trainer.
+     * (Cancels a running or upcoming plan. Guarded by TRAINING_PLAN_CREATE because managing plans is the trainer's job.)
+     */
+    @PreAuthorize("hasAuthority('TRAINING_PLAN_CREATE')")
+    @PostMapping("/{id}/cancel")
+    public ApiResponse<HorseTrainingPlanDetailResponse> cancelPlan(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(planService.cancelPlan(id, currentUser));
     }
 
     /**

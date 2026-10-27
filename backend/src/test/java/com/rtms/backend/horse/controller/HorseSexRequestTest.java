@@ -43,7 +43,7 @@ class HorseSexRequestTest {
         horses = mock(HorseService.class);
         mvc = standaloneSetup(
                 new OwnerAdmissionController(admissions, mock(AdmissionUelnPolicy.class)),
-                new HorseController(horses, null, null, null, null))
+                new HorseController(horses, null, null, null))
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
                     public boolean supportsParameter(MethodParameter parameter) {
