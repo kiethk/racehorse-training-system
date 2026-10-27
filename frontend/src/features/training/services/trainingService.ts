@@ -78,10 +78,8 @@ export const trainingService = {
     (await apiGet<ApiResponse<HorseTrainingPlanDetailResponse>>(`/api/training-plans/${id}`)).data,
 
   /** Plans with horse name, course name and progress. */
-  getPlans: async (horseId?: number): Promise<PlanSummaryResponse[]> => {
-    const url = horseId ? `/api/training-plans?horseId=${horseId}` : '/api/training-plans';
-    return (await apiGet<ApiResponse<PlanSummaryResponse[]>>(url)).data;
-  },
+  getPlans: async (): Promise<PlanSummaryResponse[]> =>
+    (await apiGet<ApiResponse<PlanSummaryResponse[]>>('/api/training-plans')).data,
 
   // Training lots
   getLots: async (from: string, to: string, includeCancelled = false): Promise<TrainingLotResponse[]> =>

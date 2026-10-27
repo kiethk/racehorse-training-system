@@ -7,11 +7,13 @@
 --   - Đúng total_sessions buổi, xoay vòng bài của khóa, chỉ vào các thứ đã chọn; Groom = Groom của chuồng.
 --   - Lot trong khung 06:00-10:00, bắt đầu :00/:15/:30/:45, không chồng lot khác của Trainer (BR-02, BR-03),
 --     tối đa 6 ngựa (BR-10), mỗi Groom một ngựa trong một lot (BR-09).
---   - Ngựa bị chặn tập: buổi chưa diễn ra bị hủy, lot rỗng bị hủy, plan đang chạy thành CANCELLED.
+--   - Ngựa bị chặn tập: buổi chưa diễn ra bị hủy, lot rỗng bị hủy, plan đang chạy thành CANCELLED. Không seed plan bị
+--     chặn hôm nay vào đúng ngày tập (buổi hôm nay đã diễn ra mà plan đã hủy).
 --   - Buổi đã ghi kết quả có đủ 7 chỉ số; điểm phong độ tính đúng công thức WorkoutPerformanceCalculator.
 -- (Rules kept: plans only for ELIGIBLE, non-blocked horses of the trainer's areas, no overlapping plans; exact session
 -- count, subject rotation, chosen weekdays, stall groom; lots inside the golden window on quarter hours, no overlap,
--- max 6 horses, one horse per groom per lot; blocking cancels what is not held yet; ratings use the app formula.)
+-- max 6 horses, one horse per groom per lot; blocking cancels what is not held yet, but no plan is blocked today on one of
+-- its training days; ratings use the app formula.)
 -- =====================================================================
 
 -- Ngày các buổi tập: từ p_start, lấy ngày có thứ nằm trong p_days, đủ p_total buổi.
@@ -155,6 +157,15 @@ BEGIN
     END IF;
     -- Lần chặn tập đầu tiên sau khi tạo plan. (The first block after the plan was created.)
     SELECT min(from_ts) INTO v_block FROM seed_block WHERE horse_id = v_horse AND from_ts > v_created;
+    -- Seed không có plan bị hủy hôm nay trong khi buổi tập hôm nay đã diễn ra (buổi đó còn chờ ghi kết quả, Trainer chỉ giải
+    -- thích khi được hỏi): ngựa bị chặn hôm nay vào đúng ngày tập của khóa thì không ghi danh khóa đó.
+    -- (The seed has no plan cancelled today while today's session already took place (it would still wait for a result;
+    -- the trainer explains that case only when asked): a horse blocked today on a training day of the course is not
+    -- enrolled in it.)
+    IF v_block::DATE = pg_temp.today() AND pg_temp.today() = ANY (v_dates) THEN
+        RAISE NOTICE 'Skipped plan of % from %: blocked today on a training day', p_horse_k, v_dates[1];
+        RETURN NULL;
+    END IF;
     v_ability := pg_temp.rnd('ability' || p_horse_k, 0.0, 1.0);
 
     INSERT INTO horse_training_plans (horse_id, course_id, trainer_id, start_date, end_date, status, created_at, updated_at,

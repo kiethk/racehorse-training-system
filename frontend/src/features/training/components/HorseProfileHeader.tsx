@@ -46,7 +46,7 @@ export function HorseProfileHeader({
         </div>
       </div>
 
-      <LinkButton href={`/trainer/plans?horseId=${horseId}`} icon="layers">View training plans</LinkButton>
+      <LinkButton href={horse ? `/trainer/plans?search=${encodeURIComponent(horse.name)}` : '/trainer/plans'} icon="layers">View training plans</LinkButton>
     </Panel>
   );
 }
