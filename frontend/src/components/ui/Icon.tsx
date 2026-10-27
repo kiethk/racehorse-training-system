@@ -12,6 +12,7 @@ type IconName =
   | 'grid'
   | 'list'
   | 'x'
+  | 'injury-dot'
   | 'download'
   | 'upload'
   | 'check'
@@ -119,6 +120,7 @@ const paths: Record<IconName, ReactElement> = {
     </>
   ),
   x: <path d="M18 6 6 18M6 6l12 12" />,
+  'injury-dot': <></>,
   download: <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />,
   upload: <path d="M12 15V3m0 0 4 4m-4-4-4 4M5 21h14" />,
   check: <path d="m5 12 5 5L20 7" />,

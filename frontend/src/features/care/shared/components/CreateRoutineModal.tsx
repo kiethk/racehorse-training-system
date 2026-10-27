@@ -9,7 +9,7 @@ import { Notice } from '@/components/ui/Notice';
 import { admissionsApi } from '@/features/admissions/services/api';
 import { ApiError } from '@/services/api';
 import type { Horse } from '@/features/stable/types';
-import { validateCreateRoutineForm, getMinRoutineDate } from '../utils/routineValidation';
+import { validateCreateRoutineForm, getMinRoutineDate } from '@/features/routine/utils/routineValidation';
 
 interface Props {
   open: boolean;

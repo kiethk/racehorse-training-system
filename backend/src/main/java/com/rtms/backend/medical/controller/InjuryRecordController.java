@@ -5,6 +5,7 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.dto.CorrectInjuryRecordRequest;
+import com.rtms.backend.medical.dto.CreateInjuryRecordRequest;
 import com.rtms.backend.medical.dto.HorseHealthSummaryResponse;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
@@ -37,6 +38,30 @@ public class InjuryRecordController {
     @PreAuthorize("hasAnyRole('VETERINARIAN', 'HEAD_TRAINER', 'CLUB_MANAGER', 'GROOM')")
     public ApiResponse<List<InjuryRecord>> getHorseInjuries(@PathVariable Long horseId) {
         return ApiResponse.success(injuryRecordService.getInjuryRecordsByHorse(horseId));
+    }
+
+    @GetMapping("/injury-records/active")
+    @PreAuthorize("hasAnyRole('VETERINARIAN', 'HEAD_TRAINER', 'CLUB_MANAGER', 'GROOM')")
+    public ApiResponse<List<InjuryRecord>> getActiveHorseInjuries(@PathVariable Long horseId) {
+        return ApiResponse.success(injuryRecordService.getActiveInjuryRecordsByHorse(horseId));
+    }
+
+    @PostMapping("/injury-records")
+    @PreAuthorize("hasRole('VETERINARIAN')")
+    public ApiResponse<InjuryRecord> createInjury(
+            @PathVariable Long horseId,
+            @Valid @RequestBody CreateInjuryRecordRequest request) {
+        return ApiResponse.success(injuryRecordService.createInjuryRecord(horseId, request));
+    }
+
+    @PostMapping("/injury-records/{injuryId}/recover")
+    @PreAuthorize("hasRole('VETERINARIAN')")
+    public ApiResponse<InjuryRecord> recoverInjury(
+            @PathVariable Long horseId,
+            @PathVariable Long injuryId) {
+        AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return ApiResponse.success(injuryRecordService.recoverInjuryRecord(horseId, injuryId, currentUser.getUserId()));
     }
 
     /** Lịch sử khám sức khỏe của một ngựa, dùng cho màn Health của bác sĩ thú y. */

@@ -25,6 +25,8 @@ public interface AdmissionApplicationRepository
 
     List<AdmissionApplication> findByOwnerId(Long ownerId);
 
+    List<AdmissionApplication> findByHorseId(Long horseId);
+
     List<AdmissionApplication> findByOwnerIdOrderBySubmittedAtDesc(Long ownerId);
 
     List<AdmissionApplication> findByOwnerIdOrderByCreatedAtDesc(Long ownerId);

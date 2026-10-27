@@ -82,6 +82,24 @@ export interface CompleteCareScheduleRequest {
     description?: string;
     idempotencyKey?: string;
   };
+  injuryMarkers?: Array<{
+    injuryType: string;
+    bodyRegionId: number;
+    severity: string;
+    description?: string;
+    diagnosedAt: string;
+    positionX?: number | null;
+    positionY?: number | null;
+    positionZ?: number | null;
+    zoneId?: string | null;
+    localX?: number | null;
+    localY?: number | null;
+    localZ?: number | null;
+    normalX?: number | null;
+    normalY?: number | null;
+    normalZ?: number | null;
+    meshName?: string | null;
+  }>;
 }
 
 export interface CancelCareScheduleRequest {

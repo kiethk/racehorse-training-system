@@ -23,6 +23,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,7 +45,7 @@ class CareScheduleDateFilterTest {
     void setUp() {
         careScheduleService = new CareScheduleService(
                 careScheduleRepository,
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null
         );
     }
 
@@ -59,9 +60,10 @@ class CareScheduleDateFilterTest {
                 eq(CareType.ROUTINE),
                 eq(1L),
                 eq(2L),
+                eq((Long) null),
                 eq(3L),
-                any(),
-                any(),
+                any(LocalDateTime.class),
+                any(LocalDateTime.class),
                 eq(pageable)
         )).thenReturn(emptyPage);
 
@@ -80,6 +82,7 @@ class CareScheduleDateFilterTest {
                 eq(CareType.ROUTINE),
                 eq(1L),
                 eq(2L),
+                eq((Long) null),
                 eq(3L),
                 dayStartCaptor.capture(),
                 dayEndCaptor.capture(),
@@ -99,13 +102,14 @@ class CareScheduleDateFilterTest {
         Page<CareSchedule> emptyPage = new PageImpl<>(List.of());
 
         when(careScheduleRepository.findFiltered(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
+                isNull(CareScheduleStatus.class),
+                isNull(CareType.class),
+                isNull(Long.class),
+                isNull(Long.class),
+                isNull(Long.class),
+                isNull(Long.class),
+                isNull(LocalDateTime.class),
+                isNull(LocalDateTime.class),
                 eq(pageable)
         )).thenReturn(emptyPage);
 
@@ -119,11 +123,12 @@ class CareScheduleDateFilterTest {
         );
 
         verify(careScheduleRepository).findFiltered(
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
+                isNull(CareScheduleStatus.class),
+                isNull(CareType.class),
+                isNull(Long.class),
+                isNull(Long.class),
+                isNull(Long.class),
+                isNull(Long.class),
                 dayStartCaptor.capture(),
                 dayEndCaptor.capture(),
                 eq(pageable)

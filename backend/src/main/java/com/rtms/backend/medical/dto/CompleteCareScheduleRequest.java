@@ -31,8 +31,17 @@ public class CompleteCareScheduleRequest {
     private String notes;
     private List<@NotNull @Valid HorseHealthMetricRequest> metrics;
 
+    /** Marker chấn thương ghi nhận cùng ca khám; lưu nguyên tử với HealthRecord. */
+    private List<@Valid InjuryMarkerRequest> injuryMarkers;
+
     /** Lịch khám lại — bắt buộc khi BLOCKED: "tạm nghỉ đến" chính là ngày của lịch này. */
     private CreateNextScheduleRequest nextSchedule;
+
+    /**
+     * Nhiều lịch tái khám cùng lúc (Vet luân phiên thăm ngựa vài ngày gần nhau).
+     * nextSchedule đơn vẫn dùng được cho compatibility.
+     */
+    private List<@Valid CreateNextScheduleRequest> nextSchedules;
 
     /** Mũi tiêm phòng / tẩy giun ghi nhận cùng ca khám; lưu nguyên tử với kết quả khám. */
     private List<@NotNull @Valid VaccinationRequest> vaccinations;
@@ -75,8 +84,14 @@ public class CompleteCareScheduleRequest {
     public CreateNextScheduleRequest getNextSchedule() { return nextSchedule; }
     public void setNextSchedule(CreateNextScheduleRequest nextSchedule) { this.nextSchedule = nextSchedule; }
 
+    public List<CreateNextScheduleRequest> getNextSchedules() { return nextSchedules; }
+    public void setNextSchedules(List<CreateNextScheduleRequest> nextSchedules) { this.nextSchedules = nextSchedules; }
+
     public List<HorseHealthMetricRequest> getMetrics() { return metrics; }
     public void setMetrics(List<HorseHealthMetricRequest> metrics) { this.metrics = metrics; }
+
+    public List<InjuryMarkerRequest> getInjuryMarkers() { return injuryMarkers; }
+    public void setInjuryMarkers(List<InjuryMarkerRequest> injuryMarkers) { this.injuryMarkers = injuryMarkers; }
 
     @JsonIgnore
     @AssertTrue(message = "Restriction details are required when training is BLOCKED")
@@ -90,6 +105,7 @@ public class CompleteCareScheduleRequest {
     @JsonIgnore
     @AssertTrue(message = "A follow-up examination (nextSchedule) is required when training is BLOCKED")
     public boolean isFollowUpValid() {
-        return trainingDecision != TrainingDecision.BLOCKED || nextSchedule != null;
+        boolean hasFollowUp = nextSchedule != null || (nextSchedules != null && !nextSchedules.isEmpty());
+        return trainingDecision != TrainingDecision.BLOCKED || hasFollowUp;
     }
 }

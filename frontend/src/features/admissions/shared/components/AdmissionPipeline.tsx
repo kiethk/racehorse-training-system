@@ -29,6 +29,15 @@ export function AdmissionPipeline({ detail }: { detail: PipelineDetail }) {
   const { steps, isRejected, isArrivalExpired, rejectionMessage } =
     mapAdmissionPipeline(detail);
 
+  // Line colour follows the state of the step it enters: green between
+  // completed steps, primary into the active one, border for anything pending.
+  const lineClass = (from: StepState | null, to: StepState | null): string => {
+    if (from !== 'completed' || !to) return 'bg-[var(--color-border)]';
+    if (to === 'completed') return 'bg-[var(--color-success)]';
+    if (to === 'current') return 'bg-[var(--color-primary)]';
+    return 'bg-[var(--color-border)]';
+  };
+
   return (
     <Panel padded className="space-y-4 overflow-hidden">
       <div className="flex items-center justify-between gap-3">
@@ -61,18 +70,7 @@ export function AdmissionPipeline({ detail }: { detail: PipelineDetail }) {
               const isFirst = idx === 0;
               const isLast = idx === steps.length - 1;
               const prevStep = idx > 0 ? steps[idx - 1] : null;
-
-              // Line to the left connects prevStep to current step
-              // A segment is green/completed only if both previous and current steps have completed or current is completed
-              const isLeftLineCompleted =
-                prevStep?.state === 'completed' &&
-                (step.state === 'completed' || step.state === 'current');
-
-              // Line to the right connects current step to next step
               const nextStep = idx < steps.length - 1 ? steps[idx + 1] : null;
-              const isRightLineCompleted =
-                step.state === 'completed' &&
-                (nextStep?.state === 'completed' || nextStep?.state === 'current');
 
               return (
                 <div key={step.id} className="relative flex flex-col items-center text-center">
@@ -82,9 +80,7 @@ export function AdmissionPipeline({ detail }: { detail: PipelineDetail }) {
                       aria-hidden="true"
                       className={cn(
                         'absolute top-6 right-1/2 left-0 h-0.5 -translate-y-1/2',
-                        isLeftLineCompleted
-                          ? 'bg-[var(--color-success)]'
-                          : 'bg-[var(--color-border)]',
+                        lineClass(prevStep?.state ?? null, step.state),
                       )}
                     />
                   )}
@@ -95,9 +91,7 @@ export function AdmissionPipeline({ detail }: { detail: PipelineDetail }) {
                       aria-hidden="true"
                       className={cn(
                         'absolute top-6 left-1/2 right-0 h-0.5 -translate-y-1/2',
-                        isRightLineCompleted
-                          ? 'bg-[var(--color-success)]'
-                          : 'bg-[var(--color-border)]',
+                        lineClass(step.state, nextStep?.state ?? null),
                       )}
                     />
                   )}

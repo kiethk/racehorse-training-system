@@ -16,9 +16,9 @@ describe('AC-11.1: VetDashboardView Start Exam Error Handling', () => {
 
     const mockApi = {
       startCareSchedule: async (_id: number) => {
-        const error = new Error('Bác sĩ thú y đang có một ca khám chưa hoàn tất (409 Conflict)');
-        (error as any).status = 409;
-        (error as any).code = 'VET_BUSY';
+        const error = new Error('Bác sĩ thú y đang có một ca khám chưa hoàn tất (409 Conflict)') as Error & { status: number; code: string };
+        error.status = 409;
+        error.code = 'VET_BUSY';
         throw error;
       },
     };
@@ -28,8 +28,8 @@ describe('AC-11.1: VetDashboardView Start Exam Error Handling', () => {
         if (schedule.status === 'SCHEDULED') {
           await mockApi.startCareSchedule(schedule.id);
         }
-      } catch (err: any) {
-        surfacedError = err.message || 'Bác sĩ đang bận ca khám khác';
+      } catch (err: unknown) {
+        surfacedError = (err instanceof Error ? err.message : 'Bác sĩ đang bận ca khám khác') || 'Bác sĩ đang bận ca khám khác';
         return; // HALT NAVIGATION
       }
 
@@ -67,7 +67,7 @@ describe('AC-11.1: VetDashboardView Start Exam Error Handling', () => {
         if (schedule.status === 'SCHEDULED') {
           await mockApi.startCareSchedule(schedule.id);
         }
-      } catch (err: any) {
+      } catch {
         return;
       }
       mockRouter.push(`/veterinarian/admissions?scheduleId=${schedule.id}`);

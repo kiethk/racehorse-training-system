@@ -103,6 +103,9 @@ public class HorseIncidentReportService {
                     .findFirstByHorseIdAndCareTypeAndStatusInOrderByCreatedAtDesc(
                             horse.getId(), CareType.URGENT, activeStatuses)
                     .orElseThrow(() -> new IllegalStateException("Urgent schedule was not created"));
+            // A reported incident suspends training from the moment it is reported — same as
+            // a report landing on an already-open case. The completing exam lifts the block.
+            trainingDecisionService.block(horse, "Urgent veterinary care pending");
         } else {
             // Đã có ca khẩn cấp đang mở: báo cáo mới chỉ gắn vào ca đó, ngựa vẫn bị chặn tập.
             trainingDecisionService.block(horse, "Urgent veterinary care pending");

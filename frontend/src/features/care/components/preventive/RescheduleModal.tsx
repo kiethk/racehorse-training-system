@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { z } from 'zod';
 import { Button, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
 import { displayError, formatDate } from '@/lib/display';
 import { toast } from '@/lib/toast';
@@ -17,6 +18,17 @@ interface RescheduleModalProps {
 }
 
 const FORM_ID = 'reschedule-care-form';
+
+const rescheduleSchema = z
+  .object({
+    newDate: z.string().min(1, 'New date is required.'),
+    reason: z.string().min(1, 'Reason is required.'),
+    note: z.string().optional(),
+  })
+  .refine((data) => data.newDate > todayIso(), {
+    message: 'Pick a date after today.',
+    path: ['newDate'],
+  });
 
 export function RescheduleModal(props: RescheduleModalProps) {
   if (!props.schedule) return null;
@@ -35,10 +47,30 @@ function RescheduleForm({
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (newDate <= todayIso()) return setError('Pick a date after today.');
+    const parsed = rescheduleSchema.safeParse({
+      newDate,
+      reason,
+      note: note.trim() || undefined,
+    });
+
+    if (!parsed.success) {
+      const errors: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0];
+        if (typeof field === 'string') {
+          errors[field] = issue.message;
+        }
+      }
+      setFieldErrors(errors);
+      setError(null);
+      return;
+    }
+
+    setFieldErrors({});
     setError(null);
     setSubmitting(true);
     try {
@@ -79,18 +111,24 @@ function RescheduleForm({
             The assigned vet and time slot are released. A vet is assigned again automatically for the new date.
           </Notice>
         )}
-        <FormField label="New date" required>
-          <Input type="date" value={newDate} min={addDaysIso(todayIso(), 1)} onChange={(e) => setNewDate(e.target.value)} />
+        <FormField label="New date" required error={fieldErrors.newDate}>
+          <Input
+            type="date"
+            value={newDate}
+            min={addDaysIso(todayIso(), 1)}
+            onChange={(e) => setNewDate(e.target.value)}
+            disabled={submitting}
+          />
         </FormField>
-        <FormField label="Reason" required>
-          <Select value={reason} onChange={(e) => setReason(e.target.value as RescheduleReason)}>
+        <FormField label="Reason" required error={fieldErrors.reason}>
+          <Select value={reason} onChange={(e) => setReason(e.target.value as RescheduleReason)} disabled={submitting}>
             {RESCHEDULE_REASONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </Select>
         </FormField>
         <FormField label="Note">
-          <Textarea rows={2} value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} />
+          <Textarea rows={2} value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} disabled={submitting} />
         </FormField>
       </form>
     </Modal>

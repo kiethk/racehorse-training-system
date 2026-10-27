@@ -106,7 +106,8 @@ class AssignmentEnforcementTest {
                 entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class)
+                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class)
         );
     }
 

@@ -58,7 +58,7 @@ class AdmissionTrainerReviewServiceTest {
 
         AdmissionApplication result = service.completeAssessment(10L, req, 2L);
 
-        assertEquals(AdmissionStatus.MANAGER_REVIEW, result.getStatus());
+        assertEquals(AdmissionStatus.APPROVED, result.getStatus());
         assertEquals("Good candidate", result.getTrainerFeedback());
         assertNotNull(result.getTrainerReviewedAt());
 

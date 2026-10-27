@@ -72,7 +72,9 @@ class MedicalServicesIntegrityTest {
                 horseRepository,
                 healthRecordRepository,
                 careScheduleRepository,
-                auditLogRepository, org.mockito.Mockito.mock(com.rtms.backend.identity.repository.UserRepository.class)
+                auditLogRepository, org.mockito.Mockito.mock(com.rtms.backend.identity.repository.UserRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.incident.repository.HorseIncidentReportRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.admission.repository.AdmissionApplicationRepository.class)
         );
 
         healthRecordService = new HealthRecordService(

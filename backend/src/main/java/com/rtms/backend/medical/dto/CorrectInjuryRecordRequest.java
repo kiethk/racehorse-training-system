@@ -8,5 +8,17 @@ public record CorrectInjuryRecordRequest(
         String injuryType,
         String severity,
         String description,
-        String status
-) {}
+        String status,
+        MarkerPlacementRequest marker
+) {
+    /** Existing callers (and tests) without a marker keep their old shape. */
+    public CorrectInjuryRecordRequest(
+            String correctionReason,
+            String injuryType,
+            String severity,
+            String description,
+            String status
+    ) {
+        this(correctionReason, injuryType, severity, description, status, null);
+    }
+}
