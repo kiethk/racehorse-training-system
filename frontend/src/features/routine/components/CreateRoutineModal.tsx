@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { FormField } from '@/components/ui/FormField';
@@ -28,16 +28,19 @@ export function CreateRoutineModal({ open, horses, onClose, onSuccess }: Props) 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (open) {
-      setHorseId(0);
-      setCareType('ROUTINE_EXAM');
-      setScheduledDate(getMinRoutineDate());
-      setDescription('');
-      setErrors({});
-      setSubmitError(null);
-    }
-  }, [open]);
+  const resetForm = () => {
+    setHorseId(0);
+    setCareType('ROUTINE_EXAM');
+    setScheduledDate(getMinRoutineDate());
+    setDescription('');
+    setErrors({});
+    setSubmitError(null);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +64,7 @@ export function CreateRoutineModal({ open, horses, onClose, onSuccess }: Props) 
         scheduledDate,
         description: description.trim(),
       });
+      resetForm();
       onSuccess();
       onClose();
     } catch (err: unknown) {
@@ -96,7 +100,7 @@ export function CreateRoutineModal({ open, horses, onClose, onSuccess }: Props) 
 
   const footer = (
     <div className="flex items-center justify-end gap-2">
-      <Button variant="secondary" size="sm" onClick={onClose} disabled={submitting}>
+      <Button variant="secondary" size="sm" onClick={handleClose} disabled={submitting}>
         Cancel
       </Button>
       <Button type="submit" form="create-routine-form" variant="primary" size="sm" loading={submitting} icon="check">
@@ -108,7 +112,7 @@ export function CreateRoutineModal({ open, horses, onClose, onSuccess }: Props) 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       title="Schedule Preventive Care"
       description="Create a routine exam, vaccination, or deworming"
       size="md"

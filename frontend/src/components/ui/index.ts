@@ -48,3 +48,4 @@ export { CapacityBar, type CapacityBarProps } from './CapacityBar';
 export { DonutChart, type DonutChartProps, type DonutSegment } from './DonutChart';
 export { SmoothLineChart, type SmoothLineChartProps, type DataPoint } from './SmoothLineChart';
 
+export { PdfViewer } from './PdfViewer';

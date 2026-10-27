@@ -16,14 +16,14 @@ public record CreateOwnerAdmissionRequest(
         @Size(max = 255) String breed,
         @PastOrPresent LocalDate dateOfBirth,
         @NotNull(message = "Sex is required (MALE or FEMALE)") HorseSex sex,
-        @Pattern(regexp = "^\\s*$|^([0-9]{6}[a-zA-Z0-9]{9}|[a-zA-Z]{3}[a-zA-Z0-9]{12})$", message = "UELN must be 15 alphanumeric characters (e.g. 704001SC0000001 or VNM22SC00000001)")
+        @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "UELN must be 15 alphanumeric characters (e.g. 704001000000001 or VNM001000000001)")
         String registrationNumber,
         @Size(max = 255) String registryName,
         @Size(max = 255) String sireName,
-        @Pattern(regexp = "^\\s*$|^([0-9]{6}[a-zA-Z0-9]{9}|[a-zA-Z]{3}[a-zA-Z0-9]{12})$", message = "Sire UELN must be 15 alphanumeric characters (e.g. 704001RT0000001 or VNM18RT00000001)")
+        @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "Sire UELN must be 15 alphanumeric characters (e.g. 704001000000001 or VNM001000000001)")
         String sireRegistrationNumber,
         @Size(max = 255) String damName,
-        @Pattern(regexp = "^\\s*$|^([0-9]{6}[a-zA-Z0-9]{9}|[a-zA-Z]{3}[a-zA-Z0-9]{12})$", message = "Dam UELN must be 15 alphanumeric characters (e.g. 704001GB0000001 or VNM19GB00000001)")
+        @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "Dam UELN must be 15 alphanumeric characters (e.g. 704001000000001 or VNM001000000001)")
         String damRegistrationNumber,
         @Size(max = 2000) String pedigreeNotes) {
 

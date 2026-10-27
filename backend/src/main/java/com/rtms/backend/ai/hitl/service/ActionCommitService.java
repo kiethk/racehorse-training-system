@@ -7,6 +7,7 @@ import com.rtms.backend.ai.dto.ActionCommitResponseDto;
 import com.rtms.backend.ai.hitl.enums.ActionStatus;
 import com.rtms.backend.ai.hitl.model.PendingAgentAction;
 import com.rtms.backend.ai.hitl.repository.PendingAgentActionRepository;
+import com.rtms.backend.ai.tool.DynamicToolRegistryService;
 import com.rtms.backend.audit.entity.AuditLog;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.config.ApiException;
@@ -171,13 +172,7 @@ public class ActionCommitService {
     }
 
     private String normalizeRole(String role) {
-        String r = role.trim().toUpperCase();
-        return switch (r) {
-            case "VET" -> "VETERINARIAN";
-            case "STABLE_STAFF" -> "GROOM";
-            case "RACING_MANAGER" -> "CLUB_MANAGER";
-            default -> r;
-        };
+        return DynamicToolRegistryService.normalizeRole(role);
     }
 
     /**

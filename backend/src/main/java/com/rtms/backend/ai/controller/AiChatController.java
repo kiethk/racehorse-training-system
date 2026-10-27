@@ -6,7 +6,7 @@ import com.rtms.backend.ai.conversation.dto.UpdateConversationTitleRequestDto;
 import com.rtms.backend.ai.conversation.service.AiConversationService;
 import com.rtms.backend.ai.dto.AiChatRequestDto;
 import com.rtms.backend.ai.dto.AiChatResponseDto;
-import com.rtms.backend.ai.service.GroqAgentOrchestratorService;
+import com.rtms.backend.ai.service.AgentOrchestratorService;
 import com.rtms.backend.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -30,12 +30,12 @@ import java.util.Map;
 @RequestMapping("/api/v1/ai")
 public class AiChatController {
 
-    private final GroqAgentOrchestratorService agentOrchestratorService;
+    private final AgentOrchestratorService agentOrchestratorService;
     private final AiConversationService conversationService;
     private final AsyncTaskExecutor taskExecutor;
 
     public AiChatController(
-            GroqAgentOrchestratorService agentOrchestratorService,
+            AgentOrchestratorService agentOrchestratorService,
             AiConversationService conversationService,
             @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor) {
         this.agentOrchestratorService = agentOrchestratorService;

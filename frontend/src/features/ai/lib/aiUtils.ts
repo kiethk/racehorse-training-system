@@ -2,43 +2,24 @@
  * Tiện ích hỗ trợ AI Assistant & Quick Prompts
  */
 
-/** @deprecated HITL proposal expiration utility */
-export function isProposalExpired(secondsLeft: number): boolean {
-  return secondsLeft <= 0;
-}
-
-/** @deprecated HITL diff keys extraction */
-export function extractDiffKeys(
-  current: Record<string, unknown> = {},
-  proposed: Record<string, unknown> = {}
-): string[] {
-  const allKeys = new Set([...Object.keys(current), ...Object.keys(proposed)]);
-  return Array.from(allKeys).filter((key) => current[key] !== proposed[key]);
-}
-
-/** @deprecated HITL idempotency key generator */
-export function generateIdempotencyKey(actionId: number): string {
-  const ts = Date.now();
-  const rand = Math.random().toString(36).substring(2, 7);
-  return `commit-${actionId}-${ts}-${rand}`;
-}
-
 export function getQuickPromptsByRole(role?: string): string[] {
   const norm = role?.toUpperCase();
   if (norm === 'HEAD_TRAINER' || norm === 'TRAINER') {
     return [
       'Lịch tập các ca hôm nay',
-      'Tiến độ các khóa đào tạo',
+      'Tiến độ các kế hoạch huấn luyện',
       'Cảnh báo nguy cơ chấn thương & nhịp tim',
       'Phân tích sở trường của ngựa',
+      'Danh sách Groom làm việc cùng',
     ];
   }
   if (norm === 'VETERINARIAN' || norm === 'VET') {
     return [
-      'Tra cứu ca viêm gân tương tự qua RAG',
+      'Tổng quan ngựa đang & chờ khám',
+      'Tra cứu ca bệnh lâm sàng qua RAG',
       'Lịch chăm sóc y tế định kỳ',
+      'Danh sách ngựa cách ly y tế',
       'Báo cáo sự cố chuồng trại 48h qua',
-      'Danh sách ngựa đang cách ly',
     ];
   }
   if (norm === 'GROOM' || norm === 'STABLE_STAFF') {
@@ -46,10 +27,10 @@ export function getQuickPromptsByRole(role?: string): string[] {
       'Checklist công việc hôm nay (3 nguồn)',
       'Chuồng và ngựa tôi phụ trách',
       'Cảnh báo ăn uống & vận động của ngựa',
-      'Kiểm tra vật tư chuồng',
+      'Tra cứu vị trí chuồng & người phụ trách',
     ];
   }
-  if (norm === 'CLUB_MANAGER' || norm === 'RACING_MANAGER') {
+  if (norm === 'CLUB_MANAGER' || norm === 'RACING_MANAGER' || norm === 'ADMIN') {
     return [
       'Danh sách nhân sự & bác sĩ',
       'Vẽ biểu đồ công suất chuồng trại',
