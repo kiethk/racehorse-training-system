@@ -234,9 +234,9 @@ export async function apiDelete<T>(path: string): Promise<T> {
 }
 
 /** Multipart upload uses the same Bearer API client as JSON requests. */
-export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
+export async function apiUpload<T>(path: string, body: FormData, method: "POST" | "PUT" = "POST"): Promise<T> {
   const res = await doFetch(path, {
-    method: "POST",
+    method,
     credentials: "include",
     body,
   });

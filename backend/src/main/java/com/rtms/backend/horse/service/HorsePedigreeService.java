@@ -5,6 +5,7 @@ import com.rtms.backend.horse.dto.HorsePedigreeResponse;
 import com.rtms.backend.horse.dto.HorseSummaryResponse;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.entity.HorsePedigree;
+import com.rtms.backend.horse.enums.HorseSex;
 import com.rtms.backend.horse.repository.HorsePedigreeRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.horse.util.UelnUtils;
@@ -142,6 +143,7 @@ public class HorsePedigreeService {
         // 5. Cross-validate pedigree UELNs
         UelnUtils.validatePedigreeUelns(childUeln, sireUeln, damUeln);
         birthDates.validate(horse.getDateOfBirth(), sire, dam);
+        validateParentSexes(sire, dam);
 
         // 6. Save updates
         HorsePedigree pedigree = horsePedigreeRepository.findByHorseId(horseId).orElseGet(HorsePedigree::new);
@@ -161,6 +163,30 @@ public class HorsePedigreeService {
         HorsePedigree saved = horsePedigreeRepository.save(pedigree);
 
         return toResponse(saved, horse, sire, dam);
+    }
+
+    /**
+     * A sire must be male and a dam female. Only parents registered here with a known sex
+     * can be checked; an external UELN or an unknown sex is accepted as before.
+     */
+    public void validateParentSexes(Horse sire, Horse dam) {
+        if (sire != null && sire.getSex() == HorseSex.FEMALE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The sire must be a male horse");
+        }
+        if (dam != null && dam.getSex() == HorseSex.MALE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The dam must be a female horse");
+        }
+    }
+
+    /** {@link #validateParentSexes(Horse, Horse)} for parents given by (already normalized) UELN. */
+    public void validateParentSexesByUeln(String sireUeln, String damUeln) {
+        validateParentSexes(findByUeln(sireUeln), findByUeln(damUeln));
+    }
+
+    private Horse findByUeln(String ueln) {
+        if (ueln == null) return null;
+        List<Horse> matches = horseRepository.findByRegistrationNumber(ueln);
+        return matches.isEmpty() ? null : matches.get(0);
     }
 
     private HorsePedigreeResponse toResponse(HorsePedigree pedigree, Horse horse, Horse sire, Horse dam) {

@@ -11,9 +11,9 @@ import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayou
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionInfoSection, AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { EditAdmissionModal } from './EditAdmissionModal';
 import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
-import { AdmissionDocumentUploads } from './AdmissionDocumentUploads';
 
 const reviewFeedback = [
   { label: 'Groom', field: 'groomFeedback', stage: 0 },
@@ -40,6 +40,7 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
   const [detail, setDetail] = useState<OwnerAdmissionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -63,7 +64,6 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
 
   const candidate = detail.candidate;
   const photo = detail.documents.find(document => document.documentType === 'HORSE_PHOTO');
-  const locked = detail.status !== 'GROOM_REVIEW';
   const activeStage = currentReviewStage(detail.status);
   const feedback = reviewFeedback.flatMap(({ label, field }) => {
     const value = detail[field]?.trim();
@@ -97,6 +97,16 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
         returnTo="/owner/admissions"
         header={<AdmissionDetailHeader detail={{ ...detail, ownerId: user?.userId, ownerName: user?.fullName }} horsePhotoUrl={photo ? admissionsApi.assetUrl(photo.fileUrl) : undefined} />}
         pipeline={<AdmissionPipeline detail={detail} />}
+        sidebar={detail.status === 'GROOM_REVIEW' ? (
+          <AdmissionSideCard title="Waiting for groom review">
+            <p className="text-[var(--color-text-secondary)]">
+              You can still change the horse details and replace or add documents until a groom reviews this application.
+            </p>
+            <Button type="button" variant="primary" icon="file-text" className="w-full" onClick={() => setEditing(true)}>
+              Edit application
+            </Button>
+          </AdmissionSideCard>
+        ) : undefined}
         content={(
           <AdmissionDetailTabs
             tabs={[
@@ -143,14 +153,14 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
             ]}
           />
         )}
-        sidebar={locked ? undefined : (
-          <AdmissionSideCard title="Additional supporting documents">
-            <p className="text-[var(--color-text-secondary)]">You can add documents while your application is in Groom review.</p>
-            <AdmissionDocumentUploads admissionId={admissionId} documents={detail.documents} locked={locked}
-              onUploaded={async () => { setDetail(await ownerAdmissionApi.detail(admissionId)); }} />
-          </AdmissionSideCard>
-        )}
       />
+      {editing && (
+        <EditAdmissionModal
+          detail={detail}
+          onClose={() => setEditing(false)}
+          onSaved={(updated) => { setDetail(updated); setEditing(false); }}
+        />
+      )}
     </div>
   );
 }

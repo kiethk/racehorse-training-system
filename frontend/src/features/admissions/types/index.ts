@@ -429,7 +429,8 @@ export interface GroomQueueResponse {
 
 export interface GroomReviewRequest {
   decision: 'APPROVED' | 'REJECTED';
-  feedback: string;
+  /** Optional when approving; required (non-blank) when rejecting. */
+  feedback?: string;
 }
 
 export interface ManagerReviewRequest {

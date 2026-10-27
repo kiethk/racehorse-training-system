@@ -37,6 +37,7 @@ public class AdmissionGroomReviewController {
     @GetMapping("/groom/queue")
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_GROOM_REVIEW')")
     public ApiResponse<GroomAdmissionQueueResponse> getGroomQueue(
+            @AuthenticationPrincipal AuthenticatedUser currentUser,
             @RequestParam(required = false) String candidateName,
             @RequestParam(required = false) AdmissionStatus status,
             @RequestParam(required = false) LocalDate submittedFrom,
@@ -44,7 +45,7 @@ public class AdmissionGroomReviewController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.success(admissionQueryService.getGroomQueue(
-                candidateName, status, submittedFrom, submittedTo, page, size));
+                currentUser.getUserId(), candidateName, status, submittedFrom, submittedTo, page, size));
     }
 
     @PostMapping("/{id}/groom-review")
@@ -59,16 +60,6 @@ public class AdmissionGroomReviewController {
                 currentUser.getUserId(),
                 request);
 
-        return ApiResponse.success(admissionQueryService.getAdmissionDetail(admission.getId()));
-    }
-
-    @PostMapping("/{id}/quarantine-allocation")
-    @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_GROOM_REVIEW')")
-    public ApiResponse<AdmissionDetailResponse> processWaitingForStall(
-            @PathVariable Long id,
-            @AuthenticationPrincipal AuthenticatedUser currentUser) {
-
-        AdmissionApplication admission = admissionGroomReviewService.processWaitingForStall(id, currentUser.getUserId());
         return ApiResponse.success(admissionQueryService.getAdmissionDetail(admission.getId()));
     }
 

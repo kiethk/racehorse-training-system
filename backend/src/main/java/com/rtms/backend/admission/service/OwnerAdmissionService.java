@@ -31,7 +31,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -61,17 +60,23 @@ public class OwnerAdmissionService {
     private final FileStorageService fileStorage;
     private final AdmissionUelnPolicy uelnPolicy;
     private final PedigreeBirthDateValidator birthDates;
+    private final com.rtms.backend.stable.repository.StableStallRepository stalls;
+    private final com.rtms.backend.notification.service.NotificationService notifications;
 
     public OwnerAdmissionService(AdmissionApplicationRepository admissions,
             CandidateHorseProfileRepository candidates, AdmissionDocumentRepository documents,
             FileStorageService fileStorage, AdmissionUelnPolicy uelnPolicy,
-            PedigreeBirthDateValidator birthDates) {
+            PedigreeBirthDateValidator birthDates,
+            com.rtms.backend.stable.repository.StableStallRepository stalls,
+            com.rtms.backend.notification.service.NotificationService notifications) {
         this.admissions = admissions;
         this.candidates = candidates;
         this.documents = documents;
         this.fileStorage = fileStorage;
         this.uelnPolicy = uelnPolicy;
         this.birthDates = birthDates;
+        this.stalls = stalls;
+        this.notifications = notifications;
     }
 
     /** The transaction creates exactly one new Application and one new immutable snapshot. */
@@ -104,6 +109,7 @@ public class OwnerAdmissionService {
         snapshot.setDamRegistrationNumber(damUeln);
         snapshot.setPedigreeNotes(trimNullable(request.pedigreeNotes()));
         candidates.save(snapshot);
+        notifyQuarantineGrooms(application, snapshot.getName());
 
         return toDetail(application, snapshot, List.of());
     }
@@ -168,17 +174,129 @@ public class OwnerAdmissionService {
 
             savedDocuments.add(documents.save(document));
         }
+        notifyQuarantineGrooms(application, snapshot.getName());
         return toDetail(application, snapshot, savedDocuments);
+    }
+
+    /**
+     * Owner edits the application while it is still waiting for a groom: the candidate details are
+     * overwritten and each uploaded file replaces the documents of its type. Once a groom has started
+     * or finished the review the snapshot is frozen (the V48 trigger enforces the same rule in the DB).
+     * The admission row lock serialises this with a concurrent groom review.
+     */
+    @Transactional
+    public OwnerAdmissionDetailResponse updateBeforeGroomReview(Long ownerId, Long admissionId,
+            CreateOwnerAdmissionRequest request,
+            List<AdmissionDocumentType> documentTypes,
+            List<MultipartFile> files) {
+        AdmissionApplication application = admissions.findByIdForUpdate(admissionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
+        assertOwner(ownerId, application);
+        if (application.getStatus() != AdmissionStatus.GROOM_REVIEW
+                || application.getGroomId() != null
+                || application.getGroomDecision() != null
+                || application.getGroomReviewedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "This application can no longer be edited because a groom has already reviewed it");
+        }
+
+        requireSex(request);
+        List<AdmissionDocumentType> types = documentTypes == null ? List.of() : documentTypes;
+        List<MultipartFile> uploads = files == null ? List.of() : files;
+        if (types.stream().anyMatch(java.util.Objects::isNull) || new java.util.HashSet<>(types).size() != types.size()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Upload at most one file per document type");
+        }
+        List<AdmissionDocumentMetadataRequest> metadata = types.stream()
+                .map(type -> new AdmissionDocumentMetadataRequest(type, null, null))
+                .toList();
+        if (metadata.size() != uploads.size()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each uploaded file needs exactly one document type");
+        }
+        validateFiles(metadata, uploads);
+
+        CandidateHorseProfile snapshot = findCandidate(admissionId);
+        String childUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.registrationNumber(), "Registration number (UELN)");
+        String sireUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.sireRegistrationNumber(), "Sire UELN");
+        String damUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.damRegistrationNumber(), "Dam UELN");
+        com.rtms.backend.horse.util.UelnUtils.validatePedigreeUelns(childUeln, sireUeln, damUeln);
+        birthDates.validateByUeln(request.dateOfBirth(), sireUeln, damUeln);
+        // This admission already holds its own UELN; only a new UELN must be free.
+        if (!java.util.Objects.equals(childUeln, snapshot.getRegistrationNumber())) {
+            uelnPolicy.assertAvailableForSubmission(childUeln);
+        }
+
+        snapshot.setName(request.name().trim());
+        snapshot.setBreed(trimNullable(request.breed()));
+        snapshot.setSex(request.sex());
+        snapshot.setDateOfBirth(request.dateOfBirth());
+        snapshot.setRegistrationNumber(childUeln);
+        snapshot.setRegistryName(trimNullable(request.registryName()));
+        snapshot.setSireName(trimNullable(request.sireName()));
+        snapshot.setSireRegistrationNumber(sireUeln);
+        snapshot.setDamName(trimNullable(request.damName()));
+        snapshot.setDamRegistrationNumber(damUeln);
+        snapshot.setPedigreeNotes(trimNullable(request.pedigreeNotes()));
+        candidates.save(snapshot);
+
+        List<String> storedKeys = registerFileCleanup();
+        List<String> replacedKeys = new ArrayList<>();
+        List<AdmissionDocument> existing = documents.findByAdmissionId(admissionId);
+        for (int i = 0; i < uploads.size(); i++) {
+            MultipartFile file = uploads.get(i);
+            AdmissionDocumentType type = types.get(i);
+            List<AdmissionDocument> previous = existing.stream()
+                    .filter(doc -> doc.getDocumentType() == type)
+                    .toList();
+            previous.forEach(doc -> replacedKeys.add(doc.getFileUrl()));
+            documents.deleteAll(previous);
+
+            String key = fileStorage.store(file, admissionFolder(admissionId));
+            storedKeys.add(key);
+            AdmissionDocument document = new AdmissionDocument();
+            document.setAdmissionId(admissionId);
+            document.setDocumentType(type);
+            document.setFileUrl(key);
+            document.setOriginalFileName(safeOriginalFileName(file.getOriginalFilename()));
+            documents.save(document);
+        }
+        deleteAfterCommit(replacedKeys);
+
+        return toDetail(application, snapshot, documents.findByAdmissionId(admissionId));
+    }
+
+    /** Replaced files are removed only once the edit is committed, never before. */
+    private void deleteAfterCommit(List<String> keys) {
+        if (keys.isEmpty()) return;
+        List<String> toDelete = List.copyOf(keys);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                toDelete.forEach(fileStorage::delete);
+            }
+        });
+    }
+
+    /**
+     * Scenario A: every quarantine groom may pick up a new admission, so all of them hear about it.
+     * Written in the submit transaction, so a rolled-back submission leaves no notification behind.
+     */
+    private void notifyQuarantineGrooms(AdmissionApplication application, String horseName) {
+        String type = com.rtms.backend.notification.service.NotificationTypes.ADMISSION_NEW_FOR_GROOM;
+        String refType = com.rtms.backend.notification.service.NotificationTypes.REFERENCE_ADMISSION;
+        for (Long groomId : stalls.findQuarantineGroomIds()) {
+            notifications.createNotification(groomId, "New admission to review",
+                    horseName + " was submitted for admission and is waiting for groom review.",
+                    type, refType, application.getId(),
+                    com.rtms.backend.notification.entity.Notification.buildDeduplicationKey(
+                            groomId, refType, application.getId(), type));
+        }
     }
 
     @Transactional(readOnly = true)
     public List<AdmissionSummaryResponse> getMyAdmissions(Long ownerId, AdmissionStatus status) {
         return admissions.findByOwnerIdOrderBySubmittedAtDesc(ownerId).stream()
                 .filter(admission -> status == null || admission.getStatus() == status)
-                .sorted(Comparator.comparing(
-                        AdmissionApplication::getSubmittedAt,
-                        Comparator.nullsLast(Comparator.naturalOrder())
-                ).reversed().thenComparing(Comparator.comparing(AdmissionApplication::getId).reversed()))
+                .sorted(AdmissionQueryService.OLDEST_FIRST)
                 .map(admission -> {
                     CandidateHorseProfile candidate = findCandidate(admission.getId());
                     String imageUrl = documents.findByAdmissionId(admission.getId()).stream()
@@ -203,60 +321,6 @@ public class OwnerAdmissionService {
     public List<AdmissionDocumentResponse> getMyDocuments(Long ownerId, Long admissionId) {
         ownedAdmission(ownerId, admissionId);
         return documents.findByAdmissionId(admissionId).stream().map(this::toDocumentResponse).toList();
-    }
-
-    @Transactional
-    public AdmissionDocumentResponse upload(Long ownerId, Long admissionId,
-            AdmissionDocumentType type, LocalDate recordDate, String note, MultipartFile file) {
-        AdmissionApplication application = admissions.findByIdForUpdate(admissionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
-        assertOwner(ownerId, application);
-        // Documents can be re-uploaded or added until Groom completes review.
-        if (application.getStatus() != AdmissionStatus.GROOM_REVIEW
-                || application.getGroomDecision() != null
-                || application.getGroomReviewedAt() != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Admission documents are locked after Groom completes review");
-        }
-        if (note != null && note.length() > 2000) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Document note is too long");
-        }
-        String key = fileStorage.store(file, admissionFolder(admissionId));
-        try {
-            List<AdmissionDocument> existingDocs = documents.findByAdmissionIdAndDocumentType(admissionId, type);
-            AdmissionDocument document;
-            if (!existingDocs.isEmpty()) {
-                document = existingDocs.get(0);
-                String oldFileUrl = document.getFileUrl();
-                if (oldFileUrl != null && !oldFileUrl.equals(key)) {
-                    try {
-                        fileStorage.delete(oldFileUrl);
-                    } catch (Exception ex) {
-                        log.warn("Failed to delete superseded document file {}: {}", oldFileUrl, ex.getMessage());
-                    }
-                }
-                for (int i = 1; i < existingDocs.size(); i++) {
-                    AdmissionDocument dup = existingDocs.get(i);
-                    try {
-                        fileStorage.delete(dup.getFileUrl());
-                    } catch (Exception ignored) {}
-                    documents.delete(dup);
-                }
-            } else {
-                document = new AdmissionDocument();
-                document.setAdmissionId(admissionId);
-                document.setDocumentType(type);
-            }
-            document.setFileUrl(key);
-            document.setOriginalFileName(safeOriginalFileName(file.getOriginalFilename()));
-            document.setRecordDate(recordDate);
-            document.setNote(trimNullable(note));
-            document.setUploadedAt(LocalDateTime.now());
-            return toDocumentResponse(documents.save(document));
-        } catch (RuntimeException ex) {
-            fileStorage.delete(key);
-            throw ex;
-        }
     }
 
     @Transactional(readOnly = true)
@@ -285,8 +349,8 @@ public class OwnerAdmissionService {
             case "CLUB_MANAGER" -> true;
             case "HORSE_OWNER" -> java.util.Objects.equals(admission.getOwnerId(), viewer.getUserId());
             case "HEAD_TRAINER" -> java.util.Objects.equals(admission.getTrainerId(), viewer.getUserId());
-            case "GROOM" -> java.util.Objects.equals(admission.getGroomId(), viewer.getUserId())
-                    || admission.getStatus() == AdmissionStatus.GROOM_REVIEW;
+            case "GROOM" -> admissions.isVisibleToGroom(admissionId, viewer.getUserId(),
+                    stalls.isQuarantineGroom(viewer.getUserId()), AdmissionStatus.GROOM_REVIEW);
             default -> false;
         };
         if (!allowed) throw new org.springframework.security.access.AccessDeniedException("Admission is not assigned to you");

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { Button } from '@/components/ui';
+import { Button, IconButton } from '@/components/ui';
 import type { Horse } from '../../../types';
 import { assignColorSlots, type AreaLayout } from '../../lib/stallLayout';
 import { initials, type SceneColors } from './sceneResources';
@@ -26,8 +26,12 @@ export function groomBadgesFor(
   }));
 }
 
-/** Key in the corner of the barn: who the grooms are, their block and how many horses they have. Click to focus. */
-export function GroomKey({ layout, badges, horseByStallId, currentUserId, focusedId, onFocus, onHover }: {
+/**
+ * Key in the corner of the barn: who the grooms are, their block and how many horses they have. Click to focus.
+ * It folds into a small chip so it never hides stalls (folded by default in the top view), and offers a way back
+ * from a focused groom.
+ */
+export function GroomKey({ layout, badges, horseByStallId, currentUserId, focusedId, onFocus, onHover, onClearFocus, collapsed, onToggleCollapsed }: {
   layout: AreaLayout;
   badges: ReadonlyMap<number, GroomBadge>;
   horseByStallId: ReadonlyMap<number, Horse>;
@@ -35,11 +39,35 @@ export function GroomKey({ layout, badges, horseByStallId, currentUserId, focuse
   focusedId: number | null;
   onFocus: (groomId: number) => void;
   onHover: (groomId: number | null) => void;
+  onClearFocus: () => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }) {
   if (badges.size === 0) return null;
+  const focusedName = focusedId != null ? badges.get(focusedId)?.name : null;
+  const showEveryone = focusedId != null && (
+    <Button variant="secondary" size="sm" icon="x" onClick={onClearFocus}>Show everyone</Button>
+  );
+
+  if (collapsed) {
+    return (
+      <div data-scene-overlay className="absolute bottom-3 left-3 z-10 flex items-center gap-2">
+        <Button variant="secondary" size="sm" icon="users" onClick={onToggleCollapsed} aria-expanded={false}
+          className="shadow-[var(--shadow-popover)]">
+          Grooms ({badges.size}){focusedName ? ` · ${focusedName}` : ''}
+        </Button>
+        {showEveryone}
+      </div>
+    );
+  }
+
   return (
     <div data-scene-overlay className="absolute bottom-3 left-3 z-10 w-72 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-popover)]">
-      <p className="px-1 pb-1 text-xs font-semibold text-[var(--color-text-secondary)]">Grooms · click to highlight their horses</p>
+      <div className="flex items-center justify-between gap-2 px-1 pb-1">
+        <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Grooms · click to highlight their horses</p>
+        <IconButton icon="minimize" label="Fold the groom key" size="sm" variant="tertiary" onClick={onToggleCollapsed} />
+      </div>
+      {focusedId != null && <div className="px-1 pb-1">{showEveryone}</div>}
       <ul className="space-y-0.5">
         {[...badges].map(([id, badge]) => {
           const blocks = layout.blocks.filter((block) => block.groomId === id).map((block) => block.blockNumber);

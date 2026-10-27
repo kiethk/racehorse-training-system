@@ -29,7 +29,7 @@ export function FormField({
   label: string;
   htmlFor?: string;
   required?: boolean;
-  hint?: string;
+  hint?: ReactNode;
   error?: string;
   children: ReactNode;
   className?: string;
@@ -49,7 +49,7 @@ export function FormField({
           {required && <span className="sr-only"> (required)</span>}
         </label>
         {children}
-        {hint && <p id={descriptionId} className="text-xs text-[var(--color-text-muted)]">{hint}</p>}
+        {hint && <div id={descriptionId} className="text-xs text-[var(--color-text-muted)]">{hint}</div>}
         {error && <p id={errorId} role="alert" className="text-xs text-[var(--color-danger)]">{error}</p>}
       </div>
     </FieldContext.Provider>

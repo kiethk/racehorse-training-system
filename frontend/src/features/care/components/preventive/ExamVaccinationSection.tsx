@@ -14,23 +14,12 @@ import {
 } from '@/components/ui';
 import { displayError, formatDate } from '@/lib/display';
 import { preventiveCareService } from '../../services/preventiveCareService';
-import type {
-  HorsePreventiveStatus,
-  PreventiveProtocol,
-  VaccinationRequest,
-  VaccinationSource,
-} from '../../types/preventive';
+import type { HorsePreventiveStatus, PreventiveProtocol } from '../../types/preventive';
 import { DueStatusPill, FEVER_THRESHOLD_C, isDueForCombinedVisit, todayIso } from './preventiveDisplay';
+import { lastDoseDraft, lastDoseKey, type VaccinationDraft } from './vaccinationDrafts';
 
-/** One dose being entered in the exam form. `key` only keeps React rows stable. */
-export interface VaccinationDraft {
-  key: string;
-  protocolId: number;
-  dosage: string;
-  route: string;
-  source: VaccinationSource;
-  administeredOn: string;
-}
+// The draft logic lives in a plain .ts file (testable without JSX); re-exported for existing imports.
+export { toVaccinationRequests, validateVaccinationDrafts, type VaccinationDraft } from './vaccinationDrafts';
 
 export const DEFER_DAY_OPTIONS = [7, 8, 9, 10] as const;
 
@@ -47,30 +36,6 @@ interface ExamVaccinationSectionProps {
   deferDays: number | null;
   onDeferChange: (days: number | null) => void;
   errors?: Record<string, string>;
-}
-
-/** Errors keyed by the draft key; empty when the doses can be submitted. */
-export function validateVaccinationDrafts(drafts: VaccinationDraft[]): Record<string, string> {
-  const errors: Record<string, string> = {};
-  const today = todayIso();
-  for (const draft of drafts) {
-    if (draft.source === 'HISTORICAL') {
-      if (!draft.administeredOn || draft.administeredOn > today) errors[draft.key] = 'Pick a date on or before today.';
-    } else if (!draft.dosage.trim()) {
-      errors[draft.key] = 'Dosage is required.';
-    }
-  }
-  return errors;
-}
-
-export function toVaccinationRequests(drafts: VaccinationDraft[]): VaccinationRequest[] {
-  return drafts.map((draft) => ({
-    protocolId: draft.protocolId,
-    dosage: draft.dosage.trim() || undefined,
-    route: draft.route.trim() || undefined,
-    source: draft.source,
-    administeredOn: draft.source === 'HISTORICAL' ? draft.administeredOn : undefined,
-  }));
 }
 
 /**
@@ -147,14 +112,14 @@ export function ExamVaccinationSection({
   const remove = (key: string) => onChange(value.filter((draft) => draft.key !== key));
   const protocolName = (id: number) => protocols.find((p) => p.id === id)?.name ?? `Protocol #${id}`;
 
-  // Admission: at most one "last dose" draft per protocol; clearing the date removes it.
-  const lastDoseKey = (protocolId: number) => `last-dose-${protocolId}`;
-  const lastDoseOf = (protocolId: number) => value.find((d) => d.key === lastDoseKey(protocolId))?.administeredOn ?? '';
-  const setLastDose = (protocolId: number, date: string) => {
-    const others = value.filter((d) => d.key !== lastDoseKey(protocolId));
-    onChange(date
-      ? [...others, { key: lastDoseKey(protocolId), protocolId, dosage: '', route: '', source: 'HISTORICAL', administeredOn: date }]
-      : others);
+  // Admission: at most one "last dose" draft per protocol; clearing the date removes it. A dose dated today may
+  // optionally be marked as given here at the club, which records it with dosage and route (ADMINISTERED).
+  const lastDoseOf = (protocolId: number) => value.find((d) => d.key === lastDoseKey(protocolId));
+  const writeLastDose = (protocol: PreventiveProtocol, date: string, atClub: boolean) => {
+    const existing = lastDoseOf(protocol.id);
+    const next = lastDoseDraft(protocol, date, today, atClub, existing);
+    const others = value.filter((d) => d.key !== lastDoseKey(protocol.id));
+    onChange(next ? [...others, next] : others);
   };
 
   return (
@@ -177,20 +142,49 @@ export function ExamVaccinationSection({
             Enter the date of the last vaccination or deworming from the horse&apos;s passport. Leave it empty when there is no record.
           </p>
           <ul className="divide-y divide-[var(--color-border)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
-            {protocols.map((protocol) => (
-              <li key={protocol.id} className="flex flex-wrap items-end justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <span className="text-sm font-medium text-[var(--color-text-primary)]">{protocol.name}</span>
-                  <span className="block text-xs text-[var(--color-text-muted)]">
-                    {protocol.mandatory ? 'Mandatory' : 'Recommended'} · repeat every {protocol.intervalDays} days
-                  </span>
-                </div>
-                <FormField label="Last dose" className="w-44" error={errors[lastDoseKey(protocol.id)]}>
-                  <Input type="date" value={lastDoseOf(protocol.id)} max={today}
-                    onChange={(e) => setLastDose(protocol.id, e.target.value)} />
-                </FormField>
-              </li>
-            ))}
+            {protocols.map((protocol) => {
+              const draft = lastDoseOf(protocol.id);
+              const atClub = draft?.source === 'ADMINISTERED';
+              const error = errors[lastDoseKey(protocol.id)];
+              return (
+                <li key={protocol.id} className="space-y-3 p-3">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+                        {protocol.name}
+                        {atClub && <Pill tone="primary" size="sm">Given at the club</Pill>}
+                      </span>
+                      <span className="block text-xs text-[var(--color-text-muted)]">
+                        {protocol.mandatory ? 'Mandatory' : 'Recommended'} · repeat every {protocol.intervalDays} days
+                      </span>
+                    </div>
+                    <FormField label="Last dose" className="w-44" error={atClub ? undefined : error}>
+                      <Input type="date" value={draft?.administeredOn ?? ''} max={today}
+                        onChange={(e) => writeLastDose(protocol, e.target.value, atClub)} />
+                    </FormField>
+                  </div>
+                  {draft?.administeredOn === today && (
+                    <Checkbox
+                      label="Given at the club today"
+                      checked={atClub}
+                      onChange={(e) => writeLastDose(protocol, today, e.target.checked)}
+                    />
+                  )}
+                  {atClub && draft && (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <FormField label="Dosage" required error={error}>
+                        <Input value={draft.dosage} maxLength={255}
+                          onChange={(e) => update(draft.key, { dosage: e.target.value })} />
+                      </FormField>
+                      <FormField label="Route">
+                        <Input value={draft.route} maxLength={100}
+                          onChange={(e) => update(draft.key, { route: e.target.value })} />
+                      </FormField>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : (

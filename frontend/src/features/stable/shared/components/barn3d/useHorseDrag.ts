@@ -20,7 +20,7 @@ export interface DragState {
 const DRAG_THRESHOLD_PX = 4;
 const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-function slotAt(layout: AreaLayout, [x, z]: [number, number]) {
+export function slotAt(layout: AreaLayout, [x, z]: [number, number]) {
   return layout.slots.find((slot) => {
     const [sx, sz] = stallPosition(slot.column, slot.row, layout.columns);
     return Math.abs(x - sx) <= STALL_WIDTH / 2 && Math.abs(z - sz) <= STALL_DEPTH / 2;

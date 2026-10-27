@@ -15,15 +15,20 @@ export function StaffAssignmentPicker({ data, draft, target, onClose, onAssign }
       let reason = '';
       try { planAssignment(data, draft, target, person.id); } catch (error) { reason = (error as Error).message; }
       const locations = staffLocations(data, draft, target.kind, person.id);
-      if (reason && target.kind === 'trainer' && locations.length) {
-        return locations.filter(source => source.areaId !== target.areaId).map(source => {
+      const plain = { person, locations, reason, drag: { kind: target.kind, personId: person.id } as DragStaff, swapLabel: '' };
+      if (target.kind === 'trainer') {
+        // A trainer who runs another area can always swap with this area's trainer, not only when adding fails.
+        const swaps = locations.filter(source => source.areaId !== target.areaId).map(source => {
           const drag: DragStaff = { kind: 'trainer', personId: person.id, source };
           let swapReason = '';
           try { planAssignment(data, draft, target, person.id, drag); } catch (error) { swapReason = (error as Error).message; }
           return { person, locations, reason: swapReason, drag, swapLabel: `Swap from ${targetLabel(data, source)}` };
         });
+        // Already this area's trainer: nothing to swap or add.
+        if (locations.some(source => source.areaId === target.areaId)) return [plain];
+        return reason && swaps.length ? swaps : [...(reason ? [] : [plain]), ...swaps];
       }
-      return [{ person, locations, reason, drag: { kind: target.kind, personId: person.id } as DragStaff, swapLabel: '' }];
+      return [plain];
     }).sort((a, b) => Number(!!a.reason) - Number(!!b.reason) || a.locations.length - b.locations.length || a.person.fullName.localeCompare(b.person.fullName));
   return (
     <Modal open title={target.kind === 'trainer' ? 'Assign Trainer' : 'Assign Groom'} description={targetLabel(data, target)} onClose={onClose}>
