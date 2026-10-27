@@ -35,6 +35,7 @@ public class AdmissionManagerReviewService {
     private final AdmissionGroomReviewService admissionGroomReviewService;
     private final PreventiveStatusService preventiveStatusService;
     private final GroomProfileRepository groomProfileRepository;
+    private final AdmissionNotificationService admissionNotificationService;
 
     public AdmissionManagerReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
@@ -43,7 +44,8 @@ public class AdmissionManagerReviewService {
             CareScheduleRepository careScheduleRepository,
             AdmissionGroomReviewService admissionGroomReviewService,
             PreventiveStatusService preventiveStatusService,
-            GroomProfileRepository groomProfileRepository) {
+            GroomProfileRepository groomProfileRepository,
+            AdmissionNotificationService admissionNotificationService) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.stableStallRepository = stableStallRepository;
         this.horseRepository = horseRepository;
@@ -51,6 +53,7 @@ public class AdmissionManagerReviewService {
         this.admissionGroomReviewService = admissionGroomReviewService;
         this.preventiveStatusService = preventiveStatusService;
         this.groomProfileRepository = groomProfileRepository;
+        this.admissionNotificationService = admissionNotificationService;
     }
 
     @Transactional
@@ -157,6 +160,7 @@ public class AdmissionManagerReviewService {
 
         admissionGroomReviewService.notifyGroomAssigned(admission, regularStall,
                 horse.getName() + " was approved and moved to stall " + regularStall.getStallCode() + ", which you look after.");
+        admissionNotificationService.notifyOwnerApproved(admission, horse, regularStall);
         admissionGroomReviewService.allocateWaitingAdmissions();
         return admission;
     }
@@ -216,6 +220,8 @@ public class AdmissionManagerReviewService {
         admission.setStatus(AdmissionStatus.REJECTED);
 
         admission = admissionApplicationRepository.save(admission);
+        admissionNotificationService.notifyOwnerRejected(
+                admission, horse.getName(), "Club Manager Final Review", feedback);
         admissionGroomReviewService.allocateWaitingAdmissions();
         return admission;
     }

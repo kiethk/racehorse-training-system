@@ -193,4 +193,31 @@ public interface StableStallRepository extends JpaRepository<StableStall, Long> 
             ORDER BY a.code ASC, ss.stall_number ASC
             """, nativeQuery = true)
     List<StableStall> findByAreaIdInOrdered(@Param("areaIds") List<Long> areaIds);
+
+    interface AreaStallCountProjection {
+        Long getAreaId();
+        StallStatus getStatus();
+        Long getCount();
+    }
+
+    @Query("""
+            SELECT ss.areaId AS areaId, ss.status AS status, COUNT(ss.id) AS count
+            FROM StableStall ss
+            WHERE ss.deletedAt IS NULL
+            GROUP BY ss.areaId, ss.status
+            """)
+    List<AreaStallCountProjection> countStallsByAreaAndStatus();
+
+    interface OverallStallCountProjection {
+        StallStatus getStatus();
+        Long getCount();
+    }
+
+    @Query("""
+            SELECT ss.status AS status, COUNT(ss.id) AS count
+            FROM StableStall ss
+            WHERE ss.deletedAt IS NULL
+            GROUP BY ss.status
+            """)
+    List<OverallStallCountProjection> countOverallStallsByStatus();
 }
