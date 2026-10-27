@@ -411,7 +411,7 @@ CREATE FUNCTION pg_temp.complete_care(
     p_next_at TIMESTAMP DEFAULT NULL, p_next_desc TEXT DEFAULT 'Routine follow-up recheck examination',
     p_vaccines TEXT[] DEFAULT NULL, p_history_codes TEXT[] DEFAULT NULL, p_history_dates DATE[] DEFAULT NULL,
     p_temp NUMERIC DEFAULT NULL, p_hr NUMERIC DEFAULT NULL, p_rr NUMERIC DEFAULT NULL, p_weight NUMERIC DEFAULT NULL,
-    p_bcs NUMERIC DEFAULT NULL, p_hydration TEXT DEFAULT 'Normal (CRT < 2s, pink)', p_metric_notes TEXT DEFAULT NULL,
+    p_bcs NUMERIC DEFAULT NULL, p_hydration TEXT DEFAULT 'NORMAL', p_metric_notes TEXT DEFAULT NULL,
     p_defer_days INT DEFAULT NULL)
 RETURNS BIGINT AS $$
 DECLARE
