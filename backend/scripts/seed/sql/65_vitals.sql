@@ -28,8 +28,8 @@ SELECT r.horse_id, r.at,
        round(pg_temp.rnd('w' || r.horse_id, 410, 480) + pg_temp.rnd('wd' || r.horse_id || r.at, -4, 4), 1),
        CASE r.kind WHEN 'sick' THEN pg_temp.rndi('rs' || r.horse_id || r.at, 16, 24)
                    ELSE pg_temp.rndi('rn' || r.horse_id || r.at, 10, 16) END,
-       CASE WHEN r.kind = 'sick' AND pg_temp.rndi('dh' || r.horse_id || r.at, 1, 3) = 1 THEN 'Mild dehydration'
-            ELSE 'Normal (CRT < 2s, pink)' END,
+       CASE WHEN r.kind = 'sick' AND pg_temp.rndi('dh' || r.horse_id || r.at, 1, 3) = 1 THEN 'MILD_DEHYDRATION'
+            ELSE 'NORMAL' END,
        pg_temp.rndi('b' || r.horse_id, 9, 13) / 2.0,
        CASE r.kind WHEN 'sick' THEN 'Daily check during the rest period.'
                    WHEN 'fatigue' THEN 'Rechecked after a tiring session: heart rate still up in the afternoon.'

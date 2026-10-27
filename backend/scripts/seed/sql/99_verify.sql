@@ -129,6 +129,9 @@ INSERT INTO seed_check VALUES
         OR i.care_schedule_id IS NULL $q$),
 ('Cancelled schedule without a reason',
  $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' AND (cancel_reason IS NULL OR btrim(cancel_reason) = '') $q$),
+('Health metric hydration status outside the HydrationStatus enum',
+ $q$ SELECT id FROM horse_health_metrics
+     WHERE hydration_status NOT IN ('NORMAL', 'MILD_DEHYDRATION', 'MODERATE_DEHYDRATION', 'SEVERE_DEHYDRATION', 'ABNORMAL_CRT') $q$),
 ('Admitted or candidate horse without a pending vaccination milestone',
  $q$ SELECT h.id FROM horses h WHERE h.current_status = 'ELIGIBLE'
        AND NOT EXISTS (SELECT 1 FROM care_schedule c WHERE c.horse_id = h.id AND c.purpose = 'PREVENTIVE'
