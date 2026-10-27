@@ -14,6 +14,7 @@ import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -58,7 +59,7 @@ class ClinicalRetrievalServiceTest {
                 "CLINICAL_RECORD",
                 "Ngựa có dấu hiệu viêm gân và khập khiễng nhẹ...",
                 0.88,
-                java.util.Map.of("horseId", 12L)
+                Map.of("horseId", 12L)
         );
 
         when(jdbcTemplate.query(anyString(), any(PreparedStatementSetter.class), any(RowMapper.class)))

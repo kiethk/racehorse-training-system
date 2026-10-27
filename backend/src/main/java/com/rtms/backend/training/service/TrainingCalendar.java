@@ -6,6 +6,8 @@ import com.rtms.backend.training.enums.TrainingDay;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 
 /**
  * Phép tính lịch của một khóa: buổi đầu rơi vào ngày nào, buổi cuối rơi vào ngày nào, và ngày sớm nhất một khóa
@@ -33,7 +35,7 @@ public final class TrainingCalendar {
      * (empty, or only null) the loop never ends.)
      */
     public static Set<TrainingDay> requireWeekdays(Set<TrainingDay> trainingDays) {
-        Set<TrainingDay> days = new java.util.LinkedHashSet<>();
+        Set<TrainingDay> days = new LinkedHashSet<>();
         if (trainingDays != null) {
             days.addAll(trainingDays);
         }
@@ -71,7 +73,7 @@ public final class TrainingCalendar {
      * (The date of every session, in order, from the start date. totalSessions is bounded by TrainingLimits.)
      */
     public static List<LocalDate> sessionDates(LocalDate startDate, Set<TrainingDay> trainingDays, int totalSessions) {
-        List<LocalDate> dates = new java.util.ArrayList<>();
+        List<LocalDate> dates = new ArrayList<>();
         LocalDate cursor = startDate;
         while (dates.size() < totalSessions) {
             if (isTrainingDay(cursor, trainingDays)) {

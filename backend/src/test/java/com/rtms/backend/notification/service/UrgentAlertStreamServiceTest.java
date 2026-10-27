@@ -14,6 +14,7 @@ import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,8 +44,8 @@ class UrgentAlertStreamServiceTest {
         field.setAccessible(true);
         Map<Long, CopyOnWriteArrayList<SseEmitter>> emitters =
                 (Map<Long, CopyOnWriteArrayList<SseEmitter>>) field.get(service);
-        emitters.put(2L, new CopyOnWriteArrayList<>(java.util.List.of(assignedVetEmitter)));
-        emitters.put(3L, new CopyOnWriteArrayList<>(java.util.List.of(otherVetEmitter)));
+        emitters.put(2L, new CopyOnWriteArrayList<>(List.of(assignedVetEmitter)));
+        emitters.put(3L, new CopyOnWriteArrayList<>(List.of(otherVetEmitter)));
 
         LocalDateTime now = LocalDateTime.now();
         UrgentAssignmentAlert alert = new UrgentAssignmentAlert(

@@ -344,9 +344,9 @@ public class GroomDailyTaskService {
         List<CareSchedule> schedules = myHorses.isEmpty() ? List.of()
                 : careScheduleRepository.findByHorseIdInAndScheduledAtBetweenAndStatusIn(
                         myHorses.stream().map(Horse::getId).toList(), dayStart, dayEnd,
-                        List.of(com.rtms.backend.medical.enums.CareScheduleStatus.SCHEDULED,
-                                com.rtms.backend.medical.enums.CareScheduleStatus.IN_PROGRESS,
-                                com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED));
+                        List.of(CareScheduleStatus.SCHEDULED,
+                                CareScheduleStatus.IN_PROGRESS,
+                                CareScheduleStatus.COMPLETED));
 
         // =============================================================
         // B2 — GOM ID RỒI NẠP MỘT LẦN

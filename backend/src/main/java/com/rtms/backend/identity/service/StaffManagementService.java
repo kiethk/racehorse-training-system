@@ -39,6 +39,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
+import java.util.Objects;
+import org.hibernate.exception.ConstraintViolationException;
 
 @Service
 public class StaffManagementService {
@@ -249,8 +253,8 @@ public class StaffManagementService {
         if (request.getEmail() != null) request.setEmail(request.getEmail().trim().toLowerCase(Locale.ROOT));
         var errors = validator.validate(request);
         if (!errors.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                errors.stream().sorted(java.util.Comparator.comparing(e -> e.getPropertyPath().toString())).findFirst().orElseThrow().getMessage());
-        if (request.getPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72)
+                errors.stream().sorted(Comparator.comparing(e -> e.getPropertyPath().toString())).findFirst().orElseThrow().getMessage());
+        if (request.getPassword().getBytes(StandardCharsets.UTF_8).length > 72)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at most 72 UTF-8 bytes");
         // Take the same lock as Manager Stable BEFORE reading allocation candidates.
         // Concurrent creations then see the previous committed assignment, not the same free block.
@@ -277,7 +281,7 @@ public class StaffManagementService {
         try { user = userRepository.saveAndFlush(user); }
         catch (DataIntegrityViolationException ex) {
             for (Throwable cause=ex; cause!=null; cause=cause.getCause()) {
-                if (cause instanceof org.hibernate.exception.ConstraintViolationException constraint
+                if (cause instanceof ConstraintViolationException constraint
                         && "users_email_key".equals(constraint.getConstraintName()))
                     throw new ResponseStatusException(HttpStatus.CONFLICT,"Email already in use",ex);
             }
@@ -428,12 +432,12 @@ public class StaffManagementService {
         quarantineAreas.sort((a,b) -> AreaCodeGenerator.compareCodes(a.getCode(),b.getCode()));
         for (Area area : quarantineAreas) {
             var rows = stableStallRepository.findByAreaId(area.getId());
-            long load = rows.stream().map(StableStall::getGroomId).filter(java.util.Objects::nonNull).distinct().count();
+            long load = rows.stream().map(StableStall::getGroomId).filter(Objects::nonNull).distinct().count();
             var free = new ArrayList<List<StableStall>>();
             for (int start : BLOCK_STARTS) {
                 int end = start + 2;
                 var block = rows.stream().filter(s -> s.getStallNumber() >= start && s.getStallNumber() <= end)
-                        .sorted(java.util.Comparator.comparing(StableStall::getStallNumber)).toList();
+                        .sorted(Comparator.comparing(StableStall::getStallNumber)).toList();
                 if (block.size()==3 && block.stream().allMatch(s -> s.getGroomId()==null)) free.add(block);
             }
             for (var block : free) {

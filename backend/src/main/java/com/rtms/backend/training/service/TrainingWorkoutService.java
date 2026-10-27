@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.Objects;
 
 /**
  * Mọi thao tác trên BUỔI TẬP (workout): sinh buổi tập khi lập kế hoạch, Trainer đóng buổi tập,
@@ -507,7 +508,7 @@ public class TrainingWorkoutService {
         List<TrainingWorkout> changed = new ArrayList<>();
         for (TrainingWorkout workout : future) {
             Long target = groomByHorse.get(workout.getHorseId());
-            if (java.util.Objects.equals(target, workout.getAssignedToId())) continue;
+            if (Objects.equals(target, workout.getAssignedToId())) continue;
             if (target != null) {
                 for (TrainingWorkout peer : byLot.getOrDefault(workout.getLotId(), List.of())) {
                     if (peer.getHorseId().equals(workout.getHorseId())) continue;

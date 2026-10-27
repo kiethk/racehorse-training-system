@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import jakarta.persistence.Query;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -48,7 +49,7 @@ class AreaServiceTest {
     void setUp() {
         areaService = new AreaService(areaRepository, stableStallRepository, entityManager, lifecycle);
         lenient().when(lifecycle.restoreFirst(any())).thenReturn(null);
-        jakarta.persistence.Query lock = mock(jakarta.persistence.Query.class);
+        Query lock = mock(Query.class);
         lenient().when(entityManager.createNativeQuery(any(String.class))).thenReturn(lock);
         lenient().when(lock.setParameter(any(String.class), any())).thenReturn(lock);
     }

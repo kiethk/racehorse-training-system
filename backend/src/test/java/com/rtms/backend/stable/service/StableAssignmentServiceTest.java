@@ -14,6 +14,8 @@ import org.junit.jupiter.api.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rtms.backend.admission.service.AdmissionGroomReviewService;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -28,7 +30,7 @@ class StableAssignmentServiceTest {
     EntityManager em;
     StableAssignmentService service;
     AreaTrainerAssignmentPolicy trainerPolicy;
-    com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
+    AdmissionGroomReviewService admissionAllocation;
     List<Area> allAreas;
     List<StableStall> allStalls;
     List<User> staff;
@@ -53,7 +55,7 @@ class StableAssignmentServiceTest {
         when(stalls.save(any(StableStall.class))).thenAnswer(i -> i.getArgument(0));
         when(profiles.findById(anyLong())).thenReturn(Optional.empty());
         trainerPolicy = mock(AreaTrainerAssignmentPolicy.class);
-        admissionAllocation = mock(com.rtms.backend.admission.service.AdmissionGroomReviewService.class);
+        admissionAllocation = mock(AdmissionGroomReviewService.class);
         service = new StableAssignmentService(areas, stalls, users, profiles, horses, workouts, em, trainerPolicy,
                 admissionAllocation);
     }
@@ -239,7 +241,7 @@ class StableAssignmentServiceTest {
         status(HttpStatus.BAD_REQUEST, () -> service.applyAssignments(new BatchStableAssignmentRequest(null, Arrays.asList((BlockGroomAssignmentDto) null))));
     }
     @Test void nullBaselineEntriesDeserializeAndInternalFlagCannotDisableChecking() throws Exception {
-        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var mapper = new ObjectMapper();
         var t = mapper.readValue("{\"areaId\":1,\"trainerId\":101,\"expectedTrainerId\":null,\"expectedTrainerIdSet\":false}", AreaTrainerAssignmentDto.class);
         assertTrue(t.isExpectedTrainerIdSet());
         status(HttpStatus.CONFLICT, () -> service.applyAssignments(new BatchStableAssignmentRequest(List.of(t), null)));

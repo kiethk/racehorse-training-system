@@ -30,6 +30,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -146,7 +147,7 @@ class PreventiveCareQueryServiceTest {
         assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
     }
 
-    private static List<String> names(org.springframework.data.domain.Page<PreventiveDueHorse> page) {
+    private static List<String> names(Page<PreventiveDueHorse> page) {
         return page.getContent().stream().map(PreventiveDueHorse::horseName).toList();
     }
 

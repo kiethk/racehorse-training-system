@@ -36,6 +36,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.ArrayList;
+import com.rtms.backend.horse.util.UelnUtils;
+import com.rtms.backend.notification.entity.Notification;
+import com.rtms.backend.notification.service.NotificationService;
+import com.rtms.backend.notification.service.NotificationTypes;
+import com.rtms.backend.stable.repository.StableStallRepository;
+import java.util.HashSet;
+import java.util.Objects;
 
 
 @Service
@@ -60,15 +67,15 @@ public class OwnerAdmissionService {
     private final FileStorageService fileStorage;
     private final AdmissionUelnPolicy uelnPolicy;
     private final PedigreeBirthDateValidator birthDates;
-    private final com.rtms.backend.stable.repository.StableStallRepository stalls;
-    private final com.rtms.backend.notification.service.NotificationService notifications;
+    private final StableStallRepository stalls;
+    private final NotificationService notifications;
 
     public OwnerAdmissionService(AdmissionApplicationRepository admissions,
             CandidateHorseProfileRepository candidates, AdmissionDocumentRepository documents,
             FileStorageService fileStorage, AdmissionUelnPolicy uelnPolicy,
             PedigreeBirthDateValidator birthDates,
-            com.rtms.backend.stable.repository.StableStallRepository stalls,
-            com.rtms.backend.notification.service.NotificationService notifications) {
+            StableStallRepository stalls,
+            NotificationService notifications) {
         this.admissions = admissions;
         this.candidates = candidates;
         this.documents = documents;
@@ -83,10 +90,10 @@ public class OwnerAdmissionService {
     @Transactional
     public OwnerAdmissionDetailResponse create(Long ownerId, CreateOwnerAdmissionRequest request) {
         requireSex(request);
-        String childUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.registrationNumber(), "Registration number (UELN)");
-        String sireUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.sireRegistrationNumber(), "Sire UELN");
-        String damUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.damRegistrationNumber(), "Dam UELN");
-        com.rtms.backend.horse.util.UelnUtils.validatePedigreeUelns(childUeln, sireUeln, damUeln);
+        String childUeln = UelnUtils.cleanAndValidate(request.registrationNumber(), "Registration number (UELN)");
+        String sireUeln = UelnUtils.cleanAndValidate(request.sireRegistrationNumber(), "Sire UELN");
+        String damUeln = UelnUtils.cleanAndValidate(request.damRegistrationNumber(), "Dam UELN");
+        UelnUtils.validatePedigreeUelns(childUeln, sireUeln, damUeln);
         birthDates.validateByUeln(request.dateOfBirth(), sireUeln, damUeln);
         uelnPolicy.assertAvailableForSubmission(childUeln);
 
@@ -124,10 +131,10 @@ public class OwnerAdmissionService {
         validateDocumentMetadata(metadata, files);
         validateFiles(metadata, files);
 
-        String childUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.registrationNumber(), "Registration number (UELN)");
-        String sireUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.sireRegistrationNumber(), "Sire UELN");
-        String damUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.damRegistrationNumber(), "Dam UELN");
-        com.rtms.backend.horse.util.UelnUtils.validatePedigreeUelns(childUeln, sireUeln, damUeln);
+        String childUeln = UelnUtils.cleanAndValidate(request.registrationNumber(), "Registration number (UELN)");
+        String sireUeln = UelnUtils.cleanAndValidate(request.sireRegistrationNumber(), "Sire UELN");
+        String damUeln = UelnUtils.cleanAndValidate(request.damRegistrationNumber(), "Dam UELN");
+        UelnUtils.validatePedigreeUelns(childUeln, sireUeln, damUeln);
         birthDates.validateByUeln(request.dateOfBirth(), sireUeln, damUeln);
         uelnPolicy.assertAvailableForSubmission(childUeln);
 
@@ -203,7 +210,7 @@ public class OwnerAdmissionService {
         requireSex(request);
         List<AdmissionDocumentType> types = documentTypes == null ? List.of() : documentTypes;
         List<MultipartFile> uploads = files == null ? List.of() : files;
-        if (types.stream().anyMatch(java.util.Objects::isNull) || new java.util.HashSet<>(types).size() != types.size()) {
+        if (types.stream().anyMatch(Objects::isNull) || new HashSet<>(types).size() != types.size()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Upload at most one file per document type");
         }
         List<AdmissionDocumentMetadataRequest> metadata = types.stream()
@@ -215,13 +222,13 @@ public class OwnerAdmissionService {
         validateFiles(metadata, uploads);
 
         CandidateHorseProfile snapshot = findCandidate(admissionId);
-        String childUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.registrationNumber(), "Registration number (UELN)");
-        String sireUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.sireRegistrationNumber(), "Sire UELN");
-        String damUeln = com.rtms.backend.horse.util.UelnUtils.cleanAndValidate(request.damRegistrationNumber(), "Dam UELN");
-        com.rtms.backend.horse.util.UelnUtils.validatePedigreeUelns(childUeln, sireUeln, damUeln);
+        String childUeln = UelnUtils.cleanAndValidate(request.registrationNumber(), "Registration number (UELN)");
+        String sireUeln = UelnUtils.cleanAndValidate(request.sireRegistrationNumber(), "Sire UELN");
+        String damUeln = UelnUtils.cleanAndValidate(request.damRegistrationNumber(), "Dam UELN");
+        UelnUtils.validatePedigreeUelns(childUeln, sireUeln, damUeln);
         birthDates.validateByUeln(request.dateOfBirth(), sireUeln, damUeln);
         // This admission already holds its own UELN; only a new UELN must be free.
-        if (!java.util.Objects.equals(childUeln, snapshot.getRegistrationNumber())) {
+        if (!Objects.equals(childUeln, snapshot.getRegistrationNumber())) {
             uelnPolicy.assertAvailableForSubmission(childUeln);
         }
 
@@ -281,13 +288,13 @@ public class OwnerAdmissionService {
      * Written in the submit transaction, so a rolled-back submission leaves no notification behind.
      */
     private void notifyQuarantineGrooms(AdmissionApplication application, String horseName) {
-        String type = com.rtms.backend.notification.service.NotificationTypes.ADMISSION_NEW_FOR_GROOM;
-        String refType = com.rtms.backend.notification.service.NotificationTypes.REFERENCE_ADMISSION;
+        String type = NotificationTypes.ADMISSION_NEW_FOR_GROOM;
+        String refType = NotificationTypes.REFERENCE_ADMISSION;
         for (Long groomId : stalls.findQuarantineGroomIds()) {
             notifications.createNotification(groomId, "New admission to review",
                     horseName + " was submitted for admission and is waiting for groom review.",
                     type, refType, application.getId(),
-                    com.rtms.backend.notification.entity.Notification.buildDeduplicationKey(
+                    Notification.buildDeduplicationKey(
                             groomId, refType, application.getId(), type));
         }
     }
@@ -300,7 +307,7 @@ public class OwnerAdmissionService {
                 .map(admission -> {
                     CandidateHorseProfile candidate = findCandidate(admission.getId());
                     String imageUrl = documents.findByAdmissionId(admission.getId()).stream()
-                            .filter(d -> com.rtms.backend.admission.enums.AdmissionDocumentType.HORSE_PHOTO.equals(d.getDocumentType()))
+                            .filter(d -> AdmissionDocumentType.HORSE_PHOTO.equals(d.getDocumentType()))
                             .findFirst()
                             .map(this::documentUrl)
                             .orElse(null);
@@ -347,13 +354,13 @@ public class OwnerAdmissionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
         boolean allowed = switch (viewer.getRole()) {
             case "CLUB_MANAGER" -> true;
-            case "HORSE_OWNER" -> java.util.Objects.equals(admission.getOwnerId(), viewer.getUserId());
-            case "HEAD_TRAINER" -> java.util.Objects.equals(admission.getTrainerId(), viewer.getUserId());
+            case "HORSE_OWNER" -> Objects.equals(admission.getOwnerId(), viewer.getUserId());
+            case "HEAD_TRAINER" -> Objects.equals(admission.getTrainerId(), viewer.getUserId());
             case "GROOM" -> admissions.isVisibleToGroom(admissionId, viewer.getUserId(),
                     stalls.isQuarantineGroom(viewer.getUserId()), AdmissionStatus.GROOM_REVIEW);
             default -> false;
         };
-        if (!allowed) throw new org.springframework.security.access.AccessDeniedException("Admission is not assigned to you");
+        if (!allowed) throw new AccessDeniedException("Admission is not assigned to you");
     }
 
     /** Where a client loads this document from: always this API, which checks the viewer before serving the file. */

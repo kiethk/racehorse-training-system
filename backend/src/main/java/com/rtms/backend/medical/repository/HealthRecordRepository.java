@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import java.time.LocalDateTime;
 
 @Repository
 public interface HealthRecordRepository extends JpaRepository<HealthRecord, Long> {
@@ -23,5 +24,5 @@ public interface HealthRecordRepository extends JpaRepository<HealthRecord, Long
 
     /** The latest clinical training decision recorded strictly before the given time (state prior to an urgent case). */
     Optional<HealthRecord> findTopByHorseIdAndTrainingDecisionIsNotNullAndExaminedAtBeforeOrderByExaminedAtDesc(
-            Long horseId, java.time.LocalDateTime cutoff);
+            Long horseId, LocalDateTime cutoff);
 }

@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.Objects;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -48,7 +49,7 @@ class CloudDemoSeedToolTest extends DemoSeedWorkflow {
         Path backup=Path.of(Objects.requireNonNull(System.getenv("RTMS_SEED_BACKUP"))).toRealPath();
         assertTrue(backup.startsWith(Path.of("target/cloud-seed/backups").toRealPath()),"Unexpected backup location");
         byte[] bytes=Files.readAllBytes(backup);
-        assertTrue(bytes.length>1000 && new String(bytes,0,5,java.nio.charset.StandardCharsets.US_ASCII).equals("PGDMP"));
+        assertTrue(bytes.length>1000 && new String(bytes,0,5,StandardCharsets.US_ASCII).equals("PGDMP"));
         assertEquals(System.getenv("RTMS_SEED_BACKUP_SHA256"),HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),"Backup checksum mismatch");
         assertEquals(1L,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version='202610171604' AND success=true",Long.class));
     }

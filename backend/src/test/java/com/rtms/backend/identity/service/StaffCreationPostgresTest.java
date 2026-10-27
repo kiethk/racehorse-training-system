@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.AdditionalAnswers.delegatesTo;
@@ -173,7 +174,7 @@ class StaffCreationPostgresTest {
     }
     @ParameterizedTest @ValueSource(strings={"{\"email\":\"invalid\"}","{\"phone\":\"123456789012345678901\"}","{\"fullName\":\" \"}","{\"password\":\" \"}","{\"role\":\"HEAD_TRAINER\"}","{\"licenseIssuedDate\":\"2999-01-01\"}"})
     void invalidApiInputNeverCreatesStaff(String override) throws Exception {
-        var mapper=new com.fasterxml.jackson.databind.ObjectMapper();
+        var mapper=new ObjectMapper();
         var body=mapper.createObjectNode().put("role","VETERINARIAN").put("fullName","Test").put("email",tag+"@test.invalid").put("password","Test@2026").put("licenseNumber","VT-TEST");
         mapper.readTree(override).properties().forEach(entry->body.set(entry.getKey(),entry.getValue()));
         var actor=new UsernamePasswordAuthenticationToken(new AuthenticatedUser(1L,"manager@test.invalid","CLUB_MANAGER"),null,List.of(new SimpleGrantedAuthority("USER_MANAGE")));

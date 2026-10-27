@@ -23,6 +23,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.hamcrest.Matchers;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -56,7 +57,7 @@ class MyProfilePostgresTest {
                         .file(new MockMultipartFile("avatar","avatar.png","image/png",image.toByteArray())).param("userId",id==1?"5":"1").with(authentication(actor)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.userId").value(id))
                 .andExpect(jsonPath("$.data.fullName").value("Updated Name")).andExpect(jsonPath("$.data.phone").value("0909123456"))
-                .andExpect(jsonPath("$.data.role").value(role)).andExpect(jsonPath("$.data.avatarUrl").value(org.hamcrest.Matchers.startsWith("/api/auth/me/avatar?v=")))
+                .andExpect(jsonPath("$.data.role").value(role)).andExpect(jsonPath("$.data.avatarUrl").value(Matchers.startsWith("/api/auth/me/avatar?v=")))
                 .andExpect(jsonPath("$.data.passwordHash").doesNotExist());
         mvc.perform(get("/api/auth/me/avatar").with(authentication(actor))).andExpect(status().isOk()).andExpect(content().contentType("image/png"));
         mvc.perform(get("/api/auth/me").with(authentication(actor))).andExpect(status().isOk()).andExpect(jsonPath("$.data.address").value("New address"));

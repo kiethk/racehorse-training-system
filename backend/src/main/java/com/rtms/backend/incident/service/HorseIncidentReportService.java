@@ -31,6 +31,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.IdentityHashMap;
 
 @Service
 public class HorseIncidentReportService {
@@ -253,7 +254,7 @@ public class HorseIncidentReportService {
                         .filter(schedule -> schedule.getVeterinarianId() != null)
                         .collect(Collectors.toMap(CareSchedule::getId, CareSchedule::getVeterinarianId, (a, b) -> a));
 
-        Map<HorseIncidentReport, Long> vetByReport = new java.util.IdentityHashMap<>();
+        Map<HorseIncidentReport, Long> vetByReport = new IdentityHashMap<>();
         for (HorseIncidentReport report : reports) {
             Long vetId = report.getHandledById() != null ? report.getHandledById()
                     : report.getCareScheduleId() != null ? vetBySchedule.get(report.getCareScheduleId())

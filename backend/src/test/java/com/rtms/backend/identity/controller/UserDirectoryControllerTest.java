@@ -13,6 +13,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
@@ -105,7 +107,7 @@ class UserDirectoryControllerTest {
         u.setEmail("owner@rtms.com");
         u.setRole(role);
 
-        when(userRepository.findById(10L)).thenReturn(java.util.Optional.of(u));
+        when(userRepository.findById(10L)).thenReturn(Optional.of(u));
 
         ApiResponse<UserSummaryResponse> response = controller.getUserById(10L);
 
@@ -118,9 +120,9 @@ class UserDirectoryControllerTest {
     @Test
     @DisplayName("getUserById: ném 404 khi không tìm thấy user")
     void testGetUserById_NotFound() {
-        when(userRepository.findById(999L)).thenReturn(java.util.Optional.empty());
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        assertThrows(ResponseStatusException.class,
                 () -> controller.getUserById(999L));
     }
 }

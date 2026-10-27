@@ -23,6 +23,12 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
 import java.util.Map;
+import com.rtms.backend.common.dto.ApiResponse;
+import com.rtms.backend.horse.service.HorseAdmissionService;
+import com.rtms.backend.training.dto.HorseSpecialtyResponse;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,7 +47,7 @@ class HorsePhotoEndpointTest {
     @Mock
     private HorsePhotoService photoService;
     @Mock
-    private com.rtms.backend.horse.service.HorseAdmissionService admissionService;
+    private HorseAdmissionService admissionService;
 
     private HorseController controller;
 
@@ -128,18 +134,18 @@ class HorsePhotoEndpointTest {
     @DisplayName("GET /api/horses: includeSpecialty=false preserves legacy response (specialty is null, no specialty query)")
     void getAllHorses_default_specialtyIsNullAndNoSpecialtyLookup() {
         AuthenticatedUser manager = new AuthenticatedUser(9L, "manager@test.com", "CLUB_MANAGER");
-        org.springframework.security.core.Authentication auth = mock(org.springframework.security.core.Authentication.class);
+        Authentication auth = mock(Authentication.class);
         when(auth.getPrincipal()).thenReturn(manager);
-        org.springframework.security.core.context.SecurityContext context = mock(org.springframework.security.core.context.SecurityContext.class);
+        SecurityContext context = mock(SecurityContext.class);
         when(context.getAuthentication()).thenReturn(auth);
-        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
+        SecurityContextHolder.setContext(context);
 
         Horse h1 = createHorse(1L, 10L);
         Horse h2 = createHorse(2L, 11L);
         when(horseService.getAllHorses(eq(manager), isNull(), isNull(), isNull())).thenReturn(List.of(h1, h2));
         when(photoService.resolveImageUrls(eq(List.of(1L, 2L)), any())).thenReturn(Map.of(1L, "/api/horses/1/photo"));
 
-        com.rtms.backend.common.dto.ApiResponse<List<HorseResponse>> response =
+        ApiResponse<List<HorseResponse>> response =
                 controller.getAllHorses(null, null, null, false);
 
         assertTrue(response.isSuccess());
@@ -156,22 +162,22 @@ class HorsePhotoEndpointTest {
     @DisplayName("GET /api/horses: includeSpecialty=true batches lookup with exact filtered IDs once")
     void getAllHorses_includeSpecialtyTrue_batchesLookupOnce() {
         AuthenticatedUser manager = new AuthenticatedUser(9L, "manager@test.com", "CLUB_MANAGER");
-        org.springframework.security.core.Authentication auth = mock(org.springframework.security.core.Authentication.class);
+        Authentication auth = mock(Authentication.class);
         when(auth.getPrincipal()).thenReturn(manager);
-        org.springframework.security.core.context.SecurityContext context = mock(org.springframework.security.core.context.SecurityContext.class);
+        SecurityContext context = mock(SecurityContext.class);
         when(context.getAuthentication()).thenReturn(auth);
-        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
+        SecurityContextHolder.setContext(context);
 
         Horse h1 = createHorse(10L, 100L);
         Horse h2 = createHorse(20L, 101L);
         when(horseService.getAllHorses(eq(manager), isNull(), isNull(), isNull())).thenReturn(List.of(h1, h2));
         when(photoService.resolveImageUrls(eq(List.of(10L, 20L)), any())).thenReturn(Map.of());
 
-        com.rtms.backend.training.dto.HorseSpecialtyResponse spec1 =
-                new com.rtms.backend.training.dto.HorseSpecialtyResponse(3, List.of(), null, List.of());
+        HorseSpecialtyResponse spec1 =
+                new HorseSpecialtyResponse(3, List.of(), null, List.of());
         when(specialtyService.getSpecialties(eq(List.of(10L, 20L)))).thenReturn(Map.of(10L, spec1));
 
-        com.rtms.backend.common.dto.ApiResponse<List<HorseResponse>> response =
+        ApiResponse<List<HorseResponse>> response =
                 controller.getAllHorses(null, null, null, true);
 
         assertTrue(response.isSuccess());

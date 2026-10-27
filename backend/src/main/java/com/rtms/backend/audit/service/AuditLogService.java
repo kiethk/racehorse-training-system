@@ -19,6 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Set;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class AuditLogService {
@@ -100,7 +104,7 @@ public class AuditLogService {
         String finalMethod = normalizedMethod;
 
         Page<AuditLog> page = auditLogRepository.findAll((root, query, cb) -> {
-            java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+            List<Predicate> predicates = new ArrayList<>();
             
             if (userId != null) {
                 predicates.add(cb.equal(root.get("user").get("id"), userId));
@@ -122,11 +126,11 @@ public class AuditLogService {
                 var actionLike = cb.like(cb.lower(root.get("action")), "%" + searchTerm + "%");
                 var detailsLike = cb.like(cb.lower(root.get("details")), "%" + searchTerm + "%");
                 var entityLike = cb.like(cb.lower(root.get("entityName")), "%" + searchTerm + "%");
-                var userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
+                var userJoin = root.join("user", JoinType.LEFT);
                 var userNameLike = cb.like(cb.lower(userJoin.get("fullName")), "%" + searchTerm + "%");
                 predicates.add(cb.or(pathLike, actionLike, detailsLike, entityLike, userNameLike));
             }
-            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+            return cb.and(predicates.toArray(new Predicate[0]));
         }, boundedPageable);
 
         return page.map(log -> {

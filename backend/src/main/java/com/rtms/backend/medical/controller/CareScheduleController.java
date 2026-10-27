@@ -23,6 +23,8 @@ import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 @RequestMapping({"/api/care-schedules", "/api/vet/schedules"})
@@ -74,7 +76,7 @@ public class CareScheduleController {
             @RequestParam(required = false) Long horseId,
             @RequestParam(required = false) Long veterinarianId,
             @RequestParam(required = false) Long admissionId,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             Pageable pageable,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         if ("VETERINARIAN".equals(currentUser.getRole())) {

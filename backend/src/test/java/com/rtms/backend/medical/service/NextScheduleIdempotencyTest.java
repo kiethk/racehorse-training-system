@@ -21,6 +21,9 @@ import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -75,8 +78,8 @@ class NextScheduleIdempotencyTest {
         // Compute matching fingerprint
         String fp = horse.getId() + "|null|ROUTINE|" + future + "|Follow-up check";
         try {
-            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(fp.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            existingSchedule.setRequestFingerprint(java.util.HexFormat.of().formatHex(digest));
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(fp.getBytes(StandardCharsets.UTF_8));
+            existingSchedule.setRequestFingerprint(HexFormat.of().formatHex(digest));
         } catch (Exception ignored) {}
 
         when(userRepository.findById(vet.getId())).thenReturn(Optional.of(vet));

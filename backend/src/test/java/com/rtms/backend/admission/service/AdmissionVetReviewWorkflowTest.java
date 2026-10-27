@@ -55,6 +55,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -119,7 +120,7 @@ class AdmissionVetReviewWorkflowTest {
                 entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class)
+                Mockito.mock(PreventiveVaccinationService.class)
         );
 
         admissionQueryService = new AdmissionQueryService(

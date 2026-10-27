@@ -40,6 +40,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class HorseService {
@@ -178,8 +179,8 @@ public class HorseService {
 
     public Horse createHorse(CreateHorseRequest request) {
         if (request.getSex() == null) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "Sex is required (MALE or FEMALE)");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Sex is required (MALE or FEMALE)");
         }
         Horse horse = new Horse();
         horse.setName(request.getName());

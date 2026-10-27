@@ -22,12 +22,12 @@ public class AdmissionManagerReviewController {
 
     private final AdmissionManagerReviewService admissionManagerReviewService;
     private final AdmissionQueryService admissionQueryService;
-    private final com.rtms.backend.admission.service.OwnerAdmissionService ownerAdmissionService;
+    private final OwnerAdmissionService ownerAdmissionService;
 
     public AdmissionManagerReviewController(
             AdmissionManagerReviewService admissionManagerReviewService,
             AdmissionQueryService admissionQueryService,
-            com.rtms.backend.admission.service.OwnerAdmissionService ownerAdmissionService) {
+            OwnerAdmissionService ownerAdmissionService) {
         this.admissionManagerReviewService = admissionManagerReviewService;
         this.admissionQueryService = admissionQueryService;
         this.ownerAdmissionService = ownerAdmissionService;

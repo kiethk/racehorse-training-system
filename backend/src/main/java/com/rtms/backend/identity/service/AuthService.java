@@ -32,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.regex.Pattern;
+import java.util.Locale;
 
 @Service
 public class AuthService {
@@ -45,7 +46,7 @@ public class AuthService {
     private final TrainerProfileRepository trainerProfileRepository;
     private final GroomProfileRepository groomProfileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final com.rtms.backend.notification.service.EmailService emailService;
+    private final EmailService emailService;
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^(0|\\+84)[3|5|7|8|9][0-9]{8}$|^[+]?[0-9]{9,15}$");
@@ -229,7 +230,7 @@ public class AuthService {
         if (rawEmail.isEmpty() || rawEmail.length() > 255 || !EMAIL_PATTERN.matcher(rawEmail).matches()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_EMAIL", "A valid email address is required");
         }
-        String email = rawEmail.toLowerCase(java.util.Locale.ROOT);
+        String email = rawEmail.toLowerCase(Locale.ROOT);
 
         String password = request.getPassword() == null ? "" : request.getPassword();
         byte[] passwordBytes = password.getBytes(StandardCharsets.UTF_8);

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import org.springframework.security.access.AccessDeniedException;
 import java.util.List;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 /**
  * @deprecated Thay bằng hub mới (docs/preventive-care-flow.md mục 6): {@link PreventiveCareHubController}
@@ -38,7 +39,7 @@ public class PreventiveCareController {
     @PostMapping
     public ApiResponse<CareSchedule> createSchedule(
             @RequestBody CreatePreventiveCareScheduleRequest request,
-            @org.springframework.security.core.annotation.AuthenticationPrincipal AuthenticatedUser currentUser) {
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(preventiveCareService.createSchedule(request, currentUser));
     }
 

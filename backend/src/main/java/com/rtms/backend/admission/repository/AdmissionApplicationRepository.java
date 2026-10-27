@@ -95,9 +95,9 @@ public interface AdmissionApplicationRepository
             @Param("filterName") boolean filterName,
             @Param("candidateName") String candidateName,
             @Param("filterFrom") boolean filterFrom,
-            @Param("submittedFrom") java.time.LocalDateTime submittedFrom,
+            @Param("submittedFrom") LocalDateTime submittedFrom,
             @Param("filterTo") boolean filterTo,
-            @Param("submittedToExclusive") java.time.LocalDateTime submittedToExclusive,
+            @Param("submittedToExclusive") LocalDateTime submittedToExclusive,
             Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -175,7 +175,7 @@ public interface AdmissionApplicationRepository
               AND a.trainerId IN :trainerIds
               AND a.horseId IS NOT NULL
             """)
-    List<Object[]> findAssignedHorsePairs(@Param("trainerIds") java.util.Collection<Long> trainerIds,
+    List<Object[]> findAssignedHorsePairs(@Param("trainerIds") Collection<Long> trainerIds,
                                           @Param("statuses") Collection<AdmissionStatus> statuses);
 
     /**

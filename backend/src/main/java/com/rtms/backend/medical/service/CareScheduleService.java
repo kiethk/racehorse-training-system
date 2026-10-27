@@ -59,6 +59,11 @@ import java.security.NoSuchAlgorithmException;
 import com.rtms.backend.event.ClinicalRecordCreatedEvent;
 import com.rtms.backend.event.InitialExamCompletedEvent;
 import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.Set;
 
 @Service
 public class CareScheduleService {
@@ -460,7 +465,7 @@ public class CareScheduleService {
         }
 
         if (schedule.getCareType() == CareType.URGENT) {
-            List<HorseIncidentReport> openIncidents = new java.util.ArrayList<>(
+            List<HorseIncidentReport> openIncidents = new ArrayList<>(
                     incidentReportRepository.findByHorseIdAndStatusIn(
                             horse.getId(),
                             List.of(IncidentStatus.REPORTED, IncidentStatus.IN_REVIEW)
@@ -475,7 +480,7 @@ public class CareScheduleService {
                 });
             }
 
-            java.util.Set<Long> recipients = new java.util.HashSet<>();
+            Set<Long> recipients = new HashSet<>();
             for (HorseIncidentReport inc : openIncidents) {
                 inc.setStatus(IncidentStatus.RESOLVED);
                 inc.setHandledById(vetId);
@@ -700,7 +705,7 @@ public class CareScheduleService {
         if (requestedAt == null && request.getScheduledDate() != null && !request.getScheduledDate().isBlank()) {
             try {
                 requestedAt = LocalDate.parse(request.getScheduledDate()).atTime(14, 0);
-            } catch (java.time.format.DateTimeParseException ex) {
+            } catch (DateTimeParseException ex) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "scheduledDate must use ISO format yyyy-MM-dd");
             }
         }
@@ -779,7 +784,7 @@ public class CareScheduleService {
         String value = horseId + "|" + admissionId + "|ROUTINE|" + requestedAt + "|" + description;
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(digest);
+            return HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException(impossible);
         }

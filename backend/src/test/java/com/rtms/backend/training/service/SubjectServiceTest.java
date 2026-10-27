@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import com.rtms.backend.security.AuthenticatedUser;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -178,8 +179,8 @@ class SubjectServiceTest {
         s1.setName("Trainer 9 Subject");
         s1.setTrainerId(9L);
 
-        com.rtms.backend.security.AuthenticatedUser trainer =
-                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+        AuthenticatedUser trainer =
+                new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
 
         when(subjectRepository.findByTrainerId(9L)).thenReturn(List.of(s1));
 
@@ -198,8 +199,8 @@ class SubjectServiceTest {
         other.setName("Other Subject");
         other.setTrainerId(10L); // different trainer
 
-        com.rtms.backend.security.AuthenticatedUser trainer =
-                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+        AuthenticatedUser trainer =
+                new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
 
         when(subjectRepository.findById(50L)).thenReturn(Optional.of(other));
 
@@ -209,8 +210,8 @@ class SubjectServiceTest {
     @Test
     @DisplayName("The owner of a new subject is the signed-in trainer")
     void testCreateSubject_OwnerIsTheSignedInTrainer() {
-        com.rtms.backend.security.AuthenticatedUser trainer =
-                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+        AuthenticatedUser trainer =
+                new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
         when(subjectRepository.save(any(Subject.class))).thenAnswer(inv -> {
             Subject s = inv.getArgument(0);
             s.setId(100L);
@@ -227,8 +228,8 @@ class SubjectServiceTest {
     @Test
     @DisplayName("A name is trimmed and a duplicate is found whatever its case")
     void testCreateSubject_DuplicateNameIgnoresCaseAndSpaces() {
-        com.rtms.backend.security.AuthenticatedUser trainer =
-                new com.rtms.backend.security.AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
+        AuthenticatedUser trainer =
+                new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
         CreateSubjectRequest req = validRequest();
         req.setName("  45-MINUTE heart-rate run ");
         when(subjectRepository.existsByNameIgnoreCaseAndTrainerId("45-MINUTE heart-rate run", 9L)).thenReturn(true);

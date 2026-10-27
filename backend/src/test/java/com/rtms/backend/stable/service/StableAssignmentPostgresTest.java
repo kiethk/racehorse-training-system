@@ -24,6 +24,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import com.rtms.backend.admission.service.AdmissionGroomReviewService;
+import com.rtms.backend.identity.dto.StaffCreationRequest;
+import com.rtms.backend.identity.service.StaffManagementService;
+import com.rtms.backend.stable.enums.AreaType;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -48,10 +52,10 @@ class StableAssignmentPostgresTest {
     @Autowired GroomProfileRepository profiles;
     @Autowired HorseRepository horses;
     @Autowired TrainingWorkoutService workouts;
-    @Autowired com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
+    @Autowired AdmissionGroomReviewService admissionAllocation;
     @Autowired EntityManager em;
     @Autowired AreaTrainerAssignmentPolicy trainerPolicy;
-    @Autowired com.rtms.backend.identity.service.StaffManagementService staffManagement;
+    @Autowired StaffManagementService staffManagement;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired WebApplicationContext web;
     long trainer1, trainer2, groom1, groom2, area1, area2, quarantine, course;
@@ -276,7 +280,7 @@ class StableAssignmentPostgresTest {
         jdbc.update("UPDATE areas SET trainer_id=NULL WHERE id IN (?,?)",area1,area2);
         horse(area1,1);
         jdbc.update("UPDATE stable_stalls SET status='RESERVED' WHERE id=?",stall(area2,1));
-        var req = new com.rtms.backend.identity.dto.StaffCreationRequest();
+        var req = new StaffCreationRequest();
         req.setFullName("Trainer auto-check "+tag); req.setEmail(tag+"new-trainer@test.invalid");
         req.setPassword("LocalTest@2026"); req.setRole("HEAD_TRAINER"); req.setCertificationNumber("CERT-"+tag);
         var created = staffManagement.createStaff(req);
@@ -383,8 +387,8 @@ class StableAssignmentPostgresTest {
     @Test void simultaneousCreatesProduceDistinctAreasWithTwelveStalls() throws Exception {
         CyclicBarrier barrier = new CyclicBarrier(2);
         try (var executor = Executors.newFixedThreadPool(2)) {
-            var a = executor.submit(() -> { barrier.await(); return areaService.createArea(com.rtms.backend.stable.enums.AreaType.QUARANTINE); });
-            var b = executor.submit(() -> { barrier.await(); return areaService.createArea(com.rtms.backend.stable.enums.AreaType.QUARANTINE); });
+            var a = executor.submit(() -> { barrier.await(); return areaService.createArea(AreaType.QUARANTINE); });
+            var b = executor.submit(() -> { barrier.await(); return areaService.createArea(AreaType.QUARANTINE); });
             var first = a.get(25, TimeUnit.SECONDS); var second = b.get(25, TimeUnit.SECONDS);
             assertNotEquals(first.getCode(), second.getCode());
             for (var area : List.of(first, second)) {

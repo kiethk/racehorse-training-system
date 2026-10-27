@@ -41,6 +41,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import com.rtms.backend.identity.entity.Role;
+import com.rtms.backend.identity.entity.User;
+import com.rtms.backend.medical.dto.CancelCareScheduleRequest;
+import org.springframework.http.HttpStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -131,7 +135,7 @@ class CareSchedulePreventiveIntegrationTest {
         CompleteCareScheduleRequest request = request();
         request.setVaccinations(List.of(vaccination(1L)));
         when(vaccinations.validate(any(), any())).thenThrow(new ApiException(
-                org.springframework.http.HttpStatus.BAD_REQUEST, "INVALID_VACCINATION", "bad"));
+                HttpStatus.BAD_REQUEST, "INVALID_VACCINATION", "bad"));
 
         assertThrows(ApiException.class, () -> service.completeCareSchedule(100L, request, 20L));
 
@@ -252,7 +256,7 @@ class CareSchedulePreventiveIntegrationTest {
         when(schedules.existsByHorseIdAndPurposeAndStatusInAndIdNot(
                 eq(10L), eq(CareSchedulePurpose.FOLLOW_UP), anyList(), eq(100L))).thenReturn(false);
 
-        var cancel = new com.rtms.backend.medical.dto.CancelCareScheduleRequest();
+        var cancel = new CancelCareScheduleRequest();
         cancel.setReason("Vet on leave");
         ApiException error = assertThrows(ApiException.class, () -> service.cancelCareSchedule(100L, cancel, 1L));
 
@@ -267,7 +271,7 @@ class CareSchedulePreventiveIntegrationTest {
         when(users.findById(1L)).thenReturn(Optional.of(manager()));
         when(horses.findById(10L)).thenReturn(Optional.of(horse));
 
-        var cancel = new com.rtms.backend.medical.dto.CancelCareScheduleRequest();
+        var cancel = new CancelCareScheduleRequest();
         cancel.setReason("Gộp vào ca khác");
         service.cancelCareSchedule(100L, cancel, 1L);
 
@@ -299,10 +303,10 @@ class CareSchedulePreventiveIntegrationTest {
         return schedule;
     }
 
-    private static com.rtms.backend.identity.entity.User manager() {
-        com.rtms.backend.identity.entity.Role role = new com.rtms.backend.identity.entity.Role();
+    private static User manager() {
+        Role role = new Role();
         role.setName("CLUB_MANAGER");
-        com.rtms.backend.identity.entity.User user = new com.rtms.backend.identity.entity.User();
+        User user = new User();
         user.setId(1L);
         user.setRole(role);
         return user;

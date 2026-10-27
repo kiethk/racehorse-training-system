@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.security.access.AccessDeniedException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,7 +42,7 @@ class HorseServiceTest {
     private TrainingWorkoutService workoutService;
 
     @Mock
-    private com.rtms.backend.stable.repository.AreaRepository areaRepository;
+    private AreaRepository areaRepository;
 
     private HorseService horseService;
 
@@ -142,14 +143,14 @@ class HorseServiceTest {
     @Test
     @DisplayName("getAllHorses với mine=true và vai trò HEAD_TRAINER: chỉ trả ngựa ở khu Trainer phụ trách")
     void testGetAllHorses_HeadTrainer_Mine() {
-        com.rtms.backend.security.AuthenticatedUser trainer =
-                new com.rtms.backend.security.AuthenticatedUser(10L, "trainer@test.com", "HEAD_TRAINER");
+        AuthenticatedUser trainer =
+                new AuthenticatedUser(10L, "trainer@test.com", "HEAD_TRAINER");
 
-        com.rtms.backend.stable.entity.Area myArea = new com.rtms.backend.stable.entity.Area();
+        Area myArea = new Area();
         myArea.setId(1L);
         myArea.setTrainerId(10L);
 
-        com.rtms.backend.stable.entity.Area otherArea = new com.rtms.backend.stable.entity.Area();
+        Area otherArea = new Area();
         otherArea.setId(2L);
         otherArea.setTrainerId(99L);
 
@@ -168,21 +169,21 @@ class HorseServiceTest {
         Horse h1 = new Horse();
         h1.setId(1L);
         h1.setCurrentStallId(101L);
-        h1.setCurrentStatus(com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE);
+        h1.setCurrentStatus(HorseStatus.ELIGIBLE);
 
         Horse h2 = new Horse();
         h2.setId(2L);
         h2.setCurrentStallId(201L);
-        h2.setCurrentStatus(com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE);
+        h2.setCurrentStatus(HorseStatus.ELIGIBLE);
 
         Horse h3 = new Horse();
         h3.setId(3L);
         h3.setCurrentStallId(null);
-        h3.setCurrentStatus(com.rtms.backend.horse.enums.HorseStatus.CANDIDATE);
+        h3.setCurrentStatus(HorseStatus.CANDIDATE);
 
         when(horseRepository.findAll()).thenReturn(List.of(h1, h2, h3));
 
-        List<Horse> result = horseService.getAllHorses(trainer, true, com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE);
+        List<Horse> result = horseService.getAllHorses(trainer, true, HorseStatus.ELIGIBLE);
 
         assertEquals(1, result.size());
         assertEquals(1L, result.get(0).getId());
@@ -195,8 +196,8 @@ class HorseServiceTest {
     @Test
     @DisplayName("unassigned=true: chỉ trả ngựa chưa có chuồng, bỏ qua hẳn nhánh mine")
     void testGetAllHorses_Unassigned() {
-        com.rtms.backend.security.AuthenticatedUser trainer =
-                new com.rtms.backend.security.AuthenticatedUser(2L, "t@x.com", "HEAD_TRAINER");
+        AuthenticatedUser trainer =
+                new AuthenticatedUser(2L, "t@x.com", "HEAD_TRAINER");
 
         Horse placed = new Horse();
         placed.setId(1L);
@@ -408,8 +409,8 @@ class HorseServiceTest {
         when(stableStallRepository.existsByIdAndGroomId(102L, 44L)).thenReturn(false);
 
         assertEquals(1L, horseService.getHorseById(1L, groom).getId());
-        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> horseService.getHorseById(2L, groom));
-        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> horseService.getHorseById(3L, groom));
+        assertThrows(AccessDeniedException.class, () -> horseService.getHorseById(2L, groom));
+        assertThrows(AccessDeniedException.class, () -> horseService.getHorseById(3L, groom));
     }
 
     @Test

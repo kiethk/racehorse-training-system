@@ -34,6 +34,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
 import java.util.Optional;
+import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -106,7 +107,7 @@ class AssignmentEnforcementTest {
                 entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class)
+                Mockito.mock(PreventiveVaccinationService.class)
         );
     }
 

@@ -64,7 +64,7 @@ public class AuditLogResponse {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public static AuditLogResponse from(com.rtms.backend.audit.entity.AuditLog log) {
+    public static AuditLogResponse from(AuditLog log) {
         AuditLogResponse dto = new AuditLogResponse();
         dto.setId(log.getId());
         dto.setHttpMethod(log.getHttpMethod());

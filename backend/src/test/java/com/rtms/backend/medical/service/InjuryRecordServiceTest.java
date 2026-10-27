@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import com.rtms.backend.identity.repository.UserRepository;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,7 +35,7 @@ class InjuryRecordServiceTest {
     @Mock private HealthRecordRepository healthRecordRepository;
     @Mock private CareScheduleRepository careScheduleRepository;
     @Mock private AuditLogRepository auditLogRepository;
-    @Mock private com.rtms.backend.identity.repository.UserRepository userRepository;
+    @Mock private UserRepository userRepository;
 
     private InjuryRecordService injuryRecordService;
     private Horse horse;

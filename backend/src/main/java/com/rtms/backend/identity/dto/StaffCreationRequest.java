@@ -2,6 +2,8 @@ package com.rtms.backend.identity.dto;
 
 import java.time.LocalDate;
 import jakarta.validation.constraints.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.Locale;
 
 public class StaffCreationRequest {
     @NotBlank(message="Full name is required") @Size(max=255) private String fullName;
@@ -24,17 +26,17 @@ public class StaffCreationRequest {
     private Long trainerId;
 
     @AssertTrue(message="License number is required for Veterinarian")
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean isVetLicenseValid() { return !"VETERINARIAN".equals(role) || licenseNumber != null && !licenseNumber.isBlank(); }
     @AssertTrue(message="Certification number is required for Head Trainer")
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean isTrainerCertificationValid() { return !"HEAD_TRAINER".equals(role) || certificationNumber != null && !certificationNumber.isBlank(); }
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
 
     public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT); }
+    public void setEmail(String email) { this.email = email == null ? null : email.trim().toLowerCase(Locale.ROOT); }
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }

@@ -35,6 +35,8 @@ import org.springframework.http.HttpStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import com.rtms.backend.medical.dto.VaccinationRequest;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -158,7 +160,7 @@ class AdmissionReviewServiceTest {
         request.setFindings("Splint inflammation; horse blocked from training but admitted");
         request.setRestrictionDetails("No track work for 30 days");
         request.setNextSchedule(next);
-        var vaccinations = java.util.List.of(new com.rtms.backend.medical.dto.VaccinationRequest());
+        var vaccinations = List.of(new VaccinationRequest());
         request.setVaccinations(vaccinations);
 
         var response = service.reviewByVet(1L, request, 5L);

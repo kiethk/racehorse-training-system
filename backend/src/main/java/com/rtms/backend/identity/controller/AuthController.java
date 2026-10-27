@@ -17,6 +17,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -50,7 +51,7 @@ public class AuthController {
             HttpServletResponse response) {
         
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new com.rtms.backend.config.ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Refresh token missing");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Refresh token missing");
         }
 
         AuthService.RefreshResult result = authService.refresh(refreshToken);
@@ -86,7 +87,7 @@ public class AuthController {
     @Operation(security = {})
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<OwnerRegistrationResponse>> register(
-            @jakarta.validation.Valid @RequestBody OwnerRegistrationRequest request) {
+            @Valid @RequestBody OwnerRegistrationRequest request) {
         OwnerRegistrationResponse response = authService.registerOwner(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response));
