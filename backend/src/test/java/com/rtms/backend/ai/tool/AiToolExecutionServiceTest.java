@@ -22,7 +22,6 @@ import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.dto.TodayTaskItemResponse;
 import com.rtms.backend.stable.entity.Area;
-import com.rtms.backend.stable.entity.GroomIncidentReport;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.enums.IncidentSeverity;
@@ -32,7 +31,6 @@ import com.rtms.backend.stable.enums.TaskSource;
 import com.rtms.backend.stable.enums.GroomTaskType;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.stable.service.GroomDailyTaskService;
 import com.rtms.backend.training.dto.*;
@@ -108,7 +106,6 @@ class AiToolExecutionServiceTest {
     private HorseSpecialtyService horseSpecialtyService;
     private HorsePerformanceService horsePerformanceService;
     private RacingReadinessAssessmentRepository racingReadinessAssessmentRepository;
-    private GroomIncidentReportRepository groomIncidentReportRepository;
     private AreaRepository areaRepository;
     private UserRepository userRepository;
     private CourseRepository courseRepository;
@@ -140,7 +137,6 @@ class AiToolExecutionServiceTest {
         horseSpecialtyService = Mockito.mock(HorseSpecialtyService.class);
         horsePerformanceService = Mockito.mock(HorsePerformanceService.class);
         racingReadinessAssessmentRepository = Mockito.mock(RacingReadinessAssessmentRepository.class);
-        groomIncidentReportRepository = Mockito.mock(GroomIncidentReportRepository.class);
         areaRepository = Mockito.mock(AreaRepository.class);
         userRepository = Mockito.mock(UserRepository.class);
         courseRepository = Mockito.mock(CourseRepository.class);
@@ -169,7 +165,6 @@ class AiToolExecutionServiceTest {
                 horseSpecialtyService,
                 horsePerformanceService,
                 racingReadinessAssessmentRepository,
-                groomIncidentReportRepository,
                 areaRepository,
                 userRepository,
                 courseRepository,
@@ -563,13 +558,15 @@ class AiToolExecutionServiceTest {
         cs1.setId(1L);
         cs1.setHorseId(10L);
         cs1.setStatus(CareScheduleStatus.IN_PROGRESS);
+        cs1.setVeterinarianId(8L);
 
         CareSchedule cs2 = new CareSchedule();
         cs2.setId(2L);
         cs2.setHorseId(11L);
         cs2.setStatus(CareScheduleStatus.SCHEDULED);
+        cs2.setVeterinarianId(8L);
 
-        when(careScheduleRepository.findAll()).thenReturn(List.of(cs1, cs2));
+        when(careScheduleRepository.findByVeterinarianId(8L)).thenReturn(List.of(cs1, cs2));
 
         Object result = toolExecutionService.executeTool("getVetExaminationOverview", Map.of(), vet);
         assertNotNull(result);
@@ -664,8 +661,8 @@ class AiToolExecutionServiceTest {
         h2.setTrainingDecision(TrainingDecision.BLOCKED);
 
         when(horseRepository.findAll()).thenReturn(List.of(h1, h2));
-        when(groomIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(any(LocalDateTime.class)))
-                .thenReturn(List.of(new GroomIncidentReport()));
+        when(horseIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(any(LocalDateTime.class)))
+                .thenReturn(List.of(new HorseIncidentReport()));
 
         Object result = toolExecutionService.executeTool("getClubHealthOverview", Map.of(), manager);
 
@@ -1103,6 +1100,11 @@ class AiToolExecutionServiceTest {
         cand.setAdmissionId(401L);
         cand.setName("SILVER BULLET");
         when(candidateHorseProfileRepository.findByAdmissionIdIn(any())).thenReturn(List.of(cand));
+        CareSchedule initialCs = new CareSchedule();
+        initialCs.setCareType(CareType.INITIAL);
+        initialCs.setAdmissionId(401L);
+        initialCs.setVeterinarianId(300L);
+        when(careScheduleRepository.findByVeterinarianId(300L)).thenReturn(List.of(initialCs));
 
         Object result = toolExecutionService.executeTool("getPendingAdmissionExams", Map.of(), vet);
         assertNotNull(result);
@@ -1129,7 +1131,8 @@ class AiToolExecutionServiceTest {
         cs.setStatus(CareScheduleStatus.SCHEDULED);
         cs.setDescription("Ngựa sốt cao đột ngột");
         cs.setScheduledAt(LocalDateTime.of(2026, 10, 20, 14, 0));
-        when(careScheduleRepository.findAll()).thenReturn(List.of(cs));
+        cs.setVeterinarianId(300L);
+        when(careScheduleRepository.findByVeterinarianId(300L)).thenReturn(List.of(cs));
 
         Horse h = new Horse();
         h.setId(10L);
@@ -1633,5 +1636,106 @@ class AiToolExecutionServiceTest {
         assertTrue(map.containsKey("groomWorkloadList"));
         assertNotNull(map.get("proposedStallTransfer"));
         assertEquals("/manager/staff", map.get("actionUrl"));
+    }
+@Test
+    @DisplayName("HEAD_TRAINER gọi recommendTrainerStrategy đề xuất toàn diện cự ly, mặt sân và điều chỉnh bài tập")
+    void testTrainer_RecommendTrainerStrategy() {
+        AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("THUNDER");
+        horse.setRegistrationNumber("VN-THUNDER");
+        horse.setTrainingDecision(TrainingDecision.ALLOWED);
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        HorseSpecialtyResponse specialty = new HorseSpecialtyResponse(
+                3,
+                List.of(DistanceBand.SPRINT),
+                SurfaceType.TURF,
+                List.of()
+        );
+        when(horseSpecialtyService.getSpecialties(List.of(10L))).thenReturn(Map.of(10L, specialty));
+
+        TrainingWorkout w1 = new TrainingWorkout();
+        w1.setTopSpeedKmh(new BigDecimal("60.5"));
+        w1.setActualDistanceMeters(new BigDecimal("1000"));
+        w1.setMaxHeartRate(125);
+        w1.setStatus(WorkoutStatus.COMPLETED);
+        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
+
+        Object result = toolExecutionService.executeTool("recommendTrainerStrategy", Map.of("horseId", 10L), trainer);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("THUNDER", map.get("tenNgua"));
+        assertEquals("VN-THUNDER", map.get("maDangKy"));
+        assertTrue(map.containsKey("chienLuocCuLyVaSanDua"));
+        assertTrue(map.containsKey("dieuChinhBaiTapKeTiep"));
+        assertEquals("/trainer/racing", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("VETERINARIAN gọi getUrgentCareAndIncidentAlerts tra cứu tổng hợp ca trực cấp cứu và sự cố chuồng trại 48h")
+    void testVet_GetUrgentCareAndIncidentAlerts() {
+        AuthenticatedUser vet = new AuthenticatedUser(300L, "vet@rtms.com", "VETERINARIAN");
+
+        CareSchedule cs = new CareSchedule();
+        cs.setId(501L);
+        cs.setHorseId(10L);
+        cs.setCareType(CareType.URGENT);
+        cs.setStatus(CareScheduleStatus.SCHEDULED);
+        cs.setDescription("Ngựa sốt cao đột ngột");
+        cs.setScheduledAt(LocalDateTime.of(2026, 10, 20, 14, 0));
+        cs.setVeterinarianId(300L);
+        when(careScheduleRepository.findByVeterinarianId(300L)).thenReturn(List.of(cs));
+
+        Horse h = new Horse();
+        h.setId(10L);
+        h.setName("LIGHTNING");
+        when(horseRepository.findAll()).thenReturn(List.of(h));
+
+        HorseIncidentReport rep = new HorseIncidentReport();
+        rep.setId(701L);
+        rep.setHorseId(10L);
+        rep.setTitle("Trầy xước chân trước");
+        rep.setReportedAt(LocalDateTime.now().minusHours(12));
+        when(horseIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(any())).thenReturn(List.of(rep));
+
+        Object result = toolExecutionService.executeTool("getUrgentCareAndIncidentAlerts", Map.of(), vet);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertTrue(map.containsKey("caTrucCapCuu"));
+        assertTrue(map.containsKey("suCoChuongTrai48h"));
+        assertEquals("/veterinarian/urgent", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi getAdmissionPipelineOverview xem tổng quan số lượng và chi tiết các đơn nhập đàn")
+    void testManager_GetAdmissionPipelineOverview() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(123L);
+        app.setOwnerId(50L);
+        app.setStatus(AdmissionStatus.MANAGER_REVIEW);
+        app.setSubmittedAt(LocalDateTime.of(2026, 10, 20, 10, 0));
+        when(admissionApplicationRepository.findAll()).thenReturn(List.of(app));
+        when(admissionApplicationRepository.findByStatus(AdmissionStatus.MANAGER_REVIEW)).thenReturn(List.of(app));
+
+        CandidateHorseProfile profile = new CandidateHorseProfile();
+        profile.setId(1L);
+        profile.setAdmissionId(123L);
+        profile.setName("PEGASUS JUNIOR");
+        when(candidateHorseProfileRepository.findByAdmissionId(123L)).thenReturn(Optional.of(profile));
+
+        Object result = toolExecutionService.executeTool("getAdmissionPipelineOverview", Map.of("status", "PENDING"), manager);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertTrue(map.containsKey("tongQuanSoLuong"));
+        assertTrue(map.containsKey("chiTietCacDon"));
+        assertEquals("/manager/admissions", map.get("actionUrl"));
     }
 }

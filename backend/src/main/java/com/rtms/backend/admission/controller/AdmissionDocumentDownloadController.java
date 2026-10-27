@@ -45,7 +45,7 @@ public class AdmissionDocumentDownloadController {
                 .filename(filename, StandardCharsets.UTF_8)
                 .build();
         return ResponseEntity.ok()
-                .contentType(storage.mediaType(document.getFileUrl()))
+                .contentType(storage.mediaType(document.getFileUrl(), filename))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .header("X-Content-Type-Options", "nosniff")
                 .body(file);

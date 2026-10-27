@@ -2,6 +2,7 @@ package com.rtms.backend.training.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.config.FarmSchedulePolicy;
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.training.dto.TrainingRulesResponse;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.SubjectService;
@@ -25,8 +26,11 @@ public class TrainingRulesController {
         return ApiResponse.success(new TrainingRulesResponse(
                 FarmSchedulePolicy.GOLDEN_HOURS_START,
                 FarmSchedulePolicy.GOLDEN_HOURS_END,
-                FarmSchedulePolicy.goldenWindowMinutes(),
                 FarmSchedulePolicy.DEFAULT_LOT_CAPACITY,
+                FarmSchedulePolicy.LOT_START_STEP_MINUTES,
+                TrainingLimits.MAX_COURSE_SESSIONS,
+                TrainingLimits.MAX_COURSE_SUBJECTS,
+                TrainingLimits.MAX_HORSES_PER_PLAN,
                 SubjectService.MIN_DURATION_MINUTES,
                 SubjectService.MAX_DURATION_MINUTES,
                 HorsePerformanceService.MAX_HEART_RATE_LIMIT,

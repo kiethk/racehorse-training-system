@@ -28,13 +28,11 @@ import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.entity.Area;
-import com.rtms.backend.stable.entity.GroomIncidentReport;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.enums.GroomTaskType;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
-import com.rtms.backend.stable.repository.GroomIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.stable.service.GroomDailyTaskService;
 import com.rtms.backend.training.dto.GroomConflictRow;
@@ -120,7 +118,6 @@ public class AiToolExecutionService {
     private final HorseSpecialtyService horseSpecialtyService;
     private final HorsePerformanceService horsePerformanceService;
     private final RacingReadinessAssessmentRepository racingReadinessAssessmentRepository;
-    private final GroomIncidentReportRepository groomIncidentReportRepository;
     private final AreaRepository areaRepository;
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
@@ -149,7 +146,6 @@ public class AiToolExecutionService {
                                   HorseSpecialtyService horseSpecialtyService,
                                   HorsePerformanceService horsePerformanceService,
                                   RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
-                                  GroomIncidentReportRepository groomIncidentReportRepository,
                                   AreaRepository areaRepository,
                                   @Autowired(required = false) UserRepository userRepository,
                                   @Autowired(required = false) CourseRepository courseRepository,
@@ -176,7 +172,6 @@ public class AiToolExecutionService {
         this.horseSpecialtyService = horseSpecialtyService;
         this.horsePerformanceService = horsePerformanceService;
         this.racingReadinessAssessmentRepository = racingReadinessAssessmentRepository;
-        this.groomIncidentReportRepository = groomIncidentReportRepository;
         this.areaRepository = areaRepository;
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
@@ -205,7 +200,6 @@ public class AiToolExecutionService {
                                   HorseSpecialtyService horseSpecialtyService,
                                   HorsePerformanceService horsePerformanceService,
                                   RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
-                                  GroomIncidentReportRepository groomIncidentReportRepository,
                                   AreaRepository areaRepository,
                                   UserRepository userRepository,
                                   CourseRepository courseRepository) {
@@ -213,7 +207,7 @@ public class AiToolExecutionService {
                 healthRecordRepository, careScheduleRepository, stableStallRepository, groomDailyTaskRepository,
                 groomDailyTaskService, admissionApplicationRepository, trainingLotRepository,
                 horseTrainingPlanRepository, horseSpecialtyService, horsePerformanceService,
-                racingReadinessAssessmentRepository, groomIncidentReportRepository, areaRepository,
+                racingReadinessAssessmentRepository, areaRepository,
                 userRepository, courseRepository, null, null, null, null, null, null, null, null);
     }
 
@@ -232,7 +226,6 @@ public class AiToolExecutionService {
                                   HorseSpecialtyService horseSpecialtyService,
                                   HorsePerformanceService horsePerformanceService,
                                   RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
-                                  GroomIncidentReportRepository groomIncidentReportRepository,
                                   AreaRepository areaRepository,
                                   UserRepository userRepository,
                                   CourseRepository courseRepository,
@@ -241,7 +234,7 @@ public class AiToolExecutionService {
                 healthRecordRepository, careScheduleRepository, stableStallRepository, groomDailyTaskRepository,
                 groomDailyTaskService, admissionApplicationRepository, trainingLotRepository,
                 horseTrainingPlanRepository, horseSpecialtyService, horsePerformanceService,
-                racingReadinessAssessmentRepository, groomIncidentReportRepository, areaRepository,
+                racingReadinessAssessmentRepository, areaRepository,
                 userRepository, courseRepository, auditLogRepository, null, null, null, null, null, null, null);
     }
 
@@ -260,7 +253,6 @@ public class AiToolExecutionService {
                                   HorseSpecialtyService horseSpecialtyService,
                                   HorsePerformanceService horsePerformanceService,
                                   RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
-                                  GroomIncidentReportRepository groomIncidentReportRepository,
                                   AreaRepository areaRepository,
                                   UserRepository userRepository,
                                   CourseRepository courseRepository,
@@ -270,7 +262,7 @@ public class AiToolExecutionService {
                 healthRecordRepository, careScheduleRepository, stableStallRepository, groomDailyTaskRepository,
                 groomDailyTaskService, admissionApplicationRepository, trainingLotRepository,
                 horseTrainingPlanRepository, horseSpecialtyService, horsePerformanceService,
-                racingReadinessAssessmentRepository, groomIncidentReportRepository, areaRepository,
+                racingReadinessAssessmentRepository, areaRepository,
                 userRepository, courseRepository, auditLogRepository, candidateHorseProfileRepository,
                 null, null, null, null, null, null);
     }
@@ -290,13 +282,12 @@ public class AiToolExecutionService {
                                   HorseSpecialtyService horseSpecialtyService,
                                   HorsePerformanceService horsePerformanceService,
                                   RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
-                                  GroomIncidentReportRepository groomIncidentReportRepository,
                                   AreaRepository areaRepository) {
         this(toolRegistryService, clinicalRetrievalService, horseRepository, trainingWorkoutRepository,
                 healthRecordRepository, careScheduleRepository, stableStallRepository, groomDailyTaskRepository,
                 groomDailyTaskService, admissionApplicationRepository, trainingLotRepository,
                 horseTrainingPlanRepository, horseSpecialtyService, horsePerformanceService,
-                racingReadinessAssessmentRepository, groomIncidentReportRepository, areaRepository,
+                racingReadinessAssessmentRepository, areaRepository,
                 null, null, null, null, null, null, null, null, null, null);
     }
 
@@ -349,17 +340,19 @@ public class AiToolExecutionService {
             case "analyzeWorkoutLoadAndOvertrainingRisk" -> handleAnalyzeWorkoutLoadAndOvertrainingRisk(args);
             case "recommendOptimalRaceDistanceAndTrack" -> handleRecommendOptimalRaceDistanceAndTrack(args);
             case "recommendNextWorkoutAdjustment" -> handleRecommendNextWorkoutAdjustment(args);
+            case "recommendTrainerStrategy" -> handleRecommendTrainerStrategy(args);
 
             // VETERINARIAN Tools
             case "searchClinicalKnowledge" -> handleSearchClinicalKnowledge(args, currentUser);
-            case "getVetExaminationOverview" -> handleGetVetExaminationOverview();
+            case "getVetExaminationOverview" -> handleGetVetExaminationOverview(currentUser);
             case "getHorseMedicalHistory" -> handleGetHorseMedicalHistory(args);
-            case "getActivePrescriptions" -> handleGetActivePrescriptions(args);
+            case "getActivePrescriptions" -> handleGetActivePrescriptions(args, currentUser);
             case "getPreventiveCareSchedule" -> handleGetPreventiveCareSchedule(args);
             case "getQuarantineStatus" -> handleGetQuarantineStatus();
             case "getRecentIncidentReports" -> handleGetRecentIncidentReports();
-            case "getPendingAdmissionExams" -> handleGetPendingAdmissionExams();
-            case "getUrgentCareAlerts" -> handleGetUrgentCareAlerts();
+            case "getPendingAdmissionExams" -> handleGetPendingAdmissionExams(currentUser);
+            case "getUrgentCareAlerts" -> handleGetUrgentCareAlerts(currentUser);
+            case "getUrgentCareAndIncidentAlerts" -> handleGetUrgentCareAndIncidentAlerts(currentUser);
             case "getHorseVitalSignsTrend" -> handleGetHorseVitalSignsTrend(args);
             case "analyzeIncidentPatternsAndRecurringRisks" -> handleAnalyzeIncidentPatternsAndRecurringRisks(args);
             case "recommendClinicalInterventionPlan" -> handleRecommendClinicalInterventionPlan(args, currentUser);
@@ -385,6 +378,7 @@ public class AiToolExecutionService {
             case "getClubHorsesDirectory" -> handleGetClubHorsesDirectory(args);
             case "getRecentAuditLogs" -> handleGetRecentAuditLogs(args);
             case "getAdmissionPipelineDetails" -> handleGetAdmissionPipelineDetails(args);
+            case "getAdmissionPipelineOverview" -> handleGetAdmissionPipelineOverview(args);
             case "analyzeStableCapacityAndStallBottlenecks" -> handleAnalyzeStableCapacityAndStallBottlenecks();
             case "recommendGroomWorkloadRebalancing" -> handleRecommendGroomWorkloadRebalancing();
 
@@ -613,19 +607,6 @@ public class AiToolExecutionService {
         if (horseIncidentReportRepository != null) {
             List<HorseIncidentReport> reports = horseIncidentReportRepository.findByHorseId(horse.getId());
             for (HorseIncidentReport r : reports) {
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("horseName", horse.getName());
-                item.put("title", r.getTitle());
-                item.put("description", r.getDescription() != null ? r.getDescription() : "");
-                item.put("timestamp", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
-                item.put("status", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
-                item.put("actionUrl", horse != null && horse.getId() != null ? "/owner/horses/" + horse.getId() : "/owner/horses");
-                result.add(item);
-            }
-        }
-        if (result.isEmpty() && groomIncidentReportRepository != null) {
-            List<GroomIncidentReport> gReports = groomIncidentReportRepository.findByHorseId(horse.getId());
-            for (GroomIncidentReport r : gReports) {
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("horseName", horse.getName());
                 item.put("title", r.getTitle());
@@ -1255,13 +1236,11 @@ public class AiToolExecutionService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("horseName", horse.getName());
         result.put("readinessStatus", r.getReadinessStatus());
-        result.put("fitnessScore", r.getFitnessScore());
         result.put("conformationScore", r.getConformationScore());
         result.put("temperamentScore", r.getTemperamentScore());
         result.put("racingFormScore", r.getGaitQualityScore());
         result.put("estimatedMonthsToRace", r.getEstimatedMonthsToRace());
         result.put("assessmentDate", r.getAssessmentDate());
-        result.put("evaluatedUpToDate", r.getValidUntil());
         result.put("expertReview", r.getRemarks());
         return result;
     }
@@ -1439,7 +1418,6 @@ public class AiToolExecutionService {
             item.put("courseName", c.getName());
             item.put("targetGoal", c.getTargetGoal() != null ? c.getTargetGoal() : "Rèn luyện thể lực");
             item.put("totalSessions", c.getTotalSessions() != null ? c.getTotalSessions() : 0);
-            item.put("description", c.getDescription() != null ? c.getDescription() : "");
             courseList.add(item);
         }
 
@@ -1661,6 +1639,23 @@ public class AiToolExecutionService {
         return result;
     }
 
+private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
+        Horse horse = resolveHorse(args);
+        if (horse == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
+        }
+        Object raceObj = handleRecommendOptimalRaceDistanceAndTrack(args);
+        Object workoutObj = handleRecommendNextWorkoutAdjustment(args);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenNgua", horse.getName());
+        result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
+        result.put("chienLuocCuLyVaSanDua", raceObj);
+        result.put("dieuChinhBaiTapKeTiep", workoutObj);
+        result.put("actionUrl", "/trainer/racing");
+        return result;
+    }
+
     // =================================================================
     // VETERINARIAN Handlers
     // =================================================================
@@ -1676,8 +1671,8 @@ public class AiToolExecutionService {
         return chunks;
     }
 
-    private Object handleGetVetExaminationOverview() {
-        List<CareSchedule> allSchedules = careScheduleRepository.findAll();
+    private Object handleGetVetExaminationOverview(AuthenticatedUser currentUser) {
+        List<CareSchedule> allSchedules = careScheduleRepository.findByVeterinarianId(currentUser.getUserId());
         Map<Long, String> horseNames = horseRepository.findAll().stream()
                 .collect(Collectors.toMap(Horse::getId, Horse::getName, (a, b) -> a));
 
@@ -1729,14 +1724,16 @@ public class AiToolExecutionService {
         return list;
     }
 
-    private Object handleGetActivePrescriptions(Map<String, Object> args) {
+    private Object handleGetActivePrescriptions(Map<String, Object> args, AuthenticatedUser currentUser) {
         Horse horse = resolveHorse(args);
         if (horse == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
         }
         List<CareSchedule> active = careScheduleRepository.findByHorseIdAndStatusIn(
                 horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
-        );
+        ).stream()
+                .filter(cs -> cs.getVeterinarianId() == null || cs.getVeterinarianId().equals(currentUser.getUserId()))
+                .toList();
         List<Map<String, Object>> result = new ArrayList<>();
         for (CareSchedule cs : active) {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -1854,12 +1851,14 @@ public class AiToolExecutionService {
 
     private Object handleGetRecentIncidentReports() {
         LocalDateTime cutoff = LocalDateTime.now().minusHours(48);
-        List<GroomIncidentReport> reports = groomIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(cutoff);
+        List<HorseIncidentReport> reports = (horseIncidentReportRepository != null)
+                ? horseIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(cutoff)
+                : Collections.emptyList();
         Map<Long, String> horseNames = horseRepository.findAll().stream()
                 .collect(Collectors.toMap(Horse::getId, Horse::getName, (a, b) -> a));
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (GroomIncidentReport r : reports) {
+        for (HorseIncidentReport r : reports) {
             Map<String, Object> item = new LinkedHashMap<>();
             String horseName = horseNames.getOrDefault(r.getHorseId(), "Ngựa #" + r.getHorseId());
             String groomName = "Groom phụ trách";
@@ -1879,10 +1878,15 @@ public class AiToolExecutionService {
         );
     }
 
-    private Object handleGetPendingAdmissionExams() {
+    private Object handleGetPendingAdmissionExams(AuthenticatedUser currentUser) {
         List<AdmissionApplication> apps = admissionApplicationRepository.findAllByOrderBySubmittedAtDesc();
+        Set<Long> vetAdmissionIds = careScheduleRepository.findByVeterinarianId(currentUser.getUserId()).stream()
+                .filter(cs -> cs.getCareType() == CareType.INITIAL && cs.getAdmissionId() != null)
+                .map(CareSchedule::getAdmissionId)
+                .collect(Collectors.toSet());
         List<AdmissionApplication> pendingVetApps = apps.stream()
                 .filter(a -> a.getStatus() == AdmissionStatus.VET_REVIEW)
+                .filter(a -> vetAdmissionIds.contains(a.getId()))
                 .toList();
 
         List<Long> appIds = pendingVetApps.stream().map(AdmissionApplication::getId).toList();
@@ -1915,10 +1919,12 @@ public class AiToolExecutionService {
         return response;
     }
 
-    private Object handleGetUrgentCareAlerts() {
-        List<CareSchedule> all = careScheduleRepository.findAll();
+    private Object handleGetUrgentCareAlerts(AuthenticatedUser currentUser) {
+        List<CareSchedule> all = careScheduleRepository.findByVeterinarianId(currentUser.getUserId());
         List<CareSchedule> urgent = all.stream()
-                .filter(cs -> cs.getCareType() == CareType.URGENT && cs.getStatus() != CareScheduleStatus.COMPLETED)
+                .filter(cs -> cs.getCareType() == CareType.URGENT
+                        && cs.getStatus() != CareScheduleStatus.COMPLETED
+                        && cs.getStatus() != CareScheduleStatus.CANCELLED)
                 .toList();
 
         Map<Long, Horse> horses = horseRepository.findAll().stream()
@@ -1944,6 +1950,17 @@ public class AiToolExecutionService {
         response.put("alertList", result);
         response.put("actionUrl", "/veterinarian/urgent");
         return response;
+    }
+
+private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUser) {
+        Object urgentCare = handleGetUrgentCareAlerts(currentUser);
+        Object recentIncidents = handleGetRecentIncidentReports();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("caTrucCapCuu", urgentCare);
+        result.put("suCoChuongTrai48h", recentIncidents);
+        result.put("actionUrl", "/veterinarian/urgent");
+        return result;
     }
 
     private Object handleGetHorseVitalSignsTrend(Map<String, Object> args) {
@@ -2289,22 +2306,6 @@ public class AiToolExecutionService {
                 result.add(item);
             }
         }
-        if (result.isEmpty() && groomIncidentReportRepository != null) {
-            List<GroomIncidentReport> gReports = groomIncidentReportRepository.findByGroomId(currentUser.getUserId());
-            for (GroomIncidentReport r : gReports) {
-                if (r.getReportedAt() != null && r.getReportedAt().isBefore(cutoff)) {
-                    continue;
-                }
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("horseName", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
-                item.put("title", r.getTitle());
-                item.put("severity", r.getSeverity() != null ? r.getSeverity().name() : "MEDIUM");
-                item.put("reportedAt", r.getReportedAt() != null ? r.getReportedAt().toString() : "N/A");
-                item.put("incidentStatus", r.getStatus() != null ? r.getStatus().name() : "REPORTED");
-                item.put("actionUrl", "/groom/incidents");
-                result.add(item);
-            }
-        }
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("totalReportedIncidents", result.size());
         response.put("incidentList", result);
@@ -2582,7 +2583,9 @@ public class AiToolExecutionService {
         long blockedCount = horses.stream().filter(h -> h.getTrainingDecision() == TrainingDecision.BLOCKED).count();
 
         LocalDateTime weekAgo = LocalDateTime.now().minusDays(7);
-        List<GroomIncidentReport> weekIncidents = groomIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(weekAgo);
+        List<HorseIncidentReport> weekIncidents = (horseIncidentReportRepository != null)
+                ? horseIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(weekAgo)
+                : Collections.emptyList();
 
         return Map.of("totalClubHorses", horses.size(), "allowedTrainingHorses", allowedCount, "medicallyBlockedHorsesCount", blockedCount, "incidentsLast7DaysCount", weekIncidents.size()
         );
@@ -2975,6 +2978,17 @@ public class AiToolExecutionService {
 
             result.add(item);
         }
+        return result;
+    }
+
+private Object handleGetAdmissionPipelineOverview(Map<String, Object> args) {
+        Object overview = handleGetAdmissionRequestsOverview();
+        Object details = handleGetAdmissionPipelineDetails(args);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tongQuanSoLuong", overview);
+        result.put("chiTietCacDon", details);
+        result.put("actionUrl", "/manager/admissions");
         return result;
     }
 

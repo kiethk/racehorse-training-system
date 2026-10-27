@@ -16,6 +16,7 @@ import com.rtms.backend.training.repository.SubjectRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -110,7 +111,6 @@ class CourseServiceTest {
     void testCreateCourse_Success() {
         CreateCourseRequest req = new CreateCourseRequest();
         req.setName("Sprint 1200m course");
-        req.setDescription("Sprint training");
         req.setTargetGoal("Prepare for the autumn race");
         req.setTotalSessions(12);
 
@@ -124,9 +124,8 @@ class CourseServiceTest {
 
         req.setSubjects(List.of(item1, item2));
 
-        when(courseRepository.existsByNameAndTrainerId("Sprint 1200m course", 9L)).thenReturn(false);
-        when(subjectRepository.existsById(1L)).thenReturn(true);
-        when(subjectRepository.existsById(2L)).thenReturn(true);
+        when(courseRepository.existsByNameIgnoreCaseAndTrainerId("Sprint 1200m course", 9L)).thenReturn(false);
+        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject(1L, 9L), subject(2L, 9L)));
 
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> {
             Course c = inv.getArgument(0);
@@ -156,9 +155,9 @@ class CourseServiceTest {
     @DisplayName("5. Rejects a course whose name already exists")
     void testCreateCourse_DuplicateName_ThrowsIllegalArgument() {
         CreateCourseRequest req = new CreateCourseRequest();
-        req.setName("Existing course");
+        req.setName("  Existing course ");
 
-        when(courseRepository.existsByNameAndTrainerId("Existing course", 9L)).thenReturn(true);
+        when(courseRepository.existsByNameIgnoreCaseAndTrainerId("Existing course", 9L)).thenReturn(true);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> courseService.createCourse(req, trainerUser));
@@ -174,17 +173,109 @@ class CourseServiceTest {
         item.setSubjectId(999L);
         req.setSubjects(List.of(item));
 
-        when(courseRepository.existsByNameAndTrainerId("Trial course", 9L)).thenReturn(false);
+        when(courseRepository.existsByNameIgnoreCaseAndTrainerId("Trial course", 9L)).thenReturn(false);
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> {
             Course c = inv.getArgument(0);
             c.setId(101L);
             return c;
         });
-        when(subjectRepository.existsById(999L)).thenReturn(false);
+        when(subjectRepository.findAllById(any())).thenReturn(List.of());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> courseService.createCourse(req, trainerUser));
         assertTrue(ex.getMessage().contains("Subject not found"));
+    }
+
+    @Test
+    @DisplayName("6b. Rejects a course that lists the same subject twice")
+    void testCreateCourse_DuplicateSubject_ThrowsIllegalArgument() {
+        CreateCourseRequest req = new CreateCourseRequest();
+        req.setName("Trial course");
+        CourseSubjectItemRequest first = new CourseSubjectItemRequest();
+        first.setSubjectId(1L);
+        CourseSubjectItemRequest again = new CourseSubjectItemRequest();
+        again.setSubjectId(1L);
+        req.setSubjects(List.of(first, again));
+
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> courseService.createCourse(req, trainerUser));
+        assertTrue(ex.getMessage().contains("already in this course"));
+        verify(courseSubjectRepository, never()).save(any(CourseSubject.class));
+    }
+
+    @Test
+    @DisplayName("6c. The rotation is renumbered 1..n: duplicate, negative or missing order numbers cannot reach the DB")
+    void testCreateCourse_RenumbersTheRotation() {
+        CreateCourseRequest req = new CreateCourseRequest();
+        req.setName("Renumbered");
+        req.setTotalSessions(6);
+        req.setSubjects(List.of(item(11L, 7), item(12L, 7), item(13L, null), item(14L, 2)));
+
+        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject(11L, 9L), subject(12L, 9L), subject(13L, 9L), subject(14L, 9L)));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> {
+            Course c = inv.getArgument(0);
+            c.setId(102L);
+            return c;
+        });
+        when(courseSubjectRepository.save(any(CourseSubject.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        courseService.createCourse(req, trainerUser);
+
+        ArgumentCaptor<CourseSubject> saved = ArgumentCaptor.forClass(CourseSubject.class);
+        verify(courseSubjectRepository, times(4)).save(saved.capture());
+        // sorted by the number sent (2, 7, 7), the one without a number last, ties kept in the order sent
+        assertEquals(List.of(14L, 11L, 12L, 13L), saved.getAllValues().stream().map(CourseSubject::getSubjectId).toList());
+        assertEquals(List.of(1, 2, 3, 4), saved.getAllValues().stream().map(CourseSubject::getOrderIndex).toList());
+    }
+
+    @Test
+    @DisplayName("6d. The owner of the course is the signed-in trainer, whatever the request says")
+    void testCreateCourse_OwnerIsTheSignedInTrainer() {
+        CreateCourseRequest req = new CreateCourseRequest();
+        req.setName("Mine");
+        req.setTotalSessions(6);
+        req.setSubjects(List.of(item(1L, 1)));
+        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject(1L, 9L)));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(courseSubjectRepository.save(any(CourseSubject.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        courseService.createCourse(req, trainerUser);
+
+        ArgumentCaptor<Course> saved = ArgumentCaptor.forClass(Course.class);
+        verify(courseRepository).save(saved.capture());
+        assertEquals(9L, saved.getValue().getTrainerId());
+        assertEquals(9L, saved.getValue().getCreatedById());
+    }
+
+    @Test
+    @DisplayName("6e. A subject of another trainer cannot be put in the course")
+    void testCreateCourse_SubjectOfAnotherTrainer() {
+        CreateCourseRequest req = new CreateCourseRequest();
+        req.setName("Mixed");
+        req.setSubjects(List.of(item(1L, 1)));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject(1L, 10L)));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> courseService.createCourse(req, trainerUser));
+        assertTrue(ex.getMessage().contains("does not belong to this trainer"));
+    }
+
+    private static CourseSubjectItemRequest item(Long subjectId, Integer orderIndex) {
+        CourseSubjectItemRequest item = new CourseSubjectItemRequest();
+        item.setSubjectId(subjectId);
+        item.setOrderIndex(orderIndex);
+        return item;
+    }
+
+    private static Subject subject(Long id, Long trainerId) {
+        Subject subject = new Subject();
+        subject.setId(id);
+        subject.setName("Subject " + id);
+        subject.setTrainerId(trainerId);
+        return subject;
     }
 
     @Test
@@ -193,9 +284,12 @@ class CourseServiceTest {
         Long courseId = 5L;
         CourseSubjectItemRequest req = new CourseSubjectItemRequest();
         req.setSubjectId(20L);
-        req.setOrderIndex(3);
 
-        when(courseRepository.existsById(courseId)).thenReturn(true);
+        Course course = new Course();
+        course.setId(courseId);
+        course.setTrainerId(9L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseSubjectRepository.findMaxOrderIndex(courseId)).thenReturn(2);
 
         Subject subject = new Subject();
         subject.setId(20L);
@@ -208,12 +302,12 @@ class CourseServiceTest {
             return cs;
         });
 
-        CourseSubjectResponse res = courseService.addSubjectToCourse(courseId, req);
+        CourseSubjectResponse res = courseService.addSubjectToCourse(courseId, req, trainerUser);
 
         assertNotNull(res);
         assertEquals(777L, res.getId());
         assertEquals("Gallop", res.getSubjectName());
-        assertEquals(3, res.getOrderIndex());
+        assertEquals(3, res.getOrderIndex(), "A new subject goes to the end of the rotation");
     }
 
     @Test
@@ -222,10 +316,10 @@ class CourseServiceTest {
         CourseSubjectItemRequest req = new CourseSubjectItemRequest();
         req.setSubjectId(1L);
 
-        when(courseRepository.existsById(999L)).thenReturn(false);
+        when(courseRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class,
-                () -> courseService.addSubjectToCourse(999L, req));
+                () -> courseService.addSubjectToCourse(999L, req, trainerUser));
     }
 
     // =================================================================
@@ -265,9 +359,10 @@ class CourseServiceTest {
 
         CourseSubjectItemRequest req = new CourseSubjectItemRequest();
         req.setSubjectId(50L);
-        req.setOrderIndex(2);
 
-        when(courseRepository.existsById(courseId)).thenReturn(true);
+        Course course = new Course();
+        course.setId(courseId);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
         when(subjectRepository.findById(50L)).thenReturn(Optional.of(sub));
         when(courseSubjectRepository.save(any(CourseSubject.class)))
                 .thenAnswer(i -> {
@@ -276,7 +371,7 @@ class CourseServiceTest {
                     return saved;
                 });
 
-        CourseSubjectResponse res = courseService.addSubjectToCourse(courseId, req);
+        CourseSubjectResponse res = courseService.addSubjectToCourse(courseId, req, trainerUser);
 
         assertEquals(60, res.getDurationMinutes());
     }
@@ -323,7 +418,6 @@ class CourseServiceTest {
         otherSubject.setName("Other Trainer Subject");
         otherSubject.setTrainerId(10L); // different trainer
 
-        when(courseRepository.existsById(5L)).thenReturn(true);
         when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
         when(subjectRepository.findById(20L)).thenReturn(Optional.of(otherSubject));
 
@@ -331,7 +425,58 @@ class CourseServiceTest {
         req.setSubjectId(20L);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> courseService.addSubjectToCourse(5L, req));
-        assertTrue(ex.getMessage().contains("does not belong to this course's trainer"));
+                () -> courseService.addSubjectToCourse(5L, req, trainerUser));
+        assertTrue(ex.getMessage().contains("does not belong to this trainer"));
+    }
+
+    @Test
+    @DisplayName("Another trainer cannot add anything to my course")
+    void testAddSubjectToCourse_NotMyCourse_IsNotFound() {
+        Course course = new Course();
+        course.setId(5L);
+        course.setTrainerId(10L);   // the course belongs to trainer 10, the caller is trainer 9
+        when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
+
+        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
+        req.setSubjectId(20L);
+
+        assertThrows(RuntimeException.class, () -> courseService.addSubjectToCourse(5L, req, trainerUser));
+        verify(courseSubjectRepository, never()).save(any(CourseSubject.class));
+    }
+
+    @Test
+    @DisplayName("A subject already in the course is not added twice")
+    void testAddSubjectToCourse_Duplicate() {
+        Course course = new Course();
+        course.setId(5L);
+        course.setTrainerId(9L);
+        when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
+        when(subjectRepository.findById(20L)).thenReturn(Optional.of(subject(20L, 9L)));
+        when(courseSubjectRepository.existsByCourseIdAndSubjectId(5L, 20L)).thenReturn(true);
+
+        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
+        req.setSubjectId(20L);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> courseService.addSubjectToCourse(5L, req, trainerUser));
+        assertTrue(ex.getMessage().contains("already in this course"));
+    }
+
+    @Test
+    @DisplayName("A course never grows past the subject limit")
+    void testAddSubjectToCourse_SubjectLimit() {
+        Course course = new Course();
+        course.setId(5L);
+        course.setTrainerId(9L);
+        when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
+        when(subjectRepository.findById(20L)).thenReturn(Optional.of(subject(20L, 9L)));
+        when(courseSubjectRepository.countByCourseId(5L)).thenReturn((long) com.rtms.backend.config.TrainingLimits.MAX_COURSE_SUBJECTS);
+
+        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
+        req.setSubjectId(20L);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> courseService.addSubjectToCourse(5L, req, trainerUser));
+        assertTrue(ex.getMessage().contains("at most"));
     }
 }

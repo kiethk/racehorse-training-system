@@ -237,7 +237,7 @@ export function RoutineChecksWorkspace() {
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <HorseAvatar name={horseName} image={null} size={42} rounded="md" />
+                      <HorseAvatar name={horseName} image={horse?.imageUrl} size={42} rounded="md" />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-base font-bold text-[var(--color-text-primary)] truncate">

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { BackLink } from '@/components/ui/BackLink';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
@@ -180,22 +181,12 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-            Incident Report
-          </h1>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            Report unusual symptoms or injuries to the veterinary team.
-          </p>
-        </div>
-        <Link
-          href="/groom/incidents"
-          className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-        >
-          <Icon name="arrow-left" size={14} /> Back to reports
-        </Link>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <BackLink href="/groom/incidents">Back to reports</BackLink>
+        <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
+          Incident Report
+        </h1>
       </div>
 
       {error && (

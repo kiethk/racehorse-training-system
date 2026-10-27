@@ -6,6 +6,7 @@ import com.rtms.backend.training.dto.CreateSubjectRequest;
 import com.rtms.backend.training.entity.Subject;
 import com.rtms.backend.training.enums.SubjectCategory;
 import com.rtms.backend.training.service.SubjectService;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -42,7 +43,7 @@ public class SubjectController {
     @PreAuthorize("hasAuthority('SUBJECT_MANAGE')")
     @PostMapping
     public ApiResponse<Subject> createSubject(
-            @RequestBody CreateSubjectRequest request,
+            @Valid @RequestBody CreateSubjectRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(subjectService.createSubject(request, currentUser));
     }

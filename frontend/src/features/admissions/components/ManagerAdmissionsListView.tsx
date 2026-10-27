@@ -108,7 +108,11 @@ export function ManagerAdmissionsListView() {
         
         return true;
       })
-      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+      .sort(
+        (a, b) =>
+          (new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()) ||
+          (b.admissionId - a.admissionId)
+      );
   }, [admissions, urlFilters]);
 
   const updateUrl = (filters: ManagerQueueFilters) => {

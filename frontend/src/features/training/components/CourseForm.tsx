@@ -13,11 +13,11 @@ import {
   Pill,
   SearchInput,
   SectionTitle,
-  Textarea,
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { CATEGORY_OPTIONS, intensityOption, surfaceLabel } from '../lib/subjectOptions';
 import type { CreateCourseRequest, Subject, SubjectCategory } from '../types';
+import { useTrainingRules } from '../hooks/useTrainingRules';
 import { subjectDragDrop } from './subjectDragDrop';
 
 const DEFAULT_SESSIONS = 12;
@@ -50,8 +50,8 @@ function CourseFormContent({
   onSubmit,
   onCancel,
 }: CourseFormProps) {
+  const rules = useTrainingRules();
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [targetGoal, setTargetGoal] = useState('');
   const [totalSessions, setTotalSessions] = useState(DEFAULT_SESSIONS);
   const [rotation, setRotation] = useState<number[]>([]);
@@ -83,10 +83,19 @@ function CourseFormContent({
     },
   });
 
+  const sessionsError =
+    !Number.isInteger(totalSessions) || totalSessions < 1 || (rules && totalSessions > rules.maxCourseSessions)
+      ? `Enter a whole number from 1 to ${rules?.maxCourseSessions ?? 60}.`
+      : null;
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!name.trim() || totalSessions <= 0) {
+    if (!name.trim() || sessionsError) {
       setValidation('Enter a course name and a valid number of sessions.');
+      return;
+    }
+    if (rules && rotation.length > rules.maxCourseSubjects) {
+      setValidation(`A course can have at most ${rules.maxCourseSubjects} subjects.`);
       return;
     }
     if (rotation.length === 0) {
@@ -96,7 +105,6 @@ function CourseFormContent({
     setValidation(null);
     onSubmit({
       name: name.trim(),
-      description: description.trim() || undefined,
       targetGoal: targetGoal.trim() || undefined,
       totalSessions: Number(totalSessions),
       subjects: rotation.map((subjectId, index) => ({ subjectId, orderIndex: index + 1 })),
@@ -124,17 +132,15 @@ function CourseFormContent({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Sprint 2YO Foundation"
+                maxLength={255}
                 disabled={submitting}
               />
             </FormField>
-            <FormField
-              label="Total sessions"
-              required
-              hint="Subjects repeat in order until the total number of sessions is reached."
-            >
+            <FormField label="Total sessions" required error={sessionsError ?? undefined}>
               <Input
                 type="number"
                 min={1}
+                max={rules?.maxCourseSessions}
                 value={totalSessions}
                 onChange={(e) => setTotalSessions(Number(e.target.value))}
                 disabled={submitting}
@@ -147,16 +153,7 @@ function CourseFormContent({
               value={targetGoal}
               onChange={(e) => setTargetGoal(e.target.value)}
               placeholder="e.g. Prepare for short-distance races"
-              disabled={submitting}
-            />
-          </FormField>
-
-          <FormField label="Course description">
-            <Textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe the training path and suitable fitness level…"
+              maxLength={1000}
               disabled={submitting}
             />
           </FormField>
@@ -164,12 +161,7 @@ function CourseFormContent({
           {/* Course Subject Rotation (Drop Zone) */}
           <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
             <div className="flex items-center justify-between gap-2">
-              <div>
-                <FieldLabel>Subject rotation ({rotation.length} selected)</FieldLabel>
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  Drag subjects from the library on the right into this rotation, or select a subject and click &ldquo;Add selected subject&rdquo;.
-                </p>
-              </div>
+              <FieldLabel>Subject rotation ({rotation.length} selected)</FieldLabel>
               {rotation.length > 0 && (
                 <Button
                   type="button"

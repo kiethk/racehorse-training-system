@@ -1,13 +1,18 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { getNavigationForRole, isNavItemActive } from '@/config/navigation';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { useSidebarState } from './useSidebarState';
-import { AiChatWidget } from '@/features/ai';
+
+const AiChatWidget = dynamic(
+  () => import('@/features/ai').then((mod) => mod.AiChatWidget),
+  { ssr: false }
+);
 
 /** Persistent frame for every signed-in page: left sidebar, top bar, content. */
 export function AppShell({ children }: { children: ReactNode }) {

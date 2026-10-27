@@ -1,8 +1,10 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.config.ApiException;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.LotHorseNameRow;
+import com.rtms.backend.training.dto.LotLoadRow;
 import com.rtms.backend.training.dto.TrainingLotResponse;
 import com.rtms.backend.training.dto.TrainingLotRow;
 import com.rtms.backend.training.entity.Subject;
@@ -13,14 +15,18 @@ import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.SubjectRepository;
 import com.rtms.backend.training.repository.TrainingLotRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -41,6 +47,11 @@ import java.util.stream.Collectors;
  */
 @Service
 public class TrainingLotService {
+
+    private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    /** Tên miền của khóa lịch, để khóa của Trainer không đụng khóa advisory của chức năng khác. (Namespace of the schedule lock.) */
+    private static final long SCHEDULE_LOCK_NAMESPACE = 0x5254_4D53_0000_0000L;
 
     private final TrainingLotRepository lotRepository;
     private final TrainingWorkoutRepository workoutRepository;
@@ -84,9 +95,16 @@ public class TrainingLotService {
     public TrainingLot findOrCreateLot(Long trainerId, LocalDate date,
                                        Subject subject, Long groomId) {
 
+        LocalTime notBefore = earliestStartOn(date);
+
         // ---------- BƯỚC 1 (STEP 1) ----------
+        // Chỉ ghép vào lot còn SCHEDULED và chưa bắt đầu: lot đã COMPLETED hay đã chạy rồi không nhận thêm ngựa.
+        // (Only join a lot that is still SCHEDULED and has not started: a COMPLETED or running lot takes no more horses.)
         List<TrainingLot> sameSubjectLots =
-                lotRepository.findActiveLotsOfDayBySubject(trainerId, date, subject.getId());
+                lotRepository.findActiveLotsOfDayBySubject(trainerId, date, subject.getId()).stream()
+                        .filter(lot -> lot.getStatus() == LotStatus.SCHEDULED)
+                        .filter(lot -> !lot.getStartTime().isBefore(notBefore))
+                        .toList();
 
         for (TrainingLot lot : sameSubjectLots) {
             long occupied = workoutRepository
@@ -106,20 +124,11 @@ public class TrainingLotService {
         // ---------- BƯỚC 2 (STEP 2) ----------
         int duration = subject.getDurationMinutes();
         List<TrainingLot> dayLots = lotRepository.findActiveLotsOfDay(trainerId, date);
-        LocalTime slot = findFirstFreeSlot(dayLots, duration);
+        LocalTime slot = findFirstFreeSlot(dayLots, duration, notBefore);
 
         // ---------- BƯỚC 3 (STEP 3) ----------
         if (slot == null) {
-            long usedMinutes = dayLots.stream()
-                    .mapToLong(l -> Duration.between(l.getStartTime(), l.getEndTime()).toMinutes())
-                    .sum();
-            throw new IllegalStateException(String.format(
-                    "Your schedule on %s is full. Subject '%s' needs %d minutes but the golden window "
-                  + "%s–%s (%d minutes) already uses %d minutes for %d lots, leaving no free slot that is wide enough. "
-                  + "Change the start date or choose a course with shorter subjects.",
-                    date, subject.getName(), duration,
-                    FarmSchedulePolicy.GOLDEN_HOURS_START, FarmSchedulePolicy.GOLDEN_HOURS_END,
-                    FarmSchedulePolicy.goldenWindowMinutes(), usedMinutes, dayLots.size()));
+            throw scheduleFull(date);
         }
 
         TrainingLot lot = new TrainingLot();
@@ -132,6 +141,35 @@ public class TrainingLotService {
         lot.setStatus(LotStatus.SCHEDULED);
 
         return lotRepository.saveAndFlush(lot);
+    }
+
+    private ApiException scheduleFull(LocalDate date) {
+        return new ApiException(HttpStatus.CONFLICT, "SCHEDULE_FULL",
+                "Your schedule on " + date.format(DAY_FORMAT) + " is full.");
+    }
+
+    /**
+     * Giờ sớm nhất một lot của ngày này được bắt đầu: đầu khung giờ vàng, còn hôm nay thì không sớm hơn lúc này (làm tròn LÊN
+     * mốc 15 phút), vì không xếp buổi tập vào một giờ đã trôi qua.
+     * (The earliest a lot of this day may start: the start of the golden window, and for today no earlier than now (rounded UP
+     * to the 15-minute step), because no workout is placed at a time that has already passed.)
+     */
+    LocalTime earliestStartOn(LocalDate date) {
+        if (!date.equals(LocalDate.now())) {
+            return FarmSchedulePolicy.GOLDEN_HOURS_START;
+        }
+        LocalTime now = LocalTime.now();
+        if (!now.isBefore(FarmSchedulePolicy.GOLDEN_HOURS_END)) {
+            return FarmSchedulePolicy.GOLDEN_HOURS_END;
+        }
+        LocalTime rounded = FarmSchedulePolicy.roundUpToLotStartStep(now);
+        return rounded.isBefore(FarmSchedulePolicy.GOLDEN_HOURS_START) ? FarmSchedulePolicy.GOLDEN_HOURS_START : rounded;
+    }
+
+    /** Khóa lịch của Trainer đến hết transaction. (Locks the trainer schedule until the end of the transaction.) */
+    @Transactional
+    public void lockSchedule(Long trainerId) {
+        lotRepository.lockSchedule(SCHEDULE_LOCK_NAMESPACE + trainerId);
     }
 
     // =================================================================
@@ -161,7 +199,13 @@ public class TrainingLotService {
      * O(n log n) and easy to explain.)
      */
     LocalTime findFirstFreeSlot(List<TrainingLot> lotsOfDay, int durationMinutes) {
-        LocalTime cursor = FarmSchedulePolicy.GOLDEN_HOURS_START;
+        return findFirstFreeSlot(lotsOfDay, durationMinutes, FarmSchedulePolicy.GOLDEN_HOURS_START);
+    }
+
+    /** Như trên nhưng không trả giờ sớm hơn {@code notBefore}. (As above, but never returns a time before {@code notBefore}.) */
+    LocalTime findFirstFreeSlot(List<TrainingLot> lotsOfDay, int durationMinutes, LocalTime notBefore) {
+        LocalTime cursor = notBefore.isBefore(FarmSchedulePolicy.GOLDEN_HOURS_START)
+                ? FarmSchedulePolicy.GOLDEN_HOURS_START : notBefore;
 
         List<TrainingLot> sorted = lotsOfDay.stream()
                 .sorted(Comparator.comparing(TrainingLot::getStartTime))
@@ -173,7 +217,10 @@ public class TrainingLotService {
                 return cursor;                       // khe ở giữa đủ rộng (the gap in between is wide enough)
             }
             if (lot.getEndTime().isAfter(cursor)) {
-                cursor = lot.getEndTime();           // nhảy qua lot này, con trỏ KHÔNG lùi (skip this lot; the pointer never moves back)
+                // Nhảy qua lot này, con trỏ KHÔNG lùi; một bài 40 phút kết thúc 06:40 thì lot sau bắt đầu 06:45.
+                // (Skip this lot, the pointer never moves back; a 40-minute subject ending at 06:40 puts the
+                // next lot at 06:45.)
+                cursor = FarmSchedulePolicy.roundUpToLotStartStep(lot.getEndTime());
             }
         }
 
@@ -286,19 +333,22 @@ public class TrainingLotService {
     // =================================================================
 
     /**
-     * Dời giờ một lot. Cả hàng ngựa trong lot dời theo, đúng thực tế: trời mưa thì cả lot cùng hoãn.
-     * (Reschedules a lot. All horses in the lot move with it, as in reality: when it rains the whole lot is postponed.)
+     * Dời giờ một lot. Cả hàng ngựa trong lot dời theo, đúng thực tế: trời mưa thì cả lot cùng hoãn. Chỉ dời được lot còn
+     * SCHEDULED và chưa diễn ra, tới một giờ chưa qua.
+     * (Reschedules a lot. All horses in the lot move with it, as in reality: when it rains the whole lot is postponed. Only a
+     * lot that is still SCHEDULED and has not taken place can move, to a time that has not passed.)
      */
     @Transactional
     public TrainingLotResponse rescheduleLot(Long lotId, LocalTime newStart, Long trainerId) {
-        TrainingLot lot = lotRepository.findById(lotId).orElseThrow(() -> lotNotFound(lotId));
-
-        if (!lot.getTrainerId().equals(trainerId)) {
-            throw new AccessDeniedException("You are not in charge of this lot!");
+        if (newStart == null) {
+            throw new IllegalArgumentException("The new start time is required!");
         }
-        if (lot.getStatus() == LotStatus.CANCELLED || lot.getStatus() == LotStatus.COMPLETED) {
-            throw new IllegalStateException(
-                    "The lot is already " + lot.getStatus() + " and cannot be rescheduled!");
+        lockSchedule(trainerId);                       // khóa TRƯỚC khi đọc lot (lock BEFORE reading the lot)
+        TrainingLot lot = findOwnLot(lotId, trainerId);
+        assertCanChange(lot, "rescheduled");
+
+        if (!FarmSchedulePolicy.isOnLotStartStep(newStart)) {
+            throw new IllegalArgumentException("A lot can only start at :00, :15, :30 or :45!");
         }
 
         Subject subject = subjectRepository.findById(lot.getSubjectId())
@@ -308,10 +358,13 @@ public class TrainingLotService {
 
         // BR-03
         if (!FarmSchedulePolicy.isWithinGoldenHours(newStart, newEnd)) {
-            throw new IllegalStateException(String.format(
+            throw new IllegalArgumentException(String.format(
                     "The new time %s–%s is outside the golden window %s–%s!",
                     newStart, newEnd,
                     FarmSchedulePolicy.GOLDEN_HOURS_START, FarmSchedulePolicy.GOLDEN_HOURS_END));
+        }
+        if (newStart.isBefore(earliestStartOn(lot.getLotDate()))) {
+            throw new IllegalArgumentException("The new time " + newStart + " has already passed!");
         }
 
         // BR-02 ở cấp lot: không đè lot khác của cùng Trainer trong ngày
@@ -323,10 +376,9 @@ public class TrainingLotService {
             boolean overlap = newStart.isBefore(other.getEndTime())
                            && newEnd.isAfter(other.getStartTime());
             if (overlap) {
-                throw new IllegalStateException(String.format(
-                        "The new time %s–%s overlaps your lot #%d (%s–%s)!",
-                        newStart, newEnd, other.getId(),
-                        other.getStartTime(), other.getEndTime()));
+                throw new ApiException(HttpStatus.CONFLICT, "LOT_OVERLAP", String.format(
+                        "The new time %s–%s overlaps another lot (%s–%s)!",
+                        newStart, newEnd, other.getStartTime(), other.getEndTime()));
             }
         }
 
@@ -336,14 +388,12 @@ public class TrainingLotService {
         return responseOf(lotId);
     }
 
-    /** Hủy lot và toàn bộ buổi tập SCHEDULED bên trong. (Cancels a lot and all SCHEDULED workouts inside it.) */
+    /** Hủy lot và mọi buổi tập SCHEDULED bên trong. (Cancels a lot and all SCHEDULED workouts inside it.) */
     @Transactional
     public TrainingLotResponse cancelLot(Long lotId, Long trainerId) {
-        TrainingLot lot = lotRepository.findById(lotId).orElseThrow(() -> lotNotFound(lotId));
-
-        if (!lot.getTrainerId().equals(trainerId)) {
-            throw new AccessDeniedException("You are not in charge of this lot!");
-        }
+        lockSchedule(trainerId);                       // khóa TRƯỚC khi đọc lot (lock BEFORE reading the lot)
+        TrainingLot lot = findOwnLot(lotId, trainerId);
+        assertCanChange(lot, "cancelled");
 
         List<TrainingWorkout> scheduled = workoutRepository.findByLotId(lotId).stream()
                 .filter(w -> w.getStatus() == WorkoutStatus.SCHEDULED)
@@ -354,6 +404,31 @@ public class TrainingLotService {
         lot.setStatus(LotStatus.CANCELLED);
         lotRepository.save(lot);
         return responseOf(lotId);
+    }
+
+    private TrainingLot findOwnLot(Long lotId, Long trainerId) {
+        TrainingLot lot = lotRepository.findById(lotId).orElseThrow(() -> lotNotFound(lotId));
+        if (!lot.getTrainerId().equals(trainerId)) {
+            throw new AccessDeniedException("You are not in charge of this lot!");
+        }
+        return lot;
+    }
+
+    /**
+     * Chỉ lot còn SCHEDULED và chưa diễn ra mới đổi được: lot đã COMPLETED hay đã hủy là lịch sử, lot đã qua giờ kết thúc thì
+     * buổi tập đã (hoặc đáng lẽ đã) xảy ra và kết quả phải được ghi chứ không phải hủy.
+     * (Only a lot that is still SCHEDULED and has not taken place can change: a COMPLETED or cancelled lot is history, and a
+     * lot past its end time has happened (or should have), so its results must be recorded rather than the lot cancelled.)
+     */
+    private void assertCanChange(TrainingLot lot, String action) {
+        if (lot.getStatus() != LotStatus.SCHEDULED) {
+            throw new ApiException(HttpStatus.CONFLICT, "LOT_NOT_SCHEDULED",
+                    "The lot is already " + lot.getStatus() + " and cannot be " + action + "!");
+        }
+        if (LocalDateTime.of(lot.getLotDate(), lot.getEndTime()).isBefore(LocalDateTime.now())) {
+            throw new ApiException(HttpStatus.CONFLICT, "LOT_ALREADY_HELD",
+                    "This lot has already taken place and cannot be " + action + ". Record its results instead.");
+        }
     }
 
     /** Response của một lot vừa được sửa, đọc lại sau khi lưu. (Response of a lot just modified, re-read after saving.) */
@@ -381,5 +456,60 @@ public class TrainingLotService {
                 lotRepository.save(lot);
             }
         });
+    }
+
+    // =================================================================
+    // KIỂM TRA NGÀY ĐẦY CHO XEM TRƯỚC (Full-day check for the preview)
+    // =================================================================
+
+    /** Một buổi sẽ diễn ra: ngày, bài và độ dài. (A session that will take place: day, subject and length.) */
+    public record PlannedSession(LocalDate date, Long subjectId, int durationMinutes) {
+    }
+
+    /**
+     * Những ngày KHÔNG THỂ nhận nhóm này: kể cả khi ghép được vào mọi lot cùng bài còn chỗ, phần ngựa còn lại cần số lot mới mà
+     * khung giờ vàng không còn đủ phút. Đây là cận dưới nên chỉ báo ngày chắc chắn hết chỗ (không tính việc nhiều ngựa cùng một
+     * Groom phải tách lot); việc xếp thật vẫn do findOrCreateLot, và vẫn có thể báo đầy ở ngày không nằm trong danh sách này.
+     * (The days that CANNOT take this group: even joining every same-subject lot that has room, the remaining horses need new
+     * lots for which the golden window has too few minutes left. This is a lower bound, so it only reports days that are
+     * certainly full (it ignores horses of one groom having to split across lots); the real placement is still findOrCreateLot
+     * and may still report a full day that is not in this list.)
+     */
+    @Transactional(readOnly = true)
+    public List<LocalDate> findFullDates(Long trainerId, List<PlannedSession> sessions, int horseCount) {
+        if (sessions.isEmpty()) {
+            return List.of();
+        }
+        LocalDate first = sessions.get(0).date();
+        LocalDate last = sessions.get(sessions.size() - 1).date();
+        Map<LocalDate, List<LotLoadRow>> loadByDate = lotRepository.findLoadBetween(trainerId, first, last).stream()
+                .collect(Collectors.groupingBy(LotLoadRow::lotDate));
+
+        int horses = Math.max(horseCount, 1);
+        List<LocalDate> full = new ArrayList<>();
+        for (PlannedSession session : sessions) {
+            List<LotLoadRow> dayLots = loadByDate.getOrDefault(session.date(), List.of());
+            LocalTime notBefore = earliestStartOn(session.date());
+
+            long usedMinutes = dayLots.stream()
+                    .mapToLong(lot -> Duration.between(lot.startTime(), lot.endTime()).toMinutes())
+                    .sum();
+            long freeMinutes = Math.min(
+                    FarmSchedulePolicy.goldenWindowMinutes() - usedMinutes,
+                    Duration.between(notBefore, FarmSchedulePolicy.GOLDEN_HOURS_END).toMinutes());
+
+            long spare = dayLots.stream()
+                    .filter(lot -> lot.status() == LotStatus.SCHEDULED)
+                    .filter(lot -> lot.subjectId().equals(session.subjectId()))
+                    .filter(lot -> !lot.startTime().isBefore(notBefore))
+                    .mapToLong(lot -> Math.max(0, lot.maxCapacity() - lot.occupied()))
+                    .sum();
+            long remaining = Math.max(0, horses - spare);
+            long newLots = (remaining + FarmSchedulePolicy.DEFAULT_LOT_CAPACITY - 1) / FarmSchedulePolicy.DEFAULT_LOT_CAPACITY;
+            if (newLots * session.durationMinutes() > Math.max(freeMinutes, 0)) {
+                full.add(session.date());
+            }
+        }
+        return full;
     }
 }

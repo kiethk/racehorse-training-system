@@ -1,6 +1,6 @@
-import { apiGet } from '@/services/api';
+import { apiGet, apiPut } from '@/services/api';
 import type { ApiResponse } from '@/types/horse';
-import type { Horse } from '@/features/stable/types';
+import type { Horse, HorseStatus } from '@/features/stable/types';
 import type { HorseAdmissionHistory, HorseSpecialty, HorsePedigree, HorseHealthMetric } from '../types';
 
 export const horseService = {
@@ -18,6 +18,19 @@ export const horseService = {
   /** List all accessible horses (e.g. Veterinarian, Trainer). */
   listAll: async (): Promise<Horse[]> =>
     (await apiGet<ApiResponse<Horse[]>>('/api/horses')).data,
+
+  /** Change horse lifecycle status (ELIGIBLE <-> INACTIVE) */
+  changeStatus: async (
+    horseId: number,
+    payload: { status: HorseStatus; reasonCode?: string; customReason?: string; reason?: string; stallId?: number } | HorseStatus,
+    legacyReason?: string,
+  ): Promise<Horse> => {
+    const body =
+      typeof payload === 'string'
+        ? { status: payload, reason: legacyReason, reasonCode: 'OTHER', customReason: legacyReason }
+        : payload;
+    return (await apiPut<ApiResponse<Horse>>(`/api/horses/${horseId}/status`, body)).data;
+  },
 
   /** Get pedigree of horse; returns null if not found. */
   getPedigree: async (horseId: number): Promise<HorsePedigree | null> => {

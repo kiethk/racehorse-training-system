@@ -32,12 +32,23 @@ export function SubjectForm({
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [validation, setValidation] = useState<string | null>(null);
 
+  const durationError =
+    rules && (durationMinutes < rules.minSubjectDurationMinutes || durationMinutes > rules.maxSubjectDurationMinutes)
+      ? `Must be between ${rules.minSubjectDurationMinutes} and ${rules.maxSubjectDurationMinutes} minutes.`
+      : null;
+
+  const distanceError =
+    !Number.isFinite(targetDistanceMeters) || targetDistanceMeters < 100 || targetDistanceMeters > 10000
+      ? 'Must be between 100 and 10,000 metres.'
+      : null;
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!name.trim()) {
       setValidation('Enter a subject name.');
       return;
     }
+    if (durationError || distanceError) return;
     setValidation(null);
     onSubmit({
       category,
@@ -60,7 +71,7 @@ export function SubjectForm({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField label="Subject name" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Gallop 1,200 m" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Gallop 1,200 m" maxLength={255} />
           </FormField>
 
           <FormField label="Category" required>
@@ -81,23 +92,18 @@ export function SubjectForm({
             </Select>
           </FormField>
 
-          <FormField label="Target distance (metres)">
+          <FormField label="Target distance (metres)" error={distanceError ?? undefined}>
             <Input
               type="number"
               min={100}
+              max={10000}
               step={50}
               value={targetDistanceMeters}
               onChange={(e) => setTargetDistanceMeters(Number(e.target.value))}
             />
           </FormField>
 
-          <FormField
-            label="Estimated duration (minutes)"
-            required
-            hint={rules
-              ? `Between ${rules.minSubjectDurationMinutes} and ${rules.maxSubjectDurationMinutes} minutes. It sets the length of the lot.`
-              : 'It sets the length of the lot.'}
-          >
+          <FormField label="Estimated duration (minutes)" required error={durationError ?? undefined}>
             <Input
               type="number"
               step={5}
@@ -112,6 +118,7 @@ export function SubjectForm({
         <FormField label="Description">
           <Textarea
             rows={2}
+            maxLength={2000}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Technical notes or instructions for the groom…"

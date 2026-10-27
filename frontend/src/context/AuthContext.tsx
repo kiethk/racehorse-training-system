@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import * as authService from '@/services/auth';
-import { refreshAccessToken } from '@/services/api';
+import { refreshAccessToken, setAccessToken, AUTH_UNAUTHORIZED_EVENT } from '@/services/api';
 import type { AuthUser } from '@/types/auth';
 
 interface AuthContextValue {
@@ -41,6 +41,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 401 or backend unavailable — treat as unauthenticated
       setUser(null);
     }
+  }, []);
+
+  // Listen to unauthorized event dispatched on failed refresh
+  useEffect(() => {
+    function handleUnauthorized() {
+      setUser(null);
+      setAccessToken(null);
+    }
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
   }, []);
 
   // On mount: restore session from cookie by fetching a new access token

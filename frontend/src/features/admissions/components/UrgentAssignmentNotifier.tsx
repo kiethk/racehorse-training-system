@@ -9,12 +9,33 @@ import { UrgentAssignmentModal } from './UrgentAssignmentModal';
 
 const RECONNECT_DELAY_MS = 5000;
 const MAX_RECONNECT_DELAY_MS = 60000;
+const SNOOZE_MS = 10 * 60 * 1000; // remind again after 10 minutes
+const SNOOZE_KEY = 'vet:urgent:snoozed';
+
+function readSnooze(): Map<number, number> {
+  try {
+    const raw = sessionStorage.getItem(SNOOZE_KEY);
+    if (!raw) return new Map();
+    return new Map(JSON.parse(raw) as [number, number][]);
+  } catch {
+    return new Map();
+  }
+}
+
+function writeSnooze(map: Map<number, number>) {
+  try {
+    sessionStorage.setItem(SNOOZE_KEY, JSON.stringify([...map.entries()]));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 export function UrgentAssignmentNotifier() {
   const router = useRouter();
   const pathname = usePathname();
   const [alerts, setAlerts] = useState<UrgentAssignmentAlert[]>([]);
   const versions = useRef(new Map<number, number>());
+  const snoozed = useRef<Map<number, number>>(readSnooze());
 
   const mergeAlerts = useCallback((incoming: UrgentAssignmentAlert[]) => {
     setAlerts((current) => {
@@ -27,6 +48,14 @@ export function UrgentAssignmentNotifier() {
       }
       return [...bySchedule.values()].sort((a, b) => new Date(a.reportedAt).getTime() - new Date(b.reportedAt).getTime());
     });
+  }, []);
+
+  const dismiss = useCallback((alert: UrgentAssignmentAlert) => {
+    const next = new Map(snoozed.current);
+    next.set(alert.scheduleId, Date.now() + SNOOZE_MS);
+    snoozed.current = next;
+    writeSnooze(next);
+    setAlerts((current) => current.filter((a) => a.scheduleId !== alert.scheduleId));
   }, []);
 
   const restore = useCallback(async () => {
@@ -105,12 +134,23 @@ export function UrgentAssignmentNotifier() {
     };
   }, [mergeAlerts, restore]);
 
-  const active = alerts.find((alert) => pathname !== `/veterinarian/urgent/${alert.scheduleId}`) ?? null;
+  const now = Date.now();
+  const active =
+    alerts.find((alert) => {
+      if (pathname === `/veterinarian/urgent/${alert.scheduleId}`) return false;
+      const until = snoozed.current.get(alert.scheduleId);
+      if (until && until > now) return false;
+      return true;
+    }) ?? null;
 
   function openCase(alert: UrgentAssignmentAlert) {
+    const next = new Map(snoozed.current);
+    next.delete(alert.scheduleId);
+    snoozed.current = next;
+    writeSnooze(next);
     setAlerts((current) => current.filter((item) => item.scheduleId !== alert.scheduleId));
     router.push(`/veterinarian/urgent/${alert.scheduleId}`);
   }
 
-  return <UrgentAssignmentModal alert={active} onOpenCase={openCase} />;
+  return <UrgentAssignmentModal alert={active} onOpenCase={openCase} onDismiss={dismiss} />;
 }

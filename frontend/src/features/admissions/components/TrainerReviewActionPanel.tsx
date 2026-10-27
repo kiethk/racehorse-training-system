@@ -20,7 +20,7 @@ const READINESS_OPTIONS: {
   { value: 'UNSUITABLE', label: 'Unsuitable' },
 ];
 
-const MIN_REMARKS = 20;
+const MAX_REMARKS = 1000;
 
 function fmtScore(score: number | null | undefined): string {
   return score != null ? `${score}/10` : '—';
@@ -30,14 +30,24 @@ function ScoreInput({
   label,
   value,
   onChange,
+  required = true,
 }: {
   label: string;
   value: number | null | undefined;
   onChange: (raw: string) => void;
+  required?: boolean;
 }) {
   return (
-    <FormField label={`${label} (0–10)`}>
-      <Input type="number" min={0} max={10} step={0.5} value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+    <FormField label={`${label} (0–10)`} required={required}>
+      <Input
+        type="number"
+        min={0}
+        max={10}
+        step={0.5}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        required={required}
+      />
     </FormField>
   );
 }
@@ -74,10 +84,47 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
   async function handleSubmit() {
     setFormError(null);
 
+    // 1. Scoring fields are required
+    if (form.conformationScore == null || isNaN(form.conformationScore)) {
+      setFormError('Please enter a Conformation score (0–10).');
+      return;
+    }
+    if (form.conformationScore < 0 || form.conformationScore > 10) {
+      setFormError('Conformation score must be between 0 and 10.');
+      return;
+    }
+
+    if (form.temperamentScore == null || isNaN(form.temperamentScore)) {
+      setFormError('Please enter a Temperament score (0–10).');
+      return;
+    }
+    if (form.temperamentScore < 0 || form.temperamentScore > 10) {
+      setFormError('Temperament score must be between 0 and 10.');
+      return;
+    }
+
+    if (form.gaitQualityScore == null || isNaN(form.gaitQualityScore)) {
+      setFormError('Please enter a Gait quality score (0–10).');
+      return;
+    }
+    if (form.gaitQualityScore < 0 || form.gaitQualityScore > 10) {
+      setFormError('Gait quality score must be between 0 and 10.');
+      return;
+    }
+
+    if (
+      form.estimatedMonthsToRace != null &&
+      (form.estimatedMonthsToRace < 0 || form.estimatedMonthsToRace > 60)
+    ) {
+      setFormError('Estimated months must be between 0 and 60.');
+      return;
+    }
+
+    // 2. Remarks / feedback is optional, but has a maximum length constraint
     const remarks = form.remarks?.trim() ?? '';
-    if (remarks.length < MIN_REMARKS) {
+    if (remarks.length > MAX_REMARKS) {
       setFormError(
-        `Professional remarks must be at least ${MIN_REMARKS} characters (currently ${remarks.length}).`,
+        `Professional remarks must not exceed ${MAX_REMARKS} characters (currently ${remarks.length}).`,
       );
       return;
     }
@@ -86,7 +133,7 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
       setSubmitting(true);
       await trainerAdmissionsApi.submitReview(admission.admissionId, {
         ...form,
-        remarks,
+        remarks: remarks || undefined,
       });
       setSubmittedNotice(true);
       onSuccess();
@@ -152,9 +199,7 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
   return (
     <AdmissionSideCard title="Racing readiness assessment" tone="primary" className="space-y-4">
       {submittedNotice && (
-        <Notice tone="success">
-          Your evaluation has been submitted successfully and forwarded to the Club Manager.
-        </Notice>
+        <Notice tone="success">Evaluation submitted to the Club Manager.</Notice>
       )}
 
       <fieldset className="space-y-2">
@@ -171,46 +216,49 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
         ))}
       </fieldset>
 
-      <ScoreInput label="Conformation" value={form.conformationScore} onChange={setNum('conformationScore')} />
-      <ScoreInput label="Temperament" value={form.temperamentScore} onChange={setNum('temperamentScore')} />
-      <ScoreInput label="Gait quality" value={form.gaitQualityScore} onChange={setNum('gaitQualityScore')} />
+      <ScoreInput
+        label="Conformation"
+        value={form.conformationScore}
+        onChange={setNum('conformationScore')}
+        required
+      />
+      <ScoreInput
+        label="Temperament"
+        value={form.temperamentScore}
+        onChange={setNum('temperamentScore')}
+        required
+      />
+      <ScoreInput
+        label="Gait quality"
+        value={form.gaitQualityScore}
+        onChange={setNum('gaitQualityScore')}
+        required
+      />
 
-      <FormField label="Estimated months until eligible for race registration">
+      <FormField label="Months until race-ready">
         <Input
           type="number"
           min={0}
           max={60}
-          placeholder="Number of months"
           value={form.estimatedMonthsToRace ?? ''}
           onChange={(e) => setNum('estimatedMonthsToRace')(e.target.value)}
         />
       </FormField>
 
-      <FormField
-        label="Professional remarks"
-        required
-        hint={`${form.remarks?.trim().length ?? 0}/${MIN_REMARKS} characters minimum`}
-      >
+      <FormField label="Remarks">
         <Textarea
           rows={4}
-          placeholder="Balanced conformation with well-developed musculature. Calm temperament upon contact. Even strides and good reach..."
+          maxLength={MAX_REMARKS}
           value={form.remarks ?? ''}
           onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
         />
       </FormField>
-
-      <p className="text-xs text-[var(--color-text-muted)]">
-        Fitness metrics will be measured and assessed periodically once the horse completes quarantine and enters regular training.
-      </p>
 
       {formError && <Notice tone="error">{formError}</Notice>}
 
       <Button variant="primary" className="w-full" loading={submitting} onClick={handleSubmit}>
         Submit evaluation
       </Button>
-      <p className="text-xs text-[var(--color-text-muted)]">
-        Once submitted, the evaluation will be forwarded to the Club Manager.
-      </p>
     </AdmissionSideCard>
   );
 }

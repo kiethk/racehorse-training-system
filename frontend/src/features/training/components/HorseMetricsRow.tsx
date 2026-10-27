@@ -34,7 +34,6 @@ export function HorseMetricsRow({ trend, rules }: { trend: HorseFitnessTrendItem
         unit={maxHeartRate != null ? 'bpm' : undefined}
         icon="heart-pulse"
         tone={overLimit ? 'danger' : 'default'}
-        hint={rules ? `Limit ${rules.maxHeartRateLimit} bpm` : undefined}
       />
       <MetricCard
         label="Top speed"

@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Định nghĩa một công cụ theo chuẩn OpenAI / Groq Function Calling Schema.
+ * Định nghĩa một công cụ theo chuẩn OpenAI / AI Function Calling Schema.
  */
 public record AiToolDefinition(
         String name,

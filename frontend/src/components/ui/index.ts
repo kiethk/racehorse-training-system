@@ -3,6 +3,7 @@
  * a control, overlay, table or badge locally. See AGENTS.md for the lookup table.
  */
 export { Avatar } from './Avatar';
+export { BackLink } from './BackLink';
 export { AvatarUpload } from './AvatarUpload';
 export { BrandLogo } from './BrandLogo';
 export { Button, IconButton, LinkButton, buttonClassName } from './Button';
@@ -38,7 +39,9 @@ export { SelectableCard } from './SelectableCard';
 export { Skeleton } from './Skeleton';
 export { LoadingScreen, Spinner } from './Spinner';
 export { DetailSkeleton, EmptyState, ListSkeleton } from './states';
+export { PeriodBarChart, type PeriodBarChartProps } from './PeriodBarChart';
 export { Pill, StatusBadge } from './StatusBadge';
 export { Table, TBody, Td, Th, THead, Tr } from './Table';
 export { Tabs, type TabItem } from './Tabs';
 export { Tooltip } from './Tooltip';
+export { PdfViewer } from './PdfViewer';

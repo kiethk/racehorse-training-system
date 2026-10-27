@@ -1,5 +1,5 @@
 package com.rtms.backend.training.dto;
-import com.rtms.backend.stable.entity.StableStall;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * Một chiến mã trong lời ghi danh theo nhóm.
@@ -7,6 +7,7 @@ import com.rtms.backend.stable.entity.StableStall;
  */
 public class HorseEnrollmentRequest {
 
+    @NotNull(message = "Horse is required")
     private Long horseId;
 
     /**

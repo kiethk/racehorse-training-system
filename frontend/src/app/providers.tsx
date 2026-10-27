@@ -1,5 +1,6 @@
 'use client';
 
+import '@/lib/pdfPolyfill';
 import { AuthProvider } from '@/context/AuthContext';
 import { NotificationProvider } from '@/features/notifications/context/NotificationContext';
 import { AiChatProvider } from '@/features/ai';

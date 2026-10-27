@@ -186,6 +186,7 @@ Import from `@/components/ui`.
 | Action button | `Button` (`primary`, `secondary`, `tertiary`, `destructive`, `warning`, `link`) |
 | Icon-only button | `IconButton` (requires `label`) |
 | Link that looks like a button | `LinkButton` |
+| Back to the previous screen (top left, above the title) | `BackLink` (`href`, or `onClick`) |
 | Text field, dropdown, multi-line | `FormField` wrapping `Input`, `Select`, `Textarea` |
 | Checkbox or radio | `Checkbox` (`type="radio"` for radios); `ChoiceInput` for a bare one inside a custom option card |
 | File picker | `FileInput` |
@@ -203,6 +204,7 @@ Import from `@/components/ui`.
 | Drag items between lists or slots | `createDragDrop<T>()` (`Provider`, `useDraggable`, `useDropZone`, `useDragDrop`); see `DRAG_DROP.md` |
 | Card or section container | `Panel` (`tone`, `interactive`), `SectionTitle`, `FieldLabel` |
 | KPI number | `MetricCard` |
+| One bar per day or per week over a date range (caller supplies values, axis, tooltip) | `PeriodBarChart` (`bucketDays`, `labelEvery`) |
 | Progress or distribution bar | `ProgressBar` (`value` / `max`, or stacked `segments`) |
 | Uniform data list | `DataTable` (sort, search, pagination, loading and empty states built in) |
 | Custom table layout | `Table` (`bare` inside a `Panel`), `THead`, `TBody`, `Tr`, `Th`, `Td` |
@@ -235,6 +237,16 @@ Every role's admission list and detail use the same blocks from `src/features/ad
 | Main column | `AdmissionDetailTabs` with `AdmissionInfoSection`, `InfoRow`, `InfoGroupTitle` |
 | Documents | `AdmissionDocumentsSection` (includes preview) |
 | Side column cards | `AdmissionSideCard` (`tone` for the role's action card) |
+
+Every role's dashboard of horses uses the same blocks from `src/features/dashboard/components`. The backend scopes the data to the viewer (an owner sees own horses, a trainer the horses of the areas, the manager every horse), so no block selects content by role:
+
+| Part | Use |
+|---|---|
+| Whole dashboard: counts, performance chart, optional health chart, horse table | `HorseDashboardView` (`title`, `horseBasePath`, `showHealth`) |
+| Performance chart alone (average rating of completed sessions per week, each horse once, last 12 weeks) | `PerformanceTrendCard` |
+| Health chart alone (horses with an abnormal health reading per day, last 30 days) | `HealthTrendCard` |
+| A new chart card with its own data | `TrendCard` (`title`, `caption`, `load`, `chart`) around `PeriodBarChart` |
+| Tooltip body | `TrendTooltip` |
 
 Every role's stable screen uses the same blocks from `src/features/stable/shared/components`:
 

@@ -17,6 +17,7 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.service.PedigreeBirthDateValidator;
 
 
+import java.util.Comparator;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -30,6 +31,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -173,6 +175,10 @@ public class OwnerAdmissionService {
     public List<AdmissionSummaryResponse> getMyAdmissions(Long ownerId, AdmissionStatus status) {
         return admissions.findByOwnerIdOrderBySubmittedAtDesc(ownerId).stream()
                 .filter(admission -> status == null || admission.getStatus() == status)
+                .sorted(Comparator.comparing(
+                        AdmissionApplication::getSubmittedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ).reversed().thenComparing(Comparator.comparing(AdmissionApplication::getId).reversed()))
                 .map(admission -> {
                     CandidateHorseProfile candidate = findCandidate(admission.getId());
                     String imageUrl = documents.findByAdmissionId(admission.getId()).stream()
@@ -205,26 +211,47 @@ public class OwnerAdmissionService {
         AdmissionApplication application = admissions.findByIdForUpdate(admissionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
         assertOwner(ownerId, application);
-        // No document changes after Groom has claimed/started reviewing this application.
+        // Documents can be re-uploaded or added until Groom completes review.
         if (application.getStatus() != AdmissionStatus.GROOM_REVIEW
-                || application.getGroomId() != null
                 || application.getGroomDecision() != null
                 || application.getGroomReviewedAt() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Admission documents are locked after Groom starts review");
+                    "Admission documents are locked after Groom completes review");
         }
         if (note != null && note.length() > 2000) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Document note is too long");
         }
         String key = fileStorage.store(file, admissionFolder(admissionId));
         try {
-            AdmissionDocument document = new AdmissionDocument();
-            document.setAdmissionId(admissionId);
-            document.setDocumentType(type);
+            List<AdmissionDocument> existingDocs = documents.findByAdmissionIdAndDocumentType(admissionId, type);
+            AdmissionDocument document;
+            if (!existingDocs.isEmpty()) {
+                document = existingDocs.get(0);
+                String oldFileUrl = document.getFileUrl();
+                if (oldFileUrl != null && !oldFileUrl.equals(key)) {
+                    try {
+                        fileStorage.delete(oldFileUrl);
+                    } catch (Exception ex) {
+                        log.warn("Failed to delete superseded document file {}: {}", oldFileUrl, ex.getMessage());
+                    }
+                }
+                for (int i = 1; i < existingDocs.size(); i++) {
+                    AdmissionDocument dup = existingDocs.get(i);
+                    try {
+                        fileStorage.delete(dup.getFileUrl());
+                    } catch (Exception ignored) {}
+                    documents.delete(dup);
+                }
+            } else {
+                document = new AdmissionDocument();
+                document.setAdmissionId(admissionId);
+                document.setDocumentType(type);
+            }
             document.setFileUrl(key);
             document.setOriginalFileName(safeOriginalFileName(file.getOriginalFilename()));
             document.setRecordDate(recordDate);
             document.setNote(trimNullable(note));
+            document.setUploadedAt(LocalDateTime.now());
             return toDocumentResponse(documents.save(document));
         } catch (RuntimeException ex) {
             fileStorage.delete(key);

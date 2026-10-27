@@ -38,6 +38,7 @@ public class AdmissionTrainerReviewService {
     private static final BigDecimal MIN_SCORE = BigDecimal.ZERO;
     private static final BigDecimal MAX_SCORE = BigDecimal.TEN;
     private static final int MAX_MONTHS = 60;
+    private static final int MAX_REMARKS_LENGTH = 3000;
 
     private final AdmissionApplicationRepository admissionRepository;
     private final RacingReadinessAssessmentRepository assessmentRepository;
@@ -89,7 +90,6 @@ public class AdmissionTrainerReviewService {
         assessment.setEstimatedMonthsToRace(request.getEstimatedMonthsToRace());
         assessment.setAssessmentDate(LocalDate.now());
         assessment.setRemarks(request.getRemarks());
-        // fitnessScore, validUntil: để NULL — ngựa đang cách ly, chỉ đánh giá định kỳ mới có
         assessmentRepository.save(assessment);
 
         admission.setTrainerFeedback(request.getRemarks());
@@ -103,13 +103,26 @@ public class AdmissionTrainerReviewService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
                     "Phải chọn mức độ sẵn sàng thi đấu (READY / NEEDS_MORE_TRAINING / UNSUITABLE)!");
         }
+        if (request.getConformationScore() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Điểm dáng vóc là bắt buộc!");
+        }
         validateScore(request.getConformationScore(), "Điểm dáng vóc");
+        if (request.getTemperamentScore() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Điểm tính nết là bắt buộc!");
+        }
         validateScore(request.getTemperamentScore(), "Điểm tính nết");
+        if (request.getGaitQualityScore() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Điểm bước đi là bắt buộc!");
+        }
         validateScore(request.getGaitQualityScore(), "Điểm bước đi");
         if (request.getEstimatedMonthsToRace() != null
                 && (request.getEstimatedMonthsToRace() < 0 || request.getEstimatedMonthsToRace() > MAX_MONTHS)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
                     "Ước tính thời gian phải từ 0 đến " + MAX_MONTHS + " tháng!");
+        }
+        if (request.getRemarks() != null && request.getRemarks().length() > MAX_REMARKS_LENGTH) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Nhận xét chuyên môn không được vượt quá " + MAX_REMARKS_LENGTH + " ký tự!");
         }
     }
 

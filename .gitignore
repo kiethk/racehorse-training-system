@@ -26,6 +26,9 @@ backend/src/main/resources/application-local.properties
 .idea/
 .vscode/
 *.iml
+.cursor/
+.gemini/
+.kiro/
 
 # OS
 .DS_Store
@@ -45,6 +48,8 @@ backend/docs/*
 .codex/
 uploads/
 .agents/
+.trail/
+.kombai/
 AGENTS.md
 IDEA.md
 GEMINI.md

@@ -64,6 +64,7 @@ export function HorseFilterBar({
           <option value="CANDIDATE">Candidate</option>
           <option value="ELIGIBLE">Eligible</option>
           <option value="REJECTED">Rejected</option>
+          <option value="INACTIVE">Inactive</option>
         </Select>
       </FormField>
 

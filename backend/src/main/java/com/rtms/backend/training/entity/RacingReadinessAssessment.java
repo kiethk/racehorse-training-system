@@ -37,10 +37,6 @@ public class RacingReadinessAssessment {
     @Column(name = "readiness_status", nullable = false, length = 50)
     private RacingReadinessStatus readinessStatus;
 
-    /** Thang 0–10. NULL ở bước nhập học vì ngựa đang cách ly, không đo được. (Scale 0-10. NULL at the admission step because the horse is in quarantine and cannot be measured.) */
-    @Column(name = "fitness_score")
-    private BigDecimal fitnessScore;
-
     // ===== Trainer đánh giá được trong khu cách ly (quan sát + dắt tay) =====
     // (Things the trainer can assess in quarantine (observation + leading by hand))
 
@@ -62,10 +58,6 @@ public class RacingReadinessAssessment {
 
     @Column(name = "assessment_date", nullable = false)
     private LocalDate assessmentDate;
-
-    /** Đánh giá định kỳ: +90 ngày. Đánh giá nhập học: NULL (có CHECK ràng buộc). (Periodic assessment: +90 days. Admission assessment: NULL (enforced by a CHECK constraint).) */
-    @Column(name = "valid_until")
-    private LocalDate validUntil;
 
     @Column(length = 3000)
     private String remarks;
@@ -98,8 +90,6 @@ public class RacingReadinessAssessment {
     public RacingReadinessStatus getReadinessStatus() { return readinessStatus; }
     public void setReadinessStatus(RacingReadinessStatus v) { this.readinessStatus = v; }
 
-    public BigDecimal getFitnessScore() { return fitnessScore; }
-    public void setFitnessScore(BigDecimal v) { this.fitnessScore = v; }
 
     public BigDecimal getConformationScore() { return conformationScore; }
     public void setConformationScore(BigDecimal v) { this.conformationScore = v; }
@@ -116,8 +106,6 @@ public class RacingReadinessAssessment {
     public LocalDate getAssessmentDate() { return assessmentDate; }
     public void setAssessmentDate(LocalDate v) { this.assessmentDate = v; }
 
-    public LocalDate getValidUntil() { return validUntil; }
-    public void setValidUntil(LocalDate v) { this.validUntil = v; }
 
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }

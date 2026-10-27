@@ -3,15 +3,20 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { PdfViewer } from '@/components/ui/PdfViewer';
+import { openBlobInTab, openProtectedFile } from '@/lib/protectedFile';
+import { toast } from '@/lib/toast';
+import { displayError } from '@/lib/display';
 import { admissionsApi } from '../../services/api';
 import type { AdmissionDocument } from '../../types';
+import { isImageDocument, isPdfDocument } from '../lib/documentKind';
 
-type LoadedFile = { url: string; kind: 'image' | 'pdf' | 'unsupported' };
+type LoadedFile = { url: string; kind: 'image' | 'pdf' | 'unsupported'; blob: Blob };
 
 export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: {
   document: AdmissionDocument;
   label: string;
-  fileUrl: string;
+  fileUrl?: string;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -37,12 +42,29 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
   useEffect(() => {
     const controller = new AbortController();
     let objectUrl: string | undefined;
-    admissionsApi.getDocumentFile(document.fileUrl, controller.signal).then((blob) => {
+    admissionsApi.getDocumentFile(document.fileUrl, controller.signal).then((rawBlob) => {
       if (controller.signal.aborted) return;
+      const fn = (document.originalFileName || '').toLowerCase();
+      const urlPath = document.fileUrl.split('?')[0].toLowerCase();
+      const isPdf = rawBlob.type === 'application/pdf'
+        || fn.endsWith('.pdf')
+        || urlPath.endsWith('.pdf')
+        || isPdfDocument(document);
+      const isImage = ['image/jpeg', 'image/png', 'image/webp'].includes(rawBlob.type)
+        || /\.(jpe?g|png|webp)$/i.test(fn)
+        || isImageDocument(document);
+
+      let blob = rawBlob;
+      if (isPdf && rawBlob.type !== 'application/pdf') {
+        blob = new Blob([rawBlob], { type: 'application/pdf' });
+      } else if (isImage && !['image/jpeg', 'image/png', 'image/webp'].includes(rawBlob.type)) {
+        const mime = fn.endsWith('.png') ? 'image/png' : fn.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+        blob = new Blob([rawBlob], { type: mime });
+      }
+
       objectUrl = URL.createObjectURL(blob);
-      const kind = ['image/jpeg', 'image/png', 'image/webp'].includes(blob.type)
-        ? 'image' : blob.type === 'application/pdf' ? 'pdf' : 'unsupported';
-      setFile({ url: objectUrl, kind });
+      const kind = isImage ? 'image' : isPdf ? 'pdf' : 'unsupported';
+      setFile({ url: objectUrl, kind, blob });
     }).catch(() => {
       if (!controller.signal.aborted) setError('Unable to load this file. Try opening it in a new tab.');
     });
@@ -50,7 +72,7 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
       controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [document.fileUrl]);
+  }, [document]);
 
   const actionClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]';
 
@@ -74,7 +96,21 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
 
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--color-border)] px-4 py-2 sm:px-5">
           {file && <a href={file.url} download={filename} className={actionClass}><Icon name="download" />Download</a>}
-          <a href={file && file.kind !== 'unsupported' ? file.url : fileUrl} target="_blank" rel="noreferrer" className={actionClass}><Icon name="external-link" />Open in new tab</a>
+          <button
+            type="button"
+            onClick={() => {
+              if (document?.fileUrl) {
+                openProtectedFile(document.fileUrl, filename).catch((err) => {
+                  toast.error(displayError(err, 'Unable to open file in new tab.'));
+                });
+              } else if (file?.url) {
+                openBlobInTab(file.url, filename, file.kind === 'pdf');
+              }
+            }}
+            className={actionClass}
+          >
+            <Icon name="external-link" />Open in new tab
+          </button>
           {file?.kind === 'image' && !error && (
             <div className="ml-auto flex items-center gap-1">
               <Button type="button" size="sm" variant="tertiary" icon="minus" aria-label="Zoom out" disabled={zoom === 100} onClick={() => setZoom((value) => value - 25)} />
@@ -97,10 +133,13 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
               <img src={file.url} alt={filename} width={1600} height={1000} className="h-full w-full object-contain p-3" onError={() => setError('This image could not be displayed. Download it or open it in a new tab.')} />
             </div>
           ) : file.kind === 'pdf' ? (
-            <div className="flex h-full flex-col">
-              <p className="shrink-0 px-4 py-2 text-xs text-[var(--color-text-muted)]">If the PDF viewer is unavailable, download the file or open it in a new tab.</p>
-              <iframe src={file.url} title={`Preview of ${filename}`} className="min-h-0 w-full flex-1 border-0" onError={() => setError('This PDF could not be displayed. Download it or open it in a new tab.')} />
-            </div>
+            <PdfViewer
+              blob={file.blob}
+              title={`Preview of ${filename}`}
+              zoom={zoom}
+              onZoomChange={setZoom}
+              onError={(err) => setError(err)}
+            />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-center text-sm">Preview is available for JPEG, PNG, WebP and PDF files. Download this file or open it in a new tab.</div>
           )}

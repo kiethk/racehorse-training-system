@@ -45,6 +45,12 @@ public class Horse {
     @Column(name = "training_decision_reason", columnDefinition = "TEXT")
     private String trainingDecisionReason;
 
+    @Column(name = "status_reason", columnDefinition = "TEXT")
+    private String statusReason;
+
+    @Column(name = "status_reason_code", length = 50)
+    private String statusReasonCode;
+
     @Column(name = "stable_location")
     private String stableLocation;
 
@@ -104,6 +110,12 @@ public class Horse {
 
     public String getTrainingDecisionReason() { return trainingDecisionReason; }
     public void setTrainingDecisionReason(String trainingDecisionReason) { this.trainingDecisionReason = trainingDecisionReason; }
+
+    public String getStatusReason() { return statusReason; }
+    public void setStatusReason(String statusReason) { this.statusReason = statusReason; }
+
+    public String getStatusReasonCode() { return statusReasonCode; }
+    public void setStatusReasonCode(String statusReasonCode) { this.statusReasonCode = statusReasonCode; }
 
     /**
      * Quy tắc duy nhất: ngựa đã được nhận vào nuôi VÀ không bị chặn tập.

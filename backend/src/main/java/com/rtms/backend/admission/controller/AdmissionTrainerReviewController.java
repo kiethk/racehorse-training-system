@@ -9,7 +9,6 @@ import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
-import com.rtms.backend.training.entity.RacingReadinessAssessment;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -60,8 +59,7 @@ public class AdmissionTrainerReviewController {
      *
      * Đường dẫn "/trainer/queue" có 3 đoạn nên không đụng "/{id}" (2 đoạn);
      * với "/{id}/documents" thì Spring ưu tiên đoạn chữ "trainer" trước biến
-     * "{id}", đúng như "/horses/{horseId}/readiness-history" bên dưới vẫn
-     * sống chung với "/{id}/trainer-review" từ trước tới nay.
+     * "{id}".
      */
     @GetMapping("/trainer/queue")
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VIEW')")
@@ -120,17 +118,5 @@ public class AdmissionTrainerReviewController {
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(
                 trainerReviewService.completeAssessment(id, request, currentUser.getUserId()));
-    }
-
-    /** Lịch sử đánh giá của một chiến mã — dùng cho biểu đồ tiến bộ sau này. */
-    @GetMapping("/horses/{horseId}/readiness-history")
-    @PreAuthorize("hasAuthority('RACING_READINESS_ASSESSMENT_VIEW')")
-    public ApiResponse<List<RacingReadinessAssessment>> getHistory(
-            @PathVariable Long horseId,
-            @RequestParam(required = false, defaultValue = "false") boolean includeAdmission) {
-        return ApiResponse.success(includeAdmission
-                ? assessmentRepository.findByHorseIdOrderByAssessmentDateDesc(horseId)
-                : assessmentRepository
-                        .findByHorseIdAndAdmissionIdIsNullOrderByAssessmentDateAsc(horseId));
     }
 }

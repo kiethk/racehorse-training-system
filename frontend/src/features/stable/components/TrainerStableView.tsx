@@ -56,10 +56,12 @@ export function TrainerStableView() {
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
   const [specialty, setSpecialty] = useState<{ horseId: number; value: HorseSpecialty } | null>(null);
 
-  const loadData = useCallback(async () => {
-    try {
+  const loadData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
       setLoading(true);
       setError(null);
+    }
+    try {
       const [areaList, stallList, horseList, trainerList, groomList] = await Promise.all([
         stableApi.getAreas('REGULAR'),
         stableApi.getStalls(),
@@ -187,7 +189,7 @@ export function TrainerStableView() {
             icon="refresh"
             disabled={loading}
             loading={loading && areas.length > 0}
-            onClick={() => void loadData()}
+            onClick={() => void loadData(true)}
           >
             Refresh
           </Button>
@@ -197,7 +199,7 @@ export function TrainerStableView() {
       {error && (
         <Notice tone="error">
           {error}{' '}
-          <Button variant="link" size="sm" onClick={() => void loadData()}>
+          <Button variant="link" size="sm" onClick={() => void loadData(true)}>
             Retry
           </Button>
         </Notice>
@@ -212,7 +214,7 @@ export function TrainerStableView() {
             title="No training areas assigned"
             description="You are currently not assigned to manage any regular stable areas. Please contact the Club Manager to assign areas to your account."
             action={
-              <Button size="sm" icon="refresh" onClick={() => void loadData()}>
+              <Button size="sm" icon="refresh" onClick={() => void loadData(true)}>
                 Refresh
               </Button>
             }

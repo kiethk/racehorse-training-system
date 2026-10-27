@@ -219,7 +219,7 @@ class CareScheduleDirectAssignmentTest {
 
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         // Chặn tập luôn kéo theo hủy buổi tập tương lai.
-        verify(workoutService).cancelFutureTrainingForHorse(eq(99L), anyString());
+        verify(workoutService).cancelFutureTrainingForHorse(99L);
         verify(horses).save(horse);
         verify(schedules, atLeastOnce()).save(argThat(schedule ->
                 schedule.getCareType() == CareType.URGENT

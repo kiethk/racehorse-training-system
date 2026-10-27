@@ -3,13 +3,15 @@ package com.rtms.backend.training.service;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.dto.DashboardPlanRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.dto.IncidentCountRow;
+import com.rtms.backend.training.dto.PerformanceSessionRow;
+import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
-import com.rtms.backend.training.dto.TrainerDashboardHorseResponse;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
 import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 public class HorsePerformanceService {
 
     private static final int RECENT_WORKOUT_DAYS = 30;
+    private static final int TREND_WEEKS = 12;
     private static final int INCIDENT_WINDOW_DAYS = 14;
     public static final int MAX_HEART_RATE_LIMIT = 220;
     public static final int RECOVERY_HEART_RATE_LIMIT = 100;
@@ -48,17 +51,20 @@ public class HorsePerformanceService {
     private final HorseIncidentReportRepository incidentReportRepository;
     private final HorseViewAccessService accessService;
     private final HorseSpecialtyService specialtyService;
+    private final HorseScopeService scopeService;
 
     public HorsePerformanceService(TrainingWorkoutRepository workoutRepository,
                                    HorseTrainingPlanRepository planRepository,
                                    HorseIncidentReportRepository incidentReportRepository,
                                    HorseViewAccessService accessService,
-                                   HorseSpecialtyService specialtyService) {
+                                   HorseSpecialtyService specialtyService,
+                                   HorseScopeService scopeService) {
         this.workoutRepository = workoutRepository;
         this.planRepository = planRepository;
         this.incidentReportRepository = incidentReportRepository;
         this.accessService = accessService;
         this.specialtyService = specialtyService;
+        this.scopeService = scopeService;
     }
 
     // =================================================================
@@ -206,12 +212,14 @@ public class HorsePerformanceService {
     }
 
     // =================================================================
-    // DASHBOARD CỦA TRAINER (Trainer dashboard)
+    // DASHBOARD THEO VAI TRÒ (Role dashboard)
     // =================================================================
 
     /**
-     * Bảng tiến độ và thể lực toàn khu của Trainer (FE-7.1).
-     * (Progress and fitness board for the whole area of a trainer.)
+     * Bảng tiến độ và thể lực của các chiến mã trong phạm vi của vai trò (FE-7.1): Owner thấy ngựa của mình, Trainer
+     * thấy ngựa trong khu, Manager thấy toàn trang trại.
+     * (Progress and fitness board of the horses in the scope of the role (FE-7.1): an owner sees own horses, a
+     * trainer the horses of the areas, the manager the whole farm.)
      *
      * Số truy vấn là HẰNG SỐ (6), không phụ thuộc số ngựa: ngựa trong khu, kế hoạch, buổi tập 30 ngày,
      * số sự cố, buổi tập tính sở trường, đều lấy một lượt rồi ghép theo horseId.
@@ -219,16 +227,14 @@ public class HorsePerformanceService {
      * workouts, incident counts and the specialty workouts are each fetched once and joined by horseId.)
      */
     @Transactional(readOnly = true)
-    public List<TrainerDashboardHorseResponse> getTrainerDashboard(AuthenticatedUser currentUser) {
-        Long trainerId = currentUser.getUserId();
-
-        List<DashboardHorseRow> horses = planRepository.findDashboardHorses(trainerId);
+    public List<DashboardHorseResponse> getDashboard(AuthenticatedUser currentUser) {
+        List<DashboardHorseRow> horses = scopeService.horsesOf(currentUser);
         if (horses.isEmpty()) {
             return Collections.emptyList();
         }
         List<Long> horseIds = horses.stream().map(DashboardHorseRow::horseId).toList();
 
-        Map<Long, List<DashboardPlanRow>> plansByHorse = planRepository.findDashboardPlans(trainerId).stream()
+        Map<Long, List<DashboardPlanRow>> plansByHorse = planRepository.findDashboardPlans(horseIds).stream()
                 .collect(Collectors.groupingBy(DashboardPlanRow::horseId));
         Map<Long, List<RecentWorkoutRow>> recentByHorse = workoutRepository
                 .findRecentCompletedWorkouts(horseIds, LocalDate.now().minusDays(RECENT_WORKOUT_DAYS)).stream()
@@ -248,12 +254,12 @@ public class HorsePerformanceService {
                 .toList();
     }
 
-    private TrainerDashboardHorseResponse buildDashboardRow(DashboardHorseRow horse,
+    private DashboardHorseResponse buildDashboardRow(DashboardHorseRow horse,
                                                             List<DashboardPlanRow> plans,
                                                             List<RecentWorkoutRow> recent,
                                                             long incidentCount,
                                                             HorseSpecialtyResponse specialty) {
-        TrainerDashboardHorseResponse response = new TrainerDashboardHorseResponse();
+        DashboardHorseResponse response = new DashboardHorseResponse();
         response.setHorseId(horse.horseId());
         response.setHorseName(horse.horseName());
         response.setBreed(horse.breed());
@@ -267,6 +273,23 @@ public class HorsePerformanceService {
         response.setAlertTitles(alerts.stream().map(HorseAlertResponse::getTitle).toList());
         response.setSpecialty(specialty);
         return response;
+    }
+
+    /**
+     * Biểu đồ phong độ chung trên dashboard: trung bình từng tuần của các buổi đã hoàn thành trong 12 tuần gần nhất (tuần
+     * hiện tại tính đến hôm nay), của các chiến mã trong phạm vi vai trò. Mỗi con được tính một lần mỗi tuần.
+     * (Performance chart on the dashboard: the weekly averages of the sessions completed in the last 12 weeks (the
+     * current week up to today), for the horses in the scope of the role. Each horse counts once per week.)
+     */
+    @Transactional(readOnly = true)
+    public PerformanceTrendResponse getPerformanceTrend(AuthenticatedUser currentUser) {
+        LocalDate to = LocalDate.now();
+        LocalDate from = PerformanceTrendCalculator.weekStartOf(to).minusWeeks(TREND_WEEKS - 1L);
+        List<Long> horseIds = scopeService.horseIdsOf(currentUser);
+        List<PerformanceSessionRow> sessions = horseIds.isEmpty()
+                ? List.of()
+                : workoutRepository.findPerformanceSessions(horseIds, from, to);
+        return new PerformanceTrendResponse(from, to, PerformanceTrendCalculator.byWeek(sessions));
     }
 
     /**
@@ -284,7 +307,7 @@ public class HorsePerformanceService {
         return plans.isEmpty() ? null : plans.get(0);
     }
 
-    private void fillPlanProgress(TrainerDashboardHorseResponse response, DashboardPlanRow plan) {
+    private void fillPlanProgress(DashboardHorseResponse response, DashboardPlanRow plan) {
         if (plan == null) {
             response.setPlanStatus("NONE");
             response.setCourseName("No plan yet");
@@ -308,7 +331,7 @@ public class HorsePerformanceService {
     }
 
     /** Điểm phong độ mới nhất và trung bình 30 ngày. (Latest rating and the 30-day average.) */
-    private void fillRatingStats(TrainerDashboardHorseResponse response, List<RecentWorkoutRow> recent) {
+    private void fillRatingStats(DashboardHorseResponse response, List<RecentWorkoutRow> recent) {
         if (recent.isEmpty()) {
             return;
         }

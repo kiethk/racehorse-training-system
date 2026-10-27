@@ -5,10 +5,14 @@ import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CreateHorseTrainingPlanRequest;
 import com.rtms.backend.training.dto.HorseTrainingPlanDetailResponse;
 import com.rtms.backend.training.dto.JoinableCohortResponse;
+import com.rtms.backend.training.dto.PlanPreviewRequest;
+import com.rtms.backend.training.dto.PlanPreviewResponse;
 import com.rtms.backend.training.dto.PlanSummaryResponse;
-import com.rtms.backend.training.dto.TrainerDashboardHorseResponse;
+import com.rtms.backend.training.dto.PerformanceTrendResponse;
+import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseTrainingPlanService;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,9 +44,20 @@ public class HorseTrainingPlanController {
      */
     @PreAuthorize("hasAuthority('TRAINING_PLAN_VIEW')")
     @GetMapping("/dashboard")
-    public ApiResponse<List<TrainerDashboardHorseResponse>> getDashboard(
+    public ApiResponse<List<DashboardHorseResponse>> getDashboard(
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(performanceService.getTrainerDashboard(currentUser));
+        return ApiResponse.success(performanceService.getDashboard(currentUser));
+    }
+
+    /**
+     * Biểu đồ phong độ chung của toàn khu trên dashboard: trung bình theo ngày, 30 ngày gần nhất.
+     * (Area-wide performance chart on the dashboard: daily averages over the last 30 days.)
+     */
+    @PreAuthorize("hasAuthority('TRAINING_PLAN_VIEW')")
+    @GetMapping("/dashboard/performance-trend")
+    public ApiResponse<PerformanceTrendResponse> getPerformanceTrend(
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(performanceService.getPerformanceTrend(currentUser));
     }
 
     /**
@@ -70,9 +85,23 @@ public class HorseTrainingPlanController {
     @PreAuthorize("hasAuthority('TRAINING_PLAN_CREATE')")
     @PostMapping
     public ApiResponse<List<HorseTrainingPlanDetailResponse>> createPlan(
-            @RequestBody CreateHorseTrainingPlanRequest request,
+            @Valid @RequestBody CreateHorseTrainingPlanRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(planService.createPlan(request, currentUser));
+    }
+
+    /**
+     * Xem trước kế hoạch: khoảng ngày của khóa và ngựa nào rảnh, bận hay bị chặn, để Trainer chọn đúng trước khi tạo.
+     * Chỉ đọc, nhưng dùng quyền TRAINING_PLAN_CREATE vì đây là một bước của việc lập kế hoạch.
+     * (Previews a plan: the course date range and which horses are free, busy or blocked, so the trainer chooses right
+     * before creating. Read-only, but guarded by TRAINING_PLAN_CREATE because it is a step of creating a plan.)
+     */
+    @PreAuthorize("hasAuthority('TRAINING_PLAN_CREATE')")
+    @PostMapping("/preview")
+    public ApiResponse<PlanPreviewResponse> previewPlan(
+            @Valid @RequestBody PlanPreviewRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(planService.previewPlan(request, currentUser));
     }
 
     /**

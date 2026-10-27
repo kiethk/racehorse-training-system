@@ -20,6 +20,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.rtms.backend.config.ApiException;
+import org.springframework.http.HttpStatus;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -287,7 +289,7 @@ class TrainingLotViewServiceTest {
         when(lotRepository.findById(10L)).thenReturn(Optional.of(lot(10L, 9L, LotStatus.SCHEDULED)));
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject(60)));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> lotService.rescheduleLot(10L, LocalTime.of(9, 30), 9L));
         assertTrue(ex.getMessage().contains("outside the golden window"));
         verify(lotRepository, never()).save(any());
@@ -304,9 +306,21 @@ class TrainingLotViewServiceTest {
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject(60)));
         when(lotRepository.findActiveLotsOfDay(9L, from)).thenReturn(List.of(lot, other));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
+        ApiException ex = assertThrows(ApiException.class,
                 () -> lotService.rescheduleLot(10L, LocalTime.of(8, 30), 9L));
-        assertTrue(ex.getMessage().contains("overlaps your lot #11"));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertTrue(ex.getMessage().contains("overlaps another lot (08:00–09:00)"));
+    }
+
+    @Test
+    @DisplayName("Rescheduling to a time off the 15-minute steps is rejected")
+    void testRescheduleLot_OffQuarterHour() {
+        when(lotRepository.findById(10L)).thenReturn(Optional.of(lot(10L, 9L, LotStatus.SCHEDULED)));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> lotService.rescheduleLot(10L, LocalTime.of(8, 10), 9L));
+        assertTrue(ex.getMessage().contains(":00, :15, :30 or :45"));
+        verify(lotRepository, never()).save(any());
     }
 
     @Test
@@ -323,9 +337,36 @@ class TrainingLotViewServiceTest {
     void testRescheduleLot_AlreadyClosed() {
         when(lotRepository.findById(10L)).thenReturn(Optional.of(lot(10L, 9L, LotStatus.COMPLETED)));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
+        ApiException ex = assertThrows(ApiException.class,
                 () -> lotService.rescheduleLot(10L, LocalTime.of(8, 0), 9L));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         assertTrue(ex.getMessage().contains("already COMPLETED"));
+    }
+
+    @Test
+    @DisplayName("A lot whose time has already passed cannot be rescheduled or cancelled")
+    void testRescheduleAndCancel_LotAlreadyHeld() {
+        TrainingLot past = lot(10L, 9L, LotStatus.SCHEDULED);
+        past.setLotDate(LocalDate.now().minusDays(1));
+        when(lotRepository.findById(10L)).thenReturn(Optional.of(past));
+
+        assertThrows(ApiException.class, () -> lotService.rescheduleLot(10L, LocalTime.of(8, 0), 9L));
+        assertThrows(ApiException.class, () -> lotService.cancelLot(10L, 9L));
+        verify(lotRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("A missing start time is a clear 400, not a NullPointerException")
+    void testRescheduleLot_NullTime() {
+        assertThrows(IllegalArgumentException.class, () -> lotService.rescheduleLot(10L, null, 9L));
+    }
+
+    @Test
+    @DisplayName("A cancelled lot cannot be cancelled again")
+    void testCancelLot_AlreadyCancelled() {
+        when(lotRepository.findById(10L)).thenReturn(Optional.of(lot(10L, 9L, LotStatus.CANCELLED)));
+
+        assertThrows(ApiException.class, () -> lotService.cancelLot(10L, 9L));
     }
 
     @Test
