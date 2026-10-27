@@ -296,7 +296,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       <Panel className="overflow-hidden border border-[var(--color-border)] p-5 sm:p-6 border-l-4 border-l-[var(--color-medical)] bg-[var(--color-surface)]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-4">
-            <HorseAvatar name={urgentCase.horseName} image={null} size={56} rounded="md" />
+            <HorseAvatar name={urgentCase.horseName} image={urgentCase.horseId ? `/api/horses/${urgentCase.horseId}/photo` : null} size={56} rounded="md" />
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xl font-bold text-[var(--color-text-primary)]">

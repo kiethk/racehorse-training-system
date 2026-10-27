@@ -225,8 +225,12 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals(1, map.get("tongSoNguaQuanLy"));
-        assertTrue(map.containsKey("danhSachNgua"));
+        assertEquals(1, map.get("totalManagedHorses"));
+        assertTrue(map.containsKey("horseList"));
+        List<?> list = (List<?>) map.get("horseList");
+        Map<?, ?> item = (Map<?, ?>) list.get(0);
+        assertTrue(item.containsKey("specialtyCount"));
+        assertTrue(item.containsKey("specialties"));
     }
 
     @Test
@@ -254,14 +258,16 @@ class AiToolExecutionServiceTest {
         );
 
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("totalSessions"));
+        List<?> list = (List<?>) response.get("sessionList");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertTrue(item.get("caTap").toString().contains("Ca Sáng"));
-        assertEquals("Sprint 1000m", item.get("tenBaiTap"));
-        assertEquals(2L, item.get("soLuongNgua"));
-        List<?> horseNames = (List<?>) item.get("danhSachNgua");
+        assertTrue(item.get("sessionTime").toString().contains("Ca Sáng"));
+        assertEquals("Sprint 1000m", item.get("subjectName"));
+        assertEquals(2L, item.get("horseCount"));
+        List<?> horseNames = (List<?>) item.get("horseList");
         assertEquals(2, horseNames.size());
     }
 
@@ -295,13 +301,13 @@ class AiToolExecutionServiceTest {
         List<?> list = (List<?>) result;
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("Sprint Course", item.get("tenKeHoach"));
-        assertEquals("Bứt phá tốc độ cự ly ngắn", item.get("mucTieu"));
-        assertTrue(item.get("trangThai").toString().contains("ACTIVE"));
+        assertEquals("Sprint Course", item.get("planName"));
+        assertEquals("Bứt phá tốc độ cự ly ngắn", item.get("targetGoal"));
+        assertTrue(item.get("status").toString().contains("ACTIVE"));
     }
 
     @Test
-    @DisplayName("HEAD_TRAINER gọi getHorseSpecialtyAnalysis phân tích sở trường ngựa luôn có mặt sân")
+    @DisplayName("HEAD_TRAINER gọi getHorseSpecialtyAnalysis phân tích sở trường ngựa luôn có mặt sân và điểm trung bình")
     void testTrainer_GetHorseSpecialtyAnalysis() {
         AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
 
@@ -328,8 +334,178 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals("RED RUM", map.get("tenNgua"));
-        assertTrue(map.get("matSanUaThich").toString().contains("TURF"));
+        assertEquals("RED RUM", map.get("horseName"));
+        assertEquals(1, map.get("specialtyCount"));
+        assertEquals(new BigDecimal("8.5"), map.get("averageRating"));
+        assertEquals(new BigDecimal("8.5"), map.get("bestRating"));
+        assertEquals(10L, map.get("horseId"));
+        assertTrue(map.get("preferredSurface").toString().contains("TURF"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi getHorseSpecialtyAnalysis với horseName='all' để xếp hạng các con ngựa theo số lượng sở trường (sortBy='count')")
+    void testTrainer_GetHorseSpecialtyAnalysis_FleetRanking_SortByCount() {
+        AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        Horse h1 = new Horse();
+        h1.setId(10L);
+        h1.setName("ALPHA SPRINT");
+        h1.setRegistrationNumber("VN-010");
+        h1.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        Horse h2 = new Horse();
+        h2.setId(20L);
+        h2.setName("BETA DUAL");
+        h2.setRegistrationNumber("VN-020");
+        h2.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        when(horseRepository.findManagedHorsesByTrainerIdAndStatusIn(eq(5L), anyCollection()))
+                .thenReturn(List.of(h1, h2));
+
+        // h1 has 1 specialty (SPRINT, rating 9.5), h2 has 2 specialties (MILE 7.1, MIDDLE 7.3 => avg 7.2)
+        HorseSpecialtyResponse spec1 = new HorseSpecialtyResponse(
+                3, List.of(DistanceBand.SPRINT), SurfaceType.TURF,
+                List.of(new DistanceStat(DistanceBand.SPRINT, 5, new BigDecimal("9.5"), new BigDecimal("64.0"))));
+        HorseSpecialtyResponse spec2 = new HorseSpecialtyResponse(
+                3, List.of(DistanceBand.MILE, DistanceBand.MIDDLE), SurfaceType.DIRT,
+                List.of(
+                        new DistanceStat(DistanceBand.MILE, 3, new BigDecimal("7.1"), new BigDecimal("58.0")),
+                        new DistanceStat(DistanceBand.MIDDLE, 3, new BigDecimal("7.3"), new BigDecimal("56.0"))
+                ));
+
+        when(horseSpecialtyService.getSpecialties(anyCollection()))
+                .thenReturn(Map.of(10L, spec1, 20L, spec2));
+
+        Object result = toolExecutionService.executeTool(
+                "getHorseSpecialtyAnalysis",
+                Map.of("horseName", "all", "sortBy", "count"),
+                trainer
+        );
+
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals(2, map.get("totalHorses"));
+        assertEquals(2, map.get("horsesWithSpecialties"));
+        assertEquals("COUNT", map.get("sortBy"));
+        assertTrue(map.containsKey("rankedHorseList"));
+
+        List<?> rankedList = (List<?>) map.get("rankedHorseList");
+        assertEquals(2, rankedList.size());
+
+        // Top horse should be BETA DUAL (2 specialties)
+        Map<?, ?> top = (Map<?, ?>) rankedList.get(0);
+        assertEquals(1, top.get("rank"));
+        assertEquals("BETA DUAL", top.get("horseName"));
+        assertEquals(2, top.get("specialtyCount"));
+        assertEquals(new BigDecimal("7.2"), top.get("averageRating"));
+
+        // Second horse should be ALPHA SPRINT (1 specialty)
+        Map<?, ?> second = (Map<?, ?>) rankedList.get(1);
+        assertEquals(2, second.get("rank"));
+        assertEquals("ALPHA SPRINT", second.get("horseName"));
+        assertEquals(1, second.get("specialtyCount"));
+        assertEquals(new BigDecimal("9.5"), second.get("averageRating"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi getHorseSpecialtyAnalysis với sortBy='rating' để xếp hạng theo điểm trung bình phong độ sở trường")
+    void testTrainer_GetHorseSpecialtyAnalysis_FleetRanking_SortByRating() {
+        AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        Horse h1 = new Horse();
+        h1.setId(10L);
+        h1.setName("ALPHA SPRINT");
+        h1.setRegistrationNumber("VN-010");
+        h1.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        Horse h2 = new Horse();
+        h2.setId(20L);
+        h2.setName("BETA DUAL");
+        h2.setRegistrationNumber("VN-020");
+        h2.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        when(horseRepository.findManagedHorsesByTrainerIdAndStatusIn(eq(5L), anyCollection()))
+                .thenReturn(List.of(h1, h2));
+
+        // h1 has 1 specialty (SPRINT, rating 9.5), h2 has 2 specialties (MILE 7.1, MIDDLE 7.3 => avg 7.2)
+        HorseSpecialtyResponse spec1 = new HorseSpecialtyResponse(
+                3, List.of(DistanceBand.SPRINT), SurfaceType.TURF,
+                List.of(new DistanceStat(DistanceBand.SPRINT, 5, new BigDecimal("9.5"), new BigDecimal("64.0"))));
+        HorseSpecialtyResponse spec2 = new HorseSpecialtyResponse(
+                3, List.of(DistanceBand.MILE, DistanceBand.MIDDLE), SurfaceType.DIRT,
+                List.of(
+                        new DistanceStat(DistanceBand.MILE, 3, new BigDecimal("7.1"), new BigDecimal("58.0")),
+                        new DistanceStat(DistanceBand.MIDDLE, 3, new BigDecimal("7.3"), new BigDecimal("56.0"))
+                ));
+
+        when(horseSpecialtyService.getSpecialties(anyCollection()))
+                .thenReturn(Map.of(10L, spec1, 20L, spec2));
+
+        Object result = toolExecutionService.executeTool(
+                "getHorseSpecialtyAnalysis",
+                Map.of("horseName", "all", "sortBy", "rating"),
+                trainer
+        );
+
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals(2, map.get("totalHorses"));
+        assertEquals("RATING", map.get("sortBy"));
+
+        List<?> rankedList = (List<?>) map.get("rankedHorseList");
+        assertEquals(2, rankedList.size());
+
+        // In sortBy='rating', ALPHA SPRINT (9.5) MUST be Rank 1!
+        Map<?, ?> top = (Map<?, ?>) rankedList.get(0);
+        assertEquals(1, top.get("rank"));
+        assertEquals("ALPHA SPRINT", top.get("horseName"));
+        assertEquals(new BigDecimal("9.5"), top.get("averageRating"));
+
+        // BETA DUAL (7.2) is Rank 2
+        Map<?, ?> second = (Map<?, ?>) rankedList.get(1);
+        assertEquals(2, second.get("rank"));
+        assertEquals("BETA DUAL", second.get("horseName"));
+        assertEquals(new BigDecimal("7.2"), second.get("averageRating"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi getHorseSpecialtyAnalysis để xếp hạng toàn bộ chiến mã trong câu lạc bộ")
+    void testManager_GetHorseSpecialtyAnalysis_FleetRanking() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        Horse h1 = new Horse();
+        h1.setId(101L);
+        h1.setName("ZEUS");
+        h1.setRegistrationNumber("VN-101");
+        h1.setCurrentStatus(HorseStatus.ELIGIBLE);
+
+        when(horseRepository.findAll()).thenReturn(List.of(h1));
+
+        HorseSpecialtyResponse spec = new HorseSpecialtyResponse(
+                3, List.of(DistanceBand.STAYER), SurfaceType.TURF,
+                List.of(new DistanceStat(DistanceBand.STAYER, 4, new BigDecimal("8.8"), new BigDecimal("60.0"))));
+        when(horseSpecialtyService.getSpecialties(anyCollection()))
+                .thenReturn(Map.of(101L, spec));
+
+        Object result = toolExecutionService.executeTool(
+                "getHorseSpecialtyAnalysis",
+                Map.of(),
+                manager
+        );
+
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals(1, map.get("totalHorses"));
+        assertEquals(1, map.get("horsesWithSpecialties"));
+        List<?> rankedList = (List<?>) map.get("rankedHorseList");
+        assertEquals(1, rankedList.size());
+        Map<?, ?> top = (Map<?, ?>) rankedList.get(0);
+        assertEquals("ZEUS", top.get("horseName"));
+        assertEquals(1, top.get("specialtyCount"));
+        assertEquals(new BigDecimal("8.8"), top.get("averageRating"));
     }
 
     @Test
@@ -360,12 +536,12 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals(1, map.get("tongSoGroomLamViecCung"));
-        List<?> groomList = (List<?>) map.get("danhSachGroom");
+        assertEquals(1, map.get("totalCollaboratingGrooms"));
+        List<?> groomList = (List<?>) map.get("groomList");
         assertNotNull(groomList);
         assertEquals(1, groomList.size());
         Map<?, ?> groomItem = (Map<?, ?>) groomList.get(0);
-        assertEquals("0988123456", groomItem.get("soDienThoai"));
+        assertEquals("0988123456", groomItem.get("phone"));
         assertEquals("Chưa có email", groomItem.get("email"));
     }
 
@@ -396,8 +572,8 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals(1, map.get("soCaDangKham"));
-        assertEquals(1, map.get("soCaChuaKham"));
+        assertEquals(1, map.get("inProgressExamsCount"));
+        assertEquals(1, map.get("pendingScheduledExamsCount"));
     }
 
     @Test
@@ -430,12 +606,12 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals(1, map.get("tongSoNguaCachLyHoacCamTap"));
+        assertEquals(1, map.get("quarantinedOrRestrictedHorsesCount"));
 
-        List<?> list = (List<?>) map.get("danhSachNguaCachLy");
+        List<?> list = (List<?>) map.get("quarantinedHorseList");
         Map<?, ?> horseItem = (Map<?, ?>) list.get(0);
-        assertEquals("BLOCKED", horseItem.get("quyetDinhTapLuyen"));
-        assertEquals(false, horseItem.get("duocPhepTapLuyen"));
+        assertEquals("BLOCKED", horseItem.get("trainingDecision"));
+        assertEquals(false, horseItem.get("isTrainingAllowed"));
     }
 
     // =================================================================
@@ -463,8 +639,8 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals("NAUSICAA", map.get("tenNgua"));
-        assertTrue(map.get("viTriChuong").toString().contains("A-01"));
+        assertEquals("NAUSICAA", map.get("horseName"));
+        assertTrue(map.get("stallLocation").toString().contains("A-01"));
     }
 
     // =================================================================
@@ -493,10 +669,10 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals(2, map.get("tongSoNguaTrongTrangTrai"));
-        assertEquals(1L, map.get("soNguaDuocPhepTapLuyen"));
-        assertEquals(1L, map.get("soNguaBiCamTapLuyenYTe"));
-        assertEquals(1, map.get("soSuCoTrong7NgayQua"));
+        assertEquals(2, map.get("totalClubHorses"));
+        assertEquals(1L, map.get("allowedTrainingHorses"));
+        assertEquals(1L, map.get("medicallyBlockedHorsesCount"));
+        assertEquals(1, map.get("incidentsLast7DaysCount"));
     }
 
     @Test
@@ -524,25 +700,50 @@ class AiToolExecutionServiceTest {
         r2.setName("VETERINARIAN");
         u2.setRole(r2);
 
-        when(userRepository.findAll()).thenReturn(List.of(u1, u2));
+        User u3 = new User();
+        u3.setId(30L);
+        u3.setFullName("Lê Văn Groom");
+        u3.setEmail("groom@rtms.com");
+        u3.setPhone("0909999888");
+        u3.setActive(true);
+        Role r3 = new Role();
+        r3.setName("GROOM");
+        u3.setRole(r3);
+
+        when(userRepository.findAll()).thenReturn(List.of(u1, u2, u3));
 
         Object result = toolExecutionService.executeTool("getSystemStaffOverview", Map.of(), manager);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
-        assertEquals(2, list.size());
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+
+        // Verify summary counts
+        assertEquals(3, response.get("totalStaff"));
+
+        // Verify role breakdown
+        Map<?, ?> roleBreakdown = (Map<?, ?>) response.get("roleBreakdown");
+        assertNotNull(roleBreakdown);
+        assertEquals(1, roleBreakdown.get("HEAD_TRAINER"));
+        assertEquals(1, roleBreakdown.get("VETERINARIAN"));
+        assertEquals(1, roleBreakdown.get("GROOM"));
+
+        // Verify staff list
+        List<?> list = (List<?>) response.get("staffList");
+        assertEquals(3, list.size());
 
         Map<?, ?> item1 = (Map<?, ?>) list.get(0);
-        assertEquals("Nguyễn Văn HLV", item1.get("hoTen"));
-        assertEquals("Huấn luyện viên trưởng", item1.get("vaiTro"));
+        assertEquals("Nguyễn Văn HLV", item1.get("fullName"));
+        assertEquals("HEAD_TRAINER", item1.get("role"));
+        assertEquals("Huấn luyện viên trưởng", item1.get("roleTitle"));
         assertEquals("trainer@rtms.com", item1.get("email"));
-        assertEquals("0901234567", item1.get("soDienThoai"));
-        assertEquals("Đang hoạt động", item1.get("trangThaiHoatDong"));
-        assertNotNull(item1.get("thongTinChuyenMon"));
+        assertEquals("0901234567", item1.get("phone"));
+        assertEquals("Đang hoạt động", item1.get("activeStatus"));
+        assertNotNull(item1.get("specialtyInfo"));
 
         Map<?, ?> item2 = (Map<?, ?>) list.get(1);
-        assertEquals("Đã khóa", item2.get("trangThaiHoatDong"));
-        assertEquals("Bác sĩ thú y", item2.get("vaiTro"));
+        assertEquals("Đã khóa", item2.get("activeStatus"));
+        assertEquals("VETERINARIAN", item2.get("role"));
+        assertEquals("Bác sĩ thú y", item2.get("roleTitle"));
 
         // Filter by role & isActive
         Object filteredResult = toolExecutionService.executeTool(
@@ -550,12 +751,13 @@ class AiToolExecutionServiceTest {
                 Map.of("role", "HEAD_TRAINER", "isActive", true),
                 manager
         );
-        assertTrue(filteredResult instanceof List<?>);
-        List<?> filteredList = (List<?>) filteredResult;
+        assertTrue(filteredResult instanceof Map<?, ?>);
+        Map<?, ?> filteredResponse = (Map<?, ?>) filteredResult;
+        assertEquals(1, filteredResponse.get("totalStaff"));
+        List<?> filteredList = (List<?>) filteredResponse.get("staffList");
         assertEquals(1, filteredList.size());
-        assertEquals("Nguyễn Văn HLV", ((Map<?, ?>) filteredList.get(0)).get("hoTen"));
+        assertEquals("Nguyễn Văn HLV", ((Map<?, ?>) filteredList.get(0)).get("fullName"));
     }
-
     @Test
     @DisplayName("CLUB_MANAGER gọi getClubHorsesDirectory tra cứu danh bạ chiến mã kèm trạng thái và HLV phụ trách")
     void testManager_GetClubHorsesDirectory() {
@@ -601,12 +803,14 @@ class AiToolExecutionServiceTest {
         assertEquals(1, list.size());
 
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("DARK ANGEL", item.get("tenNgua"));
-        assertEquals("VN-100", item.get("maSoNgua"));
-        assertEquals("Chủ Ngựa Lê Văn", item.get("tenChuNgua"));
-        assertTrue(item.get("trangThaiHienTai").toString().contains("ACTIVE"));
-        assertTrue(item.get("viTriChuong").toString().contains("A-01"));
-        assertEquals("HLV Park", item.get("huanLuyenVienPhuTrach"));
+        assertEquals("DARK ANGEL", item.get("horseName"));
+        assertEquals("VN-100", item.get("horseId"));
+        assertEquals("Chủ Ngựa Lê Văn", item.get("ownerName"));
+        assertTrue(item.get("currentStatus").toString().contains("ACTIVE"));
+        assertTrue(item.get("stallLocation").toString().contains("A-01"));
+        assertEquals("HLV Park", item.get("assignedTrainer"));
+        assertTrue(item.containsKey("specialtyCount"));
+        assertTrue(item.containsKey("specialties"));
     }
 
     @Test
@@ -636,14 +840,41 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getRecentAuditLogs", Map.of("limit", 10), manager);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("totalAuditLogs"));
+        List<?> list = (List<?>) response.get("auditLogList");
         assertEquals(1, list.size());
 
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("Cập nhật kế hoạch huấn luyện", item.get("hanhDong"));
-        assertTrue(item.get("nguoiThucHien").toString().contains("HLV Nguyễn Văn B"));
-        assertTrue(item.get("chiTietThayDoi").toString().contains("HorseTrainingPlan"));
+        assertEquals("Cập nhật kế hoạch huấn luyện", item.get("action"));
+        assertTrue(item.get("performedBy").toString().contains("HLV Nguyễn Văn B"));
+        assertTrue(item.get("changeDetails").toString().contains("HorseTrainingPlan"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi getAdmissionRequestsOverview lấy thống kê tổng quan toàn bộ đơn nhập đàn")
+    void testManager_GetAdmissionRequestsOverview() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        AdmissionApplication app1 = new AdmissionApplication();
+        app1.setId(1L);
+        app1.setStatus(AdmissionStatus.MANAGER_REVIEW);
+
+        AdmissionApplication app2 = new AdmissionApplication();
+        app2.setId(2L);
+        app2.setStatus(AdmissionStatus.APPROVED);
+
+        when(admissionApplicationRepository.findAll()).thenReturn(List.of(app1, app2));
+
+        Object result = toolExecutionService.executeTool("getAdmissionRequestsOverview", Map.of(), manager);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals(2L, map.get("totalApplications"));
+        assertEquals(1L, map.get("pendingManagerReviewCount"));
+        assertEquals(1L, map.get("approvedApplications"));
     }
 
     @Test
@@ -689,13 +920,13 @@ class AiToolExecutionServiceTest {
         assertEquals(1, list.size());
 
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("PEGASUS JUNIOR", item.get("tenNgua"));
-        assertEquals("Chủ Ngựa Trần C", item.get("tenChuNgua"));
-        assertTrue(item.get("buocHienTai").toString().contains("MANAGER_REVIEW"));
-        assertEquals("BS Thú Y Hoàng", item.get("bacSiPhuTrach"));
-        assertEquals("HLV Park", item.get("huanLuyenVienChiDinh"));
-        assertEquals("/manager/admissions/123", item.get("duongDanDieuHuong"));
-        assertEquals("/manager/admissions", item.get("actionUrl"));
+        assertEquals("PEGASUS JUNIOR", item.get("horseName"));
+        assertEquals("Chủ Ngựa Trần C", item.get("ownerName"));
+        assertTrue(item.get("currentStage").toString().contains("MANAGER_REVIEW"));
+        assertEquals("BS Thú Y Hoàng", item.get("assignedVet"));
+        assertEquals("HLV Park", item.get("designatedTrainer"));
+        assertEquals("/manager/admissions/123", item.get("navigationUrl"));
+        assertEquals("/manager/admissions/123", item.get("actionUrl"));
     }
 
     // =================================================================
@@ -727,9 +958,9 @@ class AiToolExecutionServiceTest {
         List<?> list = (List<?>) result;
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("RED RUM", item.get("tenNgua"));
-        assertEquals("Trầy xước chân trước", item.get("tieuDe"));
-        assertEquals("/owner/horses", item.get("actionUrl"));
+        assertEquals("RED RUM", item.get("horseName"));
+        assertEquals("Trầy xước chân trước", item.get("title"));
+        assertEquals("/owner/horses/10", item.get("actionUrl"));
     }
 
     @Test
@@ -754,10 +985,10 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals("RED RUM", map.get("tenNgua"));
-        assertEquals("Galileo", map.get("nguaCha"));
-        assertEquals("Urban Sea", map.get("nguaMe"));
-        assertEquals("/owner/horses", map.get("actionUrl"));
+        assertEquals("RED RUM", map.get("horseName"));
+        assertEquals("Galileo", map.get("sire"));
+        assertEquals("Urban Sea", map.get("dam"));
+        assertEquals("/owner/horses/10", map.get("actionUrl"));
     }
 
     @Test
@@ -781,13 +1012,15 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getMyHorseRaceRegistrations", Map.of(), trainer);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("totalRaceRegistrations"));
+        List<?> list = (List<?>) response.get("raceList");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("THUNDER", item.get("tenNgua"));
-        assertEquals("Cúp Mùa Xuân", item.get("tenGiaiDua"));
-        assertEquals("/trainer/racing", item.get("actionUrl"));
+        assertEquals("THUNDER", item.get("horseName"));
+        assertEquals("Cúp Mùa Xuân", item.get("raceName"));
+        assertEquals("/trainer/racing/1", item.get("actionUrl"));
     }
 
     @Test
@@ -810,13 +1043,15 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getAssignedAdmissionReviews", Map.of(), trainer);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("pendingReviewCount"));
+        List<?> list = (List<?>) response.get("applicationList");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("WIND RUNNER", item.get("tenNgua"));
-        assertEquals("Thoroughbred", item.get("giongNgua"));
-        assertEquals("/trainer/admissions", item.get("actionUrl"));
+        assertEquals("WIND RUNNER", item.get("horseName"));
+        assertEquals("Thoroughbred", item.get("breed"));
+        assertEquals("/trainer/admissions/301", item.get("actionUrl"));
     }
 
     @Test
@@ -845,8 +1080,8 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertTrue(map.containsKey("danhMucKhoaHoc"));
-        assertTrue(map.containsKey("danhMucMonHocKyThuat"));
+        assertTrue(map.containsKey("courseCurriculumList"));
+        assertTrue(map.containsKey("technicalSubjectList"));
         assertEquals("/trainer/courses", map.get("actionUrl"));
     }
 
@@ -873,13 +1108,15 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getPendingAdmissionExams", Map.of(), vet);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("pendingExamCount"));
+        List<?> list = (List<?>) response.get("examList");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("SILVER BULLET", item.get("tenNgua"));
-        assertEquals("Chờ bác sĩ khám sàng lọc", item.get("trangThai"));
-        assertEquals("/veterinarian/admissions", item.get("actionUrl"));
+        assertEquals("SILVER BULLET", item.get("horseName"));
+        assertEquals("Chờ bác sĩ khám sàng lọc", item.get("status"));
+        assertEquals("/veterinarian/admissions?id=401", item.get("actionUrl"));
     }
 
     @Test
@@ -904,14 +1141,16 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getUrgentCareAlerts", Map.of(), vet);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("totalUrgentAlerts"));
+        List<?> list = (List<?>) response.get("alertList");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("LIGHTNING", item.get("tenNgua"));
-        assertEquals("Khẩn cấp", item.get("mucDo"));
-        assertEquals("Ngựa sốt cao đột ngột", item.get("trieuChung"));
-        assertEquals("/veterinarian/urgent", item.get("actionUrl"));
+        assertEquals("LIGHTNING", item.get("horseName"));
+        assertEquals("Khẩn cấp", item.get("severity"));
+        assertEquals("Ngựa sốt cao đột ngột", item.get("symptoms"));
+        assertEquals("/veterinarian/urgent/501", item.get("actionUrl"));
     }
 
     @Test
@@ -939,11 +1178,11 @@ class AiToolExecutionServiceTest {
         List<?> list = (List<?>) result;
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("LIGHTNING", item.get("tenNgua"));
-        assertEquals("480 kg", item.get("canNang"));
-        assertEquals("38.2 °C", item.get("thanNhiet"));
-        assertEquals("36 bpm", item.get("nhipTim"));
-        assertEquals("12 nhịp/phút", item.get("nhipTho"));
+        assertEquals("LIGHTNING", item.get("horseName"));
+        assertEquals("480 kg", item.get("weight"));
+        assertEquals("38.2 °C", item.get("temperature"));
+        assertEquals("36 bpm", item.get("heartRate"));
+        assertEquals("12 nhịp/phút", item.get("respiratoryRate"));
     }
 
     @Test
@@ -983,8 +1222,8 @@ class AiToolExecutionServiceTest {
         assertEquals(2, listEmpty.size());
         Map<?, ?> first = (Map<?, ?>) listEmpty.get(0);
         // m2 có recordedAt lúc 9:00 > 8:00 nên đứng đầu
-        assertEquals("LIGHTNING", first.get("tenNgua"));
-        assertEquals("38.1 °C", first.get("thanNhiet"));
+        assertEquals("LIGHTNING", first.get("horseName"));
+        assertEquals("38.1 °C", first.get("temperature"));
 
         // 2. Truyền horseName = "tất cả"
         Object resultAll = toolExecutionService.executeTool("getHorseVitalSignsTrend", Map.of("horseName", "tất cả"), vet);
@@ -1014,12 +1253,14 @@ class AiToolExecutionServiceTest {
 
         Object result = toolExecutionService.executeTool("getMyReportedIncidents", Map.of(), groom);
         assertNotNull(result);
-        assertTrue(result instanceof List<?>);
-        List<?> list = (List<?>) result;
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> response = (Map<?, ?>) result;
+        assertEquals(1, response.get("totalReportedIncidents"));
+        List<?> list = (List<?>) response.get("incidentList");
         assertEquals(1, list.size());
         Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("SHADOW", item.get("tenNgua"));
-        assertEquals("Móng chân trái sau nứt nhẹ", item.get("tieuDe"));
+        assertEquals("SHADOW", item.get("horseName"));
+        assertEquals("Móng chân trái sau nứt nhẹ", item.get("title"));
         assertEquals("/groom/incidents", item.get("actionUrl"));
     }
 
@@ -1045,9 +1286,9 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals(2, map.get("tongSoNhiemVu"));
-        assertEquals(1L, map.get("soNhiemVuHoanThanh"));
-        assertEquals("50.0%", map.get("tyLeHoanThanh"));
+        assertEquals(2, map.get("totalTasksCount"));
+        assertEquals(1L, map.get("completedTasksCount"));
+        assertEquals("50.0%", map.get("completionRate"));
         assertEquals("/groom/tasks", map.get("actionUrl"));
     }
 
@@ -1076,13 +1317,13 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals("RED RUM", map.get("tenNgua"));
-        assertEquals("VN-HORSE-10", map.get("maDangKy"));
-        assertEquals(1, map.get("tongSoBuoiTap"));
-        assertEquals(1, map.get("tongSoBuoiTapDatYeuCau"));
-        assertNotNull(map.get("tocDoPhatTrienTheLuc"));
-        assertNotNull(map.get("danhGiaTiemNangThiDau"));
-        assertEquals("/owner/horses", map.get("actionUrl"));
+        assertEquals("RED RUM", map.get("horseName"));
+        assertEquals("VN-HORSE-10", map.get("registrationNumber"));
+        assertEquals(1, map.get("totalWorkouts"));
+        assertEquals(1, map.get("qualifiedWorkoutsCount"));
+        assertNotNull(map.get("fitnessProgressionRate"));
+        assertNotNull(map.get("racingPotentialEvaluation"));
+        assertEquals("/owner/horses/10", map.get("actionUrl"));
     }
 
     @Test
@@ -1112,12 +1353,12 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals("THUNDER", map.get("tenNgua"));
-        assertEquals("VN-THUNDER", map.get("maDangKy"));
-        assertEquals("1.2 km", map.get("tongCuLy14Ngay"));
-        assertEquals(1, map.get("soBuoiTap"));
-        assertEquals("98 bpm", map.get("nhipTimTrungBinh"));
-        assertEquals("Thấp", map.get("danhGiaNguyCo"));
+        assertEquals("THUNDER", map.get("horseName"));
+        assertEquals("VN-THUNDER", map.get("registrationNumber"));
+        assertEquals("1.2 km", map.get("totalDistance14Days"));
+        assertEquals(1, map.get("workoutCount"));
+        assertEquals("98 bpm", map.get("avgHeartRate"));
+        assertEquals("Thấp", map.get("riskAssessment"));
         assertEquals("/trainer/dashboard", map.get("actionUrl"));
     }
 
@@ -1148,10 +1389,10 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals("THUNDER", map.get("tenNgua"));
-        assertTrue(map.get("cuLyDeXuat").toString().contains("Sprint"));
-        assertTrue(map.get("matSanUaThich").toString().contains("Turf"));
-        assertEquals("60.5 km/h", map.get("tocDoToiUu"));
+        assertEquals("THUNDER", map.get("horseName"));
+        assertTrue(map.get("recommendedDistance").toString().contains("Sprint"));
+        assertTrue(map.get("preferredSurface").toString().contains("Turf"));
+        assertEquals("60.5 km/h", map.get("optimalSpeed"));
         assertEquals("/trainer/racing", map.get("actionUrl"));
     }
 
@@ -1177,9 +1418,9 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals("THUNDER", map.get("tenNgua"));
-        assertTrue(map.get("nhanXetTheLuc").toString().contains("vượt ngưỡng an toàn"));
-        assertTrue(map.get("baiTapKeTiepDeXuat").toString().contains("Giảm tải"));
+        assertEquals("THUNDER", map.get("horseName"));
+        assertTrue(map.get("fitnessReview").toString().contains("vượt ngưỡng an toàn"));
+        assertTrue(map.get("nextRecommendedWorkout").toString().contains("Giảm tải"));
         assertEquals("/trainer/plans", map.get("actionUrl"));
     }
 
@@ -1199,7 +1440,7 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertTrue(map.get("baiTapKeTiepDeXuat").toString().contains("Nghỉ ngơi"));
+        assertTrue(map.get("nextRecommendedWorkout").toString().contains("Nghỉ ngơi"));
     }
 
     @Test
@@ -1225,11 +1466,11 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals("LIGHTNING", map.get("tenNgua"));
-        assertEquals(1, map.get("tongSoSuCo"));
-        assertEquals(1, map.get("tongSoLanKhamBenh"));
-        assertTrue(map.get("benhLyPhoBien").toString().contains("Viêm khớp"));
-        assertEquals("/veterinarian/admissions", map.get("actionUrl"));
+        assertEquals("LIGHTNING", map.get("horseName"));
+        assertEquals(1, map.get("totalIncidents"));
+        assertEquals(1, map.get("totalExamsCount"));
+        assertTrue(map.get("commonConditions").toString().contains("Viêm khớp"));
+        assertEquals("/veterinarian/health?horseId=10", map.get("actionUrl"));
     }
 
     @Test
@@ -1252,9 +1493,9 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertTrue(map.get("phacDoCanThiepDeXuat").toString().contains("Bước 1"));
-        assertNotNull(map.get("xetNghiemCanLam"));
-        assertNotNull(map.get("thoiGianTheoDoiToiThieu"));
+        assertTrue(map.get("recommendedIntervention").toString().contains("Bước 1"));
+        assertNotNull(map.get("requiredTests"));
+        assertNotNull(map.get("minObservationTime"));
         assertEquals("/veterinarian/urgent", map.get("actionUrl"));
     }
 
@@ -1279,9 +1520,9 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals("LIGHTNING", map.get("tenNgua"));
-        assertEquals("85/100", map.get("diemSanSang"));
-        assertEquals("Đủ điều kiện tập nhẹ", map.get("khuyenNghiBacSi"));
+        assertEquals("LIGHTNING", map.get("horseName"));
+        assertEquals("85/100", map.get("readinessScore"));
+        assertEquals("Đủ điều kiện tập nhẹ", map.get("vetRecommendations"));
         assertEquals("/veterinarian/preventive-care", map.get("actionUrl"));
     }
 
@@ -1309,9 +1550,9 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals("SHADOW", map.get("tenNgua"));
-        assertEquals("Khẩn cấp", map.get("mucDoCanhBao"));
-        assertTrue(map.get("hanhDongCanLamNgay").toString().contains("Báo ngay cho Bác sĩ"));
+        assertEquals("SHADOW", map.get("horseName"));
+        assertEquals("Khẩn cấp", map.get("alertLevel"));
+        assertTrue(map.get("immediateActionRequired").toString().contains("Báo ngay cho Bác sĩ"));
         assertEquals("/groom/incidents", map.get("actionUrl"));
     }
 
@@ -1334,8 +1575,8 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertTrue(map.containsKey("danhSachThuTuUuTien"));
-        assertTrue(map.containsKey("luuYVeSinhPhongDich"));
+        assertTrue(map.containsKey("priorityOrderList"));
+        assertTrue(map.containsKey("biosecurityNotes"));
         assertEquals("/groom/tasks", map.get("actionUrl"));
     }
 
@@ -1357,10 +1598,10 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals(50L, map.get("tongSoChuong"));
-        assertEquals(7L, map.get("soChuongTrong"));
-        assertEquals(8L, map.get("soCaCachLy"));
-        assertNotNull(map.get("duBaoDiemNghen"));
+        assertEquals(50L, map.get("totalStalls"));
+        assertEquals(7L, map.get("vacantStalls"));
+        assertEquals(8L, map.get("quarantineCasesCount"));
+        assertNotNull(map.get("bottleneckForecast"));
         assertEquals("/manager/stable", map.get("actionUrl"));
     }
 
@@ -1391,9 +1632,110 @@ class AiToolExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result instanceof Map<?, ?>);
         Map<?, ?> map = (Map<?, ?>) result;
-        assertEquals(2, map.get("tongSoGroom"));
-        assertTrue(map.containsKey("danhSachGroomKemTaiTrong"));
-        assertNotNull(map.get("deXuatDieuChuyenChuong"));
+        assertEquals(2, map.get("totalGrooms"));
+        assertTrue(map.containsKey("groomWorkloadList"));
+        assertNotNull(map.get("proposedStallTransfer"));
         assertEquals("/manager/staff", map.get("actionUrl"));
+    }
+@Test
+    @DisplayName("HEAD_TRAINER gọi recommendTrainerStrategy đề xuất toàn diện cự ly, mặt sân và điều chỉnh bài tập")
+    void testTrainer_RecommendTrainerStrategy() {
+        AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
+
+        Horse horse = new Horse();
+        horse.setId(10L);
+        horse.setName("THUNDER");
+        horse.setRegistrationNumber("VN-THUNDER");
+        horse.setTrainingDecision(TrainingDecision.ALLOWED);
+        when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
+
+        HorseSpecialtyResponse specialty = new HorseSpecialtyResponse(
+                3,
+                List.of(DistanceBand.SPRINT),
+                SurfaceType.TURF,
+                List.of()
+        );
+        when(horseSpecialtyService.getSpecialties(List.of(10L))).thenReturn(Map.of(10L, specialty));
+
+        TrainingWorkout w1 = new TrainingWorkout();
+        w1.setTopSpeedKmh(new BigDecimal("60.5"));
+        w1.setActualDistanceMeters(new BigDecimal("1000"));
+        w1.setMaxHeartRate(125);
+        w1.setStatus(WorkoutStatus.COMPLETED);
+        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
+
+        Object result = toolExecutionService.executeTool("recommendTrainerStrategy", Map.of("horseId", 10L), trainer);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("THUNDER", map.get("tenNgua"));
+        assertEquals("VN-THUNDER", map.get("maDangKy"));
+        assertTrue(map.containsKey("chienLuocCuLyVaSanDua"));
+        assertTrue(map.containsKey("dieuChinhBaiTapKeTiep"));
+        assertEquals("/trainer/racing", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("VETERINARIAN gọi getUrgentCareAndIncidentAlerts tra cứu tổng hợp ca trực cấp cứu và sự cố chuồng trại 48h")
+    void testVet_GetUrgentCareAndIncidentAlerts() {
+        AuthenticatedUser vet = new AuthenticatedUser(300L, "vet@rtms.com", "VETERINARIAN");
+
+        CareSchedule cs = new CareSchedule();
+        cs.setId(501L);
+        cs.setHorseId(10L);
+        cs.setCareType(CareType.URGENT);
+        cs.setStatus(CareScheduleStatus.SCHEDULED);
+        cs.setDescription("Ngựa sốt cao đột ngột");
+        cs.setScheduledAt(LocalDateTime.of(2026, 10, 20, 14, 0));
+        cs.setVeterinarianId(300L);
+        when(careScheduleRepository.findByVeterinarianId(300L)).thenReturn(List.of(cs));
+
+        Horse h = new Horse();
+        h.setId(10L);
+        h.setName("LIGHTNING");
+        when(horseRepository.findAll()).thenReturn(List.of(h));
+
+        HorseIncidentReport rep = new HorseIncidentReport();
+        rep.setId(701L);
+        rep.setHorseId(10L);
+        rep.setTitle("Trầy xước chân trước");
+        rep.setReportedAt(LocalDateTime.now().minusHours(12));
+        when(horseIncidentReportRepository.findByReportedAtAfterOrderByReportedAtDesc(any())).thenReturn(List.of(rep));
+
+        Object result = toolExecutionService.executeTool("getUrgentCareAndIncidentAlerts", Map.of(), vet);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertTrue(map.containsKey("caTrucCapCuu"));
+        assertTrue(map.containsKey("suCoChuongTrai48h"));
+        assertEquals("/veterinarian/urgent", map.get("actionUrl"));
+    }
+
+    @Test
+    @DisplayName("CLUB_MANAGER gọi getAdmissionPipelineOverview xem tổng quan số lượng và chi tiết các đơn nhập đàn")
+    void testManager_GetAdmissionPipelineOverview() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "manager@rtms.com", "CLUB_MANAGER");
+
+        AdmissionApplication app = new AdmissionApplication();
+        app.setId(123L);
+        app.setOwnerId(50L);
+        app.setStatus(AdmissionStatus.MANAGER_REVIEW);
+        app.setSubmittedAt(LocalDateTime.of(2026, 10, 20, 10, 0));
+        when(admissionApplicationRepository.findAll()).thenReturn(List.of(app));
+        when(admissionApplicationRepository.findByStatus(AdmissionStatus.MANAGER_REVIEW)).thenReturn(List.of(app));
+
+        CandidateHorseProfile profile = new CandidateHorseProfile();
+        profile.setId(1L);
+        profile.setAdmissionId(123L);
+        profile.setName("PEGASUS JUNIOR");
+        when(candidateHorseProfileRepository.findByAdmissionId(123L)).thenReturn(Optional.of(profile));
+
+        Object result = toolExecutionService.executeTool("getAdmissionPipelineOverview", Map.of("status", "PENDING"), manager);
+        assertNotNull(result);
+        assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertTrue(map.containsKey("tongQuanSoLuong"));
+        assertTrue(map.containsKey("chiTietCacDon"));
+        assertEquals("/manager/admissions", map.get("actionUrl"));
     }
 }

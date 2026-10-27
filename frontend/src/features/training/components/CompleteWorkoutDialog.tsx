@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   FormField,
@@ -39,82 +39,41 @@ export function CompleteWorkoutDialog({
   onClose,
   onSuccess,
 }: CompleteWorkoutDialogProps) {
-  const [performanceRating, setPerformanceRating] = useState<number>(8);
-  const [actualDistanceMeters, setActualDistanceMeters] =
-    useState<number>(1000);
-  const [actualDurationMinutes, setActualDurationMinutes] =
-    useState<number>(60);
-  const [topSpeedKmh, setTopSpeedKmh] = useState<number>(50);
-  const [averageSpeedKmh, setAverageSpeedKmh] = useState<number>(40);
-  const [averageHeartRate, setAverageHeartRate] = useState<number>(140);
-  const [maxHeartRate, setMaxHeartRate] = useState<number>(180);
-  const [recoveryHeartRate, setRecoveryHeartRate] = useState<number>(90);
-  const [trainerFeedback, setTrainerFeedback] = useState("");
+  const [trainerFeedback, setTrainerFeedback] = useState(() => workout?.trainerFeedback ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync state when dialog opens with workout or preview
-  useEffect(() => {
-    if (!open) return;
-    if (isEdit && workout) {
-      const dist = Number(workout.actualDistanceMeters ?? 1000);
-      const dur = Number(workout.actualDurationMinutes ?? 60);
-      const top = Number(workout.topSpeedKmh ?? 50);
-      const avg = Number(workout.averageSpeedKmh ?? 40);
-      const hrAvg = Number(workout.averageHeartRate ?? 140);
-      const hrMax = Number(workout.maxHeartRate ?? 180);
-      const hrRec = Number(workout.recoveryHeartRate ?? 90);
+  const telemetry = useMemo(() => {
+    const source = isEdit && workout ? workout : preview;
+    const actualDistanceMeters = Number(source?.actualDistanceMeters ?? 1000);
+    const actualDurationMinutes = Number(source?.actualDurationMinutes ?? 60);
+    const topSpeedKmh = Number(source?.topSpeedKmh ?? 50);
+    const averageSpeedKmh = Number(source?.averageSpeedKmh ?? 40);
+    const averageHeartRate = Number(source?.averageHeartRate ?? 140);
+    const maxHeartRate = Number(source?.maxHeartRate ?? 180);
+    const recoveryHeartRate = Number(source?.recoveryHeartRate ?? 90);
 
-      const calculated = calculatePerformanceRating({
-        actualDistanceMeters: dist,
-        actualDurationMinutes: dur,
-        topSpeedKmh: top,
-        averageSpeedKmh: avg,
-        averageHeartRate: hrAvg,
-        maxHeartRate: hrMax,
-        recoveryHeartRate: hrRec,
-      });
+    const performanceRating = source?.performanceRating ?? calculatePerformanceRating({
+      actualDistanceMeters,
+      actualDurationMinutes,
+      topSpeedKmh,
+      averageSpeedKmh,
+      averageHeartRate,
+      maxHeartRate,
+      recoveryHeartRate,
+    });
 
-      setActualDistanceMeters(dist);
-      setActualDurationMinutes(dur);
-      setTopSpeedKmh(top);
-      setAverageSpeedKmh(avg);
-      setAverageHeartRate(hrAvg);
-      setMaxHeartRate(hrMax);
-      setRecoveryHeartRate(hrRec);
-      setPerformanceRating(workout.performanceRating ?? calculated);
-      setTrainerFeedback(workout.trainerFeedback ?? "");
-    } else if (preview) {
-      const dist = Number(preview.actualDistanceMeters ?? 1000);
-      const dur = Number(preview.actualDurationMinutes ?? 60);
-      const top = Number(preview.topSpeedKmh ?? 50);
-      const avg = Number(preview.averageSpeedKmh ?? 40);
-      const hrAvg = Number(preview.averageHeartRate ?? 140);
-      const hrMax = Number(preview.maxHeartRate ?? 180);
-      const hrRec = Number(preview.recoveryHeartRate ?? 90);
-
-      const calculated = preview.performanceRating ?? calculatePerformanceRating({
-        actualDistanceMeters: dist,
-        actualDurationMinutes: dur,
-        topSpeedKmh: top,
-        averageSpeedKmh: avg,
-        averageHeartRate: hrAvg,
-        maxHeartRate: hrMax,
-        recoveryHeartRate: hrRec,
-      });
-
-      setActualDistanceMeters(dist);
-      setActualDurationMinutes(dur);
-      setTopSpeedKmh(top);
-      setAverageSpeedKmh(avg);
-      setAverageHeartRate(hrAvg);
-      setMaxHeartRate(hrMax);
-      setRecoveryHeartRate(hrRec);
-      setPerformanceRating(calculated);
-      setTrainerFeedback("");
-    }
-    setError(null);
-  }, [open, isEdit, workout, preview]);
+    return {
+      actualDistanceMeters,
+      actualDurationMinutes,
+      topSpeedKmh,
+      averageSpeedKmh,
+      averageHeartRate,
+      maxHeartRate,
+      recoveryHeartRate,
+      performanceRating,
+    };
+  }, [isEdit, workout, preview]);
 
   if (!open || !workout) return null;
   const target = workout;
@@ -125,14 +84,14 @@ export function CompleteWorkoutDialog({
     setSubmitting(true);
     try {
       const payload: CompleteWorkoutRequest = {
-        actualDistanceMeters,
-        actualDurationMinutes,
-        topSpeedKmh,
-        averageSpeedKmh,
-        averageHeartRate,
-        maxHeartRate,
-        recoveryHeartRate,
-        performanceRating: Number(performanceRating),
+        actualDistanceMeters: telemetry.actualDistanceMeters,
+        actualDurationMinutes: telemetry.actualDurationMinutes,
+        topSpeedKmh: telemetry.topSpeedKmh,
+        averageSpeedKmh: telemetry.averageSpeedKmh,
+        averageHeartRate: telemetry.averageHeartRate,
+        maxHeartRate: telemetry.maxHeartRate,
+        recoveryHeartRate: telemetry.recoveryHeartRate,
+        performanceRating: Number(telemetry.performanceRating),
         trainerFeedback: trainerFeedback.trim() || null,
       };
 
@@ -199,13 +158,13 @@ export function CompleteWorkoutDialog({
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-[var(--color-text)]">
-                {performanceRating}
+                {telemetry.performanceRating}
               </span>
               <span className="text-xs text-[var(--color-text-muted)]">/ 10</span>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <RatingPill rating={performanceRating} size="md" />
+            <RatingPill rating={telemetry.performanceRating} size="md" />
             <span className="text-[11px] text-[var(--color-text-muted)]">
               Speed · Cardio · Efficiency
             </span>
@@ -219,7 +178,7 @@ export function CompleteWorkoutDialog({
               <Input
                 type="number"
                 readOnly
-                value={actualDistanceMeters}
+                value={telemetry.actualDistanceMeters}
                 className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
@@ -230,7 +189,7 @@ export function CompleteWorkoutDialog({
               <Input
                 type="number"
                 readOnly
-                value={actualDurationMinutes}
+                value={telemetry.actualDurationMinutes}
                 className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
@@ -241,7 +200,7 @@ export function CompleteWorkoutDialog({
               <Input
                 type="number"
                 readOnly
-                value={topSpeedKmh}
+                value={telemetry.topSpeedKmh}
                 className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
@@ -252,7 +211,7 @@ export function CompleteWorkoutDialog({
               <Input
                 type="number"
                 readOnly
-                value={averageSpeedKmh}
+                value={telemetry.averageSpeedKmh}
                 className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
@@ -263,7 +222,7 @@ export function CompleteWorkoutDialog({
               <Input
                 type="number"
                 readOnly
-                value={averageHeartRate}
+                value={telemetry.averageHeartRate}
                 className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
@@ -274,7 +233,7 @@ export function CompleteWorkoutDialog({
               <Input
                 type="number"
                 readOnly
-                value={maxHeartRate}
+                value={telemetry.maxHeartRate}
                 className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>
@@ -285,7 +244,7 @@ export function CompleteWorkoutDialog({
               <Input
                 type="number"
                 readOnly
-                value={recoveryHeartRate}
+                value={telemetry.recoveryHeartRate}
                 className="bg-[var(--color-bg-subtle)] text-[var(--color-text-secondary)] cursor-not-allowed select-none"
               />
             </FormField>

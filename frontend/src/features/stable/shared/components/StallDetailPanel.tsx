@@ -57,7 +57,7 @@ export function StallDetailPanel({ stall, area, horse, specialty, children, acti
       {horse ? (
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-            <HorseAvatar name={horse.name} size={44} rounded="md" />
+            <HorseAvatar name={horse.name} image={horse.imageUrl} size={44} rounded="md" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{horse.name}</p>
               <p className="truncate text-xs text-[var(--color-text-secondary)]">{horse.breed ?? 'Breed not recorded'}</p>

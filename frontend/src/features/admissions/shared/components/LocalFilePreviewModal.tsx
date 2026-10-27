@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { PdfViewer } from '@/components/ui/PdfViewer';
+import { openBlobInTab } from '@/lib/protectedFile';
 
 interface LocalFilePreviewModalProps {
   file: File;
@@ -13,6 +15,7 @@ interface LocalFilePreviewModalProps {
 export function LocalFilePreviewModal({ file, previewUrl, onClose }: LocalFilePreviewModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const [zoom, setZoom] = useState(100);
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
   useEffect(() => {
@@ -64,27 +67,55 @@ export function LocalFilePreviewModal({ file, previewUrl, onClose }: LocalFilePr
             <Icon name="download" />
             Download
           </a>
-          <a href={previewUrl} target="_blank" rel="noreferrer" className={actionClass}>
+          <button
+            type="button"
+            onClick={() => openBlobInTab(previewUrl, file.name, isPdf)}
+            className={actionClass}
+          >
             <Icon name="external-link" />
             Open in new tab
-          </a>
+          </button>
+          {!isPdf && (
+            <div className="ml-auto flex items-center gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="tertiary"
+                icon="minus"
+                aria-label="Zoom out"
+                disabled={zoom === 100}
+                onClick={() => setZoom((value) => value - 25)}
+              />
+              <span className="w-11 text-center text-xs" aria-live="polite">{zoom}%</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="tertiary"
+                icon="plus"
+                aria-label="Zoom in"
+                disabled={zoom === 200}
+                onClick={() => setZoom((value) => value + 25)}
+              />
+              <Button type="button" size="sm" variant="tertiary" onClick={() => setZoom(100)}>Fit</Button>
+            </div>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto overscroll-contain bg-[var(--color-surface-muted)]">
           {isPdf ? (
-            <div className="flex h-full flex-col">
-              <iframe
-                src={previewUrl}
-                title={`Preview of ${file.name}`}
-                className="min-h-0 w-full flex-1 border-0"
-              />
-            </div>
+            <PdfViewer
+              blob={file}
+              title={`Preview of ${file.name}`}
+              zoom={zoom}
+              onZoomChange={setZoom}
+            />
           ) : (
             <div className="flex h-full items-center justify-center p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewUrl}
                 alt={file.name}
+                style={{ width: `${zoom}%`, height: `${zoom}%` }}
                 className="max-h-full max-w-full object-contain"
               />
             </div>

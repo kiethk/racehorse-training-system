@@ -1,9 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useAiChat } from '../context/AiChatContext';
+import { getQuickPromptsByRole } from '../lib/aiUtils';
 import { MarkdownMessage } from './MarkdownMessage';
 
 export function AiChatWidget() {
@@ -66,58 +67,7 @@ export function AiChatWidget() {
   };
 
   // Quick prompts theo role của user
-  const quickPrompts = useMemo(() => {
-    const role = user?.role?.toUpperCase();
-    if (role === 'HEAD_TRAINER' || role === 'TRAINER') {
-      return [
-        'Lịch tập các ca hôm nay',
-        'Tiến độ các kế hoạch huấn luyện',
-        'Cảnh báo nguy cơ chấn thương & nhịp tim',
-        'Phân tích sở trường của ngựa',
-        'Danh sách Groom làm việc cùng',
-      ];
-    }
-    if (role === 'VETERINARIAN' || role === 'VET') {
-      return [
-        'Tổng quan ngựa đang & chờ khám',
-        'Tra cứu ca bệnh lâm sàng qua RAG',
-        'Lịch chăm sóc y tế định kỳ',
-        'Danh sách ngựa cách ly y tế',
-        'Báo cáo sự cố chuồng trại 48h qua',
-      ];
-    }
-    if (role === 'GROOM' || role === 'STABLE_STAFF') {
-      return [
-        'Checklist công việc hôm nay (3 nguồn)',
-        'Chuồng và ngựa tôi phụ trách',
-        'Cảnh báo ăn uống & vận động của ngựa',
-        'Tra cứu vị trí chuồng & người phụ trách',
-      ];
-    }
-    if (role === 'CLUB_MANAGER' || role === 'RACING_MANAGER') {
-      return [
-        'Danh sách nhân sự & bác sĩ',
-        'Vẽ biểu đồ công suất chuồng trại',
-        'Các đơn nhập chuồng chờ duyệt',
-        'Nhật ký kiểm toán gần đây',
-      ];
-    }
-    if (role === 'HORSE_OWNER') {
-      return [
-        'Danh sách chiến mã của tôi',
-        'Lịch tập sắp tới của ngựa',
-        'Tóm tắt sức khỏe và lần khám gần nhất',
-        'Tiến độ khóa huấn luyện của ngựa',
-      ];
-    }
-    // Default fallback (Read-Only)
-    return [
-      'Danh sách chiến mã của tôi',
-      'Lịch tập sắp tới của ngựa',
-      'Tóm tắt sức khỏe và lần khám gần nhất',
-      'Tiến độ khóa huấn luyện của ngựa',
-    ];
-  }, [user?.role]);
+  const quickPrompts = useMemo(() => getQuickPromptsByRole(user?.role), [user?.role]);
 
   return (
     <>
