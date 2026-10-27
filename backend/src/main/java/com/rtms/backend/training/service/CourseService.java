@@ -1,10 +1,8 @@
 package com.rtms.backend.training.service;
 
-import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CourseDetailResponse;
 import com.rtms.backend.training.dto.CourseSubjectItemRequest;
-import com.rtms.backend.training.dto.CourseSubjectResponse;
 import com.rtms.backend.training.dto.CreateCourseRequest;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.CourseSubject;
@@ -158,39 +156,6 @@ public class CourseService {
             throw new IllegalArgumentException("Subject '" + subject.getName() + "' (#" + subject.getId()
                     + ") does not belong to this trainer!");
         }
-    }
-
-    /**
-     * Thêm một bài vào CUỐI vòng xoay của khóa. Chỉ chủ khóa mới được thêm; khóa của người khác báo "không tìm thấy".
-     * (Adds a subject at the END of the course rotation. Only the owner may add; another trainer course is "not found".)
-     */
-    @Transactional
-    public CourseSubjectResponse addSubjectToCourse(Long courseId, CourseSubjectItemRequest request,
-                                                    AuthenticatedUser currentUser) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found with id: " + courseId));
-        assertCanSee(course, currentUser);
-
-        Subject subject = subjectRepository.findById(request.getSubjectId())
-                .orElseThrow(() -> new IllegalArgumentException("Subject not found with id: " + request.getSubjectId()));
-        assertSubjectBelongsTo(subject, course.getTrainerId());
-
-        if (courseSubjectRepository.existsByCourseIdAndSubjectId(courseId, subject.getId())) {
-            throw new IllegalArgumentException("Subject '" + subject.getName() + "' is already in this course!");
-        }
-        if (courseSubjectRepository.countByCourseId(courseId) >= TrainingLimits.MAX_COURSE_SUBJECTS) {
-            throw new IllegalArgumentException("A course can have at most " + TrainingLimits.MAX_COURSE_SUBJECTS + " subjects!");
-        }
-
-        CourseSubject courseSubject = new CourseSubject();
-        courseSubject.setCourseId(courseId);
-        courseSubject.setSubjectId(subject.getId());
-        courseSubject.setOrderIndex(courseSubjectRepository.findMaxOrderIndex(courseId) + 1);
-
-        CourseSubject saved = courseSubjectRepository.save(courseSubject);
-        return new CourseSubjectResponse(saved.getId(), subject.getId(), subject.getName(),
-                subject.getDescription(), subject.getSurfaceType(), subject.getTargetDistanceMeters(),
-                subject.getIntensityLevel(), saved.getOrderIndex(), subject.getDurationMinutes());
     }
 
     private static String blankToNull(String text) {

@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { VetScheduleTimeline } from '@/features/schedule/components/VetScheduleTimeline';
+import { VetScheduleTimeline } from '@/features/care/shared/components/VetScheduleTimeline';
 
 export const metadata: Metadata = {
   title: 'Veterinary Schedule & Timeline | RTMS',

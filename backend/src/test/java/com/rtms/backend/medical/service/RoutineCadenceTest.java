@@ -90,7 +90,8 @@ class RoutineCadenceTest {
     void setUp() {
         service = new CareScheduleService(schedules, horses, healthRecords, metrics, admissions, stalls, users,
                 incidents, profiles, audits, events, entityManager, notifications,
-                new TrainingDecisionService(horses, schedules, workouts), vaccinations);
+                new TrainingDecisionService(horses, schedules, workouts), vaccinations,
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class));
 
         horse = new Horse();
         horse.setId(10L);

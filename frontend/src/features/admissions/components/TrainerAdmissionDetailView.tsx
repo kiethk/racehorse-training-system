@@ -1,4 +1,5 @@
 'use client';
+import { hydrationStatusLabel } from '@/features/health/lib/hydrationStatus';
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
@@ -145,7 +146,7 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
             <div>Heart Rate: <strong>{healthMetrics[0].heartRate != null ? `${healthMetrics[0].heartRate} bpm` : '—'}</strong></div>
             <div>Respiratory Rate: <strong>{healthMetrics[0].respiratoryRate != null ? `${healthMetrics[0].respiratoryRate} bpm` : '—'}</strong></div>
             <div>Weight: <strong>{healthMetrics[0].weight != null ? `${healthMetrics[0].weight} kg` : '—'}</strong></div>
-            <div>Hydration: <strong>{healthMetrics[0].hydrationStatus || '—'}</strong></div>
+            <div>Hydration: <strong>{hydrationStatusLabel(healthMetrics[0].hydrationStatus) || '—'}</strong></div>
             <div>BCS Score: <strong>{healthMetrics[0].bodyConditionScore != null ? `${healthMetrics[0].bodyConditionScore}/9` : '—'}</strong></div>
           </div>
         </div>

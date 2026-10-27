@@ -5,12 +5,34 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 /**
- * Registry quản lý và cung cấp danh mục công cụ AI Agent (100% Read-Only / RAG Advisory) theo vai trò người dùng (Role-Based Tool Scoping).
+ * Registry quản lý và cung cấp danh mục công cụ AI Agent (100% Read-Only / RAG Advisory)
+ * theo vai trò người dùng (Role-Based Tool Scoping).
+ *
+ * Chuẩn hóa theo nguyên lý MECE và Cognitive Sweet Spot:
+ * Mọi vai trò đều có số lượng công cụ trong ngưỡng tối ưu (8 đến 12 công cụ <= 12).
  */
 @Service
 public class DynamicToolRegistryService {
 
     private final Map<String, List<AiToolDefinition>> roleToolDefinitions = new HashMap<>();
+
+    /**
+     * Bản đồ ánh xạ alias để tương thích ngược 100% cho các tool đã được chuẩn hóa, hợp nhất theo nguyên lý MECE.
+     */
+    private static final Map<String, String> TOOL_CONSOLIDATION_ALIASES = Map.ofEntries(
+            Map.entry("getHorseTrainingSummary", "getMyHorseTrainingProgress"),
+            Map.entry("analyzeWorkoutLoadAndOvertrainingRisk", "getHorseFitnessTrend"),
+            Map.entry("getCourseCurriculumOverview", "getTrainerPlansSummary"),
+            Map.entry("getRacingReadinessAssessment", "getTrainerRiskAlerts"),
+            Map.entry("recommendOptimalRaceDistanceAndTrack", "recommendTrainerStrategy"),
+            Map.entry("recommendNextWorkoutAdjustment", "recommendTrainerStrategy"),
+            Map.entry("getActivePrescriptions", "getHorseMedicalHistory"),
+            Map.entry("getRecentIncidentReports", "getUrgentCareAndIncidentAlerts"),
+            Map.entry("getUrgentCareAlerts", "getUrgentCareAndIncidentAlerts"),
+            Map.entry("getDailyGroomTasks", "getTodayAggregatedTasks"),
+            Map.entry("getAdmissionRequestsOverview", "getAdmissionPipelineOverview"),
+            Map.entry("getAdmissionPipelineDetails", "getAdmissionPipelineOverview")
+    );
 
     public DynamicToolRegistryService() {
         initToolDefinitions();
@@ -50,15 +72,22 @@ public class DynamicToolRegistryService {
         }
         String normalized = normalizeRole(role);
         List<AiToolDefinition> tools = roleToolDefinitions.getOrDefault(normalized, Collections.emptyList());
-        return tools.stream().anyMatch(t -> t.name().equalsIgnoreCase(toolName));
+        if (tools.stream().anyMatch(t -> t.name().equalsIgnoreCase(toolName))) {
+            return true;
+        }
+        String canonical = TOOL_CONSOLIDATION_ALIASES.get(toolName);
+        if (canonical != null) {
+            return tools.stream().anyMatch(t -> t.name().equalsIgnoreCase(canonical));
+        }
+        return false;
     }
 
     private void initToolDefinitions() {
-        // 1. HORSE_OWNER (100% Read-Only)
+        // 1. HORSE_OWNER (100% Read-Only - 9 Tools, Sweet Spot <= 12)
         List<AiToolDefinition> ownerTools = List.of(
                 new AiToolDefinition(
                         "getMyHorses",
-                        "Lấy danh sách các ngựa mà chủ ngựa hiện tại đang sở hữu (tên ngựa, UELN, chuồng, tình trạng).",
+                        "Lấy danh sách các ngựa mà chủ ngựa hiện tại đang sở hữu (tổng số ngựa sở hữu totalOwnedHorses, số ngựa được phép tập luyện allowedTrainingHorses, số ngựa cấm tập y tế restrictedHorses, danh sách chi tiết danhSachNgua). Bắt buộc dùng khi hỏi chủ ngựa có bao nhiêu ngựa.",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
@@ -71,7 +100,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getMyHorseTrainingProgress",
-                        "Xem tiến độ khóa huấn luyện và số buổi tập đã hoàn thành của ngựa thuộc sở hữu.",
+                        "Xem tiến độ khóa huấn luyện, kế hoạch đào tạo, số buổi tập đã hoàn thành và quyết định tập luyện của ngựa thuộc sở hữu.",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
@@ -89,14 +118,6 @@ public class DynamicToolRegistryService {
                         "getMyHorseAdmissions",
                         "Lấy danh sách các đơn đăng ký nhập chuồng của chủ sở hữu.",
                         buildParamSchema(Map.of())
-                ),
-                new AiToolDefinition(
-                        "getHorseTrainingSummary",
-                        "Xem tóm tắt tiến trình huấn luyện của ngựa thuộc sở hữu.",
-                        buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
-                        ))
                 ),
                 new AiToolDefinition(
                         "getHorseCareSchedule",
@@ -133,7 +154,7 @@ public class DynamicToolRegistryService {
         );
         roleToolDefinitions.put("HORSE_OWNER", ownerTools);
 
-        // 2. HEAD_TRAINER (100% Read-Only)
+        // 2. HEAD_TRAINER (100% Read-Only - 12 Tools, Sweet Spot <= 12)
         List<AiToolDefinition> trainerTools = List.of(
                 new AiToolDefinition(
                         "getTrainerHorses",
@@ -150,7 +171,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getHorseFitnessTrend",
-                        "Xem xu hướng thể lực (tốc độ, nhịp tim) của ngựa qua các buổi tập gần nhất.",
+                        "Xem xu hướng thể lực (tốc độ, nhịp tim) của ngựa qua các buổi tập, phân tích khối lượng tải vận động 14 ngày và cảnh báo nguy cơ quá tải.",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
@@ -167,7 +188,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getTrainerPlansSummary",
-                        "Tra cứu danh sách kế hoạch huấn luyện do HLV quản lý (hiển thị Tên kế hoạch, Tên ngựa, Mục tiêu, Trạng thái, số buổi hoàn thành).",
+                        "Tra cứu danh sách kế hoạch huấn luyện do HLV quản lý (hiển thị Tên kế hoạch, Tên ngựa, Mục tiêu, Trạng thái, số buổi hoàn thành) và danh mục môn học/bài tập.",
                         buildParamSchema(Map.of(
                                 "status", Map.of("type", "string", "description", "Trạng thái kế hoạch (ACTIVE, UPCOMING, COMPLETED)"),
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
@@ -176,23 +197,16 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getHorseSpecialtyAnalysis",
-                        "Phân tích sở trường của ngựa (cự ly tối ưu, mặt sân ưa thích rõ ràng, tốc độ đỉnh).",
+"Phân tích sở trường của ngựa (cự ly tối ưu, mặt sân ưa thích, tốc độ đỉnh, điểm đánh giá trung bình averageRating, số lượng sở trường specialtyCount). Nếu không truyền ID/tên ngựa hoặc truyền 'all'/'tất cả', hệ thống tự động trả về bảng XẾP HẠNG tất cả các con ngựa theo số lượng sở trường (sortBy='count' hoặc 'specialtyCount') hoặc theo điểm trung bình phong độ sở trường (sortBy='rating' hoặc 'averageRating'). Bắt buộc dùng khi người dùng yêu cầu xếp hạng ngựa theo sở trường (Specialty) hoặc điểm trung bình phong độ.",
                         buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của con ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên con ngựa (tùy chọn)")
+                                "horseId", Map.of("type", "integer", "description", "ID của con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all' để xếp hạng tất cả các con ngựa)"),
+                                "horseName", Map.of("type", "string", "description", "Tên con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all'/'tất cả' để xếp hạng tất cả các con ngựa)"),
+                                "sortBy", Map.of("type", "string", "description", "Tiêu chí xếp hạng: 'rating'/'averageRating' (theo điểm trung bình cao nhất) hoặc 'count'/'specialtyCount' (theo số lượng sở trường)")
                         ))
                 ),
                 new AiToolDefinition(
                         "getTrainerRiskAlerts",
-                        "Tổng hợp các cảnh báo nguy cơ chấn thương (nhịp tim cao, tụt phong độ, sự cố lặp lại) của các ngựa do HLV quản lý.",
-                        buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
-                        ))
-                ),
-                new AiToolDefinition(
-                        "getRacingReadinessAssessment",
-                        "Tra cứu đánh giá sẵn sàng thi đấu gần nhất của ngựa.",
+                        "Tổng hợp các cảnh báo nguy cơ chấn thương (nhịp tim cao, hồi phục tim kém, tụt phong độ) và chỉ số đánh giá sẵn sàng thi đấu gần nhất của các ngựa do HLV quản lý.",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
@@ -227,29 +241,8 @@ public class DynamicToolRegistryService {
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
-                        "getCourseCurriculumOverview",
-                        "Tra cứu danh mục khóa học (Course), môn học (Subject) và các bài tập kỹ thuật có trong hệ thống.",
-                        buildParamSchema(Map.of())
-                ),
-                new AiToolDefinition(
-                        "analyzeWorkoutLoadAndOvertrainingRisk",
-                        "Phân tích khối lượng vận động 14 ngày qua (cự ly, cường độ, nhịp tim hồi phục sau bài tập) và đánh giá nguy cơ quá tải/chấn thương của ngựa.",
-                        buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
-                        ))
-                ),
-                new AiToolDefinition(
-                        "recommendOptimalRaceDistanceAndTrack",
-                        "Đề xuất cự ly thi đấu và loại mặt sân (Turf / Dirt) tối ưu nhất cho ngựa dựa trên phân tích sở trường và dữ liệu thi đấu thực tế.",
-                        buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
-                        ))
-                ),
-                new AiToolDefinition(
-                        "recommendNextWorkoutAdjustment",
-                        "Đề xuất điều chỉnh bài tập kế tiếp (tăng/giảm cự ly, đổi mặt sân hoặc nghỉ hồi phục) dựa trên kết quả buổi tập gần nhất.",
+                        "recommendTrainerStrategy",
+                        "Đề xuất toàn diện chiến lược thi đấu (cự ly và mặt sân tối ưu Turf/Dirt) kết hợp phương án điều chỉnh bài tập kế tiếp dựa trên thể lực và buổi tập gần nhất.",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
@@ -258,7 +251,7 @@ public class DynamicToolRegistryService {
         );
         roleToolDefinitions.put("HEAD_TRAINER", trainerTools);
 
-        // 3. VETERINARIAN (100% Read-Only)
+        // 3. VETERINARIAN (100% Read-Only - 11 Tools, Sweet Spot <= 12)
         List<AiToolDefinition> vetTools = List.of(
                 new AiToolDefinition(
                         "searchClinicalKnowledge",
@@ -277,15 +270,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getHorseMedicalHistory",
-                        "Tra cứu hồ sơ bệnh án và lịch sử chẩn đoán lâm sàng của ngựa.",
-                        buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
-                        ))
-                ),
-                new AiToolDefinition(
-                        "getActivePrescriptions",
-                        "Xem các đơn thuốc và phác đồ điều trị đang có hiệu lực của ngựa.",
+                        "Tra cứu hồ sơ bệnh án, lịch sử chẩn đoán lâm sàng và các đơn thuốc/phác đồ đang có hiệu lực của ngựa.",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
@@ -307,18 +292,13 @@ public class DynamicToolRegistryService {
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
-                        "getRecentIncidentReports",
-                        "Danh sách báo cáo sự cố sức khỏe chuồng trại do Groom gửi trong 48h qua.",
-                        buildParamSchema(Map.of())
-                ),
-                new AiToolDefinition(
                         "getPendingAdmissionExams",
                         "Danh sách đơn đăng ký nhập đàn đang chờ Bác sĩ thú y đến khám lâm sàng đầu vào để quyết định duyệt/chặn (ALLOWED/BLOCKED).",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
-                        "getUrgentCareAlerts",
-                        "Tra cứu các ca trực cấp cứu hoặc ca chăm sóc y tế khẩn cấp phát sinh từ chuồng trại.",
+                        "getUrgentCareAndIncidentAlerts",
+                        "Tra cứu các ca trực cấp cứu khẩn cấp kết hợp danh sách báo cáo sự cố sức khỏe chuồng trại trong 48h qua.",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
@@ -357,7 +337,7 @@ public class DynamicToolRegistryService {
         );
         roleToolDefinitions.put("VETERINARIAN", vetTools);
 
-        // 4. GROOM (100% Read-Only) - Đã bỏ checkStallSuppliesStatus theo yêu cầu
+        // 4. GROOM (100% Read-Only - 8 Tools, Sweet Spot <= 12)
         List<AiToolDefinition> groomTools = List.of(
                 new AiToolDefinition(
                         "getMyAssignedHorses",
@@ -388,11 +368,6 @@ public class DynamicToolRegistryService {
                         ))
                 ),
                 new AiToolDefinition(
-                        "getDailyGroomTasks",
-                        "Lấy danh sách công việc chăm sóc chuồng và dẫn ngựa được giao trong ngày.",
-                        buildParamSchema(Map.of())
-                ),
-                new AiToolDefinition(
                         "getMyReportedIncidents",
                         "Tra cứu các sự cố chuồng trại hoặc vết thương của ngựa do chính Groom báo cáo trong 7 ngày qua và trạng thái xử lý.",
                         buildParamSchema(Map.of())
@@ -420,7 +395,7 @@ public class DynamicToolRegistryService {
         );
         roleToolDefinitions.put("GROOM", groomTools);
 
-        // 5. CLUB_MANAGER (100% Read-Only) - Quản trị chuồng trại, nhân sự, chiến mã, audit log và tuyển nhập đàn
+        // 5. CLUB_MANAGER (100% Read-Only - 9 Tools, Sweet Spot <= 12)
         List<AiToolDefinition> managerTools = List.of(
                 new AiToolDefinition(
                         "getStableOccupancyMetrics",
@@ -428,9 +403,11 @@ public class DynamicToolRegistryService {
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
-                        "getAdmissionRequestsOverview",
-                        "Xem tổng quan số lượng đơn đăng ký nhập chuồng đang chờ xét duyệt.",
-                        buildParamSchema(Map.of())
+                        "getAdmissionPipelineOverview",
+                        "Xem tổng quan số lượng đơn đăng ký nhập chuồng và chi tiết tiến trình phê duyệt đơn theo từng giai đoạn (chờ duyệt, chờ khám y tế, chờ xếp chuồng).",
+                        buildParamSchema(Map.of(
+                                "status", Map.of("type", "string", "description", "Lọc theo giai đoạn phê duyệt: PENDING (đang xử lý), APPROVED (đã duyệt), REJECTED (từ chối)")
+                        ))
                 ),
                 new AiToolDefinition(
                         "getTrainerAreaDistribution",
@@ -439,12 +416,12 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getClubHealthOverview",
-                        "Báo cáo toàn đàn: số ngựa ALLOWED vs BLOCKED, số ca sự cố trong tuần.",
+                        "Thống kê tổng số lượng ngựa và tình trạng sức khỏe toàn đàn trong câu lạc bộ (tổng số chiến mã, số ngựa được phép tập luyện vs cấm tập y tế, số ca sự cố trong tuần). Bắt buộc dùng công cụ này khi người dùng hỏi có bao nhiêu ngựa trong câu lạc bộ hoặc quy mô đàn ngựa.",
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
                         "getSystemStaffOverview",
-                        "Tra cứu danh bạ nhân sự trong hệ thống (HLV, Bác sĩ, Groom), có thể lọc theo vai trò (role), trạng thái (isActive) hoặc từ khóa tìm kiếm.",
+                        "Tra cứu danh bạ nhân sự và thống kê số lượng nhân sự trong hệ thống (tổng số nhân sự 'totalStaff', phân loại theo vai trò 'roleBreakdown': Huấn luyện viên trưởng, Bác sĩ thú y, Nhân viên chăm sóc Groom, Quản lý). Có thể lọc theo vai trò (role), trạng thái (isActive) hoặc từ khóa tìm kiếm. Bắt buộc dùng công cụ này khi người dùng hỏi có bao nhiêu nhân sự, bao nhiêu groom, bao nhiêu huấn luyện viên hoặc bác sĩ trong câu lạc bộ.",
                         buildParamSchema(Map.of(
                                 "role", Map.of("type", "string", "description", "Vai trò nhân sự cần lọc (HEAD_TRAINER, VETERINARIAN, GROOM, CLUB_MANAGER)"),
                                 "isActive", Map.of("type", "boolean", "description", "Trạng thái hoạt động (true: đang hoạt động, false: đã khóa)"),
@@ -453,24 +430,26 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getClubHorsesDirectory",
-                        "Tra cứu danh bạ toàn bộ chiến mã trong câu lạc bộ, lọc theo trạng thái (status) hoặc tên ngựa / tên chủ ngựa.",
+                        "Tra cứu danh sách chi tiết các chiến mã trong câu lạc bộ (tên ngựa, UELN, chuồng, HLV phụ trách, số lượng sở trường specialtyCount, danh sách sở trường specialties). Lọc theo trạng thái (status) hoặc tên ngựa / tên chủ ngựa.",
                         buildParamSchema(Map.of(
                                 "status", Map.of("type", "string", "description", "Trạng thái chiến mã (ACTIVE, IN_TRAINING, RESTING, QUARANTINE)"),
                                 "keyword", Map.of("type", "string", "description", "Từ khóa tìm kiếm theo tên ngựa hoặc tên chủ ngựa")
                         ))
                 ),
                 new AiToolDefinition(
-                        "getRecentAuditLogs",
-                        "Tra cứu nhật ký kiểm toán hệ thống (Audit Trail) các thao tác nhạy cảm gần đây.",
+                        "getHorseSpecialtyAnalysis",
+                        "Phân tích sở trường của ngựa (cự ly tối ưu, mặt sân ưa thích, số lượng sở trường, điểm trung bình phong độ averageRating). Nếu không truyền ID/tên ngựa hoặc truyền 'all'/'tất cả', hệ thống tự động trả về bảng XẾP HẠNG tất cả các con ngựa theo số lượng sở trường (sortBy='count') hoặc theo điểm trung bình phong độ sở trường (sortBy='rating'). Bắt buộc dùng khi người dùng yêu cầu xếp hạng ngựa theo sở trường (Specialty) hoặc điểm trung bình phong độ.",
                         buildParamSchema(Map.of(
-                                "limit", Map.of("type", "integer", "description", "Số lượng bản ghi nhật ký kiểm toán (mặc định 10)")
+                                "horseId", Map.of("type", "integer", "description", "ID của con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all' để xếp hạng tất cả các con ngựa)"),
+                                "horseName", Map.of("type", "string", "description", "Tên con ngựa (tùy chọn. Bỏ trống hoặc truyền 'all'/'tất cả' để xếp hạng tất cả các con ngựa)"),
+                                "sortBy", Map.of("type", "string", "description", "Tiêu chí xếp hạng khi quét toàn bộ ngựa: 'rating' (theo điểm trung bình phong độ sở trường từ cao xuống thấp) hoặc 'count' (theo số lượng sở trường, mặc định kết hợp cả hai)")
                         ))
                 ),
                 new AiToolDefinition(
-                        "getAdmissionPipelineDetails",
-                        "Chi tiết các đơn đăng ký nhập đàn theo từng giai đoạn phê duyệt (chờ duyệt, chờ khám y tế, chờ xếp chuồng).",
+                        "getRecentAuditLogs",
+                        "Tra cứu nhật ký kiểm toán hệ thống (Audit Trail) các thao tác nhạy cảm gần đây (tổng số nhật ký totalAuditLogs, danh sách chi tiết danhSachNhatKy).",
                         buildParamSchema(Map.of(
-                                "status", Map.of("type", "string", "description", "Lọc theo giai đoạn phê duyệt: PENDING (đang xử lý), APPROVED (đã duyệt), REJECTED (từ chối)")
+                                "limit", Map.of("type", "integer", "description", "Số lượng bản ghi nhật ký kiểm toán (mặc định 10)")
                         ))
                 ),
                 new AiToolDefinition(
@@ -497,7 +476,10 @@ public class DynamicToolRegistryService {
         return schema;
     }
 
-    private String normalizeRole(String role) {
+    public static String normalizeRole(String role) {
+        if (role == null) {
+            return "";
+        }
         String r = role.trim().toUpperCase();
         return switch (r) {
             case "HEAD_TRAINER", "TRAINER" -> "HEAD_TRAINER";

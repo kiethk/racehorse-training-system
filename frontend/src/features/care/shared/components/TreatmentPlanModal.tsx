@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
-import { careService } from '../services/careService';
+import { z } from 'zod';
+import { Button, Checkbox, FormField, Input, Modal, Notice, Select, Textarea } from '@/components/ui';
+import { careService } from '@/features/care/services/careService';
 import { displayError, formatLocalDateIso } from '@/lib/display';
 
 interface TreatmentPlanModalProps {
@@ -12,6 +13,18 @@ interface TreatmentPlanModalProps {
   horseName?: string;
   onSuccess: () => void;
 }
+
+const treatmentPlanSchema = z
+  .object({
+    treatmentName: z.string().min(1, 'Treatment plan name is required.'),
+    instructions: z.string().min(1, 'Clinical instructions are required.'),
+    startDate: z.string().min(1, 'Start date is required.'),
+    endDate: z.string().optional(),
+  })
+  .refine((data) => !data.endDate || data.endDate >= data.startDate, {
+    message: 'Target end date cannot be earlier than start date.',
+    path: ['endDate'],
+  });
 
 export function TreatmentPlanModal({
   open,
@@ -39,26 +52,34 @@ export function TreatmentPlanModal({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!treatmentName.trim()) {
-      setError('Treatment plan name is required.');
+    const parsed = treatmentPlanSchema.safeParse({
+      treatmentName: treatmentName.trim(),
+      instructions: instructions.trim(),
+      startDate,
+      endDate: endDate || undefined,
+    });
+
+    if (!parsed.success) {
+      const errors: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0];
+        if (typeof field === 'string') {
+          errors[field] = issue.message;
+        }
+      }
+      setFieldErrors(errors);
       return;
     }
-    if (!instructions.trim()) {
-      setError('Clinical instructions are required.');
-      return;
-    }
-    if (endDate && startDate && endDate < startDate) {
-      setError('Target end date cannot be earlier than start date.');
-      return;
-    }
+
+    setFieldErrors({});
+    setLoading(true);
+    setError(null);
 
     try {
-      setLoading(true);
-      setError(null);
-
       const plan = await careService.createTreatmentPlan(healthRecordId, {
         treatmentName: treatmentName.trim(),
         instructions: instructions.trim(),
@@ -117,7 +138,7 @@ export function TreatmentPlanModal({
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <Notice tone="error">{error}</Notice>}
 
-        <FormField label="Treatment Plan Name" required>
+        <FormField label="Treatment Plan Name" required error={fieldErrors.treatmentName}>
           <Input
             placeholder="e.g. Left Forelimb Desmitis Rehabilitation"
             value={treatmentName}
@@ -127,7 +148,7 @@ export function TreatmentPlanModal({
         </FormField>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Start Date" required>
+          <FormField label="Start Date" required error={fieldErrors.startDate}>
             <Input
               type="date"
               value={startDate}
@@ -135,7 +156,7 @@ export function TreatmentPlanModal({
               disabled={loading}
             />
           </FormField>
-          <FormField label="Target End Date">
+          <FormField label="Target End Date" error={fieldErrors.endDate}>
             <Input
               type="date"
               value={endDate}
@@ -145,7 +166,7 @@ export function TreatmentPlanModal({
           </FormField>
         </div>
 
-        <FormField label="Clinical Instructions & Regimen" required>
+        <FormField label="Clinical Instructions & Regimen" required error={fieldErrors.instructions}>
           <Textarea
             rows={3}
             placeholder="e.g. Hand walking 15 mins daily, cold hosing 2x/day for 20 mins, stall rest."
@@ -166,12 +187,11 @@ export function TreatmentPlanModal({
                 Optionally add the primary medication immediately.
               </p>
             </div>
-            <input
-              type="checkbox"
+            <Checkbox
+              label=""
               id="includePrescription"
               checked={includePrescription}
               onChange={(e) => setIncludePrescription(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
               disabled={loading}
             />
           </div>

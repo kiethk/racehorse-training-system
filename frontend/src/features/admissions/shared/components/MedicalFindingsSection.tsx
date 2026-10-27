@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { hydrationStatusLabel } from '@/features/health/lib/hydrationStatus';
 import { Pill } from '@/components/ui/StatusBadge';
 import { formatDateTime } from '@/lib/display';
 import { cn } from '@/lib/cn';
@@ -74,7 +75,7 @@ function MetricRow({ metric, index }: { metric: InitialVetExamMetric; index: num
           <InfoRow label="Weight" value={num(metric.weight, 'kg')} />
         )}
         {metric.hydrationStatus != null && (
-          <InfoRow label="Hydration" value={txt(metric.hydrationStatus)} />
+          <InfoRow label="Hydration" value={hydrationStatusLabel(metric.hydrationStatus) ?? txt(metric.hydrationStatus)} />
         )}
         {metric.bodyConditionScore != null && (
           <InfoRow label="Body condition score" value={num(metric.bodyConditionScore)} />

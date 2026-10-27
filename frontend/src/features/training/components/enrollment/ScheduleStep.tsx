@@ -88,12 +88,6 @@ export function ScheduleStep({
             {preview.totalSessions} sessions · {formatDate(preview.firstSessionDate, DAY_WITH_DATE)} →{' '}
             {formatDate(preview.endDate, DAY_WITH_DATE)}
           </span>
-          {preview.scheduleFullDates.length > 0 && (
-            <span className="flex items-center gap-1.5 font-semibold text-[var(--color-danger)]">
-              <Icon name="alert-triangle" size={13} />
-              Schedule full on {preview.scheduleFullDates.map((date) => formatDate(date)).join(', ')}
-            </span>
-          )}
         </div>
       )}
     </Panel>

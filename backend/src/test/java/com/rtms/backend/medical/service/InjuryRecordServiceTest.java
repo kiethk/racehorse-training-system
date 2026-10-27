@@ -44,7 +44,9 @@ class InjuryRecordServiceTest {
     void setUp() {
         injuryRecordService = new InjuryRecordService(
                 injuryRecordRepository, horseRepository, healthRecordRepository,
-                careScheduleRepository, auditLogRepository, userRepository);
+                careScheduleRepository, auditLogRepository, userRepository,
+                org.mockito.Mockito.mock(com.rtms.backend.incident.repository.HorseIncidentReportRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.admission.repository.AdmissionApplicationRepository.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -93,5 +95,44 @@ class InjuryRecordServiceTest {
         assertEquals("CRITICAL", corrected.getSeverity());
         assertEquals("SUPERSEDED", injury.getStatus());
         verify(auditLogRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("correctInjuryRecord: marker không null ghi đè tọa độ 3D")
+    void correctInjuryRecord_appliesMarkerOverrideWhenPresent() {
+        injury.setPositionX(java.math.BigDecimal.valueOf(1.1));
+        injury.setZoneId("foreleg");
+        when(injuryRecordRepository.findById(100L)).thenReturn(Optional.of(injury));
+        when(injuryRecordRepository.save(any(InjuryRecord.class))).thenAnswer(i -> i.getArgument(0));
+
+        CorrectInjuryRecordRequest req = new CorrectInjuryRecordRequest(
+                "Repositioned marker after re-examination", null, null, null, null,
+                new com.rtms.backend.medical.dto.MarkerPlacementRequest(
+                        java.math.BigDecimal.valueOf(2.5), java.math.BigDecimal.valueOf(1.2), java.math.BigDecimal.valueOf(-0.4),
+                        "hindquarters", null, null, null, null, null, null, null));
+
+        InjuryRecord corrected = injuryRecordService.correctInjuryRecord(10L, 100L, req, 20L);
+
+        assertEquals(java.math.BigDecimal.valueOf(2.5), corrected.getPositionX());
+        assertEquals("hindquarters", corrected.getZoneId());
+        assertEquals("HIGH", corrected.getSeverity());
+    }
+
+    @Test
+    @DisplayName("correctInjuryRecord: không có marker thì giữ nguyên tọa độ đã lưu")
+    void correctInjuryRecord_withoutMarkerKeepsStoredCoordinates() {
+        injury.setPositionX(java.math.BigDecimal.valueOf(1.1));
+        injury.setZoneId("foreleg");
+        when(injuryRecordRepository.findById(100L)).thenReturn(Optional.of(injury));
+        when(injuryRecordRepository.save(any(InjuryRecord.class))).thenAnswer(i -> i.getArgument(0));
+
+        CorrectInjuryRecordRequest req = new CorrectInjuryRecordRequest(
+                "Severity correction only", "Sprain", "MEDIUM", null, "ACTIVE");
+
+        InjuryRecord corrected = injuryRecordService.correctInjuryRecord(10L, 100L, req, 20L);
+
+        assertEquals(java.math.BigDecimal.valueOf(1.1), corrected.getPositionX());
+        assertEquals("foreleg", corrected.getZoneId());
+        assertEquals("MEDIUM", corrected.getSeverity());
     }
 }

@@ -302,9 +302,32 @@ export interface CompleteCareScheduleRequest {
   notes?: string;
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
+  /** Multiple follow-up rechecks (rotating vets on consecutive days). */
+  nextSchedules?: CreateNextScheduleRequest[];
   vaccinations?: VaccinationRequest[];
   /** 7–10 days; only on a preventive visit without vaccinations. */
   deferVaccinationDays?: number;
+  /** Marker chấn thương ghi nhận cùng ca khám (T4). */
+  injuryMarkers?: CreateInjuryMarkerRequest[];
+}
+
+export interface CreateInjuryMarkerRequest {
+  injuryType: string;
+  bodyRegionId: number;
+  severity: string;
+  description?: string;
+  diagnosedAt: string;
+  positionX?: number | null;
+  positionY?: number | null;
+  positionZ?: number | null;
+  zoneId?: string | null;
+  localX?: number | null;
+  localY?: number | null;
+  localZ?: number | null;
+  normalX?: number | null;
+  normalY?: number | null;
+  normalZ?: number | null;
+  meshName?: string | null;
 }
 
 export interface VetAdmissionQueueItem {

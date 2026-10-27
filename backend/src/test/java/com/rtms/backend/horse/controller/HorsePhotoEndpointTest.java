@@ -6,7 +6,6 @@ import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.service.HorsePhotoService;
 import com.rtms.backend.horse.service.HorseService;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseSpecialtyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,8 +34,6 @@ class HorsePhotoEndpointTest {
     @Mock
     private HorseService horseService;
     @Mock
-    private HorsePerformanceService performanceService;
-    @Mock
     private HorseSpecialtyService specialtyService;
     @Mock
     private HorsePhotoService photoService;
@@ -47,7 +44,7 @@ class HorsePhotoEndpointTest {
 
     @BeforeEach
     void setUp() {
-        controller = new HorseController(horseService, performanceService, specialtyService, photoService, admissionService);
+        controller = new HorseController(horseService, specialtyService, photoService, admissionService);
     }
 
     private Horse createHorse(Long id, Long ownerId) {

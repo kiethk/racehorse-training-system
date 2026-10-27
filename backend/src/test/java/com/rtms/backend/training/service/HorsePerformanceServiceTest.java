@@ -4,13 +4,11 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.dto.DashboardPlanRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
-import com.rtms.backend.training.dto.IncidentCountRow;
 import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
@@ -27,7 +25,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,9 +44,6 @@ class HorsePerformanceServiceTest {
     private HorseTrainingPlanRepository planRepository;
 
     @Mock
-    private HorseIncidentReportRepository incidentReportRepository;
-
-    @Mock
     private HorseRepository horseRepository;
 
     @Mock
@@ -66,7 +60,7 @@ class HorsePerformanceServiceTest {
     void setUp() {
         // Bộ kiểm quyền chạy thật trên repository giả, nên các test phân quyền cũ giữ nguyên.
         // (The access check runs for real on mocked repositories, so the existing authorization tests stay valid.)
-        service = new HorsePerformanceService(workoutRepository, planRepository, incidentReportRepository,
+        service = new HorsePerformanceService(workoutRepository, planRepository,
                 new HorseViewAccessService(horseRepository, planRepository, stallRepository), specialtyService,
                 new HorseScopeService(planRepository));
     }
@@ -186,7 +180,7 @@ class HorsePerformanceServiceTest {
     // =================================================================
 
     @Test
-    @DisplayName("7.2: raises alerts for max heart rate > 220, recovery > 100, falling performance and repeated incidents")
+    @DisplayName("7.2: raises alerts for max heart rate > 220, recovery > 100, and falling performance")
     void testGetHorseAlerts_MultipleRulesTriggered() {
         Long horseId = 2L;
         LocalDate today = LocalDate.now();
@@ -198,21 +192,16 @@ class HorsePerformanceServiceTest {
                         workout(horseId, today.minusDays(1), 225, 110, 4),
                         workout(horseId, today.minusDays(3), 200, 90, 6),
                         workout(horseId, today.minusDays(5), 195, 85, 8)));
-        // Incidents: 2 within 14 days
-        when(incidentReportRepository.countByHorseIdAndReportedAtAfter(eq(horseId), any(LocalDateTime.class)))
-                .thenReturn(2L);
 
         List<HorseAlertResponse> alerts = service.getHorseAlerts(horseId, manager);
 
-        assertEquals(4, alerts.size());
+        assertEquals(3, alerts.size());
         assertTrue(alerts.stream().anyMatch(a -> "MAX_HEART_RATE_EXCEEDED".equals(a.getRuleCode())),
                 "Max heart rate alert expected");
         assertTrue(alerts.stream().anyMatch(a -> "POOR_RECOVERY_HEART_RATE".equals(a.getRuleCode())),
                 "Poor recovery alert expected");
         assertTrue(alerts.stream().anyMatch(a -> "CONSECUTIVE_PERFORMANCE_DROP".equals(a.getRuleCode())),
                 "Consecutive performance drop alert expected");
-        assertTrue(alerts.stream().anyMatch(a -> "REPEATED_INCIDENTS".equals(a.getRuleCode())),
-                "Repeated incidents alert expected");
     }
 
     @Test
@@ -225,8 +214,6 @@ class HorsePerformanceServiceTest {
                         workout(horseId, LocalDate.now().minusDays(1), 200, 90, 8),
                         workout(horseId, LocalDate.now().minusDays(3), 205, 95, 7),
                         workout(horseId, LocalDate.now().minusDays(5), 198, 88, 7)));
-        when(incidentReportRepository.countByHorseIdAndReportedAtAfter(eq(horseId), any(LocalDateTime.class)))
-                .thenReturn(1L);
 
         assertTrue(service.getHorseAlerts(horseId, manager).isEmpty());
     }
@@ -242,8 +229,6 @@ class HorsePerformanceServiceTest {
                         workout(horseId, LocalDate.now().minusDays(1), 150, 60, 6),
                         workout(horseId, LocalDate.now().minusDays(2), 150, 60, 6),
                         workout(horseId, LocalDate.now().minusDays(3), 150, 60, 8)));
-        when(incidentReportRepository.countByHorseIdAndReportedAtAfter(eq(horseId), any(LocalDateTime.class)))
-                .thenReturn(0L);
 
         assertTrue(service.getHorseAlerts(horseId, manager).isEmpty());
     }
@@ -264,15 +249,13 @@ class HorsePerformanceServiceTest {
                 new DashboardHorseRow(51L, "Idle Horse", "Arabian", "A-02")));
         when(planRepository.findDashboardPlans(List.of(50L, 51L))).thenReturn(List.of(
                 new DashboardPlanRow(700L, 50L, TrainingPlanStatus.COMPLETED, today.minusDays(60), today.minusDays(30),
-                        "Old course", 10, 10L),
+                        "Old course", 10, 10L, 0L),
                 new DashboardPlanRow(701L, 50L, TrainingPlanStatus.ACTIVE, today.minusDays(5), today.plusDays(20),
-                        "Sprint course", 10, 1L)));
+                        "Sprint course", 10, 1L, 0L)));
         when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(50L, 51L)), any(LocalDate.class)))
                 .thenReturn(List.of(
                         workout(50L, today, null, null, 8),
                         workout(50L, today.minusDays(2), null, null, 6)));
-        when(incidentReportRepository.countIncidentsByHorseIds(eq(List.of(50L, 51L)), any(LocalDateTime.class)))
-                .thenReturn(List.of(new IncidentCountRow(51L, 2L)));
         HorseSpecialtyResponse noData = new HorseSpecialtyResponse(3, List.of(), null, List.of());
         when(specialtyService.getSpecialties(List.of(50L, 51L))).thenReturn(Map.of(50L, noData, 51L, noData));
 
@@ -297,15 +280,41 @@ class HorsePerformanceServiceTest {
         assertEquals("NONE", idle.getPlanStatus());
         assertEquals("No plan yet", idle.getCourseName());
         assertEquals(0.0, idle.getProgressPercent());
-        assertEquals(1, idle.getAlertsCount(), "2 incidents in 14 days raise the repeated-incidents alert");
-        assertEquals(List.of("Repeated health incidents"), idle.getAlertTitles());
+        assertEquals(0, idle.getAlertsCount(), "No workouts, no alerts");
+        assertEquals(List.of(), idle.getAlertTitles());
 
         // Cố định số truy vấn dù có bao nhiêu ngựa (a fixed number of queries no matter how many horses)
         verify(planRepository, times(1)).findDashboardHorses(trainerId);
         verify(planRepository, times(1)).findDashboardPlans(List.of(50L, 51L));
         verify(workoutRepository, times(1)).findRecentCompletedWorkouts(any(), any());
-        verify(incidentReportRepository, times(1)).countIncidentsByHorseIds(any(), any());
         verify(specialtyService, times(1)).getSpecialties(any());
+    }
+
+    @Test
+    @DisplayName("Dashboard plan: chosen by date, not by creation order")
+    void testPickCurrentPlanUsesDates() {
+        LocalDate today = LocalDate.now();
+        // Created first (lower id) but starts later; created second but starts sooner.
+        DashboardPlanRow later = new DashboardPlanRow(1L, 7L, TrainingPlanStatus.UPCOMING, today.plusDays(20),
+                today.plusDays(40), "Later course", 6, 0L, 0L);
+        DashboardPlanRow sooner = new DashboardPlanRow(2L, 7L, TrainingPlanStatus.UPCOMING, today.plusDays(3),
+                today.plusDays(15), "Sooner course", 6, 0L, 0L);
+        assertSame(sooner, HorsePerformanceService.pickCurrentPlan(List.of(later, sooner)),
+                "The upcoming plan that starts first wins");
+
+        DashboardPlanRow active = new DashboardPlanRow(3L, 7L, TrainingPlanStatus.ACTIVE, today.minusDays(2),
+                today.plusDays(1), "Running course", 6, 2L, 0L);
+        assertSame(active, HorsePerformanceService.pickCurrentPlan(List.of(later, sooner, active)),
+                "A running plan wins over upcoming ones");
+
+        DashboardPlanRow olderDone = new DashboardPlanRow(4L, 7L, TrainingPlanStatus.COMPLETED, today.minusDays(60),
+                today.minusDays(40), "Older course", 6, 6L, 0L);
+        DashboardPlanRow recentDone = new DashboardPlanRow(5L, 7L, TrainingPlanStatus.COMPLETED, today.minusDays(30),
+                today.minusDays(5), "Recent course", 6, 6L, 0L);
+        assertSame(recentDone, HorsePerformanceService.pickCurrentPlan(List.of(olderDone, recentDone)),
+                "Without running or upcoming plans, the one that ended most recently wins");
+
+        assertNull(HorsePerformanceService.pickCurrentPlan(List.of()));
     }
 
     @Test
@@ -333,8 +342,6 @@ class HorsePerformanceServiceTest {
                 new DashboardHorseRow(60L, "Mine", "Arabian", null)));
         when(planRepository.findDashboardPlans(List.of(60L))).thenReturn(List.of());
         when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(60L)), any(LocalDate.class))).thenReturn(List.of());
-        when(incidentReportRepository.countIncidentsByHorseIds(eq(List.of(60L)), any(LocalDateTime.class)))
-                .thenReturn(List.of());
         when(specialtyService.getSpecialties(List.of(60L))).thenReturn(Map.of());
 
         List<DashboardHorseResponse> dashboard = service.getDashboard(owner);
@@ -346,13 +353,50 @@ class HorsePerformanceServiceTest {
     }
 
     @Test
+    @DisplayName("Dashboard progress leaves cancelled sessions out, like the Plan page")
+    void testDashboardProgressIgnoresCancelledSessions() {
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        LocalDate today = LocalDate.now();
+        when(planRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(
+                new DashboardHorseRow(60L, "Mine", "Arabian", null)));
+        // 6-session course, 2 cancelled, 4 held: the course is done in full.
+        when(planRepository.findDashboardPlans(List.of(60L))).thenReturn(List.of(
+                new DashboardPlanRow(800L, 60L, TrainingPlanStatus.COMPLETED, today.minusDays(20), today.minusDays(2),
+                        "Six sessions", 6, 4L, 2L)));
+        when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(60L)), any(LocalDate.class))).thenReturn(List.of());
+        when(specialtyService.getSpecialties(List.of(60L))).thenReturn(Map.of());
+
+        DashboardHorseResponse row = service.getDashboard(owner).get(0);
+
+        assertEquals(4, row.getCompletedSessions());
+        assertEquals(2, row.getCancelledSessions());
+        assertEquals(100.0, row.getProgressPercent());
+    }
+
+    @Test
+    @DisplayName("A plan cancelled part-way keeps its cancelled sessions in the progress: 3 held of 6 is 50%")
+    void testDashboardProgressOfCancelledPlan() {
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        LocalDate today = LocalDate.now();
+        when(planRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(
+                new DashboardHorseRow(60L, "Mine", "Arabian", null)));
+        when(planRepository.findDashboardPlans(List.of(60L))).thenReturn(List.of(
+                new DashboardPlanRow(801L, 60L, TrainingPlanStatus.CANCELLED, today.minusDays(10), today.plusDays(5),
+                        "Six sessions", 6, 3L, 3L)));
+        when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(60L)), any(LocalDate.class))).thenReturn(List.of());
+        when(specialtyService.getSpecialties(List.of(60L))).thenReturn(Map.of());
+
+        assertEquals(50.0, service.getDashboard(owner).get(0).getProgressPercent());
+    }
+
+    @Test
     @DisplayName("A trainer with no horses gets an empty dashboard and no further queries")
     void testGetTrainerDashboard_NoHorses() {
         AuthenticatedUser trainer = new AuthenticatedUser(9L, "trainer@example.com", "HEAD_TRAINER");
         when(planRepository.findDashboardHorses(9L)).thenReturn(List.of());
 
         assertTrue(service.getDashboard(trainer).isEmpty());
-        verifyNoInteractions(workoutRepository, incidentReportRepository);
+        verifyNoInteractions(workoutRepository);
         verify(planRepository, never()).findDashboardPlans(any());
     }
 }

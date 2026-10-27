@@ -76,6 +76,9 @@ class AdmissionGroomReviewServiceTest {
     @Mock
     private GroomProfileRepository groomProfileRepository;
 
+    @Mock
+    private AdmissionNotificationService admissionNotificationService;
+
     private AdmissionGroomReviewService service;
 
     @BeforeEach
@@ -90,7 +93,8 @@ class AdmissionGroomReviewServiceTest {
                 careScheduleService,
                 notificationService,
                 new PedigreeBirthDateValidator(horseRepository),
-                groomProfileRepository);
+                groomProfileRepository,
+                admissionNotificationService);
         lenient().when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
     }
 
@@ -111,8 +115,8 @@ class AdmissionGroomReviewServiceTest {
         assertNotNull(result.getGroomReviewedAt());
         assertNull(result.getHorseId());
         verify(stableStallRepository, never()).lockAdmissionCapacityStallsForUpdate();
-        verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
-                careScheduleRepository, notificationService);
+        verify(admissionNotificationService).notifyOwnerRejected(eq(admission), anyString(), eq("Quarantine Groom Review"), eq("Missing documents"));
+        verifyNoInteractions(horseRepository, horsePedigreeRepository, careScheduleRepository, notificationService);
     }
 
     @Test
@@ -254,8 +258,8 @@ class AdmissionGroomReviewServiceTest {
         verify(notificationService).createNotification(eq(12L), anyString(), anyString(),
                 eq(NotificationTypes.ADMISSION_GROOM_ASSIGNED), eq(NotificationTypes.REFERENCE_ADMISSION), eq(1L),
                 eq("12:ADMISSION_1:ADMISSION_GROOM_ASSIGNED:stall:99"));
-        verifyNoInteractions(horseRepository, horsePedigreeRepository, candidateHorseProfileRepository,
-                careScheduleRepository);
+        verify(admissionNotificationService).notifyOwnerWaitingForArrival(eq(admission), anyString(), eq(qStall));
+        verifyNoInteractions(horseRepository, horsePedigreeRepository, careScheduleRepository);
     }
 
     @Test

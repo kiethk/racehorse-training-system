@@ -150,12 +150,30 @@ public class FileStorageService {
 
     /** Content type of a stored file, taken from the extension its key was given at upload. */
     public MediaType mediaType(String key) {
-        String lower = key == null ? "" : key.toLowerCase(Locale.ROOT);
-        return EXTENSIONS.entrySet().stream()
-                .filter(entry -> lower.endsWith(entry.getValue()))
-                .map(entry -> MediaType.parseMediaType(entry.getKey()))
-                .findFirst()
-                .orElse(MediaType.APPLICATION_OCTET_STREAM);
+        return mediaType(key, null);
+    }
+
+    public MediaType mediaType(String key, String filename) {
+        String candidate = key == null ? "" : key.toLowerCase(Locale.ROOT);
+        int q = candidate.indexOf('?');
+        if (q >= 0) candidate = candidate.substring(0, q);
+        int h = candidate.indexOf('#');
+        if (h >= 0) candidate = candidate.substring(0, h);
+
+        if (candidate.endsWith(".pdf")) return MediaType.APPLICATION_PDF;
+        if (candidate.endsWith(".jpg") || candidate.endsWith(".jpeg")) return MediaType.IMAGE_JPEG;
+        if (candidate.endsWith(".png")) return MediaType.IMAGE_PNG;
+        if (candidate.endsWith(".webp")) return MediaType.parseMediaType("image/webp");
+
+        if (filename != null && !filename.isBlank()) {
+            String fnLower = filename.toLowerCase(Locale.ROOT).trim();
+            if (fnLower.endsWith(".pdf")) return MediaType.APPLICATION_PDF;
+            if (fnLower.endsWith(".jpg") || fnLower.endsWith(".jpeg")) return MediaType.IMAGE_JPEG;
+            if (fnLower.endsWith(".png")) return MediaType.IMAGE_PNG;
+            if (fnLower.endsWith(".webp")) return MediaType.parseMediaType("image/webp");
+        }
+
+        return MediaType.APPLICATION_OCTET_STREAM;
     }
 
     /** True when the key points at local disk. */

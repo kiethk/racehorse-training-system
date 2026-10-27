@@ -87,7 +87,8 @@ class CareScheduleHardeningTests {
                 mock(EntityManager.class),
                 notificationService,
                 new TrainingDecisionService(horses, schedules, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class)
+                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class)
         );
 
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

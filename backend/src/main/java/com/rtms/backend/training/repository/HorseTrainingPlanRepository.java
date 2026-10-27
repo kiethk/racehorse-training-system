@@ -195,9 +195,9 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
     List<DashboardHorseRow> findAllDashboardHorses();
 
     /**
-     * Mọi kế hoạch của các chiến mã đã cho, kèm tên khóa và số buổi đã hoàn thành (sub-query), không cần
+     * Mọi kế hoạch của các chiến mã đã cho, kèm tên khóa, số buổi đã hoàn thành và bị hủy (sub-query), không cần
      * tải toàn bộ bảng rồi lọc bằng stream.
-     * (Every plan of the given horses with course name and completed-session count (sub-query), so no
+     * (Every plan of the given horses with course name, completed and cancelled counts (sub-query), so no
      * whole-table load followed by stream filtering.)
      */
     @Query("""
@@ -205,7 +205,10 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
                       p.id, p.horseId, p.status, p.startDate, p.endDate, c.name, c.totalSessions,
                       (SELECT COUNT(w) FROM TrainingWorkout w
                        WHERE w.planId = p.id
-                         AND w.status = com.rtms.backend.training.enums.WorkoutStatus.COMPLETED))
+                         AND w.status = com.rtms.backend.training.enums.WorkoutStatus.COMPLETED),
+                      (SELECT COUNT(w) FROM TrainingWorkout w
+                       WHERE w.planId = p.id
+                         AND w.status = com.rtms.backend.training.enums.WorkoutStatus.CANCELLED))
            FROM HorseTrainingPlan p
            JOIN Course c ON p.courseId = c.id
            WHERE p.horseId IN :horseIds
@@ -222,4 +225,6 @@ public interface HorseTrainingPlanRepository extends JpaRepository<HorseTraining
            WHERE h.id = :horseId AND a.trainerId = :trainerId
            """)
     boolean existsHorseInTrainerArea(@Param("horseId") Long horseId, @Param("trainerId") Long trainerId);
+
+    long countByStatus(TrainingPlanStatus status);
 }

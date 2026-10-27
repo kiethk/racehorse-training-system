@@ -1,7 +1,6 @@
 package com.rtms.backend.training.repository;
 
 import com.rtms.backend.training.dto.LotHorseNameRow;
-import com.rtms.backend.training.dto.LotLoadRow;
 import com.rtms.backend.training.dto.TrainingLotRow;
 import com.rtms.backend.training.entity.TrainingLot;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,22 +25,6 @@ public interface TrainingLotRepository extends JpaRepository<TrainingLot, Long> 
      */
     @Query(value = "SELECT 1 FROM (SELECT pg_advisory_xact_lock(:key)) locked", nativeQuery = true)
     int lockSchedule(@Param("key") long key);
-
-    /** Lot còn hiệu lực của Trainer trong khoảng ngày kèm số ngựa. (Active lots of the trainer in a range, with horse counts.) */
-    @Query("""
-           SELECT new com.rtms.backend.training.dto.LotLoadRow(
-                      l.lotDate, l.subjectId, l.status, l.maxCapacity,
-                      (SELECT COUNT(w) FROM TrainingWorkout w
-                       WHERE w.lotId = l.id AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED),
-                      l.startTime, l.endTime)
-           FROM TrainingLot l
-           WHERE l.trainerId = :trainerId
-             AND l.lotDate BETWEEN :fromDate AND :toDate
-             AND l.status <> com.rtms.backend.training.enums.LotStatus.CANCELLED
-           """)
-    List<LotLoadRow> findLoadBetween(@Param("trainerId") Long trainerId,
-                                     @Param("fromDate") LocalDate fromDate,
-                                     @Param("toDate") LocalDate toDate);
 
     // =================================================================
     // THUẬT TOÁN XẾP KHE (trả entity vì thuật toán cần sửa và lưu lot)

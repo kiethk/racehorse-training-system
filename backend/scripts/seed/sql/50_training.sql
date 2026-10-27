@@ -7,11 +7,13 @@
 --   - Đúng total_sessions buổi, xoay vòng bài của khóa, chỉ vào các thứ đã chọn; Groom = Groom của chuồng.
 --   - Lot trong khung 06:00-10:00, bắt đầu :00/:15/:30/:45, không chồng lot khác của Trainer (BR-02, BR-03),
 --     tối đa 6 ngựa (BR-10), mỗi Groom một ngựa trong một lot (BR-09).
---   - Ngựa bị chặn tập: buổi chưa diễn ra bị hủy, lot rỗng bị hủy, plan đang chạy thành CANCELLED.
+--   - Ngựa bị chặn tập: buổi chưa diễn ra bị hủy, lot rỗng bị hủy, plan đang chạy thành CANCELLED. Không seed plan bị
+--     chặn hôm nay vào đúng ngày tập (buổi hôm nay đã diễn ra mà plan đã hủy).
 --   - Buổi đã ghi kết quả có đủ 7 chỉ số; điểm phong độ tính đúng công thức WorkoutPerformanceCalculator.
 -- (Rules kept: plans only for ELIGIBLE, non-blocked horses of the trainer's areas, no overlapping plans; exact session
 -- count, subject rotation, chosen weekdays, stall groom; lots inside the golden window on quarter hours, no overlap,
--- max 6 horses, one horse per groom per lot; blocking cancels what is not held yet; ratings use the app formula.)
+-- max 6 horses, one horse per groom per lot; blocking cancels what is not held yet, but no plan is blocked today on one of
+-- its training days; ratings use the app formula.)
 -- =====================================================================
 
 -- Ngày các buổi tập: từ p_start, lấy ngày có thứ nằm trong p_days, đủ p_total buổi.
@@ -108,15 +110,20 @@ BEGIN
     avg := round(v_lo + (v_hi - v_lo) * (0.2 + 0.8 * a), 1);
     top := round(avg * pg_temp.rnd(p_seed || 's', 1.15, 1.30), 1);
     hr := round(v_hr_hi - (v_hr_hi - v_hr_lo) * a * pg_temp.rnd(p_seed || 'h', 0.8, 1.0));
-    hr_max := LEAST(220, hr + pg_temp.rndi(p_seed || 'm', 15, 30));
+    -- Nhịp tối đa còn xa 220; hồi phục 60-98 bpm theo năng lực (dưới ngưỡng 100). Chỉ buổi mệt mới vượt ngưỡng hồi phục,
+    -- để cảnh báo trên màn hình là trường hợp có chủ đích. (Max HR stays well under 220; recovery is 60-98 bpm by
+    -- ability, under the 100 limit. Only tiring sessions break the recovery limit, so on-screen alerts are deliberate.)
+    hr_max := LEAST(220, hr + pg_temp.rndi(p_seed || 'm', 8, 18));
     hr_rec := CASE WHEN p_fatigue THEN LEAST(hr - 9, pg_temp.rndi(p_seed || 'f', 118, 130))
-                   ELSE LEAST(hr - 9, round(120 - 45 * a * pg_temp.rnd(p_seed || 'r', 0.85, 1.0))::INT) END;
+                   ELSE round(60 + 38 * (1 - a) * pg_temp.rnd(p_seed || 'r', 0.9, 1.0))::INT END;
     rating := pg_temp.rating(dist, dur, top, avg, hr, hr_max, hr_rec);
 END $$ LANGUAGE plpgsql;
 
 -- Một kế hoạch cho một ngựa (createPlan). Trạng thái từng buổi, lot và plan suy ra từ ngày, giờ hiện tại và các khoảng
--- nghỉ trong seed_block. p_unrecorded: buổi đã qua gần nhất để trống kết quả (Trainer cần ghi).
--- (One plan for one horse. Session, lot and plan states follow from the dates, now and the rest windows.
+-- nghỉ trong seed_block. Chỉ buổi của các ngày trước hôm nay mới có kết quả; buổi hôm nay luôn chưa ghi để demo
+-- việc ghi kết quả. p_unrecorded: buổi đã qua gần nhất để trống kết quả (Trainer cần ghi).
+-- (One plan for one horse. Session, lot and plan states follow from the dates, now and the rest windows. Only sessions
+-- before today have results; today's are always left to record in the demo.
 -- p_unrecorded leaves the latest past session without a result for the trainer to record.)
 CREATE FUNCTION pg_temp.make_plan(p_horse_k TEXT, p_course BIGINT, p_start DATE, p_days TEXT,
                                   p_unrecorded BOOLEAN DEFAULT FALSE, p_fatigue_from DATE DEFAULT NULL) RETURNS BIGINT AS $$
@@ -150,7 +157,16 @@ BEGIN
     END IF;
     -- Lần chặn tập đầu tiên sau khi tạo plan. (The first block after the plan was created.)
     SELECT min(from_ts) INTO v_block FROM seed_block WHERE horse_id = v_horse AND from_ts > v_created;
-    v_ability := pg_temp.rnd('ability' || p_horse_k, 0.15, 1.0);
+    -- Seed không có plan bị hủy hôm nay trong khi buổi tập hôm nay đã diễn ra (buổi đó còn chờ ghi kết quả, Trainer chỉ giải
+    -- thích khi được hỏi): ngựa bị chặn hôm nay vào đúng ngày tập của khóa thì không ghi danh khóa đó.
+    -- (The seed has no plan cancelled today while today's session already took place (it would still wait for a result;
+    -- the trainer explains that case only when asked): a horse blocked today on a training day of the course is not
+    -- enrolled in it.)
+    IF v_block::DATE = pg_temp.today() AND pg_temp.today() = ANY (v_dates) THEN
+        RAISE NOTICE 'Skipped plan of % from %: blocked today on a training day', p_horse_k, v_dates[1];
+        RETURN NULL;
+    END IF;
+    v_ability := pg_temp.rnd('ability' || p_horse_k, 0.0, 1.0);
 
     INSERT INTO horse_training_plans (horse_id, course_id, trainer_id, start_date, end_date, status, created_at, updated_at,
                                       training_days, groom_id)
@@ -165,9 +181,13 @@ BEGIN
         v_lot := pg_temp.place(v_trainer, v_dates[i], v_subjects[((i - 1) % array_length(v_subjects, 1)) + 1], v_groom, v_created);
         SELECT end_time INTO v_lot_end FROM training_lots WHERE id = v_lot;
         v_rec := v_dates[i] + v_lot_end + make_interval(mins => pg_temp.rndi('rec' || v_plan || i, 5, 35));
-        IF v_block IS NOT NULL AND v_dates[i] >= v_block::DATE AND v_rec >= v_block THEN
+        -- Bị chặn tập: hủy mọi buổi mà lot CHƯA kết thúc lúc bị chặn (như cancelFutureTrainingForHorse). Lot đã xong
+        -- trước đó thì buổi đã diễn ra, được ghi kết quả như thường.
+        -- (Blocking cancels every session whose lot had NOT ended at the block, like cancelFutureTrainingForHorse. A lot
+        -- that ended before it took place and is recorded as usual.)
+        IF v_block IS NOT NULL AND v_dates[i] + v_lot_end > v_block THEN
             v_status := 'CANCELLED';
-        ELSIF v_rec <= pg_temp.clock() AND NOT (p_unrecorded AND i = v_last_past) THEN
+        ELSIF v_dates[i] < pg_temp.today() AND NOT (p_unrecorded AND i = v_last_past) THEN
             v_status := 'COMPLETED';
         ELSE
             v_status := 'SCHEDULED';
@@ -321,7 +341,7 @@ BEGIN
     PERFORM pg_temp.cohort('TR02', 'Speed Sharpening', ARRAY['H028', 'H031', 'H034'], -40, 'MONDAY,WEDNESDAY,FRIDAY');
     PERFORM pg_temp.cohort('TR02', 'Distance Builder', ARRAY['H029', 'H032', 'H035'], -38, 'TUESDAY,THURSDAY,SATURDAY');
     PERFORM pg_temp.cohort('TR02', 'Starting Stall Basics', ARRAY['H030', 'H033', 'H036'], -30, 'SATURDAY,SUNDAY');
-    PERFORM pg_temp.cohort('TR02', 'Speed Sharpening', ARRAY['H019', 'H023', 'H031'], -9, 'MONDAY,WEDNESDAY,FRIDAY');
+    PERFORM pg_temp.cohort('TR02', 'Speed Sharpening', ARRAY['H019', 'H023', 'H031'], -9, 'MONDAY,WEDNESDAY,FRIDAY', NULL, 'H023');
     PERFORM pg_temp.cohort('TR02', 'Distance Builder', ARRAY['H020', 'H029', 'H035'], -2, 'TUESDAY,THURSDAY,SATURDAY');
     PERFORM pg_temp.cohort('TR02', 'Starting Stall Basics', ARRAY['H025', 'H032'], 4, 'MONDAY,THURSDAY');
 

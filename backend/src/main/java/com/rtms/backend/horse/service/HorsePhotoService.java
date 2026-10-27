@@ -135,7 +135,10 @@ public class HorsePhotoService {
         }
         AdmissionDocument photo = findPhotoDocument(horseId);
         Resource resource = storage.load(photo.getFileUrl());
-        MediaType mediaType = storage.mediaType(photo.getFileUrl());
+        MediaType mediaType = storage.mediaType(photo.getFileUrl(), photo.getOriginalFileName());
+        if (mediaType == null || MediaType.APPLICATION_OCTET_STREAM.equals(mediaType)) {
+            mediaType = MediaType.IMAGE_JPEG;
+        }
         return new PhotoResult(resource, mediaType);
     }
 

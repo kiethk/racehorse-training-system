@@ -279,54 +279,6 @@ class CourseServiceTest {
     }
 
     @Test
-    @DisplayName("7. Adds a subject to a course")
-    void testAddSubjectToCourse_Success() {
-        Long courseId = 5L;
-        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
-        req.setSubjectId(20L);
-
-        Course course = new Course();
-        course.setId(courseId);
-        course.setTrainerId(9L);
-        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
-        when(courseSubjectRepository.findMaxOrderIndex(courseId)).thenReturn(2);
-
-        Subject subject = new Subject();
-        subject.setId(20L);
-        subject.setName("Gallop");
-        when(subjectRepository.findById(20L)).thenReturn(Optional.of(subject));
-
-        when(courseSubjectRepository.save(any(CourseSubject.class))).thenAnswer(inv -> {
-            CourseSubject cs = inv.getArgument(0);
-            cs.setId(777L);
-            return cs;
-        });
-
-        CourseSubjectResponse res = courseService.addSubjectToCourse(courseId, req, trainerUser);
-
-        assertNotNull(res);
-        assertEquals(777L, res.getId());
-        assertEquals("Gallop", res.getSubjectName());
-        assertEquals(3, res.getOrderIndex(), "A new subject goes to the end of the rotation");
-    }
-
-    @Test
-    @DisplayName("8. Adding a subject fails when the course does not exist")
-    void testAddSubjectToCourse_CourseNotFound_ThrowsRuntimeException() {
-        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
-        req.setSubjectId(1L);
-
-        when(courseRepository.findById(999L)).thenReturn(Optional.empty());
-
-        assertThrows(RuntimeException.class,
-                () -> courseService.addSubjectToCourse(999L, req, trainerUser));
-    }
-
-    // =================================================================
-    // durationMinutes — con số QUYẾT ĐỊNH ĐỘ DÀI LOT (the number that DECIDES the lot length)
-    // =================================================================
-
-    @Test
     @DisplayName("Course detail must return durationMinutes of every subject")
     void testGetCourseById_ReturnsDurationMinutes() {
         Long courseId = 10L;
@@ -345,35 +297,6 @@ class CourseServiceTest {
         // (Without this field the course picker shows a bare "minutes" label and the trainer cannot tell how
         // much golden window the course consumes.)
         assertEquals(90, response.getSubjects().get(0).getDurationMinutes());
-    }
-
-    @Test
-    @DisplayName("Adding a subject to a course also returns durationMinutes")
-    void testAddSubjectToCourse_ReturnsDurationMinutes() {
-        Long courseId = 10L;
-
-        Subject sub = new Subject();
-        sub.setId(50L);
-        sub.setName("Sprint acceleration");
-        sub.setDurationMinutes(60);
-
-        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
-        req.setSubjectId(50L);
-
-        Course course = new Course();
-        course.setId(courseId);
-        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
-        when(subjectRepository.findById(50L)).thenReturn(Optional.of(sub));
-        when(courseSubjectRepository.save(any(CourseSubject.class)))
-                .thenAnswer(i -> {
-                    CourseSubject saved = i.getArgument(0);
-                    saved.setId(999L);
-                    return saved;
-                });
-
-        CourseSubjectResponse res = courseService.addSubjectToCourse(courseId, req, trainerUser);
-
-        assertEquals(60, res.getDurationMinutes());
     }
 
     @Test
@@ -404,79 +327,5 @@ class CourseServiceTest {
         when(courseRepository.findById(20L)).thenReturn(Optional.of(otherCourse));
 
         assertThrows(RuntimeException.class, () -> courseService.getCourseById(20L, trainerUser));
-    }
-
-    @Test
-    @DisplayName("Cannot add another trainer's subject to course")
-    void testAddSubjectToCourse_DifferentTrainerSubject_ThrowsException() {
-        Course course = new Course();
-        course.setId(5L);
-        course.setTrainerId(9L);
-
-        Subject otherSubject = new Subject();
-        otherSubject.setId(20L);
-        otherSubject.setName("Other Trainer Subject");
-        otherSubject.setTrainerId(10L); // different trainer
-
-        when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
-        when(subjectRepository.findById(20L)).thenReturn(Optional.of(otherSubject));
-
-        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
-        req.setSubjectId(20L);
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> courseService.addSubjectToCourse(5L, req, trainerUser));
-        assertTrue(ex.getMessage().contains("does not belong to this trainer"));
-    }
-
-    @Test
-    @DisplayName("Another trainer cannot add anything to my course")
-    void testAddSubjectToCourse_NotMyCourse_IsNotFound() {
-        Course course = new Course();
-        course.setId(5L);
-        course.setTrainerId(10L);   // the course belongs to trainer 10, the caller is trainer 9
-        when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
-
-        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
-        req.setSubjectId(20L);
-
-        assertThrows(RuntimeException.class, () -> courseService.addSubjectToCourse(5L, req, trainerUser));
-        verify(courseSubjectRepository, never()).save(any(CourseSubject.class));
-    }
-
-    @Test
-    @DisplayName("A subject already in the course is not added twice")
-    void testAddSubjectToCourse_Duplicate() {
-        Course course = new Course();
-        course.setId(5L);
-        course.setTrainerId(9L);
-        when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
-        when(subjectRepository.findById(20L)).thenReturn(Optional.of(subject(20L, 9L)));
-        when(courseSubjectRepository.existsByCourseIdAndSubjectId(5L, 20L)).thenReturn(true);
-
-        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
-        req.setSubjectId(20L);
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> courseService.addSubjectToCourse(5L, req, trainerUser));
-        assertTrue(ex.getMessage().contains("already in this course"));
-    }
-
-    @Test
-    @DisplayName("A course never grows past the subject limit")
-    void testAddSubjectToCourse_SubjectLimit() {
-        Course course = new Course();
-        course.setId(5L);
-        course.setTrainerId(9L);
-        when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
-        when(subjectRepository.findById(20L)).thenReturn(Optional.of(subject(20L, 9L)));
-        when(courseSubjectRepository.countByCourseId(5L)).thenReturn((long) com.rtms.backend.config.TrainingLimits.MAX_COURSE_SUBJECTS);
-
-        CourseSubjectItemRequest req = new CourseSubjectItemRequest();
-        req.setSubjectId(20L);
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> courseService.addSubjectToCourse(5L, req, trainerUser));
-        assertTrue(ex.getMessage().contains("at most"));
     }
 }

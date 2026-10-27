@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { openAuthenticatedEventStream } from '@/services/api';
 import type { UrgentAssignmentAlert } from '../types';
 import { admissionsApi } from '../services/api';
-import { UrgentAssignmentModal } from './UrgentAssignmentModal';
+import { UrgentAssignmentBanner } from './UrgentAssignmentBanner';
 
 const RECONNECT_DELAY_MS = 5000;
 const MAX_RECONNECT_DELAY_MS = 60000;
@@ -135,13 +135,14 @@ export function UrgentAssignmentNotifier() {
   }, [mergeAlerts, restore]);
 
   const now = Date.now();
-  const active =
-    alerts.find((alert) => {
+  const active = alerts
+    .filter((alert) => {
       if (pathname === `/veterinarian/urgent/${alert.scheduleId}`) return false;
       const until = snoozed.current.get(alert.scheduleId);
       if (until && until > now) return false;
       return true;
-    }) ?? null;
+    })
+    .sort((a, b) => new Date(a.reportedAt).getTime() - new Date(b.reportedAt).getTime());
 
   function openCase(alert: UrgentAssignmentAlert) {
     const next = new Map(snoozed.current);
@@ -152,5 +153,5 @@ export function UrgentAssignmentNotifier() {
     router.push(`/veterinarian/urgent/${alert.scheduleId}`);
   }
 
-  return <UrgentAssignmentModal alert={active} onOpenCase={openCase} onDismiss={dismiss} />;
+  return <UrgentAssignmentBanner alerts={active} onOpenCase={openCase} onDismiss={dismiss} />;
 }

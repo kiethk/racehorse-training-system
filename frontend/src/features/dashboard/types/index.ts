@@ -13,6 +13,8 @@ export interface DashboardHorse {
   planStatus: PlanStatus | 'NONE';
   completedSessions: number;
   totalSessions: number;
+  /** Cancelled sessions; left out of the progress. */
+  cancelledSessions: number;
   progressPercent: number;
   latestPerformanceRating: number | null;
   avgPerformanceRating30d: number | null;
@@ -71,3 +73,80 @@ export interface Trend<TItem> {
   toDate: string;
   items: TItem[];
 }
+
+export interface StallSummary {
+  totalStalls: number;
+  occupiedStalls: number;
+  availableStalls: number;
+  reservedStalls: number;
+  occupancyRate: number;
+}
+
+export interface FleetSummary {
+  totalHorses: number;
+  activeEligible: number;
+  inTraining: number;
+  medicalBlocked: number;
+  inactive: number;
+}
+
+export interface AdmissionSummary {
+  totalPending: number;
+  managerReviewCount: number;
+  waitingArrivalCount: number;
+  groomReviewCount: number;
+  arrivalDeadlineAlertCount: number;
+}
+
+export interface IncidentSummary {
+  openIncidents: number;
+  criticalUrgentIncidents: number;
+}
+
+export interface BarnOccupancyDto {
+  areaId: number;
+  areaCode: string;
+  areaName: string;
+  areaType: string;
+  totalStalls: number;
+  occupiedStalls: number;
+  availableStalls: number;
+  reservedStalls: number;
+  occupancyRate: number;
+}
+
+export interface PendingAdmissionActionDto {
+  admissionId: number;
+  candidateHorseName: string;
+  breed: string;
+  ownerId: number;
+  ownerName: string;
+  status: string;
+  submittedAt: string;
+  arrivalDeadlineAt: string | null;
+  isArrivalOverdueOrExpiring: boolean;
+}
+
+export interface UrgentIncidentActionDto {
+  incidentId: number;
+  horseId: number;
+  horseName: string;
+  title: string;
+  description: string;
+  severity: string;
+  status: string;
+  reportedAt: string;
+  reportedById: number;
+  reporterName: string;
+}
+
+export interface ManagerDashboardSummary {
+  stallSummary: StallSummary;
+  fleetSummary: FleetSummary;
+  admissionSummary: AdmissionSummary;
+  incidentSummary: IncidentSummary;
+  barnOccupancies: BarnOccupancyDto[];
+  pendingAdmissions: PendingAdmissionActionDto[];
+  urgentIncidents: UrgentIncidentActionDto[];
+}
+

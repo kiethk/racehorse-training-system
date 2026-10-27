@@ -2,7 +2,7 @@
 
 import { useCallback, useState, type ReactNode } from 'react';
 
-import { DataTable, HorseAvatar, StatusBadge } from '@/components/ui';
+import { DataTable, HorseAvatar, Pill, StatusBadge, Tooltip } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui/DataTable';
 import type { Horse } from '@/features/stable/types';
 import { HorseSpecialtyBadges } from './HorseSpecialtyBadges';
@@ -23,8 +23,28 @@ export interface HorseTableProps {
 }
 
 /**
+ * The vet's training decision. Only an eligible horse trains, so other statuses show a dash.
+ * The reason stays in the tooltip to keep the row short.
+ */
+function TrainingCell({ horse }: { horse: Horse }) {
+  if (horse.currentStatus !== 'ELIGIBLE' || !horse.trainingDecision) {
+    return <span className="text-[var(--color-text-muted)]">—</span>;
+  }
+  if (horse.trainingDecision === 'ALLOWED') {
+    return <Pill tone="success" icon="check" size="sm">Allowed</Pill>;
+  }
+  return (
+    <Tooltip content={horse.trainingDecisionReason?.trim() || 'Training is blocked'}>
+      <span tabIndex={0} className="inline-flex rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">
+        <Pill tone="danger" icon="lock" size="sm">Blocked</Pill>
+      </span>
+    </Tooltip>
+  );
+}
+
+/**
  * Shared horse list table.
- * Columns: Horse (avatar + name), Registration number, Breed, Sex, (Specialty), Status, and optional Actions.
+ * Columns: Horse (avatar + name), Registration number, Breed, Sex, (Specialty), Training, Status, and optional Actions.
  * Built-in search (name / registration / breed) and pagination via DataTable; no API calls here.
  */
 export function HorseTable({
@@ -97,14 +117,19 @@ export function HorseTable({
                 return <span className="text-[var(--color-text-muted)]">—</span>;
               }
               return (
-                <div className="flex flex-wrap items-center">
-                  <HorseSpecialtyBadges specialty={h.specialty} size="sm" />
-                </div>
+                <HorseSpecialtyBadges specialty={h.specialty} size="sm" stacked />
               );
             },
           },
         ]
       : []),
+    {
+      id: 'training',
+      header: 'Training',
+      // Blocked horses sort first so the trainer can find them at once.
+      sortValue: (h) => (h.trainingDecision === 'BLOCKED' ? 0 : 1),
+      render: (h) => <TrainingCell horse={h} />,
+    },
     {
       id: 'status',
       header: 'Status',

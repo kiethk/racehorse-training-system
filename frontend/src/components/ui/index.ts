@@ -44,3 +44,8 @@ export { Pill, StatusBadge } from './StatusBadge';
 export { Table, TBody, Td, Th, THead, Tr } from './Table';
 export { Tabs, type TabItem } from './Tabs';
 export { Tooltip } from './Tooltip';
+export { CapacityBar, type CapacityBarProps } from './CapacityBar';
+export { DonutChart, type DonutChartProps, type DonutSegment } from './DonutChart';
+export { SmoothLineChart, type SmoothLineChartProps, type DataPoint } from './SmoothLineChart';
+
+export { PdfViewer } from './PdfViewer';

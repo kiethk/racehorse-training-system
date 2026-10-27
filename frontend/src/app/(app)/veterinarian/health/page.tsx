@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -8,15 +8,18 @@ import { Panel } from '@/components/ui/Panel';
 import { Button, LinkButton } from '@/components/ui/Button';
 import { Pill } from '@/components/ui/StatusBadge';
 import { DataTable } from '@/components/ui/DataTable';
-import { FilterChips, Tabs, SearchInput, MetricCard, Notice, PageHeader } from '@/components/ui';
+import { FilterChips, SearchInput, MetricCard, Notice, PageHeader } from '@/components/ui';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { InjuryCorrectionModal } from '@/features/health/components/InjuryCorrectionModal';
-import { TreatmentPlanModal } from '@/features/care/components/TreatmentPlanModal';
+import { TreatmentPlanModal } from '@/features/care/shared/components/TreatmentPlanModal';
 import { healthApi } from '@/features/health/services/healthApi';
 import { stableApi } from '@/features/stable/services/stableService';
 import { careService } from '@/features/care/services/careService';
+import { admissionsApi } from '@/features/admissions/services/api';
+import type { VetAdmissionQueueItem } from '@/features/admissions/types';
+import { useAuth } from '@/context/AuthContext';
 import { formatDate } from '@/lib/display';
 import type { InjuryRecord, HorseHealthSummary, HealthRecord } from '@/features/health/types';
 import type { Horse, StableStall } from '@/features/stable/types';
@@ -24,8 +27,7 @@ import type { HorseHealthMetric } from '@/features/horses/types';
 import type { HorsePreventiveStatus } from '@/features/care/types/preventive';
 import type { TreatmentPlan } from '@/features/care/types';
 
-type StatusFilter = 'ALL' | 'ALLOWED' | 'BLOCKED' | 'HAS_INJURY' | 'URGENT';
-type CategoryFilter = 'ALL' | 'STABLE' | 'ELIGIBLE';
+type StatusFilter = 'ALL' | 'ALLOWED' | 'BLOCKED';
 
 interface HorseListItem {
   horse: Horse;
@@ -36,6 +38,7 @@ interface HorseListItem {
 
 function HealthRecordsContent() {
   const router = useRouter();
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const paramHorseId = searchParams?.get('horseId');
 
@@ -43,13 +46,12 @@ function HealthRecordsContent() {
   const [error, setError] = useState<string | null>(null);
   const [horses, setHorses] = useState<Horse[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
+  const [vetAdmissions, setVetAdmissions] = useState<VetAdmissionQueueItem[]>([]);
   const [summaries, setSummaries] = useState<Record<number, HorseHealthSummary>>({});
   const [reloadKey, setReloadKey] = useState(0);
-  const fetchingIdsRef = useRef<Set<number>>(new Set());
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('ALL');
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
@@ -69,7 +71,6 @@ function HealthRecordsContent() {
   const [followUpLoading, setFollowUpLoading] = useState(false);
 
   const refreshData = useCallback(() => {
-    fetchingIdsRef.current.clear();
     setSummaries({});
     setReloadKey((k) => k + 1);
   }, []);
@@ -81,14 +82,17 @@ function HealthRecordsContent() {
       setLoading(true);
       setError(null);
       try {
-        const [horseList, stallList] = await Promise.all([
+        const [horseList, stallList, vetQueue] = await Promise.all([
           stableApi.getHorses(),
           stableApi.getStalls(),
+          // Admission stage map for blocked-horse actions; optional, the list works without it.
+          admissionsApi.getVetQueue({ size: 50 }).catch(() => null),
         ]);
 
         if (ignore) return;
         setHorses(horseList || []);
         setStalls(stallList || []);
+        setVetAdmissions(vetQueue?.content || []);
       } catch (err: unknown) {
         if (!ignore) {
           const msg = err instanceof Error ? err.message : 'Failed to load stable health data';
@@ -152,19 +156,12 @@ function HealthRecordsContent() {
     if (paramHorseId) {
       const id = Number(paramHorseId);
       if (!Number.isNaN(id) && id > 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedHorseId(id);
         void loadHorseDetail(id);
       }
     }
   }, [paramHorseId, loadHorseDetail]);
-
-  const openHorse = useCallback(
-    (horseId: number) => {
-      setSelectedHorseId(horseId);
-      void loadHorseDetail(horseId);
-    },
-    [loadHorseDetail],
-  );
 
   const closeHorse = useCallback(() => {
     setSelectedHorseId(null);
@@ -186,6 +183,15 @@ function HealthRecordsContent() {
     return map;
   }, [stalls]);
 
+  /** My admission queue items, keyed by horse, for blocked-horse intake actions. */
+  const admissionByHorse = useMemo(() => {
+    const map = new Map<number, VetAdmissionQueueItem>();
+    for (const item of vetAdmissions) {
+      if (item.horseId != null) map.set(item.horseId, item);
+    }
+    return map;
+  }, [vetAdmissions]);
+
   // Rejected horses are out of the clinical roster: no training to clear, so keep them out of the list and metrics.
   const activeHorses = useMemo(
     () => horses.filter((h) => h.currentStatus !== 'REJECTED'),
@@ -195,6 +201,7 @@ function HealthRecordsContent() {
   // VET-HLT-08: the vet needs a way back into the examination that will lift a BLOCKED decision.
   useEffect(() => {
     if (selectedHorseId == null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenFollowUp(null);
       return;
     }
@@ -241,22 +248,12 @@ function HealthRecordsContent() {
           return false;
         }
       }
-      if (categoryFilter === 'STABLE' && !item.horse.currentStallId) return false;
-      if (categoryFilter === 'ELIGIBLE' && item.horse.currentStatus !== 'ELIGIBLE') return false;
       const decision = item.summary?.trainingDecision ?? item.horse.trainingDecision ?? 'ALLOWED';
       if (statusFilter === 'ALLOWED' && decision !== 'ALLOWED') return false;
       if (statusFilter === 'BLOCKED' && decision !== 'BLOCKED') return false;
-      if (statusFilter === 'HAS_INJURY') {
-        const sum = summaries[item.horse.id];
-        if (sum !== undefined && (sum.activeInjuryCount ?? 0) === 0) return false;
-      }
-      if (statusFilter === 'URGENT') {
-        const sum = summaries[item.horse.id];
-        if (sum !== undefined && !sum.hasPendingUrgent) return false;
-      }
       return true;
     });
-  }, [listItems, search, categoryFilter, statusFilter, summaries]);
+  }, [listItems, search, statusFilter]);
 
   const pagedItems = useMemo(() => {
     const start = page * pageSize;
@@ -268,9 +265,7 @@ function HealthRecordsContent() {
     let ignore = false;
     if (activeHorses.length === 0) return;
 
-    const uncached = activeHorses.filter(
-      (h) => summaries[h.id] === undefined && !fetchingIdsRef.current.has(h.id)
-    );
+    const uncached = activeHorses.filter((h) => summaries[h.id] === undefined);
     if (uncached.length === 0) return;
 
     // Prioritize visible page items
@@ -278,8 +273,6 @@ function HealthRecordsContent() {
     const priorityItems = uncached.filter((h) => pagedIdSet.has(h.id));
     const remainingItems = uncached.filter((h) => !pagedIdSet.has(h.id));
     const sortedQueue = [...priorityItems, ...remainingItems];
-
-    sortedQueue.forEach((h) => fetchingIdsRef.current.add(h.id));
 
     const BATCH_SIZE = 8;
     const fetchQueue = async () => {
@@ -362,6 +355,7 @@ function HealthRecordsContent() {
   // Handle non-existent deep-linked horse ID gracefully
   useEffect(() => {
     if (selectedHorseId != null && !loading && horses.length > 0 && !selectedHorse) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(`Horse #${selectedHorseId} was not found in stable records.`);
       setSelectedHorseId(null);
       router.replace('/veterinarian/health');
@@ -385,7 +379,7 @@ function HealthRecordsContent() {
             {/* Patient Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--color-border)] pb-4">
               <div className="flex items-start gap-3.5">
-                <HorseAvatar name={selectedHorse.name} image={null} size={50} rounded="md" />
+                <HorseAvatar name={selectedHorse.name} image={selectedHorse.imageUrl} size={50} rounded="md" />
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
@@ -622,6 +616,23 @@ function HealthRecordsContent() {
                                   {rec.trainingDecision}
                                 </Pill>
                               )}
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                icon="file-text"
+                                onClick={() =>
+                                  router.push(
+                                    `/veterinarian/records?recordId=${rec.id}&horseId=${rec.horseId}${
+                                      rec.careScheduleId != null
+                                        ? `&scheduleId=${rec.careScheduleId}`
+                                        : ''
+                                    }${selectedHorse ? `&horseName=${encodeURIComponent(selectedHorse.name)}` : ''}`
+                                  )
+                                }
+                                className="text-[11px] h-7 px-2 transition-all active:scale-[0.98]"
+                              >
+                                View Record
+                              </Button>
                               {/* AC-3.4: Target Clinical Record Treatment Plan Action */}
                               {rec.recordType !== 'VACCINATION' && (
                                 <Button
@@ -678,6 +689,7 @@ function HealthRecordsContent() {
 
                             return (
                               <div className="mt-3 pt-2.5 border-t border-[var(--color-border)]">
+                                {/* eslint-disable-next-line no-restricted-syntax */}
                                 <button
                                   type="button"
                                   onClick={toggleExpand}
@@ -952,14 +964,6 @@ function HealthRecordsContent() {
                 >
                   Refresh
                 </Button>
-                <Button
-                  variant="secondary"
-                  icon="clipboard"
-                  onClick={() => router.push('/veterinarian/admissions')}
-                  className="transition-all active:scale-[0.98]"
-                >
-                  Admission Queue
-                </Button>
               </div>
             }
           />
@@ -996,8 +1000,6 @@ function HealthRecordsContent() {
                     { value: 'ALL', label: 'All' },
                     { value: 'ALLOWED', label: 'Allowed' },
                     { value: 'BLOCKED', label: 'Blocked' },
-                    { value: 'HAS_INJURY', label: 'Has injury' },
-                    { value: 'URGENT', label: 'Urgent' },
                   ]}
                   value={statusFilter}
                   onChange={(v) => {
@@ -1006,18 +1008,6 @@ function HealthRecordsContent() {
                   }}
                 />
               </div>
-              <Tabs
-                tabs={[
-                  { id: 'ALL', label: 'All' },
-                  { id: 'STABLE', label: 'In stable' },
-                  { id: 'ELIGIBLE', label: 'Eligible' },
-                ]}
-                active={categoryFilter}
-                onChange={(v) => {
-                  setCategoryFilter(v as CategoryFilter);
-                  setPage(0);
-                }}
-              />
             </div>
 
             {loading ? (
@@ -1033,7 +1023,7 @@ function HealthRecordsContent() {
                     header: 'Horse',
                     render: (row: HorseListItem) => (
                       <div className="flex items-center gap-2.5">
-                        <HorseAvatar name={row.horse.name} image={null} size={32} rounded="md" />
+                        <HorseAvatar name={row.horse.name} image={row.horse.imageUrl} size={32} rounded="md" />
                         <div>
                           <div className="font-semibold text-sm text-[var(--color-text-primary)]">
                             {row.horse.name}
@@ -1063,6 +1053,20 @@ function HealthRecordsContent() {
                     },
                   },
                   {
+                    id: 'reporter',
+                    header: 'Report by',
+                    render: (row: HorseListItem) => {
+                      // Who stands behind the block: the incident reporter (urgent) or the
+                      // owner of the still-running admission (quarantine).
+                      const name = row.summary?.pendingUrgentReportedByName ?? row.summary?.pendingAdmissionOwnerName;
+                      return name ? (
+                        <span className="font-medium text-[var(--color-text-secondary)]">{name}</span>
+                      ) : (
+                        <span className="text-xs text-[var(--color-text-muted)]">—</span>
+                      );
+                    },
+                  },
+                  {
                     id: 'injury',
                     header: 'Injuries',
                     render: (row: HorseListItem) => {
@@ -1080,17 +1084,79 @@ function HealthRecordsContent() {
                     id: 'action',
                     header: 'Action',
                     align: 'right',
-                    render: (row: HorseListItem) => (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        icon="chevron-right"
-                        onClick={() => openHorse(row.horse.id)}
-                        className="transition-all active:scale-[0.97]"
-                      >
-                        View record
-                      </Button>
-                    ),
+                    render: (row: HorseListItem) => {
+                      // Reported but not yet examined → the assigned vet examines; a vet
+                      // looking at someone else's case only sees who holds it. A block from
+                      // the admission intake → review it while it is the vet's turn, or just
+                      // show which intake stage holds it. Once nothing is open → View Record.
+                      const { pendingUrgentScheduleId, pendingUrgentVetId, pendingUrgentVetName, pendingAdmissionId } =
+                        row.summary ?? {};
+                      if (pendingUrgentScheduleId) {
+                        if (pendingUrgentVetId != null && pendingUrgentVetId === user?.userId) {
+                          return (
+                            <Button
+                              variant="warning"
+                              size="sm"
+                              icon="activity"
+                              onClick={() => router.push(`/veterinarian/urgent/${pendingUrgentScheduleId}`)}
+                              className="transition-all active:scale-[0.97]"
+                            >
+                              Examine
+                            </Button>
+                          );
+                        }
+                        return (
+                          <span className="text-xs text-[var(--color-text-muted)] italic">
+                            {pendingUrgentVetName ? `With ${pendingUrgentVetName}` : 'Awaiting assignment'}
+                          </span>
+                        );
+                      }
+                      if (pendingAdmissionId) {
+                        const admission = admissionByHorse.get(row.horse.id);
+                        if (admission && admission.admissionStatus === 'VET_REVIEW') {
+                          // Deep link supported by VetAdmissionQueue via ?id=
+                          return (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              icon="clipboard"
+                              onClick={() =>
+                                router.push(`/veterinarian/admissions?id=${pendingAdmissionId}`)
+                              }
+                              className="transition-all active:scale-[0.97]"
+                            >
+                              Review admission
+                            </Button>
+                          );
+                        }
+                        const stageLabel =
+                          admission?.admissionStatus === 'TRAINER_REVIEW'
+                            ? 'In intake · trainer review'
+                            : admission?.admissionStatus === 'MANAGER_REVIEW'
+                              ? 'In intake · manager review'
+                              : 'In intake review';
+                        return (
+                          <span className="text-xs text-[var(--color-text-muted)] italic">{stageLabel}</span>
+                        );
+                      }
+                      return (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon="chevron-right"
+                          onClick={() =>
+                            router.push(
+                              `/veterinarian/records?horseId=${row.horse.id}${
+                                row.horse.name ? `&horseName=${encodeURIComponent(row.horse.name)}` : ''
+                              }`,
+                            )
+                          }
+                          className="transition-all active:scale-[0.97]"
+                        >
+                          View record
+                        </Button>
+                      );
+                    },
                   },
                 ]}
                 getRowKey={(row: HorseListItem) => row.horse.id}

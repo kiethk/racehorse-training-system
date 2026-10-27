@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BackLink,
   Button,
+  ConfirmDialog,
   EmptyState,
   LinkButton,
   ListSkeleton,
@@ -14,11 +15,10 @@ import {
   ProgressBar,
   ScreenLayout,
 } from '@/components/ui';
-import { stableApi } from '@/features/stable/services/stableService';
-import type { UserSummary } from '@/features/stable/types';
 import { displayError, formatDate, formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
-import { planProgress } from '../lib/planProgress';
+import { cancelledLabel, planProgress } from '../lib/planProgress';
+import { surfaceLabel } from '../lib/subjectOptions';
 import { PLAN_STATUS, WORKOUT_STATUS } from '../lib/status';
 import { trainingService } from '../services/trainingService';
 import type {
@@ -33,14 +33,12 @@ import { StatusPill } from './StatusPill';
 function WorkoutRow({
   workout,
   index,
-  groomName,
   onRecord,
   onEdit,
   preparingResult,
 }: {
   workout: PlanWorkoutItemResponse;
   index: number;
-  groomName: string | undefined;
   onRecord: () => Promise<void>;
   onEdit: () => void;
   preparingResult: boolean;
@@ -57,15 +55,9 @@ function WorkoutRow({
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-text-secondary)]">
           <span>Date: <strong>{formatDate(workout.lotDate)}</strong></span>
           <span>Time: <strong>{formatTime(workout.startTime)} – {formatTime(workout.endTime)}</strong></span>
-          {/* The lot is shared with other horses, while the groom belongs to THIS horse only, so they are labelled apart. */}
+          {workout.surfaceType && <span>Surface: <strong>{surfaceLabel(workout.surfaceType)}</strong></span>}
           {workout.lotOccupancy != null && workout.lotOccupancy > 1 && (
             <span>With {workout.lotOccupancy - 1} other {workout.lotOccupancy === 2 ? 'horse' : 'horses'}</span>
-          )}
-          {/* A ternary and not &&: an unassigned groom must stay visible, because that is what needs attention. */}
-          {workout.assignedGroomId ? (
-            <span>Groom: <strong>{groomName ?? `#${workout.assignedGroomId}`}</strong></span>
-          ) : (
-            <span className="text-[var(--color-warning)]">Groom not assigned</span>
           )}
         </div>
 
@@ -113,16 +105,14 @@ export function PlanDetail({ planId }: { planId: number }) {
   const [resultPreview, setResultPreview] = useState<WorkoutResultPreviewResponse | null>(null);
   const [preparingWorkoutId, setPreparingWorkoutId] = useState<number | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  /** Groom names come from the staff directory endpoint that the stable screen already uses. */
-  const [grooms, setGrooms] = useState<UserSummary[]>([]);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [cancellingPlan, setCancellingPlan] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [plan, groomList] = await Promise.all([trainingService.getPlanById(planId), stableApi.getGrooms()]);
-      setDetail(plan);
-      setGrooms(groomList);
+      setDetail(await trainingService.getPlanById(planId));
     } catch (cause) {
       setError(displayError(cause, 'Unable to load training plan details.'));
     } finally {
@@ -135,14 +125,13 @@ export function PlanDetail({ planId }: { planId: number }) {
     load();
   }, [load]);
 
-  const groomNameById = useMemo(() => new Map(grooms.map((g) => [g.id, g.fullName] as const)), [grooms]);
-
   const progress = useMemo(() => {
     const workouts = detail?.workouts ?? [];
     return planProgress(
       workouts.filter((w) => w.status === 'COMPLETED').length,
       workouts.length,
       workouts.filter((w) => w.status === 'CANCELLED').length,
+      detail?.plan.status ?? 'NONE',
     );
   }, [detail]);
 
@@ -196,6 +185,24 @@ export function PlanDetail({ planId }: { planId: number }) {
   }
 
   const { plan, workouts } = detail;
+  const canCancel = plan.status === 'UPCOMING' || plan.status === 'ACTIVE';
+  // Same rule as the backend: only sessions whose lot has not ended are cancelled; a past one stays to be recorded.
+  const pendingSessions = workouts.filter(
+    (w) => w.status === 'SCHEDULED' && new Date(`${w.lotDate}T${w.endTime}`) > new Date(),
+  ).length;
+
+  async function confirmCancelPlan() {
+    setCancellingPlan(true);
+    try {
+      setDetail(await trainingService.cancelPlan(plan.id));
+      toast.success('Plan cancelled.');
+      setConfirmingCancel(false);
+    } catch (cause) {
+      toast.error(displayError(cause, 'Unable to cancel the plan.'));
+    } finally {
+      setCancellingPlan(false);
+    }
+  }
   const horseName = detail.horseName ?? `Horse #${plan.horseId}`;
 
   return (
@@ -211,19 +218,36 @@ export function PlanDetail({ planId }: { planId: number }) {
           </>
         }
         breadcrumbs={[{ label: 'Training plans', href: '/trainer/plans' }, { label: horseName }]}
-        actions={<Pill tone={PLAN_STATUS[plan.status].tone}>{PLAN_STATUS[plan.status].label}</Pill>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Pill tone={PLAN_STATUS[plan.status].tone}>{PLAN_STATUS[plan.status].label}</Pill>
+            {canCancel && (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmingCancel(true)}>
+                Cancel plan
+              </Button>
+            )}
+          </div>
+        }
       />
 
       <Panel padded className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-medium text-[var(--color-text-primary)]">
-            Progress: {progress.completed}/{progress.total} sessions ({progress.percent}%)
-          </span>
-          {progress.cancelled > 0 && (
-            <span className="text-xs text-[var(--color-text-muted)]">({progress.cancelled} cancelled)</span>
-          )}
-        </div>
-        <ProgressBar label="Plan progress" value={progress.percent} />
+        {progress.allCancelled ? (
+          <p className="text-sm font-medium text-[var(--color-text-primary)]">
+            Progress: all {progress.cancelled} sessions cancelled
+          </p>
+        ) : (
+          <>
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-[var(--color-text-primary)]">
+                Progress: {progress.completed}/{progress.total} sessions ({progress.percent}%)
+              </span>
+              {progress.cancelled > 0 && (
+                <span className="text-xs text-[var(--color-text-muted)]">{cancelledLabel(progress.cancelled)}</span>
+              )}
+            </div>
+            <ProgressBar label="Plan progress" value={progress.percent} />
+          </>
+        )}
       </Panel>
 
       <PageSection title="Session schedule">
@@ -237,7 +261,6 @@ export function PlanDetail({ planId }: { planId: number }) {
                   key={workout.workoutId}
                   workout={workout}
                   index={index}
-                  groomName={workout.assignedGroomId ? groomNameById.get(workout.assignedGroomId) : undefined}
                   onRecord={() => openResultForm(workout, false)}
                   onEdit={() => openResultForm(workout, true)}
                   preparingResult={preparingWorkoutId === workout.workoutId}
@@ -247,6 +270,23 @@ export function PlanDetail({ planId }: { planId: number }) {
           )}
         </Panel>
       </PageSection>
+
+      <ConfirmDialog
+        open={confirmingCancel}
+        title={`Cancel this plan for ${horseName}?`}
+        description={
+          <>
+            The {pendingSessions} sessions that have not taken place yet will be cancelled and their time slots released.
+            Recorded results are kept. This cannot be undone.
+          </>
+        }
+        tone="danger"
+        confirmLabel="Cancel plan"
+        cancelLabel="Keep plan"
+        loading={cancellingPlan}
+        onConfirm={confirmCancelPlan}
+        onCancel={() => setConfirmingCancel(false)}
+      />
 
       <CompleteWorkoutDialog
         key={`${activeWorkout?.workoutId ?? 'none'}-${isEditMode ? 'edit' : 'new'}`}

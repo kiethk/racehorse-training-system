@@ -54,6 +54,9 @@ class AdmissionManagerReviewServiceTest {
     @Mock
     private com.rtms.backend.identity.repository.GroomProfileRepository groomProfileRepository;
 
+    @Mock
+    private AdmissionNotificationService admissionNotificationService;
+
     private AdmissionManagerReviewService service;
 
     // ─── Shared helpers ───────────────────────────────────────────────────────
@@ -105,7 +108,8 @@ class AdmissionManagerReviewServiceTest {
                 careScheduleRepository,
                 admissionGroomReviewService,
                 preventiveStatusService,
-                groomProfileRepository);
+                groomProfileRepository,
+                admissionNotificationService);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

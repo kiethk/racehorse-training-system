@@ -7,7 +7,6 @@ import com.rtms.backend.horse.dto.HorseAdmissionHistoryResponse;
 import com.rtms.backend.horse.service.HorseAdmissionService;
 import com.rtms.backend.horse.service.HorsePhotoService;
 import com.rtms.backend.horse.service.HorseService;
-import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseSpecialtyService;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.enums.TrainingDecision;
@@ -32,8 +31,6 @@ class HorseAdmissionEndpointTest {
     @Mock
     private HorseService horseService;
     @Mock
-    private HorsePerformanceService performanceService;
-    @Mock
     private HorseSpecialtyService specialtyService;
     @Mock
     private HorsePhotoService photoService;
@@ -44,7 +41,7 @@ class HorseAdmissionEndpointTest {
 
     @BeforeEach
     void setUp() {
-        controller = new HorseController(horseService, performanceService, specialtyService, photoService, admissionService);
+        controller = new HorseController(horseService, specialtyService, photoService, admissionService);
     }
 
     @Test

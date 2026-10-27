@@ -22,7 +22,7 @@ export function HorseProfileHeader({
   return (
     <Panel padded className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex min-w-0 items-center gap-3">
-        <HorseAvatar name={name} size={48} rounded="md" />
+        <HorseAvatar name={name} image={horse?.imageUrl} size={48} rounded="md" />
         <div className="min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">{name}</h2>
@@ -46,7 +46,7 @@ export function HorseProfileHeader({
         </div>
       </div>
 
-      <LinkButton href={`/trainer/plans?horseId=${horseId}`} icon="layers">View training plans</LinkButton>
+      <LinkButton href={horse ? `/trainer/plans?search=${encodeURIComponent(horse.name)}` : '/trainer/plans'} icon="layers">View training plans</LinkButton>
     </Panel>
   );
 }

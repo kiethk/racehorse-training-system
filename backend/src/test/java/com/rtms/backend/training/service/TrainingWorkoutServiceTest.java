@@ -74,7 +74,7 @@ class TrainingWorkoutServiceTest {
     void setUp() {
         workoutService = new TrainingWorkoutService(
                 workoutRepository, planRepository, lotRepository, subjectRepository, lotService,
-                resultSimulationService);
+                resultSimulationService, new PlanCompletionService(workoutRepository, planRepository));
     }
 
     /** Dựng một buổi tập tương lai. (Builds a future workout.) */
@@ -643,6 +643,8 @@ class TrainingWorkoutServiceTest {
         when(planRepository.findById(27L)).thenReturn(Optional.of(plan));
         when(workoutRepository.saveAndFlush(any(TrainingWorkout.class))).thenAnswer(i -> i.getArgument(0));
         when(workoutRepository.countByPlanIdAndStatusNotIn(eq(27L), anyList())).thenReturn(remainingAfter);
+        // The workout just recorded is held, so a plan with nothing left closes as COMPLETED.
+        lenient().when(workoutRepository.countByPlanIdAndStatus(27L, WorkoutStatus.COMPLETED)).thenReturn(1L);
         when(lotRepository.findById(71L)).thenReturn(Optional.of(lot));
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
 
@@ -698,7 +700,7 @@ class TrainingWorkoutServiceTest {
         running.setId(1L);
         running.setStatus(TrainingPlanStatus.ACTIVE);
 
-        when(workoutRepository.findFutureScheduledByHorse(eq(77L), any(LocalDate.class)))
+        when(workoutRepository.findNotYetHeldByHorse(eq(77L), any(LocalDate.class), any(LocalTime.class)))
                 .thenReturn(List.of(w1, w2, w3));
         when(planRepository.findByHorseIdAndStatusInOrderByEndDateDesc(eq(77L), anyList()))
                 .thenReturn(List.of(running));
@@ -722,7 +724,7 @@ class TrainingWorkoutServiceTest {
         running.setId(1L);
         running.setStatus(TrainingPlanStatus.UPCOMING);
 
-        when(workoutRepository.findFutureScheduledByHorse(eq(77L), any(LocalDate.class))).thenReturn(List.of());
+        when(workoutRepository.findNotYetHeldByHorse(eq(77L), any(LocalDate.class), any(LocalTime.class))).thenReturn(List.of());
         when(planRepository.findByHorseIdAndStatusInOrderByEndDateDesc(eq(77L), anyList()))
                 .thenReturn(List.of(running));
 
@@ -738,7 +740,7 @@ class TrainingWorkoutServiceTest {
     @Test
     @DisplayName("A horse with no plan: returns 0 and writes nothing")
     void testReassign_NoFutureWorkouts_ReturnsZero() {
-        when(workoutRepository.findFutureScheduledByHorse(eq(77L), any(LocalDate.class)))
+        when(workoutRepository.findNotYetHeldByHorse(eq(77L), any(LocalDate.class), any(LocalTime.class)))
                 .thenReturn(List.of());
 
         int moved = workoutService.reassignFutureWorkoutsToGroom(77L, 5L);
@@ -753,7 +755,7 @@ class TrainingWorkoutServiceTest {
         TrainingWorkout w1 = futureWorkout(101L, 37L, 77L, 4L);
         TrainingWorkout w2 = futureWorkout(102L, 38L, 77L, 4L);
 
-        when(workoutRepository.findFutureScheduledByHorse(eq(77L), any(LocalDate.class)))
+        when(workoutRepository.findNotYetHeldByHorse(eq(77L), any(LocalDate.class), any(LocalTime.class)))
                 .thenReturn(List.of(w1, w2));
         when(workoutRepository.findGroomConflicts(eq(77L), eq(5L), any(LocalDate.class))).thenReturn(List.of());
 
@@ -770,7 +772,7 @@ class TrainingWorkoutServiceTest {
     void testReassign_NullGroom_StillWritesNull() {
         TrainingWorkout w1 = futureWorkout(101L, 37L, 77L, 4L);
 
-        when(workoutRepository.findFutureScheduledByHorse(eq(77L), any(LocalDate.class)))
+        when(workoutRepository.findNotYetHeldByHorse(eq(77L), any(LocalDate.class), any(LocalTime.class)))
                 .thenReturn(List.of(w1));
 
         int moved = workoutService.reassignFutureWorkoutsToGroom(77L, null);
@@ -787,7 +789,7 @@ class TrainingWorkoutServiceTest {
     void testReassign_Br09Conflict_Throws() {
         TrainingWorkout moving = futureWorkout(101L, 37L, 77L, 4L);
 
-        when(workoutRepository.findFutureScheduledByHorse(eq(77L), any(LocalDate.class)))
+        when(workoutRepository.findNotYetHeldByHorse(eq(77L), any(LocalDate.class), any(LocalTime.class)))
                 .thenReturn(List.of(moving));
         when(workoutRepository.findGroomConflicts(eq(77L), eq(5L), any(LocalDate.class)))
                 .thenReturn(List.of(new GroomConflictRow(37L, LocalDate.of(2026, 11, 2), LocalTime.of(6, 0), "Red Fox")));
@@ -812,7 +814,7 @@ class TrainingWorkoutServiceTest {
         TrainingWorkout w1 = futureWorkout(101L, 37L, 77L, 4L);
         TrainingWorkout w2 = futureWorkout(102L, 38L, 77L, 4L);
 
-        when(workoutRepository.findFutureScheduledByHorse(eq(77L), any(LocalDate.class)))
+        when(workoutRepository.findNotYetHeldByHorse(eq(77L), any(LocalDate.class), any(LocalTime.class)))
                 .thenReturn(List.of(w1, w2));
         when(workoutRepository.findGroomConflicts(eq(77L), eq(5L), any(LocalDate.class))).thenReturn(List.of(
                 new GroomConflictRow(37L, LocalDate.of(2026, 11, 2), LocalTime.of(6, 0), "Red Fox"),
@@ -831,7 +833,7 @@ class TrainingWorkoutServiceTest {
     void testReassign_SameGroom_NoSelfConflict() {
         TrainingWorkout w1 = futureWorkout(101L, 37L, 77L, 4L);
 
-        when(workoutRepository.findFutureScheduledByHorse(eq(77L), any(LocalDate.class)))
+        when(workoutRepository.findNotYetHeldByHorse(eq(77L), any(LocalDate.class), any(LocalTime.class)))
                 .thenReturn(List.of(w1));
         // The query excludes the moving horse itself, so it finds no conflict
         when(workoutRepository.findGroomConflicts(eq(77L), eq(4L), any(LocalDate.class))).thenReturn(List.of());
@@ -845,11 +847,11 @@ class TrainingWorkoutServiceTest {
     @Test
     @DisplayName("Completed workouts are never part of a reassignment (history keeps the old groom)")
     void testReassign_OnlyFutureScheduledAreQueried() {
-        when(workoutRepository.findFutureScheduledByHorse(eq(77L), any(LocalDate.class)))
+        when(workoutRepository.findNotYetHeldByHorse(eq(77L), any(LocalDate.class), any(LocalTime.class)))
                 .thenReturn(new ArrayList<>());
 
         workoutService.reassignFutureWorkoutsToGroom(77L, 5L);
 
-        verify(workoutRepository).findFutureScheduledByHorse(eq(77L), eq(LocalDate.now()));
+        verify(workoutRepository).findNotYetHeldByHorse(eq(77L), eq(LocalDate.now()), any(LocalTime.class));
     }
 }

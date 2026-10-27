@@ -52,6 +52,30 @@ public class InjuryRecord {
     @Column(name = "position_z", precision = 10, scale = 4)
     private BigDecimal positionZ;
 
+    @Column(name = "zone_id", length = 64)
+    private String zoneId;
+
+    @Column(name = "local_x", precision = 10, scale = 4)
+    private BigDecimal localX;
+
+    @Column(name = "local_y", precision = 10, scale = 4)
+    private BigDecimal localY;
+
+    @Column(name = "local_z", precision = 10, scale = 4)
+    private BigDecimal localZ;
+
+    @Column(name = "normal_x", precision = 10, scale = 4)
+    private BigDecimal normalX;
+
+    @Column(name = "normal_y", precision = 10, scale = 4)
+    private BigDecimal normalY;
+
+    @Column(name = "normal_z", precision = 10, scale = 4)
+    private BigDecimal normalZ;
+
+    @Column(name = "mesh_name", length = 128)
+    private String meshName;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -181,6 +205,23 @@ public class InjuryRecord {
     public void setPositionZ(BigDecimal positionZ) {
         this.positionZ = positionZ;
     }
+
+    public String getZoneId() { return zoneId; }
+    public void setZoneId(String zoneId) { this.zoneId = zoneId; }
+    public BigDecimal getLocalX() { return localX; }
+    public void setLocalX(BigDecimal v) { this.localX = v; }
+    public BigDecimal getLocalY() { return localY; }
+    public void setLocalY(BigDecimal v) { this.localY = v; }
+    public BigDecimal getLocalZ() { return localZ; }
+    public void setLocalZ(BigDecimal v) { this.localZ = v; }
+    public BigDecimal getNormalX() { return normalX; }
+    public void setNormalX(BigDecimal v) { this.normalX = v; }
+    public BigDecimal getNormalY() { return normalY; }
+    public void setNormalY(BigDecimal v) { this.normalY = v; }
+    public BigDecimal getNormalZ() { return normalZ; }
+    public void setNormalZ(BigDecimal v) { this.normalZ = v; }
+    public String getMeshName() { return meshName; }
+    public void setMeshName(String meshName) { this.meshName = meshName; }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

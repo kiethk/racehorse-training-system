@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -55,19 +56,22 @@ public class TrainingWorkoutService {
     private final SubjectRepository subjectRepository;
     private final TrainingLotService lotService;
     private final WorkoutResultSimulationService resultSimulationService;
+    private final PlanCompletionService planCompletion;
 
     public TrainingWorkoutService(TrainingWorkoutRepository workoutRepository,
                                   HorseTrainingPlanRepository planRepository,
                                   TrainingLotRepository lotRepository,
                                   SubjectRepository subjectRepository,
                                   TrainingLotService lotService,
-                                  WorkoutResultSimulationService resultSimulationService) {
+                                  WorkoutResultSimulationService resultSimulationService,
+                                  PlanCompletionService planCompletion) {
         this.workoutRepository = workoutRepository;
         this.planRepository = planRepository;
         this.lotRepository = lotRepository;
         this.subjectRepository = subjectRepository;
         this.lotService = lotService;
         this.resultSimulationService = resultSimulationService;
+        this.planCompletion = planCompletion;
     }
 
     // =================================================================
@@ -148,7 +152,7 @@ public class TrainingWorkoutService {
             Long horseId = en.horse().getId();
             TrainingLot lot = lotService.findOrCreateLot(trainerId, date, subject, en.groomId());
             TrainingWorkout saved = saveWorkout(plansByHorse.get(horseId).getId(), lot, en);
-            workoutsByHorse.get(horseId).add(new PlanWorkoutItemResponse(saved, lot, subject.getName()));
+            workoutsByHorse.get(horseId).add(new PlanWorkoutItemResponse(saved, lot, subject));
         }
     }
 
@@ -219,10 +223,8 @@ public class TrainingWorkoutService {
         updatePlanProgress(plan);
         updateLotProgress(lot);
 
-        String subjectName = subjectRepository.findById(lot.getSubjectId())
-                .map(Subject::getName)
-                .orElse("#" + lot.getSubjectId());
-        return new PlanWorkoutItemResponse(saved, lot, subjectName);
+        Subject subject = subjectRepository.findById(lot.getSubjectId()).orElse(null);
+        return new PlanWorkoutItemResponse(saved, lot, subject);
     }
 
     /**
@@ -247,10 +249,8 @@ public class TrainingWorkoutService {
         TrainingWorkout saved = workoutRepository.saveAndFlush(workout);
 
         TrainingLot lot = findLot(workout);
-        String subjectName = subjectRepository.findById(lot.getSubjectId())
-                .map(Subject::getName)
-                .orElse("#" + lot.getSubjectId());
-        return new PlanWorkoutItemResponse(saved, lot, subjectName);
+        Subject subject = subjectRepository.findById(lot.getSubjectId()).orElse(null);
+        return new PlanWorkoutItemResponse(saved, lot, subject);
     }
 
     private TrainingWorkout findWorkout(Long workoutId) {
@@ -363,25 +363,18 @@ public class TrainingWorkoutService {
 
     /**
      * Hoàn thành một buổi nghĩa là khóa ĐÃ BẮT ĐẦU, nên UPCOMING chuyển ACTIVE ngay tại đây thay vì chỉ
-     * trông vào job nửa đêm (server tắt đúng đêm đó thì plan kẹt UPCOMING mãi). Buổi cuối cùng của khóa
-     * thì plan tự COMPLETED; buổi CANCELLED được coi là đã giải quyết xong nên không chặn việc đóng khóa.
+     * trông vào job nửa đêm (server tắt đúng đêm đó thì plan kẹt UPCOMING mãi). Việc đóng khóa khi hết buổi do
+     * PlanCompletionService quyết, dùng chung với việc hủy lot.
      * (Completing a workout means the course HAS STARTED, so UPCOMING becomes ACTIVE here instead of
      * relying only on the midnight job (if the server is down that night the plan stays UPCOMING
-     * forever). The last workout closes the plan as COMPLETED; CANCELLED workouts count as resolved so
-     * they do not block closing the course.)
+     * forever). Closing the course once no session is left is decided by PlanCompletionService, shared
+     * with cancelling a lot.)
      */
     private void updatePlanProgress(HorseTrainingPlan plan) {
         if (plan.getStatus() == TrainingPlanStatus.UPCOMING) {
             plan.setStatus(TrainingPlanStatus.ACTIVE);
         }
-
-        long remaining = workoutRepository.countByPlanIdAndStatusNotIn(
-                plan.getId(), List.of(WorkoutStatus.COMPLETED, WorkoutStatus.CANCELLED));
-        if (remaining == 0
-                && plan.getStatus() != TrainingPlanStatus.COMPLETED
-                && plan.getStatus() != TrainingPlanStatus.CANCELLED) {
-            plan.setStatus(TrainingPlanStatus.COMPLETED);
-        }
+        planCompletion.closeIfFinished(plan);
         planRepository.save(plan);
     }
 
@@ -410,7 +403,9 @@ public class TrainingWorkoutService {
      *
      * Chỉ gọi qua TrainingDecisionService.block, mỗi khi ngựa bị chặn tập. Theo thiết kế đã chốt:
      * (Only called through TrainingDecisionService.block whenever a horse is blocked. By design:)
-     *   1. Hủy mọi buổi tập SCHEDULED từ hôm nay trở đi. (Cancel every SCHEDULED workout from today on.)
+     *   1. Hủy mọi buổi tập CHƯA diễn ra (lot chưa kết thúc). Buổi đã qua giờ mà chưa ghi kết quả được giữ để Trainer
+     *      ghi, vì nó đã diễn ra trước khi bị khóa. (Cancel every workout not held yet (lot not ended). A workout past
+     *      its time without a result is kept for the trainer to record, since it took place before the block.)
      *   2. Lot nào rỗng sau khi hủy thì hủy luôn, trả lại khe giờ. (A lot left empty is cancelled too,
      *      returning its time slot.)
      *   3. Plan đang chạy chuyển CANCELLED (không tạm dừng): kế hoạch dở dang sau thời gian nghỉ hiếm khi còn
@@ -422,7 +417,7 @@ public class TrainingWorkoutService {
     @Transactional
     public int cancelFutureTrainingForHorse(Long horseId) {
         List<TrainingWorkout> future =
-                workoutRepository.findFutureScheduledByHorse(horseId, LocalDate.now());
+                workoutRepository.findNotYetHeldByHorse(horseId, LocalDate.now(), LocalTime.now());
 
         future.forEach(w -> w.setStatus(WorkoutStatus.CANCELLED));
         workoutRepository.saveAll(future);
@@ -437,6 +432,29 @@ public class TrainingWorkoutService {
 
         cancelRunningPlans(horseId);
         return future.size();
+    }
+
+    /**
+     * Hủy các buổi CHƯA diễn ra của một kế hoạch và trả lại khe giờ của lot bị rỗng. Buổi đã qua giờ mà chưa ghi kết quả
+     * được giữ nguyên để Trainer vẫn ghi được, vì nó đã (hoặc đáng lẽ đã) diễn ra.
+     * (Cancels the not-yet-held workouts of a plan and frees the slot of any lot left empty. A workout past its time
+     * without a result is kept so the trainer can still record it, since it has (or should have) taken place.)
+     *
+     * @return số buổi đã hủy (number of workouts cancelled)
+     */
+    @Transactional
+    public int cancelNotYetHeldWorkouts(Long planId) {
+        List<TrainingWorkout> pending =
+                workoutRepository.findNotYetHeldByPlan(planId, LocalDate.now(), LocalTime.now());
+        pending.forEach(w -> w.setStatus(WorkoutStatus.CANCELLED));
+        workoutRepository.saveAll(pending);
+        workoutRepository.flush();   // để cancelLotIfEmpty đếm đúng (so cancelLotIfEmpty counts correctly)
+
+        pending.stream()
+                .map(TrainingWorkout::getLotId)
+                .collect(Collectors.toCollection(HashSet::new))
+                .forEach(lotService::cancelLotIfEmpty);
+        return pending.size();
     }
 
     private void cancelRunningPlans(Long horseId) {
@@ -473,7 +491,7 @@ public class TrainingWorkoutService {
     @Transactional
     public int reassignFutureWorkoutsToGroom(Long horseId, Long newGroomId) {
         List<TrainingWorkout> future =
-                workoutRepository.findFutureScheduledByHorse(horseId, LocalDate.now());
+                workoutRepository.findNotYetHeldByHorse(horseId, LocalDate.now(), LocalTime.now());
 
         if (future.isEmpty()) {
             return 0;   // ngựa chưa có kế hoạch nào (the horse has no plan yet)
@@ -485,9 +503,9 @@ public class TrainingWorkoutService {
             assertNoGroomConflict(horseId, newGroomId);
         }
 
-        // Buổi đã COMPLETED giữ Groom cũ: đó là LỊCH SỬ. findFutureScheduledByHorse chỉ trả buổi SCHEDULED.
-        // (COMPLETED workouts keep the old groom: that is HISTORY. findFutureScheduledByHorse only
-        // returns SCHEDULED workouts.)
+        // Buổi đã diễn ra giữ Groom cũ: đó là LỊCH SỬ. findNotYetHeldByHorse chỉ trả buổi chưa diễn ra.
+        // (Workouts already held keep the old groom: that is HISTORY. findNotYetHeldByHorse only returns
+        // workouts not held yet.)
         future.forEach(w -> w.setAssignedToId(newGroomId));
         workoutRepository.saveAll(future);
         return future.size();

@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 public class HeadTrainerWorkloadService {
 
     /** Số ngựa tối đa một Trainer lo cùng lúc (trong khu + đơn đang xử lý). */
-    public static final int MAX_ACTIVE_HORSES = 3;
+    public static final int MAX_ACTIVE_HORSES = 24;
 
     /** Đơn đã giao cho Trainer mà ngựa còn nằm cách ly — vẫn tính vào tải. */
     static final Set<AdmissionStatus> ASSIGNED_OPEN_STATUSES =

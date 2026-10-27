@@ -13,11 +13,13 @@ import { admissionsApi } from '@/features/admissions/services/api';
 import { stableApi } from '@/features/stable/services/stableService';
 import type { CareSchedule, CareScheduleStatus } from '@/features/admissions/types';
 import type { Horse, StableStall } from '@/features/stable/types';
+import { useAuth } from '@/context/AuthContext';
 import { CreateRoutineModal } from './CreateRoutineModal';
-import { filterRoutineSchedules } from '../utils/routineValidation';
+import { filterRoutineSchedules } from '@/features/routine/utils/routineValidation';
 
 export function RoutineChecksWorkspace() {
   const router = useRouter();
+  const { user } = useAuth();
   const [schedules, setSchedules] = useState<CareSchedule[]>([]);
   const [horses, setHorses] = useState<Horse[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
@@ -36,8 +38,9 @@ export function RoutineChecksWorkspace() {
       setLoading(true);
       setError(null);
 
+      // The vet works only on the schedules assigned to them.
       const [schedulePage, horseList, stallList] = await Promise.all([
-        admissionsApi.getCareSchedules({ careType: 'ROUTINE', size: 100 }),
+        admissionsApi.getCareSchedules({ careType: 'ROUTINE', size: 100, veterinarianId: user?.userId }),
         stableApi.getHorses(),
         stableApi.getStalls(),
       ]);
@@ -50,7 +53,7 @@ export function RoutineChecksWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let active = true;
@@ -96,6 +99,10 @@ export function RoutineChecksWorkspace() {
   }, [schedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
+    if (item.status === 'COMPLETED') {
+      router.push(`/veterinarian/records?scheduleId=${item.id}`);
+      return;
+    }
     router.push(`/veterinarian/routine/${item.id}`);
   };
 
@@ -237,7 +244,7 @@ export function RoutineChecksWorkspace() {
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <HorseAvatar name={horseName} image={null} size={42} rounded="md" />
+                      <HorseAvatar name={horseName} image={horse?.imageUrl} size={42} rounded="md" />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-base font-bold text-[var(--color-text-primary)] truncate">

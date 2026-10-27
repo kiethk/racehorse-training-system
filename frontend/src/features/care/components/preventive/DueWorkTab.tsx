@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Button,
+  ChoiceInput,
   DataTable,
   FilterBar,
   FormField,
+  Input,
   MetricCard,
   Notice,
   SearchInput,
@@ -14,6 +16,7 @@ import {
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui/DataTable';
 import { displayError, formatDate } from '@/lib/display';
+import { toast } from '@/lib/toast';
 import { preventiveCareService } from '../../services/preventiveCareService';
 import type {
   PreventiveDueHorse,
@@ -22,7 +25,7 @@ import type {
   PreventiveProtocol,
 } from '../../types/preventive';
 import { CompleteVaccinationModal } from './CompleteVaccinationModal';
-import { DueStatusPill } from './preventiveDisplay';
+import { DueStatusPill, todayIso } from './preventiveDisplay';
 
 type Filter = 'ALL' | 'ACTION' | 'OVERDUE' | 'DUE_SOON' | 'OK';
 
@@ -64,6 +67,10 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState<PreventiveDueHorse | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [batchDate, setBatchDate] = useState(todayIso());
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchReport, setBatchReport] = useState<{ ok: number; failed: { name: string; message: string }[] } | null>(null);
 
   // Ask the server once typing pauses, not on every keystroke.
   useEffect(() => {
@@ -82,6 +89,7 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
       setRows(result.content);
       setTotal(result.totalElements);
       setSummary(counts);
+      setSelected(new Set());
     } catch (cause) {
       setError(displayError(cause, 'Could not load preventive care work.'));
     } finally {
@@ -97,6 +105,44 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
   const changeFilter = (next: Filter) => {
     setFilter(next);
     setPage(0);
+  };
+
+  const toggle = (horseId: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(horseId)) next.delete(horseId);
+      else next.add(horseId);
+      return next;
+    });
+  };
+
+  // Passport-style entry: each selected horse gets its due protocols recorded with one shared
+  // date and no dosage (the historical "last dose" pattern). Sequential so one failure does
+  // not lose the results of the horses before it.
+  const recordBatch = async () => {
+    const targets = rows.filter((row) => selected.has(row.horseId));
+    setBatchRunning(true);
+    setBatchReport(null);
+    const failed: { name: string; message: string }[] = [];
+    for (const horse of targets) {
+      try {
+        await preventiveCareService.recordForHorse(horse.horseId, {
+          administeredOn: batchDate,
+          doses: horse.protocols.map((p) => ({ protocolId: p.protocolId, dosage: '' })),
+        });
+      } catch (cause) {
+        failed.push({ name: horse.horseName, message: displayError(cause, 'Could not record.') });
+      }
+    }
+    setBatchRunning(false);
+    setSelected(new Set());
+    if (failed.length === 0) {
+      toast.success(`Vaccinations recorded for ${targets.length} horse${targets.length === 1 ? '' : 's'}`,
+        'The next due dates are updated.');
+    } else {
+      setBatchReport({ ok: targets.length - failed.length, failed });
+    }
+    load();
   };
 
   const columns: DataTableColumn<PreventiveDueHorse>[] = [
@@ -128,6 +174,19 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
     { id: 'status', header: 'Status', sortValue: (row) => URGENCY[row.worstStatus], render: (row) => <DueStatusPill status={row.worstStatus} /> },
   ];
   if (canRecord) {
+    columns.unshift({
+      id: 'select',
+      header: (
+        <ChoiceInput
+          aria-label="Select all rows"
+          checked={rows.length > 0 && selected.size === rows.length}
+          onChange={() => setSelected(selected.size === rows.length ? new Set() : new Set(rows.map((row) => row.horseId)))}
+        />
+      ),
+      render: (row) => (
+        <ChoiceInput aria-label={`Select ${row.horseName}`} checked={selected.has(row.horseId)} onChange={() => toggle(row.horseId)} />
+      ),
+    });
     columns.push({
       id: 'action',
       header: '',
@@ -184,6 +243,30 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
       </FilterBar>
 
       {error && <Notice tone="error" title="Could not load" onDismiss={() => setError(null)}>{error}</Notice>}
+
+      {batchReport && (
+        <Notice tone="warning" title="Some horses could not be recorded" onDismiss={() => setBatchReport(null)}>
+          {batchReport.ok} horse{batchReport.ok === 1 ? '' : 's'} recorded. Failed:{' '}
+          {batchReport.failed.map((f) => `${f.name} — ${f.message}`).join(' · ')}
+        </Notice>
+      )}
+
+      {canRecord && selected.size > 0 && (
+        <div className="sticky bottom-4 z-[var(--z-dropdown)] flex flex-wrap items-end justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-popover)]">
+          <span className="text-sm text-[var(--color-text-secondary)]">
+            <strong className="text-[var(--color-text-primary)]">{selected.size}</strong> horse{selected.size === 1 ? '' : 's'} selected
+          </span>
+          <FormField label="Last dose on" className="w-44">
+            <Input type="date" value={batchDate} max={todayIso()} onChange={(e) => setBatchDate(e.target.value)} />
+          </FormField>
+          <div className="flex items-center gap-2">
+            <Button variant="primary" icon="check" onClick={recordBatch} disabled={batchRunning || !batchDate}>
+              {batchRunning ? 'Recording…' : 'Record doses'}
+            </Button>
+            <Button variant="tertiary" onClick={() => setSelected(new Set())} disabled={batchRunning}>Clear</Button>
+          </div>
+        </div>
+      )}
 
       <DataTable
         rows={rows}

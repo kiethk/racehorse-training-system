@@ -40,13 +40,26 @@ export default function UrgentCasesPage() {
 
   useEffect(() => {
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
-    const interval = setInterval(() => {
-      if (active) loadData(true);
+    let interval: ReturnType<typeof setInterval> | null = setInterval(() => {
+      if (active && document.visibilityState === 'visible') loadData(true);
     }, 15000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        if (interval) { clearInterval(interval); interval = null; }
+      } else {
+        if (!interval) interval = setInterval(() => {
+          if (active) loadData(true);
+        }, 15000);
+        if (active) loadData(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       active = false;
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
 
@@ -221,7 +234,7 @@ export default function UrgentCasesPage() {
                 >
                   <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                      <HorseAvatar name={item.horseName} image={null} size={48} rounded="md" />
+                      <HorseAvatar name={item.horseName} image={item.horseId ? `/api/horses/${item.horseId}/photo` : null} size={48} rounded="md" />
 
                       <div className="space-y-1.5 flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">

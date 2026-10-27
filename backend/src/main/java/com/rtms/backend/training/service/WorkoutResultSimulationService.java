@@ -15,6 +15,7 @@ public class WorkoutResultSimulationService {
 
     private static final BigDecimal DEFAULT_DISTANCE_METERS = BigDecimal.valueOf(1_000);
     private static final int DEFAULT_DURATION_MINUTES = 60;
+    private static final double POOR_RECOVERY_CHANCE = 0.1;
 
     public WorkoutResultPreviewResponse generate(Subject subject) {
         ThreadLocalRandom random = ThreadLocalRandom.current();
@@ -48,8 +49,7 @@ public class WorkoutResultSimulationService {
             case HIGH -> random.nextInt(170, 196);
         };
         int maxHeartRate = Math.min(220, averageHeartRate + random.nextInt(15, 31));
-        int recoveryUpperBound = Math.min(121, averageHeartRate - 9);
-        int recoveryHeartRate = random.nextInt(75, recoveryUpperBound);
+        int recoveryHeartRate = recoveryHeartRate(random, averageHeartRate);
 
         return new WorkoutResultPreviewResponse(
                 actualDistance,
@@ -59,6 +59,19 @@ public class WorkoutResultSimulationService {
                 averageHeartRate,
                 maxHeartRate,
                 recoveryHeartRate);
+    }
+
+    /**
+     * Most horses recover under the safe limit; about one session in ten recovers poorly and raises the alert.
+     * A poor recovery stays at least 9 bpm under the average heart rate (always above the limit, since the
+     * lowest average is 115).
+     */
+    private int recoveryHeartRate(ThreadLocalRandom random, int averageHeartRate) {
+        int limit = HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT;
+        if (random.nextDouble() < POOR_RECOVERY_CHANCE) {
+            return random.nextInt(limit + 1, Math.min(limit + 21, averageHeartRate - 8));
+        }
+        return random.nextInt(60, limit - 1);
     }
 
     private BigDecimal scaled(double value) {

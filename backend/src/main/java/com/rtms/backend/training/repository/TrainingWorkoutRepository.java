@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -62,19 +63,41 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
 
     long countByPlanIdAndStatusNotIn(Long planId, Collection<WorkoutStatus> statuses);
 
+    long countByPlanIdAndStatus(Long planId, WorkoutStatus status);
+
     /**
-     * Cascade chấn thương: mọi buổi CHƯA diễn ra của một chiến mã.
-     * (Injury cascade: every not-yet-held workout of a horse.)
+     * Buổi SCHEDULED của một kế hoạch mà lot CHƯA kết thúc; buổi đã qua giờ thì đã (hoặc đáng lẽ đã) diễn ra nên không
+     * nằm trong đây. (SCHEDULED workouts of a plan whose lot has NOT ended; a workout past its time has (or should have)
+     * taken place, so it is not included.)
+     */
+    @Query("""
+           SELECT w FROM TrainingWorkout w
+           JOIN TrainingLot l ON w.lotId = l.id
+           WHERE w.planId = :planId
+             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED
+             AND (l.lotDate > :today OR (l.lotDate = :today AND l.endTime > :now))
+           """)
+    List<TrainingWorkout> findNotYetHeldByPlan(@Param("planId") Long planId,
+                                               @Param("today") LocalDate today,
+                                               @Param("now") LocalTime now);
+
+    /**
+     * Mọi buổi CHƯA diễn ra của một chiến mã (lot chưa kết thúc), cho cascade khóa tập và đổi Groom. Lot sáng nay đã
+     * xong mà chưa ghi kết quả không nằm trong đây: buổi đó đã diễn ra, phải được ghi chứ không bị hủy hay đổi người.
+     * (Every not-yet-held workout of a horse (lot not ended), for the training-block cascade and groom changes. A lot
+     * that ended this morning without a result is not included: it took place, so it is recorded, not cancelled or
+     * handed to someone else.)
      */
     @Query("""
            SELECT w FROM TrainingWorkout w
            JOIN TrainingLot l ON w.lotId = l.id
            WHERE w.horseId = :horseId
              AND w.status = com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED
-             AND l.lotDate >= :fromDate
+             AND (l.lotDate > :today OR (l.lotDate = :today AND l.endTime > :now))
            """)
-    List<TrainingWorkout> findFutureScheduledByHorse(@Param("horseId") Long horseId,
-                                                     @Param("fromDate") LocalDate fromDate);
+    List<TrainingWorkout> findNotYetHeldByHorse(@Param("horseId") Long horseId,
+                                                @Param("today") LocalDate today,
+                                                @Param("now") LocalTime now);
 
     /**
      * Các lot mà Groom mới sẽ bị trùng (BR-09) nếu nhận con ngựa này, kèm tên con ngựa đang vướng.
@@ -125,9 +148,10 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      */
     @Query("""
            SELECT new com.rtms.backend.training.dto.PlanWorkoutItemResponse(
-                      w.id, l.id, l.lotDate, l.startTime, l.endTime, l.subjectId, s.name,
+                      w.id, l.id, l.lotDate, l.startTime, l.endTime, l.subjectId, s.name, s.surfaceType,
                       w.horseId, w.assignedToId, w.status,
-                      w.actualDistanceMeters, w.averageHeartRate, w.maxHeartRate, w.topSpeedKmh,
+                      w.actualDistanceMeters, w.actualDurationMinutes, w.averageSpeedKmh,
+                      w.averageHeartRate, w.maxHeartRate, w.recoveryHeartRate, w.topSpeedKmh,
                       w.performanceRating, w.trainerFeedback,
                       (SELECT COUNT(w2) FROM TrainingWorkout w2
                        WHERE w2.lotId = l.id

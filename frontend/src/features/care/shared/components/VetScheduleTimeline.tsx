@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui/Icon';
 import { FilterChips, Select, Input, PageHeader, MetricCard, Notice } from '@/components/ui';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { useAuth } from '@/context/AuthContext';
 import { admissionsApi } from '@/features/admissions/services/api';
 import { stableApi } from '@/features/stable/services/stableService';
 import { formatLocalDateIso } from '@/lib/display';
@@ -18,10 +19,11 @@ import {
   computeTimelinePosition,
   getCareTypeTone,
   VET_WINDOW_LEN,
-} from '../utils/timelineUtils';
+} from '@/features/schedule/utils/timelineUtils';
 
 export function VetScheduleTimeline() {
   const router = useRouter();
+  const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return formatLocalDateIso();
   });
@@ -41,8 +43,9 @@ export function VetScheduleTimeline() {
       setLoading(true);
       setError(null);
 
+      // The vet works only on the schedules assigned to them.
       const [schedulePage, horseList, stallList] = await Promise.all([
-        admissionsApi.getCareSchedules({ date: selectedDate, size: 50 }),
+        admissionsApi.getCareSchedules({ date: selectedDate, size: 50, veterinarianId: user?.userId }),
         stableApi.getHorses(),
         stableApi.getStalls(),
       ]);
@@ -56,7 +59,7 @@ export function VetScheduleTimeline() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, user]);
 
   useEffect(() => {
     let active = true;
@@ -338,7 +341,7 @@ export function VetScheduleTimeline() {
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <HorseAvatar name={horseName} image={null} size={42} rounded="md" />
+                      <HorseAvatar name={horseName} image={horse?.imageUrl} size={42} rounded="md" />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-base font-bold text-[var(--color-text-primary)] truncate">

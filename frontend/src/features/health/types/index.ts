@@ -10,6 +10,17 @@ export interface InjuryRecord {
   expectedRecoveryDate?: string;
   recoveredAt?: string;
   status: string;
+  positionX?: number | null;
+  positionY?: number | null;
+  positionZ?: number | null;
+  zoneId?: string | null;
+  localX?: number | null;
+  localY?: number | null;
+  localZ?: number | null;
+  normalX?: number | null;
+  normalY?: number | null;
+  normalZ?: number | null;
+  meshName?: string | null;
 }
 
 export interface HorseHealthSummary {
@@ -22,6 +33,16 @@ export interface HorseHealthSummary {
   lastDiagnosis?: string;
   activeInjuryCount: number;
   nextScheduledCare?: string;
+  /** Open urgent case of this horse (reported but not yet examined), if any. */
+  pendingUrgentScheduleId?: number | null;
+  /** Who reported the incident behind the pending urgent case. */
+  pendingUrgentReportedByName?: string | null;
+  /** Which vet the pending urgent case is assigned to. */
+  pendingUrgentVetId?: number | null;
+  pendingUrgentVetName?: string | null;
+  /** A block coming from the admission intake (quarantine), with its submitting owner. */
+  pendingAdmissionId?: number | null;
+  pendingAdmissionOwnerName?: string | null;
 }
 
 export interface CorrectInjuryRequest {
@@ -30,6 +51,16 @@ export interface CorrectInjuryRequest {
   severity?: string;
   description?: string;
   status?: string;
+  /** New 3D marker placement captured on the model — optional reposition. */
+  marker?: {
+    positionX: number;
+    positionY: number;
+    positionZ: number;
+    zoneId: string;
+    normalX?: number;
+    normalY?: number;
+    normalZ?: number;
+  };
 }
 
 /** Mirrors the backend HealthRecord entity — one entry of a horse's health history. */
