@@ -1,9 +1,9 @@
 package com.rtms.backend.admission.service;
+
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.HorseTrainingPlan;
 import com.rtms.backend.training.entity.TrainingWorkout;
-
 
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.admission.dto.TrainerAdmissionReviewRequest;
@@ -44,17 +44,18 @@ public class AdmissionTrainerReviewService {
     private final RacingReadinessAssessmentRepository assessmentRepository;
 
     public AdmissionTrainerReviewService(AdmissionApplicationRepository admissionRepository,
-                                         RacingReadinessAssessmentRepository assessmentRepository) {
+            RacingReadinessAssessmentRepository assessmentRepository) {
         this.admissionRepository = admissionRepository;
         this.assessmentRepository = assessmentRepository;
     }
 
     @Transactional
     public AdmissionApplication completeAssessment(Long admissionId,
-                                                    TrainerAdmissionReviewRequest request,
-                                                    Long trainerId) {
+            TrainerAdmissionReviewRequest request,
+            Long trainerId) {
 
-        // Khóa đơn: hai lần bấm nộp gần như cùng lúc thì lần sau thấy MANAGER_REVIEW và dừng.
+        // Khóa đơn: hai lần bấm nộp gần như cùng lúc thì lần sau thấy MANAGER_REVIEW và
+        // dừng.
         AdmissionApplication admission = admissionRepository.findByIdForUpdate(admissionId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND",
                         "Không tìm thấy đơn nhập học #" + admissionId));
@@ -81,7 +82,7 @@ public class AdmissionTrainerReviewService {
 
         RacingReadinessAssessment assessment = new RacingReadinessAssessment();
         assessment.setHorseId(admission.getHorseId());
-        assessment.setAdmissionId(admission.getId());   // NOT NULL -> loại "nhập học"
+        assessment.setAdmissionId(admission.getId()); // NOT NULL -> loại "nhập học"
         assessment.setTrainerId(trainerId);
         assessment.setReadinessStatus(request.getReadinessStatus());
         assessment.setConformationScore(request.getConformationScore());
@@ -94,7 +95,7 @@ public class AdmissionTrainerReviewService {
 
         admission.setTrainerFeedback(request.getRemarks());
         admission.setTrainerReviewedAt(LocalDateTime.now());
-        admission.setStatus(AdmissionStatus.APPROVED);
+        admission.setStatus(AdmissionStatus.MANAGER_REVIEW);
         return admissionRepository.save(admission);
     }
 
