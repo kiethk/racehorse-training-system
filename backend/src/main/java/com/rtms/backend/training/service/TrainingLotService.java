@@ -4,6 +4,7 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.LotHorseNameRow;
+import com.rtms.backend.training.dto.LotHorseResponse;
 import com.rtms.backend.training.dto.TrainingLotResponse;
 import com.rtms.backend.training.dto.TrainingLotRow;
 import com.rtms.backend.training.entity.Subject;
@@ -317,11 +318,12 @@ public class TrainingLotService {
         List<LotHorseNameRow> names = ownerId == null
                 ? lotRepository.findActiveHorseNames(lotIds)
                 : lotRepository.findActiveHorseNamesOfOwner(lotIds, ownerId);
-        Map<Long, List<String>> namesByLot = names.stream().collect(Collectors.groupingBy(
-                LotHorseNameRow::lotId, Collectors.mapping(LotHorseNameRow::horseName, Collectors.toList())));
+        Map<Long, List<LotHorseResponse>> horsesByLot = names.stream().collect(Collectors.groupingBy(
+                LotHorseNameRow::lotId,
+                Collectors.mapping(row -> new LotHorseResponse(row.horseId(), row.horseName()), Collectors.toList())));
 
         return rows.stream()
-                .map(row -> new TrainingLotResponse(row, namesByLot.getOrDefault(row.lotId(), List.of())))
+                .map(row -> new TrainingLotResponse(row, horsesByLot.getOrDefault(row.lotId(), List.of())))
                 .toList();
     }
 

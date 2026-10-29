@@ -197,6 +197,21 @@ INSERT INTO seed_check VALUES
 ('Task completed without a completion row of the same groom, or completed before its time',
  $q$ SELECT t.id FROM groom_daily_tasks t LEFT JOIN groom_task_completions c ON c.id = t.completion_id
      WHERE t.is_completed AND (c.id IS NULL OR c.groom_id <> t.groom_id OR t.completed_at < t.scheduled_time) $q$),
+('Trainer assessment score that is not a whole number from 0 to 10',
+ $q$ SELECT id FROM racing_readiness_assessments
+     WHERE conformation_score <> trunc(conformation_score) OR temperament_score <> trunc(temperament_score)
+        OR gait_quality_score <> trunc(gait_quality_score)
+        OR conformation_score NOT BETWEEN 0 AND 10 OR temperament_score NOT BETWEEN 0 AND 10
+        OR gait_quality_score NOT BETWEEN 0 AND 10 $q$),
+('Course with more subjects than sessions',
+ $q$ SELECT c.id FROM courses c WHERE (SELECT count(*) FROM course_subjects cs WHERE cs.course_id = c.id) > c.total_sessions $q$),
+('Two courses of one trainer with the same subjects in the same order',
+ $q$ SELECT a.id FROM courses a JOIN courses b ON b.trainer_id = a.trainer_id AND b.id > a.id
+     WHERE (SELECT array_agg(subject_id ORDER BY order_index) FROM course_subjects WHERE course_id = a.id)
+         = (SELECT array_agg(subject_id ORDER BY order_index) FROM course_subjects WHERE course_id = b.id) $q$),
+('Admission document whose file key is not a Cloudinary asset',
+ $q$ SELECT id FROM admission_documents
+     WHERE file_url !~ '^https://res\.cloudinary\.com/[^/]+/image/authenticated/v[0-9]+/rtms/admissions/[0-9]+/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$' $q$),
 ('Completion photo key that is not a stored file',
  $q$ SELECT p.completion_id FROM groom_task_completion_photos p
      WHERE NOT EXISTS (SELECT 1 FROM admission_documents d WHERE d.file_url = p.image_key) $q$),

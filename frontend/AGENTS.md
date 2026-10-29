@@ -192,6 +192,8 @@ Import from `@/components/ui`.
 | File picker | `FileInput` |
 | Search box | `SearchInput` |
 | View switch (Week / Month) | `SegmentedControl` |
+| Score picked from a bar of cells (0 to 10) | `ScoreScale` |
+| Name that opens its record when clicked (a horse in a lot) | `ChipButton` |
 | Quick filters with counts | `FilterChips` |
 | Section tabs | `Tabs` |
 | Filter row above a list | `FilterBar` |

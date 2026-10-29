@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, EmptyState, Icon, ListSkeleton, PageSection, Panel, Pill } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
+import { newestFirst } from '../lib/listOrder';
 import { trainingService } from '../services/trainingService';
 import type { Course, CourseDetailResponse, CreateCourseRequest, Subject } from '../types';
 import { CourseDetailModal } from './CourseDetailModal';
@@ -57,7 +58,7 @@ export function CourseList() {
     setError(null);
     try {
       const [courseList, subjectList] = await Promise.all([trainingService.getCourses(), trainingService.getSubjects()]);
-      setCourses(courseList);
+      setCourses([...courseList].sort(newestFirst));
       setSubjects(subjectList);
     } catch (cause) {
       setError(displayError(cause, 'Unable to load training courses.'));

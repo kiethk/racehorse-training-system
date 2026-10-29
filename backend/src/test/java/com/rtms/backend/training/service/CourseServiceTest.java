@@ -263,6 +263,89 @@ class CourseServiceTest {
         assertTrue(ex.getMessage().contains("does not belong to this trainer"));
     }
 
+    @Test
+    @DisplayName("6f. A course cannot have more subjects than sessions")
+    void testCreateCourse_MoreSubjectsThanSessions_Rejected() {
+        CreateCourseRequest req = new CreateCourseRequest();
+        req.setName("Too many");
+        req.setTotalSessions(2);
+        req.setSubjects(List.of(item(1L, 1), item(2L, 2), item(3L, 3)));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> courseService.createCourse(req, trainerUser));
+        assertTrue(ex.getMessage().contains("more subjects (3) than sessions (2)"));
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("6g. A course may have as many subjects as sessions")
+    void testCreateCourse_SubjectsEqualSessions_Allowed() {
+        CreateCourseRequest req = new CreateCourseRequest();
+        req.setName("Exact");
+        req.setTotalSessions(2);
+        req.setSubjects(List.of(item(1L, 1), item(2L, 2)));
+        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject(1L, 9L), subject(2L, 9L)));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(courseSubjectRepository.save(any(CourseSubject.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertDoesNotThrow(() -> courseService.createCourse(req, trainerUser));
+    }
+
+    @Test
+    @DisplayName("6h. Rejects a course with exactly the same subjects in the same order as one the trainer already has")
+    void testCreateCourse_SameRotationAsExistingCourse_Rejected() {
+        CreateCourseRequest req = new CreateCourseRequest();
+        req.setName("Copy");
+        req.setTotalSessions(6);
+        // sent out of order on purpose: the order numbers, not the array position, make the rotation 5, 6, 7
+        req.setSubjects(List.of(item(7L, 3), item(5L, 1), item(6L, 2)));
+        existingCourseWithRotation(30L, "Original", 5L, 6L, 7L);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> courseService.createCourse(req, trainerUser));
+        assertTrue(ex.getMessage().contains("'Original' already has exactly these subjects in the same order"));
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("6i. The same subjects in a different order, or with a different list, are allowed")
+    void testCreateCourse_DifferentOrderOrList_Allowed() {
+        existingCourseWithRotation(30L, "Original", 5L, 6L, 7L);
+        when(subjectRepository.findAllById(any())).thenReturn(
+                List.of(subject(5L, 9L), subject(6L, 9L), subject(7L, 9L), subject(8L, 9L)));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(courseSubjectRepository.save(any(CourseSubject.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CreateCourseRequest reordered = new CreateCourseRequest();
+        reordered.setName("Reordered");
+        reordered.setTotalSessions(6);
+        reordered.setSubjects(List.of(item(7L, 1), item(6L, 2), item(5L, 3)));
+        assertDoesNotThrow(() -> courseService.createCourse(reordered, trainerUser));
+
+        CreateCourseRequest longer = new CreateCourseRequest();
+        longer.setName("Longer");
+        longer.setTotalSessions(6);
+        longer.setSubjects(List.of(item(5L, 1), item(6L, 2), item(7L, 3), item(8L, 4)));
+        assertDoesNotThrow(() -> courseService.createCourse(longer, trainerUser));
+    }
+
+    private void existingCourseWithRotation(Long courseId, String name, Long... subjectIds) {
+        Course existing = new Course();
+        existing.setId(courseId);
+        existing.setName(name);
+        existing.setTrainerId(9L);
+        when(courseRepository.findByTrainerId(9L)).thenReturn(List.of(existing));
+        List<CourseSubject> rows = new java.util.ArrayList<>();
+        for (int i = 0; i < subjectIds.length; i++) {
+            CourseSubject row = new CourseSubject();
+            row.setCourseId(courseId);
+            row.setSubjectId(subjectIds[i]);
+            row.setOrderIndex(i + 1);
+            rows.add(row);
+        }
+        when(courseSubjectRepository.findByCourseIdInOrderByCourseIdAscOrderIndexAsc(any())).thenReturn(rows);
+    }
+
     private static CourseSubjectItemRequest item(Long subjectId, Integer orderIndex) {
         CourseSubjectItemRequest item = new CourseSubjectItemRequest();
         item.setSubjectId(subjectId);

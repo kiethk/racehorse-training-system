@@ -97,12 +97,6 @@ BEGIN
     RETURN v;
 END $$ LANGUAGE plpgsql STABLE;
 
--- Khóa file của một hồ sơ: "local:<uuid>.<đuôi>", uuid = md5 của đường dẫn trong bộ hồ sơ. seed-admission-files.ps1
--- đặt tên file đúng theo công thức này. (Storage key of a document; seed-admission-files.ps1 names the file the same way.)
-CREATE FUNCTION pg_temp.file_key(p_path TEXT) RETURNS TEXT AS $$
-    SELECT 'local:' || md5('rtms-seed/' || p_path)::UUID::TEXT || lower(substring(p_path FROM '\.[A-Za-z0-9]+$'))
-$$ LANGUAGE sql IMMUTABLE;
-
 -- Ngày giờ theo kiểu LocalDateTime.toString() của Java (bỏ giây khi bằng 0), dùng cho request_fingerprint.
 -- (Date-time as Java LocalDateTime.toString(), used by request_fingerprint.)
 CREATE FUNCTION pg_temp.java_ts(p TIMESTAMP) RETURNS TEXT AS $$

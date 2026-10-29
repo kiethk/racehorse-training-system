@@ -13,8 +13,10 @@ import com.rtms.backend.training.repository.SubjectRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,6 +93,10 @@ public class CourseService {
             throw new IllegalArgumentException("A course named '" + name + "' already exists!");
         }
 
+        List<CourseSubjectItemRequest> rotation = inRotationOrder(request.getSubjects());
+        assertSubjectsFitSessions(rotation.size(), request.getTotalSessions());
+        assertRotationIsNew(rotation, trainerId);
+
         Course course = new Course();
         course.setName(name);
         course.setTargetGoal(blankToNull(request.getTargetGoal()));
@@ -99,7 +105,7 @@ public class CourseService {
         course.setCreatedById(trainerId);
 
         Course savedCourse = courseRepository.save(course);
-        addSubjects(savedCourse.getId(), request.getSubjects(), trainerId);
+        addSubjects(savedCourse.getId(), request.getSubjects(), rotation, trainerId);
 
         return new CourseDetailResponse(savedCourse,
                 courseSubjectRepository.findCourseSubjectResponses(savedCourse.getId()));
@@ -111,7 +117,8 @@ public class CourseService {
      * (Attaches the subjects and RENUMBERS the rotation 1..n in the order the client sent (orderIndex only sorts). Duplicate,
      * negative, missing or gapped numbers then give a valid rotation instead of a DB error.)
      */
-    private void addSubjects(Long courseId, List<CourseSubjectItemRequest> items, Long courseTrainerId) {
+    private void addSubjects(Long courseId, List<CourseSubjectItemRequest> items,
+                             List<CourseSubjectItemRequest> inRotationOrder, Long courseTrainerId) {
         Set<Long> seen = new HashSet<>();
         for (CourseSubjectItemRequest item : items) {
             // Khóa xoay vòng qua danh sách bài, nên mỗi bài chỉ có một lần.
@@ -131,16 +138,6 @@ public class CourseService {
             assertSubjectBelongsTo(subject, courseTrainerId);
         }
 
-        List<CourseSubjectItemRequest> inRotationOrder = IntStream.range(0, items.size())
-                .boxed()
-                .sorted(Comparator
-                        .comparing((Integer position) -> items.get(position).getOrderIndex() == null)
-                        .thenComparing(position -> items.get(position).getOrderIndex() == null
-                                ? 0 : items.get(position).getOrderIndex())
-                        .thenComparing(Comparator.naturalOrder()))
-                .map(items::get)
-                .toList();
-
         int order = 1;
         for (CourseSubjectItemRequest item : inRotationOrder) {
             CourseSubject courseSubject = new CourseSubject();
@@ -149,6 +146,52 @@ public class CourseService {
             courseSubject.setOrderIndex(order++);
             courseSubjectRepository.save(courseSubject);
         }
+    }
+
+    /** Các bài theo thứ tự xoay vòng: theo orderIndex, bài không có số xếp cuối, bằng nhau thì giữ thứ tự client gửi. (Items in rotation order.) */
+    private static List<CourseSubjectItemRequest> inRotationOrder(List<CourseSubjectItemRequest> items) {
+        return IntStream.range(0, items.size())
+                .boxed()
+                .sorted(Comparator
+                        .comparing((Integer position) -> items.get(position).getOrderIndex() == null)
+                        .thenComparing(position -> items.get(position).getOrderIndex() == null
+                                ? 0 : items.get(position).getOrderIndex())
+                        .thenComparing(Comparator.naturalOrder()))
+                .map(items::get)
+                .toList();
+    }
+
+    /**
+     * Khóa xoay vòng qua danh sách bài, mỗi buổi tập một bài, nên số bài không thể nhiều hơn số buổi: bài thừa sẽ không bao giờ được tập.
+     * (The course rotates through its subjects, one per session, so it cannot have more subjects than sessions: the extra ones would never be trained.)
+     */
+    private static void assertSubjectsFitSessions(int subjectCount, Integer totalSessions) {
+        if (totalSessions != null && subjectCount > totalSessions) {
+            throw new IllegalArgumentException("A course cannot have more subjects (" + subjectCount
+                    + ") than sessions (" + totalSessions + ")!");
+        }
+    }
+
+    /**
+     * Không tạo khóa có đúng cùng danh sách bài và cùng thứ tự với một khóa đã có của Trainer; khác thứ tự thì được.
+     * (A course cannot repeat the exact subject list, in the same order, of one the trainer already has; a different order is fine.)
+     */
+    private void assertRotationIsNew(List<CourseSubjectItemRequest> rotation, Long trainerId) {
+        List<Long> wanted = rotation.stream().map(CourseSubjectItemRequest::getSubjectId).toList();
+        List<Course> existing = trainerId != null ? courseRepository.findByTrainerId(trainerId) : courseRepository.findAll();
+        if (existing.isEmpty()) return;
+
+        Map<Long, String> namesById = existing.stream().collect(Collectors.toMap(Course::getId, Course::getName));
+        Map<Long, List<Long>> subjectsByCourse = new LinkedHashMap<>();
+        for (CourseSubject cs : courseSubjectRepository.findByCourseIdInOrderByCourseIdAscOrderIndexAsc(namesById.keySet())) {
+            subjectsByCourse.computeIfAbsent(cs.getCourseId(), id -> new ArrayList<>()).add(cs.getSubjectId());
+        }
+        subjectsByCourse.forEach((courseId, subjects) -> {
+            if (subjects.equals(wanted)) {
+                throw new IllegalArgumentException("Course '" + namesById.get(courseId)
+                        + "' already has exactly these subjects in the same order!");
+            }
+        });
     }
 
     private void assertSubjectBelongsTo(Subject subject, Long courseTrainerId) {

@@ -5,6 +5,7 @@ import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
+import com.rtms.backend.training.dto.HorseScheduleItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.service.HorsePerformanceService;
@@ -62,6 +63,17 @@ public class HorsePerformanceController {
             @PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(performanceService.getHorseAlerts(id, currentUser));
+    }
+
+    /** Lịch tập của con ngựa trong khoảng ngày, kể cả buổi đã hủy. (The horse training schedule over a date range, cancelled sessions included.) */
+    @PreAuthorize("hasAuthority('HORSE_VIEW')")
+    @GetMapping("/api/horses/{id}/schedule")
+    public ApiResponse<List<HorseScheduleItemResponse>> getSchedule(
+            @PathVariable Long id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(performanceService.getHorseSchedule(id, from, to, currentUser));
     }
 
     /** Sở trường thi đấu suy ra từ các buổi tập; vai nào xem được ngựa thì xem được. (Racing specialty inferred from workouts.) */

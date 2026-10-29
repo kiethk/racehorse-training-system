@@ -34,6 +34,11 @@ interface AdmissionTableProps<Row extends AdmissionRow> {
   pagination?: DataTablePagination;
 }
 
+/** Newest submission first; the same submission time falls back to the newest application. */
+function newestSubmissionFirst(left: AdmissionRow, right: AdmissionRow): number {
+  return new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime() || right.admissionId - left.admissionId;
+}
+
 /** The one admission list table. Every role renders this so rows look identical. */
 export function AdmissionTable<Row extends AdmissionRow>({
   admissions,
@@ -111,6 +116,7 @@ export function AdmissionTable<Row extends AdmissionRow>({
       emptyAction={emptyAction}
       pageSize={pagination ? undefined : 10}
       pagination={pagination}
+      defaultOrder={newestSubmissionFirst}
       getSearchText={searchable ? (admission) => `${admission.candidateName} ${admission.breed ?? ''} ${admission.status}` : undefined}
       searchPlaceholder="Search horse, breed, or status…"
     />
