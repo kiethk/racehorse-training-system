@@ -35,7 +35,7 @@ BEGIN
             p_findings => p_findings, p_diagnosis => p_diagnosis, p_decision => p_decision, p_restriction => p_restriction,
             p_treatment => p_treatment, p_symptoms => p_symptoms, p_next_at => p_next_at,
             p_next_desc => 'Recheck after the urgent case', p_temp => p_temp, p_hr => p_hr, p_rr => 16,
-            p_hydration => 'Normal (CRT < 2s, pink)', p_metric_notes => 'Recorded during the urgent examination.');
+            p_hydration => 'NORMAL', p_metric_notes => 'Recorded during the urgent examination.');
     END IF;
     RETURN v_schedule;
 END $$ LANGUAGE plpgsql;
