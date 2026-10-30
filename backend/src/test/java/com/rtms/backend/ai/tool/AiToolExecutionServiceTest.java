@@ -246,8 +246,8 @@ class AiToolExecutionServiceTest {
         when(trainingLotRepository.findTrainerLotRows(eq(5L), any(LocalDate.class), any(LocalDate.class), eq(false)))
                 .thenReturn(List.of(row));
 
-        LotHorseNameRow name1 = new LotHorseNameRow(100L, "THUNDER");
-        LotHorseNameRow name2 = new LotHorseNameRow(100L, "LIGHTNING");
+        LotHorseNameRow name1 = new LotHorseNameRow(100L, 1L, "THUNDER");
+        LotHorseNameRow name2 = new LotHorseNameRow(100L, 2L, "LIGHTNING");
         when(trainingLotRepository.findActiveHorseNames(anyCollection()))
                 .thenReturn(List.of(name1, name2));
 

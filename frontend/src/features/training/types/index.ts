@@ -239,7 +239,24 @@ export interface TrainingLotResponse {
   maxCapacity: number;
   occupied: number;
   remainingSlots: number;
-  horseNames: string[];
+  horses: LotHorse[];
+}
+
+/** A horse in a lot: its id opens the horse schedule, its name is what the lot shows. */
+export interface LotHorse {
+  horseId: number;
+  name: string;
+}
+
+/** One session of a horse in its schedule. The lot and the horse's own workout can each be cancelled. */
+export interface HorseScheduleItem {
+  lotId: number;
+  lotDate: string; // YYYY-MM-DD
+  startTime: string; // "06:00:00"
+  endTime: string;
+  subjectName: string;
+  lotStatus: WorkoutStatus;
+  workoutStatus: WorkoutStatus;
 }
 
 export interface RescheduleLotRequest {
