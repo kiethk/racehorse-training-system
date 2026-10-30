@@ -17,6 +17,7 @@ import type {
   TrainingLotResponse,
   RescheduleLotRequest,
   HorseFitnessTrendItem,
+  HorseScheduleItem,
   HorseAlert,
   TrainingRules,
 } from '../types';
@@ -86,6 +87,10 @@ export const trainingService = {
     (await apiGet<ApiResponse<TrainingLotResponse[]>>(
       `/api/lots?from=${from}&to=${to}&includeCancelled=${includeCancelled}`,
     )).data,
+
+  /** One horse's sessions from a date to a date, cancelled ones included. */
+  getHorseSchedule: async (horseId: number, from: string, to: string): Promise<HorseScheduleItem[]> =>
+    (await apiGet<ApiResponse<HorseScheduleItem[]>>(`/api/horses/${horseId}/schedule?from=${from}&to=${to}`)).data,
 
   rescheduleLot: async (id: number, data: RescheduleLotRequest): Promise<TrainingLotResponse> =>
     (await apiPatch<ApiResponse<TrainingLotResponse>>(`/api/lots/${id}/reschedule`, data)).data,

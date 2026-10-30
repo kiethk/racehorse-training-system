@@ -124,6 +124,24 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
                                               @Param("fromDate") LocalDate fromDate);
 
     /**
+     * Lịch tập của MỘT con ngựa trong khoảng ngày, kể cả buổi đã hủy, theo thứ tự ngày rồi giờ.
+     * (One horse schedule over a date range, cancelled sessions included, in date then time order.)
+     */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.HorseScheduleItemResponse(
+                      l.id, l.lotDate, l.startTime, l.endTime, s.name, l.status, w.status)
+           FROM TrainingWorkout w
+           JOIN TrainingLot l ON w.lotId = l.id
+           JOIN Subject s ON l.subjectId = s.id
+           WHERE w.horseId = :horseId
+             AND l.lotDate BETWEEN :fromDate AND :toDate
+           ORDER BY l.lotDate ASC, l.startTime ASC
+           """)
+    List<HorseScheduleItemResponse> findHorseSchedule(@Param("horseId") Long horseId,
+                                                      @Param("fromDate") LocalDate fromDate,
+                                                      @Param("toDate") LocalDate toDate);
+
+    /**
      * Nguồn 2 của màn hình Today Tasks (Groom): buổi tập trong ngày kèm giờ lot, tên ngựa, tên bài tập.
      * (Source 2 of the groom Today Tasks screen: the day workouts with lot times, horse and subject names.)
      */

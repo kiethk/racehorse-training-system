@@ -42,6 +42,11 @@ function TrainingCell({ horse }: { horse: Horse }) {
   );
 }
 
+/** Newest horse first: a bigger id was created later. */
+function newestHorseFirst(left: Horse, right: Horse): number {
+  return right.id - left.id;
+}
+
 /**
  * Shared horse list table.
  * Columns: Horse (avatar + name), Registration number, Breed, Sex, (Specialty), Training, Status, and optional Actions.
@@ -153,6 +158,7 @@ export function HorseTable({
     <DataTable<Horse>
       key={resetPageKey != null ? String(resetPageKey) : undefined}
       rows={horses}
+      defaultOrder={newestHorseFirst}
       columns={columns}
       getRowKey={(h) => h.id}
       loading={loading}

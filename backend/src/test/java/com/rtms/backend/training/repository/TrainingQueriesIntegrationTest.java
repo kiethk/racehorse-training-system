@@ -373,6 +373,16 @@ class TrainingQueriesIntegrationTest {
     }
 
     @Test
+    void horseScheduleListsEverySessionOfTheHorseInDateOrder() {
+        var schedule = workouts.findHorseSchedule(horse1.getId(), today.minusDays(30), today.plusDays(30));
+
+        assertEquals(List.of(today.minusDays(1), today), schedule.stream().map(item -> item.lotDate()).toList());
+        assertEquals(WorkoutStatus.COMPLETED, schedule.get(0).workoutStatus());
+        assertEquals(WorkoutStatus.SCHEDULED, schedule.get(1).workoutStatus());
+        assertTrue(workouts.findHorseSchedule(horse1.getId(), today.plusDays(1), today.plusDays(7)).isEmpty(), "Outside the range");
+    }
+
+    @Test
     void fitnessTrendAndRecentWorkoutsReadOnlyCompletedOnes() {
         List<HorseFitnessTrendItemResponse> trend =
                 workouts.findFitnessTrend(horse1.getId(), today.minusDays(30), today);

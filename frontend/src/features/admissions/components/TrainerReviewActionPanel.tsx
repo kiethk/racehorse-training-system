@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Checkbox, FormField, Input, Notice, Textarea } from '@/components/ui';
+import { Button, Checkbox, FormField, Input, Notice, ScoreScale, Textarea } from '@/components/ui';
 import { AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
 import { trainerAdmissionsApi } from '../services/trainerAdmissionService';
 import { simpleStatusLabel } from '../shared/components/AdmissionStatusBadge';
@@ -24,32 +24,6 @@ const MAX_REMARKS = 1000;
 
 function fmtScore(score: number | null | undefined): string {
   return score != null ? `${score}/10` : '—';
-}
-
-function ScoreInput({
-  label,
-  value,
-  onChange,
-  required = true,
-}: {
-  label: string;
-  value: number | null | undefined;
-  onChange: (raw: string) => void;
-  required?: boolean;
-}) {
-  return (
-    <FormField label={`${label} (0–10)`} required={required}>
-      <Input
-        type="number"
-        min={0}
-        max={10}
-        step={0.5}
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        required={required}
-      />
-    </FormField>
-  );
 }
 
 interface TrainerReviewActionPanelProps {
@@ -84,31 +58,17 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
   async function handleSubmit() {
     setFormError(null);
 
-    // 1. Scoring fields are required
-    if (form.conformationScore == null || isNaN(form.conformationScore)) {
-      setFormError('Please enter a Conformation score (0–10).');
+    // 1. Scoring fields are required (the scale only offers 0 to 10)
+    if (form.conformationScore == null) {
+      setFormError('Please choose a Conformation score (0–10).');
       return;
     }
-    if (form.conformationScore < 0 || form.conformationScore > 10) {
-      setFormError('Conformation score must be between 0 and 10.');
+    if (form.temperamentScore == null) {
+      setFormError('Please choose a Temperament score (0–10).');
       return;
     }
-
-    if (form.temperamentScore == null || isNaN(form.temperamentScore)) {
-      setFormError('Please enter a Temperament score (0–10).');
-      return;
-    }
-    if (form.temperamentScore < 0 || form.temperamentScore > 10) {
-      setFormError('Temperament score must be between 0 and 10.');
-      return;
-    }
-
-    if (form.gaitQualityScore == null || isNaN(form.gaitQualityScore)) {
-      setFormError('Please enter a Gait quality score (0–10).');
-      return;
-    }
-    if (form.gaitQualityScore < 0 || form.gaitQualityScore > 10) {
-      setFormError('Gait quality score must be between 0 and 10.');
+    if (form.gaitQualityScore == null) {
+      setFormError('Please choose a Gait quality score (0–10).');
       return;
     }
 
@@ -216,22 +176,22 @@ export function TrainerReviewActionPanel({ view, onSuccess }: TrainerReviewActio
         ))}
       </fieldset>
 
-      <ScoreInput
+      <ScoreScale
         label="Conformation"
-        value={form.conformationScore}
-        onChange={setNum('conformationScore')}
+        value={form.conformationScore ?? null}
+        onChange={(score) => setForm((f) => ({ ...f, conformationScore: score }))}
         required
       />
-      <ScoreInput
+      <ScoreScale
         label="Temperament"
-        value={form.temperamentScore}
-        onChange={setNum('temperamentScore')}
+        value={form.temperamentScore ?? null}
+        onChange={(score) => setForm((f) => ({ ...f, temperamentScore: score }))}
         required
       />
-      <ScoreInput
+      <ScoreScale
         label="Gait quality"
-        value={form.gaitQualityScore}
-        onChange={setNum('gaitQualityScore')}
+        value={form.gaitQualityScore ?? null}
+        onChange={(score) => setForm((f) => ({ ...f, gaitQualityScore: score }))}
         required
       />
 
