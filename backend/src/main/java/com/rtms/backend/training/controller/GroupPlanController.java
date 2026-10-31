@@ -63,4 +63,11 @@ public class GroupPlanController {
             @Valid @RequestBody GroupPlanRequest request, @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(planService.createPlan(request, currentUser));
     }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('GROUP_PLAN_CREATE')")
+    public ApiResponse<GroupPlanDetailResponse> cancelPlan(
+            @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(planService.cancelPlan(id, currentUser));
+    }
 }

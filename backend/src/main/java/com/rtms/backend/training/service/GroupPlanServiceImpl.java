@@ -61,9 +61,6 @@ import java.util.stream.Collectors;
 @Service
 public class GroupPlanServiceImpl implements GroupPlanService {
 
-    /** Tên miền của khóa lịch, để khóa của Trainer không đụng khóa advisory của chức năng khác. (Namespace of the schedule lock.) */
-    private static final long SCHEDULE_LOCK_NAMESPACE = 0x5254_4D53_0001_0000L;
-
     private static final List<TrainingPlanStatus> UNFINISHED = List.of(TrainingPlanStatus.UPCOMING, TrainingPlanStatus.ACTIVE);
     private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -158,7 +155,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
         // sau thấy plan của request trước và báo trùng lịch thay vì cùng tạo plan chồng nhau.
         // (Lock the trainer schedule BEFORE reading anything: two simultaneous requests (a double click, two tabs) queue here, so
         // the second sees the plans of the first and reports a clash instead of both creating overlapping plans.)
-        sessionRepository.lockSchedule(SCHEDULE_LOCK_NAMESPACE + trainerId);
+        sessionRepository.lockSchedule(ScheduleLocks.of(trainerId));
 
         Context context = prepare(request, currentUser);
         Schedule schedule = buildSchedule(context, request.startDate(), trainerId);
@@ -253,6 +250,28 @@ public class GroupPlanServiceImpl implements GroupPlanService {
                 .filter(found -> canSee(found, currentUser))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_PLAN_NOT_FOUND", "Plan not found!"));
         return detail(plan);
+    }
+
+    @Override
+    @Transactional
+    public GroupPlanDetailResponse cancelPlan(Long planId, AuthenticatedUser currentUser) {
+        sessionRepository.lockSchedule(ScheduleLocks.of(currentUser.getUserId()));
+        settlement.settle();
+        GroupPlan plan = planRepository.findById(planId)
+                .filter(found -> found.getTrainerId().equals(currentUser.getUserId()))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_PLAN_NOT_FOUND", "Plan not found!"));
+        if (!UNFINISHED.contains(plan.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "PLAN_ALREADY_CLOSED", "This plan is already closed!");
+        }
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        sessionRepository.cancelNotStartedOfPlan(planId, now.toLocalDate(), now.toLocalTime());
+        workoutRepository.cancelWorkoutsOfCancelledSessions();
+
+        // The bulk updates cleared the persistence context, so the plan is read again before it is closed.
+        GroupPlan cancelled = planRepository.findById(planId).orElseThrow();
+        cancelled.setStatus(TrainingPlanStatus.CANCELLED);
+        return detail(planRepository.saveAndFlush(cancelled));
     }
 
     /** Trainer chỉ thấy kế hoạch của mình; Quản lý thấy tất cả; vai khác báo "không tìm thấy". (A Trainer sees own plans, a Manager all, others "not found".) */

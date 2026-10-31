@@ -60,4 +60,18 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
              AND (s.sessionDate < :today OR (s.sessionDate = :today AND s.endTime <= :time))
            """)
     int markEndedAsHeld(@Param("today") LocalDate today, @Param("time") LocalTime time);
+
+    /**
+     * Hủy mọi buổi SCHEDULED CHƯA bắt đầu của một kế hoạch bằng MỘT câu UPDATE; trả về số buổi đã hủy.
+     * (Cancels every SCHEDULED Session of a plan that has NOT started with ONE UPDATE; returns how many were cancelled.)
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+           UPDATE TrainingSession s
+           SET s.status = com.rtms.backend.training.enums.SessionStatus.CANCELLED
+           WHERE s.groupPlanId = :planId
+             AND s.status = com.rtms.backend.training.enums.SessionStatus.SCHEDULED
+             AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > :time))
+           """)
+    int cancelNotStartedOfPlan(@Param("planId") Long planId, @Param("today") LocalDate today, @Param("time") LocalTime time);
 }

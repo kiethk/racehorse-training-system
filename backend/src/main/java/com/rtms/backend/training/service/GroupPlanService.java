@@ -26,4 +26,12 @@ public interface GroupPlanService {
     List<GroupPlanSummaryResponse> getPlans(Long groupId, AuthenticatedUser currentUser);
 
     GroupPlanDetailResponse getPlan(Long planId, AuthenticatedUser currentUser);
+
+    /**
+     * Bỏ khóa: mọi buổi CHƯA bắt đầu bị hủy và kế hoạch thành CANCELLED ngay, kể cả khi một buổi đang chạy. Buổi đang chạy vẫn chạy
+     * hết, tự thành HELD và ghi kết quả được. Khoảng ngày của kế hoạch được giải phóng.
+     * (Drops the course: every Session that has NOT started is cancelled and the plan becomes CANCELLED at once, even while a Session
+     * is running. The running Session finishes, becomes HELD by itself and can have results recorded. The plan dates are released.)
+     */
+    GroupPlanDetailResponse cancelPlan(Long planId, AuthenticatedUser currentUser);
 }

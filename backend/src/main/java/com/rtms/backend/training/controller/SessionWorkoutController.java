@@ -6,6 +6,7 @@ import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.dto.SessionWorkoutResponse;
 import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
 import com.rtms.backend.training.service.SessionWorkoutService;
+import com.rtms.backend.training.service.TrainingSessionService;
 import jakarta.validation.Valid;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -29,9 +30,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class SessionWorkoutController {
 
     private final SessionWorkoutService workoutService;
+    private final TrainingSessionService sessionService;
 
-    public SessionWorkoutController(SessionWorkoutService workoutService) {
+    public SessionWorkoutController(SessionWorkoutService workoutService, TrainingSessionService sessionService) {
         this.workoutService = workoutService;
+        this.sessionService = sessionService;
     }
 
     /** Số đo mô phỏng mới sau khi buổi đã hết giờ; không lưu. (A fresh simulated measurement after the Session ended; not saved.) */
@@ -67,5 +70,13 @@ public class SessionWorkoutController {
     public ApiResponse<SessionWorkoutResponse> markDidNotRun(
             @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(workoutService.markDidNotRun(id, currentUser));
+    }
+
+    /** Hủy Workout của riêng một chiến mã trước khi buổi bắt đầu; con vẫn ở trong nhóm. (Cancels one horse's Workout before its Session starts; the horse stays in the group.) */
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('SESSION_UPDATE')")
+    public ApiResponse<SessionWorkoutResponse> cancelWorkout(
+            @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(sessionService.cancelWorkout(id, currentUser));
     }
 }

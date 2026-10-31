@@ -311,4 +311,19 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
                                  WHERE s.status = com.rtms.backend.training.enums.SessionStatus.HELD)
            """)
     int markWorkoutsOfHeldSessionsAsHeld();
+
+    /** Hủy các Workout còn SCHEDULED của một buổi đã bị hủy. (Cancels the SCHEDULED Workouts of a cancelled Session.) */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+           UPDATE TrainingWorkout w
+           SET w.status = com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
+           WHERE w.status = com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED
+             AND w.sessionId IN (SELECT s.id FROM TrainingSession s
+                                 WHERE s.status = com.rtms.backend.training.enums.SessionStatus.CANCELLED)
+           """)
+    int cancelWorkoutsOfCancelledSessions();
+
+    long countBySessionIdAndStatusNot(Long sessionId, WorkoutStatus status);
+
+    List<TrainingWorkout> findBySessionId(Long sessionId);
 }
