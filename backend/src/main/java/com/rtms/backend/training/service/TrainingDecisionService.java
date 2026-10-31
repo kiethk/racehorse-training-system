@@ -36,6 +36,7 @@ public class TrainingDecisionService {
     private final HorseRepository horseRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final TrainingWorkoutService workoutService;
+    private final GroupWorkoutSyncService groupSync;
 
     /**
      * @param workoutService hủy buổi tập tương lai khi chặn tập. TrainingWorkoutService không phụ thuộc ngược lại
@@ -45,10 +46,12 @@ public class TrainingDecisionService {
      */
     public TrainingDecisionService(HorseRepository horseRepository,
                                    CareScheduleRepository careScheduleRepository,
-                                   TrainingWorkoutService workoutService) {
+                                   TrainingWorkoutService workoutService,
+                                   GroupWorkoutSyncService groupSync) {
         this.horseRepository = horseRepository;
         this.careScheduleRepository = careScheduleRepository;
         this.workoutService = workoutService;
+        this.groupSync = groupSync;
     }
 
     /**
@@ -63,6 +66,8 @@ public class TrainingDecisionService {
         horse.setTrainingDecisionReason(reason);
         horseRepository.save(horse);
         workoutService.cancelFutureTrainingForHorse(horse.getId());
+        // Ngựa bị chặn ra khỏi nhóm; các ngựa còn lại vẫn tập bình thường. (A blocked horse leaves its group; the others train on.)
+        groupSync.exitAnyGroup(horse.getId());
     }
 
     @Transactional

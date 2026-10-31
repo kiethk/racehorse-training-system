@@ -86,7 +86,7 @@ class CareScheduleHardeningTests {
                 events,
                 mock(EntityManager.class),
                 notificationService,
-                new TrainingDecisionService(horses, schedules, workoutService),
+                new TrainingDecisionService(horses, schedules, workoutService, org.mockito.Mockito.mock(com.rtms.backend.training.service.GroupWorkoutSyncService.class)),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class)
         );

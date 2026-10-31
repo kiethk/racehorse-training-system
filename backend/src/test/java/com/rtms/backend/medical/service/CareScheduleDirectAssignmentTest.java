@@ -74,7 +74,7 @@ class CareScheduleDirectAssignmentTest {
                 events,
                 mock(EntityManager.class),
                 mock(NotificationService.class),
-                new TrainingDecisionService(horses, schedules, workoutService),
+                new TrainingDecisionService(horses, schedules, workoutService, org.mockito.Mockito.mock(com.rtms.backend.training.service.GroupWorkoutSyncService.class)),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class));
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

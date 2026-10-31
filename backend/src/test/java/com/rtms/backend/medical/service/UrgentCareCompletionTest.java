@@ -82,7 +82,7 @@ class UrgentCareCompletionTest {
                 admissionRepository, stallRepository, userRepository, incidentReportRepository,
                 veterinarianProfileRepository, auditLogRepository, eventPublisher, entityManager,
                 notificationService,
-                new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
+                new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService, org.mockito.Mockito.mock(com.rtms.backend.training.service.GroupWorkoutSyncService.class)),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class));
 

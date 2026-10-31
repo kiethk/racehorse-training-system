@@ -74,4 +74,15 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
              AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > :time))
            """)
     int cancelNotStartedOfPlan(@Param("planId") Long planId, @Param("today") LocalDate today, @Param("time") LocalTime time);
+
+    /** Buổi SCHEDULED CHƯA bắt đầu của các kế hoạch đã cho, theo thứ tự. (SCHEDULED Sessions of the given plans that have NOT started, in order.) */
+    @Query("""
+           SELECT s FROM TrainingSession s
+           WHERE s.groupPlanId IN :planIds
+             AND s.status = com.rtms.backend.training.enums.SessionStatus.SCHEDULED
+             AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > :time))
+           ORDER BY s.sessionDate, s.startTime
+           """)
+    List<TrainingSession> findNotStartedOfPlans(@Param("planIds") Collection<Long> planIds,
+                                                @Param("today") LocalDate today, @Param("time") LocalTime time);
 }

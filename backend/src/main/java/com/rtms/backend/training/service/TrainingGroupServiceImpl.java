@@ -57,6 +57,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     private final HorseRepository horseRepository;
     private final UserRepository userRepository;
     private final TrainingDecisionService trainingDecisionService;
+    private final GroupWorkoutSyncService groupSync;
 
     public TrainingGroupServiceImpl(TrainingGroupRepository groupRepository,
                                     TrainingGroupMemberRepository memberRepository,
@@ -64,7 +65,8 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
                                     CourseRepository courseRepository,
                                     HorseRepository horseRepository,
                                     UserRepository userRepository,
-                                    TrainingDecisionService trainingDecisionService) {
+                                    TrainingDecisionService trainingDecisionService,
+                                    GroupWorkoutSyncService groupSync) {
         this.groupRepository = groupRepository;
         this.memberRepository = memberRepository;
         this.planRepository = planRepository;
@@ -72,6 +74,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         this.horseRepository = horseRepository;
         this.userRepository = userRepository;
         this.trainingDecisionService = trainingDecisionService;
+        this.groupSync = groupSync;
     }
 
     // =================================================================
@@ -184,8 +187,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
                 .filter(m -> m.getGroupId().equals(group.getId()))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_IN_GROUP",
                         "That horse is not in group '" + group.getName() + "'!"));
-        memberRepository.delete(member);
-        memberRepository.flush();
+        groupSync.exitGroup(member);
         return toResponse(group);
     }
 
@@ -200,8 +202,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
                 throw new ApiException(HttpStatus.CONFLICT, "HORSE_ALREADY_IN_GROUP",
                         "That horse is already in group '" + target.getName() + "'!");
             }
-            memberRepository.delete(current.get());
-            memberRepository.flush();
+            groupSync.exitGroup(current.get());
         }
         join(target, horseId, currentUser);
         return toResponse(target);
@@ -252,18 +253,21 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
                     horse.getName(), other));
         }
 
+        groupSync.assertCanJoin(group.getId());
+
         TrainingGroupMember member = new TrainingGroupMember();
         member.setGroupId(group.getId());
         member.setHorseId(horseId);
         member.setGroomId(stall.stallGroomId());
         try {
-            memberRepository.saveAndFlush(member);
+            member = memberRepository.saveAndFlush(member);
         } catch (DataIntegrityViolationException e) {
             // Hai request đồng thời cùng qua các bước kiểm trên; DB là lớp chặn cuối.
             // (Two simultaneous requests passed the checks above; the DB is the last guard.)
             throw new ApiException(HttpStatus.CONFLICT, "GROUP_CONFLICT",
                     "The group changed at the same time. Reload and try again!");
         }
+        groupSync.createFutureWorkouts(member);
     }
 
     private void assertInTrainerArea(Horse horse, HorseStallInfo stall, Long trainerId) {

@@ -37,7 +37,7 @@ class TrainingDecisionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService);
+        service = new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService, org.mockito.Mockito.mock(com.rtms.backend.training.service.GroupWorkoutSyncService.class));
         horse = new Horse();
         horse.setId(7L);
         horse.setName("Thunder");

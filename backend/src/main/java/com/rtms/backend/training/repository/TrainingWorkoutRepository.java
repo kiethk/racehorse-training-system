@@ -326,4 +326,16 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
     long countBySessionIdAndStatusNot(Long sessionId, WorkoutStatus status);
 
     List<TrainingWorkout> findBySessionId(Long sessionId);
+
+    /** Workout còn SCHEDULED của một chiến mã trong các buổi đã cho. (A horse's SCHEDULED Workouts in the given Sessions.) */
+    @Query("""
+           SELECT w FROM TrainingWorkout w
+           WHERE w.horseId = :horseId AND w.sessionId IN :sessionIds
+             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED
+           """)
+    List<TrainingWorkout> findScheduledOfHorseInSessions(@Param("horseId") Long horseId,
+                                                         @Param("sessionIds") Collection<Long> sessionIds);
+
+    /** Mọi Workout của chiến mã thuộc mô hình nhóm, mọi trạng thái. (Every group-model Workout of a horse, any status.) */
+    List<TrainingWorkout> findByHorseIdAndSessionIdIsNotNull(Long horseId);
 }
