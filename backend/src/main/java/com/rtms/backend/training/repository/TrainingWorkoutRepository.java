@@ -4,6 +4,7 @@ import com.rtms.backend.training.dto.*;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import com.rtms.backend.training.dto.SessionCountRow;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -289,4 +290,13 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
        """)
     Optional<TrainingWorkout> findByIdAndTrainerId(@Param("workoutId") Long workoutId, @Param("trainerId") Long trainerId);
     List<TrainingWorkout> findByHorseIdOrderByCreatedAtDesc(Long horseId);
+
+    /** Số Workout còn hiệu lực của nhiều buổi bằng MỘT truy vấn. (Non-cancelled Workout counts of many Sessions in ONE query.) */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.SessionCountRow(w.sessionId, COUNT(w))
+           FROM TrainingWorkout w
+           WHERE w.sessionId IN :sessionIds AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
+           GROUP BY w.sessionId
+           """)
+    List<SessionCountRow> countActiveBySession(@Param("sessionIds") Collection<Long> sessionIds);
 }

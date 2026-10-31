@@ -18,6 +18,10 @@ public interface GroupPlanRepository extends JpaRepository<GroupPlan, Long> {
 
     List<GroupPlan> findByGroupIdInAndStatusIn(Collection<Long> groupIds, Collection<TrainingPlanStatus> statuses);
 
+    List<GroupPlan> findByTrainerIdOrderByStartDateDesc(Long trainerId);
+
+    List<GroupPlan> findAllByOrderByStartDateDesc();
+
     List<GroupPlan> findByStatusAndStartDateLessThanEqual(TrainingPlanStatus status, LocalDate date);
 
     List<GroupPlan> findByStatusIn(Collection<TrainingPlanStatus> statuses);

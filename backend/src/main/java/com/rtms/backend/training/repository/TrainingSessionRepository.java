@@ -1,5 +1,6 @@
 package com.rtms.backend.training.repository;
 
+import com.rtms.backend.training.dto.PlanSessionCountRow;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.enums.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,4 +32,17 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
             Long trainerId, LocalDate sessionDate, SessionStatus status);
 
     long countByGroupPlanIdAndStatus(Long groupPlanId, SessionStatus status);
+
+    /** Buổi chưa hủy của Trainer trong một khoảng ngày, một truy vấn cho cả khóa. (A trainer's non-cancelled Sessions over a date range, one query for the whole course.) */
+    List<TrainingSession> findByTrainerIdAndSessionDateBetweenAndStatusNot(
+            Long trainerId, LocalDate from, LocalDate to, SessionStatus status);
+
+    /** Số buổi của nhiều kế hoạch theo trạng thái bằng MỘT truy vấn. (Session counts of many plans per status in ONE query.) */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.PlanSessionCountRow(s.groupPlanId, s.status, COUNT(s))
+           FROM TrainingSession s
+           WHERE s.groupPlanId IN :planIds
+           GROUP BY s.groupPlanId, s.status
+           """)
+    List<PlanSessionCountRow> countByPlanAndStatus(@Param("planIds") Collection<Long> planIds);
 }
