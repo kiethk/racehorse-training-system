@@ -338,4 +338,6 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
 
     /** Mọi Workout của chiến mã thuộc mô hình nhóm, mọi trạng thái. (Every group-model Workout of a horse, any status.) */
     List<TrainingWorkout> findByHorseIdAndSessionIdIsNotNull(Long horseId);
+
+    List<TrainingWorkout> findBySessionIdIn(Collection<Long> sessionIds);
 }

@@ -85,4 +85,28 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
            """)
     List<TrainingSession> findNotStartedOfPlans(@Param("planIds") Collection<Long> planIds,
                                                 @Param("today") LocalDate today, @Param("time") LocalTime time);
+
+    List<TrainingSession> findByTrainerIdAndSessionDateBetweenOrderBySessionDateAscStartTimeAsc(
+            Long trainerId, LocalDate from, LocalDate to);
+
+    List<TrainingSession> findBySessionDateBetweenOrderBySessionDateAscStartTimeAsc(LocalDate from, LocalDate to);
+
+    /** Buổi trong khoảng ngày có ít nhất một ngựa do Groom này dắt. (Sessions in a range with at least one horse this Groom leads.) */
+    @Query("""
+           SELECT DISTINCT s FROM TrainingSession s
+           JOIN TrainingWorkout w ON w.sessionId = s.id
+           WHERE w.assignedToId = :groomId AND s.sessionDate BETWEEN :from AND :to
+           ORDER BY s.sessionDate, s.startTime
+           """)
+    List<TrainingSession> findOfGroom(@Param("groomId") Long groomId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** Buổi trong khoảng ngày có ít nhất một ngựa của Owner này. (Sessions in a range with at least one horse of this Owner.) */
+    @Query("""
+           SELECT DISTINCT s FROM TrainingSession s
+           JOIN TrainingWorkout w ON w.sessionId = s.id
+           JOIN Horse h ON w.horseId = h.id
+           WHERE h.ownerId = :ownerId AND s.sessionDate BETWEEN :from AND :to
+           ORDER BY s.sessionDate, s.startTime
+           """)
+    List<TrainingSession> findOfOwner(@Param("ownerId") Long ownerId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }
