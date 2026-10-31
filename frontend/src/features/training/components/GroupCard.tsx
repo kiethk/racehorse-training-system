@@ -58,7 +58,7 @@ export function GroupCard({
         </ul>
       )}
 
-      <div className="mt-auto flex items-center justify-between gap-2 border-t border-[var(--color-border)] pt-3">
+      <div className="mt-auto space-y-3 border-t border-[var(--color-border)] pt-3">
         {group.currentPlanStatus && group.currentCourseName ? (
           <Tooltip content={group.currentPlanEndDate ? `Ends ${formatDate(group.currentPlanEndDate)}` : ''}>
             <span className="flex min-w-0 cursor-help items-center gap-2">
@@ -70,7 +70,7 @@ export function GroupCard({
         ) : (
           <span className="text-sm text-[var(--color-text-muted)]">Free</span>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           {group.members.length > 0 && (
             <LinkButton size="sm" href={`/trainer/plans/new?groupId=${group.id}`}>Assign course</LinkButton>
           )}

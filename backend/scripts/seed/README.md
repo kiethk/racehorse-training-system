@@ -50,9 +50,12 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
 - **Sinh hiệu:** Thú y đo mỗi ngựa một lần mỗi tuần, mỗi ngựa một ngày riêng, đôi khi lệch nhẹ. Ngựa đang tạm nghỉ được
   đo hằng ngày với số đo bất thường tới khi khỏi; ngựa có buổi tập mệt thì chiều hôm đó nhịp tim cao.
 - **Huấn luyện:** 3 Trainer, mỗi người có bài tập và khóa riêng. Khóa có nhiều kiểu: một bài lặp lại, nhiều bài xoay vòng,
-  toàn bài khác nhau, khóa chưa ai học. Có khoảng 13 tuần lịch sử: plan COMPLETED / ACTIVE / UPCOMING, plan bị hủy vì ngựa
-  bị chặn tập, lot bị Trainer hủy vì mưa, buổi đã qua chưa ghi kết quả, ngựa có dấu hiệu mệt. Điểm phong độ trải từ thấp
-  tới cao và tính đúng công thức của app.
+  toàn bài khác nhau, khóa chưa ai học. Ngựa được chia vào các Training Group (tối đa 6 ngựa, không hai ngựa cùng Groom trong
+  một nhóm); ngựa đang bị chặn tập không nằm trong nhóm nào. Mỗi nhóm chạy nối tiếp các khóa trong khoảng 13 tuần lịch sử: Group
+  Plan COMPLETED / ACTIVE và một plan UPCOMING xếp hàng sau plan đang chạy. Trạng thái theo đồng hồ: Session hết giờ là HELD, dù
+  đã ghi kết quả hay chưa. Có sẵn các kịch bản demo: Session đã HELD còn thiếu kết quả (nhãn "Needs result"), ngựa vào giữa
+  khóa, ngựa bị hủy riêng một buổi, ngựa "không chạy", Session bị hủy vì mưa, plan bị bỏ giữa chừng, ngựa bị chặn tập ra khỏi
+  nhóm, ngựa có dấu hiệu mệt. Điểm phong độ trải từ thấp tới cao và tính đúng công thức của app.
 - **Groom:** 5 việc SOP mỗi ngày trong 14 ngày gần nhất, theo đúng Groom của chuồng ngựa đang ở; việc giao thêm; hoàn thành
   theo khối có ghi chú và ảnh; vài khối bị bỏ lỡ. groom1 còn việc hôm nay để thử tick.
 - **Thi đấu:** đề cử PENDING / APPROVED / REJECTED.
@@ -70,7 +73,7 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
 | `sql/30_admissions.sql` | Luồng nhập học từng đơn |
 | `sql/40_vet_cases.sql` | Ca Thú y sau nhập trại |
 | `sql/45_preventive.sql` | Tiêm phòng tới hôm nay |
-| `sql/50_training.sql` | Bài tập, khóa, plan, lot, buổi tập |
+| `sql/50_training.sql` | Bài tập, khóa, nhóm huấn luyện, Group Plan, Session, Workout |
 | `sql/60_groom.sql` | Việc hằng ngày của Groom |
 | `sql/65_vitals.sql` | Chỉ số sinh hiệu Thú y đo khi đi buồng |
 | `sql/70_racing.sql` | Đề cử thi đấu |
@@ -86,7 +89,7 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
    - Ngày giờ viết tương đối với hôm nay: `pg_temp.at(-3, TIME '14:00')`, `pg_temp.today() + 5`, `pg_temp.clock()`.
      Dữ liệu trong `10_data.sql` viết theo ngày gốc 2026-10-25 và được dời bằng `pg_temp.d()` / `pg_temp.ts()`.
    - Đi qua hàm có sẵn thay vì INSERT tay khi có thể. Ví dụ `pg_temp.book` / `pg_temp.complete_care` cho lịch Thú y,
-     `pg_temp.cohort` cho plan, `pg_temp.report_incident` cho sự cố. Các hàm này giữ luật giống service.
+     `pg_temp.make_group_plan` cho plan của nhóm, `pg_temp.report_incident` cho sự cố. Các hàm này giữ luật giống service.
 3. **Luật của phần mình**: thêm một dòng vào `99_verify.sql` (tên luật + câu SELECT trả về các dòng vi phạm).
 4. **Bảng danh mục mới do migration nạp** (như `preventive_protocols`): thêm tên bảng vào `v_keep` trong `01_cleanup.sql`,
    nếu không seed sẽ xóa nó.
