@@ -167,8 +167,8 @@ class HorseResponseJsonTest {
                 mock(com.rtms.backend.horse.repository.HorseRepository.class);
         com.rtms.backend.stable.repository.StableStallRepository stallRepo =
                 mock(com.rtms.backend.stable.repository.StableStallRepository.class);
-        com.rtms.backend.training.service.TrainingWorkoutService workoutSvc =
-                mock(com.rtms.backend.training.service.TrainingWorkoutService.class);
+        com.rtms.backend.training.service.GroupWorkoutSyncService workoutSvc =
+                mock(com.rtms.backend.training.service.GroupWorkoutSyncService.class);
         com.rtms.backend.stable.repository.AreaRepository areaRepo =
                 mock(com.rtms.backend.stable.repository.AreaRepository.class);
 

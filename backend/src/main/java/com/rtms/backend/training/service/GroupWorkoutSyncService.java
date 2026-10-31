@@ -28,6 +28,25 @@ public interface GroupWorkoutSyncService {
      */
     void exitGroup(TrainingGroupMember member);
 
+    /**
+     * Đổi Groom của MỘT chiến mã cho các buổi chưa bắt đầu và cho tư cách thành viên nhóm; null khi gỡ Groom khỏi chuồng. Buổi đã diễn
+     * ra giữ Groom cũ vì đó là lịch sử.
+     * (Changes the Groom of ONE horse for its not-yet-started Sessions and for its group membership; null when the Groom is removed
+     * from the stall. Sessions already held keep the old Groom, which is history.)
+     *
+     * @return số Workout đã chuyển (number of Workouts moved)
+     * @throws IllegalStateException nếu hai thành viên của một nhóm sẽ cùng Groom, BR-09 (if two members of a group would share a Groom)
+     */
+    int reassignFutureWorkoutsToGroom(Long horseId, Long newGroomId);
+
+    /**
+     * Như trên cho NHIỀU ngựa cùng lúc; kiểm tra phân bổ cuối cùng TRƯỚC khi đổi bất cứ thứ gì nên hoán đổi Groom giữa hai ngựa vẫn
+     * được. Giá trị null nghĩa là gỡ Groom.
+     * (Like the above for MANY horses at once; the final allocation is validated BEFORE anything changes, so swapping Grooms between
+     * two horses works. A null value removes the Groom.)
+     */
+    int reassignFutureWorkoutsToGrooms(java.util.Map<Long, Long> groomByHorse);
+
     /** Như exitGroup cho ngựa bất kỳ nhóm nào; không làm gì nếu ngựa không ở nhóm nào. (Like exitGroup for a horse in any group; does nothing if it is in none.) */
     void exitAnyGroup(Long horseId);
 }

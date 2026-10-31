@@ -10,8 +10,8 @@ import java.time.LocalTime;
  *
  * @param goldenHoursStart          đầu khung giờ vàng huấn luyện (start of the training golden hours)
  * @param goldenHoursEnd            cuối khung giờ vàng (end of the golden hours)
- * @param lotCapacity               sức chứa mặc định của một lot (default capacity of a lot)
- * @param lotStartStepMinutes       lot chỉ bắt đầu ở bội số của số phút này (a lot only starts on multiples of these minutes)
+ * @param groupCapacity               sức chứa mặc định của một session (default capacity of a session)
+ * @param sessionStartStepMinutes       session chỉ bắt đầu ở bội số của số phút này (a session only starts on multiples of these minutes)
  * @param maxCourseSessions         số buổi tối đa của một khóa (most sessions of one course)
  * @param maxCourseSubjects         số môn tối đa của một khóa (most subjects of one course)
  * @param maxHorsesPerPlan          số ngựa tối đa mỗi lần ghi danh (most horses per enrollment)
@@ -22,8 +22,8 @@ import java.time.LocalTime;
  */
 public record TrainingRulesResponse(LocalTime goldenHoursStart,
                                     LocalTime goldenHoursEnd,
-                                    int lotCapacity,
-                                    int lotStartStepMinutes,
+                                    int groupCapacity,
+                                    int sessionStartStepMinutes,
                                     int maxCourseSessions,
                                     int maxCourseSubjects,
                                     int maxHorsesPerPlan,

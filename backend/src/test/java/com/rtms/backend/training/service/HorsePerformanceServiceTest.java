@@ -13,10 +13,10 @@ import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
-import com.rtms.backend.training.enums.LotStatus;
+import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import com.rtms.backend.training.repository.GroupPlanRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,7 +44,7 @@ class HorsePerformanceServiceTest {
     private TrainingWorkoutRepository workoutRepository;
 
     @Mock
-    private HorseTrainingPlanRepository planRepository;
+    private GroupPlanRepository planRepository;
 
     @Mock
     private HorseRepository horseRepository;
@@ -177,7 +177,7 @@ class HorsePerformanceServiceTest {
         LocalDate to = LocalDate.of(2026, 11, 2);
         List<HorseScheduleItemResponse> rows = List.of(new HorseScheduleItemResponse(
                 7L, from, java.time.LocalTime.of(6, 0), java.time.LocalTime.of(7, 0), "Gallop",
-                LotStatus.SCHEDULED, WorkoutStatus.CANCELLED));
+                SessionStatus.SCHEDULED, WorkoutStatus.CANCELLED));
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse(1L, 5L)));
         when(workoutRepository.findHorseSchedule(1L, from, to)).thenReturn(rows);
 

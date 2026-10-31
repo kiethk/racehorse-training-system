@@ -23,7 +23,7 @@ import { useGroupPlanPreview } from '../hooks/useGroupPlanPreview';
 import { toIsoDate, tomorrowIso } from '../lib/dateRange';
 import { trainingService } from '../services/trainingService';
 import type { Course, TrainingDay, TrainingGroup } from '../types';
-import { DAYS_OF_WEEK } from './enrollment/ScheduleStep';
+import { DAYS_OF_WEEK } from '../lib/weekdays';
 import { GroupPlanPreviewPanel } from './GroupPlanPreviewPanel';
 
 const DEFAULT_DAYS: TrainingDay[] = ['MONDAY', 'WEDNESDAY', 'FRIDAY'];

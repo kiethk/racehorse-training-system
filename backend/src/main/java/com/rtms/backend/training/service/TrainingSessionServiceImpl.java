@@ -59,7 +59,7 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
         if (newStartTime == null) {
             throw new IllegalArgumentException("The new start time must not be empty!");
         }
-        if (!FarmSchedulePolicy.isOnLotStartStep(newStartTime)) {
+        if (!FarmSchedulePolicy.isOnSessionStartStep(newStartTime)) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_START_TIME",
                     "A session starts at minute 00, 15, 30 or 45!");
         }

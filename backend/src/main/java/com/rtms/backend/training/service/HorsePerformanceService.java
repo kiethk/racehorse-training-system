@@ -12,7 +12,7 @@ import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import com.rtms.backend.training.repository.GroupPlanRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,13 +45,13 @@ public class HorsePerformanceService {
     private static final LocalTime DEFAULT_END_TIME = LocalTime.of(10, 0);
 
     private final TrainingWorkoutRepository workoutRepository;
-    private final HorseTrainingPlanRepository planRepository;
+    private final GroupPlanRepository planRepository;
     private final HorseViewAccessService accessService;
     private final HorseSpecialtyService specialtyService;
     private final HorseScopeService scopeService;
 
     public HorsePerformanceService(TrainingWorkoutRepository workoutRepository,
-                                   HorseTrainingPlanRepository planRepository,
+                                   GroupPlanRepository planRepository,
                                    HorseViewAccessService accessService,
                                    HorseSpecialtyService specialtyService,
                                    HorseScopeService scopeService) {
@@ -146,7 +146,7 @@ public class HorsePerformanceService {
                         "MAX_HEART_RATE_EXCEEDED",
                         "Maximum heart rate above safe limit",
                         String.format("Recorded a maximum heart rate of %d bpm (safe limit <= %d bpm) on %s.",
-                                r.maxHeartRate(), MAX_HEART_RATE_LIMIT, r.lotDate()),
+                                r.maxHeartRate(), MAX_HEART_RATE_LIMIT, r.sessionDate()),
                         "DANGER",
                         triggeredAt(r),
                         r.maxHeartRate().doubleValue(),
@@ -162,7 +162,7 @@ public class HorsePerformanceService {
                         "POOR_RECOVERY_HEART_RATE",
                         "Poor heart-rate recovery",
                         String.format("Post-workout recovery heart rate is abnormally high (%d bpm, safe limit <= %d bpm) on %s.",
-                                r.recoveryHeartRate(), RECOVERY_HEART_RATE_LIMIT, r.lotDate()),
+                                r.recoveryHeartRate(), RECOVERY_HEART_RATE_LIMIT, r.sessionDate()),
                         "DANGER",
                         triggeredAt(r),
                         r.recoveryHeartRate().doubleValue(),
@@ -198,7 +198,7 @@ public class HorsePerformanceService {
     }
 
     private LocalDateTime triggeredAt(RecentWorkoutRow row) {
-        return row.lotDate().atTime(row.lotEndTime() != null ? row.lotEndTime() : DEFAULT_END_TIME);
+        return row.sessionDate().atTime(row.sessionEndTime() != null ? row.sessionEndTime() : DEFAULT_END_TIME);
     }
 
     // =================================================================

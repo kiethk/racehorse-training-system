@@ -97,7 +97,7 @@ abstract class DemoSeedWorkflow {
     @MockitoBean AdmissionArrivalScheduler arrivalScheduler;
     @MockitoBean CareScheduleScheduler careScheduler;
     @MockitoBean GroomDailyTaskScheduler dailyScheduler;
-    @MockitoBean TrainingPlanStatusScheduler planScheduler;
+    @MockitoBean SessionSettlementScheduler sessionScheduler;
 
     final ObjectMapper json = new ObjectMapper();
     final Map<String, Long> staffIds = new LinkedHashMap<>();

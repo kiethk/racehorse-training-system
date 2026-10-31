@@ -2,7 +2,6 @@ package com.rtms.backend.admission.service;
 
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.HorseTrainingPlan;
 import com.rtms.backend.training.entity.TrainingWorkout;
 
 import com.rtms.backend.config.ApiException;
@@ -30,7 +29,7 @@ import java.time.LocalDateTime;
  * MANAGER_REVIEW, Manager mới quyết định cuối cùng.
  *
  * Bước này KHÔNG đụng tới Horse.currentStatus (vẫn CANDIDATE), chuồng cách ly,
- * hay Course / HorseTrainingPlan / TrainingWorkout.
+ * hay Course / GroupPlan / TrainingWorkout.
  */
 @Service
 public class AdmissionTrainerReviewService {

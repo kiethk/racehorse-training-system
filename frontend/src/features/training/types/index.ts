@@ -1,5 +1,5 @@
 export type PlanStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
-export type WorkoutStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+export type WorkoutStatus = 'SCHEDULED' | 'HELD' | 'CANCELLED';
 export type SurfaceType = 'TURF' | 'DIRT' | 'SYNTHETIC';
 export type IntensityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -71,138 +71,7 @@ export interface CreateCourseRequest {
   subjects: CourseSubjectItem[];
 }
 
-export interface HorseEnrollmentItem {
-  horseId: number;
-  groomId?: number | null;
-}
-
 /** Whether a horse can join the plan being previewed. Mirrors the backend enum PlanAvailability. */
-export type PlanAvailability = 'AVAILABLE' | 'BUSY' | 'BLOCKED' | 'NO_GROOM';
-
-/** A running or upcoming plan of a horse. */
-export interface RunningPlanRow {
-  planId: number;
-  horseId: number;
-  courseName: string;
-  startDate: string;
-  endDate: string;
-  status: PlanStatus;
-}
-
-export interface PlanPreviewRequest {
-  courseId: number;
-  startDate: string; // YYYY-MM-DD
-  trainingDays: TrainingDay[];
-  selectedHorseIds: number[];
-}
-
-export interface HorsePlanAvailability {
-  horseId: number;
-  horseName: string;
-  breed: string | null;
-  stallCode: string | null;
-  availability: PlanAvailability;
-  /** Ready-to-show explanation; null when the horse is available. */
-  reason: string | null;
-  /** Plans overlapping the previewed period. */
-  conflicts: RunningPlanRow[];
-  /** Earliest date this horse is free for the whole course; only for BUSY horses. */
-  earliestStart: string | null;
-}
-
-export interface PlanPreviewResponse {
-  /** The chosen start moved to the nearest training weekday: the date the plan really starts. */
-  firstSessionDate: string;
-  endDate: string;
-  totalSessions: number;
-  /** Earliest date every selected horse is free for the whole course; null when none is selected. */
-  groupEarliestStart: string | null;
-  horses: HorsePlanAvailability[];
-}
-
-export interface CreateHorseTrainingPlanRequest {
-  courseId: number;
-  startDate: string; // YYYY-MM-DD
-  trainingDays: TrainingDay[];
-  horses: HorseEnrollmentItem[];
-}
-
-export interface JoinableCohortResponse {
-  cohortStatus: 'UPCOMING' | 'ACTIVE';
-  suggestedStartDate: string;
-  trainingDays: TrainingDay[];
-  horseCount: number;
-  /**
-   * Number of IN-PHASE sessions — same day, same subject.
-   * NOT "sessions in the same lot": being in phase is only a NECESSARY condition.
-   * The group is still split across lots if over capacity (BR-10) or sharing a Groom (BR-09).
-   */
-  sharedSessions: number;
-  totalSessions: number;
-  waitDays: number;
-  /** Capacity of one lot, returned by the backend so the number 6 is not hardcoded. */
-  lotCapacity: number;
-}
-
-export interface PlanWorkoutItemResponse {
-  workoutId: number;
-  lotId: number;
-  lotDate: string;
-  startTime: string;
-  endTime: string;
-  subjectId: number;
-  subjectName: string;
-  /** Surface of the lot's subject; null if the subject was deleted. */
-  surfaceType: SurfaceType | null;
-  horseId: number;
-  /** The handler of THIS horse only — NOT "the lot's groom". */
-  assignedGroomId: number | null;
-  /** Total active horses in the lot, to show how group matching works. */
-  lotOccupancy: number | null;
-  status: WorkoutStatus;
-  actualDistanceMeters: number | null;
-  actualDurationMinutes?: number | null;
-  averageSpeedKmh?: number | null;
-  averageHeartRate: number | null;
-  maxHeartRate: number | null;
-  recoveryHeartRate?: number | null;
-  topSpeedKmh: number | null;
-  performanceRating: number | null;
-  trainerFeedback: string | null;
-}
-
-export interface HorseTrainingPlan {
-  id: number;
-  horseId: number;
-  courseId: number;
-  startDate: string;
-  endDate: string;
-  status: PlanStatus;
-}
-
-export interface HorseTrainingPlanDetailResponse {
-  plan: HorseTrainingPlan;
-  workouts: PlanWorkoutItemResponse[];
-  horseName: string | null;
-  courseName: string | null;
-}
-
-/** One row in the training plan list. */
-export interface PlanSummaryResponse {
-  planId: number;
-  horseId: number;
-  horseName: string;
-  courseId: number;
-  courseName: string;
-  startDate: string;
-  endDate: string;
-  status: PlanStatus;
-  totalSessions: number;
-  completedSessions: number;
-  /** Cancelled sessions — removed from the denominator when computing progress. */
-  cancelledSessions: number;
-}
-
 export interface CompleteWorkoutRequest {
   actualDistanceMeters: number;
   actualDurationMinutes: number;
@@ -227,40 +96,15 @@ export interface WorkoutResultPreviewResponse {
   performanceRating?: number;
 }
 
-export interface TrainingLotResponse {
-  lotId: number;
-  lotDate: string;
-  startTime: string; // "06:00:00"
-  endTime: string;   // "07:30:00"
-  subjectId: number;
-  subjectName: string;
-  durationMinutes: number;
-  status: WorkoutStatus;
-  maxCapacity: number;
-  occupied: number;
-  remainingSlots: number;
-  horses: LotHorse[];
-}
-
-/** A horse in a lot: its id opens the horse schedule, its name is what the lot shows. */
-export interface LotHorse {
-  horseId: number;
-  name: string;
-}
-
-/** One session of a horse in its schedule. The lot and the horse's own workout can each be cancelled. */
+/** One session of a horse in its schedule. The session and the horse's own workout can each be cancelled. */
 export interface HorseScheduleItem {
-  lotId: number;
-  lotDate: string; // YYYY-MM-DD
+  sessionId: number;
+  sessionDate: string; // YYYY-MM-DD
   startTime: string; // "06:00:00"
   endTime: string;
   subjectName: string;
-  lotStatus: WorkoutStatus;
+  sessionStatus: SessionStatus;
   workoutStatus: WorkoutStatus;
-}
-
-export interface RescheduleLotRequest {
-  newStartTime: string; // "HH:mm" or "HH:mm:ss"
 }
 
 export interface HorseFitnessTrendItem {
@@ -290,9 +134,10 @@ export interface HorseAlert {
 export interface TrainingRules {
   goldenHoursStart: string; // "06:00:00"
   goldenHoursEnd: string;   // "10:00:00"
-  lotCapacity: number;
-  /** A lot only starts on multiples of this many minutes (00, 15, 30, 45). */
-  lotStartStepMinutes: number;
+  /** The most horses one training group holds. */
+  groupCapacity: number;
+  /** A session only starts on multiples of this many minutes (00, 15, 30, 45). */
+  sessionStartStepMinutes: number;
   minSubjectDurationMinutes: number;
   maxSubjectDurationMinutes: number;
   maxCourseSessions: number;

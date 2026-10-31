@@ -179,7 +179,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getTrainerSchedule",
-                        "Tra cứu các ca tập TrainingLot của HLV theo ngày date (mặc định hôm nay) hoặc khoảng fromDate đến toDate (hiển thị rõ Ca tập, thời gian, bài tập, danh sách ngựa).",
+                        "Tra cứu các ca tập buổi tập (Session) của HLV theo ngày date (mặc định hôm nay) hoặc khoảng fromDate đến toDate (hiển thị rõ Ca tập, thời gian, bài tập, danh sách ngựa).",
                         buildParamSchema(Map.of(
                                 "date", Map.of("type", "string", "description", "Ngày cần tra cứu (YYYY-MM-DD)"),
                                 "fromDate", Map.of("type", "string", "description", "Từ ngày (YYYY-MM-DD)"),
@@ -214,7 +214,7 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "checkGroomConflictForLot",
-                        "Kiểm tra quy tắc BR-09 khi gán Groom cho ngựa trong ca tập (lot).",
+                        "Kiểm tra quy tắc BR-09 khi gán Groom cho ngựa trong ca tập (session).",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)"),

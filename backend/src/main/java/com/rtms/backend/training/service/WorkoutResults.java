@@ -6,8 +6,8 @@ import com.rtms.backend.training.entity.TrainingWorkout;
 import java.math.BigDecimal;
 
 /**
- * Kiểm tra và ghi chỉ số của một buổi tập, dùng chung cho mô hình lot cũ và mô hình nhóm để mọi nơi ghi kết quả đều theo MỘT luật.
- * (Validates and applies the measurements of a workout, shared by the old lot model and the group model so every place that
+ * Kiểm tra và ghi chỉ số của một buổi tập, dùng chung cho mô hình session cũ và mô hình nhóm để mọi nơi ghi kết quả đều theo MỘT luật.
+ * (Validates and applies the measurements of a workout, shared by the old session model and the group model so every place that
  * records a result follows ONE rule.)
  */
 public final class WorkoutResults {

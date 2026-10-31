@@ -5,7 +5,7 @@ import { Button, FormField, Modal, Notice, Select } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { useTrainingRules } from '../hooks/useTrainingRules';
-import { lotStartOptions, minutesOf } from '../lib/timeline';
+import { minutesOf, sessionStartOptions } from '../lib/timeline';
 import { trainingService } from '../services/trainingService';
 import type { ScheduleSession } from '../types';
 
@@ -45,7 +45,7 @@ function MoveForm({
 
   const duration = minutesOf(session.endTime) - minutesOf(session.startTime);
   const options = rules
-    ? lotStartOptions(rules.goldenHoursStart, rules.goldenHoursEnd, duration, rules.lotStartStepMinutes)
+    ? sessionStartOptions(rules.goldenHoursStart, rules.goldenHoursEnd, duration, rules.sessionStartStepMinutes)
     : [startTime];
 
   async function submit(event: React.FormEvent) {

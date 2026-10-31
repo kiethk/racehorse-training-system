@@ -26,8 +26,8 @@ public class TrainingRulesController {
         return ApiResponse.success(new TrainingRulesResponse(
                 FarmSchedulePolicy.GOLDEN_HOURS_START,
                 FarmSchedulePolicy.GOLDEN_HOURS_END,
-                FarmSchedulePolicy.DEFAULT_LOT_CAPACITY,
-                FarmSchedulePolicy.LOT_START_STEP_MINUTES,
+                TrainingLimits.MAX_HORSES_PER_GROUP,
+                FarmSchedulePolicy.SESSION_START_STEP_MINUTES,
                 TrainingLimits.MAX_COURSE_SESSIONS,
                 TrainingLimits.MAX_COURSE_SUBJECTS,
                 TrainingLimits.MAX_HORSES_PER_PLAN,

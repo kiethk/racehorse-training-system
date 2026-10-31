@@ -26,7 +26,7 @@ public final class TrainingLimits {
     public static final int DESCRIPTION_MAX_LENGTH = 2000;
     public static final int GOAL_MAX_LENGTH = 1000;
 
-    /** Thời lượng một môn, tính bằng phút; nó quyết định độ dài của lot. (Length of a subject in minutes; it sets the length of the lot.) */
+    /** Thời lượng một môn, tính bằng phút; nó quyết định độ dài của session. (Length of a subject in minutes; it sets the length of the session.) */
     public static final int MIN_SUBJECT_DURATION_MINUTES = 15;
     public static final int MAX_SUBJECT_DURATION_MINUTES = 240;
 

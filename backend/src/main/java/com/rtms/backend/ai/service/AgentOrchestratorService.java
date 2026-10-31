@@ -319,7 +319,7 @@ public class AgentOrchestratorService {
                 Thông tin người dùng hiện tại: %s, Vai trò: %s.
 
                 QUY TẮC BẮT BUỘC (TUÂN THỦ TUYỆT ĐỐI 100%%):
-                1. TUYỆT ĐỐI KHÔNG HIỂN THỊ ID SỐ NỘI BỘ TRONG DATABASE TRONG CÂU TRẢ LỜI (Ví dụ: không viết "Ngựa #1", "Ngựa ID 5", "Stall 10", "Lot #12", "Groom #3"). Luôn luôn chuyển đổi và hiển thị bằng TÊN ĐẦY ĐỦ VÀ CÓ Ý NGHĨA (Ví dụ: "Chiến mã Thunder Flash", "Chuồng A-01", "Groom Nguyễn Văn A", "Ca Sáng (08:00 - 09:30)").
+                1. TUYỆT ĐỐI KHÔNG HIỂN THỊ ID SỐ NỘI BỘ TRONG DATABASE TRONG CÂU TRẢ LỜI (Ví dụ: không viết "Ngựa #1", "Ngựa ID 5", "Stall 10", "Session #12", "Groom #3"). Luôn luôn chuyển đổi và hiển thị bằng TÊN ĐẦY ĐỦ VÀ CÓ Ý NGHĨA (Ví dụ: "Chiến mã Thunder Flash", "Chuồng A-01", "Groom Nguyễn Văn A", "Ca Sáng (08:00 - 09:30)").
                 2. TUYỆT ĐỐI KHÔNG HIỂN THỊ TÊN HÀM / TÊN TOOL CODE NỘI BỘ TRONG ĐOẠN CHAT (Ví dụ: không bao giờ nhắc đến "getTrainerSchedule", "getTrainerHorses", "getQuarantineStatus", "handleGet..."). Thay vào đó hãy dùng ngôn từ nghiệp vụ tự nhiên (Ví dụ: "Hệ thống ghi nhận lịch huấn luyện...", "Theo phân công chuồng trại...").
                 3. HẠN CHẾ CONFLICT DỮ LIỆU:
                    - Tất cả các ngựa đang trong diện cách ly y tế hoặc ở khu chuồng cách ly (Quarantine) TUYỆT ĐỐI KHÔNG ĐƯỢC PHÉP TẬP LUYỆN (trạng thái luyện tập luôn là CẤM TẬP / BLOCKED). Không bao giờ trả lời mâu thuẫn giữa cách ly y tế và cho phép tập luyện.
@@ -438,7 +438,7 @@ public class AgentOrchestratorService {
                    - QUAN HỆ THỰC THỂ:
                      + Huấn luyện viên trưởng [Trainer] quản lý Khu vực [Area] gồm nhiều Cụm chuồng [StableLot] và Ô chuồng [Stall].
                      + Mỗi Ô chuồng [Stall] được phân công cho 1 Groom chăm sóc và chứa 1 Chiến mã [Horse].
-                     + Chiến mã [Horse] được ghi danh vào Khóa huấn luyện [Training Plan] -> gồm nhiều Buổi tập [Workout Session] -> chia thành các Lượt tập [Training Lot].
+                     + Chiến mã [Horse] được ghi danh vào Khóa huấn luyện [Training Plan] -> gồm nhiều Buổi tập [Workout Session] -> chia thành các Lượt tập [Training Session].
                      + Chiến mã có thành tích tốt được Huấn luyện viên đăng ký tham gia các Giải đua [Race Registration].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
                      + Tra cứu lịch tập & ca tập: Dùng `getTrainerSchedule` (đọc `totalSessions` và `sessionList`).
@@ -666,7 +666,7 @@ public class AgentOrchestratorService {
             case "endDate" -> "Ngày kết thúc";
             case "startTime" -> "Giờ bắt đầu";
             case "endTime" -> "Giờ kết thúc";
-            case "sessionTime" -> "Ca tập (Lot)";
+            case "sessionTime" -> "Ca tập (Session)";
             case "surface" -> "Mặt sân";
             case "preferredSurface" -> "Mặt sân ưa thích";
             case "intensity" -> "Cường độ";

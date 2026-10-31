@@ -46,7 +46,7 @@ public final class SessionSlotFinder {
         if (!time.isBefore(FarmSchedulePolicy.GOLDEN_HOURS_END)) {
             return FarmSchedulePolicy.GOLDEN_HOURS_END;
         }
-        LocalTime rounded = FarmSchedulePolicy.roundUpToLotStartStep(time);
+        LocalTime rounded = FarmSchedulePolicy.roundUpToSessionStartStep(time);
         return rounded.isBefore(FarmSchedulePolicy.GOLDEN_HOURS_START) ? FarmSchedulePolicy.GOLDEN_HOURS_START : rounded;
     }
 
@@ -73,7 +73,7 @@ public final class SessionSlotFinder {
             if (taken.end().isAfter(cursor)) {
                 // Nhảy qua buổi này, con trỏ KHÔNG lùi; một bài 40 phút kết thúc 06:40 thì buổi sau bắt đầu 06:45.
                 // (Skip this Session, the pointer never moves back; a 40-minute Subject ending 06:40 puts the next at 06:45.)
-                cursor = FarmSchedulePolicy.roundUpToLotStartStep(taken.end());
+                cursor = FarmSchedulePolicy.roundUpToSessionStartStep(taken.end());
             }
         }
 

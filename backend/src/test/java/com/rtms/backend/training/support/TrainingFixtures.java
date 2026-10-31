@@ -98,6 +98,11 @@ public class TrainingFixtures {
         return subjects.saveAndFlush(subject);
     }
 
+    /** Lưu lại một bài đã sửa trong test. (Saves a Subject changed inside a test.) */
+    public Subject save(Subject subject) {
+        return subjects.saveAndFlush(subject);
+    }
+
     public Course course(User trainer, String name, int totalSessions, Subject... orderedSubjects) {
         Course course = new Course();
         course.setName(name);

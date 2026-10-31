@@ -25,7 +25,7 @@ import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -55,7 +55,7 @@ class CareScheduleHardeningTests {
     private VeterinarianProfileRepository profiles;
     private HorseIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private TrainingWorkoutService workoutService;
+    private GroupWorkoutSyncService workoutService;
     private NotificationService notificationService;
     private AdmissionApplicationRepository admissionRepository;
     private CareScheduleService service;
@@ -68,7 +68,7 @@ class CareScheduleHardeningTests {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(HorseIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        workoutService = mock(TrainingWorkoutService.class);
+        workoutService = mock(GroupWorkoutSyncService.class);
         notificationService = mock(NotificationService.class);
         admissionRepository = mock(AdmissionApplicationRepository.class);
 
@@ -86,7 +86,7 @@ class CareScheduleHardeningTests {
                 events,
                 mock(EntityManager.class),
                 notificationService,
-                new TrainingDecisionService(horses, schedules, workoutService, org.mockito.Mockito.mock(com.rtms.backend.training.service.GroupWorkoutSyncService.class)),
+                new TrainingDecisionService(horses, schedules, workoutService),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class)
         );

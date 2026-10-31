@@ -4,7 +4,7 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import com.rtms.backend.training.repository.GroupPlanRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -18,10 +18,10 @@ import org.springframework.stereotype.Service;
 public class HorseViewAccessService {
 
     private final HorseRepository horseRepository;
-    private final HorseTrainingPlanRepository planRepository;
+    private final GroupPlanRepository planRepository;
     private final StableStallRepository stallRepository;
 
-    public HorseViewAccessService(HorseRepository horseRepository, HorseTrainingPlanRepository planRepository,
+    public HorseViewAccessService(HorseRepository horseRepository, GroupPlanRepository planRepository,
                                   StableStallRepository stallRepository) {
         this.horseRepository = horseRepository;
         this.planRepository = planRepository;

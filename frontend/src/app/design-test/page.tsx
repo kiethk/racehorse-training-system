@@ -275,11 +275,11 @@ export default function DesignTestPage() {
         <div className="space-y-2">
           <Notice tone="success">Admission approved.</Notice>
           <Notice tone="error" title="Could not save">The server rejected the request.</Notice>
-          <Notice tone="warning">This plan overlaps another lot.</Notice>
+          <Notice tone="warning">This plan overlaps another course.</Notice>
           <Notice tone="info" onDismiss={() => undefined}>Dismissible notice.</Notice>
           <div className="flex flex-wrap gap-2 pt-1">
             <Button onClick={() => toast.success('Status updated')}>Success toast</Button>
-            <Button onClick={() => toast.error('Unable to cancel this lot', 'Try again in a moment.')}>
+            <Button onClick={() => toast.error('Unable to cancel this session', 'Try again in a moment.')}>
               Error toast
             </Button>
           </div>
@@ -295,7 +295,7 @@ export default function DesignTestPage() {
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           title="Reschedule workout"
-          description="Pick a new time slot for this lot."
+          description="Pick a new time slot for this session."
           footer={
             <>
               <Button onClick={() => setModalOpen(false)}>Cancel</Button>
@@ -309,10 +309,10 @@ export default function DesignTestPage() {
         </Modal>
         <ConfirmDialog
           open={confirmOpen}
-          title="Cancel this lot?"
+          title="Cancel this session?"
           description="Riders will be notified. This cannot be undone."
           tone="danger"
-          confirmLabel="Cancel lot"
+          confirmLabel="Cancel session"
           cancelLabel="Keep"
           onConfirm={() => setConfirmOpen(false)}
           onCancel={() => setConfirmOpen(false)}

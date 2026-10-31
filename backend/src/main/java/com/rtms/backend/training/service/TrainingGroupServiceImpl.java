@@ -40,9 +40,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Cài đặt TrainingGroupService. Luật thành viên được kiểm một lần khi thêm ngựa (không kiểm lại mỗi ngày như mô hình lot cũ).
+ * Cài đặt TrainingGroupService. Luật thành viên được kiểm một lần khi thêm ngựa (không kiểm lại mỗi ngày như mô hình session cũ).
  * (Implementation of TrainingGroupService. Membership rules are checked once, when a horse is added (not re-checked every day
- * as the old lot model did).)
+ * as the old session model did).)
  */
 @Service
 public class TrainingGroupServiceImpl implements TrainingGroupService {

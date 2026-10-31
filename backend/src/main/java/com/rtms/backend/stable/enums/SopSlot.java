@@ -17,7 +17,7 @@ import java.time.LocalTime;
  */
 public enum SopSlot {
 
-    /** 05:00 — ăn sáng. Cách lot đầu (06:00) đúng 60 phút, đủ tiêu hoá trước khi vận động. */
+    /** 05:00 — ăn sáng. Cách session đầu (06:00) đúng 60 phút, đủ tiêu hoá trước khi vận động. */
     MORNING_FEED(
             LocalTime.of(5, 0),
             GroomTaskType.FEEDING),
@@ -27,7 +27,7 @@ public enum SopSlot {
             LocalTime.of(5, 30),
             GroomTaskType.MUCKING_OUT),
 
-    /** 10:00 — ngay sau khi lot cuối kết thúc. Gom việc hạ nhiệt của cả 3 con làm một mạch. */
+    /** 10:00 — ngay sau khi session cuối kết thúc. Gom việc hạ nhiệt của cả 3 con làm một mạch. */
     POST_WORKOUT_GROOMING(
             LocalTime.of(10, 0),
             GroomTaskType.GROOMING),

@@ -16,14 +16,8 @@ import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.entity.HorseTrainingPlan;
-import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.enums.WorkoutStatus;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
-import com.rtms.backend.training.repository.TrainingWorkoutRepository;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,13 +42,9 @@ class HorseStatusChangeTest {
     @Mock
     private StableStallRepository stableStallRepository;
     @Mock
-    private TrainingWorkoutService workoutService;
+    private GroupWorkoutSyncService workoutService;
     @Mock
     private AreaRepository areaRepository;
-    @Mock
-    private TrainingWorkoutRepository workoutRepository;
-    @Mock
-    private HorseTrainingPlanRepository planRepository;
     @Mock
     private CareScheduleRepository careScheduleRepository;
     @Mock
@@ -74,8 +64,6 @@ class HorseStatusChangeTest {
                 stableStallRepository,
                 workoutService,
                 areaRepository,
-                workoutRepository,
-                planRepository,
                 careScheduleRepository,
                 groomDailyTaskRepository,
                 notificationService
@@ -104,16 +92,6 @@ class HorseStatusChangeTest {
         stall.setId(stallId);
         stall.setStatus(StallStatus.OCCUPIED);
 
-        TrainingWorkout workout = new TrainingWorkout();
-        workout.setId(201L);
-        workout.setHorseId(horseId);
-        workout.setStatus(WorkoutStatus.SCHEDULED);
-
-        HorseTrainingPlan plan = new HorseTrainingPlan();
-        plan.setId(301L);
-        plan.setHorseId(horseId);
-        plan.setStatus(TrainingPlanStatus.ACTIVE);
-
         CareSchedule care = new CareSchedule();
         care.setId(401L);
         care.setHorseId(horseId);
@@ -126,10 +104,6 @@ class HorseStatusChangeTest {
 
         when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findById(stallId)).thenReturn(Optional.of(stall));
-        when(workoutRepository.findFutureScheduledByHorsesForUpdate(eq(List.of(horseId)), any(LocalDate.class)))
-                .thenReturn(List.of(workout));
-        when(planRepository.findByHorseIdAndStatusInOrderByEndDateDesc(eq(horseId), anyList()))
-                .thenReturn(List.of(plan));
         when(careScheduleRepository.findByHorseIdAndStatusIn(eq(horseId), anyList()))
                 .thenReturn(List.of(care));
         when(groomDailyTaskRepository.findByHorseIdAndIsCompletedFalse(horseId))
@@ -150,13 +124,8 @@ class HorseStatusChangeTest {
         assertEquals(StallStatus.AVAILABLE, stall.getStatus());
         verify(stableStallRepository).save(stall);
 
-        // Assert Workout cancelled
-        assertEquals(WorkoutStatus.CANCELLED, workout.getStatus());
-        verify(workoutRepository).saveAll(List.of(workout));
-
-        // Assert Plan cancelled
-        assertEquals(TrainingPlanStatus.CANCELLED, plan.getStatus());
-        verify(planRepository).saveAll(List.of(plan));
+        // Assert the horse left its training group (its not-yet-started Workouts are cancelled there)
+        verify(workoutService).exitAnyGroup(horseId);
 
         // Assert Care cancelled
         assertEquals(CareScheduleStatus.CANCELLED, care.getStatus());

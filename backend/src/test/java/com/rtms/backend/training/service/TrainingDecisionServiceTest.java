@@ -30,14 +30,14 @@ class TrainingDecisionServiceTest {
     private CareScheduleRepository careScheduleRepository;
 
     @Mock
-    private TrainingWorkoutService workoutService;
+    private GroupWorkoutSyncService workoutService;
 
     private TrainingDecisionService service;
     private Horse horse;
 
     @BeforeEach
     void setUp() {
-        service = new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService, org.mockito.Mockito.mock(com.rtms.backend.training.service.GroupWorkoutSyncService.class));
+        service = new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService);
         horse = new Horse();
         horse.setId(7L);
         horse.setName("Thunder");
@@ -53,7 +53,7 @@ class TrainingDecisionServiceTest {
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         assertEquals("Tendon strain", horse.getTrainingDecisionReason());
         verify(horseRepository).save(horse);
-        verify(workoutService).cancelFutureTrainingForHorse(7L);
+        verify(workoutService).exitAnyGroup(7L);
     }
 
     @Test

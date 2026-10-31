@@ -38,8 +38,8 @@ export function StableMap() {
    * Used only to show the Groom's NAME on each stall.
    *
    * Trainers no longer assign Grooms (V63 — that belongs to the Club
-   * Manager), but they still need to know who cares for which horse to coordinate lots: when two
-   * horses with the same Groom land in the same lot it hits BR-09, and the fix is to
+   * Manager), but they still need to know who cares for which horse to coordinate sessions: when two
+   * horses with the same Groom land in the same session it hits BR-09, and the fix is to
    * move a horse to another Groom's stall or pick a separate Groom for the session.
    */
   const [grooms, setGrooms] = useState<UserSummary[]>([]);

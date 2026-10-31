@@ -38,16 +38,16 @@ import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.RacingReadinessAssessment;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.DistanceBand;
-import com.rtms.backend.training.enums.LotStatus;
+import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.RacingReadinessStatus;
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import com.rtms.backend.training.repository.GroupPlanRepository;
 import com.rtms.backend.training.repository.RacingReadinessAssessmentRepository;
-import com.rtms.backend.training.repository.TrainingLotRepository;
+import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseSpecialtyService;
@@ -101,8 +101,8 @@ class AiToolExecutionServiceTest {
     private GroomDailyTaskRepository groomDailyTaskRepository;
     private GroomDailyTaskService groomDailyTaskService;
     private AdmissionApplicationRepository admissionApplicationRepository;
-    private TrainingLotRepository trainingLotRepository;
-    private HorseTrainingPlanRepository horseTrainingPlanRepository;
+    private TrainingSessionRepository trainingSessionRepository;
+    private GroupPlanRepository horseTrainingPlanRepository;
     private HorseSpecialtyService horseSpecialtyService;
     private HorsePerformanceService horsePerformanceService;
     private RacingReadinessAssessmentRepository racingReadinessAssessmentRepository;
@@ -132,8 +132,8 @@ class AiToolExecutionServiceTest {
         groomDailyTaskRepository = Mockito.mock(GroomDailyTaskRepository.class);
         groomDailyTaskService = Mockito.mock(GroomDailyTaskService.class);
         admissionApplicationRepository = Mockito.mock(AdmissionApplicationRepository.class);
-        trainingLotRepository = Mockito.mock(TrainingLotRepository.class);
-        horseTrainingPlanRepository = Mockito.mock(HorseTrainingPlanRepository.class);
+        trainingSessionRepository = Mockito.mock(TrainingSessionRepository.class);
+        horseTrainingPlanRepository = Mockito.mock(GroupPlanRepository.class);
         horseSpecialtyService = Mockito.mock(HorseSpecialtyService.class);
         horsePerformanceService = Mockito.mock(HorsePerformanceService.class);
         racingReadinessAssessmentRepository = Mockito.mock(RacingReadinessAssessmentRepository.class);
@@ -160,7 +160,7 @@ class AiToolExecutionServiceTest {
                 groomDailyTaskRepository,
                 groomDailyTaskService,
                 admissionApplicationRepository,
-                trainingLotRepository,
+                trainingSessionRepository,
                 horseTrainingPlanRepository,
                 horseSpecialtyService,
                 horsePerformanceService,
@@ -234,21 +234,21 @@ class AiToolExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("HEAD_TRAINER gọi getTrainerSchedule tra cứu ca tập TrainingLot hiển thị rõ Ca tập")
+    @DisplayName("HEAD_TRAINER gọi getTrainerSchedule tra cứu ca tập Session hiển thị rõ Ca tập")
     void testTrainer_GetTrainerSchedule() {
         AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
 
-        TrainingLotRow row = new TrainingLotRow(
+        SessionRow row = new SessionRow(
                 100L, 5L, LocalDate.of(2026, 10, 20),
                 LocalTime.of(8, 0), LocalTime.of(9, 30),
-                1L, "Sprint 1000m", 60, LotStatus.SCHEDULED, 4, 2L
+                1L, "Sprint 1000m", 60, SessionStatus.SCHEDULED, 2L
         );
-        when(trainingLotRepository.findTrainerLotRows(eq(5L), any(LocalDate.class), any(LocalDate.class), eq(false)))
+        when(trainingSessionRepository.findTrainerSessionRows(eq(5L), any(LocalDate.class), any(LocalDate.class), eq(false)))
                 .thenReturn(List.of(row));
 
-        LotHorseNameRow name1 = new LotHorseNameRow(100L, 1L, "THUNDER");
-        LotHorseNameRow name2 = new LotHorseNameRow(100L, 2L, "LIGHTNING");
-        when(trainingLotRepository.findActiveHorseNames(anyCollection()))
+        SessionHorseNameRow name1 = new SessionHorseNameRow(100L, 1L, "THUNDER");
+        SessionHorseNameRow name2 = new SessionHorseNameRow(100L, 2L, "LIGHTNING");
+        when(trainingSessionRepository.findActiveHorseNames(anyCollection()))
                 .thenReturn(List.of(name1, name2));
 
         Object result = toolExecutionService.executeTool(
@@ -1306,7 +1306,8 @@ class AiToolExecutionServiceTest {
 
         TrainingWorkout w1 = new TrainingWorkout();
         w1.setId(1L);
-        w1.setStatus(WorkoutStatus.COMPLETED);
+        w1.setStatus(WorkoutStatus.HELD);
+        w1.setActualDistanceMeters(new BigDecimal("1000"));
         w1.setPerformanceRating(8);
         w1.setTopSpeedKmh(new BigDecimal("58.2"));
 
@@ -1411,7 +1412,7 @@ class AiToolExecutionServiceTest {
         TrainingWorkout w1 = new TrainingWorkout();
         w1.setActualDistanceMeters(new BigDecimal("1000"));
         w1.setMaxHeartRate(125);
-        w1.setStatus(WorkoutStatus.COMPLETED);
+        w1.setStatus(WorkoutStatus.HELD);
         when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
 
         Object result = toolExecutionService.executeTool("recommendNextWorkoutAdjustment", Map.of("horseId", 10L), trainer);
@@ -1661,7 +1662,7 @@ class AiToolExecutionServiceTest {
         w1.setTopSpeedKmh(new BigDecimal("60.5"));
         w1.setActualDistanceMeters(new BigDecimal("1000"));
         w1.setMaxHeartRate(125);
-        w1.setStatus(WorkoutStatus.COMPLETED);
+        w1.setStatus(WorkoutStatus.HELD);
         when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
 
         Object result = toolExecutionService.executeTool("recommendTrainerStrategy", Map.of("horseId", 10L), trainer);

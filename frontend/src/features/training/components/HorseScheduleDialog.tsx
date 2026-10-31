@@ -135,7 +135,7 @@ function ScheduleBody({
                   const state = SESSION_STATE[sessionState(session, now)];
                   return (
                     <div
-                      key={session.lotId}
+                      key={session.sessionId}
                       className="space-y-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2"
                     >
                       <p className="font-metric text-xs font-semibold text-[var(--color-text-primary)]">

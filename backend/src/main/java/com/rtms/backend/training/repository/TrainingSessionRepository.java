@@ -1,6 +1,8 @@
 package com.rtms.backend.training.repository;
 
 import com.rtms.backend.training.dto.PlanSessionCountRow;
+import com.rtms.backend.training.dto.SessionHorseNameRow;
+import com.rtms.backend.training.dto.SessionRow;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.enums.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -109,4 +111,73 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
            ORDER BY s.sessionDate, s.startTime
            """)
     List<TrainingSession> findOfOwner(@Param("ownerId") Long ownerId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    // =================================================================
+    // API XEM LỊCH: trả thẳng DTO, số ngựa đếm bằng sub-query
+    // (SCHEDULE API: returns DTO rows directly, horse count computed by a sub-query)
+    // =================================================================
+
+    /** Phần SELECT dùng chung cho mọi truy vấn xem buổi. (SELECT part shared by every Session view query.) */
+    String SESSION_ROW_SELECT = """
+            SELECT new com.rtms.backend.training.dto.SessionRow(
+                       s.id, s.trainerId, s.sessionDate, s.startTime, s.endTime, s.subjectId, sub.name,
+                       sub.durationMinutes, s.status,
+                       (SELECT COUNT(w) FROM TrainingWorkout w
+                        WHERE w.sessionId = s.id
+                          AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED))
+            FROM TrainingSession s
+            JOIN Subject sub ON s.subjectId = sub.id
+            """;
+
+    /** Lịch của Trainer. includeCancelled = false thì ẩn buổi đã hủy. (A Trainer's schedule; cancelled Sessions hidden unless asked.) */
+    @Query(SESSION_ROW_SELECT + """
+            WHERE s.trainerId = :trainerId
+              AND s.sessionDate BETWEEN :from AND :to
+              AND (:includeCancelled = true
+                   OR s.status <> com.rtms.backend.training.enums.SessionStatus.CANCELLED)
+            ORDER BY s.sessionDate ASC, s.startTime ASC
+            """)
+    List<SessionRow> findTrainerSessionRows(@Param("trainerId") Long trainerId,
+                                            @Param("from") LocalDate from,
+                                            @Param("to") LocalDate to,
+                                            @Param("includeCancelled") boolean includeCancelled);
+
+    /** Các buổi có ít nhất một con ngựa CỦA OWNER ĐÓ còn hiệu lực. (Sessions with at least one active horse BELONGING TO THAT OWNER.) */
+    @Query(SESSION_ROW_SELECT + """
+            WHERE s.sessionDate BETWEEN :from AND :to
+              AND s.status <> com.rtms.backend.training.enums.SessionStatus.CANCELLED
+              AND EXISTS (SELECT 1 FROM TrainingWorkout ow
+                          JOIN Horse oh ON ow.horseId = oh.id
+                          WHERE ow.sessionId = s.id
+                            AND oh.ownerId = :ownerId
+                            AND ow.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED)
+            ORDER BY s.sessionDate ASC, s.startTime ASC
+            """)
+    List<SessionRow> findOwnerSessionRows(@Param("ownerId") Long ownerId,
+                                          @Param("from") LocalDate from,
+                                          @Param("to") LocalDate to);
+
+    /** Tên các ngựa còn hiệu lực trong NHIỀU buổi bằng MỘT truy vấn. (Names of active horses in MANY Sessions with ONE query.) */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.SessionHorseNameRow(w.sessionId, h.id, h.name)
+           FROM TrainingWorkout w
+           JOIN Horse h ON w.horseId = h.id
+           WHERE w.sessionId IN :sessionIds
+             AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
+           ORDER BY w.sessionId ASC, w.id ASC
+           """)
+    List<SessionHorseNameRow> findActiveHorseNames(@Param("sessionIds") Collection<Long> sessionIds);
+
+    /** Như trên nhưng chỉ ngựa của một owner, để owner không thấy tên ngựa của chủ khác. (Same, but only one owner's horses.) */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.SessionHorseNameRow(w.sessionId, h.id, h.name)
+           FROM TrainingWorkout w
+           JOIN Horse h ON w.horseId = h.id
+           WHERE w.sessionId IN :sessionIds
+             AND h.ownerId = :ownerId
+             AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
+           ORDER BY w.sessionId ASC, w.id ASC
+           """)
+    List<SessionHorseNameRow> findActiveHorseNamesOfOwner(@Param("sessionIds") Collection<Long> sessionIds,
+                                                          @Param("ownerId") Long ownerId);
 }

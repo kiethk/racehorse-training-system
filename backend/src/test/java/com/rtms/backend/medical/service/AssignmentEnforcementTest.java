@@ -15,7 +15,7 @@ import com.rtms.backend.notification.repository.NotificationRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -82,7 +82,7 @@ class AssignmentEnforcementTest {
     private NotificationRepository notificationRepository;
 
     @Mock
-    private TrainingWorkoutService workoutService;
+    private GroupWorkoutSyncService workoutService;
 
     private CareScheduleService careScheduleService;
     private NotificationService notificationService;
@@ -105,7 +105,7 @@ class AssignmentEnforcementTest {
                 eventPublisher,
                 entityManager,
                 notificationService,
-                new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService, org.mockito.Mockito.mock(com.rtms.backend.training.service.GroupWorkoutSyncService.class)),
+                new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class)
         );
