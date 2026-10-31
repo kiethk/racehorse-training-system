@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost, apiPut } from '@/services/api';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/services/api';
 import type { ApiResponse } from '@/types/horse';
 import type {
   Subject,
@@ -20,6 +20,9 @@ import type {
   HorseScheduleItem,
   HorseAlert,
   TrainingRules,
+  TrainingGroup,
+  GroupCandidate,
+  CreateTrainingGroupRequest,
 } from '../types';
 
 /**
@@ -124,4 +127,30 @@ export const trainingService = {
   getHorseAlerts: async (horseId: number): Promise<HorseAlert[]> =>
     (await apiGet<ApiResponse<HorseAlert[]>>(`/api/horses/${horseId}/alerts`)).data,
 
+
+  // Training groups
+  getGroups: async (): Promise<TrainingGroup[]> =>
+    (await apiGet<ApiResponse<TrainingGroup[]>>('/api/training-groups')).data,
+
+  createGroup: async (data: CreateTrainingGroupRequest): Promise<TrainingGroup> =>
+    (await apiPost<ApiResponse<TrainingGroup>>('/api/training-groups', data)).data,
+
+  renameGroup: async (id: number, name: string): Promise<TrainingGroup> =>
+    (await apiPatch<ApiResponse<TrainingGroup>>(`/api/training-groups/${id}`, { name })).data,
+
+  deleteGroup: async (id: number): Promise<void> => {
+    await apiDelete<ApiResponse<null>>(`/api/training-groups/${id}`);
+  },
+
+  getGroupCandidates: async (id: number): Promise<GroupCandidate[]> =>
+    (await apiGet<ApiResponse<GroupCandidate[]>>(`/api/training-groups/${id}/candidates`)).data,
+
+  addGroupHorse: async (id: number, horseId: number): Promise<TrainingGroup> =>
+    (await apiPost<ApiResponse<TrainingGroup>>(`/api/training-groups/${id}/horses`, { horseId })).data,
+
+  removeGroupHorse: async (id: number, horseId: number): Promise<TrainingGroup> =>
+    (await apiDelete<ApiResponse<TrainingGroup>>(`/api/training-groups/${id}/horses/${horseId}`)).data,
+
+  moveGroupHorse: async (targetGroupId: number, horseId: number): Promise<TrainingGroup> =>
+    (await apiPost<ApiResponse<TrainingGroup>>(`/api/training-groups/${targetGroupId}/horses/move`, { horseId })).data,
 };

@@ -304,3 +304,38 @@ export interface TrainingRules {
   recoveryHeartRateLimit: number;
 }
 
+
+// ---------------------------------------------------------------------------
+// Training groups
+// ---------------------------------------------------------------------------
+
+export interface GroupMember {
+  horseId: number;
+  horseName: string;
+  groomId: number | null;
+  groomName: string | null;
+  joinedAt: string;
+}
+
+export interface TrainingGroup {
+  id: number;
+  name: string;
+  trainerId: number;
+  members: GroupMember[];
+  currentCourseName: string | null;
+  currentPlanStatus: PlanStatus | null;
+  currentPlanEndDate: string | null;
+}
+
+export interface GroupCandidate {
+  horseId: number;
+  horseName: string;
+  groomName: string | null;
+  joinable: boolean;
+  reason: string | null;
+}
+
+export interface CreateTrainingGroupRequest {
+  name: string;
+  horseIds?: number[];
+}
