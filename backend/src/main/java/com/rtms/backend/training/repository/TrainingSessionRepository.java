@@ -4,11 +4,13 @@ import com.rtms.backend.training.dto.PlanSessionCountRow;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.enums.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -45,4 +47,17 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
            GROUP BY s.groupPlanId, s.status
            """)
     List<PlanSessionCountRow> countByPlanAndStatus(@Param("planIds") Collection<Long> planIds);
+
+    /**
+     * Buổi SCHEDULED đã hết giờ thành HELD bằng MỘT câu UPDATE; trả về số buổi đã đổi.
+     * (SCHEDULED Sessions whose end time passed become HELD with ONE UPDATE; returns how many changed.)
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+           UPDATE TrainingSession s
+           SET s.status = com.rtms.backend.training.enums.SessionStatus.HELD
+           WHERE s.status = com.rtms.backend.training.enums.SessionStatus.SCHEDULED
+             AND (s.sessionDate < :today OR (s.sessionDate = :today AND s.endTime <= :time))
+           """)
+    int markEndedAsHeld(@Param("today") LocalDate today, @Param("time") LocalTime time);
 }

@@ -75,6 +75,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
     private final CourseRepository courseRepository;
     private final CourseSubjectRepository courseSubjectRepository;
     private final SubjectRepository subjectRepository;
+    private final SessionSettlementService settlement;
     private final Clock clock;
 
     public GroupPlanServiceImpl(GroupPlanRepository planRepository,
@@ -85,6 +86,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
                                 CourseRepository courseRepository,
                                 CourseSubjectRepository courseSubjectRepository,
                                 SubjectRepository subjectRepository,
+                                SessionSettlementService settlement,
                                 Clock clock) {
         this.planRepository = planRepository;
         this.sessionRepository = sessionRepository;
@@ -94,6 +96,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
         this.courseRepository = courseRepository;
         this.courseSubjectRepository = courseSubjectRepository;
         this.subjectRepository = subjectRepository;
+        this.settlement = settlement;
         this.clock = clock;
     }
 
@@ -230,8 +233,9 @@ public class GroupPlanServiceImpl implements GroupPlanService {
     // =================================================================
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<GroupPlanSummaryResponse> getPlans(Long groupId, AuthenticatedUser currentUser) {
+        settlement.settle();
         List<GroupPlan> plans = "HEAD_TRAINER".equals(currentUser.getRole())
                 ? planRepository.findByTrainerIdOrderByStartDateDesc(currentUser.getUserId())
                 : planRepository.findAllByOrderByStartDateDesc();
@@ -242,8 +246,9 @@ public class GroupPlanServiceImpl implements GroupPlanService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public GroupPlanDetailResponse getPlan(Long planId, AuthenticatedUser currentUser) {
+        settlement.settle();
         GroupPlan plan = planRepository.findById(planId)
                 .filter(found -> canSee(found, currentUser))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_PLAN_NOT_FOUND", "Plan not found!"));

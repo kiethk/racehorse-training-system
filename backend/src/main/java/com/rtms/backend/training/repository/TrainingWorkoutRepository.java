@@ -5,6 +5,7 @@ import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import com.rtms.backend.training.dto.SessionCountRow;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -299,4 +300,15 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            GROUP BY w.sessionId
            """)
     List<SessionCountRow> countActiveBySession(@Param("sessionIds") Collection<Long> sessionIds);
+
+    /** Workout còn SCHEDULED của các buổi đã HELD thành HELD. (SCHEDULED Workouts of HELD Sessions become HELD.) */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+           UPDATE TrainingWorkout w
+           SET w.status = com.rtms.backend.training.enums.WorkoutStatus.HELD
+           WHERE w.status = com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED
+             AND w.sessionId IN (SELECT s.id FROM TrainingSession s
+                                 WHERE s.status = com.rtms.backend.training.enums.SessionStatus.HELD)
+           """)
+    int markWorkoutsOfHeldSessionsAsHeld();
 }
