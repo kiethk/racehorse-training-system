@@ -99,6 +99,7 @@ export function getNavigationForRole(role: Role): NavSection[] {
           label: 'Care',
           items: [
             { id: 'care-tasks', label: 'Daily Tasks', icon: 'list', href: '/groom/tasks' },
+            { id: 'groom-schedule', label: 'Schedule', icon: 'calendar', href: '/groom/schedule' },
             { id: 'incidents', label: 'Incidents', icon: 'alert-triangle', href: '/groom/incidents' },
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/groom/admissions' },
             { id: 'horse-edit-requests', label: 'Change Requests', icon: 'file-text', href: '/groom/horse-edit-requests' },
@@ -114,6 +115,7 @@ export function getNavigationForRole(role: Role): NavSection[] {
           label: 'My stable',
           items: [
             { id: 'my-horses', label: 'My Horses', icon: 'horse', href: '/owner/horses' },
+            { id: 'owner-schedule', label: 'Schedule', icon: 'calendar', href: '/owner/schedule' },
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/owner/admissions' },
             { id: 'racing', label: 'Racing', icon: 'flag' },
           ],

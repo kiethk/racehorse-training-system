@@ -1,17 +1,17 @@
 import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { LotTimeline } from '@/features/training/components/LotTimeline';
+import { SchedulePage } from '@/features/training/components/SchedulePage';
 
 export const metadata: Metadata = {
-  title: 'Training lot schedule | Trainer | RTMS',
+  title: 'Schedule | Trainer | RTMS',
 };
 
 export default function TrainerSchedulePage() {
   return (
     <RoleGuard allowedRoles={['HEAD_TRAINER']}>
       <PageContainer>
-        <LotTimeline />
+        <SchedulePage canManage />
       </PageContainer>
     </RoleGuard>
   );

@@ -27,6 +27,10 @@ import type {
   GroupPlanPreview,
   GroupPlanSummary,
   GroupPlanDetail,
+  ScheduleSession,
+  SessionDetail,
+  SessionWorkoutResult,
+  HorseAttendance,
 } from '../types';
 
 /**
@@ -170,4 +174,46 @@ export const trainingService = {
 
   getGroupPlan: async (id: number): Promise<GroupPlanDetail> =>
     (await apiGet<ApiResponse<GroupPlanDetail>>(`/api/group-plans/${id}`)).data,
+
+  cancelGroupPlan: async (id: number): Promise<GroupPlanDetail> =>
+    (await apiPost<ApiResponse<GroupPlanDetail>>(`/api/group-plans/${id}/cancel`, {})).data,
+
+  // Group sessions
+  getSessions: async (params: { from: string; to: string; groupId?: number; needsResult?: boolean }): Promise<ScheduleSession[]> => {
+    const query = new URLSearchParams({ from: params.from, to: params.to });
+    if (params.groupId) query.set('groupId', String(params.groupId));
+    if (params.needsResult) query.set('needsResult', 'true');
+    return (await apiGet<ApiResponse<ScheduleSession[]>>(`/api/training-sessions?${query}`)).data;
+  },
+
+  getSession: async (id: number): Promise<SessionDetail> =>
+    (await apiGet<ApiResponse<SessionDetail>>(`/api/training-sessions/${id}`)).data,
+
+  rescheduleSession: async (id: number, newStartTime: string): Promise<void> => {
+    await apiPatch<ApiResponse<unknown>>(`/api/training-sessions/${id}/reschedule`, { newStartTime });
+  },
+
+  cancelSession: async (id: number): Promise<void> => {
+    await apiPost<ApiResponse<unknown>>(`/api/training-sessions/${id}/cancel`, {});
+  },
+
+  cancelSessionWorkout: async (id: number): Promise<void> => {
+    await apiPost<ApiResponse<unknown>>(`/api/session-workouts/${id}/cancel`, {});
+  },
+
+  previewSessionResult: async (id: number): Promise<WorkoutResultPreviewResponse> =>
+    (await apiGet<ApiResponse<WorkoutResultPreviewResponse>>(`/api/session-workouts/${id}/result-preview`)).data,
+
+  recordSessionResult: async (id: number, data: CompleteWorkoutRequest): Promise<SessionWorkoutResult> =>
+    (await apiPatch<ApiResponse<SessionWorkoutResult>>(`/api/session-workouts/${id}/result`, data)).data,
+
+  updateSessionResult: async (id: number, data: CompleteWorkoutRequest): Promise<SessionWorkoutResult> =>
+    (await apiPut<ApiResponse<SessionWorkoutResult>>(`/api/session-workouts/${id}/result`, data)).data,
+
+  markDidNotRun: async (id: number): Promise<void> => {
+    await apiPost<ApiResponse<unknown>>(`/api/session-workouts/${id}/did-not-run`, {});
+  },
+
+  getHorseAttendance: async (horseId: number): Promise<HorseAttendance[]> =>
+    (await apiGet<ApiResponse<HorseAttendance[]>>(`/api/horses/${horseId}/group-plan-history`)).data,
 };

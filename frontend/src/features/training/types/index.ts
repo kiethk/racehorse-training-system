@@ -410,3 +410,67 @@ export interface GroupPlanDetail {
   trainingDays: TrainingDay[];
   sessions: PlanSessionItem[];
 }
+
+// ---------------------------------------------------------------------------
+// Group sessions (schedule, results, attendance)
+// ---------------------------------------------------------------------------
+
+export interface ScheduleSession {
+  id: number;
+  planId: number;
+  groupId: number | null;
+  groupName: string | null;
+  courseName: string;
+  subjectName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: SessionStatus;
+  horseCount: number;
+  /** Held Workouts that still have no recorded result. */
+  needsResultCount: number;
+}
+
+export interface SessionHorse {
+  workoutId: number;
+  horseId: number;
+  horseName: string;
+  groomName: string | null;
+  status: 'SCHEDULED' | 'HELD' | 'CANCELLED';
+  hasResult: boolean;
+  performanceRating: number | null;
+}
+
+export interface SessionDetail {
+  session: ScheduleSession;
+  horses: SessionHorse[];
+}
+
+export interface SessionWorkoutResult {
+  id: number;
+  sessionId: number;
+  horseId: number;
+  status: 'SCHEDULED' | 'HELD' | 'CANCELLED';
+  hasResult: boolean;
+  actualDistanceMeters: number | null;
+  actualDurationMinutes: number | null;
+  topSpeedKmh: number | null;
+  averageSpeedKmh: number | null;
+  averageHeartRate: number | null;
+  maxHeartRate: number | null;
+  recoveryHeartRate: number | null;
+  performanceRating: number | null;
+  trainerFeedback: string | null;
+}
+
+export interface HorseAttendance {
+  planId: number;
+  groupName: string | null;
+  courseName: string;
+  planStatus: PlanStatus;
+  startDate: string;
+  endDate: string;
+  attended: number;
+  total: number;
+  joinedOn: string;
+}

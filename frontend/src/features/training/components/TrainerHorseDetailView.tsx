@@ -1,6 +1,7 @@
 'use client';
 
 import { HorseProfileView } from '@/features/horses/shared/components/HorseProfileView';
+import { HorseAttendanceList } from './HorseAttendanceList';
 import { HorseFitnessTrendView } from './HorseFitnessTrendView';
 import { TrainerHorseIncidentsTab } from './TrainerHorseIncidentsTab';
 
@@ -24,6 +25,11 @@ export function TrainerHorseDetailView({ horseId }: TrainerHorseDetailViewProps)
           id: 'fitness-trends',
           label: 'Fitness & Trends',
           content: <HorseFitnessTrendView horseId={horse.id} hideHeader />,
+        },
+        {
+          id: 'training-history',
+          label: 'Training history',
+          content: <HorseAttendanceList horseId={horse.id} />,
         },
         {
           id: 'incidents',
