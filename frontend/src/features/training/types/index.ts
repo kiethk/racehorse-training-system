@@ -339,3 +339,74 @@ export interface CreateTrainingGroupRequest {
   name: string;
   horseIds?: number[];
 }
+
+// ---------------------------------------------------------------------------
+// Group plans
+// ---------------------------------------------------------------------------
+
+export type SessionStatus = 'SCHEDULED' | 'HELD' | 'CANCELLED';
+
+export interface GroupPlanRequest {
+  groupId: number;
+  courseId: number;
+  startDate: string;
+  trainingDays: TrainingDay[];
+}
+
+export interface PlannedSession {
+  date: string;
+  subjectName: string;
+  durationMinutes: number;
+  /** Null when the day has no free slot. */
+  startTime: string | null;
+  endTime: string | null;
+}
+
+export interface PlanOverlap {
+  planId: number;
+  courseName: string;
+  startDate: string;
+  endDate: string;
+  status: PlanStatus;
+}
+
+export interface GroupPlanPreview {
+  startDate: string;
+  endDate: string;
+  memberCount: number;
+  sessions: PlannedSession[];
+  fullDates: string[];
+  overlaps: PlanOverlap[];
+  earliestFreeStart: string;
+  canCreate: boolean;
+}
+
+export interface GroupPlanSummary {
+  id: number;
+  groupId: number | null;
+  groupName: string | null;
+  courseId: number;
+  courseName: string;
+  startDate: string;
+  endDate: string;
+  status: PlanStatus;
+  sessionsHeld: number;
+  sessionsCancelled: number;
+  sessionsTotal: number;
+}
+
+export interface PlanSessionItem {
+  id: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  subjectName: string;
+  status: SessionStatus;
+  horseCount: number;
+}
+
+export interface GroupPlanDetail {
+  plan: GroupPlanSummary;
+  trainingDays: TrainingDay[];
+  sessions: PlanSessionItem[];
+}

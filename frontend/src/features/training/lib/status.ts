@@ -1,4 +1,4 @@
-import type { PlanStatus, WorkoutStatus } from '../types';
+import type { PlanStatus, SessionStatus, WorkoutStatus } from '../types';
 
 export type StatusTone = 'primary' | 'success' | 'info' | 'warning' | 'danger' | 'neutral';
 
@@ -37,3 +37,10 @@ export function lotFillTone(remainingSlots: number, nearlyFullAt = 2): 'danger' 
   if (remainingSlots <= nearlyFullAt) return 'warning';
   return 'success';
 }
+
+/** A group Session: ahead, Held (its end time passed), or cancelled. Held follows the clock, not the results. */
+export const SESSION_STATUS: Record<SessionStatus, StatusStyle> = {
+  SCHEDULED: { label: 'Scheduled', tone: 'info' },
+  HELD: { label: 'Held', tone: 'success' },
+  CANCELLED: { label: 'Cancelled', tone: 'danger' },
+};

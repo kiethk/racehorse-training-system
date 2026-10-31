@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Icon, IconButton, Panel, Tooltip } from '@/components/ui';
+import { Button, Icon, IconButton, LinkButton, Panel, Tooltip } from '@/components/ui';
 import { formatDate } from '@/lib/display';
 import { PLAN_STATUS } from '../lib/status';
 import type { TrainingGroup } from '../types';
@@ -70,11 +70,16 @@ export function GroupCard({
         ) : (
           <span className="text-sm text-[var(--color-text-muted)]">Free</span>
         )}
-        <Tooltip content="The group is full" disabled={!full}>
-          <span>
-            <Button size="sm" icon="plus" onClick={onAddHorse} disabled={full}>Add horse</Button>
-          </span>
-        </Tooltip>
+        <div className="flex items-center gap-2">
+          {group.members.length > 0 && (
+            <LinkButton size="sm" href={`/trainer/plans/new?groupId=${group.id}`}>Assign course</LinkButton>
+          )}
+          <Tooltip content="The group is full" disabled={!full}>
+            <span>
+              <Button size="sm" icon="plus" onClick={onAddHorse} disabled={full}>Add horse</Button>
+            </span>
+          </Tooltip>
+        </div>
       </div>
     </Panel>
   );

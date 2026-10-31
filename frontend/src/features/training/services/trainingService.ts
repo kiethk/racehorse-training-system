@@ -23,6 +23,10 @@ import type {
   TrainingGroup,
   GroupCandidate,
   CreateTrainingGroupRequest,
+  GroupPlanRequest,
+  GroupPlanPreview,
+  GroupPlanSummary,
+  GroupPlanDetail,
 } from '../types';
 
 /**
@@ -153,4 +157,17 @@ export const trainingService = {
 
   moveGroupHorse: async (targetGroupId: number, horseId: number): Promise<TrainingGroup> =>
     (await apiPost<ApiResponse<TrainingGroup>>(`/api/training-groups/${targetGroupId}/horses/move`, { horseId })).data,
+
+  // Group plans
+  previewGroupPlan: async (request: GroupPlanRequest, signal?: AbortSignal): Promise<GroupPlanPreview> =>
+    (await apiPost<ApiResponse<GroupPlanPreview>>('/api/group-plans/preview', request, signal)).data,
+
+  createGroupPlan: async (request: GroupPlanRequest): Promise<GroupPlanDetail> =>
+    (await apiPost<ApiResponse<GroupPlanDetail>>('/api/group-plans', request)).data,
+
+  getGroupPlans: async (groupId?: number): Promise<GroupPlanSummary[]> =>
+    (await apiGet<ApiResponse<GroupPlanSummary[]>>(`/api/group-plans${groupId ? `?groupId=${groupId}` : ''}`)).data,
+
+  getGroupPlan: async (id: number): Promise<GroupPlanDetail> =>
+    (await apiGet<ApiResponse<GroupPlanDetail>>(`/api/group-plans/${id}`)).data,
 };
