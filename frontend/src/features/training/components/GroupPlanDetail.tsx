@@ -1,13 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { BackLink, Button, ConfirmDialog, DetailSkeleton, EmptyState, PageHeader, Panel, ProgressBar, ScreenLayout, Table, TBody, Td, Th, THead, Tr } from '@/components/ui';
 import { displayError, formatDate, formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { planProgress } from '../lib/planProgress';
 import { PLAN_STATUS, SESSION_STATUS } from '../lib/status';
 import { trainingService } from '../services/trainingService';
-import type { GroupPlanDetail as GroupPlanDetailData } from '../types';
+import type { GroupPlanDetail as GroupPlanDetailData, PlanHorse } from '../types';
+import { PlanSessionHorses } from './PlanSessionHorses';
 import { StatusPill } from './StatusPill';
 import { groupLabel } from '../lib/disbandMessage';
 
@@ -19,10 +20,14 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [planHorses, setPlanHorses] = useState<PlanHorse[]>([]);
+  const [openSessionId, setOpenSessionId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setDetail(await trainingService.getGroupPlan(planId));
+      const [loaded, horses] = await Promise.all([trainingService.getGroupPlan(planId), trainingService.getPlanHorses(planId)]);
+      setDetail(loaded);
+      setPlanHorses(horses);
     } catch (cause) {
       setError(displayError(cause, 'Unable to load the plan.'));
     }
@@ -83,10 +88,29 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
         <p className="text-xs text-[var(--color-text-muted)]">{progress.completed}/{progress.total} sessions</p>
       </Panel>
 
+      <Panel padded className="space-y-2">
+        <h2 className="text-sm font-semibold text-[var(--color-text)]">Horses in this plan</h2>
+        {planHorses.length === 0 ? (
+          <p className="text-sm text-[var(--color-text-muted)]">No horses.</p>
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {planHorses.map((horse) => (
+              <li key={horse.horseId} className="flex items-center justify-between gap-2 text-sm">
+                <span>{horse.horseName}</span>
+                <span className="text-[var(--color-text-muted)]" title="Sessions attended out of sessions held or still to come">
+                  {horse.attended} of {horse.total}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
       <Panel>
         <Table bare>
           <THead>
             <Tr>
+              <Th><span className="sr-only">Open</span></Th>
               <Th>#</Th>
               <Th>Date</Th>
               <Th>Time</Th>
@@ -96,16 +120,38 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
             </Tr>
           </THead>
           <TBody>
-            {sessions.map((session, index) => (
-              <Tr key={session.id}>
-                <Td>{index + 1}</Td>
-                <Td>{formatDate(session.date, DAY)}</Td>
-                <Td>{formatTime(session.startTime)} – {formatTime(session.endTime)}</Td>
-                <Td>{session.subjectName}</Td>
-                <Td>{session.horseCount}</Td>
-                <Td><StatusPill status={SESSION_STATUS[session.status]} /></Td>
-              </Tr>
-            ))}
+            {sessions.map((session, index) => {
+              const open = openSessionId === session.id;
+              return (
+                <Fragment key={session.id}>
+                  <Tr>
+                    <Td>
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        icon={open ? 'chevron-down' : 'chevron-right'}
+                        aria-expanded={open}
+                        aria-label={`Horses of session ${index + 1}`}
+                        onClick={() => setOpenSessionId(open ? null : session.id)}
+                      />
+                    </Td>
+                    <Td>{index + 1}</Td>
+                    <Td>{formatDate(session.date, DAY)}</Td>
+                    <Td>{formatTime(session.startTime)} – {formatTime(session.endTime)}</Td>
+                    <Td>{session.subjectName}</Td>
+                    <Td>{session.horseCount}</Td>
+                    <Td><StatusPill status={SESSION_STATUS[session.status]} /></Td>
+                  </Tr>
+                  {open && (
+                    <Tr>
+                      <Td colSpan={7} className="bg-[var(--color-surface-subtle)]">
+                        <PlanSessionHorses planId={planId} sessionId={session.id} />
+                      </Td>
+                    </Tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </TBody>
         </Table>
       </Panel>

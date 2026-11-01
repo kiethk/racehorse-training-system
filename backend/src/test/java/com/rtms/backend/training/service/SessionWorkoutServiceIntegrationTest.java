@@ -65,6 +65,7 @@ class SessionWorkoutServiceIntegrationTest {
     @Autowired private TrainingSessionRepository sessions;
     @Autowired private TrainingWorkoutRepository workouts;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     private AuthenticatedUser trainer;
     private GroupPlanDetailResponse plan;
@@ -167,13 +168,65 @@ class SessionWorkoutServiceIntegrationTest {
     }
 
     @Test
-    void incompleteMeasurementsAreRefused() {
+    void everyMissingReadingIsRefusedWithAMessageNamingThatField() {
         clock.set(monday.atTime(12, 0));
-        CompleteWorkoutRequest request = validResult();
-        request.setMaxHeartRate(null);
+        Long workoutId = firstWorkoutOfSession(0).getId();
+        java.util.Map<String, java.util.function.Consumer<CompleteWorkoutRequest>> clears = new java.util.LinkedHashMap<>();
+        clears.put("Actual distance", r -> r.setActualDistanceMeters(null));
+        clears.put("Actual duration", r -> r.setActualDurationMinutes(null));
+        clears.put("Top speed", r -> r.setTopSpeedKmh(null));
+        clears.put("Average speed", r -> r.setAverageSpeedKmh(null));
+        clears.put("Average heart rate", r -> r.setAverageHeartRate(null));
+        clears.put("Maximum heart rate", r -> r.setMaxHeartRate(null));
+        clears.put("Recovery heart rate", r -> r.setRecoveryHeartRate(null));
 
-        assertThrows(IllegalArgumentException.class,
-                () -> service.recordResult(firstWorkoutOfSession(0).getId(), request, trainer));
+        clears.forEach((label, clear) -> {
+            CompleteWorkoutRequest request = validResult();
+            clear.accept(request);
+            IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                    () -> service.recordResult(workoutId, request, trainer));
+            assertEquals(label + " is required", error.getMessage());
+        });
+        assertFalse(workouts.findById(workoutId).orElseThrow().getActualDistanceMeters() != null);
+    }
+
+    // ------------------------------------------------------------------ rating
+
+    @Test
+    void theServerAlwaysComputesTheRatingFromTheReadings() {
+        clock.set(monday.atTime(12, 0));
+        Long workoutId = firstWorkoutOfSession(0).getId();
+
+        SessionWorkoutResponse recorded = service.recordResult(workoutId, validResult(), trainer);
+
+        assertEquals(9, recorded.performanceRating());
+    }
+
+    @Test
+    void editingReadingsRecomputesTheRating() {
+        clock.set(monday.atTime(12, 0));
+        Long workoutId = firstWorkoutOfSession(0).getId();
+        service.recordResult(workoutId, validResult(), trainer);
+        CompleteWorkoutRequest edit = validResult();
+        edit.setRecoveryHeartRate(190);
+        edit.setAverageSpeedKmh(BigDecimal.valueOf(20));
+
+        SessionWorkoutResponse edited = service.updateResult(workoutId, edit, trainer);
+
+        assertEquals(WorkoutPerformanceCalculator.calculate(edit.getActualDistanceMeters(), edit.getActualDurationMinutes(),
+                edit.getTopSpeedKmh(), edit.getAverageSpeedKmh(), edit.getAverageHeartRate(), edit.getMaxHeartRate(),
+                edit.getRecoveryHeartRate()), edited.performanceRating());
+        assertTrue(edited.performanceRating() < 9);
+    }
+
+    @Test
+    void aRatingSentByTheClientIsRejectedAsAnUnsupportedField() {
+        String json = """
+                {"actualDistanceMeters":800,"actualDurationMinutes":30,"topSpeedKmh":55,"averageSpeedKmh":48,
+                 "averageHeartRate":150,"maxHeartRate":200,"recoveryHeartRate":80,"performanceRating":1}""";
+
+        assertThrows(com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException.class,
+                () -> objectMapper.readValue(json, CompleteWorkoutRequest.class));
     }
 
     // -------------------------------------------------------------- did not run

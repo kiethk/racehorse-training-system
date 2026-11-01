@@ -1,4 +1,4 @@
-import type { PlanStatus, SessionStatus, WorkoutStatus } from '../types';
+import type { PlanStatus, SessionHorseOutcome, SessionStatus, WorkoutStatus } from '../types';
 
 export type StatusTone = 'primary' | 'success' | 'info' | 'warning' | 'danger' | 'neutral';
 
@@ -37,4 +37,12 @@ export const SESSION_STATUS: Record<SessionStatus, StatusStyle> = {
   SCHEDULED: { label: 'Scheduled', tone: 'info' },
   HELD: { label: 'Held', tone: 'success' },
   CANCELLED: { label: 'Cancelled', tone: 'danger' },
+};
+
+/** What became of one horse in one Session of a plan. */
+export const SESSION_HORSE_OUTCOME: Record<SessionHorseOutcome, StatusStyle> = {
+  TO_RUN: { label: 'To run', tone: 'info' },
+  RAN: { label: 'Ran', tone: 'success' },
+  CANCELLED: { label: 'Cancelled', tone: 'danger' },
+  DID_NOT_RUN: { label: 'Did not run', tone: 'warning' },
 };

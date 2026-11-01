@@ -80,11 +80,10 @@ export interface CompleteWorkoutRequest {
   averageHeartRate: number;
   maxHeartRate: number;
   recoveryHeartRate: number;
-  performanceRating: number; // 1-10
   trainerFeedback?: string | null;
 }
 
-/** A fresh, non-persistent measurement set returned when the result form is opened. */
+/** A simulated measurement set returned only when the Trainer presses "Generate sample data"; never saved by itself. */
 export interface WorkoutResultPreviewResponse {
   actualDistanceMeters: number;
   actualDurationMinutes: number;
@@ -93,7 +92,6 @@ export interface WorkoutResultPreviewResponse {
   averageHeartRate: number;
   maxHeartRate: number;
   recoveryHeartRate: number;
-  performanceRating?: number;
 }
 
 /** One session of a horse in its schedule. The session and the horse's own workout can each be cancelled. */
@@ -250,6 +248,24 @@ export interface PlanSessionItem {
   subjectName: string;
   status: SessionStatus;
   horseCount: number;
+}
+
+export type SessionHorseOutcome = 'TO_RUN' | 'RAN' | 'CANCELLED' | 'DID_NOT_RUN';
+
+/** A horse of a plan with its Attendance (attended of total Sessions). */
+export interface PlanHorse {
+  horseId: number;
+  horseName: string;
+  attended: number;
+  total: number;
+}
+
+/** A horse in one Session of a plan with what became of it. */
+export interface SessionHorseOutcomeItem {
+  workoutId: number;
+  horseId: number;
+  horseName: string;
+  outcome: SessionHorseOutcome;
 }
 
 export interface GroupPlanDetail {

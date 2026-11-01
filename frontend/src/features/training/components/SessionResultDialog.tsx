@@ -1,27 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Button, FormField, Modal, Notice, Skeleton, Textarea } from '@/components/ui';
+import { useState } from 'react';
+import { Button, FormField, Input, Modal, Notice, Textarea } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
-import { calculatePerformanceRating } from '../lib/performanceCalculator';
 import { trainingService } from '../services/trainingService';
-import type { SessionHorse, WorkoutResultPreviewResponse } from '../types';
+import {
+  EMPTY_READINGS,
+  READING_FIELDS,
+  readingsToInputs,
+  readingsToRequest,
+  validateReadings,
+  type ReadingErrors,
+} from '../lib/workoutReadings';
+import type { SessionHorse } from '../types';
 
 const FORM_ID = 'session-result-form';
 
-function Measure({ label, value, unit }: { label: string; value: number | string; unit: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-[var(--color-text-muted)]">{label}</dt>
-      <dd className="text-sm font-semibold text-[var(--color-text-primary)]">{value} {unit}</dd>
-    </div>
-  );
-}
-
 /**
- * Records the result of one horse in a Held Session. The measurements come from the backend preview (a fresh simulated set that is
- * not saved until the Trainer confirms), so the Trainer only adds feedback. Recording changes no status.
+ * Records the result of one horse in a Held Session. The form opens empty: the Trainer types the readings from the IoT device, or
+ * presses "Generate sample data" for a demo. The rating is never sent; the server computes it. Recording changes no status.
  */
 export function SessionResultDialog({
   horse,
@@ -54,40 +52,41 @@ function ResultForm({
   onClose: () => void;
   onRecorded: () => Promise<void> | void;
 }) {
-  const [preview, setPreview] = useState<WorkoutResultPreviewResponse | null>(null);
+  const [readings, setReadings] = useState(EMPTY_READINGS);
   const [feedback, setFeedback] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<ReadingErrors>({});
   const [error, setError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    let current = true;
-    trainingService
-      .previewSessionResult(horse.workoutId)
-      .then((data) => current && setPreview(data))
-      .catch((cause) => current && setError(displayError(cause, 'Unable to prepare the result.')));
-    return () => {
-      current = false;
-    };
-  }, [horse.workoutId]);
+  async function generate() {
+    setGenerating(true);
+    setError(null);
+    try {
+      const sample = await trainingService.previewSessionResult(horse.workoutId);
+      setReadings(readingsToInputs(sample));
+      setFieldErrors({});
+    } catch (cause) {
+      setError(displayError(cause, 'Unable to generate sample data.'));
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!preview) return;
+    const errors = validateReadings(readings);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
     setSubmitting(true);
     setError(null);
     try {
-      await trainingService.recordSessionResult(horse.workoutId, {
-        actualDistanceMeters: preview.actualDistanceMeters,
-        actualDurationMinutes: preview.actualDurationMinutes,
-        topSpeedKmh: preview.topSpeedKmh,
-        averageSpeedKmh: preview.averageSpeedKmh,
-        averageHeartRate: preview.averageHeartRate,
-        maxHeartRate: preview.maxHeartRate,
-        recoveryHeartRate: preview.recoveryHeartRate,
-        performanceRating: rating,
-        trainerFeedback: feedback.trim() || null,
-      });
-      toast.success('Result recorded.');
+      const saved = await trainingService.recordSessionResult(horse.workoutId, readingsToRequest(readings, feedback));
+      toast.success(
+        saved.performanceRating != null
+          ? `Result recorded. Rating ${saved.performanceRating} / 10.`
+          : 'Result recorded.',
+      );
       await onRecorded();
       onClose();
     } catch (cause) {
@@ -97,31 +96,26 @@ function ResultForm({
     }
   }
 
-  if (!preview) {
-    return error ? <Notice tone="error">{error}</Notice> : <Skeleton className="h-40 w-full" />;
-  }
-  const rating = preview.performanceRating ?? calculatePerformanceRating({
-    actualDistanceMeters: Number(preview.actualDistanceMeters),
-    actualDurationMinutes: Number(preview.actualDurationMinutes),
-    topSpeedKmh: Number(preview.topSpeedKmh),
-    averageSpeedKmh: Number(preview.averageSpeedKmh),
-    averageHeartRate: preview.averageHeartRate,
-    maxHeartRate: preview.maxHeartRate,
-    recoveryHeartRate: preview.recoveryHeartRate,
-  });
-
   return (
-    <form id={FORM_ID} onSubmit={submit} className="space-y-4">
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Measure label="Distance" value={preview.actualDistanceMeters} unit="m" />
-        <Measure label="Duration" value={preview.actualDurationMinutes} unit="min" />
-        <Measure label="Top speed" value={preview.topSpeedKmh} unit="km/h" />
-        <Measure label="Average speed" value={preview.averageSpeedKmh} unit="km/h" />
-        <Measure label="Average heart rate" value={preview.averageHeartRate} unit="bpm" />
-        <Measure label="Max heart rate" value={preview.maxHeartRate} unit="bpm" />
-        <Measure label="Recovery heart rate" value={preview.recoveryHeartRate} unit="bpm" />
-        <Measure label="Rating" value={rating} unit="/ 10" />
-      </dl>
+    <form id={FORM_ID} onSubmit={submit} noValidate className="space-y-4">
+      <div className="flex justify-end">
+        <Button type="button" size="sm" variant="secondary" icon="sparkles" onClick={generate} disabled={generating || submitting}>
+          {generating ? 'Generating...' : 'Generate sample data'}
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {READING_FIELDS.map((field) => (
+          <FormField key={field.key} label={`${field.label} (${field.unit})`} required error={fieldErrors[field.key]}>
+            <Input
+              type="number"
+              inputMode="decimal"
+              step={field.step}
+              value={readings[field.key]}
+              onChange={(event) => setReadings((current) => ({ ...current, [field.key]: event.target.value }))}
+            />
+          </FormField>
+        ))}
+      </div>
       <FormField label="Feedback">
         <Textarea value={feedback} maxLength={2000} onChange={(event) => setFeedback(event.target.value)} />
       </FormField>

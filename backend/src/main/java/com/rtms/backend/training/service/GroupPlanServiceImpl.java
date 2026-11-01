@@ -3,17 +3,21 @@ package com.rtms.backend.training.service;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.config.TrainingLimits;
+import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.GroupPlanDetailResponse;
 import com.rtms.backend.training.dto.GroupPlanPreviewResponse;
 import com.rtms.backend.training.dto.GroupPlanRequest;
 import com.rtms.backend.training.dto.GroupPlanSummaryResponse;
+import com.rtms.backend.training.dto.PlanHorseResponse;
 import com.rtms.backend.training.dto.PlanOverlapResponse;
 import com.rtms.backend.training.dto.PlanSessionCountRow;
 import com.rtms.backend.training.dto.PlanSessionResponse;
 import com.rtms.backend.training.dto.PlannedSessionResponse;
 import com.rtms.backend.training.dto.RunningPlanRow;
 import com.rtms.backend.training.dto.SessionCountRow;
+import com.rtms.backend.training.dto.SessionHorseOutcomeResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.GroupPlan;
 import com.rtms.backend.training.entity.Subject;
@@ -73,6 +77,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
     private final CourseSubjectRepository courseSubjectRepository;
     private final SubjectRepository subjectRepository;
     private final SessionSettlementService settlement;
+    private final HorseRepository horseRepository;
     private final Clock clock;
 
     public GroupPlanServiceImpl(GroupPlanRepository planRepository,
@@ -84,6 +89,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
                                 CourseSubjectRepository courseSubjectRepository,
                                 SubjectRepository subjectRepository,
                                 SessionSettlementService settlement,
+                                HorseRepository horseRepository,
                                 Clock clock) {
         this.planRepository = planRepository;
         this.sessionRepository = sessionRepository;
@@ -94,6 +100,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
         this.courseSubjectRepository = courseSubjectRepository;
         this.subjectRepository = subjectRepository;
         this.settlement = settlement;
+        this.horseRepository = horseRepository;
         this.clock = clock;
     }
 
@@ -250,6 +257,60 @@ public class GroupPlanServiceImpl implements GroupPlanService {
                 .filter(found -> canSee(found, currentUser))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_PLAN_NOT_FOUND", "Plan not found!"));
         return detail(plan);
+    }
+
+    @Override
+    @Transactional
+    public List<PlanHorseResponse> getPlanHorses(Long planId, AuthenticatedUser currentUser) {
+        settlement.settle();
+        GroupPlan plan = visiblePlan(planId, currentUser);
+        List<TrainingSession> sessions = sessionRepository.findByGroupPlanIdOrderBySessionDateAscStartTimeAsc(plan.getId());
+        int total = (int) sessions.stream().filter(session -> session.getStatus() != SessionStatus.CANCELLED).count();
+        List<TrainingWorkout> workouts = workoutRepository.findBySessionIdIn(sessions.stream().map(TrainingSession::getId).toList());
+        Map<Long, String> names = horseNames(workouts);
+        Map<Long, Long> attended = workouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.HELD)
+                .collect(Collectors.groupingBy(TrainingWorkout::getHorseId, Collectors.counting()));
+        return workouts.stream().map(TrainingWorkout::getHorseId).distinct()
+                .map(horseId -> new PlanHorseResponse(horseId, names.get(horseId), attended.getOrDefault(horseId, 0L).intValue(), total))
+                .sorted(Comparator.comparing(PlanHorseResponse::horseName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public List<SessionHorseOutcomeResponse> getSessionHorses(Long planId, Long sessionId, AuthenticatedUser currentUser) {
+        settlement.settle();
+        visiblePlan(planId, currentUser);
+        TrainingSession session = sessionRepository.findById(sessionId)
+                .filter(found -> planId.equals(found.getGroupPlanId()))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "Session not found!"));
+        List<TrainingWorkout> workouts = workoutRepository.findBySessionId(session.getId());
+        Map<Long, String> names = horseNames(workouts);
+        return workouts.stream()
+                .map(workout -> new SessionHorseOutcomeResponse(workout.getId(), workout.getHorseId(), names.get(workout.getHorseId()),
+                        outcome(session, workout)))
+                .sorted(Comparator.comparing(SessionHorseOutcomeResponse::horseName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    /** Workout hủy trong buổi đã diễn ra là "Did not run"; hủy trước đó là "Cancelled". (A cancelled Workout in a Session that took place is "Did not run"; otherwise "Cancelled".) */
+    private String outcome(TrainingSession session, TrainingWorkout workout) {
+        return switch (workout.getStatus()) {
+            case SCHEDULED -> "TO_RUN";
+            case HELD -> "RAN";
+            case CANCELLED -> session.getStatus() == SessionStatus.HELD ? "DID_NOT_RUN" : "CANCELLED";
+        };
+    }
+
+    private Map<Long, String> horseNames(List<TrainingWorkout> workouts) {
+        return horseRepository.findAllById(workouts.stream().map(TrainingWorkout::getHorseId).collect(Collectors.toSet())).stream()
+                .collect(Collectors.toMap(Horse::getId, Horse::getName));
+    }
+
+    private GroupPlan visiblePlan(Long planId, AuthenticatedUser currentUser) {
+        return planRepository.findById(planId)
+                .filter(found -> canSee(found, currentUser))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_PLAN_NOT_FOUND", "Plan not found!"));
     }
 
     @Override
