@@ -300,6 +300,8 @@ export interface SessionHorse {
   status: 'SCHEDULED' | 'HELD' | 'CANCELLED';
   hasResult: boolean;
   performanceRating: number | null;
+  /** The stored result, null until one is recorded; the edit form is pre-filled from it. */
+  result: SessionWorkoutResult | null;
 }
 
 export interface SessionDetail {

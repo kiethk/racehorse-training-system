@@ -156,6 +156,9 @@ function SessionBody({
                   </span>
                 </Tooltip>
               )}
+              {canManage && horse.status === 'HELD' && horse.hasResult && (
+                <Button size="sm" onClick={() => setRecording(horse)}>Edit result</Button>
+              )}
               {canManage && held && horse.status === 'HELD' && !horse.hasResult && (
                 <>
                   <Button size="sm" variant="primary" onClick={() => setRecording(horse)}>Record result</Button>
