@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useId, useState, type ReactNode } from 'react';
 import { Tabs, type TabItem } from '@/components/ui';
 
@@ -7,9 +8,11 @@ export interface HorseDetailTab extends TabItem {
   content: ReactNode;
 }
 
-/** Shared underlined tabs. Callers supply only the tabs their actor may access. */
+/** Shared underlined tabs (?tab=<id> opens that tab first). Callers supply only the tabs their actor may access. */
 export function HorseDetailTabs({ tabs }: { tabs: readonly HorseDetailTab[] }) {
-  const [active, setActive] = useState(tabs[0]?.id);
+  // A link can open a given tab with ?tab=<id>.
+  const requested = useSearchParams().get('tab');
+  const [active, setActive] = useState(tabs.find((tab) => tab.id === requested)?.id ?? tabs[0]?.id);
   const panelId = useId();
   const current = tabs.find((tab) => tab.id === active) ?? tabs[0];
 

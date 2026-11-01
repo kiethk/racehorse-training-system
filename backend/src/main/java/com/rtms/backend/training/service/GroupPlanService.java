@@ -25,7 +25,7 @@ public interface GroupPlanService {
     GroupPlanDetailResponse createPlan(GroupPlanRequest request, AuthenticatedUser currentUser);
 
     /** Danh sách kế hoạch; Trainer thấy của mình, vai khác được xem thấy tất cả. (Plan list: a Trainer sees own, other viewing roles all.) */
-    List<GroupPlanSummaryResponse> getPlans(Long groupId, AuthenticatedUser currentUser);
+    List<GroupPlanSummaryResponse> getPlans(Long groupId, Long horseId, AuthenticatedUser currentUser);
 
     GroupPlanDetailResponse getPlan(Long planId, AuthenticatedUser currentUser);
 

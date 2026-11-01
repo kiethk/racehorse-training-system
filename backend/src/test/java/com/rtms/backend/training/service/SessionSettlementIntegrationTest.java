@@ -177,7 +177,7 @@ class SessionSettlementIntegrationTest {
     void readingThePlanListSettlesFirst() {
         clock.set(monday.plusDays(5).atTime(7, 0));
 
-        String status = planService.getPlans(null, trainer).get(0).status();
+        String status = planService.getPlans(null, null, trainer).get(0).status();
 
         assertEquals("COMPLETED", status);
     }

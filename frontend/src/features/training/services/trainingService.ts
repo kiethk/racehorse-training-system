@@ -115,8 +115,13 @@ export const trainingService = {
   createGroupPlan: async (request: GroupPlanRequest): Promise<GroupPlanDetail> =>
     (await apiPost<ApiResponse<GroupPlanDetail>>('/api/group-plans', request)).data,
 
-  getGroupPlans: async (groupId?: number): Promise<GroupPlanSummary[]> =>
-    (await apiGet<ApiResponse<GroupPlanSummary[]>>(`/api/group-plans${groupId ? `?groupId=${groupId}` : ''}`)).data,
+  getGroupPlans: async (filter?: { groupId?: number; horseId?: number }): Promise<GroupPlanSummary[]> => {
+    const query = new URLSearchParams();
+    if (filter?.groupId) query.set('groupId', String(filter.groupId));
+    if (filter?.horseId) query.set('horseId', String(filter.horseId));
+    const suffix = query.size > 0 ? `?${query}` : '';
+    return (await apiGet<ApiResponse<GroupPlanSummary[]>>(`/api/group-plans${suffix}`)).data;
+  },
 
   getGroupPlan: async (id: number): Promise<GroupPlanDetail> =>
     (await apiGet<ApiResponse<GroupPlanDetail>>(`/api/group-plans/${id}`)).data,

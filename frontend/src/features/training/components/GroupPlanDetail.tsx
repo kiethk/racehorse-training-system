@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { BackLink, Button, ConfirmDialog, DetailSkeleton, EmptyState, PageHeader, Panel, ProgressBar, ScreenLayout, Table, TBody, Td, Th, THead, Tr } from '@/components/ui';
 import { displayError, formatDate, formatTime } from '@/lib/display';
@@ -96,7 +97,12 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {planHorses.map((horse) => (
               <li key={horse.horseId} className="flex items-center justify-between gap-2 text-sm">
-                <span>{horse.horseName}</span>
+                <Link
+                  href={`/trainer/horses/${horse.horseId}?tab=training-history`}
+                  className="font-medium text-[var(--color-primary)] hover:underline"
+                >
+                  {horse.horseName}
+                </Link>
                 <span className="text-[var(--color-text-muted)]" title="Sessions attended out of sessions held or still to come">
                   {horse.attended} of {horse.total}
                 </span>

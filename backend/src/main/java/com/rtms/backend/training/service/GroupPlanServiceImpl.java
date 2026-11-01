@@ -238,13 +238,21 @@ public class GroupPlanServiceImpl implements GroupPlanService {
 
     @Override
     @Transactional
-    public List<GroupPlanSummaryResponse> getPlans(Long groupId, AuthenticatedUser currentUser) {
+    public List<GroupPlanSummaryResponse> getPlans(Long groupId, Long horseId, AuthenticatedUser currentUser) {
         settlement.settle();
         List<GroupPlan> plans = "HEAD_TRAINER".equals(currentUser.getRole())
                 ? planRepository.findByTrainerIdOrderByStartDateDesc(currentUser.getUserId())
                 : planRepository.findAllByOrderByStartDateDesc();
         if (groupId != null) {
             plans = plans.stream().filter(plan -> groupId.equals(plan.getGroupId())).toList();
+        }
+        if (horseId != null) {
+            // A plan matches when the horse has any Workout in one of its Sessions, cancelled ones included.
+            Set<Long> sessionIds = workoutRepository.findByHorseIdAndSessionIdIsNotNull(horseId).stream()
+                    .map(TrainingWorkout::getSessionId).collect(Collectors.toSet());
+            Set<Long> planIds = sessionRepository.findAllById(sessionIds).stream()
+                    .map(TrainingSession::getGroupPlanId).collect(Collectors.toSet());
+            plans = plans.stream().filter(plan -> planIds.contains(plan.getId())).toList();
         }
         return summaries(plans);
     }

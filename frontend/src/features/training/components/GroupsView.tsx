@@ -114,7 +114,7 @@ export function GroupsView() {
   /** Counts what disbanding will cancel before asking, so the confirmation can say it. */
   const askDisband = (group: TrainingGroup) =>
     run(async () => {
-      const plans = await trainingService.getGroupPlans(group.id);
+      const plans = await trainingService.getGroupPlans({ groupId: group.id });
       const unfinished = plans.filter((plan) => plan.status === 'UPCOMING' || plan.status === 'ACTIVE');
       const details = await Promise.all(unfinished.map((plan) => trainingService.getGroupPlan(plan.id)));
       const now = Date.now();

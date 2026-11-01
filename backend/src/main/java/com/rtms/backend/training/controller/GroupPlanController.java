@@ -41,8 +41,9 @@ public class GroupPlanController {
     @PreAuthorize("hasAuthority('GROUP_PLAN_LIST')")
     public ApiResponse<List<GroupPlanSummaryResponse>> getPlans(
             @RequestParam(required = false) Long groupId,
+            @RequestParam(required = false) Long horseId,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(planService.getPlans(groupId, currentUser));
+        return ApiResponse.success(planService.getPlans(groupId, horseId, currentUser));
     }
 
     @GetMapping("/{id}")

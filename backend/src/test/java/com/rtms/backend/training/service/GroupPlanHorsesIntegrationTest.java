@@ -7,6 +7,7 @@ import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.GroupPlanDetailResponse;
 import com.rtms.backend.training.dto.GroupPlanRequest;
+import com.rtms.backend.training.dto.GroupPlanSummaryResponse;
 import com.rtms.backend.training.dto.PlanHorseResponse;
 import com.rtms.backend.training.dto.SessionHorseOutcomeResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
@@ -171,7 +172,28 @@ class GroupPlanHorsesIntegrationTest {
                 () -> planService.getSessionHorses(plan.plan().id(), otherPlan.sessions().get(0).id(), trainer)).getErrorCode());
     }
 
+    @Test
+    void theHorseFilterKeepsThePlansWhereTheHorseHasAWorkoutEvenCancelledOnes() {
+        Horse echo = fixtures.horse("Echo");
+        TrainingGroupResponse other = groupService.createGroup(new CreateTrainingGroupRequest("Nhom 2", List.of(echo.getId())), trainer);
+        Course course = fixtures.course(trainerUser, "Other", 1, fixtures.subject(trainerUser, "S2", 30));
+        GroupPlanDetailResponse otherPlan = planService.createPlan(
+                new GroupPlanRequest(other.id(), course.getId(), monday.plusDays(28), MON_WED_FRI), trainer);
+        clock.set(monday.atTime(12, 0));
+        settlement.settle();
+        groupService.removeHorse(group.id(), blaze.getId(), trainer);   // Blaze's later Workouts are cancelled
+
+        assertEquals(List.of(plan.plan().id()), planIds(blaze.getId()));
+        assertEquals(List.of(otherPlan.plan().id()), planIds(echo.getId()));
+        assertEquals(2, planService.getPlans(null, null, trainer).size());
+        assertTrue(planIds(fixtures.horse("Idle").getId()).isEmpty());
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    private List<Long> planIds(Long horseId) {
+        return planService.getPlans(null, horseId, trainer).stream().map(GroupPlanSummaryResponse::id).toList();
+    }
 
     private Map<String, PlanHorseResponse> planHorses() {
         return planService.getPlanHorses(plan.plan().id(), trainer).stream()
