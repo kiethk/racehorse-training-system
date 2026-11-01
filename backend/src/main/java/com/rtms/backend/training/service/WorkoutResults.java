@@ -17,25 +17,13 @@ public final class WorkoutResults {
     }
 
     public static void validate(CompleteWorkoutRequest request) {
-        if (request.getActualDistanceMeters() == null
-                || request.getActualDurationMinutes() == null
-                || request.getTopSpeedKmh() == null
-                || request.getAverageSpeedKmh() == null
-                || request.getAverageHeartRate() == null
-                || request.getMaxHeartRate() == null
-                || request.getRecoveryHeartRate() == null) {
-            throw new IllegalArgumentException("All measured results are required!");
-        }
-        if (request.getPerformanceRating() == null) {
-            request.setPerformanceRating(WorkoutPerformanceCalculator.calculate(
-                    request.getActualDistanceMeters(),
-                    request.getActualDurationMinutes(),
-                    request.getTopSpeedKmh(),
-                    request.getAverageSpeedKmh(),
-                    request.getAverageHeartRate(),
-                    request.getMaxHeartRate(),
-                    request.getRecoveryHeartRate()));
-        }
+        require(request.getActualDistanceMeters(), "Actual distance");
+        require(request.getActualDurationMinutes(), "Actual duration");
+        require(request.getTopSpeedKmh(), "Top speed");
+        require(request.getAverageSpeedKmh(), "Average speed");
+        require(request.getAverageHeartRate(), "Average heart rate");
+        require(request.getMaxHeartRate(), "Maximum heart rate");
+        require(request.getRecoveryHeartRate(), "Recovery heart rate");
         if (request.getActualDistanceMeters().compareTo(BigDecimal.ZERO) <= 0
                 || request.getActualDurationMinutes().compareTo(BigDecimal.ZERO) <= 0
                 || request.getTopSpeedKmh().compareTo(BigDecimal.ZERO) <= 0
@@ -53,11 +41,14 @@ public final class WorkoutResults {
         if (request.getAverageHeartRate() > request.getMaxHeartRate()) {
             throw new IllegalArgumentException("Average heart rate cannot exceed maximum heart rate!");
         }
-        if (request.getPerformanceRating() < 1 || request.getPerformanceRating() > 10) {
-            throw new IllegalArgumentException("Performance rating must be between 1 and 10!");
-        }
         if (request.getTrainerFeedback() != null && request.getTrainerFeedback().length() > 2000) {
             throw new IllegalArgumentException("Trainer feedback cannot exceed 2000 characters!");
+        }
+    }
+
+    private static void require(Object value, String label) {
+        if (value == null) {
+            throw new IllegalArgumentException(label + " is required");
         }
     }
 

@@ -80,11 +80,10 @@ export interface CompleteWorkoutRequest {
   averageHeartRate: number;
   maxHeartRate: number;
   recoveryHeartRate: number;
-  performanceRating: number; // 1-10
   trainerFeedback?: string | null;
 }
 
-/** A fresh, non-persistent measurement set returned when the result form is opened. */
+/** A simulated measurement set returned only when the Trainer presses "Generate sample data"; never saved by itself. */
 export interface WorkoutResultPreviewResponse {
   actualDistanceMeters: number;
   actualDurationMinutes: number;
@@ -93,7 +92,6 @@ export interface WorkoutResultPreviewResponse {
   averageHeartRate: number;
   maxHeartRate: number;
   recoveryHeartRate: number;
-  performanceRating?: number;
 }
 
 /** One session of a horse in its schedule. The session and the horse's own workout can each be cancelled. */
