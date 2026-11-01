@@ -142,7 +142,7 @@ public interface TrainingLotRepository extends JpaRepository<TrainingLot, Long> 
      * (Names of active horses in MANY lots with ONE query, replacing findAllById inside a loop.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.LotHorseNameRow(w.lotId, h.name)
+           SELECT new com.rtms.backend.training.dto.LotHorseNameRow(w.lotId, h.id, h.name)
            FROM TrainingWorkout w
            JOIN Horse h ON w.horseId = h.id
            WHERE w.lotId IN :lotIds
@@ -156,7 +156,7 @@ public interface TrainingLotRepository extends JpaRepository<TrainingLot, Long> 
      * (Same as above but only one owner horses, so an owner never sees the names of other owners horses.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.LotHorseNameRow(w.lotId, h.name)
+           SELECT new com.rtms.backend.training.dto.LotHorseNameRow(w.lotId, h.id, h.name)
            FROM TrainingWorkout w
            JOIN Horse h ON w.horseId = h.id
            WHERE w.lotId IN :lotIds

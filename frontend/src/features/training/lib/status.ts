@@ -22,6 +22,15 @@ export const WORKOUT_STATUS: Record<WorkoutStatus, StatusStyle> = {
   CANCELLED: { label: 'Cancelled', tone: 'danger' },
 };
 
+/** What a session looks like in a horse's schedule: not yet held, held, or called off. */
+export type SessionState = 'UPCOMING' | 'COMPLETED' | 'CANCELLED';
+
+export const SESSION_STATE: Record<SessionState, StatusStyle> = {
+  UPCOMING: { label: 'Upcoming', tone: 'info' },
+  COMPLETED: { label: 'Completed', tone: 'success' },
+  CANCELLED: { label: 'Cancelled', tone: 'danger' },
+};
+
 /** Free slots left in a lot decide how urgent it looks: full is red, nearly full is amber. */
 export function lotFillTone(remainingSlots: number, nearlyFullAt = 2): 'danger' | 'warning' | 'success' {
   if (remainingSlots === 0) return 'danger';

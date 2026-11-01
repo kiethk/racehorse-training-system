@@ -2,6 +2,7 @@ package com.rtms.backend.training.service;
 
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.LotHorseNameRow;
+import com.rtms.backend.training.dto.LotHorseResponse;
 import com.rtms.backend.training.dto.TrainingLotResponse;
 import com.rtms.backend.training.dto.TrainingLotRow;
 import com.rtms.backend.training.entity.Subject;
@@ -96,12 +97,12 @@ class TrainingLotViewServiceTest {
     void testGetLots_TrainerUsesOwnId() {
         when(lotRepository.findTrainerLotRows(9L, from, to, true)).thenReturn(List.of(row(10L, 9L, 2)));
         when(lotRepository.findActiveHorseNames(anyCollection())).thenReturn(List.of(
-                new LotHorseNameRow(10L, "Red Fox"), new LotHorseNameRow(10L, "Silver Moon")));
+                new LotHorseNameRow(10L, 1L, "Red Fox"), new LotHorseNameRow(10L, 1L, "Silver Moon")));
 
         List<TrainingLotResponse> result = lotService.getLots(trainer, 777L, from, to, true);
 
         assertEquals(1, result.size());
-        assertEquals(List.of("Red Fox", "Silver Moon"), result.get(0).getHorseNames());
+        assertEquals(List.of("Red Fox", "Silver Moon"), horseNames(result.get(0)));
         assertEquals(2, result.get(0).getOccupied());
         assertEquals(4, result.get(0).getRemainingSlots());
         verify(lotRepository, never()).findTrainerLotRows(eq(777L), any(), any(), anyBoolean());
@@ -111,7 +112,7 @@ class TrainingLotViewServiceTest {
     @DisplayName("A groom sees the lots where they lead a horse")
     void testGetLots_Groom() {
         when(lotRepository.findGroomLotRows(4L, from, to)).thenReturn(List.of(row(10L, 9L, 1)));
-        when(lotRepository.findActiveHorseNames(anyCollection())).thenReturn(List.of(new LotHorseNameRow(10L, "Red Fox")));
+        when(lotRepository.findActiveHorseNames(anyCollection())).thenReturn(List.of(new LotHorseNameRow(10L, 1L, "Red Fox")));
 
         List<TrainingLotResponse> result = lotService.getLots(groom, null, from, to, false);
 
@@ -124,11 +125,11 @@ class TrainingLotViewServiceTest {
     void testGetLots_OwnerSeesOnlyOwnHorses() {
         when(lotRepository.findOwnerLotRows(5L, from, to)).thenReturn(List.of(row(10L, 9L, 3)));
         when(lotRepository.findActiveHorseNamesOfOwner(anyCollection(), eq(5L)))
-                .thenReturn(List.of(new LotHorseNameRow(10L, "My Horse")));
+                .thenReturn(List.of(new LotHorseNameRow(10L, 1L, "My Horse")));
 
         List<TrainingLotResponse> result = lotService.getLots(owner, null, from, to, true);
 
-        assertEquals(List.of("My Horse"), result.get(0).getHorseNames(),
+        assertEquals(List.of("My Horse"), horseNames(result.get(0)),
                 "Names of other owners horses in the same lot must not be shown");
         assertEquals(3, result.get(0).getOccupied(), "Only the total count is shared");
         verify(lotRepository, never()).findActiveHorseNames(any());
@@ -153,7 +154,7 @@ class TrainingLotViewServiceTest {
         List<TrainingLotResponse> result = lotService.getLots(manager, 9L, from, to, true);
 
         assertEquals(1, result.size());
-        assertTrue(result.get(0).getHorseNames().isEmpty());
+        assertTrue(horseNames(result.get(0)).isEmpty());
     }
 
     @Test
@@ -171,13 +172,13 @@ class TrainingLotViewServiceTest {
         when(lotRepository.findTrainerLotRows(9L, from, to, false))
                 .thenReturn(List.of(row(10L, 9L, 1), row(11L, 9L, 1), row(12L, 9L, 0)));
         when(lotRepository.findActiveHorseNames(anyCollection())).thenReturn(List.of(
-                new LotHorseNameRow(10L, "A"), new LotHorseNameRow(11L, "B")));
+                new LotHorseNameRow(10L, 1L, "A"), new LotHorseNameRow(11L, 1L, "B")));
 
         List<TrainingLotResponse> result = lotService.getLots(trainer, null, from, to, false);
 
-        assertEquals(List.of("A"), result.get(0).getHorseNames());
-        assertEquals(List.of("B"), result.get(1).getHorseNames());
-        assertTrue(result.get(2).getHorseNames().isEmpty());
+        assertEquals(List.of("A"), horseNames(result.get(0)));
+        assertEquals(List.of("B"), horseNames(result.get(1)));
+        assertTrue(horseNames(result.get(2)).isEmpty());
         verify(lotRepository, times(1)).findActiveHorseNames(anyCollection());
     }
 
@@ -189,7 +190,7 @@ class TrainingLotViewServiceTest {
     @DisplayName("A trainer opens their own lot")
     void testGetLot_TrainerOwnLot() {
         when(lotRepository.findLotRowById(10L)).thenReturn(Optional.of(row(10L, 9L, 1)));
-        when(lotRepository.findActiveHorseNames(anyCollection())).thenReturn(List.of(new LotHorseNameRow(10L, "Red Fox")));
+        when(lotRepository.findActiveHorseNames(anyCollection())).thenReturn(List.of(new LotHorseNameRow(10L, 1L, "Red Fox")));
 
         assertEquals(10L, lotService.getLot(10L, trainer).getLotId());
     }
@@ -219,11 +220,11 @@ class TrainingLotViewServiceTest {
         when(lotRepository.findLotRowById(10L)).thenReturn(Optional.of(row(10L, 9L, 4)));
         when(workoutRepository.existsActiveWorkoutOfOwnerInLot(10L, 5L)).thenReturn(true);
         when(lotRepository.findActiveHorseNamesOfOwner(anyCollection(), eq(5L)))
-                .thenReturn(List.of(new LotHorseNameRow(10L, "My Horse")));
+                .thenReturn(List.of(new LotHorseNameRow(10L, 1L, "My Horse")));
 
         TrainingLotResponse res = lotService.getLot(10L, owner);
 
-        assertEquals(List.of("My Horse"), res.getHorseNames());
+        assertEquals(List.of("My Horse"), horseNames(res));
         assertEquals(4, res.getOccupied());
     }
 
@@ -411,5 +412,9 @@ class TrainingLotViewServiceTest {
 
         assertEquals(LotStatus.CANCELLED, emptyLot.getStatus());
         verify(lotRepository, never()).findById(11L);
+    }
+
+    private static List<String> horseNames(TrainingLotResponse lot) {
+        return lot.getHorses().stream().map(LotHorseResponse::name).toList();
     }
 }

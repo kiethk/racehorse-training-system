@@ -6,6 +6,7 @@ import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.dto.DashboardPlanRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
+import com.rtms.backend.training.dto.HorseScheduleItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
@@ -81,6 +82,20 @@ public class HorsePerformanceService {
         LocalDate from = fromDate != null ? fromDate : LocalDate.of(1900, 1, 1);
         LocalDate to = toDate != null ? toDate : LocalDate.of(2999, 12, 31);
         return workoutRepository.findFitnessTrend(horseId, from, to);
+    }
+
+    /**
+     * Lịch tập của một con ngựa trong khoảng ngày (vai nào xem được ngựa thì xem được lịch).
+     * (A horse training schedule over a date range; whoever may view the horse may view it.)
+     */
+    @Transactional(readOnly = true)
+    public List<HorseScheduleItemResponse> getHorseSchedule(Long horseId, LocalDate from, LocalDate to,
+                                                            AuthenticatedUser currentUser) {
+        accessService.assertCanViewHorse(horseId, currentUser);
+        if (to.isBefore(from)) {
+            throw new IllegalArgumentException("The end date cannot be before the start date");
+        }
+        return workoutRepository.findHorseSchedule(horseId, from, to);
     }
 
     // =================================================================

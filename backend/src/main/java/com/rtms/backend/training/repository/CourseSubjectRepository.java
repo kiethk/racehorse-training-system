@@ -8,12 +8,19 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
 public interface CourseSubjectRepository extends JpaRepository<CourseSubject, Long> {
 
     long countByCourseId(Long courseId);
+
+    /**
+     * Các bài của nhiều khóa, gom theo khóa rồi theo đúng thứ tự xoay vòng; dùng để so danh sách bài của khóa mới.
+     * (The subjects of several courses, grouped by course then in rotation order; used to compare a new course subject list.)
+     */
+    List<CourseSubject> findByCourseIdInOrderByCourseIdAscOrderIndexAsc(Collection<Long> courseIds);
 
     /**
      * Các bài tập của khóa theo đúng thứ tự (một câu JOIN thay cho findById từng bài).

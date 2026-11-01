@@ -13,21 +13,20 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
 Đứng ở thư mục `backend`:
 
 ```powershell
-# 1. Chép file hồ sơ nhập học (ảnh + PDF) vào backend\uploads\admissions. Bỏ qua nếu đã đủ và không đổi.
-.\scripts\seed-admission-files.ps1
-
-# 2. Seed database (hỏi xác nhận; thêm -Yes để bỏ hỏi).
+# Seed database (hỏi xác nhận; thêm -Yes để bỏ hỏi).
 .\scripts\seed-database.ps1
 ```
 
-- `seed-admission-files.ps1` tự tìm thư mục `RTMS_Admission_Packs_<ngày>` nằm cạnh thư mục repo (hoặc dùng `-Source <đường dẫn>`).
-  Nó so dấu vân tay SHA-256 của toàn bộ file nguồn. Nếu giống lần trước và đủ file thì bỏ qua. Nếu khác thì **xóa sạch**
-  thư mục upload rồi chép lại, nên thư mục không bao giờ phình gấp đôi. Thêm `-Force` để luôn chép lại.
 - `seed-database.ps1` đọc kết nối từ `src/main/resources/application-local.properties` (giống backend), hoặc từ tham số
   `-DbHost -Port -Database -User -Password`. Nó từ chối chạy khi:
   - DB chưa có bảng hoặc còn migration chưa áp. Khi đó chạy backend một lần cho Flyway làm trước.
   - DB không nằm trên máy (localhost). Muốn chạy ở nơi khác phải thêm `-AllowRemote`.
-- Hai script độc lập nhau. Chạy lại seed DB không cần chép lại file, vì tên file trong DB suy ra cố định từ bộ hồ sơ.
+- **File hồ sơ nhập học nằm trên Cloudinary**, không phải ổ đĩa. 324 file (54 ảnh + 270 PDF) đã được upload một lần ở lần seed
+  cloud ngày 17/10; `10_data.sql` (bảng `seed_doc`, cột `file_url`) giữ URL của từng file. Seed chỉ ghi URL vào DB, không upload
+  gì thêm, nên chạy lại bao nhiêu lần cũng không sinh file trùng trên Cloudinary.
+- Muốn mở được ảnh / PDF, backend phải có `CLOUDINARY_URL` của đúng tài khoản `zk0ncjb1` (như trong `backend/.env.cloud`).
+  Backend tự ký URL khi đọc; URL lưu trong DB không có chữ ký nên lộ ra cũng không mở được file.
+  Không có `CLOUDINARY_URL` thì mọi màn hình vẫn chạy, chỉ riêng ảnh ngựa và tài liệu hồ sơ báo 404.
 
 ## Tài khoản (mật khẩu `admin123`)
 
@@ -66,7 +65,7 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
 | `sql/seed.sql` | Chạy các file dưới đây theo thứ tự |
 | `sql/00_helpers.sql` | Hàm dùng chung: dời ngày, tra id theo khóa, lịch Thú y, hoàn tất ca khám, mốc tiêm, thông báo, nhật ký |
 | `sql/01_cleanup.sql` | TRUNCATE mọi bảng trừ bảng danh mục do migration nạp |
-| `sql/10_data.sql` | Dữ liệu định danh: tài khoản, khu, ngựa, đơn, file hồ sơ |
+| `sql/10_data.sql` | Dữ liệu định danh: tài khoản, khu, ngựa, đơn, URL Cloudinary của file hồ sơ |
 | `sql/20_accounts_stable.sql` | Tài khoản, hồ sơ nhân viên, khu, chuồng, phân Groom |
 | `sql/30_admissions.sql` | Luồng nhập học từng đơn |
 | `sql/40_vet_cases.sql` | Ca Thú y sau nhập trại |

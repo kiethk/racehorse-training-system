@@ -193,7 +193,7 @@ public class AdmissionQueryService {
                 ? ""
                 : candidateName.trim();
         var pageable = PageRequest.of(page, pageSize,
-                Sort.by(Sort.Order.asc("createdAt"), Sort.Order.asc("id")));
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         Page<AdmissionApplication> result = admissionApplicationRepository.findGroomQueue(
                 groomId,
                 stableStallRepository.isQuarantineGroom(groomId),

@@ -39,6 +39,7 @@ export function DataTable<Row>({
   getSearchText,
   searchPlaceholder = 'Search records…',
   toolbarExtras,
+  defaultOrder,
   className = '',
 }: {
   rows: Row[];
@@ -58,6 +59,8 @@ export function DataTable<Row>({
   getSearchText?: (row: Row) => string;
   searchPlaceholder?: string;
   toolbarExtras?: ReactNode;
+  /** Order of the rows until the user sorts by a column (e.g. newest first). Without it rows keep the order they arrive in. */
+  defaultOrder?: (left: Row, right: Row) => number;
   className?: string;
 }) {
   const [sort, setSort] = useState<{ id: string; direction: 'asc' | 'desc' } | null>(null);
@@ -73,7 +76,7 @@ export function DataTable<Row>({
   }, [activeSearch, getSearchText, rows]);
 
   const sorted = useMemo(() => {
-    if (!sort) return filtered;
+    if (!sort) return defaultOrder ? [...filtered].sort(defaultOrder) : filtered;
     const column = columns.find((item) => item.id === sort.id);
     if (!column?.sortValue) return filtered;
     const direction = sort.direction === 'asc' ? 1 : -1;
@@ -89,7 +92,7 @@ export function DataTable<Row>({
           : String(a).localeCompare(String(b), 'en-GB', { numeric: true, sensitivity: 'base' });
       return result * direction;
     });
-  }, [columns, filtered, sort]);
+  }, [columns, defaultOrder, filtered, sort]);
 
   const activePage = pagination?.page ?? localPage;
   const activePageSize = pagination?.pageSize ?? pageSize;

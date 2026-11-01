@@ -15,6 +15,7 @@ import {
 import { HorseFilterBar } from '@/features/horses/shared/components/HorseFilterBar';
 import { displayError, formatDate } from '@/lib/display';
 import { cancelledLabel, planProgress } from '../lib/planProgress';
+import { planOrder } from '../lib/listOrder';
 import { PLAN_STATUS } from '../lib/status';
 import { trainingService } from '../services/trainingService';
 import type { PlanStatus, PlanSummaryResponse } from '../types';
@@ -96,9 +97,11 @@ export function PlanList() {
 
   const visible = useMemo(() => {
     const query = appliedSearch.toLowerCase();
-    return plans.filter((plan) =>
-      (!appliedStatus || plan.status === appliedStatus)
-      && (!query || plan.horseName.toLowerCase().includes(query)));
+    return plans
+      .filter((plan) =>
+        (!appliedStatus || plan.status === appliedStatus)
+        && (!query || plan.horseName.toLowerCase().includes(query)))
+      .sort(planOrder);
   }, [plans, appliedSearch, appliedStatus]);
 
   const applyFilters = () => {

@@ -144,7 +144,7 @@ class AdmissionQueryServiceTest {
     @Test
     void groomQueueTrimsNameUsesInclusiveDateRangeAndCapsPageSize() {
         var page = PageRequest.of(2, 10,
-                Sort.by(Sort.Order.asc("createdAt"), Sort.Order.asc("id")));
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         when(stalls.isQuarantineGroom(7L)).thenReturn(true);
         when(admissions.findGroomQueue(eq(7L), eq(true), eq(AdmissionStatus.GROOM_REVIEW), eq(false), eq(AdmissionStatus.GROOM_REVIEW), eq(true), eq("Mercury"),
                 eq(true), any(), eq(true), any(), any(Pageable.class)))
@@ -160,7 +160,7 @@ class AdmissionQueryServiceTest {
                 eq(true), eq(LocalDateTime.of(2026, 1, 2, 0, 0)),
                 eq(true), eq(LocalDateTime.of(2026, 1, 9, 0, 0)), pageable.capture());
         // BR-04: oldest admission first, id as a stable tie-breaker for paging.
-        assertEquals(Sort.by(Sort.Order.asc("createdAt"), Sort.Order.asc("id")), pageable.getValue().getSort());
+        assertEquals(Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")), pageable.getValue().getSort());
     }
 
     @Test

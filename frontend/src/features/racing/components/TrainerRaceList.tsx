@@ -13,6 +13,11 @@ type FilterTab = 'ALL' | RaceRegistrationStatus;
 
 const TABS: FilterTab[] = ['ALL', 'PENDING', 'APPROVED', 'REJECTED'];
 
+/** Newest nomination first; the same creation time falls back to the newest id. */
+function newestNominationFirst(left: RaceRegistrationResponse, right: RaceRegistrationResponse): number {
+  return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime() || right.id - left.id;
+}
+
 const columns: DataTableColumn<RaceRegistrationResponse>[] = [
   {
     id: 'race',
@@ -135,6 +140,7 @@ export function TrainerRaceList() {
         <DataTable
           ariaLabel="Race nominations"
           rows={visible}
+          defaultOrder={newestNominationFirst}
           columns={columns}
           getRowKey={(item) => item.id}
           getSearchText={(item) => `${item.raceName} ${item.raceCategory} ${item.horseName ?? ''} ${item.location}`}

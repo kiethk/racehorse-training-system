@@ -149,8 +149,3 @@ UNION ALL SELECT 'Race nominations', count(*)::TEXT FROM race_registrations
 UNION ALL SELECT 'Notifications', count(*)::TEXT FROM notifications;
 "@
 Write-Host 'Main accounts (password admin123): admin@rtms.com, owner@rtms.com, trainer1@rtms.com, vet1@rtms.com, groom1@rtms.com' -ForegroundColor Green
-
-$state = Join-Path $backendRoot 'uploads\admissions\.rtms-seed-state.json'
-if (-not (Test-Path -LiteralPath $state) -and -not $env:RTMS_STORAGE_UPLOAD_DIR) {
-    Write-Host 'Admission files are not in backend\uploads\admissions yet: run .\scripts\seed-admission-files.ps1 so documents and photos open.' -ForegroundColor Yellow
-}

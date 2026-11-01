@@ -29,6 +29,11 @@ import { PerformanceTrendCard } from './PerformanceTrendCard';
 
 type HorseFilter = 'ALL' | 'ACTIVE' | 'ALERT';
 
+/** The horse added to the club last comes first. */
+function newestHorseFirst(left: DashboardHorse, right: DashboardHorse): number {
+  return right.horseId - left.horseId;
+}
+
 /**
  * The third line of the course cell: the bar and the held/planned count, counted the same way as on the Plan page.
  * Cancelled sessions are named in the tooltip to keep the row short.
@@ -266,6 +271,7 @@ export function HorseDashboardView({
         <DataTable
           ariaLabel="Assigned horses"
           rows={visibleHorses}
+          defaultOrder={newestHorseFirst}
           columns={columns}
           getRowKey={(horse) => horse.horseId}
           loading={loading}

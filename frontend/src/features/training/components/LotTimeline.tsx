@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
+  ChipButton,
   ConfirmDialog,
   EmptyState,
   IconButton,
@@ -18,12 +19,14 @@ import {
 import { cn } from '@/lib/cn';
 import { displayError, formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
+import { useTrainerHorses } from '../hooks/useTrainerHorses';
 import { useTrainingRules } from '../hooks/useTrainingRules';
 import { shiftIsoDate, toIsoDate } from '../lib/dateRange';
 import { lotFillTone } from '../lib/status';
 import { clockOf, hourMarks, minutesOf, snapLotStart, stripPosition } from '../lib/timeline';
 import { trainingService } from '../services/trainingService';
-import type { TrainingLotResponse, TrainingRules } from '../types';
+import type { LotHorse, TrainingLotResponse, TrainingRules } from '../types';
+import { HorseScheduleDialog } from './HorseScheduleDialog';
 import { RescheduleDialog } from './RescheduleDialog';
 
 const STRIP_TONE = {
@@ -165,10 +168,12 @@ function LotCard({
   lot,
   onReschedule,
   onCancel,
+  onOpenHorse,
 }: {
   lot: TrainingLotResponse;
   onReschedule: () => void;
   onCancel: () => void;
+  onOpenHorse: (horse: LotHorse) => void;
 }) {
   return (
     <Panel padded className="flex flex-col justify-between gap-4">
@@ -186,13 +191,15 @@ function LotCard({
         </div>
 
         <div className="space-y-1.5 border-t border-[var(--color-border)] pt-2">
-          <p className="text-xs text-[var(--color-text-muted)]">Participating horses ({lot.horseNames.length})</p>
-          {lot.horseNames.length === 0 ? (
+          <p className="text-xs text-[var(--color-text-muted)]">Participating horses ({lot.horses.length})</p>
+          {lot.horses.length === 0 ? (
             <p className="text-xs text-[var(--color-text-muted)]">No horses</p>
           ) : (
             <ul className="flex flex-wrap gap-1.5">
-              {lot.horseNames.map((name) => (
-                <li key={name}><Pill tone="neutral" size="sm" icon="horse">{name}</Pill></li>
+              {lot.horses.map((horse) => (
+                <li key={horse.horseId} className="max-w-full">
+                  <ChipButton icon="horse" onClick={() => onOpenHorse(horse)}>{horse.name}</ChipButton>
+                </li>
               ))}
             </ul>
           )}
@@ -209,6 +216,7 @@ function LotCard({
 
 export function LotTimeline() {
   const rules = useTrainingRules();
+  const { horses: trainerHorses } = useTrainerHorses();
 
   const [date, setDate] = useState(() => toIsoDate(new Date()));
   const [lots, setLots] = useState<TrainingLotResponse[]>([]);
@@ -218,6 +226,7 @@ export function LotTimeline() {
   const [rescheduleTarget, setRescheduleTarget] = useState<TrainingLotResponse | null>(null);
   const [cancelTarget, setCancelTarget] = useState<TrainingLotResponse | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [openHorse, setOpenHorse] = useState<LotHorse | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -320,6 +329,7 @@ export function LotTimeline() {
                     lot={lot}
                     onReschedule={() => setRescheduleTarget(lot)}
                     onCancel={() => setCancelTarget(lot)}
+                    onOpenHorse={setOpenHorse}
                   />
                 ))}
               </div>
@@ -331,6 +341,12 @@ export function LotTimeline() {
       {!rules && !loading && !error && (
         <Notice tone="info">The schedule window could not be loaded, so the timeline strip is hidden.</Notice>
       )}
+
+      <HorseScheduleDialog
+        target={openHorse && { ...openHorse, horse: trainerHorses.find((horse) => horse.id === openHorse.horseId) }}
+        startDate={date}
+        onClose={() => setOpenHorse(null)}
+      />
 
       <RescheduleDialog
         key={rescheduleTarget?.lotId ?? 'none'}

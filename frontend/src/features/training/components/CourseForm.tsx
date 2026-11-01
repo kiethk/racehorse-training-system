@@ -88,6 +88,11 @@ function CourseFormContent({
       ? `Enter a whole number from 1 to ${rules?.maxCourseSessions ?? 60}.`
       : null;
 
+  // One subject per session, so the rotation cannot be longer than the course.
+  const tooManySubjects = !sessionsError && rotation.length > totalSessions
+    ? `A course cannot have more subjects (${rotation.length}) than sessions (${totalSessions}). Remove subjects or add sessions.`
+    : null;
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!name.trim() || sessionsError) {
@@ -100,6 +105,10 @@ function CourseFormContent({
     }
     if (rotation.length === 0) {
       setValidation('Select at least one subject for the course rotation.');
+      return;
+    }
+    if (tooManySubjects) {
+      setValidation(tooManySubjects);
       return;
     }
     setValidation(null);
@@ -175,6 +184,8 @@ function CourseFormContent({
                 </Button>
               )}
             </div>
+
+            {tooManySubjects && <p className="text-xs text-[var(--color-danger)]">{tooManySubjects}</p>}
 
             <div
               {...dropProps}

@@ -5,6 +5,7 @@ import { Button, EmptyState, ListSkeleton, Modal, PageSection, Panel, Pill } fro
 import { displayError, formatNumber } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { categoryLabel, intensityOption, surfaceLabel } from '../lib/subjectOptions';
+import { newestFirst } from '../lib/listOrder';
 import { trainingService } from '../services/trainingService';
 import type { CreateSubjectRequest, Subject } from '../types';
 import { SubjectForm } from './SubjectForm';
@@ -69,7 +70,7 @@ export function SubjectList() {
     setLoading(true);
     setError(null);
     try {
-      setSubjects(await trainingService.getSubjects());
+      setSubjects([...(await trainingService.getSubjects())].sort(newestFirst));
     } catch (cause) {
       setError(displayError(cause, 'Unable to load the subject library.'));
     } finally {

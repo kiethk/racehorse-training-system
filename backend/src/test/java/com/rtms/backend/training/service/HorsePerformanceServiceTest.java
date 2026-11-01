@@ -8,11 +8,14 @@ import com.rtms.backend.training.dto.DashboardHorseResponse;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.dto.DashboardPlanRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
+import com.rtms.backend.training.dto.HorseScheduleItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
+import com.rtms.backend.training.enums.LotStatus;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -164,6 +167,41 @@ class HorsePerformanceServiceTest {
         when(planRepository.existsHorseInTrainerArea(1L, 9L)).thenReturn(false);
 
         assertThrows(AccessDeniedException.class, () -> service.getFitnessTrend(1L, null, null, trainer));
+        verifyNoInteractions(workoutRepository);
+    }
+
+    @Test
+    @DisplayName("The schedule of a horse is read for the requested days, cancelled sessions included")
+    void testGetHorseSchedule_ReturnsTheRequestedRange() {
+        LocalDate from = LocalDate.of(2026, 10, 27);
+        LocalDate to = LocalDate.of(2026, 11, 2);
+        List<HorseScheduleItemResponse> rows = List.of(new HorseScheduleItemResponse(
+                7L, from, java.time.LocalTime.of(6, 0), java.time.LocalTime.of(7, 0), "Gallop",
+                LotStatus.SCHEDULED, WorkoutStatus.CANCELLED));
+        when(horseRepository.findById(1L)).thenReturn(Optional.of(horse(1L, 5L)));
+        when(workoutRepository.findHorseSchedule(1L, from, to)).thenReturn(rows);
+
+        assertEquals(rows, service.getHorseSchedule(1L, from, to, manager));
+    }
+
+    @Test
+    @DisplayName("A schedule range that ends before it starts is rejected")
+    void testGetHorseSchedule_BackwardsRange_Rejected() {
+        when(horseRepository.findById(1L)).thenReturn(Optional.of(horse(1L, 5L)));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.getHorseSchedule(1L, LocalDate.of(2026, 11, 2), LocalDate.of(2026, 10, 27), manager));
+        verifyNoInteractions(workoutRepository);
+    }
+
+    @Test
+    @DisplayName("An owner cannot read the schedule of someone else's horse")
+    void testGetHorseSchedule_OtherOwner_Denied() {
+        AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", "HORSE_OWNER");
+        when(horseRepository.findById(1L)).thenReturn(Optional.of(horse(1L, 99L)));
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.getHorseSchedule(1L, LocalDate.of(2026, 10, 27), LocalDate.of(2026, 11, 2), owner));
         verifyNoInteractions(workoutRepository);
     }
 

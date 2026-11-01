@@ -208,7 +208,7 @@ BEGIN
         VALUES (v_adm, hs.name, hs.breed, hs.dob, hs.ueln, hs.registry, hs.sire_name, hs.sire_ueln, hs.dam_name, hs.dam_ueln,
                 hs.pedigree_notes, v_t, v_t, hs.sex);
         INSERT INTO admission_documents (admission_id, document_type, file_url, record_date, note, uploaded_at, original_file_name)
-        SELECT v_adm, doc.doc_type, pg_temp.file_key(doc.path), doc.record_date, doc.note, v_t, doc.file_name
+        SELECT v_adm, doc.doc_type, doc.file_url, doc.record_date, doc.note, v_t, doc.file_name
           FROM seed_doc doc WHERE doc.horse_k = a.horse_k ORDER BY doc.ord;
         PERFORM pg_temp.audit(v_owner, 'Submit Admission Application', 'AdmissionApplication', NULL,
                               'Horse owner submitted a new admission application dossier', v_t, 'POST', '/api/owner/admissions');

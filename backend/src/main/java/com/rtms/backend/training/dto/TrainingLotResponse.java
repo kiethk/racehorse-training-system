@@ -17,9 +17,9 @@ public class TrainingLotResponse {
     private Integer maxCapacity;
     private Integer occupied;
     private Integer remainingSlots;
-    private List<String> horseNames;
+    private List<LotHorseResponse> horses;
 
-    public TrainingLotResponse(TrainingLotRow row, List<String> horseNames) {
+    public TrainingLotResponse(TrainingLotRow row, List<LotHorseResponse> horses) {
         int occupied = row.occupied().intValue();
         this.lotId = row.lotId();
         this.lotDate = row.lotDate();
@@ -32,7 +32,7 @@ public class TrainingLotResponse {
         this.maxCapacity = row.maxCapacity();
         this.occupied = occupied;
         this.remainingSlots = row.maxCapacity() - occupied;
-        this.horseNames = horseNames;
+        this.horses = horses;
     }
 
     public Long getLotId() { return lotId; }
@@ -46,5 +46,5 @@ public class TrainingLotResponse {
     public Integer getMaxCapacity() { return maxCapacity; }
     public Integer getOccupied() { return occupied; }
     public Integer getRemainingSlots() { return remainingSlots; }
-    public List<String> getHorseNames() { return horseNames; }
+    public List<LotHorseResponse> getHorses() { return horses; }
 }
