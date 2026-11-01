@@ -19,6 +19,8 @@ import type {
   GroupPlanPreview,
   GroupPlanSummary,
   GroupPlanDetail,
+  PlanHorse,
+  SessionHorseOutcomeItem,
   ScheduleSession,
   SessionDetail,
   SessionWorkoutResult,
@@ -115,6 +117,12 @@ export const trainingService = {
 
   getGroupPlan: async (id: number): Promise<GroupPlanDetail> =>
     (await apiGet<ApiResponse<GroupPlanDetail>>(`/api/group-plans/${id}`)).data,
+
+  getPlanHorses: async (planId: number): Promise<PlanHorse[]> =>
+    (await apiGet<ApiResponse<PlanHorse[]>>(`/api/group-plans/${planId}/horses`)).data,
+
+  getPlanSessionHorses: async (planId: number, sessionId: number): Promise<SessionHorseOutcomeItem[]> =>
+    (await apiGet<ApiResponse<SessionHorseOutcomeItem[]>>(`/api/group-plans/${planId}/sessions/${sessionId}/horses`)).data,
 
   cancelGroupPlan: async (id: number): Promise<GroupPlanDetail> =>
     (await apiPost<ApiResponse<GroupPlanDetail>>(`/api/group-plans/${id}/cancel`, {})).data,

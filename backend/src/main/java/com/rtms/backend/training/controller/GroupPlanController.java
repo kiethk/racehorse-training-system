@@ -6,6 +6,8 @@ import com.rtms.backend.training.dto.GroupPlanDetailResponse;
 import com.rtms.backend.training.dto.GroupPlanPreviewResponse;
 import com.rtms.backend.training.dto.GroupPlanRequest;
 import com.rtms.backend.training.dto.GroupPlanSummaryResponse;
+import com.rtms.backend.training.dto.PlanHorseResponse;
+import com.rtms.backend.training.dto.SessionHorseOutcomeResponse;
 import com.rtms.backend.training.service.GroupPlanService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -48,6 +50,20 @@ public class GroupPlanController {
     public ApiResponse<GroupPlanDetailResponse> getPlan(
             @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(planService.getPlan(id, currentUser));
+    }
+
+    @GetMapping("/{id}/horses")
+    @PreAuthorize("hasAuthority('GROUP_PLAN_VIEW')")
+    public ApiResponse<List<PlanHorseResponse>> getPlanHorses(
+            @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(planService.getPlanHorses(id, currentUser));
+    }
+
+    @GetMapping("/{id}/sessions/{sessionId}/horses")
+    @PreAuthorize("hasAuthority('GROUP_PLAN_VIEW')")
+    public ApiResponse<List<SessionHorseOutcomeResponse>> getSessionHorses(
+            @PathVariable Long id, @PathVariable Long sessionId, @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(planService.getSessionHorses(id, sessionId, currentUser));
     }
 
     @PostMapping("/preview")
