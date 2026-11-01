@@ -97,6 +97,13 @@ BEGIN
     RETURN v;
 END $$ LANGUAGE plpgsql STABLE;
 
+-- Khóa file của một ảnh seed dựng sẵn trong backend\uploads: "local:<uuid>.<đuôi>", uuid = md5 của đường dẫn
+-- trong bộ hồ sơ. report_incident dùng để ảnh sự cố render từ đĩa local (hướng 3.3 local-only, không qua
+-- Cloudinary như admission_documents của develop). (Storage key of a locally seeded picture.)
+CREATE FUNCTION pg_temp.file_key(p_path TEXT) RETURNS TEXT AS $$
+    SELECT 'local:' || md5('rtms-seed/' || p_path)::UUID::TEXT || lower(substring(p_path FROM '\.[A-Za-z0-9]+$'))
+$$ LANGUAGE sql IMMUTABLE;
+
 -- Ngày giờ theo kiểu LocalDateTime.toString() của Java (bỏ giây khi bằng 0), dùng cho request_fingerprint.
 -- (Date-time as Java LocalDateTime.toString(), used by request_fingerprint.)
 CREATE FUNCTION pg_temp.java_ts(p TIMESTAMP) RETURNS TEXT AS $$
