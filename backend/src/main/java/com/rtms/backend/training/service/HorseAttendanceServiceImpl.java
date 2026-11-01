@@ -80,9 +80,9 @@ public class HorseAttendanceServiceImpl implements HorseAttendanceService {
 
         Map<Long, GroupPlan> plansById = planRepository.findAllById(workoutsByPlan.keySet()).stream()
                 .collect(Collectors.toMap(GroupPlan::getId, Function.identity()));
-        Map<Long, String> groupNames = groupRepository
+        Map<Long, TrainingGroup> groupsById = groupRepository
                 .findAllById(plansById.values().stream().map(GroupPlan::getGroupId).filter(Objects::nonNull).toList()).stream()
-                .collect(Collectors.toMap(TrainingGroup::getId, TrainingGroup::getName));
+                .collect(Collectors.toMap(TrainingGroup::getId, Function.identity()));
         Map<Long, String> courseNames = courseRepository
                 .findAllById(plansById.values().stream().map(GroupPlan::getCourseId).toList()).stream()
                 .collect(Collectors.toMap(Course::getId, Course::getName));
@@ -101,7 +101,8 @@ public class HorseAttendanceServiceImpl implements HorseAttendanceService {
                     .map(workout -> sessionsById.get(workout.getSessionId()).getSessionDate())
                     .min(Comparator.naturalOrder()).orElse(plan.getStartDate());
             history.add(new HorseAttendanceResponse(plan.getId(),
-                    plan.getGroupId() == null ? null : groupNames.get(plan.getGroupId()),
+                    plan.getGroupId() == null ? null : groupsById.get(plan.getGroupId()).getName(),
+                    plan.getGroupId() != null && groupsById.get(plan.getGroupId()).isDisbanded(),
                     courseNames.get(plan.getCourseId()), plan.getStatus().name(), plan.getStartDate(), plan.getEndDate(),
                     attended, total, joinedOn));
         }

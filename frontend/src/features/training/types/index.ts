@@ -168,6 +168,7 @@ export interface TrainingGroup {
   currentCourseName: string | null;
   currentPlanStatus: PlanStatus | null;
   currentPlanEndDate: string | null;
+  disbanded: boolean;
 }
 
 export interface GroupCandidate {
@@ -228,6 +229,7 @@ export interface GroupPlanSummary {
   id: number;
   groupId: number | null;
   groupName: string | null;
+  groupDisbanded: boolean;
   courseId: number;
   courseName: string;
   startDate: string;
@@ -281,6 +283,7 @@ export interface ScheduleSession {
   planId: number;
   groupId: number | null;
   groupName: string | null;
+  groupDisbanded: boolean;
   courseName: string;
   subjectName: string;
   date: string;
@@ -329,6 +332,7 @@ export interface SessionWorkoutResult {
 export interface HorseAttendance {
   planId: number;
   groupName: string | null;
+  groupDisbanded: boolean;
   courseName: string;
   planStatus: PlanStatus;
   startDate: string;

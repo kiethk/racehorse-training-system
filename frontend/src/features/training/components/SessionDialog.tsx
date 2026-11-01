@@ -11,6 +11,7 @@ import type { ScheduleSession, SessionDetail, SessionHorse } from '../types';
 import { SessionRescheduleDialog } from './SessionRescheduleDialog';
 import { SessionResultDialog } from './SessionResultDialog';
 import { StatusPill } from './StatusPill';
+import { groupLabel } from '../lib/disbandMessage';
 
 type Confirm = { kind: 'cancelSession' } | { kind: 'cancelWorkout' | 'didNotRun'; horse: SessionHorse } | null;
 
@@ -117,7 +118,7 @@ function SessionBody({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-            {session.groupName ?? 'Deleted group'} · {session.subjectName}
+            {groupLabel(session.groupName, session.groupDisbanded)} · {session.subjectName}
           </h3>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {formatDate(session.date, { weekday: 'long', day: '2-digit', month: 'short' })} · {formatTime(session.startTime)}–{formatTime(session.endTime)}

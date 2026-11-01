@@ -29,6 +29,10 @@ public class TrainingGroup {
     @Column(nullable = false, length = 100)
     private String name;
 
+    /** Thời điểm giải tán; rỗng khi nhóm còn hoạt động. (When the group was disbanded; null while it is live.) */
+    @Column(name = "disbanded_at")
+    private LocalDateTime disbandedAt;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -55,6 +59,10 @@ public class TrainingGroup {
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+
+    public LocalDateTime getDisbandedAt() { return disbandedAt; }
+    public void setDisbandedAt(LocalDateTime disbandedAt) { this.disbandedAt = disbandedAt; }
+    public boolean isDisbanded() { return disbandedAt != null; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

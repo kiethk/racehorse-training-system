@@ -10,6 +10,7 @@ import { trainingService } from '../services/trainingService';
 import type { GroupPlanDetail as GroupPlanDetailData, PlanHorse } from '../types';
 import { PlanSessionHorses } from './PlanSessionHorses';
 import { StatusPill } from './StatusPill';
+import { groupLabel } from '../lib/disbandMessage';
 
 const DAY: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: 'short' };
 
@@ -80,7 +81,7 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
 
       <Panel padded className="space-y-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-[var(--color-text-secondary)]">
-          <span>{plan.groupName ?? 'Deleted group'}</span>
+          <span>{groupLabel(plan.groupName, plan.groupDisbanded)}</span>
           <span>{formatDate(plan.startDate)} – {formatDate(plan.endDate)}</span>
         </div>
         <ProgressBar label="Plan progress" value={progress.percent} />

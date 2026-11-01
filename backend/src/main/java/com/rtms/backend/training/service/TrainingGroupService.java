@@ -19,12 +19,20 @@ public interface TrainingGroupService {
     /** Nhóm của Trainer; vai khác được xem (Quản lý) thấy mọi nhóm. (A Trainer's groups; other viewing roles see all.) */
     List<TrainingGroupResponse> getGroups(AuthenticatedUser currentUser);
 
+    /** Các nhóm đã giải tán, chỉ để xem. (Disbanded groups, read-only.) */
+    List<TrainingGroupResponse> getDisbandedGroups(AuthenticatedUser currentUser);
+
     TrainingGroupResponse createGroup(CreateTrainingGroupRequest request, AuthenticatedUser currentUser);
 
     TrainingGroupResponse renameGroup(Long groupId, RenameTrainingGroupRequest request, AuthenticatedUser currentUser);
 
-    /** Chỉ xóa được khi nhóm không còn kế hoạch chưa đóng; ngựa trong nhóm tự được giải phóng. (Only when no unfinished plan; horses are released.) */
-    void deleteGroup(Long groupId, AuthenticatedUser currentUser);
+    /**
+     * Giải tán nhóm trong MỘT giao dịch: hủy mọi kế hoạch chưa đóng theo luật Cancel plan, cho mọi ngựa rời nhóm rồi đánh dấu Disbanded;
+     * nhóm chưa từng có kế hoạch thì bị xóa hẳn.
+     * (Disbands the group in ONE transaction: cancels every unfinished plan with the Cancel plan rules, takes every horse out, then
+     * marks the group Disbanded; a group that never had a plan is deleted.)
+     */
+    void disbandGroup(Long groupId, AuthenticatedUser currentUser);
 
     TrainingGroupResponse addHorse(Long groupId, Long horseId, AuthenticatedUser currentUser);
 

@@ -83,13 +83,16 @@ export const trainingService = {
   getGroups: async (): Promise<TrainingGroup[]> =>
     (await apiGet<ApiResponse<TrainingGroup[]>>('/api/training-groups')).data,
 
+  getDisbandedGroups: async (): Promise<TrainingGroup[]> =>
+    (await apiGet<ApiResponse<TrainingGroup[]>>('/api/training-groups?disbanded=true')).data,
+
   createGroup: async (data: CreateTrainingGroupRequest): Promise<TrainingGroup> =>
     (await apiPost<ApiResponse<TrainingGroup>>('/api/training-groups', data)).data,
 
   renameGroup: async (id: number, name: string): Promise<TrainingGroup> =>
     (await apiPatch<ApiResponse<TrainingGroup>>(`/api/training-groups/${id}`, { name })).data,
 
-  deleteGroup: async (id: number): Promise<void> => {
+  disbandGroup: async (id: number): Promise<void> => {
     await apiDelete<ApiResponse<null>>(`/api/training-groups/${id}`);
   },
 

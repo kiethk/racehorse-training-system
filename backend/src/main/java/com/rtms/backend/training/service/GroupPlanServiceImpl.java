@@ -365,9 +365,9 @@ public class GroupPlanServiceImpl implements GroupPlanService {
             return List.of();
         }
         List<Long> planIds = plans.stream().map(GroupPlan::getId).toList();
-        Map<Long, String> groupNames = groupRepository
+        Map<Long, TrainingGroup> groupsById = groupRepository
                 .findAllById(plans.stream().map(GroupPlan::getGroupId).filter(java.util.Objects::nonNull).collect(Collectors.toSet()))
-                .stream().collect(Collectors.toMap(TrainingGroup::getId, TrainingGroup::getName));
+                .stream().collect(Collectors.toMap(TrainingGroup::getId, java.util.function.Function.identity()));
         Map<Long, String> courseNames = courseNames(plans.stream().map(GroupPlan::getCourseId).toList());
         Map<Long, Map<SessionStatus, Long>> counts = sessionRepository.countByPlanAndStatus(planIds).stream()
                 .collect(Collectors.groupingBy(PlanSessionCountRow::planId,
@@ -379,7 +379,8 @@ public class GroupPlanServiceImpl implements GroupPlanService {
             int cancelled = byStatus.getOrDefault(SessionStatus.CANCELLED, 0L).intValue();
             int scheduled = byStatus.getOrDefault(SessionStatus.SCHEDULED, 0L).intValue();
             return new GroupPlanSummaryResponse(plan.getId(), plan.getGroupId(),
-                    plan.getGroupId() == null ? null : groupNames.get(plan.getGroupId()), plan.getCourseId(),
+                    plan.getGroupId() == null ? null : groupsById.get(plan.getGroupId()).getName(),
+                    plan.getGroupId() != null && groupsById.get(plan.getGroupId()).isDisbanded(), plan.getCourseId(),
                     courseNames.get(plan.getCourseId()), plan.getStartDate(), plan.getEndDate(), plan.getStatus().name(),
                     held, cancelled, held + cancelled + scheduled);
         }).toList();
@@ -396,6 +397,9 @@ public class GroupPlanServiceImpl implements GroupPlanService {
         TrainingGroup group = groupRepository.findById(request.groupId())
                 .filter(found -> found.getTrainerId().equals(trainerId))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "Group not found!"));
+        if (group.isDisbanded()) {
+            throw new ApiException(HttpStatus.CONFLICT, "GROUP_DISBANDED", "Group '" + group.getName() + "' is disbanded!");
+        }
         Course course = courseRepository.findById(request.courseId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "Training course not found!"));
         if (course.getTrainerId() != null && !course.getTrainerId().equals(trainerId)) {

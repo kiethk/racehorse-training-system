@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, ConfirmDialog, EmptyState, ListSkeleton, PageHeader, Panel, ScreenLayout } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
+import { disbandMessage, type DisbandImpact } from '../lib/disbandMessage';
 import { trainingService } from '../services/trainingService';
 import type { TrainingGroup } from '../types';
 import { AddHorseDialog } from './AddHorseDialog';
+import { DisbandedGroups } from './DisbandedGroups';
 import { GroupCard } from './GroupCard';
 import { GroupNameDialog } from './GroupNameDialog';
 import { MoveHorseDialog } from './MoveHorseDialog';
@@ -18,9 +20,10 @@ interface HorseTarget {
   horseName: string;
 }
 
-/** The Trainer's groups: create, rename and delete a group, and add, remove or move its horses. */
+/** The Trainer's groups: create, rename and disband a group, and add, remove or move its horses. */
 export function GroupsView() {
   const [groups, setGroups] = useState<TrainingGroup[]>([]);
+  const [disbanded, setDisbanded] = useState<TrainingGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,13 +32,15 @@ export function GroupsView() {
   const [addTarget, setAddTarget] = useState<TrainingGroup | null>(null);
   const [moveTarget, setMoveTarget] = useState<HorseTarget | null>(null);
   const [removeTarget, setRemoveTarget] = useState<HorseTarget | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<TrainingGroup | null>(null);
+  const [disbandTarget, setDisbandTarget] = useState<{ group: TrainingGroup; impact: DisbandImpact } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setGroups(await trainingService.getGroups());
+      const [live, closed] = await Promise.all([trainingService.getGroups(), trainingService.getDisbandedGroups()]);
+      setGroups(live);
+      setDisbanded(closed);
     } catch (cause) {
       setError(displayError(cause, 'Unable to load the groups.'));
     } finally {
@@ -106,13 +111,26 @@ export function GroupsView() {
       setRemoveTarget(null);
     }, 'Unable to remove the horse.');
 
-  const deleteGroup = () =>
+  /** Counts what disbanding will cancel before asking, so the confirmation can say it. */
+  const askDisband = (group: TrainingGroup) =>
     run(async () => {
-      if (!deleteTarget) return;
-      await trainingService.deleteGroup(deleteTarget.id);
-      setDeleteTarget(null);
+      const plans = await trainingService.getGroupPlans(group.id);
+      const unfinished = plans.filter((plan) => plan.status === 'UPCOMING' || plan.status === 'ACTIVE');
+      const details = await Promise.all(unfinished.map((plan) => trainingService.getGroupPlan(plan.id)));
+      const now = Date.now();
+      const sessions = details
+        .flatMap((detail) => detail.sessions)
+        .filter((session) => session.status === 'SCHEDULED' && new Date(`${session.date}T${session.startTime}`).getTime() > now);
+      setDisbandTarget({ group, impact: { plans: unfinished.length, sessions: sessions.length } });
+    }, 'Unable to read the group plans.');
+
+  const disbandGroup = () =>
+    run(async () => {
+      if (!disbandTarget) return;
+      await trainingService.disbandGroup(disbandTarget.group.id);
+      setDisbandTarget(null);
       await load();
-    }, 'Unable to delete the group.');
+    }, 'Unable to disband the group.');
 
   return (
     <ScreenLayout variant="list">
@@ -158,13 +176,15 @@ export function GroupsView() {
                 setNameError(null);
                 setNameDialog({ mode: 'rename', group });
               }}
-              onDelete={() => setDeleteTarget(group)}
+              onDisband={() => askDisband(group)}
               onRemoveHorse={(horseId, horseName) => setRemoveTarget({ group, horseId, horseName })}
               onMoveHorse={(horseId, horseName) => setMoveTarget({ group, horseId, horseName })}
             />
           ))}
         </div>
       )}
+
+      <DisbandedGroups groups={disbanded} />
 
       <GroupNameDialog
         open={nameDialog !== null}
@@ -198,14 +218,14 @@ export function GroupsView() {
         onCancel={() => setRemoveTarget(null)}
       />
       <ConfirmDialog
-        open={deleteTarget !== null}
-        title="Delete group"
-        description={deleteTarget ? `Delete ${deleteTarget.name}? Its horses become free.` : ''}
-        confirmLabel="Delete"
+        open={disbandTarget !== null}
+        title="Disband group"
+        description={disbandTarget ? disbandMessage(disbandTarget.group.name, disbandTarget.impact) : ''}
+        confirmLabel="Disband"
         tone="danger"
         loading={busy}
-        onConfirm={deleteGroup}
-        onCancel={() => setDeleteTarget(null)}
+        onConfirm={disbandGroup}
+        onCancel={() => setDisbandTarget(null)}
       />
     </ScreenLayout>
   );
