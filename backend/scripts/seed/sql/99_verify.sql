@@ -204,6 +204,18 @@ INSERT INTO seed_check VALUES
  $q$ SELECT a.id FROM group_plans a JOIN group_plans b ON b.group_id = a.group_id AND b.id < a.id
      WHERE a.status IN ('UPCOMING', 'ACTIVE') AND b.status IN ('UPCOMING', 'ACTIVE')
        AND a.start_date <= b.end_date AND b.start_date <= a.end_date $q$),
+('Disbanded group with members or an unfinished plan',
+ $q$ SELECT g.id FROM training_groups g WHERE g.disbanded_at IS NOT NULL
+       AND (EXISTS (SELECT 1 FROM training_group_members m WHERE m.group_id = g.id)
+            OR EXISTS (SELECT 1 FROM group_plans p WHERE p.group_id = g.id AND p.status IN ('UPCOMING', 'ACTIVE'))) $q$),
+('Disbanded group dated before it was created or in the future',
+ $q$ SELECT id FROM training_groups WHERE disbanded_at IS NOT NULL AND (disbanded_at < created_at OR disbanded_at > pg_temp.clock()) $q$),
+('Plan or session of a disbanded group dated after the group was disbanded and not cancelled',
+ $q$ SELECT p.id FROM group_plans p JOIN training_groups g ON g.id = p.group_id
+     WHERE g.disbanded_at IS NOT NULL AND (p.created_at > g.disbanded_at
+        OR EXISTS (SELECT 1 FROM training_sessions s WHERE s.group_plan_id = p.id AND s.status <> 'CANCELLED' AND s.session_date + s.start_time > g.disbanded_at)) $q$),
+('Two live groups of one trainer with the same name',
+ $q$ SELECT min(id) FROM training_groups WHERE disbanded_at IS NULL GROUP BY trainer_id, name HAVING count(*) > 1 $q$),
 ('Course uses a subject of another trainer',
  $q$ SELECT cs.id FROM course_subjects cs JOIN courses c ON c.id = cs.course_id JOIN subjects s ON s.id = cs.subject_id
      WHERE s.trainer_id <> c.trainer_id $q$),
