@@ -18,3 +18,8 @@ export function disbandMessage(groupName: string, impact: DisbandImpact): string
   if (impact.plans === 0) return `Disband ${groupName}? ${horses}`;
   return `Disband ${groupName}? ${count(impact.plans, 'plan')} and ${count(impact.sessions, 'session')} not yet started will be cancelled. ${horses}`;
 }
+
+/** A CANCELLED plan, or the plan of a Disbanded group, only shows its history: no cancel or reschedule actions. */
+export function isViewOnlyPlan(status: string, groupDisbanded: boolean): boolean {
+  return groupDisbanded || status === 'CANCELLED';
+}

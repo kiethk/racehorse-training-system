@@ -110,7 +110,7 @@ function SessionBody({
 
   const { session, horses } = detail;
   const started = sessionHasStarted(session);
-  const canChange = canManage && session.status === 'SCHEDULED' && !started;
+  const canChange = canManage && session.status === 'SCHEDULED' && !started && !session.groupDisbanded;
   const held = session.status === 'HELD';
 
   return (
