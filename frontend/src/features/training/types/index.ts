@@ -250,6 +250,24 @@ export interface PlanSessionItem {
   horseCount: number;
 }
 
+export type SessionHorseOutcome = 'TO_RUN' | 'RAN' | 'CANCELLED' | 'DID_NOT_RUN';
+
+/** A horse of a plan with its Attendance (attended of total Sessions). */
+export interface PlanHorse {
+  horseId: number;
+  horseName: string;
+  attended: number;
+  total: number;
+}
+
+/** A horse in one Session of a plan with what became of it. */
+export interface SessionHorseOutcomeItem {
+  workoutId: number;
+  horseId: number;
+  horseName: string;
+  outcome: SessionHorseOutcome;
+}
+
 export interface GroupPlanDetail {
   plan: GroupPlanSummary;
   trainingDays: TrainingDay[];
