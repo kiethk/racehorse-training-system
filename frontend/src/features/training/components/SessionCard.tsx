@@ -5,7 +5,7 @@ import { formatTime } from '@/lib/display';
 import { SESSION_STATUS } from '../lib/status';
 import type { ScheduleSession } from '../types';
 import { StatusPill } from './StatusPill';
-import { groupLabel } from '../lib/disbandMessage';
+import { groupLabel } from '../lib/groupLifecycle';
 
 /**
  * One Session as a card: time, group, subject, how many horses and its status. A Held Session that still misses results carries a

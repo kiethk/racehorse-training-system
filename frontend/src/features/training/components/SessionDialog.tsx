@@ -11,7 +11,7 @@ import type { ScheduleSession, SessionDetail, SessionHorse } from '../types';
 import { SessionRescheduleDialog } from './SessionRescheduleDialog';
 import { SessionResultDialog } from './SessionResultDialog';
 import { StatusPill } from './StatusPill';
-import { groupLabel } from '../lib/disbandMessage';
+import { groupLabel } from '../lib/groupLifecycle';
 
 type Confirm = { kind: 'cancelSession' } | { kind: 'cancelWorkout' | 'didNotRun'; horse: SessionHorse } | null;
 

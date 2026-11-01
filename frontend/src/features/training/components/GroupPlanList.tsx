@@ -5,12 +5,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button, EmptyState, LinkButton, ListSkeleton, PageHeader, Panel, ProgressBar, ScreenLayout, Select } from '@/components/ui';
 import { useHorses } from '@/features/horses/hooks/useHorses';
 import { displayError, formatDate } from '@/lib/display';
-import { groupLabel } from '../lib/disbandMessage';
+import { groupLabel, plural } from '../lib/groupLifecycle';
 import { groupPlansByGroup, type PlanBlock } from '../lib/planBlocks';
 import { planProgress } from '../lib/planProgress';
 import { PLAN_STATUS } from '../lib/status';
 import { trainingService } from '../services/trainingService';
 import type { GroupPlanSummary, TrainingGroup } from '../types';
+import { DisbandedToggle } from './DisbandedToggle';
 import { StatusPill } from './StatusPill';
 
 /** The Trainer's plans, one block per group (live groups first, Disbanded ones last and collapsed), with a horse filter. */
@@ -94,26 +95,14 @@ export function GroupPlanList() {
 }
 
 function DisbandedBlocks({ blocks }: { blocks: PlanBlock[] }) {
-  const [open, setOpen] = useState(false);
   return (
-    <section className="space-y-3">
-      <Button
-        variant="tertiary"
-        size="sm"
-        icon={open ? 'chevron-down' : 'chevron-right'}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        Disbanded ({blocks.length})
-      </Button>
-      {open && (
-        <div className="space-y-6">
-          {blocks.map((block) => (
-            <GroupBlock key={block.groupId ?? 'none'} block={block} />
-          ))}
-        </div>
-      )}
-    </section>
+    <DisbandedToggle count={blocks.length}>
+      <div className="space-y-6">
+        {blocks.map((block) => (
+          <GroupBlock key={block.groupId ?? 'none'} block={block} />
+        ))}
+      </div>
+    </DisbandedToggle>
   );
 }
 
@@ -124,8 +113,8 @@ function GroupBlock({ block }: { block: PlanBlock }) {
         <div>
           <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{groupLabel(block.name, block.disbanded)}</h2>
           <p className="text-xs text-[var(--color-text-secondary)]">
-            {block.disbanded ? '' : `${block.horseCount} ${block.horseCount === 1 ? 'horse' : 'horses'} · `}
-            {block.plans.length} {block.plans.length === 1 ? 'plan' : 'plans'}
+            {block.disbanded ? '' : `${plural(block.horseCount, 'horse')} · `}
+            {plural(block.plans.length, 'plan')}
           </p>
         </div>
         {!block.disbanded && block.plans.length === 0 && block.groupId !== null && (
@@ -152,7 +141,6 @@ function PlanCard({ plan }: { plan: GroupPlanSummary }) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold text-[var(--color-text-primary)]">{plan.courseName}</h3>
-            
           </div>
           <StatusPill status={PLAN_STATUS[plan.status]} />
         </div>

@@ -1,4 +1,4 @@
-﻿-- =====================================================================
+-- =====================================================================
 -- 50_training.sql — bài tập, khóa học, Training Group, Group Plan, Session và Workout của 3 Head Trainer (~13 tuần + sắp tới).
 -- (Subjects, courses, training groups, group plans, sessions and workouts of the 3 head trainers: ~13 weeks of history plus upcoming.)
 --

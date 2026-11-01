@@ -8,7 +8,7 @@ import { PLAN_STATUS } from '../lib/status';
 import { trainingService } from '../services/trainingService';
 import type { HorseAttendance } from '../types';
 import { StatusPill } from './StatusPill';
-import { groupLabel } from '../lib/disbandMessage';
+import { groupLabel } from '../lib/groupLifecycle';
 
 /**
  * Every Group Plan a horse took part in, one line per plan, with how many Sessions it attended out of how many and since when.

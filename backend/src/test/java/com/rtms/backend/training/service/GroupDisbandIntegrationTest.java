@@ -10,19 +10,29 @@ import com.rtms.backend.training.dto.PlanSessionResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.enums.TrainingDay;
+import com.rtms.backend.training.repository.GroupPlanRepository;
 import com.rtms.backend.training.repository.TrainingGroupMemberRepository;
 import com.rtms.backend.training.support.MutableClock;
 import com.rtms.backend.training.support.TestClockConfig;
 import com.rtms.backend.training.support.TrainingFixtures;
+import com.rtms.backend.training.entity.TrainingGroup;
+import com.rtms.backend.training.repository.TrainingGroupRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceUtils;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.Savepoint;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -30,8 +40,11 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 
 /**
  * Giải tán nhóm qua service: hủy kế hoạch chưa đóng theo luật Cancel plan, buổi đang chạy vẫn thành Held đúng giờ, ngựa rời nhóm,
@@ -55,6 +68,11 @@ class GroupDisbandIntegrationTest {
     @Autowired private MutableClock clock;
     @Autowired private TrainingGroupMemberRepository members;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private TrainingGroupRepository groups;
+    @Autowired private GroupPlanRepository plans;
+    @Autowired private EntityManager entityManager;
+    @Autowired private DataSource dataSource;
+    @MockitoSpyBean private GroupWorkoutSyncService groupSync;
 
     private User trainerUser;
     private AuthenticatedUser trainer;
@@ -160,6 +178,52 @@ class GroupDisbandIntegrationTest {
         assertEquals("GROUP_NOT_FOUND", assertThrows(ApiException.class,
                 () -> groupService.disbandGroup(group.id(), other)).getErrorCode());
         assertEquals(1, groupService.getGroups(trainer).get(0).members().size());
+    }
+
+    @Test
+    void theDisbandingMomentComesFromTheClock() {
+        TrainingGroupResponse group = groupWithHorses("Nhom 1", "Thunder");
+        assignCourse(group);
+        clock.set(monday.atTime(6, 15));
+
+        groupService.disbandGroup(group.id(), trainer);
+
+        assertEquals(monday.atTime(6, 15), groups.findById(group.id()).orElseThrow().getDisbandedAt());
+    }
+
+    @Test
+    void aFailureWhileDisbandingLeavesTheGroupItsHorsesAndItsPlansUntouched() throws Exception {
+        TrainingGroupResponse group = groupWithHorses("Nhom 1", "Thunder", "Blaze");
+        GroupPlanDetailResponse plan = assignCourse(group);
+        doThrow(new IllegalStateException("boom")).when(groupSync).exitGroup(any());
+
+        // The test transaction cannot roll back on its own, so a JDBC savepoint stands in for the request's transaction:
+        // the failure comes after the plans were cancelled, and rolling back to the savepoint must undo all of it.
+        entityManager.flush();
+        Connection connection = DataSourceUtils.getConnection(dataSource);
+        Savepoint beforeRequest = connection.setSavepoint();
+        assertThrows(IllegalStateException.class, () -> groupService.disbandGroup(group.id(), trainer));
+        connection.rollback(beforeRequest);
+        entityManager.clear();
+
+        assertNull(groups.findById(group.id()).orElseThrow().getDisbandedAt());
+        assertEquals(2, members.countByGroupId(group.id()));
+        assertEquals("UPCOMING", plans.findById(plan.plan().id()).orElseThrow().getStatus().name());
+        assertEquals(List.of("SCHEDULED", "SCHEDULED", "SCHEDULED"),
+                planService.getPlan(plan.plan().id(), trainer).sessions().stream().map(PlanSessionResponse::status).toList());
+    }
+
+    @Test
+    void liveGroupNamesAreUniquePerTrainerWhateverTheirCase() {
+        TrainingGroup first = new TrainingGroup();
+        first.setTrainerId(trainerUser.getId());
+        first.setName("Alpha");
+        groups.saveAndFlush(first);
+        TrainingGroup second = new TrainingGroup();
+        second.setTrainerId(trainerUser.getId());
+        second.setName("alpha");
+
+        assertThrows(DataIntegrityViolationException.class, () -> groups.saveAndFlush(second));
     }
 
     // ------------------------------------------------------------------ helpers

@@ -28,6 +28,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,6 +61,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     private final TrainingDecisionService trainingDecisionService;
     private final GroupWorkoutSyncService groupSync;
     private final GroupPlanService planService;
+    private final Clock clock;
 
     public TrainingGroupServiceImpl(TrainingGroupRepository groupRepository,
                                     TrainingGroupMemberRepository memberRepository,
@@ -69,7 +71,8 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
                                     UserRepository userRepository,
                                     TrainingDecisionService trainingDecisionService,
                                     GroupWorkoutSyncService groupSync,
-                                    GroupPlanService planService) {
+                                    GroupPlanService planService,
+                                    Clock clock) {
         this.groupRepository = groupRepository;
         this.memberRepository = memberRepository;
         this.planRepository = planRepository;
@@ -79,6 +82,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         this.trainingDecisionService = trainingDecisionService;
         this.groupSync = groupSync;
         this.planService = planService;
+        this.clock = clock;
     }
 
     // =================================================================
@@ -187,7 +191,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         memberRepository.flush();
         TrainingGroup group = groupRepository.findById(groupId).orElseThrow();
         if (planRepository.existsByGroupId(groupId)) {
-            group.setDisbandedAt(LocalDateTime.now());
+            group.setDisbandedAt(LocalDateTime.now(clock));
             groupRepository.saveAndFlush(group);
         } else {
             groupRepository.delete(group);

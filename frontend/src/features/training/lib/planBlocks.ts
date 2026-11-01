@@ -1,3 +1,4 @@
+import { REMOVED_GROUP_LABEL } from './groupLifecycle.ts';
 import type { GroupPlanSummary, TrainingGroup } from '../types';
 
 /** One group on the Plans page: its name, current horses and its plans in display order. */
@@ -31,7 +32,7 @@ export function groupPlansByGroup(liveGroups: TrainingGroup[], plans: GroupPlanS
   for (const plan of plans) {
     if (plan.groupId !== null && liveIds.has(plan.groupId)) continue;
     const block = closed.get(plan.groupId) ?? {
-      groupId: plan.groupId, name: plan.groupName ?? 'Deleted group', disbanded: true, horseCount: 0, plans: [],
+      groupId: plan.groupId, name: plan.groupName ?? REMOVED_GROUP_LABEL, disbanded: true, horseCount: 0, plans: [],
     };
     block.plans.push(plan);
     closed.set(plan.groupId, block);

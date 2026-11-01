@@ -11,7 +11,7 @@ import { trainingService } from '../services/trainingService';
 import type { GroupPlanDetail as GroupPlanDetailData, PlanHorse } from '../types';
 import { PlanSessionHorses } from './PlanSessionHorses';
 import { StatusPill } from './StatusPill';
-import { groupLabel, isViewOnlyPlan } from '../lib/disbandMessage';
+import { groupLabel, isViewOnlyPlan } from '../lib/groupLifecycle';
 
 const DAY: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: 'short' };
 
@@ -90,7 +90,7 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
       </Panel>
 
       <Panel padded className="space-y-2">
-        <h2 className="text-sm font-semibold text-[var(--color-text)]">Horses in this plan</h2>
+        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Horses in this plan</h2>
         {planHorses.length === 0 ? (
           <p className="text-sm text-[var(--color-text-muted)]">No horses.</p>
         ) : (

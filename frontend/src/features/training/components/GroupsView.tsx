@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, ConfirmDialog, EmptyState, ListSkeleton, PageHeader, Panel, ScreenLayout } from '@/components/ui';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
-import { disbandMessage, type DisbandImpact } from '../lib/disbandMessage';
+import { disbandMessage, type DisbandImpact } from '../lib/groupLifecycle';
 import { trainingService } from '../services/trainingService';
 import type { TrainingGroup } from '../types';
 import { AddHorseDialog } from './AddHorseDialog';
@@ -121,7 +121,7 @@ export function GroupsView() {
       const sessions = details
         .flatMap((detail) => detail.sessions)
         .filter((session) => session.status === 'SCHEDULED' && new Date(`${session.date}T${session.startTime}`).getTime() > now);
-      setDisbandTarget({ group, impact: { plans: unfinished.length, sessions: sessions.length } });
+      setDisbandTarget({ group, impact: { plans: unfinished.length, sessions: sessions.length, hasHistory: plans.length > 0 } });
     }, 'Unable to read the group plans.');
 
   const disbandGroup = () =>
