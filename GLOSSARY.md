@@ -8,6 +8,10 @@ How a Trainer organises racehorses into fixed groups and runs them through cours
 A named, lasting set of horses (at most 6) owned by one Trainer, going out on the track together on training days. A horse belongs to at most one Training Group at a time, and no two horses of the same Groom share one.
 _Avoid_: Lot, cohort, batch
 
+**Disbanded**:
+The state of a Training Group its Trainer has closed for good: it keeps its name and its past Group Plans, but has no horses, takes no new horses and gets no new Group Plan. Disbanding is always the Trainer's own act, never a result of the group running empty. Disbanding a group that still has unfinished Group Plans cancels them in the same act. A group that never had a Group Plan is simply removed, leaving no trace.
+_Avoid_: Deleted, cancelled, archived
+
 **Group Plan**:
 A Training Group running one Course from a start date on chosen weekdays; it ends together for the whole group when its last Session finishes. Horses may join or leave while it runs.
 _Avoid_: Horse plan, enrollment
