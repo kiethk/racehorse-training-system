@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { SearchInput, Select } from '@/components/ui/Input';
@@ -38,9 +39,35 @@ export function AccountManagementView() {
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
+  const searchParams = useSearchParams();
+
   useEffect(() => {
     void fetchAccounts();
   }, []);
+
+  useEffect(() => {
+    const paramUserId = searchParams.get('userId');
+    if (paramUserId) {
+      const parsed = Number(paramUserId);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        setSelectedUserId(parsed);
+      }
+    }
+    const paramSearch = searchParams.get('search');
+    if (paramSearch) {
+      setSearch(paramSearch);
+    }
+  }, [searchParams]);
+
+  function handleCloseDetail() {
+    setSelectedUserId(null);
+    if (searchParams.get('userId')) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('userId');
+      const newQuery = params.toString();
+      window.history.replaceState(null, '', newQuery ? `?${newQuery}` : window.location.pathname);
+    }
+  }
 
   async function fetchAccounts() {
     try {
@@ -293,7 +320,7 @@ export function AccountManagementView() {
       {/* Account Detail Modal */}
       <AccountDetailModal
         userId={selectedUserId}
-        onClose={() => setSelectedUserId(null)}
+        onClose={handleCloseDetail}
         headTrainers={headTrainers}
         onUpdated={() => {
           void fetchAccounts();
