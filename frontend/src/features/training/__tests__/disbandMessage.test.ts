@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { disbandMessage, groupLabel } from '../lib/disbandMessage.ts';
+import { disbandMessage, groupLabel, isViewOnlyPlan } from '../lib/disbandMessage.ts';
 
 describe('disbandMessage', () => {
   it('only says the horses leave when there is no unfinished plan', () => {
@@ -24,5 +24,13 @@ describe('groupLabel', () => {
     assert.equal(groupLabel('Nhom 1', true), 'Nhom 1 (Disbanded)');
     assert.equal(groupLabel('Nhom 1', false), 'Nhom 1');
     assert.equal(groupLabel(null, false), 'Deleted group');
+  });
+});
+
+describe('isViewOnlyPlan', () => {
+  it('is view only for a cancelled plan or a disbanded group', () => {
+    assert.equal(isViewOnlyPlan('CANCELLED', false), true);
+    assert.equal(isViewOnlyPlan('ACTIVE', true), true);
+    assert.equal(isViewOnlyPlan('ACTIVE', false), false);
   });
 });

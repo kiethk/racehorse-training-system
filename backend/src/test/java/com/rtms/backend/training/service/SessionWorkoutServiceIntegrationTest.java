@@ -57,6 +57,7 @@ class SessionWorkoutServiceIntegrationTest {
             List.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY, TrainingDay.FRIDAY);
 
     @Autowired private SessionWorkoutService service;
+    @Autowired private SessionScheduleService scheduleService;
     @Autowired private GroupPlanService planService;
     @Autowired private TrainingGroupService groupService;
     @Autowired private TrainingFixtures fixtures;
@@ -156,6 +157,41 @@ class SessionWorkoutServiceIntegrationTest {
         CompleteWorkoutRequest edit = validResult();
         edit.setTrainerFeedback("Smoother than last week");
         assertEquals("Smoother than last week", service.updateResult(workoutId, edit, trainer).trainerFeedback());
+    }
+
+    @Test
+    void aRecordedResultOfACancelledPlanCanStillBeEditedAndRated() {
+        clock.set(monday.atTime(12, 0));
+        Long workoutId = firstWorkoutOfSession(0).getId();
+        service.recordResult(workoutId, validResult(), trainer);
+        planService.cancelPlan(plan.plan().id(), trainer);
+        CompleteWorkoutRequest edit = validResult();
+        edit.setRecoveryHeartRate(190);
+
+        SessionWorkoutResponse edited = service.updateResult(workoutId, edit, trainer);
+
+        assertEquals(190, edited.recoveryHeartRate());
+        assertTrue(edited.performanceRating() < 9);
+        assertEquals(TrainingPlanStatus.CANCELLED, plans.findById(plan.plan().id()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void theSessionDetailCarriesTheStoredReadingsSoTheEditFormCanBePrefilled() {
+        clock.set(monday.atTime(12, 0));
+        Long workoutId = firstWorkoutOfSession(0).getId();
+        CompleteWorkoutRequest request = validResult();
+        request.setTrainerFeedback("Good");
+        service.recordResult(workoutId, request, trainer);
+        Long sessionId = sessions.findByGroupPlanIdOrderBySessionDateAscStartTimeAsc(plan.plan().id()).get(0).getId();
+
+        var horses = scheduleService.getSession(sessionId, trainer).horses();
+
+        var recorded = horses.stream().filter(h -> h.workoutId().equals(workoutId)).findFirst().orElseThrow();
+        assertEquals(0, BigDecimal.valueOf(800).compareTo(recorded.result().actualDistanceMeters()));
+        assertEquals(80, recorded.result().recoveryHeartRate());
+        assertEquals("Good", recorded.result().trainerFeedback());
+        var other = horses.stream().filter(h -> !h.workoutId().equals(workoutId)).findFirst().orElseThrow();
+        assertEquals(null, other.result());
     }
 
     @Test

@@ -110,7 +110,7 @@ function SessionBody({
 
   const { session, horses } = detail;
   const started = sessionHasStarted(session);
-  const canChange = canManage && session.status === 'SCHEDULED' && !started;
+  const canChange = canManage && session.status === 'SCHEDULED' && !started && !session.groupDisbanded;
   const held = session.status === 'HELD';
 
   return (
@@ -156,6 +156,9 @@ function SessionBody({
                     <IconButton icon="x" label={`Cancel ${horse.horseName}`} onClick={() => setConfirm({ kind: 'cancelWorkout', horse })} />
                   </span>
                 </Tooltip>
+              )}
+              {canManage && horse.status === 'HELD' && horse.hasResult && (
+                <Button size="sm" onClick={() => setRecording(horse)}>Edit result</Button>
               )}
               {canManage && held && horse.status === 'HELD' && !horse.hasResult && (
                 <>

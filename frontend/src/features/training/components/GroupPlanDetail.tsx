@@ -11,7 +11,7 @@ import { trainingService } from '../services/trainingService';
 import type { GroupPlanDetail as GroupPlanDetailData, PlanHorse } from '../types';
 import { PlanSessionHorses } from './PlanSessionHorses';
 import { StatusPill } from './StatusPill';
-import { groupLabel } from '../lib/disbandMessage';
+import { groupLabel, isViewOnlyPlan } from '../lib/disbandMessage';
 
 const DAY: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: 'short' };
 
@@ -73,7 +73,7 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
         actions={
           <>
             <StatusPill status={PLAN_STATUS[plan.status]} size="md" />
-            {(plan.status === 'UPCOMING' || plan.status === 'ACTIVE') && (
+            {!isViewOnlyPlan(plan.status, plan.groupDisbanded) && (plan.status === 'UPCOMING' || plan.status === 'ACTIVE') && (
               <Button variant="destructive" size="sm" onClick={() => setConfirmCancel(true)}>Cancel course</Button>
             )}
           </>

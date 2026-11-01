@@ -56,6 +56,8 @@ Bộ seed này thay cho file dump và các script seed local cũ. Nó dựng l�
   đã ghi kết quả hay chưa. Có sẵn các kịch bản demo: Session đã HELD còn thiếu kết quả (nhãn "Needs result"), ngựa vào giữa
   khóa, ngựa bị hủy riêng một buổi, ngựa "không chạy", Session bị hủy vì mưa, plan bị bỏ giữa chừng, ngựa bị chặn tập ra khỏi
   nhóm, ngựa có dấu hiệu mệt. Điểm phong độ trải từ thấp tới cao và tính đúng công thức của app.
+  Trainer1 còn có nhóm đã giải tán "Foundation Group" (Disbanded, không còn ngựa, không còn plan chưa đóng; plan COMPLETED và
+  plan CANCELLED vẫn giữ nhóm, có Session đã HELD) và nhóm đang hoạt động "Reserve Group" chưa có ngựa, chưa có plan.
 - **Groom:** 5 việc SOP mỗi ngày trong 14 ngày gần nhất, theo đúng Groom của chuồng ngựa đang ở; việc giao thêm; hoàn thành
   theo khối có ghi chú và ảnh; vài khối bị bỏ lỡ. groom1 còn việc hôm nay để thử tick.
 - **Thi đấu:** đề cử PENDING / APPROVED / REJECTED.

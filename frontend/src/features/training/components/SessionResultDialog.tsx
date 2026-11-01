@@ -12,14 +12,16 @@ import {
   readingsToRequest,
   validateReadings,
   type ReadingErrors,
+  type ReadingKey,
 } from '../lib/workoutReadings';
 import type { SessionHorse } from '../types';
 
 const FORM_ID = 'session-result-form';
 
 /**
- * Records the result of one horse in a Held Session. The form opens empty: the Trainer types the readings from the IoT device, or
- * presses "Generate sample data" for a demo. The rating is never sent; the server computes it. Recording changes no status.
+ * Records or edits the result of one horse in a Held Session. A new result opens an empty form: the Trainer types the readings from the
+ * IoT device, or presses "Generate sample data" for a demo. Editing opens the same form pre-filled with the stored readings. The rating
+ * is never sent; the server computes it on every save. Saving changes no status.
  */
 export function SessionResultDialog({
   horse,
@@ -34,7 +36,7 @@ export function SessionResultDialog({
     <Modal
       open={horse !== null}
       onClose={onClose}
-      title={horse ? `Result for ${horse.horseName}` : ''}
+      title={horse ? `${horse.result ? 'Edit result' : 'Result'} for ${horse.horseName}` : ''}
       size="md"
       layer="confirm"
     >
@@ -52,8 +54,10 @@ function ResultForm({
   onClose: () => void;
   onRecorded: () => Promise<void> | void;
 }) {
-  const [readings, setReadings] = useState(EMPTY_READINGS);
-  const [feedback, setFeedback] = useState('');
+  const stored = horse.result;
+  const editing = stored !== null;
+  const [readings, setReadings] = useState(() => (stored ? readingsToInputs(stored as Record<ReadingKey, number>) : EMPTY_READINGS));
+  const [feedback, setFeedback] = useState(stored?.trainerFeedback ?? '');
   const [fieldErrors, setFieldErrors] = useState<ReadingErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -81,16 +85,18 @@ function ResultForm({
     setSubmitting(true);
     setError(null);
     try {
-      const saved = await trainingService.recordSessionResult(horse.workoutId, readingsToRequest(readings, feedback));
+      const request = readingsToRequest(readings, feedback);
+      const saved = editing
+        ? await trainingService.updateSessionResult(horse.workoutId, request)
+        : await trainingService.recordSessionResult(horse.workoutId, request);
+      const verb = editing ? 'updated' : 'recorded';
       toast.success(
-        saved.performanceRating != null
-          ? `Result recorded. Rating ${saved.performanceRating} / 10.`
-          : 'Result recorded.',
+        saved.performanceRating != null ? `Result ${verb}. Rating ${saved.performanceRating} / 10.` : `Result ${verb}.`,
       );
       await onRecorded();
       onClose();
     } catch (cause) {
-      setError(displayError(cause, 'Unable to record the result.'));
+      setError(displayError(cause, editing ? 'Unable to update the result.' : 'Unable to record the result.'));
     } finally {
       setSubmitting(false);
     }
@@ -123,7 +129,7 @@ function ResultForm({
       <div className="flex justify-end gap-2">
         <Button type="button" variant="tertiary" onClick={onClose} disabled={submitting}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={submitting}>
-          {submitting ? 'Saving...' : 'Record result'}
+          {submitting ? 'Saving...' : editing ? 'Save changes' : 'Record result'}
         </Button>
       </div>
     </form>

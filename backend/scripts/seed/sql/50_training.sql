@@ -1,4 +1,4 @@
--- =====================================================================
+﻿-- =====================================================================
 -- 50_training.sql — bài tập, khóa học, Training Group, Group Plan, Session và Workout của 3 Head Trainer (~13 tuần + sắp tới).
 -- (Subjects, courses, training groups, group plans, sessions and workouts of the 3 head trainers: ~13 weeks of history plus upcoming.)
 --
@@ -460,6 +460,36 @@ BEGIN
     PERFORM pg_temp.course('TR03', 'Pace Variation', 'Tempo, sprints and recovery in one block.', 6,
                            ARRAY['Tempo Canter', 'Short Sprint Repeats', 'Stretch and Walk'], 45);
 
+
+    -- Trainer1, an early group that ran two plans and was then Disbanded; its horses go into the Morning groups below on 3 Aug.
+    -- (Disbanded group: no members, no unfinished plan, past plans keep the group. Built first because a horse is in one group only.)
+    DECLARE
+        v_old BIGINT; v_k TEXT; v_h BIGINT; v_g BIGINT; v_gone TIMESTAMP := pg_temp.at(-91, TIME '09:30');
+        v_trainer BIGINT := pg_temp.uid('TR01');
+    BEGIN
+        INSERT INTO training_groups (trainer_id, name, created_at, updated_at)
+        VALUES (v_trainer, 'Foundation Group', pg_temp.at(-125, TIME '09:00'), pg_temp.at(-125, TIME '09:00')) RETURNING id INTO v_old;
+        PERFORM pg_temp.audit(v_trainer, 'Create Training Group', 'TrainingGroup', v_old,
+                              'Trainer created a new training group', pg_temp.at(-125, TIME '09:00'), 'POST', '/api/training-groups');
+        FOREACH v_k IN ARRAY ARRAY['H001','H004','H007'] LOOP
+            v_h := pg_temp.hid(v_k);
+            SELECT ss.groom_id INTO v_g FROM horses h JOIN stable_stalls ss ON ss.id = h.current_stall_id WHERE h.id = v_h;
+            INSERT INTO training_group_members (group_id, horse_id, groom_id, joined_at) VALUES (v_old, v_h, v_g, pg_temp.at(-125, TIME '09:00'));
+        END LOOP;
+        PERFORM pg_temp.make_group_plan(v_old, (SELECT id FROM courses WHERE name = 'Gate Confidence Drill' AND trainer_id = v_trainer),
+                                        pg_temp.today() - 118, 'MONDAY,WEDNESDAY,FRIDAY');
+        v_plan := pg_temp.make_group_plan(v_old, (SELECT id FROM courses WHERE name = 'Novice Foundation' AND trainer_id = v_trainer),
+                                          pg_temp.today() - 104, 'MONDAY,WEDNESDAY,FRIDAY');
+        PERFORM pg_temp.cancel_plan(v_plan, (SELECT session_date + end_time FROM (
+            SELECT session_date, end_time, row_number() OVER (ORDER BY session_date, start_time) idx
+              FROM training_sessions WHERE group_plan_id = v_plan) q WHERE idx = 4) + INTERVAL '30 minutes');
+        -- Disband (TrainingGroupService.disband): the horses leave, the group row stays with its disbanded_at.
+        DELETE FROM training_group_members WHERE group_id = v_old;
+        UPDATE training_groups SET disbanded_at = v_gone, updated_at = v_gone WHERE id = v_old;
+        PERFORM pg_temp.audit(v_trainer, 'Disband Training Group', 'TrainingGroup', v_old,
+                              'Trainer disbanded a training group', v_gone, 'POST', '/api/training-groups/' || v_old || '/disband');
+    END;
+
     -- ----------------------------------------------------------------- groups and their courses
     v_groups := pg_temp.make_groups('TR01', 'Morning Group',
         ARRAY['H001','H002','H003','H004','H005','H006','H007','H008','H009','H010','H011','H012','H013','H014','H015','H016','H017','H018']);
@@ -507,6 +537,16 @@ BEGIN
             SELECT session_date, end_time, row_number() OVER (ORDER BY session_date, start_time) idx
               FROM training_sessions WHERE group_plan_id = v_plan) q WHERE idx = 4) + INTERVAL '30 minutes');
     END IF;
+
+    -- Trainer1, a live group nobody has joined yet (no members, no plan).
+    DECLARE
+        v_trainer BIGINT := pg_temp.uid('TR01'); v_g BIGINT;
+    BEGIN
+        INSERT INTO training_groups (trainer_id, name, created_at, updated_at)
+        VALUES (v_trainer, 'Reserve Group', pg_temp.at(-30, TIME '09:00'), pg_temp.at(-30, TIME '09:00')) RETURNING id INTO v_g;
+        PERFORM pg_temp.audit(v_trainer, 'Create Training Group', 'TrainingGroup', v_g,
+                              'Trainer created a new training group', pg_temp.at(-30, TIME '09:00'), 'POST', '/api/training-groups');
+    END;
 
     PERFORM pg_temp.settle_plans();
 END $$;

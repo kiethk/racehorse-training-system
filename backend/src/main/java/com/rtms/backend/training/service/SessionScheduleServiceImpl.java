@@ -9,6 +9,7 @@ import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.ScheduleSessionResponse;
 import com.rtms.backend.training.dto.SessionDetailResponse;
 import com.rtms.backend.training.dto.SessionHorseResponse;
+import com.rtms.backend.training.dto.SessionWorkoutResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.GroupPlan;
 import com.rtms.backend.training.entity.Subject;
@@ -136,7 +137,8 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
                 .map(workout -> new SessionHorseResponse(workout.getId(), workout.getHorseId(),
                         horseNames.get(workout.getHorseId()),
                         workout.getAssignedToId() == null ? null : groomNames.get(workout.getAssignedToId()),
-                        workout.getStatus().name(), workout.getActualDistanceMeters() != null, workout.getPerformanceRating()))
+                        workout.getStatus().name(), workout.getActualDistanceMeters() != null, workout.getPerformanceRating(),
+                        workout.getActualDistanceMeters() != null ? SessionWorkoutResponse.of(workout) : null))
                 .toList();
         return new SessionDetailResponse(toSummary(session, workouts, visible, lookups), horses);
     }
