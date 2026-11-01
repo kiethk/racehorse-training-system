@@ -15,6 +15,7 @@ interface Props {
   data: StableSnapshot;
   draft: AssignmentDraft;
   horses: ReturnType<typeof horseMap>;
+  highlightedStallIds?: Set<number>;
   disabled: boolean;
   onPick: (target: AssignmentTarget) => void;
   onRemove: (target: AssignmentTarget) => void;
@@ -23,7 +24,7 @@ interface Props {
   onDelete: () => void;
 }
 
-export function AreaCard({ view, data, draft, horses, onSelectStall, onDelete, ...assignment }: Props) {
+export function AreaCard({ view, data, draft, horses, highlightedStallIds, onSelectStall, onDelete, ...assignment }: Props) {
   const { area, occupied, stalls, blocks, missingTrainer, hasGrooms, attention } = view;
   const trainerId = draft.trainers[area.id];
   const trainerReason = trainerChangeReason(data, area.id);
@@ -35,11 +36,13 @@ export function AreaCard({ view, data, draft, horses, onSelectStall, onDelete, .
   return (
     <Panel data-area-card={area.code} tone={attention ? 'warning' : 'default'} className="min-w-0 overflow-hidden"
       {...dropProps}>
-      <div className="flex items-center justify-between gap-3 px-4 py-4">
-        <div>
-          <h2 className="text-lg font-semibold">Area {area.code}</h2>
-          <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">{occupied} / {stalls.length} occupied</p>
-        </div>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--color-border)]/50">
+        <h2 className="text-base font-semibold text-[var(--color-text-primary)] flex items-baseline gap-1.5">
+          <span>Area {area.code}</span>
+          <span className="text-xs font-normal text-[var(--color-text-muted)]">
+            ({occupied}/{stalls.length})
+          </span>
+        </h2>
         <div className="flex items-center gap-1.5">
           {attention > 0 && <Pill tone="warning" size="sm">Needs assignment</Pill>}
           <DropdownMenu>
@@ -61,8 +64,18 @@ export function AreaCard({ view, data, draft, horses, onSelectStall, onDelete, .
           {blocks.map(block => (
             <GroomBlock key={block.number} block={block} areaId={area.id} disabled={assignment.disabled} onAssign={assignment.onAssign}>
               <div className="grid grid-cols-3 gap-1.5">
-                {block.stalls.map(stall => <StallCell key={stall.id} stall={stall} horse={horses.get(stall.id)}
-                  selected={false} onSelect={onSelectStall} compact />)}
+                {block.stalls.map(stall => (
+                  <StallCell
+                    key={stall.id}
+                    stall={stall}
+                    horse={horses.get(stall.id)}
+                    selected={false}
+                    onSelect={onSelectStall}
+                    highlighted={highlightedStallIds?.has(stall.id)}
+                    dimmed={Boolean(highlightedStallIds && highlightedStallIds.size > 0 && !highlightedStallIds.has(stall.id))}
+                    compact
+                  />
+                ))}
               </div>
               <StaffAssignment {...assignment} disabled={assignment.disabled || !block.complete}
                 target={{ kind: 'groom', areaId: area.id, blockNumber: block.number }}

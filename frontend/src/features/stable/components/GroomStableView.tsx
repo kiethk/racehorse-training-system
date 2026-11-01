@@ -193,6 +193,7 @@ export function GroomStableView() {
             area={areas.find((area) => area.id === selectedStall?.areaId)}
             horse={selectedHorse}
             specialty={specialty && specialty.horseId === selectedHorseId ? specialty.value : null}
+            groomName={selectedIsOwn ? user?.fullName : (selectedStall?.groomId ? `Groom #${selectedStall.groomId}` : 'Unassigned')}
             hint="Your stalls are highlighted on the map. Pick one to see today's tasks and open incidents."
             actions={
               selectedHorse && selectedIsOwn ? (

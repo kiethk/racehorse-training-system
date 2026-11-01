@@ -8,8 +8,11 @@ import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.service.HorsePhotoService;
 import com.rtms.backend.horse.service.HorseService;
+import com.rtms.backend.identity.entity.User;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.service.HorseSpecialtyService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -24,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @RestController
@@ -36,14 +40,24 @@ public class HorseController {
     private final HorseSpecialtyService specialtyService;
     private final HorsePhotoService photoService;
     private final com.rtms.backend.horse.service.HorseAdmissionService admissionService;
+    private final UserRepository userRepository;
 
     public HorseController(HorseService horseService,
                            HorseSpecialtyService specialtyService, HorsePhotoService photoService,
                            com.rtms.backend.horse.service.HorseAdmissionService admissionService) {
+        this(horseService, specialtyService, photoService, admissionService, null);
+    }
+
+    @Autowired
+    public HorseController(HorseService horseService,
+                           HorseSpecialtyService specialtyService, HorsePhotoService photoService,
+                           com.rtms.backend.horse.service.HorseAdmissionService admissionService,
+                           @Autowired(required = false) UserRepository userRepository) {
         this.horseService = horseService;
         this.specialtyService = specialtyService;
         this.photoService = photoService;
         this.admissionService = admissionService;
+        this.userRepository = userRepository;
     }
 
     @PreAuthorize("hasAuthority('HORSE_VIEW')")
@@ -65,11 +79,29 @@ public class HorseController {
                 ? specialtyService.getSpecialties(ids)
                 : Collections.emptyMap();
 
+        Map<Long, String> ownerNames;
+        if (userRepository != null) {
+            List<Long> ownerIds = horses.stream()
+                    .map(Horse::getOwnerId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (!ownerIds.isEmpty()) {
+                ownerNames = userRepository.findAllById(ownerIds).stream()
+                        .collect(Collectors.toMap(User::getId, User::getFullName, (existing, replacement) -> existing));
+            } else {
+                ownerNames = Collections.emptyMap();
+            }
+        } else {
+            ownerNames = Collections.emptyMap();
+        }
+
         List<HorseResponse> response = horses.stream()
                 .map(h -> new HorseResponse(
                         h,
                         imageUrls.get(h.getId()),
-                        Boolean.TRUE.equals(includeSpecialty) ? specialties.get(h.getId()) : null))
+                        Boolean.TRUE.equals(includeSpecialty) ? specialties.get(h.getId()) : null,
+                        h.getOwnerId() != null ? ownerNames.get(h.getOwnerId()) : null))
                 .collect(Collectors.toList());
 
         return ApiResponse.success(response);
@@ -88,7 +120,13 @@ public class HorseController {
                 .getAuthentication().getPrincipal();
         Horse horse = horseService.getHorseById(id, currentUser);
         Map<Long, String> imageUrls = photoService.resolveImageUrls(List.of(id), BASE_URL);
-        return ApiResponse.success(new HorseResponse(horse, imageUrls.get(id)));
+        String ownerName = null;
+        if (userRepository != null && horse.getOwnerId() != null) {
+            ownerName = userRepository.findById(horse.getOwnerId())
+                    .map(User::getFullName)
+                    .orElse(null);
+        }
+        return ApiResponse.success(new HorseResponse(horse, imageUrls.get(id), null, ownerName));
     }
 
     /**

@@ -13,14 +13,18 @@ export function HorseInfoRow({
   label,
   value,
   stacked = false,
+  layout = 'aligned',
   className,
 }: {
   label: string;
   value: ReactNode;
   stacked?: boolean;
+  layout?: 'aligned' | 'between' | 'stacked';
   className?: string;
 }) {
-  if (stacked) {
+  const activeLayout = stacked ? 'stacked' : layout;
+
+  if (activeLayout === 'stacked') {
     return (
       <div className={cn('min-w-0 space-y-1', className)}>
         <span className="block text-xs font-medium text-[var(--color-text-muted)]">
@@ -33,12 +37,27 @@ export function HorseInfoRow({
     );
   }
 
+  if (activeLayout === 'between') {
+    return (
+      <div className={cn('flex items-start justify-between gap-4', className)}>
+        <span className="shrink-0 text-sm text-[var(--color-text-muted)]">{label}</span>
+        <span className="min-w-0 break-words text-right text-sm font-medium text-[var(--color-text-primary)]">
+          {value === null || value === undefined || value === '' ? <span className="font-normal text-[var(--color-text-muted)]">Not recorded</span> : value}
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <div className={cn('flex items-start justify-between gap-4', className)}>
-      <span className="shrink-0 text-[var(--color-text-muted)]">{label}</span>
-      <span className="min-w-0 break-words text-right font-medium text-[var(--color-text-primary)]">
-        {value === null || value === undefined || value === '' ? <span className="font-normal text-[var(--color-text-muted)]">Not recorded</span> : value}
-      </span>
+    <div className={cn('grid grid-cols-1 gap-1 sm:grid-cols-[180px_1fr] sm:gap-4 sm:items-baseline', className)}>
+      <span className="shrink-0 text-sm text-[var(--color-text-muted)]">{label}</span>
+      <div className="min-w-0 break-words text-left text-sm font-medium text-[var(--color-text-primary)]">
+        {value === null || value === undefined || value === '' ? (
+          <span className="font-normal italic text-[var(--color-text-muted)]">Not recorded</span>
+        ) : (
+          value
+        )}
+      </div>
     </div>
   );
 }
