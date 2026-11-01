@@ -3,6 +3,7 @@
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon, Panel, Pill } from '@/components/ui';
 import { formatDate, formatEnumLabel } from '@/lib/display';
+import { getCareTypeTone } from '@/features/schedule/utils/timelineUtils';
 
 interface SchedulePatientHeaderProps {
   scheduleId: number;
@@ -59,7 +60,8 @@ export function SchedulePatientHeader({
             )}
             {careType && (
               <span>
-                {formatEnumLabel(careType)} Care
+                {getCareTypeTone(careType as 'INITIAL' | 'ROUTINE' | 'URGENT', purpose).label}
+                {careType === 'INITIAL' ? ' Examination' : ' Care'}
               </span>
             )}
             {purpose && (

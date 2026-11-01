@@ -325,7 +325,6 @@ public class AdmissionQueryService {
                                     exam.setExaminedAt(hr.getExaminedAt());
                                     exam.setTrainingDecision(hr.getTrainingDecision());
                                     exam.setRestrictionDetails(hr.getRestrictionDetails());
-                                    exam.setSymptoms(hr.getSymptoms());
                                     exam.setFindings(hr.getFindings());
                                     exam.setDiagnosis(hr.getDiagnosis());
                                     exam.setTreatment(hr.getTreatment());

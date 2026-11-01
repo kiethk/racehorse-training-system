@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, type FormEvent } from 'react';
+import React, { useEffect, useRef, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -8,12 +8,13 @@ import { Notice } from '@/components/ui/Notice';
 import { ChoiceInput, Input, Textarea } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { ApiError } from '@/services/api';
-import { Button } from '@/components/ui/Button';
+import { Button, LinkButton } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { HorseVitalsPanel } from '@/features/health/components/HorseVitalsPanel';
 import {
   zoneById,
   resolveInjuryWorldPosition,
@@ -27,8 +28,12 @@ const UrgentHorseInjuryViewer = dynamic(
   () => import('@/features/vet/components/UrgentHorseInjuryViewer'),
   { ssr: false },
 );
-import { careService } from '@/features/care/services/careService';
-import { displayError } from '@/lib/display';
+import { displayError, formatDateTime } from '@/lib/display';
+import { VitalsSection } from './vet-review/VitalsSection';
+import { randomizeUrgentVitals, pickFindingScenario } from './vet-review/urgentSimulation';
+import { emptyMetrics, metricConfigs, type MetricField } from './vet-review/constants';
+import { toast } from '@/lib/toast';
+import type { HorseHealthMetric } from '@/features/horses/types';
 import type {
   CompleteCareScheduleRequest,
   HorseHealthMetricRequest,
@@ -50,16 +55,10 @@ function newIdempotencyKey() {
     : `follow-up-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function formatDateTime(value: string | null) {
-  if (!value) return 'Not specified';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
-}
-
 export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [urgentCase, setUrgentCase] = useState<UrgentAssignmentAlert | null>(null);
+  // One-shot auto-start on open (same rule as the initial exam workspace); re-armed when the id changes.
+  const autoStartRef = useRef(false);
   const [reports, setReports] = useState<UrgentCaseReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
@@ -69,7 +68,6 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [completedData, setCompletedData] = useState<CompleteCareScheduleRequest | null>(null);
 
   // Form states
-  const [symptoms, setSymptoms] = useState('');
   const [findings, setFindings] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [treatment, setTreatment] = useState('');
@@ -83,10 +81,9 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     description: 'Follow-up after the urgent examination',
   }]);
   const [notes, setNotes] = useState('');
-  const [temperature, setTemperature] = useState('');
-  const [heartRate, setHeartRate] = useState('');
-  const [respiratoryRate, setRespiratoryRate] = useState('');
-  const [weight, setWeight] = useState('');
+  // Same vitals model as the admission examination form (shared VitalsSection).
+  const [metrics, setMetrics] = useState<Record<MetricField, string>>(emptyMetrics);
+  const [completedMetrics, setCompletedMetrics] = useState<HorseHealthMetric[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   type InjuryMarker = {
@@ -150,8 +147,8 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     setSubmitError('');
     setCompletedData(null);
     setStarting(false);
+    autoStartRef.current = false;
     setSubmitting(false);
-    setSymptoms('');
     setFindings('');
     setDiagnosis('');
     setTreatment('');
@@ -159,10 +156,8 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     setRestrictionDetails('');
     setFollowUps([{ key: newIdempotencyKey(), date: businessDate(3), description: 'Follow-up after the urgent examination' }]);
     setNotes('');
-    setTemperature('');
-    setHeartRate('');
-    setRespiratoryRate('');
-    setWeight('');
+    setMetrics(emptyMetrics);
+    setCompletedMetrics([]);
     setFieldErrors({});
     setInjuryMarkers([]);
     setIsAddMode(false);
@@ -174,7 +169,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
         if (!active) return;
         setUrgentCase(data);
         if (data.description) {
-          setSymptoms((prev) => prev || data.description);
+          setFindings((prev) => prev || data.description);
         }
 
         // Load active injury markers (persisted) for read-only display on the 3D model.
@@ -209,20 +204,24 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           });
 
         if (data.status === 'COMPLETED') {
-          careService
-            .getScheduleDetail(scheduleId)
-            .then((detail) => {
+          // The full HealthRecord has the vet's notes; the schedule-detail summary does not.
+          Promise.all([
+            healthApi.getHealthRecords(data.horseId),
+            healthApi.getHealthMetrics(data.horseId),
+          ])
+            .then(([records, allMetrics]) => {
               if (!active) return;
-              if (detail && detail.healthRecord) {
-                setCompletedData({
-                  symptoms: data.description || '',
-                  findings: detail.healthRecord.findings || '',
-                  diagnosis: detail.healthRecord.diagnosis || '',
-                  treatment: detail.healthRecord.treatment || undefined,
-                  trainingDecision: detail.healthRecord.trainingDecision === 'RESTRICTED' ? 'BLOCKED' : (detail.healthRecord.trainingDecision as TrainingDecision),
-                  restrictionDetails: detail.healthRecord.restrictionDetails || undefined,
-                });
-              }
+              const rec = records.find((r) => r.careScheduleId === scheduleId) ?? null;
+              if (!rec) return;
+              setCompletedData({
+                findings: rec.findings || '',
+                diagnosis: rec.diagnosis || '',
+                treatment: rec.treatment || undefined,
+                notes: rec.notes || undefined,
+                trainingDecision: rec.trainingDecision ?? 'BLOCKED',
+                restrictionDetails: rec.restrictionDetails || undefined,
+              });
+              setCompletedMetrics((allMetrics || []).filter((m) => m.healthRecordId === rec.id));
             })
             .catch(() => {});
         }
@@ -252,6 +251,34 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     };
   }, [scheduleId]);
 
+  // Simulated telemetry scan: fills the vitals section with one of three post-exercise
+  // profiles measured in racehorse physiology (peak HR 200-214, 141-188 at 1 min post-gallop,
+  // ~100 by 15 min, RR 49-77, exhaustion temps >= 40 C). An urgent case arrives hot, so a
+  // resting-only scan would mislead. Hydration grade in section 1 cross-checks the numbers.
+  function handleRandomizeVitals() {
+    setMetrics(randomizeUrgentVitals());
+  }
+
+  // Fills only the EMPTY clinical-text fields with one coherent scenario narrative.
+  function handleSampleFindings() {
+    const scenario = pickFindingScenario();
+    const inserted: string[] = [];
+    if (!findings.trim()) { setFindings(scenario.findings); inserted.push('findings'); }
+    if (!diagnosis.trim()) { setDiagnosis(scenario.diagnosis); inserted.push('diagnosis'); }
+    if (!treatment.trim()) { setTreatment(scenario.treatment); inserted.push('treatment'); }
+    if (!notes.trim()) { setNotes(scenario.notes); inserted.push('notes'); }
+    if (!inserted.length) {
+      toast.info('Nothing to insert', 'Every findings field already contains text.');
+      return;
+    }
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      for (const key of inserted) delete next[key];
+      return next;
+    });
+    toast.success('Sample findings inserted', `${inserted.length} empty field(s) filled from the ${scenario.name} scenario.`);
+  }
+
   async function startExam() {
     if (!urgentCase || urgentCase.status !== 'SCHEDULED') return;
     setStarting(true);
@@ -270,10 +297,21 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     }
   }
 
+  // Entering a SCHEDULED urgent case from ANY entry (list card, Intake Case, dashboard
+  // emergency card, notification, deep link) starts the exam once and opens the form
+  // directly — same rule the initial exam workspace applies. On failure the
+  // "Awaiting Clinical Intake" callout and Start Examination button stay as the manual retry.
+  useEffect(() => {
+    if (urgentCase?.status === 'SCHEDULED' && !autoStartRef.current) {
+      autoStartRef.current = true;
+      void startExam();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot, guarded by the ref above
+  }, [urgentCase]);
+
   function validateForm(): boolean {
     const schema = z
       .object({
-        symptoms: z.string().min(1, 'Symptoms are required for an urgent examination.'),
         findings: z.string().min(1, 'Examination findings are required.'),
         diagnosis: z.string().min(1, 'A clinical diagnosis is required.'),
         restrictionDetails: z.string().optional(),
@@ -305,24 +343,33 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       });
 
     const parsed = schema.safeParse({
-      symptoms: symptoms.trim(),
       findings: findings.trim(),
       diagnosis: diagnosis.trim(),
       restrictionDetails: restrictionDetails.trim(),
       followUps,
     });
 
-    if (parsed.success) {
-      setFieldErrors({});
-      return true;
-    }
     const errors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0];
-      if (typeof field === 'string' && !errors[field]) errors[field] = issue.message;
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0];
+        if (typeof field === 'string' && !errors[field]) errors[field] = issue.message;
+      }
     }
+
+    // Vitals validation mirrors the admission examination form.
+    for (const cfg of metricConfigs) {
+      const val = metrics[cfg.key];
+      if (val && val.trim()) {
+        const num = Number(val);
+        if (Number.isNaN(num) || num <= 0) errors[cfg.key] = `${cfg.label} must be a valid positive number.`;
+      }
+    }
+    const hasVital = metricConfigs.some((cfg) => metrics[cfg.key]?.trim()) || metrics.hydrationStatus.trim() !== '';
+    if (!hasVital) errors.metrics = 'At least one vital sign is required before submitting.';
+
     setFieldErrors(errors);
-    return false;
+    return Object.keys(errors).length === 0;
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -337,21 +384,25 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     setSubmitting(true);
     setSubmitError('');
 
-    const metrics: HorseHealthMetricRequest = {};
-    if (temperature.trim()) metrics.temperature = Number(temperature);
-    if (heartRate.trim()) metrics.heartRate = Number(heartRate);
-    if (respiratoryRate.trim()) metrics.respiratoryRate = Number(respiratoryRate);
-    if (weight.trim()) metrics.weight = Number(weight);
+    // Same metrics shape as the admission examination form.
+    const metricValues = Object.fromEntries(
+      Object.entries(metrics)
+        .filter(([, value]) => value.trim())
+        .map(([key, value]) => [
+          key,
+          ['hydrationStatus', 'notes'].includes(key) ? value.trim() : Number(value),
+        ]),
+    ) as HorseHealthMetricRequest;
+    const hasMetrics = Object.keys(metricValues).length > 0;
 
     const payload: CompleteCareScheduleRequest = {
-      symptoms: symptoms.trim(),
       findings: findings.trim(),
       diagnosis: diagnosis.trim(),
       treatment: treatment.trim() || undefined,
       trainingDecision,
       restrictionDetails: restrictionDetails.trim() || undefined,
       notes: notes.trim() || undefined,
-      metrics: Object.keys(metrics).length > 0 ? [metrics] : undefined,
+      metrics: hasMetrics ? [metricValues] : undefined,
       injuryMarkers:
         injuryMarkers.length > 0
           ? injuryMarkers.map((m) => ({
@@ -389,6 +440,16 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       await admissionsApi.completeCareSchedule(urgentCase.scheduleId, payload);
       setCompletedData(payload);
       setUrgentCase((current) => (current ? { ...current, status: 'COMPLETED' } : current));
+      void healthApi
+        .getHealthRecords(urgentCase.horseId)
+        .then((records) => {
+          const rec = records.find((r) => r.careScheduleId === urgentCase.scheduleId);
+          if (!rec) return undefined;
+          return healthApi.getHealthMetrics(urgentCase.horseId).then((m) => {
+            setCompletedMetrics((m || []).filter((x) => x.healthRecordId === rec.id));
+          });
+        })
+        .catch(() => {});
     } catch (cause) {
       setSubmitError(
         cause instanceof ApiError
@@ -757,115 +818,36 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 </div>
               ) : (
               <form onSubmit={handleSubmit} noValidate className="space-y-6">
-                {/* 1. Clinical Vitals (Integrated Labels, No Bottom Helper Text, No Out-of-Range Warnings) */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                    <Icon name="heart-pulse" size={14} className="text-[var(--color-medical)]" />
-                    <span>1. Clinical Vitals Telemetry</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {/* Temperature */}
-                    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5 transition-colors focus-within:border-[var(--color-primary)] focus-within:bg-[var(--color-surface)]">
-                      <label
-                        htmlFor="vital-temp"
-                        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]"
-                      >
-                        Temperature (°C)
-                      </label>
-                      <Input
-                        id="vital-temp"
-                        type="number"
-                        step="0.1"
-                        placeholder="38.0"
-                        value={temperature}
-                        onChange={(e) => setTemperature(e.target.value)}
-                        className="mt-1 w-full !min-h-0 !rounded-none !border-0 !bg-transparent !px-0 !py-0 font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
-                      />
-                    </div>
-
-                    {/* Heart Rate */}
-                    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5 transition-colors focus-within:border-[var(--color-primary)] focus-within:bg-[var(--color-surface)]">
-                      <label
-                        htmlFor="vital-hr"
-                        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]"
-                      >
-                        Heart Rate (bpm)
-                      </label>
-                      <Input
-                        id="vital-hr"
-                        type="number"
-                        step="1"
-                        placeholder="36"
-                        value={heartRate}
-                        onChange={(e) => setHeartRate(e.target.value)}
-                        className="mt-1 w-full !min-h-0 !rounded-none !border-0 !bg-transparent !px-0 !py-0 font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
-                      />
-                    </div>
-
-                    {/* Respiratory Rate */}
-                    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5 transition-colors focus-within:border-[var(--color-primary)] focus-within:bg-[var(--color-surface)]">
-                      <label
-                        htmlFor="vital-rr"
-                        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]"
-                      >
-                        Respiration (rpm)
-                      </label>
-                      <Input
-                        id="vital-rr"
-                        type="number"
-                        step="1"
-                        placeholder="12"
-                        value={respiratoryRate}
-                        onChange={(e) => setRespiratoryRate(e.target.value)}
-                        className="mt-1 w-full !min-h-0 !rounded-none !border-0 !bg-transparent !px-0 !py-0 font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
-                      />
-                    </div>
-
-                    {/* Weight */}
-                    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5 transition-colors focus-within:border-[var(--color-primary)] focus-within:bg-[var(--color-surface)]">
-                      <label
-                        htmlFor="vital-wt"
-                        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]"
-                      >
-                        Weight (kg)
-                      </label>
-                      <Input
-                        id="vital-wt"
-                        type="number"
-                        step="0.5"
-                        placeholder="500"
-                        value={weight}
-                        onChange={(e) => setWeight(e.target.value)}
-                        className="mt-1 w-full !min-h-0 !rounded-none !border-0 !bg-transparent !px-0 !py-0 font-metric text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:font-normal"
-                      />
-                    </div>
-                  </div>
-                </div>
+                {/* 1. Vitals — the same section as the admission examination form */}
+                <VitalsSection
+                  metrics={metrics}
+                  setMetrics={setMetrics}
+                  fieldErrors={fieldErrors}
+                  isFormDisabled={false}
+                  onRandomize={handleRandomizeVitals}
+                />
+                {fieldErrors.metrics && (
+                  <p className="text-xs text-[var(--color-danger)]">{fieldErrors.metrics}</p>
+                )}
 
                 {/* 2. Clinical Findings & Diagnosis */}
                 <div className="space-y-4 border-t border-[var(--color-border)] pt-5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                    <Icon name="stethoscope" size={14} className="text-[var(--color-medical)]" />
-                    <span>2. Examination Findings & Clinical Diagnosis</span>
-                  </div>
-
-                  <div>
-                    <FormField label="Observed urgent symptoms" htmlFor="urgent-symptoms" required>
-                      <Textarea
-                        id="urgent-symptoms"
-                        rows={2}
-                        value={symptoms}
-                        onChange={(e) => {
-                          setSymptoms(e.target.value);
-                          if (fieldErrors.symptoms) setFieldErrors((prev) => ({ ...prev, symptoms: '' }));
-                        }}
-                        placeholder="Describe the horse's symptoms or signs of distress…"
-                      />
-                    </FormField>
-                    {fieldErrors.symptoms && (
-                      <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.symptoms}</p>
-                    )}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                      <Icon name="stethoscope" size={14} className="text-[var(--color-medical)]" />
+                      <span>2. Examination Findings & Clinical Diagnosis</span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      icon="sparkles"
+                      onClick={handleSampleFindings}
+                      className="transition-all active:scale-[0.97]"
+                      title="Insert a complete sample clinical narrative into the empty fields"
+                    >
+                      Sample Findings
+                    </Button>
                   </div>
 
                   <div>
@@ -1179,6 +1161,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       </dd>
                     </div>
                   )}
+                  {completedData.notes && (
+                    <div className="sm:col-span-2">
+                      <dt className="font-semibold text-[var(--color-text-muted)]">Vet Assessment Notes</dt>
+                      <dd className="mt-1 whitespace-pre-wrap text-[var(--color-text-primary)] leading-relaxed">
+                        {completedData.notes}
+                      </dd>
+                    </div>
+                  )}
                   {(completedData.nextSchedules?.length || 0) > 0 && (
                     <div className="sm:col-span-2">
                       <dt className="font-semibold text-[var(--color-text-muted)]">Scheduled Follow-ups</dt>
@@ -1199,6 +1189,19 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   )}
                 </dl>
               )}
+
+              {completedMetrics.length > 0 && <HorseVitalsPanel metrics={completedMetrics} />}
+
+              <div className="flex justify-end">
+                <LinkButton
+                  href={`/veterinarian/records?scheduleId=${scheduleId}&back=urgent`}
+                  variant="secondary"
+                  size="sm"
+                  icon="file-text"
+                >
+                  View full record
+                </LinkButton>
+              </div>
             </Panel>
           )}
         </div>

@@ -194,9 +194,10 @@ CREATE FUNCTION pg_temp.horse_busy(p_horse BIGINT, p_start TIMESTAMP, p_minutes 
 $$ LANGUAGE sql STABLE;
 
 -- Khe trống đầu tiên từ p_earliest: lịch thường chỉ trong khung Thú y 13:30-15:30 (4 khe 30 phút); khám nhập trại
--- ưu tiên khung đó rồi tới 08:00-17:30. Ưu tiên Thú y p_vet, sau đó tới các Thú y đang làm việc khác.
--- (First free slot from p_earliest: routine care only in the 13:30-15:30 vet window; intake exams prefer it, then
--- 08:00-17:30. Prefers vet p_vet, then the other active vets.)
+-- ưu tiên NGOÀI khung đó trước, chỉ rơi vào khung khi cả ngày ngoài khung đã đầy (giống findAssignmentSlot của
+-- CareScheduleService). Ưu tiên Thú y p_vet, sau đó tới các Thú y đang làm việc khác.
+-- (First free slot from p_earliest: routine care only in the 13:30-15:30 vet window; intake exams prefer slots
+-- OUTSIDE that window and only fall back into it when the rest of the day is full, mirroring the service.)
 CREATE FUNCTION pg_temp.find_slot(p_horse BIGINT, p_vet BIGINT, p_earliest TIMESTAMP, p_care_type TEXT,
                                   p_except BIGINT DEFAULT NULL, OUT vet_id BIGINT, OUT slot TIMESTAMP) AS $$
 DECLARE
@@ -208,9 +209,9 @@ DECLARE
 BEGIN
     v_times := ARRAY[TIME '13:30', TIME '14:00', TIME '14:30', TIME '15:00'];
     IF p_care_type = 'INITIAL' THEN
-        v_times := v_times || ARRAY(SELECT t::TIME FROM generate_series(TIMESTAMP '2000-01-01 08:00',
-                                                                         TIMESTAMP '2000-01-01 17:30', INTERVAL '30 minutes') t
-                                    WHERE t::TIME NOT IN (TIME '13:30', TIME '14:00', TIME '14:30', TIME '15:00'));
+        v_times := ARRAY(SELECT t::TIME FROM generate_series(TIMESTAMP '2000-01-01 08:00',
+                                                             TIMESTAMP '2000-01-01 17:30', INTERVAL '30 minutes') t
+                         WHERE t::TIME NOT IN (TIME '13:30', TIME '14:00', TIME '14:30', TIME '15:00')) || v_times;
     END IF;
     SELECT ARRAY_AGG(u.id ORDER BY (u.id = p_vet) DESC, u.id) INTO v_vets
       FROM users u JOIN roles r ON r.id = u.role_id
@@ -451,9 +452,13 @@ BEGIN
         PERFORM pg_temp.block(h.id, p_restriction, p_at);
     END IF;
 
-    INSERT INTO health_records (horse_id, veterinarian_id, examined_at, symptoms, findings, diagnosis, notes, created_at,
+    IF p_symptoms IS NOT NULL AND p_symptoms <> '' THEN
+        p_findings := p_findings || ' | Symptoms: ' || p_symptoms;
+    END IF;
+
+    INSERT INTO health_records (horse_id, veterinarian_id, examined_at, findings, diagnosis, notes, created_at,
                                 updated_at, record_type, treatment, care_schedule_id, training_decision, restriction_details)
-    VALUES (h.id, c.veterinarian_id, p_at, p_symptoms, p_findings, p_diagnosis, p_notes, p_at, p_at, c.care_type,
+    VALUES (h.id, c.veterinarian_id, p_at, p_findings, p_diagnosis, p_notes, p_at, p_at, c.care_type,
             p_treatment, c.id, p_decision, p_restriction)
     RETURNING id INTO v_hr;
 
@@ -509,6 +514,7 @@ BEGIN
     -- (Urgent case: resolve the horse's open incident reports, notify the reporting grooms and the area trainer.)
     IF c.care_type = 'URGENT' THEN
         v_note := 'Diagnosis: ' || p_diagnosis || COALESCE(E'\nTreatment: ' || p_treatment, '')
+                  || COALESCE(E'\nAssessment: ' || nullif(p_notes, ''), '')
                   || CASE WHEN (SELECT training_decision FROM horses WHERE id = h.id) = 'BLOCKED'
                           THEN E'\nTraining: blocked - ' || (SELECT training_decision_reason FROM horses WHERE id = h.id)
                           ELSE E'\nTraining: allowed' END;
@@ -547,14 +553,15 @@ $$ LANGUAGE sql STABLE;
 -- Sự cố do Groom báo (createReport): mở ca khẩn cấp nếu ngựa chưa có, chặn tập, giao Thú y ngay.
 -- (An incident reported by a groom: opens an urgent case if none is open, blocks training, assigns a vet at once.)
 CREATE FUNCTION pg_temp.report_incident(p_horse BIGINT, p_reporter BIGINT, p_at TIMESTAMP, p_title TEXT, p_desc TEXT,
-                                        p_severity TEXT, p_vet BIGINT) RETURNS BIGINT AS $$
+                                        p_severity TEXT, p_vet BIGINT, p_image TEXT DEFAULT NULL) RETURNS BIGINT AS $$
 DECLARE
     v_incident BIGINT;
     v_schedule BIGINT;
     v_vet BIGINT;
 BEGIN
-    INSERT INTO horse_incident_reports (reported_by_id, horse_id, title, description, severity, reported_at, status)
-    VALUES (p_reporter, p_horse, p_title, p_desc, p_severity, p_at, 'REPORTED') RETURNING id INTO v_incident;
+    INSERT INTO horse_incident_reports (reported_by_id, horse_id, title, description, severity, reported_at, status,
+                                        image_url)
+    VALUES (p_reporter, p_horse, p_title, p_desc, p_severity, p_at, 'REPORTED', pg_temp.file_key(p_image)) RETURNING id INTO v_incident;
     SELECT id INTO v_schedule FROM care_schedule
      WHERE horse_id = p_horse AND care_type = 'URGENT' AND status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS');
     IF v_schedule IS NULL THEN

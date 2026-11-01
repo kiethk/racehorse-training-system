@@ -43,7 +43,7 @@ export interface HealthRecord {
   horseId: number;
   veterinarianId: number;
   examinedAt: string;
-  symptoms: string | null;
+  symptoms?: string | null;
   findings: string | null;
   diagnosis: string | null;
   treatment: string | null;
@@ -169,7 +169,7 @@ export interface InitialVetExamResponse {
   examinedAt: string;
   trainingDecision: TrainingDecision | null;
   restrictionDetails: string | null;
-  symptoms: string | null;
+  symptoms?: string | null;
   findings: string | null;
   diagnosis: string | null;
   treatment: string | null;

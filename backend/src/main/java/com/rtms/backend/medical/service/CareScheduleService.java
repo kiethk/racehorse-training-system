@@ -390,14 +390,14 @@ public class CareScheduleService {
         record.setTreatment(request.getTreatment() != null ? request.getTreatment().trim() : null);
         record.setTrainingDecision(request.getTrainingDecision());
         record.setRestrictionDetails(request.getRestrictionDetails() != null ? request.getRestrictionDetails().trim() : null);
-        record.setSymptoms(request.getSymptoms() != null ? request.getSymptoms().trim() : null);
+
         record.setNotes(request.getNotes() != null ? request.getNotes().trim() : null);
         HealthRecord savedRecord = healthRecordRepository.save(record);
         eventPublisher.publishEvent(new ClinicalRecordCreatedEvent(
                 savedRecord.getId(),
                 horse.getId(),
                 horse.getRegistrationNumber(),
-                savedRecord.getSymptoms(),
+                savedRecord.getFindings(),
                 savedRecord.getDiagnosis(),
                 List.of("VETERINARIAN", "HEAD_TRAINER", "CLUB_MANAGER")
         ));
@@ -1095,17 +1095,25 @@ public class CareScheduleService {
                         LocalTime.of(14, 30),
                         LocalTime.of(15, 0));
             } else {
-                times = new ArrayList<>(List.of(
-                        FarmSchedulePolicy.VET_WINDOW_START,
-                        LocalTime.of(14, 0),
-                        LocalTime.of(14, 30),
-                        LocalTime.of(15, 0)));
+                // Admission exams prefer the 08:00-17:00 grid OUTSIDE the routine window so
+                // they never steal a routine slot. Only when every outside-window hour of the
+                // day is taken can one fall back into the window's free slots (it is a routine
+                // preference, not an exclusive lock; urgent cases may also land inside it).
+                times = new ArrayList<>();
                 for (int hour = 8; hour <= 17; hour++) {
                     for (int minute : List.of(0, 30)) {
                         LocalTime time = LocalTime.of(hour, minute);
-                        if (!times.contains(time)) times.add(time);
+                        if (!time.isBefore(FarmSchedulePolicy.VET_WINDOW_START)
+                                && time.isBefore(FarmSchedulePolicy.VET_WINDOW_END)) {
+                            continue;
+                        }
+                        times.add(time);
                     }
                 }
+                times.add(FarmSchedulePolicy.VET_WINDOW_START);
+                times.add(LocalTime.of(14, 0));
+                times.add(LocalTime.of(14, 30));
+                times.add(LocalTime.of(15, 0));
             }
             for (LocalTime time : times) {
                 LocalDateTime slot = day.atTime(time);
@@ -1329,12 +1337,15 @@ public class CareScheduleService {
                 : (roleName != null ? roleName : "");
     }
 
-    /** What the reporting Groom is told when the urgent case closes: diagnosis, care to give, and whether the horse may train. */
+    /** What the reporting Groom is told when the urgent case closes: diagnosis, care to give, the vet's assessment note and whether the horse may train. */
     private static String incidentOutcomeNote(CompleteCareScheduleRequest request,
             TrainingDecision effectiveDecision, String effectiveReason) {
         StringBuilder note = new StringBuilder("Diagnosis: ").append(request.getDiagnosis().trim());
         if (request.getTreatment() != null && !request.getTreatment().isBlank()) {
             note.append("\nTreatment: ").append(request.getTreatment().trim());
+        }
+        if (request.getNotes() != null && !request.getNotes().isBlank()) {
+            note.append("\nAssessment: ").append(request.getNotes().trim());
         }
         if (effectiveDecision == TrainingDecision.BLOCKED) {
             note.append("\nTraining: blocked");

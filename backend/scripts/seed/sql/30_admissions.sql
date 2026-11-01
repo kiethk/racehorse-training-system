@@ -279,6 +279,8 @@ BEGIN
                                   v_t, 'POST', '/api/admissions/' || v_adm || '/arrival-confirmation');
 
             v_vet := pg_temp.uid(a.vet_k);
+            -- purpose='FOLLOW_UP' is NOT a seed bug: care_schedule.purpose is NOT NULL and the CareSchedule
+            -- entity defaults every schedule to FOLLOW_UP (@PrePersist), so app-created INITIAL rows carry it too.
             v_sched := pg_temp.new_schedule(v_horse, 'INITIAL', 'FOLLOW_UP',
                                             'Initial admission physical examination in quarantine area', NULL, v_t, v_adm);
             PERFORM pg_temp.notify(v_vet, 'ADMISSION', v_adm, 'ADMISSION_VET_ASSIGNED', 'New horse assignment',

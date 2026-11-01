@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -16,9 +17,11 @@ import { MetricCard } from '@/components/ui/MetricCard';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Notice } from '@/components/ui/Notice';
 import { admissionsApi } from '@/features/admissions/services/api';
+import { formatDateTime } from '@/lib/display';
 import type { UrgentAssignmentAlert } from '@/features/admissions/types';
 
 export default function UrgentCasesPage() {
+  const router = useRouter();
   const [urgentCases, setUrgentCases] = useState<UrgentAssignmentAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -226,7 +229,8 @@ export default function UrgentCasesPage() {
               {filteredCases.map((item) => (
                 <Panel
                   key={item.scheduleId}
-                  className={`overflow-hidden border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)] ${
+                  onClick={() => router.push(`/veterinarian/urgent/${item.scheduleId}`)}
+                  className={`cursor-pointer overflow-hidden border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)] ${
                     item.status === 'SCHEDULED'
                       ? 'border-l-4 border-l-[var(--color-danger)]'
                       : 'border-l-4 border-l-[var(--color-warning)]'
@@ -286,15 +290,7 @@ export default function UrgentCasesPage() {
                           <span className="flex items-center gap-1">
                             <Icon name="clock" size={12} />
                             <span>
-                              {new Date(item.reportedAt).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                              })}{' '}
-                              at{' '}
-                              {new Date(item.reportedAt).toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                              {formatDateTime(item.reportedAt)}
                             </span>
                           </span>
 
@@ -306,7 +302,10 @@ export default function UrgentCasesPage() {
                     </div>
 
                     <div className="shrink-0 flex items-center md:self-center">
-                      <Link href={`/veterinarian/urgent/${item.scheduleId}`}>
+                      <Link
+                        href={`/veterinarian/urgent/${item.scheduleId}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Button
                           variant={item.status === 'SCHEDULED' ? 'destructive' : 'primary'}
                           icon="chevron-right"

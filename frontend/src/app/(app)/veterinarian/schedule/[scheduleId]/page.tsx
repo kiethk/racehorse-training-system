@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { BackLink, Spinner } from '@/components/ui';
@@ -16,7 +16,11 @@ import { SchedulePatientHeader } from '@/features/care/components/SchedulePatien
 export default function ScheduleDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const scheduleId = Number(params?.scheduleId);
+  // Opened from the admission queue? Return there instead of the timeline.
+  const backHref = searchParams.get('back') === 'admissions' ? '/veterinarian/admissions' : '/veterinarian/schedule';
+  const backLabel = searchParams.get('back') === 'admissions' ? 'Back to Admissions' : 'Back to Schedule';
   const [detail, setDetail] = useState<CareScheduleDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +87,7 @@ export default function ScheduleDetailPage() {
     <RoleGuard allowedRoles={['VETERINARIAN']}>
       <PageContainer>
         <div className="mb-4">
-          <BackLink onClick={() => router.push('/veterinarian/schedule')}>Back to Schedule</BackLink>
+          <BackLink onClick={() => router.push(backHref)}>{backLabel}</BackLink>
         </div>
 
         {loading ? (
@@ -126,7 +130,7 @@ export default function ScheduleDetailPage() {
                 candidateName={detail.horse?.name}
                 horseId={detail.schedule.horseId ?? undefined}
                 onStartExam={handleStartExam}
-                onSuccess={() => router.push('/veterinarian/schedule')}
+                onSuccess={() => router.push(backHref)}
               />
             </div>
           )

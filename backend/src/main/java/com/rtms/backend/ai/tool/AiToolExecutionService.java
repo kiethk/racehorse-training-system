@@ -1713,7 +1713,6 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("horseName", horse.getName());
             item.put("examDate", hr.getExaminedAt());
-            item.put("symptoms", hr.getSymptoms());
             item.put("clinicalObservations", hr.getFindings());
             item.put("diagnosis", hr.getDiagnosis());
             item.put("treatmentPlan", hr.getTreatment());
@@ -2045,8 +2044,8 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         for (HealthRecord hr : records) {
             if (hr.getDiagnosis() != null && !hr.getDiagnosis().isBlank()) {
                 conditions.add(hr.getDiagnosis().trim());
-            } else if (hr.getSymptoms() != null && !hr.getSymptoms().isBlank()) {
-                conditions.add(hr.getSymptoms().trim());
+            } else if (hr.getFindings() != null && !hr.getFindings().isBlank()) {
+                conditions.add(hr.getFindings().trim());
             }
         }
         for (HorseIncidentReport ir : incidents) {

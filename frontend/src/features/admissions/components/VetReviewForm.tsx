@@ -14,6 +14,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Notice } from '@/components/ui/Notice';
 import { admissionAsideClassName, admissionDetailGridClassName } from '../shared/components/AdmissionDetailLayout';
 import { Icon } from '@/components/ui/Icon';
+import { formatDateTime } from '@/lib/display';
 
 import { admissionsApi } from '../services/api';
 import {
@@ -56,14 +57,6 @@ const bodySystems: Array<{ key: BodySystemKey; label: string }> = [
   { key: 'hooves', label: 'Hooves' },
   { key: 'digestive', label: 'Digestive' },
 ];
-
-const findingLevelLabels: Record<FindingLevel, string> = {
-  NORMAL: 'Normal',
-  MILD: 'Mild abnormality',
-  MODERATE: 'Moderate abnormality',
-  SEVERE: 'Severe abnormality',
-  NOT_EXAMINED: 'Not examined',
-};
 
 const normalSystemFindings = Object.fromEntries(
   bodySystems.map(({ key }) => [key, 'NORMAL']),
@@ -229,13 +222,12 @@ export function VetReviewForm({
   const [systemFindings, setSystemFindings] = useState<Record<BodySystemKey, FindingLevel>>({
     ...normalSystemFindings,
   });
-  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>(['No symptoms observed']);
   const [structuredDiagnosis, setStructuredDiagnosis] = useState('Clinically healthy');
+  const [abnormalFindings, setAbnormalFindings] = useState('');
   const [treatment, setTreatment] = useState('');
   const [notes, setNotes] = useState('');
 
   // Urgent form fields override
-  const [symptoms, setSymptoms] = useState('');
   const [findings, setFindings] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
 
@@ -256,12 +248,11 @@ export function VetReviewForm({
   const [availableDraft, setAvailableDraft] = useState<{
     metrics?: Record<MetricField, string>;
     examMode?: ExamMode;
+    abnormalFindings?: string;
     systemFindings?: Record<BodySystemKey, FindingLevel>;
-    selectedSymptoms?: string[];
     structuredDiagnosis?: string;
     treatment?: string;
     notes?: string;
-    symptoms?: string;
     findings?: string;
     diagnosis?: string;
     trainingDecision?: TrainingDecision;
@@ -310,13 +301,10 @@ export function VetReviewForm({
     metrics.bodyConditionScore !== '' ||
     metrics.hydrationStatus !== '' ||
     metrics.notes !== '' ||
-    symptoms.trim() !== '' ||
     findings.trim() !== '' ||
     diagnosis.trim() !== '' ||
     examMode !== 'NORMAL' ||
     Object.values(systemFindings).some((f) => f !== 'NORMAL') ||
-    selectedSymptoms.length > 1 ||
-    (selectedSymptoms.length === 1 && selectedSymptoms[0] !== 'No symptoms observed') ||
     structuredDiagnosis !== 'Clinically healthy' ||
     treatment.trim() !== '' ||
     notes.trim() !== '' ||
@@ -333,12 +321,11 @@ export function VetReviewForm({
     if (!availableDraft) return;
     if (availableDraft.metrics) setMetrics(availableDraft.metrics);
     if (availableDraft.examMode) setExamMode(availableDraft.examMode);
+    if (availableDraft.abnormalFindings !== undefined) setAbnormalFindings(availableDraft.abnormalFindings);
     if (availableDraft.systemFindings) setSystemFindings(availableDraft.systemFindings);
-    if (availableDraft.selectedSymptoms) setSelectedSymptoms(availableDraft.selectedSymptoms);
     if (availableDraft.structuredDiagnosis) setStructuredDiagnosis(availableDraft.structuredDiagnosis);
     if (availableDraft.treatment !== undefined) setTreatment(availableDraft.treatment);
     if (availableDraft.notes !== undefined) setNotes(availableDraft.notes);
-    if (availableDraft.symptoms !== undefined) setSymptoms(availableDraft.symptoms);
     if (availableDraft.findings !== undefined) setFindings(availableDraft.findings);
     if (availableDraft.diagnosis !== undefined) setDiagnosis(availableDraft.diagnosis);
     // Old drafts may still hold RESTRICTED -> it is now merged into BLOCKED.
@@ -367,16 +354,15 @@ export function VetReviewForm({
   const handleSaveDraft = useCallback(() => {
     try {
       const storageKey = draftStorageKey;
-      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const timestamp = new Date().toISOString();
       const payload = {
         metrics,
         examMode,
+        abnormalFindings,
         systemFindings,
-        selectedSymptoms,
         structuredDiagnosis,
         treatment,
         notes,
-        symptoms,
         findings,
         diagnosis,
         trainingDecision,
@@ -399,12 +385,11 @@ export function VetReviewForm({
     draftStorageKey,
     metrics,
     examMode,
+    abnormalFindings,
     systemFindings,
-    selectedSymptoms,
     structuredDiagnosis,
     treatment,
     notes,
-    symptoms,
     findings,
     diagnosis,
     trainingDecision,
@@ -424,12 +409,11 @@ export function VetReviewForm({
     }
     setMetrics(emptyMetrics);
     setExamMode('NORMAL');
+    setAbnormalFindings('');
     setSystemFindings({ ...normalSystemFindings });
-    setSelectedSymptoms(['No symptoms observed']);
     setStructuredDiagnosis('Clinically healthy');
     setTreatment('');
     setNotes('');
-    setSymptoms('');
     setFindings('');
     setDiagnosis('');
     setTrainingDecision('ALLOWED');
@@ -472,14 +456,13 @@ export function VetReviewForm({
     // 2. Clinical Findings & Examination
     setPhysicalExamConfirmed(true);
     setExamMode('NORMAL');
+    setAbnormalFindings('');
     setSystemFindings({ ...normalSystemFindings });
-    setSelectedSymptoms(['No symptoms observed']);
     setStructuredDiagnosis('Clinically healthy');
     setTreatment('No medical treatment required. Cleared for routine care protocol.');
     setNotes('General physical examination reveals no clinical abnormalities. Cardiovascular, respiratory, and musculoskeletal systems intact.');
 
     if (isUrgent) {
-      setSymptoms('Mild fatigue following transport, no acute distress.');
       setFindings('Clear lungs, strong peripheral pulses, sound hooves, no heat or effusion.');
       setDiagnosis('Clinically healthy with normal post-transport adaptation.');
     }
@@ -507,19 +490,10 @@ export function VetReviewForm({
     return () => clearTimeout(timer);
   }, [isDirty, isGated, availableDraft, handleSaveDraft]);
 
-  const generatedSymptoms =
-    examMode === 'NORMAL'
-      ? 'No symptoms observed'
-      : selectedSymptoms.join('; ') || 'No presenting symptoms selected';
-
-  const generatedFindings =
+    const generatedFindings =
     examMode === 'NORMAL'
       ? 'Physical examination completed in person. General condition, respiratory, cardiovascular, musculoskeletal, neurological, skin and coat, hooves, and digestive systems were within normal limits.'
-      : `Physical examination completed in person. ${bodySystems
-          .map(({ key, label }) => `${label}: ${findingLevelLabels[systemFindings[key]].toLowerCase()}`)
-          .join('; ')}.`;
-
-  const effectiveSymptoms = isUrgent ? symptoms.trim() : generatedSymptoms;
+      : abnormalFindings.trim();
   const effectiveFindings = isUrgent ? findings.trim() : generatedFindings;
   const effectiveDiagnosis = isUrgent ? diagnosis.trim() : structuredDiagnosis;
 
@@ -529,7 +503,6 @@ export function VetReviewForm({
     // Zod schema for the core, conditional text/date fields (T6).
     const schema = z.object({
       physicalExamConfirmed: z.boolean(),
-      symptoms: z.string(),
       effectiveFindings: z.string().min(1, 'Clinical examination findings are required.'),
       effectiveDiagnosis: z.string().min(1, 'Clinical diagnosis is required.'),
       restrictionDetails: z.string(),
@@ -539,18 +512,15 @@ export function VetReviewForm({
       if (!data.physicalExamConfirmed) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['physicalExamConfirmed'], message: 'In-person physical examination confirmation is required.' });
       }
-      if (isUrgent && !data.symptoms.trim()) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['symptoms'], message: 'Detailed presenting symptoms are required for urgent care.' });
-      }
-      if (
+            if (
         !isUrgent &&
         examMode === 'ABNORMAL' &&
-        bodySystems.every(({ key }) => systemFindings[key] === 'NORMAL')
+        !abnormalFindings.trim()
       ) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['systemFindings'], message: 'Select at least one abnormal or not-examined body system.' });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['abnormalFindings'], message: 'Describe the abnormal examination findings.' });
       }
       if (trainingDecision === 'BLOCKED' && !data.restrictionDetails.trim()) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['restrictionDetails'], message: 'Restriction details are mandatory when training is blocked.' });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['restrictionDetails'], message: 'An assessment note is required when training is blocked.' });
       }
       if (followUpActive) {
         if (!data.followUpDate) {
@@ -566,7 +536,6 @@ export function VetReviewForm({
 
     const parsed = schema.safeParse({
       physicalExamConfirmed,
-      symptoms,
       effectiveFindings,
       effectiveDiagnosis,
       restrictionDetails,
@@ -679,7 +648,6 @@ export function VetReviewForm({
           findings: effectiveFindings,
           diagnosis: effectiveDiagnosis,
           treatment: treatment.trim() || undefined,
-          symptoms: effectiveSymptoms || undefined,
           notes: notes.trim() || undefined,
           feedback: notes.trim() || undefined,
           nextSchedule: nextScheduleRequest,
@@ -693,7 +661,6 @@ export function VetReviewForm({
         const request: CompleteCareScheduleRequest = {
           findings: effectiveFindings,
           diagnosis: effectiveDiagnosis,
-          symptoms: effectiveSymptoms || undefined,
           treatment: treatment.trim() || undefined,
           trainingDecision,
           restrictionDetails: restrictionDetails.trim() || undefined,
@@ -803,7 +770,7 @@ export function VetReviewForm({
             <div className="flex items-center gap-2">
               <Icon name="clipboard" size={14} className="text-[var(--color-primary)] shrink-0" />
               <span>
-                A saved draft from <strong>{availableDraft.timestamp}</strong> was found. Would you like to restore it?
+                A saved draft from <strong>{formatDateTime(availableDraft.timestamp)}</strong> was found. Would you like to restore it?
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -832,7 +799,7 @@ export function VetReviewForm({
           <div className="mb-4 flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)]">
             <span className="flex items-center gap-1.5 font-medium">
               <Icon name="check" size={12} className="text-[var(--color-success)]" />
-              Draft saved at {draftSavedTime}
+              Draft saved at {formatDateTime(draftSavedTime)}
             </span>
             <Button type="button" variant="link" size="sm" onClick={handleClearDraft}>
               Delete draft
@@ -868,9 +835,13 @@ export function VetReviewForm({
                   diagnosis={diagnosis}
                   setDiagnosis={setDiagnosis}
                   examMode={examMode}
+                  setExamMode={setExamMode}
                   structuredDiagnosis={structuredDiagnosis}
                   setStructuredDiagnosis={setStructuredDiagnosis}
+                  abnormalFindings={abnormalFindings}
+                  setAbnormalFindings={setAbnormalFindings}
                   fieldErrors={fieldErrors}
+                  setFieldErrors={setFieldErrors}
                 />
                 <TreatmentSection
                   isFormDisabled={isFormDisabled}
@@ -929,7 +900,6 @@ export function VetReviewForm({
 
             {/* Training Decision */}
             <TrainingDecisionSection
-              isUrgent={isUrgent}
               isFormDisabled={isFormDisabled}
               trainingDecision={trainingDecision}
               setTrainingDecision={setTrainingDecision}

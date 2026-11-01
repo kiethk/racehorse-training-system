@@ -1,6 +1,7 @@
 package com.rtms.backend.medical.service;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.audit.repository.AuditLogRepository;
+import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -33,6 +34,8 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -181,6 +184,72 @@ class CareScheduleDirectAssignmentTest {
         assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
         assertEquals(1L, requested.getVeterinarianId(),
                 "A stale overdue in-progress exam must not disqualify the vet from an emergency");
+    }
+
+    @Test
+    void initialExamPrefersSlotsOutsideTheRoutineWindow() {
+        LocalDate day = LocalDate.now().plusDays(1);
+        CareSchedule requested = initialRequest(99L, day.atTime(8, 0));
+        User vet = eligibleVet(1L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+        lockEligible(vet);
+
+        service.assignRequestedSchedule(requested);
+
+        assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
+        assertEquals(day.atTime(8, 0), requested.getScheduledAt(),
+                "Admission exams must fill the working day outside 13:30-15:30 before touching the routine window");
+    }
+
+    @Test
+    void initialExamFallsBackIntoTheRoutineWindowOnlyWhenTheRestOfTheDayIsFull() {
+        LocalDate day = LocalDate.now().plusDays(1);
+        CareSchedule requested = initialRequest(99L, day.atTime(8, 0));
+        User vet = eligibleVet(1L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+        lockEligible(vet);
+        // Occupy every 08:00-17:00 slot outside the routine window; the window stays free.
+        List<CareSchedule> blockers = new ArrayList<>();
+        for (int hour = 8; hour <= 17; hour++) {
+            for (int minute : List.of(0, 30)) {
+                LocalTime time = LocalTime.of(hour, minute);
+                if (!time.isBefore(FarmSchedulePolicy.VET_WINDOW_START)
+                        && time.isBefore(FarmSchedulePolicy.VET_WINDOW_END)) {
+                    continue;
+                }
+                CareSchedule block = new CareSchedule();
+                block.setId((long) hour * 60 + minute);
+                block.setVeterinarianId(1L);
+                block.setHorseId(50L + hour);
+                block.setCareType(CareType.ROUTINE);
+                block.setStatus(CareScheduleStatus.SCHEDULED);
+                block.setDurationMinutes(30);
+                block.setScheduledAt(day.atTime(time));
+                blockers.add(block);
+            }
+        }
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(blockers);
+
+        service.assignRequestedSchedule(requested);
+
+        assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
+        assertEquals(day.atTime(13, 30), requested.getScheduledAt(),
+                "When the hours outside the window are full, the exam takes a free slot inside it");
+    }
+
+    private CareSchedule initialRequest(Long horseId, LocalDateTime requestedAt) {
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setName("Horse " + horseId);
+        when(horses.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(600L);
+        schedule.setHorseId(horseId);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setDurationMinutes(30);
+        schedule.setRequestedAt(requestedAt);
+        return schedule;
     }
 
     private CareSchedule urgentSchedule(Long horseId, Long incidentId) {

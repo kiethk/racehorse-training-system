@@ -27,7 +27,6 @@ public class CompleteCareScheduleRequest {
     /** Lý do chặn tập — bắt buộc khi BLOCKED, Trainer đọc thấy khi lập kế hoạch. */
     private String restrictionDetails;
 
-    private String symptoms;
     private String notes;
     private List<@NotNull @Valid HorseHealthMetricRequest> metrics;
 
@@ -75,8 +74,6 @@ public class CompleteCareScheduleRequest {
     public String getRestrictionDetails() { return restrictionDetails; }
     public void setRestrictionDetails(String restrictionDetails) { this.restrictionDetails = restrictionDetails; }
 
-    public String getSymptoms() { return symptoms; }
-    public void setSymptoms(String symptoms) { this.symptoms = symptoms; }
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }

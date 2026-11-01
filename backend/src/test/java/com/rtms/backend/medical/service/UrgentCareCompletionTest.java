@@ -169,6 +169,27 @@ class UrgentCareCompletionTest {
     }
 
     @Test
+    @DisplayName("handlerNote trả cả ghi chú đánh giá của thú y về người báo cáo, không chỉ kết luận chẩn đoán")
+    void testCompleteUrgentSchedule_handlerNoteCarriesAssessmentNote() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        horse.setTrainingDecisionReason("Urgent veterinary care pending");
+
+        stubCompletion();
+        when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+
+        CompleteCareScheduleRequest req = completeRequest(TrainingDecision.ALLOWED);
+        req.setTreatment("Cold hosing and NSAID for five days");
+        req.setNotes("Mild flexor strain; recheck before returning to work.");
+
+        careScheduleService.completeCareSchedule(urgentSchedule.getId(), req, vet.getId());
+
+        assertTrue(incident.getHandlerNote().contains("Treatment: Cold hosing and NSAID for five days"));
+        assertTrue(incident.getHandlerNote().contains("Assessment: Mild flexor strain; recheck before returning to work."));
+        assertTrue(incident.getHandlerNote().endsWith("Training: allowed"));
+    }
+
+    @Test
     @DisplayName("Trạng thái khóa cũ được giữ lại: đóng ca khẩn cấp cuối vẫn BLOCKED vì lý do trước đó")
     void testCompleteUrgentSchedule_restoresPreviousBlock() {
         HealthRecord previous = new HealthRecord();

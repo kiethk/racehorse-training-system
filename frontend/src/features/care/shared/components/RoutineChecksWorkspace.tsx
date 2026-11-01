@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Icon } from '@/components/ui/Icon';
-import { FilterChips, SearchInput, Notice, PageHeader, MetricCard } from '@/components/ui';
+import { FilterChips, SearchInput, Notice, PageHeader, MetricCard, Pagination } from '@/components/ui';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { admissionsApi } from '@/features/admissions/services/api';
@@ -29,6 +29,8 @@ export function RoutineChecksWorkspace() {
   // Filters & Search
   const [statusFilter, setStatusFilter] = useState<CareScheduleStatus | 'ALL'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 8;
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
@@ -82,6 +84,14 @@ export function RoutineChecksWorkspace() {
   const filteredList = useMemo(() => {
     return filterRoutineSchedules(schedules, statusFilter, searchTerm, horseInfoMap);
   }, [schedules, statusFilter, searchTerm, horseInfoMap]);
+
+  // Pagination slice
+  const pageCount = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const paginatedList = useMemo(() => {
+    const start = currentPage * PAGE_SIZE;
+    return filteredList.slice(start, start + PAGE_SIZE);
+  }, [filteredList, currentPage]);
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -180,7 +190,10 @@ export function RoutineChecksWorkspace() {
         <FilterChips
           label="Status"
           value={statusFilter}
-          onChange={(v) => setStatusFilter(v as CareScheduleStatus | 'ALL')}
+          onChange={(v) => {
+            setStatusFilter(v as CareScheduleStatus | 'ALL');
+            setPage(0);
+          }}
           options={[
             { value: 'ALL', label: 'All', count: schedules.length },
             { value: 'SCHEDULED', label: 'Scheduled', count: stats.scheduled },
@@ -192,7 +205,10 @@ export function RoutineChecksWorkspace() {
         <div className="w-full sm:w-64">
           <SearchInput
             value={searchTerm}
-            onChange={setSearchTerm}
+            onChange={(term) => {
+              setSearchTerm(term);
+              setPage(0);
+            }}
             placeholder="Search horse name, stall..."
             label="Search routine care"
           />
@@ -226,8 +242,9 @@ export function RoutineChecksWorkspace() {
           />
         </Panel>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {filteredList.map((cs) => {
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {paginatedList.map((cs) => {
             const horse = horseMap.get(cs.horseId);
             const horseName = horse?.name || `Horse #${cs.horseId}`;
             const stallCode = horse?.currentStallId ? stallMap.get(horse.currentStallId) : 'Unassigned';
@@ -321,6 +338,18 @@ export function RoutineChecksWorkspace() {
               </Panel>
             );
           })}
+          </div>
+
+          <Panel className="overflow-hidden">
+            <Pagination
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              total={filteredList.length}
+              onPageChange={setPage}
+              disabled={loading}
+              className="border-t-0"
+            />
+          </Panel>
         </div>
       )}
 

@@ -6,7 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "injury_records")
+@Table(name = "health_conditions")
 public class InjuryRecord {
 
     @Id
@@ -19,10 +19,13 @@ public class InjuryRecord {
     @Column(name = "health_record_id", nullable = false)
     private Long healthRecordId;
 
-    @Column(name = "injury_type", nullable = false)
+    @Column(name = "category", nullable = false, length = 20)
+    private String category = "INJURY";
+
+    @Column(name = "condition_type", nullable = false)
     private String injuryType;
 
-    @Column(name = "body_region_id", nullable = false)
+    @Column(name = "body_region_id")
     private Long bodyRegionId;
 
     @Column(name = "severity", nullable = false, length = 50)
@@ -31,7 +34,7 @@ public class InjuryRecord {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "diagnosed_at", nullable = false)
+    @Transient
     private LocalDateTime diagnosedAt;
 
     @Column(name = "expected_recovery_date")
@@ -73,7 +76,7 @@ public class InjuryRecord {
     @Column(name = "normal_z", precision = 10, scale = 4)
     private BigDecimal normalZ;
 
-    @Column(name = "mesh_name", length = 128)
+    @Transient
     private String meshName;
 
     @Column(name = "created_at", updatable = false)
@@ -229,5 +232,21 @@ public class InjuryRecord {
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public String getCategory() {
+        return category != null ? category : "INJURY";
+    }
+
+    public void setCategory(String category) {
+        this.category = category != null ? category : "INJURY";
+    }
+
+    public String getConditionType() {
+        return injuryType;
+    }
+
+    public void setConditionType(String conditionType) {
+        this.injuryType = conditionType;
     }
 }

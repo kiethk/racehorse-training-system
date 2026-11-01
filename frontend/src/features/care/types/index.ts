@@ -59,7 +59,7 @@ export interface CreateNextScheduleRequest {
 }
 
 export interface CompleteCareScheduleRequest {
-  symptoms: string;
+  symptoms?: string;
   findings: string;
   diagnosis: string;
   treatment?: string;

@@ -145,6 +145,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
      * Hàng đợi khám của bác sĩ thú y. Mặc định (scheduleStatus = null) ẩn các ca
      * COMPLETED và CANCELLED; khi người dùng chọn một trạng thái cụ thể thì bộ lọc
      * đó được ưu tiên, nên ca đã hoàn thành vẫn xem được qua bộ lọc Completed.
+     * Khi chọn một stage admission cụ thể (admissionStatus != null) thì ca COMPLETED
+     * được hiện lại, vì khám xong là điều kiện cần để admission chuyển stage.
      * Bộ lọc pill (Awaiting / In exam) chỉ mô tả ca đang chờ nên bị bỏ qua khi
      * đã chọn trạng thái cụ thể.
      */
@@ -153,7 +155,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
         WHERE cs.admissionId = a.id AND c.admissionId = a.id
           AND cs.veterinarianId = :vetId
           AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
-               OR (:scheduleStatus IS NULL AND cs.status NOT IN ('COMPLETED','CANCELLED')))
+               OR (:scheduleStatus IS NULL AND cs.status <> 'CANCELLED'
+                   AND (:admissionStatus IS NOT NULL OR cs.status <> 'COMPLETED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
@@ -176,7 +179,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
         WHERE cs.admissionId = a.id AND c.admissionId = a.id
           AND cs.veterinarianId = :vetId
           AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
-               OR (:scheduleStatus IS NULL AND cs.status NOT IN ('COMPLETED','CANCELLED')))
+               OR (:scheduleStatus IS NULL AND cs.status <> 'CANCELLED'
+                   AND (:admissionStatus IS NOT NULL OR cs.status <> 'COMPLETED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))

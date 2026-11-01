@@ -42,6 +42,9 @@ public class Prescription {
     @Column(name = "preventive_protocol_id")
     private Long preventiveProtocolId;
 
+    @Column(name = "withdrawal_days", nullable = false)
+    private Integer withdrawalDays = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -137,6 +140,14 @@ public class Prescription {
 
     public void setPreventiveProtocolId(Long preventiveProtocolId) {
         this.preventiveProtocolId = preventiveProtocolId;
+    }
+
+    public Integer getWithdrawalDays() {
+        return withdrawalDays != null ? withdrawalDays : 0;
+    }
+
+    public void setWithdrawalDays(Integer withdrawalDays) {
+        this.withdrawalDays = withdrawalDays != null ? withdrawalDays : 0;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -160,7 +160,6 @@ public class AdmissionReviewService {
         compReq.setFindings(request.getFindings() != null ? request.getFindings() : "Exam completed");
         compReq.setDiagnosis(request.getDiagnosis() != null ? request.getDiagnosis() : "Quarantine physical exam");
         compReq.setTreatment(request.getTreatment());
-        compReq.setSymptoms(request.getSymptoms());
         compReq.setNotes(request.getNotes() != null ? request.getNotes() : request.getFeedback());
         compReq.setMetrics(request.getMetrics());
         compReq.setNextSchedule(request.getNextSchedule());

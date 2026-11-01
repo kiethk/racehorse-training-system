@@ -31,7 +31,6 @@ public class VetReviewRequest {
     @NotNull(message = "Physical exam confirmation is required")
     private Boolean physicalExamConfirmed;
 
-    private String symptoms;
     private String findings;
     private String diagnosis;
     private String treatment;
@@ -56,8 +55,6 @@ public class VetReviewRequest {
     public Boolean getPhysicalExamConfirmed() { return physicalExamConfirmed; }
     public void setPhysicalExamConfirmed(Boolean physicalExamConfirmed) { this.physicalExamConfirmed = physicalExamConfirmed; }
 
-    public String getSymptoms() { return symptoms; }
-    public void setSymptoms(String symptoms) { this.symptoms = symptoms; }
     public String getFindings() { return findings; }
     public void setFindings(String findings) { this.findings = findings; }
     public String getDiagnosis() { return diagnosis; }
