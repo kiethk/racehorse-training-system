@@ -9,7 +9,14 @@ import java.util.List;
 @Repository
 public interface TrainingGroupRepository extends JpaRepository<TrainingGroup, Long> {
 
-    List<TrainingGroup> findByTrainerIdOrderByNameAsc(Long trainerId);
+    List<TrainingGroup> findByTrainerIdAndDisbandedAtIsNullOrderByNameAsc(Long trainerId);
 
-    boolean existsByTrainerIdAndNameIgnoreCase(Long trainerId, String name);
+    List<TrainingGroup> findByTrainerIdAndDisbandedAtIsNotNullOrderByNameAsc(Long trainerId);
+
+    List<TrainingGroup> findByDisbandedAtIsNull();
+
+    List<TrainingGroup> findByDisbandedAtIsNotNull();
+
+    /** Tên chỉ cần khác nhau giữa các nhóm còn hoạt động. (Names only need to differ among live groups.) */
+    boolean existsByTrainerIdAndNameIgnoreCaseAndDisbandedAtIsNull(Long trainerId, String name);
 }

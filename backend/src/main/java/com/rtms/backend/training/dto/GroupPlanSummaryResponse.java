@@ -8,6 +8,7 @@ import java.time.LocalDate;
 public record GroupPlanSummaryResponse(Long id,
                                        Long groupId,
                                        String groupName,
+                                       boolean groupDisbanded,
                                        Long courseId,
                                        String courseName,
                                        LocalDate startDate,

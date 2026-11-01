@@ -8,6 +8,7 @@ import { PLAN_STATUS } from '../lib/status';
 import { trainingService } from '../services/trainingService';
 import type { HorseAttendance } from '../types';
 import { StatusPill } from './StatusPill';
+import { groupLabel } from '../lib/disbandMessage';
 
 /**
  * Every Group Plan a horse took part in, one line per plan, with how many Sessions it attended out of how many and since when.
@@ -39,7 +40,7 @@ export function HorseAttendanceList({ horseId }: { horseId: number }) {
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{line.courseName}</p>
             <p className="truncate text-xs text-[var(--color-text-secondary)]">
-              {line.groupName ?? 'Deleted group'} · joined {formatDate(line.joinedOn)}
+              {groupLabel(line.groupName, line.groupDisbanded)} · joined {formatDate(line.joinedOn)}
             </p>
           </div>
           <div className="flex items-center gap-3">

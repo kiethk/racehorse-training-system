@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -39,8 +40,10 @@ public class TrainingGroupController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('TRAINING_GROUP_VIEW')")
-    public ApiResponse<List<TrainingGroupResponse>> getGroups(@AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(groupService.getGroups(currentUser));
+    public ApiResponse<List<TrainingGroupResponse>> getGroups(
+            @RequestParam(defaultValue = "false") boolean disbanded,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(disbanded ? groupService.getDisbandedGroups(currentUser) : groupService.getGroups(currentUser));
     }
 
     @PostMapping
@@ -62,8 +65,8 @@ public class TrainingGroupController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('TRAINING_GROUP_MANAGE')")
-    public ApiResponse<Void> deleteGroup(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        groupService.deleteGroup(id, currentUser);
+    public ApiResponse<Void> disbandGroup(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        groupService.disbandGroup(id, currentUser);
         return ApiResponse.success(null);
     }
 

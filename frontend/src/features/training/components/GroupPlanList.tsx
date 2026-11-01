@@ -9,6 +9,7 @@ import { PLAN_STATUS } from '../lib/status';
 import { trainingService } from '../services/trainingService';
 import type { GroupPlanSummary } from '../types';
 import { StatusPill } from './StatusPill';
+import { groupLabel } from '../lib/disbandMessage';
 
 /** The Trainer's group plans, newest first, each with its progress. */
 export function GroupPlanList() {
@@ -68,7 +69,7 @@ function PlanCard({ plan }: { plan: GroupPlanSummary }) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold text-[var(--color-text-primary)]">{plan.courseName}</h3>
-            <p className="truncate text-sm text-[var(--color-text-secondary)]">{plan.groupName ?? 'Deleted group'}</p>
+            <p className="truncate text-sm text-[var(--color-text-secondary)]">{groupLabel(plan.groupName, plan.groupDisbanded)}</p>
           </div>
           <StatusPill status={PLAN_STATUS[plan.status]} />
         </div>

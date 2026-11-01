@@ -20,6 +20,8 @@ public interface GroupPlanRepository extends JpaRepository<GroupPlan, Long> {
 
     List<GroupPlan> findByGroupIdAndStatusIn(Long groupId, Collection<TrainingPlanStatus> statuses);
 
+    boolean existsByGroupId(Long groupId);
+
     boolean existsByGroupIdAndStatusIn(Long groupId, Collection<TrainingPlanStatus> statuses);
 
     List<GroupPlan> findByGroupIdInAndStatusIn(Collection<Long> groupIds, Collection<TrainingPlanStatus> statuses);

@@ -13,14 +13,14 @@ export function GroupCard({
   group,
   onAddHorse,
   onRename,
-  onDelete,
+  onDisband,
   onRemoveHorse,
   onMoveHorse,
 }: {
   group: TrainingGroup;
   onAddHorse: () => void;
   onRename: () => void;
-  onDelete: () => void;
+  onDisband: () => void;
   onRemoveHorse: (horseId: number, horseName: string) => void;
   onMoveHorse: (horseId: number, horseName: string) => void;
 }) {
@@ -35,7 +35,7 @@ export function GroupCard({
         </div>
         <div className="flex items-center gap-1">
           <IconButton icon="file-text" label="Rename group" onClick={onRename} />
-          <IconButton icon="x" label="Delete group" onClick={onDelete} />
+          <IconButton icon="x" label="Disband group" onClick={onDisband} />
         </div>
       </div>
 
