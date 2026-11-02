@@ -1,8 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/Table';
 import { Notice } from '@/components/ui/Notice';
-import { cn } from '@/lib/cn';
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -10,8 +10,13 @@ import { Panel } from '@/components/ui/Panel';
 import { FilterBar } from '@/components/ui/FilterBar';
 import { FormField } from '@/components/ui/FormField';
 import { Input, SearchInput, Select } from '@/components/ui/Input';
+import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { auditLogApi } from '../services/api';
+import { downloadAuditLogsCsv, extractAuditSummary } from '../lib/auditExport';
+import { resolveEntityUrl, resolveLogModule } from '../lib/auditDiff';
+import { AuditLogDetailModal } from './AuditLogDetailModal';
+import { ModuleBadge } from './ModuleBadge';
 import type { AuditLogItem, AuditLogFilters, PageResponse } from '../types';
 
 const STATUS_OPTIONS = [
@@ -20,10 +25,33 @@ const STATUS_OPTIONS = [
   { label: 'Failed / Rejected', value: '400' },
 ] as const;
 
+const MODULE_OPTIONS = [
+  { label: 'All Modules', value: 'ALL' },
+  { label: 'Admissions', value: 'ADMISSIONS' },
+  { label: 'Medical & Care', value: 'MEDICAL' },
+  { label: 'Stables & Stalls', value: 'STABLE' },
+  { label: 'Horse Lifecycle', value: 'HORSES' },
+  { label: 'Staff & Accounts', value: 'STAFF' },
+  { label: 'Training & Courses', value: 'TRAINING' },
+  { label: 'Racing & Registration', value: 'RACING' },
+  { label: 'System & Admin', value: 'SYSTEM' },
+] as const;
+
+const ROLE_OPTIONS = [
+  { label: 'All Roles', value: 'ALL' },
+  { label: 'Club Manager', value: 'CLUB_MANAGER' },
+  { label: 'Head Trainer', value: 'HEAD_TRAINER' },
+  { label: 'Veterinarian', value: 'VETERINARIAN' },
+  { label: 'Groom', value: 'GROOM' },
+  { label: 'Horse Owner', value: 'HORSE_OWNER' },
+] as const;
+
 const initialFilters: AuditLogFilters = {
   search: '',
   httpMethod: 'ALL',
   statusCode: 'ALL',
+  module: 'ALL',
+  role: 'ALL',
   from: '',
   to: '',
   page: 0,
@@ -42,46 +70,44 @@ function formatRole(role: string | null): string {
   }
 }
 
-function formatAction(action: string | null): string {
-  if (!action) return 'System Operation';
-  if (action === 'CARE_SCHEDULE_AUTO_ASSIGNED') return 'Care Schedule Auto Assigned';
-  if (action === 'CARE_SCHEDULE_RESCHEDULED') return 'Reschedule Medical Care';
-  if (action.includes('_') && action === action.toUpperCase()) {
-    return action
-      .toLowerCase()
-      .split('_')
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
+function formatAction(action: string | null, method?: string, path?: string): string {
+  if (action) {
+    if (action === 'CARE_SCHEDULE_AUTO_ASSIGNED') return 'Care Schedule Auto Assigned';
+    if (action === 'CARE_SCHEDULE_RESCHEDULED') return 'Reschedule Medical Care';
+    if (action.includes('_') && action === action.toUpperCase()) {
+      return action
+        .toLowerCase()
+        .split('_')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+    }
+    return action;
   }
-  return action;
-}
-
-function formatDetails(log: AuditLogItem): string {
-  if (log.details && log.details.trim().length > 0) {
-    return log.details;
+  if (method && path) {
+    return `${method} ${path}`;
   }
-  if (log.action) {
-    const act = formatAction(log.action);
-    return log.entityName ? `${act} on ${log.entityName}` : act;
-  }
-  return 'System processed operation successfully.';
+  return 'System Activity';
 }
 
 function OutcomeText({ success }: { success: boolean }) {
   if (success) {
     return (
-      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+        <span className="size-1.5 rounded-full bg-emerald-500" />
         Success
       </span>
     );
   }
 
   return (
-    <span className="font-semibold text-rose-600 dark:text-rose-400">
+    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400">
+      <span className="size-1.5 rounded-full bg-rose-500" />
       Failed
     </span>
   );
 }
+
+
 
 export function ManagerAuditLogView() {
   const router = useRouter();
@@ -93,6 +119,8 @@ export function ManagerAuditLogView() {
       search: searchParams.get('search') || '',
       httpMethod: searchParams.get('httpMethod') || 'ALL',
       statusCode: searchParams.get('statusCode') || 'ALL',
+      module: searchParams.get('module') || 'ALL',
+      role: searchParams.get('role') || 'ALL',
       from: searchParams.get('from') || '',
       to: searchParams.get('to') || '',
       page: Number(searchParams.get('page')) || 0,
@@ -103,6 +131,7 @@ export function ManagerAuditLogView() {
   const [data, setData] = useState<PageResponse<AuditLogItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
   
   const [draft, setDraft] = useState<AuditLogFilters>(urlFilters);
 
@@ -135,6 +164,8 @@ export function ManagerAuditLogView() {
     if (filters.search) params.set('search', filters.search.trim());
     if (filters.httpMethod !== 'ALL') params.set('httpMethod', filters.httpMethod);
     if (filters.statusCode !== 'ALL') params.set('statusCode', filters.statusCode);
+    if (filters.module && filters.module !== 'ALL') params.set('module', filters.module);
+    if (filters.role && filters.role !== 'ALL') params.set('role', filters.role);
     if (filters.from) params.set('from', filters.from);
     if (filters.to) params.set('to', filters.to);
     if (filters.page > 0) params.set('page', String(filters.page));
@@ -157,6 +188,12 @@ export function ManagerAuditLogView() {
     updateUrl({ ...urlFilters, page: newPage });
   };
 
+  const handleExportCsv = () => {
+    if (!data || data.content.length === 0) return;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadAuditLogsCsv(data.content, `audit-logs-${dateStr}.csv`);
+  };
+
   if (loading && !data) {
     return (
       <Panel>
@@ -167,37 +204,86 @@ export function ManagerAuditLogView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">Activity & Audit Logs</h1>
-        <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-          Review historical staff activities, operational decisions, and intake reviews across the club.
-        </p>
+      {/* Header with Title and Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
+            Activity & Audit Logs
+          </h1>
+          <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+            Review historical staff activities, domain approvals, and intake decisions across the club.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleExportCsv}
+            disabled={!data || data.content.length === 0}
+          >
+            <Icon name="download" className="size-4 mr-1.5" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
+      {/* Advanced Filter Bar */}
       <FilterBar
         className="[&_input]:min-h-9 [&_select]:min-h-9"
         onSubmit={(event) => { event.preventDefault(); apply(); }}
       >
-        <FormField label="Search Activity or User" className="min-w-[15rem] flex-[1.6]">
+        <FormField label="Search Activity or User" className="min-w-[13rem] flex-[1.4]">
           <SearchInput
             label="Search Activity or User"
             value={draft.search}
             onChange={(search) => setDraft({ ...draft, search })}
-            placeholder="Search by person, action, or target ID..."
+            placeholder="Search by actor, action, or ID..."
           />
         </FormField>
-        <FormField label="Result Status" className="min-w-[9rem] flex-1">
-          <Select value={draft.statusCode} onChange={(e) => setDraft({ ...draft, statusCode: e.target.value })}>
+        <FormField label="Module" className="min-w-[9.5rem] flex-1">
+          <Select
+            value={draft.module || 'ALL'}
+            onChange={(e) => setDraft({ ...draft, module: e.target.value })}
+          >
+            {MODULE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Actor Role" className="min-w-[9.5rem] flex-1">
+          <Select
+            value={draft.role || 'ALL'}
+            onChange={(e) => setDraft({ ...draft, role: e.target.value })}
+          >
+            {ROLE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Result Status" className="min-w-[8.5rem] flex-1">
+          <Select
+            value={draft.statusCode}
+            onChange={(e) => setDraft({ ...draft, statusCode: e.target.value })}
+          >
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </Select>
         </FormField>
-        <FormField label="From Date" className="min-w-[9.5rem] flex-1">
-          <Input type="date" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} />
+        <FormField label="From Date" className="min-w-[8.5rem] flex-1">
+          <Input
+            type="date"
+            value={draft.from}
+            onChange={(e) => setDraft({ ...draft, from: e.target.value })}
+          />
         </FormField>
-        <FormField label="To Date" className="min-w-[9.5rem] flex-1">
-          <Input type="date" min={draft.from || undefined} value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} />
+        <FormField label="To Date" className="min-w-[8.5rem] flex-1">
+          <Input
+            type="date"
+            min={draft.from || undefined}
+            value={draft.to}
+            onChange={(e) => setDraft({ ...draft, to: e.target.value })}
+          />
         </FormField>
         <div className="flex shrink-0 items-center gap-2">
           <Button type="submit" variant="primary">Filter</Button>
@@ -216,70 +302,113 @@ export function ManagerAuditLogView() {
           />
         ) : (
           <div className="flex flex-col h-full">
-            <Table bare className={loading ? 'whitespace-nowrap opacity-60 transition-opacity' : 'whitespace-nowrap transition-opacity'}>
+            <Table bare className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
               <THead>
                 <Tr>
-                  <Th className="px-6 py-4">Timestamp</Th>
-                  <Th className="px-6 py-4">Actor</Th>
-                  <Th className="px-6 py-4">Role</Th>
-                  <Th className="px-6 py-4">Activity</Th>
-                  <Th className="px-6 py-4 min-w-[20rem]">Activity Summary</Th>
-                  <Th className="px-6 py-4 text-center">Outcome</Th>
+                  <Th className="px-5 py-3.5 w-[11rem]">Timestamp</Th>
+                  <Th className="px-5 py-3.5 w-[14rem]">Actor & Role</Th>
+                  <Th className="px-5 py-3.5 min-w-[15rem]">Module & Activity</Th>
+                  <Th className="px-5 py-3.5 w-[12rem]">Target Entity</Th>
+                  <Th className="px-5 py-3.5 w-[11rem] text-right">Outcome & Inspect</Th>
                 </Tr>
               </THead>
               <TBody>
                 {data.content.map((log) => {
-                  const displayAction = formatAction(log.action);
-                  const displayDetails = formatDetails(log);
+                  const displayAction = formatAction(log.action, log.httpMethod, log.requestPath);
+                  const targetEntityUrl = resolveEntityUrl(log.entityName, log.entityId);
+                  const moduleName = resolveLogModule(log.module, log.entityName, log.requestPath, log.action);
 
                   return (
-                    <Tr key={log.id} className="hover:bg-[var(--color-surface-muted)] transition-colors">
-                      <Td className="px-6 py-4 text-[var(--color-text-secondary)] whitespace-nowrap text-xs font-mono">
+                    <Tr
+                      key={log.id}
+                      className="hover:bg-[var(--color-surface-muted)] transition-colors cursor-pointer"
+                      onClick={() => setSelectedLog(log)}
+                    >
+                      {/* 1. Timestamp */}
+                      <Td className="px-5 py-3.5 text-[var(--color-text-secondary)] text-xs font-mono whitespace-nowrap">
                         {new Date(log.createdAt).toLocaleString('en-GB', { 
                           day: '2-digit', month: 'short', year: 'numeric',
                           hour: '2-digit', minute: '2-digit'
                         })}
                       </Td>
-                      <Td className="px-6 py-4">
-                        {log.actorName ? (
-                          <div>
-                            <span className="font-semibold block text-[var(--color-text-primary)] text-sm">{log.actorName}</span>
-                            {log.actorEmail && <span className="text-xs text-[var(--color-text-muted)]">{log.actorEmail}</span>}
+
+                      {/* 2. Actor & Role (stacked) */}
+                      <Td className="px-5 py-3.5">
+                        <div className="space-y-0.5">
+                          {log.actorName ? (
+                            <span className="font-semibold block text-[var(--color-text-primary)] text-sm truncate max-w-[13rem]">
+                              {log.actorName}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--color-text-secondary)] italic text-sm">System / Guest</span>
+                          )}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs px-1.5 py-0.2 rounded bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] font-medium">
+                              {formatRole(log.actorRole)}
+                            </span>
+                            {log.actorEmail && (
+                              <span className="text-[11px] text-[var(--color-text-muted)] truncate max-w-[11rem] font-mono">
+                                {log.actorEmail}
+                              </span>
+                            )}
                           </div>
-                        ) : (
-                          <span className="text-[var(--color-text-secondary)] italic text-sm">System / Guest</span>
-                        )}
+                        </div>
                       </Td>
-                      <Td className="px-6 py-4">
-                        <span className="text-sm text-[var(--color-text-secondary)] font-medium">
-                          {formatRole(log.actorRole)}
-                        </span>
+
+                      {/* 3. Module & Activity (stacked) */}
+                      <Td className="px-5 py-3.5">
+                        <div className="space-y-1">
+                          <ModuleBadge moduleName={moduleName} />
+                          <div className="font-semibold text-sm text-[var(--color-text-primary)] leading-snug">
+                            {displayAction}
+                          </div>
+                        </div>
                       </Td>
-                      <Td className="px-6 py-4">
-                        <span className="font-semibold text-sm text-[var(--color-text-primary)]">
-                          {displayAction}
-                        </span>
-                      </Td>
-                      <Td className="px-6 py-4">
-                        <div className="max-w-md lg:max-w-xl">
-                          <p className="text-sm text-[var(--color-text-primary)] leading-snug line-clamp-2" title={displayDetails}>
-                            {displayDetails}
-                          </p>
-                          {log.entityName && (
-                            <div className="mt-1 flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-                              <span>Target:</span>
-                              <span className="font-medium text-[var(--color-text-secondary)]">{log.entityName}</span>
-                              {log.entityId && (
-                                <span className="bg-[var(--color-surface-muted)] px-1.5 py-0.2 rounded font-mono text-[11px]">
+
+                      {/* 4. Target Entity with link */}
+                      <Td className="px-5 py-3.5">
+                        {log.entityName ? (
+                          targetEntityUrl ? (
+                            <Link
+                              href={targetEntityUrl}
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-medium text-sm text-[var(--color-primary)] hover:underline inline-flex items-center gap-1.5 max-w-[11rem] truncate"
+                              title={`View ${log.entityName} ${log.entityId != null ? '#' + log.entityId : ''}`}
+                            >
+                              <span>{log.entityName}</span>
+                              {log.entityId != null && (
+                                <span className="bg-[var(--color-primary-soft)] px-1.5 py-0.2 rounded font-mono text-[11px] font-semibold">
+                                  #{log.entityId}
+                                </span>
+                              )}
+                            </Link>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-primary)]">
+                              <span>{log.entityName}</span>
+                              {log.entityId != null && (
+                                <span className="bg-[var(--color-surface-muted)] px-1.5 py-0.2 rounded font-mono text-[11px] text-[var(--color-text-secondary)]">
                                   #{log.entityId}
                                 </span>
                               )}
                             </div>
-                          )}
-                        </div>
+                          )
+                        ) : (
+                          <span className="text-xs text-[var(--color-text-muted)] italic">-</span>
+                        )}
                       </Td>
-                      <Td className="px-6 py-4 text-center">
-                        <OutcomeText success={log.success} />
+
+                      {/* 5. Outcome & Inspect (inline together) */}
+                      <Td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-3">
+                          <OutcomeText success={log.success} />
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setSelectedLog(log)}
+                          >
+                            Inspect
+                          </Button>
+                        </div>
                       </Td>
                     </Tr>
                   );
@@ -314,6 +443,13 @@ export function ManagerAuditLogView() {
           </div>
         )}
       </Panel>
+
+      {/* Audit Log Detail & State Diff Modal */}
+      <AuditLogDetailModal
+        item={selectedLog}
+        open={selectedLog != null}
+        onClose={() => setSelectedLog(null)}
+      />
     </div>
   );
 }
