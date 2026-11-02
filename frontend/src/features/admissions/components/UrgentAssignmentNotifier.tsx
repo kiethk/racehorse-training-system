@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { openAuthenticatedEventStream } from '@/services/api';
 import type { UrgentAssignmentAlert } from '../types';
 import { admissionsApi } from '../services/api';
+import { UrgentP1Overlay } from '@/features/vet/components/UrgentP1Overlay';
 import { UrgentAssignmentBanner } from './UrgentAssignmentBanner';
 
 const RECONNECT_DELAY_MS = 5000;
@@ -36,6 +37,12 @@ export function UrgentAssignmentNotifier() {
   const [alerts, setAlerts] = useState<UrgentAssignmentAlert[]>([]);
   const versions = useRef(new Map<number, number>());
   const snoozed = useRef<Map<number, number>>(readSnooze());
+  const [hiddenBannerIds, setHiddenBannerIds] = useState<Set<number>>(new Set());
+
+  // Re-sync snooze state on mount in case user logged in/out
+  useEffect(() => {
+    snoozed.current = readSnooze();
+  }, []);
 
   const mergeAlerts = useCallback((incoming: UrgentAssignmentAlert[]) => {
     setAlerts((current) => {
@@ -50,12 +57,16 @@ export function UrgentAssignmentNotifier() {
     });
   }, []);
 
-  const dismiss = useCallback((alert: UrgentAssignmentAlert) => {
+  const handleSnooze = useCallback((alert: UrgentAssignmentAlert) => {
     const next = new Map(snoozed.current);
     next.set(alert.scheduleId, Date.now() + SNOOZE_MS);
     snoozed.current = next;
     writeSnooze(next);
     setAlerts((current) => current.filter((a) => a.scheduleId !== alert.scheduleId));
+  }, []);
+
+  const handleBannerDismiss = useCallback((alert: UrgentAssignmentAlert) => {
+    setHiddenBannerIds((prev) => new Set([...prev, alert.scheduleId]));
   }, []);
 
   const restore = useCallback(async () => {
@@ -153,5 +164,14 @@ export function UrgentAssignmentNotifier() {
     router.push(`/veterinarian/urgent/${alert.scheduleId}`);
   }
 
-  return <UrgentAssignmentBanner alerts={active} onOpenCase={openCase} onDismiss={dismiss} />;
+  return (
+    <>
+      <UrgentP1Overlay alerts={active} onOpenCase={openCase} onSnooze={handleSnooze} />
+      <UrgentAssignmentBanner
+        alerts={active.slice(1).filter((a) => !hiddenBannerIds.has(a.scheduleId))}
+        onOpenCase={openCase}
+        onDismiss={handleBannerDismiss}
+      />
+    </>
+  );
 }
