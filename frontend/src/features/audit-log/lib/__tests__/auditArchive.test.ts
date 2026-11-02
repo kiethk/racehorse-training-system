@@ -38,3 +38,4 @@ describe('Audit Archive & Purge Data Types and Invariants', () => {
     assert.equal(new Date(request.beforeDate!).getTime() < now.getTime(), true);
   });
 });
+

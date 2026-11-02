@@ -9,3 +9,4 @@ public record AuditArchiveStatusResponse(
         boolean requiresMaintenance
 ) {
 }
+

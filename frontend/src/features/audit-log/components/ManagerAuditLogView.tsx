@@ -13,10 +13,11 @@ import { Input, SearchInput, Select } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { auditLogApi } from '../services/api';
-import { downloadAuditLogsCsv, extractAuditSummary } from '../lib/auditExport';
+import { extractAuditSummary } from '../lib/auditExport';
 import { resolveEntityUrl, resolveLogModule } from '../lib/auditDiff';
 import { AuditLogDetailModal } from './AuditLogDetailModal';
 import { AuditLogArchiveModal } from './AuditLogArchiveModal';
+import { AuditLogExportModal } from './AuditLogExportModal';
 import { ModuleBadge } from './ModuleBadge';
 import type { AuditLogItem, AuditLogFilters, PageResponse, AuditArchiveStatus } from '../types';
 
@@ -135,6 +136,7 @@ export function ManagerAuditLogView() {
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
   const [archiveStatus, setArchiveStatus] = useState<AuditArchiveStatus | null>(null);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   
   const [draft, setDraft] = useState<AuditLogFilters>(urlFilters);
 
@@ -148,6 +150,7 @@ export function ManagerAuditLogView() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadArchiveStatus();
   }, []);
 
@@ -204,12 +207,6 @@ export function ManagerAuditLogView() {
     updateUrl({ ...urlFilters, page: newPage });
   };
 
-  const handleExportCsv = () => {
-    if (!data || data.content.length === 0) return;
-    const dateStr = new Date().toISOString().slice(0, 10);
-    downloadAuditLogsCsv(data.content, `audit-logs-${dateStr}.csv`);
-  };
-
   if (loading && !data) {
     return (
       <Panel>
@@ -258,8 +255,7 @@ export function ManagerAuditLogView() {
           <Button
             type="button"
             variant="secondary"
-            onClick={handleExportCsv}
-            disabled={!data || data.content.length === 0}
+            onClick={() => setIsExportModalOpen(true)}
           >
             <Icon name="download" className="size-4 mr-1.5" />
             Export CSV
@@ -500,6 +496,13 @@ export function ManagerAuditLogView() {
           auditLogApi.getAuditLogs(urlFilters).then(setData).catch(console.error);
           loadArchiveStatus();
         }}
+      />
+
+      {/* Export CSV Modal (Export without purging) */}
+      <AuditLogExportModal
+        open={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        currentFilters={urlFilters}
       />
     </div>
   );

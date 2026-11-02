@@ -41,7 +41,7 @@ public class ManagerAuditLogController {
     }
 
     @GetMapping
-    @PreAuthorize("principal.role == 'CLUB_MANAGER'")
+    @PreAuthorize("hasAuthority('AUDIT_LOG_VIEW')")
     public ApiResponse<Page<AuditLogResponse>> getAuditLogs(
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String httpMethod,
@@ -59,13 +59,13 @@ public class ManagerAuditLogController {
     }
 
     @GetMapping("/archive-status")
-    @PreAuthorize("principal.role == 'CLUB_MANAGER'")
+    @PreAuthorize("hasAuthority('AUDIT_LOG_VIEW')")
     public ApiResponse<AuditArchiveStatusResponse> getArchiveStatus() {
         return ApiResponse.success(auditLogService.getArchiveStatus());
     }
 
     @GetMapping("/export-archive")
-    @PreAuthorize("principal.role == 'CLUB_MANAGER'")
+    @PreAuthorize("hasAuthority('AUDIT_LOG_VIEW') or hasAuthority('AUDIT_LOG_MANAGE')")
     public ResponseEntity<byte[]> exportArchive(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
@@ -74,7 +74,18 @@ public class ManagerAuditLogController {
         String csvContent = auditLogService.exportArchiveCsv(from, to, before);
         byte[] csvBytes = csvContent.getBytes(StandardCharsets.UTF_8);
 
-        String filename = "audit_archive_" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + ".csv";
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+        String filename;
+        if (from != null && to != null) {
+            filename = "audit_logs_from_" + from.format(formatter) + "_to_" + to.format(formatter) + ".csv";
+        } else if (before != null) {
+            filename = "audit_archive_before_" + before.format(formatter) + ".csv";
+        } else if (from != null) {
+            filename = "audit_logs_from_" + from.format(formatter) + ".csv";
+        } else {
+            filename = "audit_logs_all_" + LocalDate.now().format(formatter) + ".csv";
+        }
+
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(filename, StandardCharsets.UTF_8)
                 .build();
@@ -86,7 +97,7 @@ public class ManagerAuditLogController {
     }
 
     @PostMapping("/purge")
-    @PreAuthorize("principal.role == 'CLUB_MANAGER'")
+    @PreAuthorize("hasAuthority('AUDIT_LOG_MANAGE')")
     public ApiResponse<AuditPurgeResponse> purgeAuditLogs(
             @AuthenticationPrincipal AuthenticatedUser user,
             @Valid @RequestBody(required = false) AuditPurgeRequest request

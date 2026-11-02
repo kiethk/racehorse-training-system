@@ -8,3 +8,4 @@ public record AuditPurgeRequest(
         String reason
 ) {
 }
+

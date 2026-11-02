@@ -60,8 +60,18 @@ export const auditLogApi = {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    a.download = `audit_archive_${dateStr}.csv`;
+
+    const formatDate = (iso: string) => iso.slice(0, 10).replace(/-/g, '');
+    let filename = `audit_logs_all_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.csv`;
+    if (params?.from && params?.to) {
+      filename = `audit_logs_from_${formatDate(params.from)}_to_${formatDate(params.to)}.csv`;
+    } else if (params?.before) {
+      filename = `audit_archive_before_${formatDate(params.before)}.csv`;
+    } else if (params?.from) {
+      filename = `audit_logs_from_${formatDate(params.from)}.csv`;
+    }
+
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
