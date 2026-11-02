@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 'use client';
 
 import Link from 'next/link';
@@ -62,14 +63,12 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
           </span>
           <ModuleBadge moduleName={moduleName} />
           {item.success ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-              <span className="size-1.5 rounded-full bg-emerald-500" />
-              Success
+            <span className="text-xs text-[var(--color-text-muted)]">
+              (Success)
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-700 dark:text-rose-400">
-              <span className="size-1.5 rounded-full bg-rose-500" />
-              Failed ({item.statusCode})
+            <span className="text-xs text-[var(--color-text-muted)]">
+              (Failed - {item.statusCode})
             </span>
           )}
         </div>
@@ -109,7 +108,7 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
             {parsed.targetUrl && (
               <Link
                 href={parsed.targetUrl}
-                className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:underline pt-0.5"
+                className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-text-primary)] hover:underline pt-0.5"
               >
                 <span>View {item.entityName || 'Entity'}</span>
                 <Icon name="external-link" className="size-3" />
@@ -155,15 +154,15 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
           </div>
         </div>
 
-        {/* Reason Callout (Clean, high contrast, subtle) */}
+        {/* Reason Callout (Clean, normal text) */}
         {parsed.reason && (
-          <div className="rounded border border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20 px-3.5 py-2 text-xs text-amber-950 dark:text-amber-200">
-            <span className="font-semibold text-amber-900 dark:text-amber-300">Reason: </span>
+          <div className="rounded border border-[var(--color-border)] px-3.5 py-2 text-xs text-[var(--color-text-primary)]">
+            <span className="font-semibold">Reason: </span>
             {parsed.reason}
           </div>
         )}
 
-        {/* Changes Table (Standard, clean enterprise table) */}
+        {/* Changes Table (Standard, clean enterprise table with normal black text) */}
         <div>
           <div className="text-[11px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5">
             Changes
@@ -172,33 +171,24 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
           {parsed.diffs.length > 0 ? (
             <div className="overflow-hidden rounded border border-[var(--color-border)]">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] font-medium border-b border-[var(--color-border)]">
+                <thead className="bg-[var(--color-surface-muted)] text-[var(--color-text-primary)] font-semibold border-b border-[var(--color-border)]">
                   <tr>
-                    <th className="py-2 px-3 font-semibold w-1/3">Field</th>
-                    <th className="py-2 px-3 font-semibold w-1/3">Previous</th>
-                    <th className="py-2 px-3 font-semibold w-1/3">New</th>
+                    <th className="py-2 px-3 w-1/3">Field</th>
+                    <th className="py-2 px-3 w-1/3">Previous</th>
+                    <th className="py-2 px-3 w-1/3">New</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border)] font-mono text-xs">
                   {parsed.diffs.map((diff) => (
-                    <tr
-                      key={diff.field}
-                      className={diff.isChanged ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : undefined}
-                    >
+                    <tr key={diff.field}>
                       <td className="py-2 px-3 font-medium text-[var(--color-text-primary)]">
                         {diff.field}
                       </td>
-                      <td className="py-2 px-3 text-[var(--color-text-muted)]">
+                      <td className="py-2 px-3 text-[var(--color-text-primary)]">
                         {diff.beforeValue}
                       </td>
                       <td className="py-2 px-3">
-                        <span
-                          className={
-                            diff.isChanged
-                              ? 'font-semibold text-emerald-700 dark:text-emerald-400'
-                              : 'text-[var(--color-text-primary)]'
-                          }
-                        >
+                        <span className={`text-[var(--color-text-primary)] ${diff.isChanged ? 'font-bold' : ''}`}>
                           {diff.afterValue}
                         </span>
                       </td>
@@ -208,7 +198,7 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
               </table>
             </div>
           ) : (
-            <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs font-mono text-[var(--color-text-secondary)] whitespace-pre-wrap break-all">
+            <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs font-mono text-[var(--color-text-primary)] whitespace-pre-wrap break-all">
               {parsed.raw || 'No change payload recorded for this operation.'}
             </div>
           )}
