@@ -2,7 +2,7 @@ package com.rtms.backend.training.service;
 
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.DashboardHorseRow;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import com.rtms.backend.training.repository.GroupPlanRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,9 +20,9 @@ import java.util.List;
 @Service
 public class HorseScopeService {
 
-    private final HorseTrainingPlanRepository planRepository;
+    private final GroupPlanRepository planRepository;
 
-    public HorseScopeService(HorseTrainingPlanRepository planRepository) {
+    public HorseScopeService(GroupPlanRepository planRepository) {
         this.planRepository = planRepository;
     }
 

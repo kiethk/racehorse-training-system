@@ -2,8 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { cancelledLabel, planProgress } from '../lib/planProgress.ts';
 import { ratingDistribution, ratingTier, ratingTone } from '../lib/rating.ts';
-import { lotFillTone, PLAN_STATUS } from '../lib/status.ts';
-import { clockOf, hourMarks, lotStartOptions, minutesOf, snapLotStart, stripPosition } from '../lib/timeline.ts';
+import { PLAN_STATUS } from '../lib/status.ts';
+import { clockOf, minutesOf, sessionStartOptions } from '../lib/timeline.ts';
 import { rangeForPreset, rangeLabel, shiftIsoDate, toIsoDate, tomorrowIso } from '../lib/dateRange.ts';
 
 describe('planProgress', () => {
@@ -70,11 +70,6 @@ describe('status maps', () => {
     assert.deepEqual(Object.keys(PLAN_STATUS).sort(), ['ACTIVE', 'CANCELLED', 'COMPLETED', 'NONE', 'UPCOMING']);
   });
 
-  it('flags a full lot red and a nearly full lot amber', () => {
-    assert.equal(lotFillTone(0), 'danger');
-    assert.equal(lotFillTone(2), 'warning');
-    assert.equal(lotFillTone(3), 'success');
-  });
 });
 
 describe('date ranges', () => {
@@ -105,34 +100,12 @@ describe('schedule timeline', () => {
     assert.equal(minutesOf('06:30:00'), 390);
   });
 
-  it('places a lot as a share of the window', () => {
-    assert.deepEqual(stripPosition('07:00:00', '08:00:00', '06:00:00', '10:00:00'), { leftPercent: 25, widthPercent: 25 });
-  });
-
-  it('keeps a lot that overruns the window inside the strip', () => {
-    const position = stripPosition('09:30:00', '10:30:00', '06:00:00', '10:00:00');
-    assert.equal(position.leftPercent, 87.5);
-    assert.equal(position.widthPercent, 12.5);
-  });
-
-  it('marks every full hour of the window', () => {
-    assert.deepEqual(hourMarks('06:00:00', '10:00:00').map((m) => m.label), ['06:00', '07:00', '08:00', '09:00', '10:00']);
-    assert.equal(hourMarks('06:00:00', '10:00:00')[2].percent, 50);
-  });
-
-  it('offers only quarter-hour starts that keep the lot inside the window', () => {
-    const options = lotStartOptions('06:00:00', '10:00:00', 60, 15);
+  it('offers only quarter-hour starts that keep the session inside the window', () => {
+    const options = sessionStartOptions('06:00:00', '10:00:00', 60, 15);
     assert.equal(options[0], '06:00');
     assert.equal(options[1], '06:15');
     assert.equal(options.at(-1), '09:00');
     assert.equal(clockOf(405), '06:45');
-  });
-
-  it('snaps a dragged lot to the nearest step and keeps it inside the window', () => {
-    assert.equal(snapLotStart(429, 60, 15, '06:00:00', '10:00:00'), 435); // 07:09 -> 07:15
-    assert.equal(snapLotStart(427, 60, 15, '06:00:00', '10:00:00'), 420); // 07:07 -> 07:00
-    assert.equal(snapLotStart(300, 60, 15, '06:00:00', '10:00:00'), 360); // before 06:00 -> 06:00
-    assert.equal(snapLotStart(590, 60, 15, '06:00:00', '10:00:00'), 540); // would end after 10:00 -> 09:00
   });
 });
 

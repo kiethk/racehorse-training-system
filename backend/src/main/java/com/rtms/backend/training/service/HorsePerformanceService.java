@@ -12,7 +12,7 @@ import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import com.rtms.backend.training.repository.GroupPlanRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,17 +41,18 @@ public class HorsePerformanceService {
     private static final int RECENT_WORKOUT_DAYS = 30;
     private static final int TREND_WEEKS = 12;
     public static final int MAX_HEART_RATE_LIMIT = 220;
+    public static final int AVERAGE_HEART_RATE_LIMIT = 180;
     public static final int RECOVERY_HEART_RATE_LIMIT = 100;
     private static final LocalTime DEFAULT_END_TIME = LocalTime.of(10, 0);
 
     private final TrainingWorkoutRepository workoutRepository;
-    private final HorseTrainingPlanRepository planRepository;
+    private final GroupPlanRepository planRepository;
     private final HorseViewAccessService accessService;
     private final HorseSpecialtyService specialtyService;
     private final HorseScopeService scopeService;
 
     public HorsePerformanceService(TrainingWorkoutRepository workoutRepository,
-                                   HorseTrainingPlanRepository planRepository,
+                                   GroupPlanRepository planRepository,
                                    HorseViewAccessService accessService,
                                    HorseSpecialtyService specialtyService,
                                    HorseScopeService scopeService) {
@@ -133,7 +134,7 @@ public class HorsePerformanceService {
         List<HorseAlertResponse> alerts = new ArrayList<>();
         maxHeartRateAlert(recent).ifPresent(alerts::add);
         recoveryHeartRateAlert(recent).ifPresent(alerts::add);
-        performanceDropAlert(recent).ifPresent(alerts::add);
+        averageHeartRateAlert(recent).ifPresent(alerts::add);
         return alerts;
     }
 
@@ -146,7 +147,7 @@ public class HorsePerformanceService {
                         "MAX_HEART_RATE_EXCEEDED",
                         "Maximum heart rate above safe limit",
                         String.format("Recorded a maximum heart rate of %d bpm (safe limit <= %d bpm) on %s.",
-                                r.maxHeartRate(), MAX_HEART_RATE_LIMIT, r.lotDate()),
+                                r.maxHeartRate(), MAX_HEART_RATE_LIMIT, r.sessionDate()),
                         "DANGER",
                         triggeredAt(r),
                         r.maxHeartRate().doubleValue(),
@@ -162,43 +163,31 @@ public class HorsePerformanceService {
                         "POOR_RECOVERY_HEART_RATE",
                         "Poor heart-rate recovery",
                         String.format("Post-workout recovery heart rate is abnormally high (%d bpm, safe limit <= %d bpm) on %s.",
-                                r.recoveryHeartRate(), RECOVERY_HEART_RATE_LIMIT, r.lotDate()),
+                                r.recoveryHeartRate(), RECOVERY_HEART_RATE_LIMIT, r.sessionDate()),
                         "DANGER",
                         triggeredAt(r),
                         r.recoveryHeartRate().doubleValue(),
                         (double) RECOVERY_HEART_RATE_LIMIT));
     }
 
-    /** Luật 3: điểm phong độ giảm liên tiếp qua 3 buổi. (Rule 3: performance rating falling over 3 workouts.) */
-    private Optional<HorseAlertResponse> performanceDropAlert(List<RecentWorkoutRow> recent) {
-        List<Integer> ratings = recent.stream()
-                .map(RecentWorkoutRow::performanceRating)
-                .filter(rating -> rating != null)
-                .limit(3)
-                .toList();
-        if (ratings.size() < 3) {
-            return Optional.empty();
-        }
-
-        int newest = ratings.get(0);
-        int middle = ratings.get(1);
-        int oldest = ratings.get(2);
-        if (newest >= middle || middle >= oldest) {
-            return Optional.empty();
-        }
-        return Optional.of(new HorseAlertResponse(
-                "CONSECUTIVE_PERFORMANCE_DROP",
-                "Declining performance",
-                String.format("Performance rating fell across the last 3 workouts (%d → %d → %d).",
-                        oldest, middle, newest),
-                "WARNING",
-                LocalDateTime.now(),
-                (double) newest,
-                (double) oldest));
+    /** Luật 3: nhịp tim trung bình vượt ngưỡng; chỉ báo mốc gần nhất. (Rule 3: average heart rate over the limit; newest only.) */
+    private Optional<HorseAlertResponse> averageHeartRateAlert(List<RecentWorkoutRow> recent) {
+        return recent.stream()
+                .filter(r -> r.averageHeartRate() != null && r.averageHeartRate() > AVERAGE_HEART_RATE_LIMIT)
+                .findFirst()
+                .map(r -> new HorseAlertResponse(
+                        "AVERAGE_HEART_RATE_EXCEEDED",
+                        "Elevated average heart rate",
+                        String.format("Recorded an average heart rate of %d bpm (safe limit <= %d bpm) on %s.",
+                                r.averageHeartRate(), AVERAGE_HEART_RATE_LIMIT, r.sessionDate()),
+                        "WARNING",
+                        triggeredAt(r),
+                        r.averageHeartRate().doubleValue(),
+                        (double) AVERAGE_HEART_RATE_LIMIT));
     }
 
     private LocalDateTime triggeredAt(RecentWorkoutRow row) {
-        return row.lotDate().atTime(row.lotEndTime() != null ? row.lotEndTime() : DEFAULT_END_TIME);
+        return row.sessionDate().atTime(row.sessionEndTime() != null ? row.sessionEndTime() : DEFAULT_END_TIME);
     }
 
     // =================================================================

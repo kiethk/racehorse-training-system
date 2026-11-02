@@ -1,6 +1,6 @@
 package com.rtms.backend.horse.service;
 import com.rtms.backend.config.GlobalExceptionHandler;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 
 
 import com.rtms.backend.horse.dto.CreateHorseRequest;
@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.repository.AreaRepository;
 
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.dto.HorseStatusChangeRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
@@ -25,15 +27,7 @@ import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.entity.GroomDailyTask;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
-import com.rtms.backend.training.entity.HorseTrainingPlan;
-import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.enums.WorkoutStatus;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
-import com.rtms.backend.training.repository.TrainingWorkoutRepository;
-import com.rtms.backend.audit.dto.DomainAuditEvent;
-import com.rtms.backend.audit.service.AuditLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
@@ -52,10 +46,8 @@ public class HorseService {
 
     private final HorseRepository horseRepository;
     private final StableStallRepository stableStallRepository;
-    private final TrainingWorkoutService workoutService;
+    private final GroupWorkoutSyncService workoutService;
     private final AreaRepository areaRepository;
-    private final TrainingWorkoutRepository workoutRepository;
-    private final HorseTrainingPlanRepository planRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final GroomDailyTaskRepository groomDailyTaskRepository;
     private final NotificationService notificationService;
@@ -63,33 +55,28 @@ public class HorseService {
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        TrainingWorkoutService workoutService,
+                        GroupWorkoutSyncService workoutService,
                         AreaRepository areaRepository) {
         this(horseRepository, stableStallRepository, workoutService, areaRepository,
-                null, null, null, null, null, null);
+                null, null, null, null);
     }
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        TrainingWorkoutService workoutService,
+                        GroupWorkoutSyncService workoutService,
                         AreaRepository areaRepository,
-                        TrainingWorkoutRepository workoutRepository,
-                        HorseTrainingPlanRepository planRepository,
                         CareScheduleRepository careScheduleRepository,
                         GroomDailyTaskRepository groomDailyTaskRepository,
                         NotificationService notificationService) {
         this(horseRepository, stableStallRepository, workoutService, areaRepository,
-                workoutRepository, planRepository, careScheduleRepository,
-                groomDailyTaskRepository, notificationService, null);
+                careScheduleRepository, groomDailyTaskRepository, notificationService, null);
     }
 
     @Autowired
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        TrainingWorkoutService workoutService,
+                        GroupWorkoutSyncService workoutService,
                         AreaRepository areaRepository,
-                        TrainingWorkoutRepository workoutRepository,
-                        HorseTrainingPlanRepository planRepository,
                         CareScheduleRepository careScheduleRepository,
                         GroomDailyTaskRepository groomDailyTaskRepository,
                         NotificationService notificationService,
@@ -98,8 +85,6 @@ public class HorseService {
         this.stableStallRepository = stableStallRepository;
         this.workoutService = workoutService;
         this.areaRepository = areaRepository;
-        this.workoutRepository = workoutRepository;
-        this.planRepository = planRepository;
         this.careScheduleRepository = careScheduleRepository;
         this.groomDailyTaskRepository = groomDailyTaskRepository;
         this.notificationService = notificationService;
@@ -371,27 +356,8 @@ public class HorseService {
                 horse.setCurrentStallId(null);
             }
 
-            // 3.2. Cancel upcoming workouts
-            if (workoutRepository != null) {
-                List<TrainingWorkout> futureWorkouts = workoutRepository
-                        .findFutureScheduledByHorsesForUpdate(List.of(horseId), LocalDate.now());
-                if (!futureWorkouts.isEmpty()) {
-                    for (TrainingWorkout w : futureWorkouts) {
-                        w.setStatus(WorkoutStatus.CANCELLED);
-                    }
-                    workoutRepository.saveAll(futureWorkouts);
-                }
-            }
-
-            // 3.3. Cancel active and upcoming training plans
-            if (planRepository != null) {
-                List<HorseTrainingPlan> activePlans = planRepository
-                        .findByHorseIdAndStatusInOrderByEndDateDesc(horseId, List.of(TrainingPlanStatus.ACTIVE, TrainingPlanStatus.UPCOMING));
-                if (!activePlans.isEmpty()) {
-                    activePlans.forEach(p -> p.setStatus(TrainingPlanStatus.CANCELLED));
-                    planRepository.saveAll(activePlans);
-                }
-            }
+            // 3.2. Leave the training group: not-yet-started Workouts are cancelled, the group carries on without it.
+            workoutService.exitAnyGroup(horseId);
 
             // 3.4. Cancel pending and scheduled medical appointments
             if (careScheduleRepository != null) {

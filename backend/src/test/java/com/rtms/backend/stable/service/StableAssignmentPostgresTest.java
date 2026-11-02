@@ -5,7 +5,7 @@ import com.rtms.backend.identity.repository.*;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.dto.*;
 import com.rtms.backend.stable.repository.*;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -47,7 +47,7 @@ class StableAssignmentPostgresTest {
     @Autowired UserRepository users;
     @Autowired GroomProfileRepository profiles;
     @Autowired HorseRepository horses;
-    @Autowired TrainingWorkoutService workouts;
+    @Autowired GroupWorkoutSyncService workouts;
     @Autowired com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
     @Autowired EntityManager em;
     @Autowired AreaTrainerAssignmentPolicy trainerPolicy;
@@ -112,15 +112,15 @@ class StableAssignmentPostgresTest {
             VALUES (?,?,?,CURRENT_DATE,CURRENT_DATE+30,'ACTIVE') RETURNING id
             """, Long.class, horse, course, trainer1);
     }
-    long lot() {
+    long session() {
         return jdbc.queryForObject("""
             INSERT INTO training_lots(trainer_id,subject_id,lot_date,start_time,end_time)
             SELECT ?,id,CURRENT_DATE+1,'08:00','09:00' FROM subjects ORDER BY id LIMIT 1 RETURNING id
             """, Long.class, trainer1);
     }
-    void workout(long horse, long lot, long groom, String status) {
+    void workout(long horse, long session, long groom, String status) {
         jdbc.update("INSERT INTO training_workouts(horse_id,plan_id,lot_id,assigned_to_id,status) VALUES (?,?,?,?,?)",
-                horse, plan(horse), lot, groom, status);
+                horse, plan(horse), session, groom, status);
     }
     Long assigned(long area, int number) {
         return jdbc.queryForObject("SELECT groom_id FROM stable_stalls WHERE area_id=? AND stall_number=?", Long.class, area, number);
@@ -222,11 +222,11 @@ class StableAssignmentPostgresTest {
     }
 
     @Test void scheduledLotAloneBlocksEmptyAreaAndCompletedOrCancelledLotsDoNot() {
-        long l = lot();
+        long l = session();
         assertFalse(trainerCheck(area1).canChange());
         assertEquals(409, assertThrows(ResponseStatusException.class, () -> assignments.applyAssignments(trainerChange(trainer2))).getStatusCode().value());
         jdbc.update("UPDATE training_lots SET status='COMPLETED' WHERE id=?",l);
-        long cancelled = lot(); jdbc.update("UPDATE training_lots SET status='CANCELLED' WHERE id=?",cancelled);
+        long cancelled = session(); jdbc.update("UPDATE training_lots SET status='CANCELLED' WHERE id=?",cancelled);
         assertTrue(trainerCheck(area1).canChange());
         assignments.applyAssignments(trainerChange(trainer2));
         assertEquals(trainer2,currentTrainer(area1));
@@ -234,7 +234,7 @@ class StableAssignmentPostgresTest {
     }
 
     @Test void unfinishedWorkoutBlocksEvenWhenItsPlanAndLotWereMarkedCompleted() {
-        long h = horse(area2,1), l = lot(); workout(h,l,groom1,"SCHEDULED");
+        long h = horse(area2,1), l = session(); workout(h,l,groom1,"SCHEDULED");
         jdbc.update("UPDATE horse_training_plans SET status='COMPLETED' WHERE horse_id=?",h);
         jdbc.update("UPDATE training_lots SET status='COMPLETED' WHERE id=?",l);
         assertFalse(trainerCheck(area1).canChange());
@@ -247,7 +247,7 @@ class StableAssignmentPostgresTest {
     }
 
     @Test void cancelledTrainingDoesNotBlockEmptyAreaAndIsNotRewritten() {
-        long h = horse(area2,1), l = lot(); workout(h,l,groom1,"CANCELLED");
+        long h = horse(area2,1), l = session(); workout(h,l,groom1,"CANCELLED");
         jdbc.update("UPDATE horse_training_plans SET status='CANCELLED' WHERE horse_id=?",h);
         jdbc.update("UPDATE training_lots SET status='CANCELLED' WHERE id=?",l);
         assertTrue(trainerCheck(area1).canChange());
@@ -306,9 +306,9 @@ class StableAssignmentPostgresTest {
 
     @Test void occupiedSameLotSwapUpdatesWorkoutsAndRetainsHistory() {
         owner(area1, 1, groom1); owner(area1, 2, groom2);
-        long h1 = horse(area1, 1), h2 = horse(area1, 4), l = lot();
+        long h1 = horse(area1, 1), h2 = horse(area1, 4), l = session();
         workout(h1, l, groom1, "SCHEDULED"); workout(h2, l, groom2, "SCHEDULED");
-        long historicalLot = lot(); workout(h1, historicalLot, groom1, "COMPLETED");
+        long historicalLot = session(); workout(h1, historicalLot, groom1, "COMPLETED");
         var result = assignments.applyAssignments(request(edit(area1, 1, groom2, groom1), edit(area1, 2, groom1, groom2)));
         assertEquals(2, result.getAffectedWorkoutsCount());
         assertEquals(groom2, assigned(area1, 1)); assertEquals(groom1, assigned(area1, 4));
@@ -320,7 +320,7 @@ class StableAssignmentPostgresTest {
 
     @Test void realConflictRollsBackWholeAssignment() {
         owner(area1, 1, groom1); owner(area1, 2, groom2);
-        long h1 = horse(area1, 1), h2 = horse(area1, 4), l = lot();
+        long h1 = horse(area1, 1), h2 = horse(area1, 4), l = session();
         workout(h1, l, groom1, "SCHEDULED"); workout(h2, l, groom2, "COMPLETED");
         var ex = assertThrows(ResponseStatusException.class, () -> assignments.applyAssignments(request(edit(area1, 1, groom2, groom1), edit(area1, 2, groom1, groom2))));
         assertEquals(409, ex.getStatusCode().value());
@@ -329,7 +329,7 @@ class StableAssignmentPostgresTest {
 
     @Test void failureAfterFlushedAssignmentWritesReallyRollsBack() {
         owner(area1, 1, groom1);
-        long h = horse(area1, 1), l = lot();
+        long h = horse(area1, 1), l = session();
         workout(h, l, groom1, "SCHEDULED");
         var failingProfiles = mock(GroomProfileRepository.class);
         when(failingProfiles.findById(groom1)).thenAnswer(i -> profiles.findById(groom1));

@@ -319,7 +319,7 @@ public class AgentOrchestratorService {
                 Thông tin người dùng hiện tại: %s, Vai trò: %s.
 
                 QUY TẮC BẮT BUỘC (TUÂN THỦ TUYỆT ĐỐI 100%%):
-                1. TUYỆT ĐỐI KHÔNG HIỂN THỊ ID SỐ NỘI BỘ TRONG DATABASE TRONG CÂU TRẢ LỜI (Ví dụ: không viết "Ngựa #1", "Ngựa ID 5", "Stall 10", "Lot #12", "Groom #3"). Luôn luôn chuyển đổi và hiển thị bằng TÊN ĐẦY ĐỦ VÀ CÓ Ý NGHĨA (Ví dụ: "Chiến mã Thunder Flash", "Chuồng A-01", "Groom Nguyễn Văn A", "Ca Sáng (08:00 - 09:30)").
+                1. TUYỆT ĐỐI KHÔNG HIỂN THỊ ID SỐ NỘI BỘ TRONG DATABASE TRONG CÂU TRẢ LỜI (Ví dụ: không viết "Ngựa #1", "Ngựa ID 5", "Stall 10", "Session #12", "Groom #3"). Luôn luôn chuyển đổi và hiển thị bằng TÊN ĐẦY ĐỦ VÀ CÓ Ý NGHĨA (Ví dụ: "Chiến mã Thunder Flash", "Chuồng A-01", "Groom Nguyễn Văn A", "Ca Sáng (08:00 - 09:30)").
                 2. TUYỆT ĐỐI KHÔNG HIỂN THỊ TÊN HÀM / TÊN TOOL CODE NỘI BỘ TRONG ĐOẠN CHAT (Ví dụ: không bao giờ nhắc đến "getTrainerSchedule", "getTrainerHorses", "getQuarantineStatus", "handleGet..."). Thay vào đó hãy dùng ngôn từ nghiệp vụ tự nhiên (Ví dụ: "Hệ thống ghi nhận lịch huấn luyện...", "Theo phân công chuồng trại...").
                 3. HẠN CHẾ CONFLICT DỮ LIỆU:
                    - Tất cả các ngựa đang trong diện cách ly y tế hoặc ở khu chuồng cách ly (Quarantine) TUYỆT ĐỐI KHÔNG ĐƯỢC PHÉP TẬP LUYỆN (trạng thái luyện tập luôn là CẤM TẬP / BLOCKED). Không bao giờ trả lời mâu thuẫn giữa cách ly y tế và cho phép tập luyện.
@@ -436,14 +436,19 @@ public class AgentOrchestratorService {
             case "HEAD_TRAINER", "TRAINER" -> """
                 16. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO HUẤN LUYỆN VIÊN (HEAD_TRAINER DOMAIN ONTOLOGY):
                    - QUAN HỆ THỰC THỂ:
-                     + Huấn luyện viên trưởng [Trainer] quản lý Khu vực [Area] gồm nhiều Cụm chuồng [StableLot] và Ô chuồng [Stall].
-                     + Mỗi Ô chuồng [Stall] được phân công cho 1 Groom chăm sóc và chứa 1 Chiến mã [Horse].
-                     + Chiến mã [Horse] được ghi danh vào Khóa huấn luyện [Training Plan] -> gồm nhiều Buổi tập [Workout Session] -> chia thành các Lượt tập [Training Lot].
+                     + Huấn luyện viên trưởng [Trainer] quản lý Khu vực [Area] gồm nhiều Ô chuồng [Stall]; mỗi Ô chuồng có 1 Groom chăm sóc và chứa 1 Chiến mã [Horse].
+                     + Trainer xếp ngựa vào các Nhóm huấn luyện [Training Group], tối đa 6 ngựa, mỗi ngựa chỉ ở một nhóm và hai ngựa cùng Groom không chung một nhóm. Nhóm có thể bị giải tán [Disbanded]: giữ tên và lịch sử, không còn ngựa.
+                     + Nhóm chạy một Khóa [Course] theo một Kế hoạch nhóm [Group Plan] -> gồm nhiều Buổi tập [Session], mỗi buổi cả nhóm cùng ra sân chạy một Bài tập [Subject] -> mỗi ngựa trong buổi có một Workout.
+                     + Trạng thái Workout: Scheduled (chưa diễn ra) -> Needs result (buổi đã qua giờ, chưa xác nhận) -> Ran (đã ghi chỉ số, là bằng chứng ngựa đã chạy) hoặc Did not run (Trainer xác nhận không chạy); Cancelled là bị hủy trước giờ. Không có học bù.
+                     + Attendance X/Y của một ngựa trong một khóa: X là số buổi Ran, Y là số buổi của khóa không bị hủy cả buổi. Buổi Needs result KHÔNG được tính là đã chạy.
                      + Chiến mã có thành tích tốt được Huấn luyện viên đăng ký tham gia các Giải đua [Race Registration].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
                      + Tra cứu lịch tập & ca tập: Dùng `getTrainerSchedule` (đọc `totalSessions` và `sessionList`).
+                     + Buổi nào chưa ghi kết quả / chưa điểm danh: Dùng `getTrainerSchedule` với `needsResultOnly=true` (đọc `totalWorkoutsNeedingResult` và `horseList` từng buổi).
+                     + Tra cứu nhóm, ngựa trong nhóm, khóa nhóm đang chạy: Dùng `getTrainerGroups`.
                      + Tra cứu ngựa thuộc quyền huấn luyện: Dùng `getTrainerHorses` -> để lấy danh sách tên và ID ngựa.
-                     + Tra cứu kế hoạch huấn luyện: Dùng `getTrainerPlansSummary`.
+                     + Tra cứu khóa và Attendance của ngựa: Dùng `getTrainerPlansSummary` (đọc `progress` dạng X/Y).
+                     + Lịch sử buổi tập đã diễn ra của một ngựa: Dùng `getWorkoutHistory` (đọc `outcome`).
                      + Đăng ký giải đua: Dùng `getMyHorseRaceRegistrations` (đọc `totalRaceRegistrations`).
                      + Đơn tuyển nhận nhập đàn chờ thẩm định: Dùng `getAssignedAdmissionReviews` (đọc `pendingReviewCount`).
                       + Phân tích & Xếp hạng sở trường: Dùng `getHorseSpecialtyAnalysis` (đọc `rankedHorseList` và `specialtyCount`).
@@ -453,7 +458,7 @@ public class AgentOrchestratorService {
                    - QUAN HỆ THỰC THỂ:
                      + Bác sĩ thú y [Vet] theo dõi sức khỏe và điều trị cho toàn bộ Đàn ngựa [Horses].
                      + Khi ngựa gặp vấn đề sức khỏe: Bác sĩ ghi nhận Hồ sơ bệnh án [HealthRecord], Chỉ số sinh hiệu [HorseHealthMetric] và Lịch chăm sóc/điều trị [CareSchedule].
-                     + Ngựa bị chấn thương/truyền nhiễm hoặc mới nhập đàn -> Chuyển vào Khu cách ly [Quarantine Area] và BAN HÀNH LỆNH CẤM TẬP (BLOCKED/RESTRICTED).
+                     + Ngựa bị chấn thương/truyền nhiễm hoặc mới nhập đàn -> Chuyển vào Khu cách ly [Quarantine Area] và BAN HÀNH LỆNH CẤM TẬP (BLOCKED).
                      + Tiếp nhận ngựa mới vào đàn: Bác sĩ thực hiện Khám sàng lọc nhập đàn [Admission Vet Exam].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
                      + Cảnh báo cấp cứu khẩn cấp: Dùng `getUrgentCareAlerts` (đọc `totalUrgentAlerts`).
@@ -464,7 +469,7 @@ public class AgentOrchestratorService {
             case "GROOM", "STABLE_STAFF" -> """
                 16. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO GROOM (GROOM DOMAIN ONTOLOGY):
                    - QUAN HỆ THỰC THỂ:
-                     + Nhân viên chăm sóc [Groom] được phân công phụ trách một nhóm Ô chuồng [Stall] thuộc Cụm chuồng [StableLot].
+                     + Nhân viên chăm sóc [Groom] được phân công phụ trách một số Ô chuồng [Stall] trong các Khu vực [Area].
                      + Groom chịu trách nhiệm trực tiếp cho ăn, dọn dẹp, kiểm tra sức khỏe hàng ngày cho các Chiến mã trong ô chuồng của mình.
                      + Nếu phát hiện ngựa có dấu hiệu bất thường (bỏ ăn, cào đất, sốt, đau bụng Colic, trầy xước) -> Groom tạo Báo cáo sự cố [Incident Report].
                      + Khi có xe chở ngựa mới đến cổng -> Groom tiến hành Kiểm tra sơ bộ thể trạng [Admission Groom Review].
@@ -655,8 +660,18 @@ public class AgentOrchestratorService {
             case "trainingDecision", "isTrainingAllowed", "quyetDinhTapLuyen" -> "Quyết định tập luyện";
             case "decisionReason" -> "Lý do quyết định";
             case "totalWorkouts" -> "Tổng số buổi tập";
-            case "completedSessions" -> "Số buổi đã hoàn thành";
-            case "totalSessions" -> "Tổng số buổi theo giáo trình";
+            case "completedSessions" -> "Số buổi đã chạy (Ran)";
+            case "totalSessions" -> "Tổng số buổi";
+            case "groupName" -> "Nhóm huấn luyện";
+            case "joinedOn" -> "Ngày vào nhóm";
+            case "outcome" -> "Kết cục";
+            case "needsResultCount" -> "Số ngựa chưa ghi kết quả";
+            case "totalWorkoutsNeedingResult" -> "Tổng số lượt chưa ghi kết quả";
+            case "totalGroups", "groupList" -> "Nhóm đang hoạt động";
+            case "disbandedGroupCount", "disbandedGroupList" -> "Nhóm đã giải tán";
+            case "currentCourse" -> "Khóa đang chạy";
+            case "currentPlanStatus" -> "Trạng thái khóa";
+            case "currentPlanPeriod" -> "Thời gian khóa";
             case "planName" -> "Tên kế hoạch";
             case "courseName" -> "Tên khóa học";
             case "subjectName" -> "Bài tập / Môn học";
@@ -666,7 +681,7 @@ public class AgentOrchestratorService {
             case "endDate" -> "Ngày kết thúc";
             case "startTime" -> "Giờ bắt đầu";
             case "endTime" -> "Giờ kết thúc";
-            case "sessionTime" -> "Ca tập (Lot)";
+            case "sessionTime" -> "Ca tập (Session)";
             case "surface" -> "Mặt sân";
             case "preferredSurface" -> "Mặt sân ưa thích";
             case "intensity" -> "Cường độ";

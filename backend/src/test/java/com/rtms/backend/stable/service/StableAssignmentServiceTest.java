@@ -8,7 +8,7 @@ import com.rtms.backend.stable.dto.*;
 import com.rtms.backend.stable.entity.*;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.repository.*;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import jakarta.persistence.*;
 import org.junit.jupiter.api.*;
 import org.springframework.http.HttpStatus;
@@ -24,7 +24,7 @@ class StableAssignmentServiceTest {
     UserRepository users;
     GroomProfileRepository profiles;
     HorseRepository horses;
-    TrainingWorkoutService workouts;
+    GroupWorkoutSyncService workouts;
     EntityManager em;
     StableAssignmentService service;
     AreaTrainerAssignmentPolicy trainerPolicy;
@@ -36,7 +36,7 @@ class StableAssignmentServiceTest {
     @BeforeEach void setup() {
         areas = mock(AreaRepository.class); stalls = mock(StableStallRepository.class);
         users = mock(UserRepository.class); profiles = mock(GroomProfileRepository.class);
-        horses = mock(HorseRepository.class); workouts = mock(TrainingWorkoutService.class);
+        horses = mock(HorseRepository.class); workouts = mock(GroupWorkoutSyncService.class);
         em = mock(EntityManager.class);
         Query query = mock(Query.class);
         when(em.createNativeQuery(anyString())).thenReturn(query);

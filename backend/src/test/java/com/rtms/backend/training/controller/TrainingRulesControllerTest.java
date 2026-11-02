@@ -19,11 +19,12 @@ class TrainingRulesControllerTest {
         TrainingRulesResponse rules = response.getData();
         assertEquals(LocalTime.of(6, 0), rules.goldenHoursStart());
         assertEquals(LocalTime.of(10, 0), rules.goldenHoursEnd());
-        assertEquals(6, rules.lotCapacity());
-        assertEquals(15, rules.lotStartStepMinutes());
+        assertEquals(6, rules.groupCapacity());
+        assertEquals(15, rules.sessionStartStepMinutes());
         assertEquals(15, rules.minSubjectDurationMinutes());
         assertEquals(240, rules.maxSubjectDurationMinutes());
         assertEquals(220, rules.maxHeartRateLimit());
+        assertEquals(180, rules.averageHeartRateLimit());
         assertEquals(100, rules.recoveryHeartRateLimit());
     }
 }

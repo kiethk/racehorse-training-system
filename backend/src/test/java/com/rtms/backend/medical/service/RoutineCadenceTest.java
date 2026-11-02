@@ -26,7 +26,7 @@ import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -79,7 +79,7 @@ class RoutineCadenceTest {
     @Mock ApplicationEventPublisher events;
     @Mock EntityManager entityManager;
     @Mock NotificationService notifications;
-    @Mock TrainingWorkoutService workouts;
+    @Mock GroupWorkoutSyncService workouts;
     @Mock PreventiveVaccinationService vaccinations;
 
     private CareScheduleService service;

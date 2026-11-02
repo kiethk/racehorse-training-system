@@ -25,7 +25,7 @@ import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,7 +64,7 @@ class CareSchedulePreventiveIntegrationTest {
     @Mock ApplicationEventPublisher events;
     @Mock EntityManager entityManager;
     @Mock NotificationService notifications;
-    @Mock TrainingWorkoutService workouts;
+    @Mock GroupWorkoutSyncService workouts;
     @Mock PreventiveVaccinationService vaccinations;
 
     private CareScheduleService service;

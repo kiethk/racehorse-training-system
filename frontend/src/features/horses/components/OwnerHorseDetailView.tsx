@@ -21,14 +21,14 @@ import {
 import { horseService } from '../services/horseService';
 import { trainingService } from '@/features/training/services/trainingService';
 import { racingService } from '@/features/racing/services/racingService';
-import { useTrainingRules } from '@/features/training/hooks/useTrainingRules';
 import { HorseSpecialtyBadges } from '../shared/components/HorseSpecialtyBadges';
 import { HorseOverviewPedigreeTable } from './HorseOverviewPedigreeTable';
 import { HorseHealthSummary } from './HorseHealthSummary';
 import { HorseRacingHistory } from './HorseRacingHistory';
-import { FitnessTrendChart } from '@/features/training/components/FitnessTrendChart';
-import { HorseMetricsRow } from '@/features/training/components/HorseMetricsRow';
-import { WorkoutHistoryTable } from '@/features/training/components/WorkoutHistoryTable';
+import { HorseAttendanceList } from '@/features/training/components/HorseAttendanceList';
+import { HorseFitnessTrendView } from '@/features/training/components/HorseFitnessTrendView';
+import { HorseScheduleView } from '@/features/training/components/HorseScheduleDialog';
+import { toIsoDate } from '@/features/training/lib/dateRange';
 import type { Horse } from '@/features/stable/types';
 import type { HorseDocumentSlot, HorseEditRequest, HorseHealthMetric, HorsePedigree, HorseSpecialty } from '../types';
 import { horseEditRequestService } from '../services/horseEditRequestService';
@@ -37,27 +37,28 @@ import { EditHorseRequestModal, initialFields } from './EditHorseRequestModal';
 import { normalizeFields } from '../lib/horseEdit';
 import type { HorseDocumentType } from '../types';
 import { toast } from '@/lib/toast';
-import type { HorseAlert, HorseFitnessTrendItem } from '@/features/training/types';
+import type { HorseAlert } from '@/features/training/types';
 import type { RaceRegistrationResponse } from '@/features/racing/types';
 import { displayError, formatDate } from '@/lib/display';
 
 const tabs: TabItem[] = [
   { id: 'overview', label: 'Overview & Pedigree', icon: 'file-text' },
-  { id: 'training', label: 'Training & Fitness', icon: 'activity' },
+  { id: 'training-schedule', label: 'Training schedule', icon: 'calendar' },
+  { id: 'training-plans', label: 'Training plans', icon: 'clipboard' },
+  { id: 'fitness-trends', label: 'Fitness & Trends', icon: 'activity' },
   { id: 'health', label: 'Health & Care', icon: 'heart-pulse' },
   { id: 'racing', label: 'Racing History', icon: 'flag' },
 ];
 
 export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
-  const rules = useTrainingRules();
+  const today = toIsoDate(new Date());
   const [activeTab, setActiveTab] = useState('overview');
 
   const [horse, setHorse] = useState<Horse | null>(null);
   const [specialty, setSpecialty] = useState<HorseSpecialty | null>(null);
   const [pedigree, setPedigree] = useState<HorsePedigree | null>(null);
 
-  // Training data
-  const [trend, setTrend] = useState<HorseFitnessTrendItem[]>([]);
+  // Training & alerts data
   const [alerts, setAlerts] = useState<HorseAlert[]>([]);
 
   // Health data
@@ -88,7 +89,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         horseData,
         specialtyData,
         pedigreeData,
-        trendData,
         alertData,
         metricsData,
         preventiveData,
@@ -99,7 +99,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         horseService.getById(horseId),
         horseService.getSpecialty(horseId).catch(() => null),
         horseService.getPedigree(horseId).catch(() => null),
-        trainingService.getFitnessTrend(horseId).catch(() => []),
         trainingService.getHorseAlerts(horseId).catch(() => []),
         horseService.getHealthMetrics(horseId).catch(() => []),
         horseService.getPreventiveCare(horseId).catch(() => []),
@@ -111,7 +110,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
       setHorse(horseData);
       setSpecialty(specialtyData);
       setPedigree(pedigreeData);
-      setTrend(trendData);
       setAlerts(alertData);
       setHealthMetrics(metricsData);
       setPreventiveCare(preventiveData);
@@ -126,6 +124,7 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
   }, [horseId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAll();
   }, [loadAll]);
 
@@ -293,7 +292,7 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         <div className="space-y-4">
           <HorseOverviewPedigreeTable horse={horse} pedigree={pedigree} />
 
-<Panel padded>
+          <Panel padded>
             <h3 className="mb-1 text-[14px] font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
               <Icon name="file-text" size={16} className="text-[var(--color-primary)]" />
               Documents
@@ -324,23 +323,27 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
               </div>
             )}
           </Panel>
-        </div>      )}
-
-      {/* Tab 2: Training & Fitness */}
-      {activeTab === 'training' && (
-        <div className="space-y-6">
-          {/* Key Metric Numbers */}
-          <HorseMetricsRow trend={trend} rules={rules} />
-
-          {/* Charts (Heart rate, speed, performance rating) */}
-          <FitnessTrendChart trend={trend} rules={rules} />
-
-          {/* Completed Workouts Table */}
-          <WorkoutHistoryTable trend={trend} rules={rules} loading={false} />
         </div>
       )}
 
-      {/* Tab 3: Health & Care */}
+      {/* Tab 2: Training schedule */}
+      {activeTab === 'training-schedule' && (
+        <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <HorseScheduleView target={{ horseId: horse.id, name: horse.name, horse }} startDate={today} hideHeader />
+        </div>
+      )}
+
+      {/* Tab 3: Training plans */}
+      {activeTab === 'training-plans' && (
+        <HorseAttendanceList horseId={horse.id} />
+      )}
+
+      {/* Tab 4: Fitness & Trends */}
+      {activeTab === 'fitness-trends' && (
+        <HorseFitnessTrendView horseId={horse.id} hideHeader />
+      )}
+
+      {/* Tab 5: Health & Care */}
       {activeTab === 'health' && (
         <HorseHealthSummary
           alerts={alerts}
@@ -349,7 +352,7 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         />
       )}
 
-      {/* Tab 4: Racing History */}
+      {/* Tab 6: Racing History */}
       {activeTab === 'racing' && (
         <HorseRacingHistory registrations={raceRegistrations} />
       )}

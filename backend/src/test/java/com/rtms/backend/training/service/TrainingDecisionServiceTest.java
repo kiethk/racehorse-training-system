@@ -30,7 +30,7 @@ class TrainingDecisionServiceTest {
     private CareScheduleRepository careScheduleRepository;
 
     @Mock
-    private TrainingWorkoutService workoutService;
+    private GroupWorkoutSyncService workoutService;
 
     private TrainingDecisionService service;
     private Horse horse;
@@ -53,7 +53,7 @@ class TrainingDecisionServiceTest {
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         assertEquals("Tendon strain", horse.getTrainingDecisionReason());
         verify(horseRepository).save(horse);
-        verify(workoutService).cancelFutureTrainingForHorse(7L);
+        verify(workoutService).exitAnyGroup(7L);
     }
 
     @Test

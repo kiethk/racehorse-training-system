@@ -8,9 +8,10 @@ import java.time.LocalTime;
  * (A recently completed workout — only the columns the alert rules need.)
  */
 public record RecentWorkoutRow(Long horseId,
-                               LocalDate lotDate,
-                               LocalTime lotEndTime,
+                               LocalDate sessionDate,
+                               LocalTime sessionEndTime,
                                Integer maxHeartRate,
+                               Integer averageHeartRate,
                                Integer recoveryHeartRate,
                                Integer performanceRating) {
 }

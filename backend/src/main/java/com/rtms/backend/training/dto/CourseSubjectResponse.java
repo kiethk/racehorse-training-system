@@ -17,12 +17,12 @@ public class CourseSubjectResponse {
 
     /**
      * Thời lượng bài tập (phút) — con số QUYẾT ĐỊNH ĐỘ DÀI LOT khi hệ thống
-     * xếp lịch: lot.endTime = lot.startTime + durationMinutes.
+     * xếp lịch: session.endTime = session.startTime + durationMinutes.
      *
      * Không có trường này thì màn hình chọn khoá không cho Trainer thấy khoá
      * sẽ ngốn bao nhiêu khung giờ vàng — đúng thứ họ cần để quyết định.
      * (Subject duration in minutes: the number that DECIDES THE LOT LENGTH when the system schedules
-     *  (lot.endTime = lot.startTime + durationMinutes). Without it the course picker cannot show the trainer how much
+     *  (session.endTime = session.startTime + durationMinutes). Without it the course picker cannot show the trainer how much
      *  golden window a course will consume, which is exactly what they need to decide.)
      */
     private Integer durationMinutes;
