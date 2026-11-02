@@ -1,3 +1,13 @@
+export interface AuditDetailPayload {
+  version?: number;
+  summary?: string;
+  reason?: string;
+  module?: string;
+  targetUrl?: string;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+}
+
 export interface AuditLogItem {
   id: number;
   actorUserId: number | null;
@@ -10,6 +20,7 @@ export interface AuditLogItem {
   action: string | null;
   entityName: string | null;
   entityId: number | null;
+  module?: string | null;
   details: string | null;
   success: boolean;
   createdAt: string;
@@ -34,6 +45,8 @@ export interface AuditLogFilters {
   search: string;
   httpMethod: string;
   statusCode: string;
+  module?: string;
+  role?: string;
   from: string;
   to: string;
   page: number;

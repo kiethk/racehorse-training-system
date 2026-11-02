@@ -14,6 +14,8 @@ export const auditLogApi = {
     if (filters.search.trim()) params.set('search', filters.search.trim());
     if (filters.httpMethod && filters.httpMethod !== 'ALL') params.set('httpMethod', filters.httpMethod);
     if (filters.statusCode && filters.statusCode !== 'ALL') params.set('statusCode', filters.statusCode);
+    if (filters.module && filters.module !== 'ALL') params.set('module', filters.module);
+    if (filters.role && filters.role !== 'ALL') params.set('role', filters.role);
     
     if (filters.from) {
       const fromDate = new Date(filters.from);
