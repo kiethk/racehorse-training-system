@@ -38,16 +38,16 @@ import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.RacingReadinessAssessment;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.DistanceBand;
-import com.rtms.backend.training.enums.LotStatus;
+import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.RacingReadinessStatus;
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import com.rtms.backend.training.repository.GroupPlanRepository;
 import com.rtms.backend.training.repository.RacingReadinessAssessmentRepository;
-import com.rtms.backend.training.repository.TrainingLotRepository;
+import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseSpecialtyService;
@@ -79,6 +79,17 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.http.HttpStatus;
 
+import com.rtms.backend.training.dto.HorseAttendanceResponse;
+import com.rtms.backend.training.dto.PastWorkoutRow;
+import com.rtms.backend.training.enums.SessionStatus;
+import com.rtms.backend.training.service.HorseAttendanceService;
+import com.rtms.backend.training.service.SessionScheduleService;
+import com.rtms.backend.training.service.TrainingGroupService;
+import com.rtms.backend.training.dto.GroupMemberResponse;
+import com.rtms.backend.training.dto.ScheduleSessionResponse;
+import com.rtms.backend.training.dto.SessionDetailResponse;
+import com.rtms.backend.training.dto.SessionHorseResponse;
+import com.rtms.backend.training.dto.TrainingGroupResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -101,8 +112,8 @@ class AiToolExecutionServiceTest {
     private GroomDailyTaskRepository groomDailyTaskRepository;
     private GroomDailyTaskService groomDailyTaskService;
     private AdmissionApplicationRepository admissionApplicationRepository;
-    private TrainingLotRepository trainingLotRepository;
-    private HorseTrainingPlanRepository horseTrainingPlanRepository;
+    private TrainingSessionRepository trainingSessionRepository;
+    private GroupPlanRepository horseTrainingPlanRepository;
     private HorseSpecialtyService horseSpecialtyService;
     private HorsePerformanceService horsePerformanceService;
     private RacingReadinessAssessmentRepository racingReadinessAssessmentRepository;
@@ -117,6 +128,9 @@ class AiToolExecutionServiceTest {
     private HorsePedigreeRepository horsePedigreeRepository;
     private HorseIncidentReportRepository horseIncidentReportRepository;
     private GroomTaskCompletionRepository groomTaskCompletionRepository;
+    private HorseAttendanceService horseAttendanceService;
+    private TrainingGroupService trainingGroupService;
+    private SessionScheduleService sessionScheduleService;
 
     private AiToolExecutionService toolExecutionService;
 
@@ -132,8 +146,8 @@ class AiToolExecutionServiceTest {
         groomDailyTaskRepository = Mockito.mock(GroomDailyTaskRepository.class);
         groomDailyTaskService = Mockito.mock(GroomDailyTaskService.class);
         admissionApplicationRepository = Mockito.mock(AdmissionApplicationRepository.class);
-        trainingLotRepository = Mockito.mock(TrainingLotRepository.class);
-        horseTrainingPlanRepository = Mockito.mock(HorseTrainingPlanRepository.class);
+        trainingSessionRepository = Mockito.mock(TrainingSessionRepository.class);
+        horseTrainingPlanRepository = Mockito.mock(GroupPlanRepository.class);
         horseSpecialtyService = Mockito.mock(HorseSpecialtyService.class);
         horsePerformanceService = Mockito.mock(HorsePerformanceService.class);
         racingReadinessAssessmentRepository = Mockito.mock(RacingReadinessAssessmentRepository.class);
@@ -149,6 +163,9 @@ class AiToolExecutionServiceTest {
         horseIncidentReportRepository = Mockito.mock(HorseIncidentReportRepository.class);
         groomTaskCompletionRepository = Mockito.mock(GroomTaskCompletionRepository.class);
 
+        horseAttendanceService = Mockito.mock(HorseAttendanceService.class);
+        trainingGroupService = Mockito.mock(TrainingGroupService.class);
+        sessionScheduleService = Mockito.mock(SessionScheduleService.class);
         toolExecutionService = new AiToolExecutionService(
                 toolRegistryService,
                 clinicalRetrievalService,
@@ -160,7 +177,7 @@ class AiToolExecutionServiceTest {
                 groomDailyTaskRepository,
                 groomDailyTaskService,
                 admissionApplicationRepository,
-                trainingLotRepository,
+                trainingSessionRepository,
                 horseTrainingPlanRepository,
                 horseSpecialtyService,
                 horsePerformanceService,
@@ -175,7 +192,10 @@ class AiToolExecutionServiceTest {
                 horseHealthMetricRepository,
                 horsePedigreeRepository,
                 horseIncidentReportRepository,
-                groomTaskCompletionRepository
+                groomTaskCompletionRepository,
+                horseAttendanceService,
+                trainingGroupService,
+                sessionScheduleService
         );
     }
 
@@ -234,21 +254,21 @@ class AiToolExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("HEAD_TRAINER gọi getTrainerSchedule tra cứu ca tập TrainingLot hiển thị rõ Ca tập")
+    @DisplayName("HEAD_TRAINER gọi getTrainerSchedule tra cứu ca tập Session hiển thị rõ Ca tập")
     void testTrainer_GetTrainerSchedule() {
         AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
 
-        TrainingLotRow row = new TrainingLotRow(
+        SessionRow row = new SessionRow(
                 100L, 5L, LocalDate.of(2026, 10, 20),
                 LocalTime.of(8, 0), LocalTime.of(9, 30),
-                1L, "Sprint 1000m", 60, LotStatus.SCHEDULED, 4, 2L
+                1L, "Sprint 1000m", 60, SessionStatus.SCHEDULED, 2L
         );
-        when(trainingLotRepository.findTrainerLotRows(eq(5L), any(LocalDate.class), any(LocalDate.class), eq(false)))
+        when(trainingSessionRepository.findTrainerSessionRows(eq(5L), any(LocalDate.class), any(LocalDate.class), eq(false)))
                 .thenReturn(List.of(row));
 
-        LotHorseNameRow name1 = new LotHorseNameRow(100L, 1L, "THUNDER");
-        LotHorseNameRow name2 = new LotHorseNameRow(100L, 2L, "LIGHTNING");
-        when(trainingLotRepository.findActiveHorseNames(anyCollection()))
+        SessionHorseNameRow name1 = new SessionHorseNameRow(100L, 1L, "THUNDER");
+        SessionHorseNameRow name2 = new SessionHorseNameRow(100L, 2L, "LIGHTNING");
+        when(trainingSessionRepository.findActiveHorseNames(anyCollection()))
                 .thenReturn(List.of(name1, name2));
 
         Object result = toolExecutionService.executeTool(
@@ -283,6 +303,9 @@ class AiToolExecutionServiceTest {
         );
         when(horseTrainingPlanRepository.findPlanSummaries(5L, 10L))
                 .thenReturn(List.of(summary));
+        when(horseAttendanceService.getHistory(10L, trainer)).thenReturn(List.of(new HorseAttendanceResponse(
+                1L, "Nhom 1", false, "Sprint Course", "ACTIVE",
+                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 1), 7, 18, LocalDate.of(2026, 10, 1))));
 
         Course course = new Course();
         course.setId(2L);
@@ -304,6 +327,57 @@ class AiToolExecutionServiceTest {
         assertEquals("Sprint Course", item.get("planName"));
         assertEquals("Bứt phá tốc độ cự ly ngắn", item.get("targetGoal"));
         assertTrue(item.get("status").toString().contains("ACTIVE"));
+        assertEquals("7/18 buổi đã chạy", item.get("progress"));
+        assertEquals("Nhom 1", item.get("groupName"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi getTrainerGroups xem nhóm đang hoạt động, ngựa kèm Groom, khóa đang chạy và nhóm đã giải tán")
+    void testTrainer_GetTrainerGroups() {
+        AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
+        GroupMemberResponse thunder = new GroupMemberResponse(10L, "THUNDER", 7L, "Groom An", LocalDateTime.now());
+        when(trainingGroupService.getGroups(trainer)).thenReturn(List.of(new TrainingGroupResponse(
+                1L, "Morning Group 1", 5L, List.of(thunder), "Sprint Course", "ACTIVE",
+                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 20), false)));
+        when(trainingGroupService.getDisbandedGroups(trainer)).thenReturn(List.of(new TrainingGroupResponse(
+                2L, "Old Group", 5L, List.of(), null, null, null, null, true)));
+
+        Map<?, ?> map = (Map<?, ?>) toolExecutionService.executeTool("getTrainerGroups", Map.of(), trainer);
+
+        Map<?, ?> live = (Map<?, ?>) ((List<?>) map.get("groupList")).get(0);
+        assertEquals("Morning Group 1", live.get("groupName"));
+        assertEquals("1/6", live.get("horseCount"));
+        assertEquals(List.of("THUNDER (Groom: Groom An)"), live.get("horseList"));
+        assertEquals("Sprint Course", live.get("currentCourse"));
+        Map<?, ?> gone = (Map<?, ?>) ((List<?>) map.get("disbandedGroupList")).get(0);
+        assertEquals("Old Group (Disbanded)", gone.get("groupName"));
+    }
+
+    @Test
+    @DisplayName("HEAD_TRAINER gọi getTrainerSchedule với needsResultOnly để xem buổi còn ngựa chưa ghi kết quả")
+    void testTrainer_GetTrainerScheduleNeedsResult() {
+        AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
+        ScheduleSessionResponse session = new ScheduleSessionResponse(50L, 1L, 1L, "Morning Group 1", false, "Sprint Course",
+                "Gallop 1200m", LocalDate.now().minusDays(1), LocalTime.of(6, 0), LocalTime.of(6, 30), "HELD", 2, 1);
+        when(sessionScheduleService.getSessions(any(), any(), isNull(), eq(true), eq(trainer))).thenReturn(List.of(session));
+        when(sessionScheduleService.getSession(50L, trainer)).thenReturn(new SessionDetailResponse(session, List.of(
+                new SessionHorseResponse(1L, 10L, "THUNDER", "Groom An", "HELD", null, null),
+                new SessionHorseResponse(2L, 11L, "BLAZE", "Groom Binh", "RAN", 7, null))));
+
+        Map<?, ?> map = (Map<?, ?>) toolExecutionService.executeTool("getTrainerSchedule", Map.of("needsResultOnly", true), trainer);
+
+        assertEquals(1, map.get("totalSessions"));
+        assertEquals(1, map.get("totalWorkoutsNeedingResult"));
+        Map<?, ?> item = (Map<?, ?>) ((List<?>) map.get("sessionList")).get(0);
+        assertEquals(List.of("THUNDER"), item.get("horseList"));
+        assertEquals("Morning Group 1", item.get("groupName"));
+    }
+
+    /** Một Workout đã chạy trong buổi hôm qua. (A Workout that Ran in yesterday's Session.) */
+    private static PastWorkoutRow ranYesterday(TrainingWorkout workout) {
+        workout.setStatus(WorkoutStatus.RAN);
+        return new PastWorkoutRow(workout, LocalDate.now().minusDays(1), LocalTime.of(6, 0), LocalTime.of(6, 30),
+                "Gallop 1200m", "Nhom 1", false, SessionStatus.HELD);
     }
 
     @Test
@@ -1306,12 +1380,12 @@ class AiToolExecutionServiceTest {
 
         TrainingWorkout w1 = new TrainingWorkout();
         w1.setId(1L);
-        w1.setStatus(WorkoutStatus.COMPLETED);
+        w1.setStatus(WorkoutStatus.RAN);
+        w1.setActualDistanceMeters(new BigDecimal("1000"));
         w1.setPerformanceRating(8);
         w1.setTopSpeedKmh(new BigDecimal("58.2"));
 
-        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L))
-                .thenReturn(List.of(w1));
+        when(trainingWorkoutRepository.findPastWorkouts(eq(10L), any())).thenReturn(List.of(ranYesterday(w1)));
 
         Object result = toolExecutionService.executeTool("analyzeHorseInvestmentAndFitnessROI", Map.of("horseId", 10L), owner);
         assertNotNull(result);
@@ -1347,7 +1421,7 @@ class AiToolExecutionServiceTest {
         w1.setTopSpeedKmh(new BigDecimal("54.0"));
         w1.setCreatedAt(LocalDateTime.now().minusDays(2));
 
-        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
+        when(trainingWorkoutRepository.findPastWorkouts(eq(10L), any())).thenReturn(List.of(ranYesterday(w1)));
 
         Object result = toolExecutionService.executeTool("analyzeWorkoutLoadAndOvertrainingRisk", Map.of("horseId", 10L), trainer);
         assertNotNull(result);
@@ -1383,7 +1457,7 @@ class AiToolExecutionServiceTest {
 
         TrainingWorkout w1 = new TrainingWorkout();
         w1.setTopSpeedKmh(new BigDecimal("60.5"));
-        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
+        when(trainingWorkoutRepository.findPastWorkouts(eq(10L), any())).thenReturn(List.of(ranYesterday(w1)));
 
         Object result = toolExecutionService.executeTool("recommendOptimalRaceDistanceAndTrack", Map.of("horseId", 10L), trainer);
         assertNotNull(result);
@@ -1410,9 +1484,8 @@ class AiToolExecutionServiceTest {
 
         TrainingWorkout w1 = new TrainingWorkout();
         w1.setActualDistanceMeters(new BigDecimal("1000"));
-        w1.setMaxHeartRate(125);
-        w1.setStatus(WorkoutStatus.COMPLETED);
-        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
+        w1.setMaxHeartRate(225);     // over the app's safe maximum of 220 bpm
+        when(trainingWorkoutRepository.findPastWorkouts(eq(10L), any())).thenReturn(List.of(ranYesterday(w1)));
 
         Object result = toolExecutionService.executeTool("recommendNextWorkoutAdjustment", Map.of("horseId", 10L), trainer);
         assertNotNull(result);
@@ -1661,8 +1734,8 @@ class AiToolExecutionServiceTest {
         w1.setTopSpeedKmh(new BigDecimal("60.5"));
         w1.setActualDistanceMeters(new BigDecimal("1000"));
         w1.setMaxHeartRate(125);
-        w1.setStatus(WorkoutStatus.COMPLETED);
-        when(trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(w1));
+        w1.setStatus(WorkoutStatus.RAN);
+        when(trainingWorkoutRepository.findPastWorkouts(eq(10L), any())).thenReturn(List.of(ranYesterday(w1)));
 
         Object result = toolExecutionService.executeTool("recommendTrainerStrategy", Map.of("horseId", 10L), trainer);
         assertNotNull(result);

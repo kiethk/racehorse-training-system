@@ -21,7 +21,7 @@ export function HorseAlertList({
     >
       {alerts.length === 0 ? (
         <Notice tone="success" title="Fitness indicators are within safe ranges">
-          No elevated heart rate, poor recovery or recurring incidents detected.
+          No elevated heart rate or poor recovery detected.
         </Notice>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

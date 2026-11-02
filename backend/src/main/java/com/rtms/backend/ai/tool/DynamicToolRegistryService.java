@@ -9,7 +9,7 @@ import java.util.*;
  * theo vai trò người dùng (Role-Based Tool Scoping).
  *
  * Chuẩn hóa theo nguyên lý MECE và Cognitive Sweet Spot:
- * Mọi vai trò đều có số lượng công cụ trong ngưỡng tối ưu (8 đến 12 công cụ <= 12).
+ * Mọi vai trò đều có số lượng công cụ trong ngưỡng tối ưu (8 đến 12 công cụ), riêng Trainer 13 vì có thêm Nhóm huấn luyện.
  */
 @Service
 public class DynamicToolRegistryService {
@@ -154,7 +154,7 @@ public class DynamicToolRegistryService {
         );
         roleToolDefinitions.put("HORSE_OWNER", ownerTools);
 
-        // 2. HEAD_TRAINER (100% Read-Only - 12 Tools, Sweet Spot <= 12)
+        // 2. HEAD_TRAINER (100% Read-Only - 13 Tools: Sweet Spot 12 + Training Group, lõi công việc của Trainer)
         List<AiToolDefinition> trainerTools = List.of(
                 new AiToolDefinition(
                         "getTrainerHorses",
@@ -162,8 +162,13 @@ public class DynamicToolRegistryService {
                         buildParamSchema(Map.of())
                 ),
                 new AiToolDefinition(
+                        "getTrainerGroups",
+                        "Tra cứu các Nhóm huấn luyện (Training Group) của HLV: mỗi nhóm tối đa 6 ngựa ra sân cùng nhau, gồm danh sách ngựa kèm Groom, khóa đang chạy hoặc sắp chạy (Group Plan) và thời gian; kèm danh sách nhóm đã giải tán (Disbanded) với những ngựa có mặt lúc giải tán. Dùng khi hỏi nhóm nào có những ngựa nào, ngựa X thuộc nhóm nào, nhóm nào đang rảnh.",
+                        buildParamSchema(Map.of())
+                ),
+                new AiToolDefinition(
                         "getWorkoutHistory",
-                        "Tra cứu lịch sử các buổi tập workout của một con ngựa.",
+                        "Tra cứu tối đa 20 buổi tập đã diễn ra gần nhất của một con ngựa (mới nhất trước), mỗi buổi có ngày, ca tập, nhóm, bài tập và kết cục: Ran (đã chạy, kèm chỉ số), Needs result (chưa ghi kết quả), Did not run (không chạy), Cancelled (bị hủy). Buổi sắp tới thì dùng getTrainerSchedule.",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
@@ -179,16 +184,17 @@ public class DynamicToolRegistryService {
                 ),
                 new AiToolDefinition(
                         "getTrainerSchedule",
-                        "Tra cứu các ca tập TrainingLot của HLV theo ngày date (mặc định hôm nay) hoặc khoảng fromDate đến toDate (hiển thị rõ Ca tập, thời gian, bài tập, danh sách ngựa).",
+                        "Tra cứu các buổi tập (Session) của HLV theo ngày date (mặc định hôm nay) hoặc khoảng fromDate đến toDate (hiển thị rõ Ca tập, thời gian, bài tập, danh sách ngựa). Truyền needsResultOnly=true để lấy các buổi trong 90 ngày qua còn ngựa chưa ghi kết quả (Needs result), kèm tên những con đó: đây là danh sách việc cần điểm danh.",
                         buildParamSchema(Map.of(
                                 "date", Map.of("type", "string", "description", "Ngày cần tra cứu (YYYY-MM-DD)"),
                                 "fromDate", Map.of("type", "string", "description", "Từ ngày (YYYY-MM-DD)"),
-                                "toDate", Map.of("type", "string", "description", "Đến ngày (YYYY-MM-DD)")
+                                "toDate", Map.of("type", "string", "description", "Đến ngày (YYYY-MM-DD)"),
+                                "needsResultOnly", Map.of("type", "boolean", "description", "true: chỉ lấy các buổi còn ngựa chưa ghi kết quả trong 90 ngày qua (bỏ qua date/fromDate/toDate)")
                         ))
                 ),
                 new AiToolDefinition(
                         "getTrainerPlansSummary",
-                        "Tra cứu danh sách kế hoạch huấn luyện do HLV quản lý (hiển thị Tên kế hoạch, Tên ngựa, Mục tiêu, Trạng thái, số buổi hoàn thành) và danh mục môn học/bài tập.",
+                        "Tra cứu các khóa (Group Plan) mà ngựa của HLV đã và đang tham gia, mỗi dòng một ngựa một khóa: Tên khóa, Nhóm, Mục tiêu, Trạng thái phần của con ngựa và Attendance X/Y (số buổi đã chạy trên tổng số buổi không bị hủy cả buổi), giống màn hình lịch sử huấn luyện.",
                         buildParamSchema(Map.of(
                                 "status", Map.of("type", "string", "description", "Trạng thái kế hoạch (ACTIVE, UPCOMING, COMPLETED)"),
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
@@ -213,8 +219,8 @@ public class DynamicToolRegistryService {
                         ))
                 ),
                 new AiToolDefinition(
-                        "checkGroomConflictForLot",
-                        "Kiểm tra quy tắc BR-09 khi gán Groom cho ngựa trong ca tập (lot).",
+                        "checkGroomConflict",
+                        "Kiểm tra quy tắc BR-09 trước khi giao một Groom cho một ngựa: liệt kê các buổi sắp tới mà Groom đó đã dắt một ngựa khác trong cùng Nhóm huấn luyện (một Groom chỉ dắt một ngựa mỗi nhóm).",
                         buildParamSchema(Map.of(
                                 "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
                                 "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)"),

@@ -110,11 +110,11 @@ public class SubjectService {
             throw new IllegalArgumentException(String.format(
                     "Subject duration must be between %d and %d minutes!", MIN_DURATION_MINUTES, MAX_DURATION_MINUTES));
         }
-        // Một bài dài hơn cả khung giờ vàng thì không bao giờ xếp được lot.
-        // (A subject longer than the whole golden window can never be placed in a lot.)
+        // Một bài dài hơn cả khung giờ vàng thì không bao giờ xếp được session.
+        // (A subject longer than the whole golden window can never be placed in a session.)
         if (durationMinutes > FarmSchedulePolicy.goldenWindowMinutes()) {
             throw new IllegalArgumentException(String.format(
-                    "Duration of %d minutes exceeds the golden window (%d minutes), so no lot can be scheduled!",
+                    "Duration of %d minutes exceeds the golden window (%d minutes), so no session can be scheduled!",
                     durationMinutes, FarmSchedulePolicy.goldenWindowMinutes()));
         }
     }

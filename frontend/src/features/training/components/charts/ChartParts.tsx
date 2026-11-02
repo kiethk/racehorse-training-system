@@ -81,7 +81,7 @@ export function TrendChartCard({
 export interface GridTick {
   value: number;
   /** Colour of a tick that marks a limit the backend enforces; other ticks are neutral. */
-  emphasis?: 'danger' | 'warning';
+  emphasis?: 'danger' | 'warning' | 'info';
 }
 
 export function GridLines({ ticks, min, max }: { ticks: GridTick[]; min: number; max: number }) {

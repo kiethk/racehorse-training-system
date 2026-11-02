@@ -14,8 +14,10 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
+import com.rtms.backend.training.service.SessionWorkoutService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -47,19 +49,22 @@ public class ActionCommitService {
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final TrainingWorkoutRepository trainingWorkoutRepository;
+    private final SessionWorkoutService sessionWorkoutService;
 
     public ActionCommitService(PendingAgentActionRepository pendingActionRepository,
                                ActionProposalService proposalService,
                                ObjectMapper objectMapper,
                                AuditLogRepository auditLogRepository,
                                UserRepository userRepository,
-                               TrainingWorkoutRepository trainingWorkoutRepository) {
+                               TrainingWorkoutRepository trainingWorkoutRepository,
+                               SessionWorkoutService sessionWorkoutService) {
         this.pendingActionRepository = pendingActionRepository;
         this.proposalService = proposalService;
         this.objectMapper = objectMapper;
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
         this.trainingWorkoutRepository = trainingWorkoutRepository;
+        this.sessionWorkoutService = sessionWorkoutService;
     }
 
     /**
@@ -201,7 +206,10 @@ public class ActionCommitService {
     }
 
     /**
-     * Áp dụng cập nhật metric cho buổi tập luyện (TrainingWorkout).
+     * Sửa chỉ số của một Workout đã RAN qua đúng luồng sửa kết quả của Trainer: số mới gộp với số cũ, server kiểm tra và tự tính lại
+     * điểm. Workout chưa có kết quả thì không sửa được ở đây (Trainer ghi kết quả trên lịch).
+     * (Edits the readings of a Workout that Ran through the Trainer's own edit-result flow: new numbers merge with the stored ones, the
+     * server validates them and recomputes the rating. A Workout without results cannot be edited here; the Trainer records it.)
      */
     private void applyEditWorkoutMetric(String targetEntityId, JsonNode proposedValues, AuthenticatedUser currentUser) {
         if (targetEntityId == null || targetEntityId.isBlank()) {
@@ -209,47 +217,31 @@ public class ActionCommitService {
         }
 
         Long workoutId = Long.valueOf(targetEntityId);
-        TrainingWorkout workout;
-        if ("HEAD_TRAINER".equalsIgnoreCase(currentUser.getRole())) {
-            workout = trainingWorkoutRepository.findByIdAndTrainerId(workoutId, currentUser.getUserId())
-                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "WORKOUT_NOT_FOUND",
-                            "Không tìm thấy buổi tập #" + workoutId + " hoặc bạn không có quyền huấn luyện buổi tập này"));
-        } else {
-            workout = trainingWorkoutRepository.findById(workoutId)
-                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "WORKOUT_NOT_FOUND",
-                            "Không tìm thấy buổi tập #" + workoutId));
-        }
+        TrainingWorkout workout = trainingWorkoutRepository.findByIdAndTrainerId(workoutId, currentUser.getUserId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "WORKOUT_NOT_FOUND",
+                        "Không tìm thấy buổi tập #" + workoutId + " hoặc bạn không có quyền huấn luyện buổi tập này"));
 
-        if (proposedValues.has("actualDistanceMeters")) {
-            workout.setActualDistanceMeters(new BigDecimal(proposedValues.get("actualDistanceMeters").asText()));
-        }
-        if (proposedValues.has("actualDurationMinutes")) {
-            workout.setActualDurationMinutes(new BigDecimal(proposedValues.get("actualDurationMinutes").asText()));
-        }
-        if (proposedValues.has("topSpeedKmh")) {
-            workout.setTopSpeedKmh(new BigDecimal(proposedValues.get("topSpeedKmh").asText()));
-        }
-        if (proposedValues.has("averageSpeedKmh")) {
-            workout.setAverageSpeedKmh(new BigDecimal(proposedValues.get("averageSpeedKmh").asText()));
-        }
-        if (proposedValues.has("averageHeartRate")) {
-            workout.setAverageHeartRate(proposedValues.get("averageHeartRate").asInt());
-        }
-        if (proposedValues.has("maxHeartRate")) {
-            workout.setMaxHeartRate(proposedValues.get("maxHeartRate").asInt());
-        }
-        if (proposedValues.has("recoveryHeartRate")) {
-            workout.setRecoveryHeartRate(proposedValues.get("recoveryHeartRate").asInt());
-        }
-        if (proposedValues.has("performanceRating")) {
-            workout.setPerformanceRating(proposedValues.get("performanceRating").asInt());
-        }
-        if (proposedValues.has("trainerFeedback")) {
-            workout.setTrainerFeedback(proposedValues.get("trainerFeedback").asText());
-        }
+        CompleteWorkoutRequest request = new CompleteWorkoutRequest();
+        request.setActualDistanceMeters(decimal(proposedValues, "actualDistanceMeters", workout.getActualDistanceMeters()));
+        request.setActualDurationMinutes(decimal(proposedValues, "actualDurationMinutes", workout.getActualDurationMinutes()));
+        request.setTopSpeedKmh(decimal(proposedValues, "topSpeedKmh", workout.getTopSpeedKmh()));
+        request.setAverageSpeedKmh(decimal(proposedValues, "averageSpeedKmh", workout.getAverageSpeedKmh()));
+        request.setAverageHeartRate(integer(proposedValues, "averageHeartRate", workout.getAverageHeartRate()));
+        request.setMaxHeartRate(integer(proposedValues, "maxHeartRate", workout.getMaxHeartRate()));
+        request.setRecoveryHeartRate(integer(proposedValues, "recoveryHeartRate", workout.getRecoveryHeartRate()));
+        request.setTrainerFeedback(proposedValues.has("trainerFeedback")
+                ? proposedValues.get("trainerFeedback").asText() : workout.getTrainerFeedback());
 
-        trainingWorkoutRepository.save(workout);
+        sessionWorkoutService.updateResult(workoutId, request, currentUser);
         log.info("ActionCommitService: Cập nhật thành công workout #{} bởi user [{}]", workoutId, currentUser.getUserId());
+    }
+
+    private static BigDecimal decimal(JsonNode values, String field, BigDecimal current) {
+        return values.has(field) ? new BigDecimal(values.get(field).asText()) : current;
+    }
+
+    private static Integer integer(JsonNode values, String field, Integer current) {
+        return values.has(field) ? Integer.valueOf(values.get(field).asInt()) : current;
     }
 
     /**

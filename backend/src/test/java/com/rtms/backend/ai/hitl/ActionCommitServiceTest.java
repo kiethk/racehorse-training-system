@@ -15,7 +15,10 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.entity.TrainingWorkout;
+import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
+import com.rtms.backend.training.service.SessionWorkoutService;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +42,7 @@ class ActionCommitServiceTest {
     private AuditLogRepository auditLogRepository;
     private UserRepository userRepository;
     private TrainingWorkoutRepository trainingWorkoutRepository;
+    private SessionWorkoutService sessionWorkoutService;
     private ActionCommitService commitService;
 
     @BeforeEach
@@ -49,6 +53,7 @@ class ActionCommitServiceTest {
         auditLogRepository = Mockito.mock(AuditLogRepository.class);
         userRepository = Mockito.mock(UserRepository.class);
         trainingWorkoutRepository = Mockito.mock(TrainingWorkoutRepository.class);
+        sessionWorkoutService = Mockito.mock(SessionWorkoutService.class);
 
         commitService = new ActionCommitService(
                 pendingActionRepository,
@@ -56,7 +61,8 @@ class ActionCommitServiceTest {
                 objectMapper,
                 auditLogRepository,
                 userRepository,
-                trainingWorkoutRepository
+                trainingWorkoutRepository,
+                sessionWorkoutService
         );
     }
 
@@ -91,6 +97,7 @@ class ActionCommitServiceTest {
         TrainingWorkout workout = new TrainingWorkout();
         workout.setId(12L);
         workout.setActualDistanceMeters(new BigDecimal("1200.00"));
+        workout.setAverageHeartRate(170);
 
         when(pendingActionRepository.findByActionToken(token)).thenReturn(Optional.of(action));
         when(proposalService.verifyTokenSignature(action)).thenReturn(true);
@@ -106,10 +113,14 @@ class ActionCommitServiceTest {
         assertEquals(ActionStatus.COMMITTED, response.status());
         assertEquals("proposeEditWorkoutMetric", response.toolName());
 
-        // Kiểm tra workout đã được cập nhật giá trị mới
-        assertEquals(new BigDecimal("1600.00"), workout.getActualDistanceMeters());
-        assertEquals(new BigDecimal("58.50"), workout.getTopSpeedKmh());
-        verify(trainingWorkoutRepository).save(workout);
+        // Số mới gộp với số cũ rồi đi qua luồng sửa kết quả, nơi điểm được tính lại. (New numbers merge with the stored ones and go
+        // through the edit-result flow, where the rating is recomputed.)
+        ArgumentCaptor<CompleteWorkoutRequest> sent = ArgumentCaptor.forClass(CompleteWorkoutRequest.class);
+        verify(sessionWorkoutService).updateResult(eq(12L), sent.capture(), eq(trainer));
+        assertEquals(new BigDecimal("1600.00"), sent.getValue().getActualDistanceMeters());
+        assertEquals(new BigDecimal("58.50"), sent.getValue().getTopSpeedKmh());
+        assertEquals(170, sent.getValue().getAverageHeartRate());
+        verify(trainingWorkoutRepository, never()).save(any());
 
         // Kiểm tra audit log được ghi
         verify(auditLogRepository).save(any(AuditLog.class));

@@ -22,7 +22,7 @@ import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -48,7 +48,7 @@ class CareScheduleDirectAssignmentTest {
     private VeterinarianProfileRepository profiles;
     private HorseIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private TrainingWorkoutService workoutService;
+    private GroupWorkoutSyncService workoutService;
     private CareScheduleService service;
 
     @BeforeEach
@@ -59,7 +59,7 @@ class CareScheduleDirectAssignmentTest {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(HorseIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        workoutService = mock(TrainingWorkoutService.class);
+        workoutService = mock(GroupWorkoutSyncService.class);
         service = new CareScheduleService(
                 schedules,
                 horses,
@@ -284,7 +284,7 @@ class CareScheduleDirectAssignmentTest {
 
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         // Chặn tập luôn kéo theo hủy buổi tập tương lai.
-        verify(workoutService).cancelFutureTrainingForHorse(99L);
+        verify(workoutService).exitAnyGroup(99L);
         verify(horses).save(horse);
         verify(schedules, atLeastOnce()).save(argThat(schedule ->
                 schedule.getCareType() == CareType.URGENT

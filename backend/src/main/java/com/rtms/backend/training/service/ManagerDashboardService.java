@@ -22,7 +22,7 @@ import com.rtms.backend.training.dto.ManagerDashboardSummaryResponse;
 import com.rtms.backend.training.dto.ManagerDashboardSummaryResponse.*;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import com.rtms.backend.training.repository.GroupPlanRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +37,7 @@ public class ManagerDashboardService {
     private final StableStallRepository stableStallRepository;
     private final AreaRepository areaRepository;
     private final HorseRepository horseRepository;
-    private final HorseTrainingPlanRepository horseTrainingPlanRepository;
+    private final GroupPlanRepository groupPlanRepository;
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final CandidateHorseProfileRepository candidateHorseProfileRepository;
     private final HorseIncidentReportRepository horseIncidentReportRepository;
@@ -47,7 +47,7 @@ public class ManagerDashboardService {
             StableStallRepository stableStallRepository,
             AreaRepository areaRepository,
             HorseRepository horseRepository,
-            HorseTrainingPlanRepository horseTrainingPlanRepository,
+            GroupPlanRepository groupPlanRepository,
             AdmissionApplicationRepository admissionApplicationRepository,
             CandidateHorseProfileRepository candidateHorseProfileRepository,
             HorseIncidentReportRepository horseIncidentReportRepository,
@@ -55,7 +55,7 @@ public class ManagerDashboardService {
         this.stableStallRepository = stableStallRepository;
         this.areaRepository = areaRepository;
         this.horseRepository = horseRepository;
-        this.horseTrainingPlanRepository = horseTrainingPlanRepository;
+        this.groupPlanRepository = groupPlanRepository;
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.horseIncidentReportRepository = horseIncidentReportRepository;
@@ -132,7 +132,7 @@ public class ManagerDashboardService {
         // 2. Fleet Summary
         long totalHorses = horseRepository.count();
         long activeEligible = horseRepository.countByCurrentStatus(HorseStatus.ELIGIBLE);
-        long inTraining = horseTrainingPlanRepository.countByStatus(TrainingPlanStatus.ACTIVE);
+        long inTraining = groupPlanRepository.countHorsesInTraining();
         long medicalBlocked = horseRepository.countByTrainingDecision(TrainingDecision.BLOCKED);
         long inactive = horseRepository.countByCurrentStatus(HorseStatus.INACTIVE);
 

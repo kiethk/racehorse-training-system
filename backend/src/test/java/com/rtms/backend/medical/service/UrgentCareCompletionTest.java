@@ -23,7 +23,7 @@ import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -65,7 +65,7 @@ class UrgentCareCompletionTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private EntityManager entityManager;
     @Mock private NotificationService notificationService;
-    @Mock private TrainingWorkoutService workoutService;
+    @Mock private GroupWorkoutSyncService workoutService;
 
     private CareScheduleService careScheduleService;
 
@@ -125,7 +125,7 @@ class UrgentCareCompletionTest {
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         assertEquals("Urgent veterinary care pending", horse.getTrainingDecisionReason());
         assertFalse(horse.canTrain());
-        verify(workoutService).cancelFutureTrainingForHorse(10L);
+        verify(workoutService).exitAnyGroup(10L);
     }
 
     @Test
@@ -165,7 +165,7 @@ class UrgentCareCompletionTest {
         assertTrue(incident.getHandlerNote().startsWith("Diagnosis: "));
         assertTrue(incident.getHandlerNote().endsWith("Training: allowed"));
         verify(healthRecordRepository).save(any(HealthRecord.class));
-        verify(workoutService, never()).cancelFutureTrainingForHorse(anyLong());
+        verify(workoutService, never()).exitAnyGroup(anyLong());
     }
 
     @Test
@@ -391,7 +391,7 @@ class UrgentCareCompletionTest {
 
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         assertEquals("Walk only for 5 days", horse.getTrainingDecisionReason());
-        verify(workoutService).cancelFutureTrainingForHorse(10L);
+        verify(workoutService).exitAnyGroup(10L);
 
         ArgumentCaptor<CareSchedule> followUp = ArgumentCaptor.forClass(CareSchedule.class);
         verify(careScheduleRepository).saveAndFlush(followUp.capture());

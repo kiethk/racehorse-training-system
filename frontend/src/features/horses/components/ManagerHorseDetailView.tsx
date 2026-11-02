@@ -1,24 +1,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Icon, Notice } from '@/components/ui';
+import { Button, Notice } from '@/components/ui';
 import { HorseProfileView } from '@/features/horses/shared/components/HorseProfileView';
 import type { Horse } from '@/features/stable/types';
 import type { HorseHealthMetric, HorsePedigree, HorseSpecialty } from '../types';
-import type { HorseAlert, HorseFitnessTrendItem } from '@/features/training/types';
+import type { HorseAlert } from '@/features/training/types';
 import type { RaceRegistrationResponse } from '@/features/racing/types';
 import { horseService } from '../services/horseService';
 import { trainingService } from '@/features/training/services/trainingService';
 import { racingService } from '@/features/racing/services/racingService';
-import { useTrainingRules } from '@/features/training/hooks/useTrainingRules';
 import { ChangeHorseStatusModal } from './ChangeHorseStatusModal';
 import { StableTeamTab } from './StableTeamTab';
 import { HistoryTab } from './HistoryTab';
+import { HorseAttendanceList } from '@/features/training/components/HorseAttendanceList';
+import { HorseFitnessTrendView } from '@/features/training/components/HorseFitnessTrendView';
+import { HorseScheduleView } from '@/features/training/components/HorseScheduleDialog';
+import { toIsoDate } from '@/features/training/lib/dateRange';
 import { HorsePedigreeCard } from './HorsePedigreeCard';
 import { HorseSpecialtySection } from '../shared/components/HorseSpecialtySection';
-import { HorseMetricsRow } from '@/features/training/components/HorseMetricsRow';
-import { FitnessTrendChart } from '@/features/training/components/FitnessTrendChart';
-import { WorkoutHistoryTable } from '@/features/training/components/WorkoutHistoryTable';
 import { HorseHealthSummary } from './HorseHealthSummary';
 import { HorseRacingHistory } from './HorseRacingHistory';
 
@@ -28,52 +28,44 @@ interface ManagerHorseDetailViewProps {
 
 /**
  * 360-degree comprehensive horse detail view for Club Manager.
- * Combines Overview & Pedigree, Stable & Team, Training & Fitness,
+ * Combines Overview & Pedigree, Training schedule, Training plans, Fitness & Trends, Stable & Team,
  * Medical & Vet Care, Racing History, and Status History into an executive command view.
+ * The training tabs are the same screens the Trainer and Owner see.
  */
 export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps) {
-  const rules = useTrainingRules();
-
   // Status transition state
   const [modalHorse, setModalHorse] = useState<Horse | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [onSuccessCallback, setOnSuccessCallback] = useState<(() => void) | null>(null);
+  const today = toIsoDate(new Date());
 
   // Cross-actor operational data
   const [specialty, setSpecialty] = useState<HorseSpecialty | null>(null);
   const [pedigree, setPedigree] = useState<HorsePedigree | null>(null);
-  const [trend, setTrend] = useState<HorseFitnessTrendItem[]>([]);
   const [alerts, setAlerts] = useState<HorseAlert[]>([]);
   const [healthMetrics, setHealthMetrics] = useState<HorseHealthMetric[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [preventiveCare, setPreventiveCare] = useState<any[]>([]);
   const [raceRegistrations, setRaceRegistrations] = useState<RaceRegistrationResponse[]>([]);
-  const [loadingFacets, setLoadingFacets] = useState(true);
 
   useEffect(() => {
     let active = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoadingFacets(true);
 
     Promise.all([
       horseService.getSpecialty(horseId).catch(() => null),
       horseService.getPedigree(horseId).catch(() => null),
-      trainingService.getFitnessTrend(horseId).catch(() => []),
       trainingService.getHorseAlerts(horseId).catch(() => []),
       horseService.getHealthMetrics(horseId).catch(() => []),
       horseService.getPreventiveCare(horseId).catch(() => []),
       racingService.listMine(horseId).catch(() => []),
-    ]).then(([specialtyData, pedigreeData, trendData, alertData, metricsData, preventiveData, racingData]) => {
+    ]).then(([specialtyData, pedigreeData, alertData, metricsData, preventiveData, racingData]) => {
       if (!active) return;
       setSpecialty(specialtyData);
       setPedigree(pedigreeData);
-      setTrend(trendData);
       setAlerts(alertData);
       setHealthMetrics(metricsData);
       setPreventiveCare(preventiveData);
       setRaceRegistrations(racingData);
-    }).finally(() => {
-      if (active) setLoadingFacets(false);
     });
 
     return () => {
@@ -115,6 +107,25 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
         )}
         extraTabs={({ horse }) => [
           {
+            id: 'training-schedule',
+            label: 'Training schedule',
+            content: (
+              <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                <HorseScheduleView target={{ horseId: horse.id, name: horse.name, horse }} startDate={today} hideHeader />
+              </div>
+            ),
+          },
+          {
+            id: 'training-plans',
+            label: 'Training plans',
+            content: <HorseAttendanceList horseId={horse.id} />,
+          },
+          {
+            id: 'fitness-trends',
+            label: 'Fitness & Trends',
+            content: <HorseFitnessTrendView horseId={horse.id} hideHeader />,
+          },
+          {
             id: 'stable-team',
             label: 'Stable & Team',
             content: (
@@ -122,17 +133,6 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
                 ownerId={horse.ownerId ?? null}
                 currentStallId={horse.currentStallId ?? null}
               />
-            ),
-          },
-          {
-            id: 'training',
-            label: 'Training & Fitness',
-            content: (
-              <div className="space-y-6">
-                <HorseMetricsRow trend={trend} rules={rules} />
-                <FitnessTrendChart trend={trend} rules={rules} />
-                <WorkoutHistoryTable trend={trend} rules={rules} loading={loadingFacets} />
-              </div>
             ),
           },
           {

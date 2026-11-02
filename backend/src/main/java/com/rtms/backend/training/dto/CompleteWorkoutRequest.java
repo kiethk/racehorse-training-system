@@ -14,7 +14,7 @@ import java.math.BigDecimal;
  *
  * Theo đề tài, đây là việc của Head Trainer ("Đánh giá phong độ, ghi nhận chỉ
  * số buổi tập và đưa ra nhận xét chuyên môn sau mỗi buổi tập"), KHÔNG phải của
- * Groom. Groom chỉ tick hoàn thành các việc chăm sóc trong groom_daily_tasks.
+ * Groom. Không có điểm đánh giá: server luôn tự tính từ các chỉ số. Groom chỉ tick hoàn thành các việc chăm sóc trong groom_daily_tasks.
  * (The trainer records the result after a workout. Per the project brief this is the head trainer job
  *  ("assess form, record workout metrics and give professional feedback after each workout"), NOT the groom job.
  *  The groom only ticks off care tasks in groom_daily_tasks.)
@@ -56,10 +56,6 @@ public class CompleteWorkoutRequest {
     @Max(value = 240, message = "Recovery heart rate cannot exceed 240 bpm")
     private Integer recoveryHeartRate;
 
-    @Min(value = 1, message = "Performance rating must be between 1 and 10")
-    @Max(value = 10, message = "Performance rating must be between 1 and 10")
-    private Integer performanceRating;   // 1..10 (auto-calculated from IoT metrics if omitted)
-
     @Size(max = 2000, message = "Trainer feedback cannot exceed 2000 characters")
     private String trainerFeedback;
 
@@ -83,9 +79,6 @@ public class CompleteWorkoutRequest {
 
     public Integer getRecoveryHeartRate() { return recoveryHeartRate; }
     public void setRecoveryHeartRate(Integer v) { this.recoveryHeartRate = v; }
-
-    public Integer getPerformanceRating() { return performanceRating; }
-    public void setPerformanceRating(Integer v) { this.performanceRating = v; }
 
     public String getTrainerFeedback() { return trainerFeedback; }
     public void setTrainerFeedback(String v) { this.trainerFeedback = v; }
