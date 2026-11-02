@@ -9,8 +9,8 @@ export function clockOf(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 }
 
-/** Every start time, on the step, at which a lot of `duration` minutes still ends inside the window. */
-export function lotStartOptions(windowStart: string, windowEnd: string, duration: number, step: number): string[] {
+/** Every start time, on the step, at which a session of `duration` minutes still ends inside the window. */
+export function sessionStartOptions(windowStart: string, windowEnd: string, duration: number, step: number): string[] {
   const options: string[] = [];
   for (let minute = minutesOf(windowStart); minute + duration <= minutesOf(windowEnd); minute += step) {
     options.push(clockOf(minute));
@@ -18,8 +18,14 @@ export function lotStartOptions(windowStart: string, windowEnd: string, duration
   return options;
 }
 
-/** The start nearest to `minutes` on the step, kept so that the whole lot stays inside the window. */
-export function snapLotStart(minutes: number, duration: number, step: number, windowStart: string, windowEnd: string): number {
+/** The start nearest to `minutes` on the step, kept so that the whole session stays inside the window. */
+export function snapSessionStart(
+  minutes: number,
+  duration: number,
+  step: number,
+  windowStart: string,
+  windowEnd: string,
+): number {
   const from = minutesOf(windowStart);
   const latest = minutesOf(windowEnd) - duration;
   const snapped = from + Math.round((minutes - from) / step) * step;
@@ -31,7 +37,7 @@ export interface StripPosition {
   widthPercent: number;
 }
 
-/** Where a lot sits on a strip that spans the window, as percentages of its width. */
+/** Where a session sits on a strip that spans the window, as percentages of its width. */
 export function stripPosition(start: string, end: string, windowStart: string, windowEnd: string): StripPosition {
   const from = minutesOf(windowStart);
   const length = minutesOf(windowEnd) - from || 1;

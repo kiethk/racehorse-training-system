@@ -6,7 +6,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.repository.AreaRepository;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 
 
 import com.rtms.backend.horse.entity.Horse;
@@ -38,7 +38,7 @@ class HorseServiceTest {
     private StableStallRepository stableStallRepository;
 
     @Mock
-    private TrainingWorkoutService workoutService;
+    private GroupWorkoutSyncService workoutService;
 
     @Mock
     private com.rtms.backend.stable.repository.AreaRepository areaRepository;

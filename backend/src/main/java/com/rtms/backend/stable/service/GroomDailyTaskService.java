@@ -329,8 +329,8 @@ public class GroomDailyTaskService {
         List<GroomDailyTask> sopTasks = taskRepository
                 .findByGroomIdAndScheduledTimeBetween(targetGroomId, dayStart, dayEnd);
 
-        // Nguồn 2 — Buổi tập, đã JOIN sẵn giờ lot, tên ngựa và tên bài tập trong MỘT câu query
-        // (Source 2 — Workouts, with lot times, horse name and subject name already joined in ONE query)
+        // Nguồn 2 — Buổi tập, đã JOIN sẵn giờ session, tên ngựa và tên bài tập trong MỘT câu query
+        // (Source 2 — Workouts, with session times, horse name and subject name already joined in ONE query)
         List<GroomWorkoutRow> workouts = workoutRepository.findGroomWorkoutRows(targetGroomId, targetDate);
 
         // Nguồn 3 — Lịch thú y của ngựa trong chuồng mình

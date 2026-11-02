@@ -40,7 +40,7 @@ import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -100,7 +100,7 @@ class AdmissionVetReviewWorkflowTest {
     @Mock
     private NotificationService notificationService;
     @Mock
-    private TrainingWorkoutService workoutService;
+    private GroupWorkoutSyncService workoutService;
     @Mock
     private CandidateHorseProfileRepository candidateProfileRepository;
     @Mock

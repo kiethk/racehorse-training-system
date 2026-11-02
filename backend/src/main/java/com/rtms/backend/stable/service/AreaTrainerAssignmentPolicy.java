@@ -23,15 +23,14 @@ public class AreaTrainerAssignmentPolicy {
                     WHERE s.area_id=a.id) AS has_horses,
             EXISTS (SELECT 1 FROM stable_stalls s WHERE s.area_id=a.id
                     AND s.status IN ('OCCUPIED','RESERVED')) AS has_occupied_stalls,
-            (EXISTS (SELECT 1 FROM horse_training_plans p WHERE p.trainer_id=a.trainer_id
+            (EXISTS (SELECT 1 FROM group_plans p WHERE p.trainer_id=a.trainer_id
                      AND p.status IN ('UPCOMING','ACTIVE'))
-             OR EXISTS (SELECT 1 FROM training_lots l WHERE l.trainer_id=a.trainer_id
-                        AND l.status='SCHEDULED')
+             OR EXISTS (SELECT 1 FROM training_sessions ts WHERE ts.trainer_id=a.trainer_id
+                        AND ts.status='SCHEDULED')
              OR EXISTS (SELECT 1 FROM training_workouts w
-                        JOIN horse_training_plans p ON p.id=w.plan_id
-                        JOIN training_lots l ON l.id=w.lot_id
-                        WHERE (p.trainer_id=a.trainer_id OR l.trainer_id=a.trainer_id)
-                          AND w.status='SCHEDULED' AND l.status<>'CANCELLED')) AS has_training
+                        JOIN training_sessions ts ON ts.id=w.session_id
+                        WHERE ts.trainer_id=a.trainer_id
+                          AND w.status='SCHEDULED' AND ts.status<>'CANCELLED')) AS has_training
         FROM areas a WHERE a.deleted_at IS NULL
         """;
 
@@ -58,7 +57,7 @@ public class AreaTrainerAssignmentPolicy {
             if (!"REGULAR".equals(row.getString("type"))) reasons.add("Quarantine areas do not have a Trainer.");
             if (row.getBoolean("has_horses")) reasons.add("Area has horses. Trainer reassignment is unavailable.");
             else if (row.getBoolean("has_occupied_stalls")) reasons.add("Area has occupied or reserved stalls.");
-            // A Trainer's lots may contain horses from multiple Areas. There is no safe Area-only transfer.
+            // A Trainer's sessions may contain horses from multiple Areas. There is no safe Area-only transfer.
             if (row.getBoolean("has_training")) reasons.add("Current Trainer has unfinished training. Complete or cancel it before changing assignments.");
             return new AreaTrainerChangeCheck(row.getLong("id"), row.getObject("trainer_id", Long.class),
                     reasons.isEmpty(), List.copyOf(reasons));

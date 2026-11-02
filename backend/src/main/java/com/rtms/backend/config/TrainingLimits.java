@@ -26,7 +26,7 @@ public final class TrainingLimits {
     public static final int DESCRIPTION_MAX_LENGTH = 2000;
     public static final int GOAL_MAX_LENGTH = 1000;
 
-    /** Thời lượng một môn, tính bằng phút; nó quyết định độ dài của lot. (Length of a subject in minutes; it sets the length of the lot.) */
+    /** Thời lượng một môn, tính bằng phút; nó quyết định độ dài của session. (Length of a subject in minutes; it sets the length of the session.) */
     public static final int MIN_SUBJECT_DURATION_MINUTES = 15;
     public static final int MAX_SUBJECT_DURATION_MINUTES = 240;
 
@@ -46,4 +46,10 @@ public final class TrainingLimits {
 
     /** Ngày bắt đầu kế hoạch không được xa hơn số ngày này kể từ hôm nay. (A plan may not start further than this from today.) */
     public static final int MAX_START_HORIZON_DAYS = 365;
+
+    /** Độ dài tối đa của tên nhóm huấn luyện. (Longest name of a training group.) */
+    public static final int GROUP_NAME_MAX_LENGTH = 100;
+
+    /** Số chiến mã tối đa của một nhóm huấn luyện (BR-10). (Most horses in one training group (BR-10).) */
+    public static final int MAX_HORSES_PER_GROUP = 6;
 }

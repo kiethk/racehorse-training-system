@@ -26,14 +26,15 @@ public class TrainingRulesController {
         return ApiResponse.success(new TrainingRulesResponse(
                 FarmSchedulePolicy.GOLDEN_HOURS_START,
                 FarmSchedulePolicy.GOLDEN_HOURS_END,
-                FarmSchedulePolicy.DEFAULT_LOT_CAPACITY,
-                FarmSchedulePolicy.LOT_START_STEP_MINUTES,
+                TrainingLimits.MAX_HORSES_PER_GROUP,
+                FarmSchedulePolicy.SESSION_START_STEP_MINUTES,
                 TrainingLimits.MAX_COURSE_SESSIONS,
                 TrainingLimits.MAX_COURSE_SUBJECTS,
                 TrainingLimits.MAX_HORSES_PER_PLAN,
                 SubjectService.MIN_DURATION_MINUTES,
                 SubjectService.MAX_DURATION_MINUTES,
                 HorsePerformanceService.MAX_HEART_RATE_LIMIT,
+                HorsePerformanceService.AVERAGE_HEART_RATE_LIMIT,
                 HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT));
     }
 }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
 import { ImageLightbox } from '@/components/ui/ImageLightbox';
+import { useProtectedFileUrl } from '@/lib/protectedFile';
 import { formatDate } from '@/lib/display';
 import { formatHorseSex } from '@/features/horses/lib/sex';
 import type { HorseSex } from '@/types/horse';
@@ -41,21 +42,31 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus 
 }) {
   const [photoOpen, setPhotoOpen] = useState(false);
   const candidate = detail.candidate;
+
+  const effectivePhoto =
+    horsePhotoUrl ||
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (detail as any).documents?.find((doc: any) => doc.documentType === 'HORSE_PHOTO')?.fileUrl ||
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (candidate as any)?.imageUrl ||
+    null;
+  const { url: protectedPhotoUrl } = useProtectedFileUrl(effectivePhoto);
+
   if (!candidate) return null;
 
   return (
     <>
       <header className="flex min-w-0 shrink-0 items-start gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:items-center sm:gap-4 sm:px-6 sm:py-5">
-        {horsePhotoUrl ? (
+        {protectedPhotoUrl ? (
           <button
             type="button"
             onClick={() => setPhotoOpen(true)}
             className="group relative shrink-0 cursor-pointer overflow-hidden rounded-[var(--radius-md)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
             title={`Preview full photo of ${candidate.name}`}
           >
-            <HorseAvatar name={candidate.name} image={horsePhotoUrl} size={56} rounded="md" />
-            <span className="absolute inset-0 flex items-center justify-center rounded-[var(--radius-md)] bg-black/40 text-white opacity-0 transition-opacity group-hover:opacity-100">
-              <Icon name="maximize" size={14} />
+            <HorseAvatar name={candidate.name} image={protectedPhotoUrl} size={56} rounded="md" />
+            <span className="absolute inset-0 flex items-center justify-center gap-1 rounded-[var(--radius-md)] bg-black/40 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 backdrop-blur-[1px]">
+              <Icon name="maximize" size={13} />
             </span>
           </button>
         ) : (
@@ -93,9 +104,9 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus 
         </div>
       </header>
 
-      {photoOpen && horsePhotoUrl && (
+      {photoOpen && protectedPhotoUrl && (
         <ImageLightbox
-          images={[{ src: horsePhotoUrl, alt: `${candidate.name}'s admission photo` }]}
+          images={[{ src: protectedPhotoUrl, alt: `${candidate.name}'s admission photo` }]}
           index={0}
           onIndexChange={() => undefined}
           onClose={() => setPhotoOpen(false)}

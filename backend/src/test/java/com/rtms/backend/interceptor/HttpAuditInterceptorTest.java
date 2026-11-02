@@ -6,8 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContext;   
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken; 
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
@@ -52,6 +51,19 @@ class HttpAuditInterceptorTest {
         interceptor.afterCompletion(request, response, null, null);
 
         verify(auditLogService).recordHttpRequest(null, "POST", "/api/horses", 201);
+    }
+
+    // 2b. POST with DOMAIN_AUDIT_LOGGED → skipped to prevent Tier-1 duplication
+    @Test
+    void givenPostRequest_whenDomainAuditLogged_thenTier1AuditSkipped() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/admissions/12/vet-review");
+        when(request.getAttribute("DOMAIN_AUDIT_LOGGED")).thenReturn(Boolean.TRUE);
+        when(response.getStatus()).thenReturn(200);
+
+        interceptor.afterCompletion(request, response, null, null);
+
+        verifyNoInteractions(auditLogService);
     }
 
     // 3. PUT → audit called
@@ -181,6 +193,17 @@ class HttpAuditInterceptorTest {
     void givenLogoutEndpoint_thenNoAuditCall() throws Exception {
         when(request.getMethod()).thenReturn("POST");
         when(request.getRequestURI()).thenReturn("/api/auth/logout");
+        when(response.getStatus()).thenReturn(200);
+
+        interceptor.afterCompletion(request, response, null, null);
+
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void givenAiChatEndpoint_thenNoAuditCall() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/v1/ai/chat");
         when(response.getStatus()).thenReturn(200);
 
         interceptor.afterCompletion(request, response, null, null);

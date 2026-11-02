@@ -1,5 +1,4 @@
 package com.rtms.backend.interceptor;
-import com.rtms.backend.identity.controller.AuthController;
 
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.audit.service.AuditLogService;
@@ -28,7 +27,10 @@ public class HttpAuditInterceptor implements HandlerInterceptor {
             "/api/auth/login",
             "/api/auth/refresh",
             "/api/auth/logout",
-            "/api/auth/register"
+            "/api/auth/register",
+            "/api/v1/ai/chat",
+            "/api/v1/ai/chat/stream",
+            "/api/v1/ai/conversations"
     );
 
     private final AuditLogService auditLogService;
@@ -47,6 +49,11 @@ public class HttpAuditInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
         if (EXCLUDED_PATHS.contains(path)) {
+            return;
+        }
+
+        // Tier-1 deduplication: skip HTTP interceptor logging if a Tier-2 domain audit was recorded
+        if (Boolean.TRUE.equals(request.getAttribute("DOMAIN_AUDIT_LOGGED"))) {
             return;
         }
 

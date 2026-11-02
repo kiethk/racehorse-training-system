@@ -17,8 +17,8 @@ import java.time.LocalTime;
  *   - Unit test dùng được mà không cần Spring context.
  *   - Gõ sai tên là lỗi biên dịch, không phải null lúc chạy.
  *
- * Ngược lại, max_capacity của lot ĐƯỢC lưu trong DB vì nó phụ thuộc bề rộng
- * đường chạy và có thể khác nhau giữa các lot.
+ * Ngược lại, max_capacity của session ĐƯỢC lưu trong DB vì nó phụ thuộc bề rộng
+ * đường chạy và có thể khác nhau giữa các session.
  */
 public final class FarmSchedulePolicy {
 
@@ -38,7 +38,7 @@ public final class FarmSchedulePolicy {
     //
     // Ba lập luận sinh lý vẫn giữ nguyên:
     //   - Tiêu hoá: ăn 05:00 -> tập 06:00 = đúng 60 phút giãn cách
-    //   - Sốc nhiệt: lot cuối kết thúc 10:00, phần lớn khối lượng trước 09:00
+    //   - Sốc nhiệt: session cuối kết thúc 10:00, phần lớn khối lượng trước 09:00
     //   - Mặt sân: 06:00 độ ẩm còn tốt hơn 06:30
     // ---------------------------------------------------------------
     public static final LocalTime GOLDEN_HOURS_START = LocalTime.of(6, 0);
@@ -55,15 +55,13 @@ public final class FarmSchedulePolicy {
     public static final LocalTime VET_WINDOW_END   = LocalTime.of(15, 30);
 
     /**
-     * Lot chỉ bắt đầu ở phút 00, 15, 30 hoặc 45: lịch chuồng ngựa đọc theo quãng 15 phút, giờ lẻ như 06:40 khó
+     * Session chỉ bắt đầu ở phút 00, 15, 30 hoặc 45: lịch chuồng ngựa đọc theo quãng 15 phút, giờ lẻ như 06:40 khó
      * nhớ và khó báo cho Groom.
-     * (A lot only starts at minute 00, 15, 30 or 45: a stable schedule is read in 15-minute steps; an odd time
+     * (A session only starts at minute 00, 15, 30 or 45: a stable schedule is read in 15-minute steps; an odd time
      * like 06:40 is hard to remember and to pass on to grooms.)
      */
-    public static final int LOT_START_STEP_MINUTES = 15;
+    public static final int SESSION_START_STEP_MINUTES = 15;
 
-    /** BR-10 — sức chứa mặc định khi hệ thống tự mở lot mới. */
-    public static final int DEFAULT_LOT_CAPACITY = 6;
 
     /** BR-06 — số chuồng tối đa một Groom được phụ trách. */
     public static final int MAX_STALLS_PER_GROOM = 3;
@@ -74,18 +72,18 @@ public final class FarmSchedulePolicy {
     }
 
     /** Giờ bắt đầu có rơi đúng mốc 15 phút không. (Whether a start time falls on a 15-minute step.) */
-    public static boolean isOnLotStartStep(LocalTime time) {
-        return time.getSecond() == 0 && time.getNano() == 0 && time.getMinute() % LOT_START_STEP_MINUTES == 0;
+    public static boolean isOnSessionStartStep(LocalTime time) {
+        return time.getSecond() == 0 && time.getNano() == 0 && time.getMinute() % SESSION_START_STEP_MINUTES == 0;
     }
 
     /** Làm tròn LÊN mốc 15 phút gần nhất. (Rounds UP to the nearest 15-minute step.) */
-    public static LocalTime roundUpToLotStartStep(LocalTime time) {
+    public static LocalTime roundUpToSessionStartStep(LocalTime time) {
         LocalTime minute = time.withSecond(0).withNano(0);
         if (minute.isBefore(time)) {
             minute = minute.plusMinutes(1);
         }
-        int remainder = minute.getMinute() % LOT_START_STEP_MINUTES;
-        return remainder == 0 ? minute : minute.plusMinutes(LOT_START_STEP_MINUTES - remainder);
+        int remainder = minute.getMinute() % SESSION_START_STEP_MINUTES;
+        return remainder == 0 ? minute : minute.plusMinutes(SESSION_START_STEP_MINUTES - remainder);
     }
 
     /** BR-03 — khoảng [start, end] có nằm trọn trong khung giờ vàng không. */

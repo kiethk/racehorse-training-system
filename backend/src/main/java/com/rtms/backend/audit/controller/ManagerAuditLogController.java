@@ -34,10 +34,12 @@ public class ManagerAuditLogController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String module,
+            @RequestParam(required = false) String role,
             @PageableDefault(size = 20) Pageable pageable
     ) {
         return ApiResponse.success(
-                auditLogService.getAuditLogs(userId, httpMethod, statusCode, from, to, search, pageable)
+                auditLogService.getAuditLogs(userId, httpMethod, statusCode, from, to, search, module, role, pageable)
         );
     }
 }

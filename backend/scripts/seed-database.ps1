@@ -141,7 +141,9 @@ UNION ALL SELECT 'Admissions', count(*)::TEXT FROM admission_applications
 UNION ALL SELECT 'Admission documents', count(*)::TEXT FROM admission_documents
 UNION ALL SELECT 'Care schedules', count(*)::TEXT FROM care_schedule
 UNION ALL SELECT 'Health records', count(*)::TEXT FROM health_records
-UNION ALL SELECT 'Training plans', count(*)::TEXT FROM horse_training_plans
+UNION ALL SELECT 'Training groups', count(*)::TEXT FROM training_groups
+UNION ALL SELECT 'Group plans', count(*)::TEXT FROM group_plans
+UNION ALL SELECT 'Training sessions', count(*)::TEXT FROM training_sessions
 UNION ALL SELECT 'Training workouts', count(*)::TEXT FROM training_workouts
 UNION ALL SELECT 'Groom daily tasks', count(*)::TEXT FROM groom_daily_tasks
 UNION ALL SELECT 'Incident reports', count(*)::TEXT FROM horse_incident_reports

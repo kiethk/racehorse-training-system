@@ -49,9 +49,9 @@ public class AuditActivityResolver {
     private static final Pattern USER_BASE = Pattern.compile("^/api/users/?$");
 
     // Pattern definitions - Training
-    private static final Pattern TRAINING_PLANS_DETAIL = Pattern.compile("^/api/training-plans/(\\d+)/.*$");
-    private static final Pattern TRAINING_PLANS_ID = Pattern.compile("^/api/training-plans/(\\d+)/?$");
-    private static final Pattern TRAINING_PLANS_BASE = Pattern.compile("^/api/training-plans/?$");
+    private static final Pattern TRAINING_PLANS_DETAIL = Pattern.compile("^/api/group-plans/(\\d+)/.*$");
+    private static final Pattern TRAINING_PLANS_ID = Pattern.compile("^/api/group-plans/(\\d+)/?$");
+    private static final Pattern TRAINING_PLANS_BASE = Pattern.compile("^/api/group-plans/?$");
 
     private static final Pattern COURSES_DETAIL = Pattern.compile("^/api/courses/(\\d+)/?$");
     private static final Pattern COURSES_BASE = Pattern.compile("^/api/courses/?$");
@@ -59,8 +59,8 @@ public class AuditActivityResolver {
     private static final Pattern SUBJECTS_DETAIL = Pattern.compile("^/api/subjects/(\\d+)/?$");
     private static final Pattern SUBJECTS_BASE = Pattern.compile("^/api/subjects/?$");
 
-    private static final Pattern LOTS_DETAIL = Pattern.compile("^/api/lots/(\\d+)/?$");
-    private static final Pattern LOTS_BASE = Pattern.compile("^/api/lots/?$");
+    private static final Pattern LOTS_DETAIL = Pattern.compile("^/api/training-sessions/(\\d+)/?$");
+    private static final Pattern LOTS_BASE = Pattern.compile("^/api/training-sessions/?$");
 
     private static final Pattern WORKOUTS_DETAIL = Pattern.compile("^/api/workouts/(\\d+)/?$");
     private static final Pattern WORKOUTS_BASE = Pattern.compile("^/api/workouts/?$");
@@ -92,6 +92,24 @@ public class AuditActivityResolver {
         String statusSuffix = isSuccess ? "" : " (Attempt failed)";
 
         Matcher m;
+
+        // 0. AI Assistant & HITL
+        if (normalizedPath.contains("/ai/chat") || normalizedPath.contains("/ai/conversations")) {
+            return new ResolvedActivity(
+                    "AI Assistant Consultation",
+                    "AI Assistant",
+                    null,
+                    "Interacted with AI Assistant for consultation" + statusSuffix
+            );
+        }
+        if (normalizedPath.contains("/ai/actions/commit")) {
+            return new ResolvedActivity(
+                    "AI Action Commit",
+                    "AI Action",
+                    null,
+                    "Committed confirmed action recommended by AI Assistant" + statusSuffix
+            );
+        }
 
         // 1. Admissions Workflow
         if ((m = ADMISSION_GROOM_REVIEW.matcher(normalizedPath)).matches()) {
@@ -189,10 +207,10 @@ public class AuditActivityResolver {
 
         if ((m = TRAINING_PLANS_DETAIL.matcher(normalizedPath)).matches() || (m = TRAINING_PLANS_ID.matcher(normalizedPath)).matches()) {
             Long id = parseId(m.group(1));
-            String action = "DELETE".equals(normalizedMethod) ? "Delete Training Plan" : "Update Training Plan";
+            String action = "DELETE".equals(normalizedMethod) ? "Cancel Training Plan" : "Update Training Plan";
             return new ResolvedActivity(
                     action,
-                    "HorseTrainingPlan",
+                    "GroupPlan",
                     id,
                     ("DELETE".equals(normalizedMethod) ? "Removed training plan #" : "Updated milestones and schedule for training plan #") + id + statusSuffix
             );
@@ -200,7 +218,7 @@ public class AuditActivityResolver {
         if (TRAINING_PLANS_BASE.matcher(normalizedPath).matches() && "POST".equals(normalizedMethod)) {
             return new ResolvedActivity(
                     "Create Training Plan",
-                    "HorseTrainingPlan",
+                    "GroupPlan",
                     null,
                     "Trainer created a new training plan for horse" + statusSuffix
             );
@@ -227,20 +245,20 @@ public class AuditActivityResolver {
 
         if ((m = LOTS_DETAIL.matcher(normalizedPath)).matches()) {
             Long id = parseId(m.group(1));
-            String action = "DELETE".equals(normalizedMethod) ? "Cancel Training Lot" : "Update Training Lot";
+            String action = "DELETE".equals(normalizedMethod) ? "Cancel Training Session" : "Update Training Session";
             return new ResolvedActivity(
                     action,
-                    "TrainingLot",
+                    "TrainingSession",
                     id,
-                    ("DELETE".equals(normalizedMethod) ? "Cancelled training lot session #" : "Updated training lot session #") + id + statusSuffix
+                    ("DELETE".equals(normalizedMethod) ? "Cancelled training session #" : "Updated training session #") + id + statusSuffix
             );
         }
         if (LOTS_BASE.matcher(normalizedPath).matches() && "POST".equals(normalizedMethod)) {
             return new ResolvedActivity(
-                    "Schedule Training Lot",
-                    "TrainingLot",
+                    "Schedule Training Session",
+                    "TrainingSession",
                     null,
-                    "Trainer scheduled a new training lot session" + statusSuffix
+                    "Trainer scheduled a new training session" + statusSuffix
             );
         }
 
@@ -258,7 +276,7 @@ public class AuditActivityResolver {
                     "Update Training Rules",
                     "TrainingRule",
                     null,
-                    "Configured training capacity, lot limits, and scheduling safety rules" + statusSuffix
+                    "Configured training capacity, session limits, and scheduling safety rules" + statusSuffix
             );
         }
 
@@ -497,10 +515,11 @@ public class AuditActivityResolver {
     private static String guessEntity(String path) {
         if (path.contains("/admissions")) return "AdmissionApplication";
         if (path.contains("/courses")) return "Course";
-        if (path.contains("/training-plans")) return "HorseTrainingPlan";
+        if (path.contains("/group-plans")) return "GroupPlan";
+        if (path.contains("/training-groups")) return "TrainingGroup";
         if (path.contains("/subjects")) return "Subject";
-        if (path.contains("/lots")) return "TrainingLot";
-        if (path.contains("/workouts")) return "TrainingWorkout";
+        if (path.contains("/training-sessions")) return "TrainingSession";
+        if (path.contains("/workouts") || path.contains("/session-workouts")) return "TrainingWorkout";
         if (path.contains("/training-rules")) return "TrainingRule";
         if (path.contains("/horses")) return "Horse";
         if (path.contains("/staff") || path.contains("/users") || path.contains("/accounts")) return "Staff";
@@ -508,16 +527,17 @@ public class AuditActivityResolver {
         if (path.contains("/care-schedules") || path.contains("/health-records") || path.contains("/preventive")) return "Medical";
         if (path.contains("/incidents")) return "IncidentReport";
         if (path.contains("/race-registrations")) return "RaceRegistration";
+        if (path.contains("/ai")) return "AI Assistant";
         return "System";
     }
 
     private static String humanizeEntity(String entityName) {
         return switch (entityName) {
             case "AdmissionApplication" -> "Admission Application";
-            case "HorseTrainingPlan" -> "Training Plan";
+            case "GroupPlan" -> "Training Plan";
             case "Course" -> "Training Course";
             case "Subject" -> "Training Subject";
-            case "TrainingLot" -> "Training Lot";
+            case "TrainingSession" -> "Training Session";
             case "TrainingWorkout" -> "Workout Session";
             case "TrainingRule" -> "Training Rules";
             case "IncidentReport" -> "Incident Report";

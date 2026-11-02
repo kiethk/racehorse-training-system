@@ -436,28 +436,25 @@ BEGIN
             WHERE hr2.horse_id = hr.horse_id AND hr2.training_decision = 'BLOCKED'
        );
 
-    -- 11b. Chan tap keo theo (giong TrainingDecisionService.block): huy buoi tap chua dien ra, huy lot da rong, huy plan
-    -- dang chay. Khong lam buoc nay thi seed de lai ngua BLOCKED van co plan ACTIVE/UPCOMING.
-    -- (Cascade of a block, like TrainingDecisionService.block: cancel not-yet-held workouts, cancel emptied lots, cancel
-    -- running plans. Without it the seed leaves BLOCKED horses with an ACTIVE/UPCOMING plan.)
+    -- 11b. Chan tap keo theo (giong TrainingDecisionService.block): ngua bi chan ra khoi nhom huan luyen va cac Workout cua buoi
+    -- chua bat dau bi huy; buoi khong con Workout nao cung bi huy. Khong lam buoc nay thi seed de lai ngua BLOCKED trong nhom.
+    -- (Cascade of a block, like TrainingDecisionService.block: the horse leaves its training group, its Workouts in Sessions that
+    -- have not started are cancelled, and a Session left with none is cancelled too.)
     UPDATE training_workouts w
        SET status = 'CANCELLED', updated_at = v_now
-      FROM training_lots l, horses h
-     WHERE l.id = w.lot_id AND h.id = w.horse_id
+      FROM training_sessions s, horses h
+     WHERE s.id = w.session_id AND h.id = w.horse_id
        AND h.training_decision = 'BLOCKED'
-       AND w.status = 'SCHEDULED' AND l.lot_date >= CURRENT_DATE;
+       AND w.status = 'SCHEDULED' AND s.session_date + s.start_time > v_now;
 
-    UPDATE training_lots l
+    UPDATE training_sessions s
        SET status = 'CANCELLED', updated_at = v_now
-     WHERE l.status = 'SCHEDULED'
-       AND NOT EXISTS (SELECT 1 FROM training_workouts w WHERE w.lot_id = l.id AND w.status <> 'CANCELLED')
-       AND EXISTS (SELECT 1 FROM training_workouts w WHERE w.lot_id = l.id);
+     WHERE s.status = 'SCHEDULED'
+       AND NOT EXISTS (SELECT 1 FROM training_workouts w WHERE w.session_id = s.id AND w.status <> 'CANCELLED')
+       AND EXISTS (SELECT 1 FROM training_workouts w WHERE w.session_id = s.id);
 
-    UPDATE horse_training_plans p
-       SET status = 'CANCELLED', updated_at = v_now
-      FROM horses h
-     WHERE h.id = p.horse_id AND h.training_decision = 'BLOCKED'
-       AND p.status IN ('ACTIVE', 'UPCOMING');
+    DELETE FROM training_group_members m USING horses h
+     WHERE h.id = m.horse_id AND h.training_decision = 'BLOCKED';
 
     RAISE NOTICE '[VET-DEMO] seed complete: 16 care_schedule, 14 health_records, 45 metrics, 8 plans, 10 prescriptions, 5 injuries.';
 END;

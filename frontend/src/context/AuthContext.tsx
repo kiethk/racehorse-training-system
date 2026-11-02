@@ -88,6 +88,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!meRes.success) {
       throw new Error(meRes.message || 'Failed to load user profile');
     }
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('vet:urgent:snoozed');
+        sessionStorage.removeItem('vet:urgent:p1:dismissed');
+        localStorage.removeItem('vet:urgent:p1:snoozed');
+      } catch {
+        // ignore storage errors
+      }
+    }
     setUser(meRes.data);
   }, []);
 
@@ -97,6 +106,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Even if the backend call fails, clear local state
     } finally {
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem('vet:urgent:snoozed');
+          sessionStorage.removeItem('vet:urgent:p1:dismissed');
+          localStorage.removeItem('vet:urgent:p1:snoozed');
+        } catch {
+          // ignore storage errors
+        }
+      }
       setUser(null);
     }
   }, []);

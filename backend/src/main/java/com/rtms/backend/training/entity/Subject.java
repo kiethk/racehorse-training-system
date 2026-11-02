@@ -42,7 +42,7 @@ public class Subject {
     // ===== THÊM MỚI (V43) =====
     // (NEW (V43))
 
-    /** Thời lượng buổi tập (phút) — quyết định độ dài của lot chạy bài này. (Workout duration in minutes: it decides the length of the lot that runs this subject.) */
+    /** Thời lượng buổi tập (phút) — quyết định độ dài của session chạy bài này. (Workout duration in minutes: it decides the length of the session that runs this subject.) */
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes = 60;
 

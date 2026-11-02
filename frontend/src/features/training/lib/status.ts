@@ -1,4 +1,4 @@
-import type { PlanStatus, WorkoutStatus } from '../types';
+import type { PlanStatus, SessionHorseOutcome, SessionStatus, WorkoutStatus } from '../types';
 
 export type StatusTone = 'primary' | 'success' | 'info' | 'warning' | 'danger' | 'neutral';
 
@@ -18,22 +18,33 @@ export const PLAN_STATUS: Record<PlanStatus | 'NONE', StatusStyle> = {
 
 export const WORKOUT_STATUS: Record<WorkoutStatus, StatusStyle> = {
   SCHEDULED: { label: 'Scheduled', tone: 'info' },
-  COMPLETED: { label: 'Completed', tone: 'success' },
+  HELD: { label: 'Needs result', tone: 'warning' },
+  RAN: { label: 'Ran', tone: 'success' },
   CANCELLED: { label: 'Cancelled', tone: 'danger' },
 };
 
 /** What a session looks like in a horse's schedule: not yet held, held, or called off. */
-export type SessionState = 'UPCOMING' | 'COMPLETED' | 'CANCELLED';
+export type SessionState = 'UPCOMING' | 'HELD' | 'CANCELLED';
 
 export const SESSION_STATE: Record<SessionState, StatusStyle> = {
   UPCOMING: { label: 'Upcoming', tone: 'info' },
-  COMPLETED: { label: 'Completed', tone: 'success' },
+  HELD: { label: 'Held', tone: 'success' },
   CANCELLED: { label: 'Cancelled', tone: 'danger' },
 };
 
-/** Free slots left in a lot decide how urgent it looks: full is red, nearly full is amber. */
-export function lotFillTone(remainingSlots: number, nearlyFullAt = 2): 'danger' | 'warning' | 'success' {
-  if (remainingSlots === 0) return 'danger';
-  if (remainingSlots <= nearlyFullAt) return 'warning';
-  return 'success';
-}
+
+/** A group Session: ahead, Held (its end time passed), or cancelled. Held follows the clock, not the results. */
+export const SESSION_STATUS: Record<SessionStatus, StatusStyle> = {
+  SCHEDULED: { label: 'Scheduled', tone: 'info' },
+  HELD: { label: 'Held', tone: 'success' },
+  CANCELLED: { label: 'Cancelled', tone: 'danger' },
+};
+
+/** What became of one horse in one Session of a plan. */
+export const SESSION_HORSE_OUTCOME: Record<SessionHorseOutcome, StatusStyle> = {
+  TO_RUN: { label: 'To run', tone: 'info' },
+  NEEDS_RESULT: { label: 'Needs result', tone: 'warning' },
+  RAN: { label: 'Ran', tone: 'success' },
+  CANCELLED: { label: 'Cancelled', tone: 'danger' },
+  DID_NOT_RUN: { label: 'Did not run', tone: 'warning' },
+};

@@ -34,7 +34,7 @@ import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -72,7 +72,7 @@ class CareSchedulePrescriptionFlowTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private EntityManager entityManager;
     @Mock private NotificationService notificationService;
-    @Mock private TrainingWorkoutService workoutService;
+    @Mock private GroupWorkoutSyncService groupSync;
     @Mock private PreventiveVaccinationService preventiveVaccinationService;
     @Mock private InjuryRecordRepository injuryRecordRepository;
     @Mock private ClinicalMedicationRepository clinicalMedicationRepository;
@@ -90,7 +90,7 @@ class CareSchedulePrescriptionFlowTest {
                 admissionRepository, stallRepository, userRepository, incidentReportRepository,
                 veterinarianProfileRepository, auditLogRepository, eventPublisher, entityManager,
                 notificationService,
-                new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
+                new TrainingDecisionService(horseRepository, careScheduleRepository, groupSync),
                 preventiveVaccinationService, injuryRecordRepository,
                 clinicalMedicationRepository, treatmentPlanRepository, prescriptionRepository);
 

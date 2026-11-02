@@ -5,6 +5,8 @@ import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -22,7 +24,6 @@ import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 
-
 import com.rtms.backend.config.ApiException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -45,6 +47,7 @@ public class AdmissionReviewService {
     private final HealthRecordRepository healthRecordRepository;
     private final AdmissionNotificationService admissionNotificationService;
     private final AdmissionGroomReviewService admissionGroomReviewService;
+    private final AuditLogService auditLogService;
 
     @Autowired
     public AdmissionReviewService(AdmissionApplicationRepository admissions,
@@ -53,7 +56,8 @@ public class AdmissionReviewService {
             CareScheduleService careScheduleService,
             HealthRecordRepository healthRecordRepository,
             AdmissionNotificationService admissionNotificationService,
-            AdmissionGroomReviewService admissionGroomReviewService) {
+            AdmissionGroomReviewService admissionGroomReviewService,
+            AuditLogService auditLogService) {
         this.admissions = admissions;
         this.careSchedules = careSchedules;
         this.horses = horses;
@@ -62,6 +66,26 @@ public class AdmissionReviewService {
         this.healthRecordRepository = healthRecordRepository;
         this.admissionNotificationService = admissionNotificationService;
         this.admissionGroomReviewService = admissionGroomReviewService;
+        this.auditLogService = auditLogService;
+    }
+
+    public AdmissionReviewService(AdmissionApplicationRepository admissions,
+            CareScheduleRepository careSchedules,
+            HorseRepository horses, StableStallRepository stalls,
+            CareScheduleService careScheduleService,
+            HealthRecordRepository healthRecordRepository,
+            AdmissionNotificationService admissionNotificationService,
+            AdmissionGroomReviewService admissionGroomReviewService) {
+        this(admissions, careSchedules, horses, stalls, careScheduleService, healthRecordRepository,
+                admissionNotificationService, admissionGroomReviewService, null);
+    }
+
+    public AdmissionReviewService(AdmissionApplicationRepository admissions,
+            CareScheduleRepository careSchedules,
+            HorseRepository horses, StableStallRepository stalls,
+            CareScheduleService careScheduleService,
+            HealthRecordRepository healthRecordRepository) {
+        this(admissions, careSchedules, horses, stalls, careScheduleService, healthRecordRepository, null, null, null);
     }
 
 
@@ -152,6 +176,31 @@ public class AdmissionReviewService {
                 : compReq.getRestrictionDetails();
         Long careScheduleId = completed != null ? completed.id() : schedule.getId();
         Long vetExamId = careScheduleId;
+
+        if (auditLogService != null) {
+            String noteOrReason = request.getNotes() != null && !request.getNotes().isBlank()
+                    ? request.getNotes()
+                    : request.getFeedback();
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .userId(actorId)
+                    .action("VET_INTAKE_EXAM")
+                    .entityName("AdmissionApplication")
+                    .entityId(admissionId)
+                    .module("MEDICAL")
+                    .summary("Veterinarian completed intake exam and evaluated training eligibility as " + trainingDecision)
+                    .reason(noteOrReason)
+                    .targetUrl("/manager/admissions/" + admissionId)
+                    .before(Map.of(
+                            "admissionStatus", "VET_REVIEW",
+                            "horseStatus", horse.getCurrentStatus() != null ? horse.getCurrentStatus().name() : "PENDING"
+                    ))
+                    .after(Map.of(
+                            "admissionStatus", admission.getStatus().name(),
+                            "trainingDecision", trainingDecision.name(),
+                            "horseStatus", horse.getCurrentStatus() != null ? horse.getCurrentStatus().name() : "PENDING"
+                    ))
+                    .build());
+        }
 
         return new VetReviewResponse(
                 admission.getId(),
@@ -251,6 +300,27 @@ public class AdmissionReviewService {
                 "Veterinary Clinical Review", reason);
 
         admissionGroomReviewService.allocateWaitingAdmissions();
+
+        if (auditLogService != null) {
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .userId(actorId)
+                    .action("VET_INTAKE_REJECT")
+                    .entityName("AdmissionApplication")
+                    .entityId(admissionId)
+                    .module("MEDICAL")
+                    .summary("Veterinarian rejected admission application")
+                    .reason(reason)
+                    .targetUrl("/manager/admissions/" + admissionId)
+                    .before(Map.of(
+                            "admissionStatus", "VET_REVIEW",
+                            "horseStatus", horse != null && horse.getCurrentStatus() != null ? horse.getCurrentStatus().name() : "PENDING"
+                    ))
+                    .after(Map.of(
+                            "admissionStatus", "REJECTED",
+                            "horseStatus", "REJECTED"
+                    ))
+                    .build());
+        }
 
         String qStallCode = quarantineStallId != null
                 ? stalls.findById(quarantineStallId).map(StableStall::getStallCode).orElse(null)

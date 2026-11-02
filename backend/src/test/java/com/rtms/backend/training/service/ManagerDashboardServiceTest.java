@@ -22,7 +22,7 @@ import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.ManagerDashboardSummaryResponse;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
+import com.rtms.backend.training.repository.GroupPlanRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ class ManagerDashboardServiceTest {
     private HorseRepository horseRepository;
 
     @Mock
-    private HorseTrainingPlanRepository horseTrainingPlanRepository;
+    private GroupPlanRepository horseTrainingPlanRepository;
 
     @Mock
     private AdmissionApplicationRepository admissionApplicationRepository;
@@ -128,7 +128,7 @@ class ManagerDashboardServiceTest {
         // 2. Fleet
         when(horseRepository.count()).thenReturn(20L);
         when(horseRepository.countByCurrentStatus(HorseStatus.ELIGIBLE)).thenReturn(15L);
-        when(horseTrainingPlanRepository.countByStatus(TrainingPlanStatus.ACTIVE)).thenReturn(12L);
+        when(horseTrainingPlanRepository.countHorsesInTraining()).thenReturn(12L);
         when(horseRepository.countByTrainingDecision(TrainingDecision.BLOCKED)).thenReturn(2L);
         when(horseRepository.countByCurrentStatus(HorseStatus.INACTIVE)).thenReturn(3L);
 

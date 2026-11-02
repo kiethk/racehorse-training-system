@@ -23,7 +23,7 @@ import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.TrainingWorkoutService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -59,8 +59,8 @@ class CareSchedulePreemptionTest {
         events = mock(ApplicationEventPublisher.class);
         notifications = mock(NotificationService.class);
 
-        TrainingWorkoutService workoutService = mock(TrainingWorkoutService.class);
-        TrainingDecisionService trainingDecisionService = new TrainingDecisionService(horses, schedules, workoutService);
+        GroupWorkoutSyncService groupSync = mock(GroupWorkoutSyncService.class);
+        TrainingDecisionService trainingDecisionService = new TrainingDecisionService(horses, schedules, groupSync);
 
         service = new CareScheduleService(
                 schedules,

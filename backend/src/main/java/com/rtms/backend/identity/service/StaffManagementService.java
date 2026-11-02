@@ -17,6 +17,9 @@ import com.rtms.backend.stable.service.AreaTrainerAssignmentPolicy;
 import com.rtms.backend.stable.util.AreaCodeGenerator;
 import jakarta.persistence.EntityManager;
 import jakarta.validation.Validator;
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 
 
@@ -37,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -64,6 +68,7 @@ public class StaffManagementService {
     private final AreaTrainerAssignmentPolicy trainerAssignmentPolicy;
     private final EntityManager em;
     private final Validator validator;
+    private final AuditLogService auditLogService;
 
     private static final List<String> STAFF_ROLES = Arrays.asList("GROOM", "VETERINARIAN", "HEAD_TRAINER");
 
@@ -77,6 +82,23 @@ public class StaffManagementService {
             AreaRepository areaRepository,
             StableStallRepository stableStallRepository,
             AreaTrainerAssignmentPolicy trainerAssignmentPolicy, EntityManager em, Validator validator) {
+        this(userRepository, roleRepository, passwordEncoder, groomProfileRepository,
+             vetProfileRepository, trainerProfileRepository, areaRepository,
+             stableStallRepository, trainerAssignmentPolicy, em, validator, null);
+    }
+
+    @Autowired
+    public StaffManagementService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            GroomProfileRepository groomProfileRepository,
+            VeterinarianProfileRepository vetProfileRepository,
+            TrainerProfileRepository trainerProfileRepository,
+            AreaRepository areaRepository,
+            StableStallRepository stableStallRepository,
+            AreaTrainerAssignmentPolicy trainerAssignmentPolicy, EntityManager em, Validator validator,
+            AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -88,6 +110,7 @@ public class StaffManagementService {
         this.trainerAssignmentPolicy = trainerAssignmentPolicy;
         this.em = em;
         this.validator = validator;
+        this.auditLogService = auditLogService;
     }
 
     // ── READ ──────────────────────────────────────────────────────────────────
@@ -308,8 +331,23 @@ public class StaffManagementService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot update status of non-staff account through this API");
         }
 
+        boolean oldActive = user.isActive();
         user.setActive(active);
         user = userRepository.save(user);
+
+        if (auditLogService != null) {
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .action("STAFF_STATUS_UPDATE")
+                    .entityName("STAFF")
+                    .entityId(userId)
+                    .module("STAFF")
+                    .targetUrl("/manager/accounts?userId=" + userId)
+                    .summary("Updated staff status of " + (user.getFullName() != null ? user.getFullName() : ("User #" + userId)) + " to " + (active ? "ACTIVE" : "INACTIVE"))
+                    .before(Map.of("active", oldActive))
+                    .after(Map.of("active", active))
+                    .build());
+        }
+
         return mapToSummary(user);
     }
 

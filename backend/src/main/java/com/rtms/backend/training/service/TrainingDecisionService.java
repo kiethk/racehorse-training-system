@@ -20,10 +20,10 @@ import java.util.List;
  * (The ONLY place that changes the "may the horse train" decision.)
  *
  * Trước đây 8 chỗ (Vet, Groom, Manager, sự cố...) tự đặt 3-4 trường khóa trên ngựa và không chỗ nào hủy kế
- * hoạch đang chạy: ngựa bị chặn mà buổi tập vẫn nằm trong lot, Groom vẫn được giao dắt đi tập. Gom về đây để
+ * hoạch đang chạy: ngựa bị chặn mà buổi tập vẫn nằm trong session, Groom vẫn được giao dắt đi tập. Gom về đây để
  * chặn tập luôn kéo theo hủy buổi tập tương lai.
  * (Before, 8 places (vet, groom, manager, incidents...) set 3-4 lock fields on the horse themselves and none
- * cancelled running plans: a horse was blocked while its workouts stayed in the lot and the groom was still told
+ * cancelled running plans: a horse was blocked while its workouts stayed in the session and the groom was still told
  * to lead it out. They are gathered here so blocking always cancels future workouts.)
  */
 @Service
@@ -35,7 +35,7 @@ public class TrainingDecisionService {
 
     private final HorseRepository horseRepository;
     private final CareScheduleRepository careScheduleRepository;
-    private final TrainingWorkoutService workoutService;
+    private final GroupWorkoutSyncService groupSync;
 
     /**
      * @param workoutService hủy buổi tập tương lai khi chặn tập. TrainingWorkoutService không phụ thuộc ngược lại
@@ -45,16 +45,16 @@ public class TrainingDecisionService {
      */
     public TrainingDecisionService(HorseRepository horseRepository,
                                    CareScheduleRepository careScheduleRepository,
-                                   TrainingWorkoutService workoutService) {
+                                   GroupWorkoutSyncService groupSync) {
         this.horseRepository = horseRepository;
         this.careScheduleRepository = careScheduleRepository;
-        this.workoutService = workoutService;
+        this.groupSync = groupSync;
     }
 
     /**
-     * Chặn tập và hủy mọi buổi tập chưa diễn ra (lot rỗng bị hủy theo, plan đang chạy chuyển CANCELLED). Gọi lại
+     * Chặn tập và hủy mọi buổi tập chưa diễn ra (session rỗng bị hủy theo, plan đang chạy chuyển CANCELLED). Gọi lại
      * khi ngựa đã bị chặn là vô hại: lần hủy thứ hai không còn gì để hủy.
-     * (Blocks training and cancels every workout not yet held (empty lots are cancelled too, running plans become
+     * (Blocks training and cancels every workout not yet held (empty sessions are cancelled too, running plans become
      * CANCELLED). Calling again on an already blocked horse is harmless: the second cancel has nothing left.)
      */
     @Transactional
@@ -62,7 +62,8 @@ public class TrainingDecisionService {
         horse.setTrainingDecision(TrainingDecision.BLOCKED);
         horse.setTrainingDecisionReason(reason);
         horseRepository.save(horse);
-        workoutService.cancelFutureTrainingForHorse(horse.getId());
+        // Ngựa bị chặn ra khỏi nhóm; các ngựa còn lại vẫn tập bình thường. (A blocked horse leaves its group; the others train on.)
+        groupSync.exitAnyGroup(horse.getId());
     }
 
     @Transactional

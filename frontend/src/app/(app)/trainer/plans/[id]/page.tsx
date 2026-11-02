@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { PlanDetail } from '@/features/training/components/PlanDetail';
+import { GroupPlanDetail } from '@/features/training/components/GroupPlanDetail';
 
 export const metadata: Metadata = {
   title: 'Training plan details | Trainer | RTMS',
@@ -18,7 +18,7 @@ export default async function TrainingPlanDetailPage({
   return (
     <RoleGuard allowedRoles={['HEAD_TRAINER']}>
       <PageContainer>
-        <PlanDetail planId={planId} />
+        <GroupPlanDetail planId={planId} />
       </PageContainer>
     </RoleGuard>
   );
