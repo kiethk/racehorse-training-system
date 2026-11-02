@@ -50,6 +50,11 @@ public class HttpAuditInterceptor implements HandlerInterceptor {
             return;
         }
 
+        // Tier-1 deduplication: skip HTTP interceptor logging if a Tier-2 domain audit was recorded
+        if (Boolean.TRUE.equals(request.getAttribute("DOMAIN_AUDIT_LOGGED"))) {
+            return;
+        }
+
         Long userId = resolveUserId();
         int statusCode = response.getStatus();
 

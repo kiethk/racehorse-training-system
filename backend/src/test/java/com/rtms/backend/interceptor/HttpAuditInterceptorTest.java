@@ -54,6 +54,19 @@ class HttpAuditInterceptorTest {
         verify(auditLogService).recordHttpRequest(null, "POST", "/api/horses", 201);
     }
 
+    // 2b. POST with DOMAIN_AUDIT_LOGGED → skipped to prevent Tier-1 duplication
+    @Test
+    void givenPostRequest_whenDomainAuditLogged_thenTier1AuditSkipped() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/admissions/12/vet-review");
+        when(request.getAttribute("DOMAIN_AUDIT_LOGGED")).thenReturn(Boolean.TRUE);
+        when(response.getStatus()).thenReturn(200);
+
+        interceptor.afterCompletion(request, response, null, null);
+
+        verifyNoInteractions(auditLogService);
+    }
+
     // 3. PUT → audit called
     @Test
     void givenPutRequest_thenAuditCalled() throws Exception {

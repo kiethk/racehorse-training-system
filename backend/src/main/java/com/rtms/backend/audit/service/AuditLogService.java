@@ -1,11 +1,14 @@
 package com.rtms.backend.audit.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rtms.backend.audit.dto.DomainAuditEvent;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.audit.dto.AuditLogResponse;
 import com.rtms.backend.audit.entity.AuditLog;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.identity.repository.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -16,8 +19,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -32,13 +39,72 @@ public class AuditLogService {
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final AuditActivityResolver activityResolver;
+    private final ObjectMapper objectMapper;
+
+    public AuditLogService(AuditLogRepository auditLogRepository,
+                           UserRepository userRepository,
+                           AuditActivityResolver activityResolver,
+                           ObjectMapper objectMapper) {
+        this.auditLogRepository = auditLogRepository;
+        this.userRepository = userRepository;
+        this.activityResolver = activityResolver;
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+    }
 
     public AuditLogService(AuditLogRepository auditLogRepository,
                            UserRepository userRepository,
                            AuditActivityResolver activityResolver) {
-        this.auditLogRepository = auditLogRepository;
-        this.userRepository = userRepository;
-        this.activityResolver = activityResolver;
+        this(auditLogRepository, userRepository, activityResolver, new ObjectMapper());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordDomainEvent(DomainAuditEvent event) {
+        if (event == null) return;
+        try {
+            AuditLog log = new AuditLog();
+
+            if (event.userId() != null) {
+                User user = userRepository.findById(event.userId()).orElse(null);
+                log.setUser(user);
+            }
+
+            log.setAction(event.action());
+            log.setEntityName(event.entityName());
+            log.setEntityId(event.entityId());
+            log.setHttpMethod("DOMAIN");
+            log.setRequestPath(event.targetUrl());
+            log.setStatusCode(200);
+
+            Map<String, Object> payload = new LinkedHashMap<>();
+            if (event.summary() != null) payload.put("summary", event.summary());
+            if (event.reason() != null) payload.put("reason", event.reason());
+            if (event.module() != null) payload.put("module", event.module());
+            if (event.targetUrl() != null) payload.put("targetUrl", event.targetUrl());
+            if (event.before() != null) payload.put("before", event.before());
+            if (event.after() != null) payload.put("after", event.after());
+
+            String jsonDetails = objectMapper.writeValueAsString(payload);
+            log.setDetails(jsonDetails);
+
+            auditLogRepository.save(log);
+
+            // Mark request context to prevent duplicate Tier-1 logging
+            markCurrentRequestAudited();
+        } catch (Exception e) {
+            logger.error("Failed to persist domain audit log for action {}: {}", event.action(), e.getMessage(), e);
+        }
+    }
+
+    private void markCurrentRequestAudited() {
+        try {
+            var attributes = RequestContextHolder.getRequestAttributes();
+            if (attributes instanceof ServletRequestAttributes servletAttrs) {
+                HttpServletRequest req = servletAttrs.getRequest();
+                req.setAttribute("DOMAIN_AUDIT_LOGGED", Boolean.TRUE);
+            }
+        } catch (Exception e) {
+            // Ignore if invoked outside of a servlet request context (e.g. async/background jobs)
+        }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
