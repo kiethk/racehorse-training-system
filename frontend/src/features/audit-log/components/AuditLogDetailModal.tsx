@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { parseAuditDetails } from '../lib/auditDiff';
+import { parseAuditDetails, resolveLogModule } from '../lib/auditDiff';
 import type { AuditLogItem } from '../types';
 
 interface AuditLogDetailModalProps {
@@ -47,7 +47,7 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
 
   const parsed = parseAuditDetails(item.details, item.entityName, item.entityId);
   const actionTitle = formatAction(item.action, item.httpMethod, item.requestPath);
-  const moduleName = item.module || parsed.module || 'SYSTEM';
+  const moduleName = resolveLogModule(item.module || parsed.module, item.entityName, item.requestPath, item.action);
 
   return (
     <Modal

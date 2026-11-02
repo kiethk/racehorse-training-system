@@ -43,6 +43,55 @@ export function resolveEntityUrl(
   return null;
 }
 
+export function resolveLogModule(
+  module?: string | null,
+  entityName?: string | null,
+  requestPath?: string | null,
+  action?: string | null
+): string {
+  if (module && module !== 'SYSTEM') {
+    return module.toUpperCase();
+  }
+
+  // 1. Entity name check
+  if (entityName && entityName.toUpperCase() !== 'SYSTEM') {
+    const e = entityName.toUpperCase();
+    if (e.includes('ADMISSION')) return 'ADMISSIONS';
+    if (e.includes('CARE') || e.includes('HEALTH') || e.includes('MEDICAL') || e.includes('TREATMENT') || e.includes('INCIDENT')) return 'MEDICAL';
+    if (e.includes('STABLE') || e.includes('STALL') || e.includes('AREA')) return 'STABLE';
+    if (e.includes('HORSE')) return 'HORSES';
+    if (e.includes('USER') || e.includes('STAFF') || e.includes('ACCOUNT')) return 'STAFF';
+    if (e.includes('TRAINING') || e.includes('COURSE') || e.includes('SUBJECT') || e.includes('LOT') || e.includes('WORKOUT')) return 'TRAINING';
+    if (e.includes('RACE')) return 'RACING';
+  }
+
+  // 2. Request path check
+  if (requestPath) {
+    const p = requestPath.toLowerCase();
+    if (p.includes('/admissions')) return 'ADMISSIONS';
+    if (p.includes('/care-schedules') || p.includes('/health-records') || p.includes('/health-metrics') || p.includes('/preventive') || p.includes('/treatment-plans') || p.includes('/incidents') || p.includes('/vet/')) return 'MEDICAL';
+    if (p.includes('/stalls') || p.includes('/areas') || p.includes('/groom-daily-tasks')) return 'STABLE';
+    if (p.includes('/horses')) return 'HORSES';
+    if (p.includes('/staff') || p.includes('/users') || p.includes('/accounts')) return 'STAFF';
+    if (p.includes('/training-plans') || p.includes('/courses') || p.includes('/subjects') || p.includes('/lots') || p.includes('/workouts')) return 'TRAINING';
+    if (p.includes('/race-registrations')) return 'RACING';
+  }
+
+  // 3. Action check
+  if (action) {
+    const a = action.toUpperCase();
+    if (a.includes('ADMISSION')) return 'ADMISSIONS';
+    if (a.includes('CARE') || a.includes('HEALTH') || a.includes('VET') || a.includes('TREATMENT')) return 'MEDICAL';
+    if (a.includes('STALL') || a.includes('AREA') || a.includes('STABLE')) return 'STABLE';
+    if (a.includes('HORSE')) return 'HORSES';
+    if (a.includes('STAFF') || a.includes('USER') || a.includes('ACCOUNT')) return 'STAFF';
+    if (a.includes('TRAINING') || a.includes('WORKOUT') || a.includes('COURSE') || a.includes('LOT')) return 'TRAINING';
+    if (a.includes('RACE')) return 'RACING';
+  }
+
+  return 'SYSTEM';
+}
+
 function formatValue(val: unknown): string {
   if (val === null || val === undefined) return 'None';
   if (typeof val === 'object') return JSON.stringify(val);
@@ -115,3 +164,4 @@ export function parseAuditDetails(
     diffs: [],
   };
 }
+

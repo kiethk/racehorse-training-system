@@ -1,4 +1,5 @@
 import type { AuditLogItem, AuditDetailPayload } from '../types';
+import { resolveLogModule } from './auditDiff.ts';
 
 function escapeCsvField(val: unknown): string {
   if (val == null) return '""';
@@ -37,7 +38,7 @@ export function exportAuditLogsToCsv(items: AuditLogItem[]): string {
   const rows = items.map((item) => {
     const actor = item.actorName || item.actorEmail || 'System';
     const role = item.actorRole || '-';
-    const moduleName = item.module || '-';
+    const moduleName = resolveLogModule(item.module, item.entityName, item.requestPath, item.action);
     const action = item.action || `${item.httpMethod} ${item.requestPath}`;
     const entityName = item.entityName || '-';
     const entityId = item.entityId != null ? String(item.entityId) : '-';
@@ -74,3 +75,4 @@ export function downloadAuditLogsCsv(items: AuditLogItem[], filename = 'audit-lo
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+

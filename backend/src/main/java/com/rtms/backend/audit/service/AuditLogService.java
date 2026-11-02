@@ -37,13 +37,13 @@ public class AuditLogService {
     private static final int DEFAULT_PAGE_SIZE = 20;
 
     private static final Map<String, java.util.List<String>> MODULE_ENTITY_MAP = Map.of(
-            "ADMISSIONS", java.util.List.of("AdmissionApplication"),
-            "MEDICAL", java.util.List.of("CareSchedule", "HealthRecord", "TreatmentPlan", "PreventiveCareSchedule", "IncidentReport"),
-            "STABLE", java.util.List.of("StableStall", "Area", "GroomDailyTask"),
-            "HORSES", java.util.List.of("Horse"),
-            "STAFF", java.util.List.of("User", "Staff"),
-            "TRAINING", java.util.List.of("Course", "HorseTrainingPlan", "Subject", "TrainingLot", "TrainingWorkout", "TrainingRule"),
-            "RACING", java.util.List.of("RaceRegistration")
+            "ADMISSIONS", java.util.List.of("AdmissionApplication", "Admission"),
+            "MEDICAL", java.util.List.of("CareSchedule", "HealthRecord", "TreatmentPlan", "PreventiveCareSchedule", "IncidentReport", "Medical"),
+            "STABLE", java.util.List.of("StableStall", "Area", "GroomDailyTask", "Stable"),
+            "HORSES", java.util.List.of("Horse", "Horses"),
+            "STAFF", java.util.List.of("User", "Staff", "Account"),
+            "TRAINING", java.util.List.of("Course", "HorseTrainingPlan", "Subject", "TrainingLot", "TrainingWorkout", "TrainingRule", "Training"),
+            "RACING", java.util.List.of("RaceRegistration", "Racing")
     );
 
     private final AuditLogRepository auditLogRepository;
@@ -213,12 +213,43 @@ public class AuditLogService {
             if (targetModule != null) {
                 var moduleJson = cb.like(cb.lower(root.get("details")), "%\"module\":\"" + targetModule.toLowerCase() + "\"%");
                 var entityList = MODULE_ENTITY_MAP.get(targetModule);
-                if (entityList != null && !entityList.isEmpty()) {
-                    var entityIn = root.get("entityName").in(entityList);
-                    predicates.add(cb.or(moduleJson, entityIn));
-                } else {
-                    predicates.add(moduleJson);
-                }
+                var entityPredicate = (entityList != null && !entityList.isEmpty())
+                        ? root.get("entityName").in(entityList)
+                        : cb.disjunction();
+
+                jakarta.persistence.criteria.Predicate pathPredicate = switch (targetModule) {
+                    case "ADMISSIONS" -> cb.like(cb.lower(root.get("requestPath")), "%/admissions%");
+                    case "MEDICAL" -> cb.or(
+                            cb.like(cb.lower(root.get("requestPath")), "%/care-schedules%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/health%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/preventive%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/treatment%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/incidents%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/vet/%")
+                    );
+                    case "STABLE" -> cb.or(
+                            cb.like(cb.lower(root.get("requestPath")), "%/stalls%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/areas%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/groom-daily-tasks%")
+                    );
+                    case "HORSES" -> cb.like(cb.lower(root.get("requestPath")), "%/horses%");
+                    case "STAFF" -> cb.or(
+                            cb.like(cb.lower(root.get("requestPath")), "%/staff%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/users%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/accounts%")
+                    );
+                    case "TRAINING" -> cb.or(
+                            cb.like(cb.lower(root.get("requestPath")), "%/training%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/courses%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/subjects%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/lots%"),
+                            cb.like(cb.lower(root.get("requestPath")), "%/workouts%")
+                    );
+                    case "RACING" -> cb.like(cb.lower(root.get("requestPath")), "%/race-registrations%");
+                    default -> cb.disjunction();
+                };
+
+                predicates.add(cb.or(moduleJson, entityPredicate, pathPredicate));
             }
             if (targetRole != null) {
                 var userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
@@ -258,6 +289,7 @@ public class AuditLogService {
                     dto.setDetails(resolved.details());
                 }
             }
+            dto.setModule(AuditLogResponse.resolveModule(dto.getEntityName(), dto.getDetails(), log.getRequestPath(), dto.getAction()));
             if (dto.getAction() != null) {
                 dto.setAction(formatAction(dto.getAction()));
             }

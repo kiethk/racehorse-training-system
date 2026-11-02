@@ -226,5 +226,17 @@ class AuditLogServiceReadTest {
         AuditLog horseLog = new AuditLog();
         horseLog.setEntityName("Horse");
         assertEquals("HORSES", AuditLogResponse.from(horseLog).getModule());
+
+        AuditLog pathLog = new AuditLog();
+        pathLog.setRequestPath("/api/horses/10/status");
+        assertEquals("HORSES", AuditLogResponse.from(pathLog).getModule());
+
+        AuditLog admissionPathLog = new AuditLog();
+        admissionPathLog.setRequestPath("/api/admissions/42/approve");
+        assertEquals("ADMISSIONS", AuditLogResponse.from(admissionPathLog).getModule());
+
+        AuditLog stablePathLog = new AuditLog();
+        stablePathLog.setRequestPath("/api/stalls/occupancy");
+        assertEquals("STABLE", AuditLogResponse.from(stablePathLog).getModule());
     }
 }

@@ -14,7 +14,7 @@ import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { auditLogApi } from '../services/api';
 import { downloadAuditLogsCsv, extractAuditSummary } from '../lib/auditExport';
-import { resolveEntityUrl } from '../lib/auditDiff';
+import { resolveEntityUrl, resolveLogModule } from '../lib/auditDiff';
 import { AuditLogDetailModal } from './AuditLogDetailModal';
 import type { AuditLogItem, AuditLogFilters, PageResponse } from '../types';
 
@@ -31,6 +31,8 @@ const MODULE_OPTIONS = [
   { label: 'Stables & Stalls', value: 'STABLE' },
   { label: 'Horse Lifecycle', value: 'HORSES' },
   { label: 'Staff & Accounts', value: 'STAFF' },
+  { label: 'Training & Courses', value: 'TRAINING' },
+  { label: 'Racing & Registration', value: 'RACING' },
   { label: 'System & Admin', value: 'SYSTEM' },
 ] as const;
 
@@ -86,28 +88,19 @@ function formatAction(action: string | null, method?: string, path?: string): st
   return 'System Activity';
 }
 
-function formatDetails(log: AuditLogItem): string {
-  if (log.details && log.details.trim().length > 0) {
-    return extractAuditSummary(log.details);
-  }
-  if (log.action) {
-    const act = formatAction(log.action);
-    return log.entityName ? `${act} on ${log.entityName}` : act;
-  }
-  return 'System processed operation successfully.';
-}
-
 function OutcomeText({ success }: { success: boolean }) {
   if (success) {
     return (
-      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+        <span className="size-1.5 rounded-full bg-emerald-500" />
         Success
       </span>
     );
   }
 
   return (
-    <span className="font-semibold text-rose-600 dark:text-rose-400">
+    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400">
+      <span className="size-1.5 rounded-full bg-rose-500" />
       Failed
     </span>
   );
@@ -132,6 +125,12 @@ function ModuleBadge({ moduleName }: { moduleName: string | null | undefined }) 
       break;
     case 'STAFF':
       badgeColor = 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300';
+      break;
+    case 'TRAINING':
+      badgeColor = 'bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300';
+      break;
+    case 'RACING':
+      badgeColor = 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300';
       break;
   }
 
@@ -335,24 +334,21 @@ export function ManagerAuditLogView() {
           />
         ) : (
           <div className="flex flex-col h-full">
-            <Table bare className={loading ? 'whitespace-nowrap opacity-60 transition-opacity' : 'whitespace-nowrap transition-opacity'}>
+            <Table bare className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
               <THead>
                 <Tr>
-                  <Th className="px-6 py-4">Timestamp</Th>
-                  <Th className="px-6 py-4">Actor</Th>
-                  <Th className="px-6 py-4">Role</Th>
-                  <Th className="px-6 py-4">Module</Th>
-                  <Th className="px-6 py-4">Activity</Th>
-                  <Th className="px-6 py-4 min-w-[20rem]">Activity Summary</Th>
-                  <Th className="px-6 py-4 text-center">Outcome</Th>
-                  <Th className="px-6 py-4 text-right">Details</Th>
+                  <Th className="px-5 py-3.5 w-[11rem]">Timestamp</Th>
+                  <Th className="px-5 py-3.5 w-[14rem]">Actor & Role</Th>
+                  <Th className="px-5 py-3.5 min-w-[15rem]">Module & Activity</Th>
+                  <Th className="px-5 py-3.5 w-[12rem]">Target Entity</Th>
+                  <Th className="px-5 py-3.5 w-[11rem] text-right">Outcome & Inspect</Th>
                 </Tr>
               </THead>
               <TBody>
                 {data.content.map((log) => {
                   const displayAction = formatAction(log.action, log.httpMethod, log.requestPath);
-                  const displayDetails = formatDetails(log);
                   const targetEntityUrl = resolveEntityUrl(log.entityName, log.entityId);
+                  const moduleName = resolveLogModule(log.module, log.entityName, log.requestPath, log.action);
 
                   return (
                     <Tr
@@ -360,78 +356,92 @@ export function ManagerAuditLogView() {
                       className="hover:bg-[var(--color-surface-muted)] transition-colors cursor-pointer"
                       onClick={() => setSelectedLog(log)}
                     >
-                      <Td className="px-6 py-4 text-[var(--color-text-secondary)] whitespace-nowrap text-xs font-mono">
+                      {/* 1. Timestamp */}
+                      <Td className="px-5 py-3.5 text-[var(--color-text-secondary)] text-xs font-mono whitespace-nowrap">
                         {new Date(log.createdAt).toLocaleString('en-GB', { 
                           day: '2-digit', month: 'short', year: 'numeric',
                           hour: '2-digit', minute: '2-digit'
                         })}
                       </Td>
-                      <Td className="px-6 py-4">
-                        {log.actorName ? (
-                          <div>
-                            <span className="font-semibold block text-[var(--color-text-primary)] text-sm">{log.actorName}</span>
-                            {log.actorEmail && <span className="text-xs text-[var(--color-text-muted)]">{log.actorEmail}</span>}
-                          </div>
-                        ) : (
-                          <span className="text-[var(--color-text-secondary)] italic text-sm">System / Guest</span>
-                        )}
-                      </Td>
-                      <Td className="px-6 py-4">
-                        <span className="text-sm text-[var(--color-text-secondary)] font-medium">
-                          {formatRole(log.actorRole)}
-                        </span>
-                      </Td>
-                      <Td className="px-6 py-4">
-                        <ModuleBadge moduleName={log.module} />
-                      </Td>
-                      <Td className="px-6 py-4">
-                        <span className="font-semibold text-sm text-[var(--color-text-primary)]">
-                          {displayAction}
-                        </span>
-                      </Td>
-                      <Td className="px-6 py-4">
-                        <div className="max-w-md lg:max-w-xl">
-                          <p className="text-sm text-[var(--color-text-primary)] leading-snug line-clamp-2" title={displayDetails}>
-                            {displayDetails}
-                          </p>
-                          {log.entityName && (
-                            <div className="mt-1 flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-                              <span>Target:</span>
-                              {targetEntityUrl ? (
-                                <Link
-                                  href={targetEntityUrl}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="font-medium text-[var(--color-primary)] hover:underline inline-flex items-center gap-1"
-                                >
-                                  {log.entityName}
-                                  {log.entityId != null && <span>#{log.entityId}</span>}
-                                  <Icon name="external-link" className="size-3" />
-                                </Link>
-                              ) : (
-                                <>
-                                  <span className="font-medium text-[var(--color-text-secondary)]">{log.entityName}</span>
-                                  {log.entityId != null && (
-                                    <span className="bg-[var(--color-surface-muted)] px-1.5 py-0.2 rounded font-mono text-[11px]">
-                                      #{log.entityId}
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                            </div>
+
+                      {/* 2. Actor & Role (stacked) */}
+                      <Td className="px-5 py-3.5">
+                        <div className="space-y-0.5">
+                          {log.actorName ? (
+                            <span className="font-semibold block text-[var(--color-text-primary)] text-sm truncate max-w-[13rem]">
+                              {log.actorName}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--color-text-secondary)] italic text-sm">System / Guest</span>
                           )}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs px-1.5 py-0.2 rounded bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] font-medium">
+                              {formatRole(log.actorRole)}
+                            </span>
+                            {log.actorEmail && (
+                              <span className="text-[11px] text-[var(--color-text-muted)] truncate max-w-[11rem] font-mono">
+                                {log.actorEmail}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </Td>
-                      <Td className="px-6 py-4 text-center">
-                        <OutcomeText success={log.success} />
+
+                      {/* 3. Module & Activity (stacked) */}
+                      <Td className="px-5 py-3.5">
+                        <div className="space-y-1">
+                          <ModuleBadge moduleName={moduleName} />
+                          <div className="font-semibold text-sm text-[var(--color-text-primary)] leading-snug">
+                            {displayAction}
+                          </div>
+                        </div>
                       </Td>
-                      <Td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setSelectedLog(log)}
-                        >
-                          Inspect
-                        </Button>
+
+                      {/* 4. Target Entity with link */}
+                      <Td className="px-5 py-3.5">
+                        {log.entityName ? (
+                          targetEntityUrl ? (
+                            <Link
+                              href={targetEntityUrl}
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-medium text-sm text-[var(--color-primary)] hover:underline inline-flex items-center gap-1.5 max-w-[11rem] truncate"
+                              title={`View ${log.entityName} ${log.entityId != null ? '#' + log.entityId : ''}`}
+                            >
+                              <span>{log.entityName}</span>
+                              {log.entityId != null && (
+                                <span className="bg-[var(--color-primary-soft)] px-1.5 py-0.2 rounded font-mono text-[11px] font-semibold">
+                                  #{log.entityId}
+                                </span>
+                              )}
+                              <Icon name="external-link" className="size-3 shrink-0" />
+                            </Link>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-primary)]">
+                              <span>{log.entityName}</span>
+                              {log.entityId != null && (
+                                <span className="bg-[var(--color-surface-muted)] px-1.5 py-0.2 rounded font-mono text-[11px] text-[var(--color-text-secondary)]">
+                                  #{log.entityId}
+                                </span>
+                              )}
+                            </div>
+                          )
+                        ) : (
+                          <span className="text-xs text-[var(--color-text-muted)] italic">-</span>
+                        )}
+                      </Td>
+
+                      {/* 5. Outcome & Inspect (inline together) */}
+                      <Td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-3">
+                          <OutcomeText success={log.success} />
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setSelectedLog(log)}
+                          >
+                            Inspect
+                          </Button>
+                        </div>
                       </Td>
                     </Tr>
                   );

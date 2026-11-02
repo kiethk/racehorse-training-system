@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAuditDetails, resolveEntityUrl } from '../auditDiff.ts';
+import { parseAuditDetails, resolveEntityUrl, resolveLogModule } from '../auditDiff.ts';
 
 describe('Audit Diff Parser', () => {
   it('parses structured JSON with before and after states and detects changes', () => {
@@ -62,4 +62,15 @@ describe('Audit Diff Parser', () => {
     assert.equal(resolveEntityUrl('Unknown', 1), null);
     assert.equal(resolveEntityUrl(null, null), null);
   });
+
+  it('resolves module accurately using fallback heuristics when module is empty or SYSTEM', () => {
+    assert.equal(resolveLogModule('ADMISSIONS', null, null, null), 'ADMISSIONS');
+    assert.equal(resolveLogModule('SYSTEM', 'Horse', null, null), 'HORSES');
+    assert.equal(resolveLogModule('SYSTEM', null, '/api/horses/10', null), 'HORSES');
+    assert.equal(resolveLogModule(null, null, '/api/admissions/4', null), 'ADMISSIONS');
+    assert.equal(resolveLogModule(null, null, '/api/stalls/occupancy', null), 'STABLE');
+    assert.equal(resolveLogModule(null, null, null, 'CARE_SCHEDULE_RESCHEDULED'), 'MEDICAL');
+    assert.equal(resolveLogModule(null, null, null, null), 'SYSTEM');
+  });
 });
+
