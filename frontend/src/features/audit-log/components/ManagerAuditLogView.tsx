@@ -16,6 +16,7 @@ import { auditLogApi } from '../services/api';
 import { downloadAuditLogsCsv, extractAuditSummary } from '../lib/auditExport';
 import { resolveEntityUrl, resolveLogModule } from '../lib/auditDiff';
 import { AuditLogDetailModal } from './AuditLogDetailModal';
+import { ModuleBadge } from './ModuleBadge';
 import type { AuditLogItem, AuditLogFilters, PageResponse } from '../types';
 
 const STATUS_OPTIONS = [
@@ -106,40 +107,7 @@ function OutcomeText({ success }: { success: boolean }) {
   );
 }
 
-function ModuleBadge({ moduleName }: { moduleName: string | null | undefined }) {
-  const mod = (moduleName || 'SYSTEM').toUpperCase();
-  let badgeColor = 'bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)]';
 
-  switch (mod) {
-    case 'ADMISSIONS':
-      badgeColor = 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300';
-      break;
-    case 'MEDICAL':
-      badgeColor = 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300';
-      break;
-    case 'STABLE':
-      badgeColor = 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300';
-      break;
-    case 'HORSES':
-      badgeColor = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
-      break;
-    case 'STAFF':
-      badgeColor = 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300';
-      break;
-    case 'TRAINING':
-      badgeColor = 'bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300';
-      break;
-    case 'RACING':
-      badgeColor = 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300';
-      break;
-  }
-
-  return (
-    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wider ${badgeColor}`}>
-      {mod}
-    </span>
-  );
-}
 
 export function ManagerAuditLogView() {
   const router = useRouter();

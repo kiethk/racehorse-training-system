@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { ModuleBadge } from './ModuleBadge';
 import { parseAuditDetails, resolveLogModule } from '../lib/auditDiff';
 import type { AuditLogItem } from '../types';
 
@@ -59,9 +60,7 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
           <span className="text-lg font-bold text-[var(--color-text-primary)]">
             Audit Log #{item.id}
           </span>
-          <span className="rounded-full bg-[var(--color-primary-soft)] px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-[var(--color-primary)]">
-            {moduleName}
-          </span>
+          <ModuleBadge moduleName={moduleName} />
           {item.success ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
               <span className="size-1.5 rounded-full bg-emerald-500" />
@@ -195,8 +194,21 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
 
         {/* Change Diff Table */}
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-2">
-            Detailed Changes & State Transition
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+              Detailed Changes & State Transition
+            </div>
+            {parsed.diffs.length > 0 ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-white dark:bg-zinc-900 dark:text-emerald-300 px-2.5 py-0.5 rounded-md border border-emerald-300 dark:border-emerald-700 shadow-2xs">
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                Domain State Transition (Before & After)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-white dark:bg-zinc-900 dark:text-zinc-300 px-2 py-0.5 rounded-md border border-slate-300 dark:border-zinc-700 shadow-2xs">
+                <span className="size-1.5 rounded-full bg-slate-400" />
+                HTTP Telemetry Record
+              </span>
+            )}
           </div>
 
           {parsed.diffs.length > 0 ? (
@@ -242,10 +254,16 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
               </table>
             </div>
           ) : (
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3.5 space-y-2.5">
               <pre className="text-xs font-mono whitespace-pre-wrap break-all text-[var(--color-text-secondary)]">
                 {parsed.raw || 'No detailed payload recorded for this operation.'}
               </pre>
+              <div className="border-t border-[var(--color-border)]/70 pt-2 flex items-start gap-2 text-xs text-[var(--color-text-muted)]">
+                <Icon name="info" className="size-3.5 mt-0.5 shrink-0 text-slate-400" />
+                <span>
+                  This record captures HTTP request telemetry. Detailed Before & After state comparisons and operational reasons are recorded for domain business mutations (such as Admission Reviews, Medical Decisions, Stall Allocations, and Horse Status updates).
+                </span>
+              </div>
             </div>
           )}
         </div>
