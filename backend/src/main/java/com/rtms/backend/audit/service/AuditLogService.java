@@ -13,6 +13,7 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -55,6 +56,7 @@ public class AuditLogService {
     private final AuditActivityResolver activityResolver;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public AuditLogService(AuditLogRepository auditLogRepository,
                            UserRepository userRepository,
                            AuditActivityResolver activityResolver,

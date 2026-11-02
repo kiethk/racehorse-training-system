@@ -1,5 +1,4 @@
 package com.rtms.backend.interceptor;
-import com.rtms.backend.identity.controller.AuthController;
 
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.audit.service.AuditLogService;
