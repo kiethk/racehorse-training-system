@@ -201,6 +201,17 @@ class HttpAuditInterceptorTest {
         verifyNoInteractions(auditLogService);
     }
 
+    @Test
+    void givenAiChatEndpoint_thenNoAuditCall() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/v1/ai/chat");
+        when(response.getStatus()).thenReturn(200);
+
+        interceptor.afterCompletion(request, response, null, null);
+
+        verifyNoInteractions(auditLogService);
+    }
+
     // 11. AuditLogService throws → interceptor does not rethrow
     @Test
     void givenAuditServiceThrows_thenInterceptorDoesNotRethrow() throws Exception {

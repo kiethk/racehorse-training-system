@@ -1,5 +1,4 @@
 package com.rtms.backend.audit.dto;
-import com.rtms.backend.audit.entity.AuditLog;
 
 import java.time.LocalDateTime;
 

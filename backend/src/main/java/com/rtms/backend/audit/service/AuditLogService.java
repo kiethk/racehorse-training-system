@@ -8,6 +8,8 @@ import com.rtms.backend.audit.entity.AuditLog;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.identity.repository.UserRepository;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +25,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -36,14 +40,14 @@ public class AuditLogService {
     private static final int MAX_PAGE_SIZE = 50;
     private static final int DEFAULT_PAGE_SIZE = 20;
 
-    private static final Map<String, java.util.List<String>> MODULE_ENTITY_MAP = Map.of(
-            "ADMISSIONS", java.util.List.of("AdmissionApplication", "Admission"),
-            "MEDICAL", java.util.List.of("CareSchedule", "HealthRecord", "TreatmentPlan", "PreventiveCareSchedule", "IncidentReport", "Medical"),
-            "STABLE", java.util.List.of("StableStall", "Area", "GroomDailyTask", "Stable"),
-            "HORSES", java.util.List.of("Horse", "Horses"),
-            "STAFF", java.util.List.of("User", "Staff", "Account"),
-            "TRAINING", java.util.List.of("Course", "HorseTrainingPlan", "Subject", "TrainingLot", "TrainingWorkout", "TrainingRule", "Training"),
-            "RACING", java.util.List.of("RaceRegistration", "Racing")
+    private static final Map<String, List<String>> MODULE_ENTITY_MAP = Map.of(
+            "ADMISSIONS", List.of("AdmissionApplication", "Admission"),
+            "MEDICAL", List.of("CareSchedule", "HealthRecord", "TreatmentPlan", "PreventiveCareSchedule", "IncidentReport", "Medical"),
+            "STABLE", List.of("StableStall", "Area", "GroomDailyTask", "Stable"),
+            "HORSES", List.of("Horse", "Horses"),
+            "STAFF", List.of("User", "Staff", "Account"),
+            "TRAINING", List.of("Course", "HorseTrainingPlan", "Subject", "TrainingLot", "TrainingWorkout", "TrainingRule", "Training"),
+            "RACING", List.of("RaceRegistration", "Racing")
     );
 
     private final AuditLogRepository auditLogRepository;
@@ -193,7 +197,7 @@ public class AuditLogService {
         String targetRole = (role != null && !role.isBlank() && !"ALL".equalsIgnoreCase(role.trim())) ? role.trim().toUpperCase() : null;
 
         Page<AuditLog> page = auditLogRepository.findAll((root, query, cb) -> {
-            java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+            List<Predicate> predicates = new ArrayList<>();
             
             if (userId != null) {
                 predicates.add(cb.equal(root.get("user").get("id"), userId));
@@ -217,7 +221,7 @@ public class AuditLogService {
                         ? root.get("entityName").in(entityList)
                         : cb.disjunction();
 
-                jakarta.persistence.criteria.Predicate pathPredicate = switch (targetModule) {
+                Predicate pathPredicate = switch (targetModule) {
                     case "ADMISSIONS" -> cb.like(cb.lower(root.get("requestPath")), "%/admissions%");
                     case "MEDICAL" -> cb.or(
                             cb.like(cb.lower(root.get("requestPath")), "%/care-schedules%"),
@@ -252,8 +256,8 @@ public class AuditLogService {
                 predicates.add(cb.or(moduleJson, entityPredicate, pathPredicate));
             }
             if (targetRole != null) {
-                var userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
-                var roleJoin = userJoin.join("role", jakarta.persistence.criteria.JoinType.LEFT);
+                var userJoin = root.join("user", JoinType.LEFT);
+                var roleJoin = userJoin.join("role", JoinType.LEFT);
                 predicates.add(cb.equal(cb.upper(roleJoin.get("name")), targetRole));
             }
             if (searchTerm != null) {
@@ -261,11 +265,11 @@ public class AuditLogService {
                 var actionLike = cb.like(cb.lower(root.get("action")), "%" + searchTerm + "%");
                 var detailsLike = cb.like(cb.lower(root.get("details")), "%" + searchTerm + "%");
                 var entityLike = cb.like(cb.lower(root.get("entityName")), "%" + searchTerm + "%");
-                var userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
+                var userJoin = root.join("user", JoinType.LEFT);
                 var userNameLike = cb.like(cb.lower(userJoin.get("fullName")), "%" + searchTerm + "%");
                 predicates.add(cb.or(pathLike, actionLike, detailsLike, entityLike, userNameLike));
             }
-            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+            return cb.and(predicates.toArray(new Predicate[0]));
         }, boundedPageable);
 
         return page.map(log -> {

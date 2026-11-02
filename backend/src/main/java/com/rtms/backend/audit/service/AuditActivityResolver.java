@@ -93,6 +93,24 @@ public class AuditActivityResolver {
 
         Matcher m;
 
+        // 0. AI Assistant & HITL
+        if (normalizedPath.contains("/ai/chat") || normalizedPath.contains("/ai/conversations")) {
+            return new ResolvedActivity(
+                    "AI Assistant Consultation",
+                    "AI Assistant",
+                    null,
+                    "Interacted with AI Assistant for consultation" + statusSuffix
+            );
+        }
+        if (normalizedPath.contains("/ai/actions/commit")) {
+            return new ResolvedActivity(
+                    "AI Action Commit",
+                    "AI Action",
+                    null,
+                    "Committed confirmed action recommended by AI Assistant" + statusSuffix
+            );
+        }
+
         // 1. Admissions Workflow
         if ((m = ADMISSION_GROOM_REVIEW.matcher(normalizedPath)).matches()) {
             Long id = parseId(m.group(1));
@@ -508,6 +526,7 @@ public class AuditActivityResolver {
         if (path.contains("/care-schedules") || path.contains("/health-records") || path.contains("/preventive")) return "Medical";
         if (path.contains("/incidents")) return "IncidentReport";
         if (path.contains("/race-registrations")) return "RaceRegistration";
+        if (path.contains("/ai")) return "AI Assistant";
         return "System";
     }
 
