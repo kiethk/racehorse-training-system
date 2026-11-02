@@ -57,17 +57,17 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
       size="lg"
       title={
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-lg font-bold text-[var(--color-text-primary)]">
+          <span className="text-base font-bold text-[var(--color-text-primary)]">
             Audit Log #{item.id}
           </span>
           <ModuleBadge moduleName={moduleName} />
           {item.success ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
               <span className="size-1.5 rounded-full bg-emerald-500" />
               Success
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-400">
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-700 dark:text-rose-400">
               <span className="size-1.5 rounded-full bg-rose-500" />
               Failed ({item.statusCode})
             </span>
@@ -76,7 +76,7 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
       }
       description={
         <span className="text-xs text-[var(--color-text-muted)] font-mono">
-          Recorded on {new Date(item.createdAt).toLocaleString('en-GB', {
+          {new Date(item.createdAt).toLocaleString('en-GB', {
             dateStyle: 'full',
             timeStyle: 'medium',
           })}
@@ -90,154 +90,108 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
         </div>
       }
     >
-      <div className="space-y-6 pt-2">
-        {/* Action Title & High-level Summary */}
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
-          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-            Action Performed
-          </div>
-          <div className="mt-1 text-base font-semibold text-[var(--color-text-primary)]">
-            {actionTitle}
-          </div>
-          {parsed.summary && (
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)] leading-relaxed">
-              {parsed.summary}
-            </p>
-          )}
-        </div>
-
-        {/* Actor & Target Entity Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Actor Info */}
-          <div className="rounded-lg border border-[var(--color-border)] p-4 flex flex-col justify-between">
+      <div className="space-y-4 pt-1">
+        {/* Unified Overview Card */}
+        <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--color-border)] pb-2.5">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-2">
-                Initiated By (Actor)
+              <div className="text-[11px] font-medium text-[var(--color-text-muted)]">Action</div>
+              <div className="text-sm font-semibold text-[var(--color-text-primary)]">
+                {actionTitle}
               </div>
-              {item.actorUserId ? (
-                <div className="space-y-1">
-                  <div className="font-semibold text-[var(--color-text-primary)] text-sm">
-                    {item.actorName || `User #${item.actorUserId}`}
-                  </div>
-                  {item.actorEmail && (
-                    <div className="text-xs text-[var(--color-text-secondary)] font-mono">
-                      {item.actorEmail}
-                    </div>
-                  )}
-                  <div className="pt-1 flex items-center gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] font-medium">
-                      {formatRole(item.actorRole)}
-                    </span>
-                    <span className="text-xs text-[var(--color-text-muted)] font-mono">
-                      ID: {item.actorUserId}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-sm italic text-[var(--color-text-secondary)]">
-                  System Process / Unauthenticated
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Target Entity Info */}
-          <div className="rounded-lg border border-[var(--color-border)] p-4 flex flex-col justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-2">
-                Target Entity
-              </div>
-              {item.entityName ? (
-                <div className="space-y-1">
-                  <div className="font-semibold text-[var(--color-text-primary)] text-sm">
-                    {item.entityName}
-                  </div>
-                  {item.entityId != null && (
-                    <div className="text-xs text-[var(--color-text-muted)] font-mono">
-                      Entity ID: #{item.entityId}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-sm italic text-[var(--color-text-secondary)]">
-                  General System / Endpoint
+              {parsed.summary && (
+                <div className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+                  {parsed.summary}
                 </div>
               )}
             </div>
 
-            {/* Universal Entity Redirection Link */}
             {parsed.targetUrl && (
-              <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
-                <Link
-                  href={parsed.targetUrl}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary)] hover:underline"
-                >
-                  <Icon name="external-link" className="size-3.5" />
-                  View Target Entity Details
-                </Link>
-              </div>
+              <Link
+                href={parsed.targetUrl}
+                className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:underline pt-0.5"
+              >
+                <span>View {item.entityName || 'Entity'}</span>
+                <Icon name="external-link" className="size-3" />
+              </Link>
             )}
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div>
+              <span className="text-[var(--color-text-muted)]">Actor: </span>
+              {item.actorUserId ? (
+                <span className="font-medium text-[var(--color-text-primary)]">
+                  {item.actorName || `User #${item.actorUserId}`}
+                  {item.actorRole && (
+                    <span className="ml-1 text-[var(--color-text-muted)]">
+                      ({formatRole(item.actorRole)})
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-[var(--color-text-secondary)]">System</span>
+              )}
+              {item.actorEmail && (
+                <div className="text-[var(--color-text-muted)] font-mono text-[11px]">
+                  {item.actorEmail}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <span className="text-[var(--color-text-muted)]">Target: </span>
+              {item.entityName ? (
+                <span className="font-medium text-[var(--color-text-primary)]">
+                  {item.entityName}
+                  {item.entityId != null && (
+                    <span className="ml-1 font-mono text-[var(--color-text-muted)]">#{item.entityId}</span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-[var(--color-text-secondary)]">System</span>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Reason / Justification Callout */}
+        {/* Reason Callout (Clean, high contrast, subtle) */}
         {parsed.reason && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
-            <div className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-400">
-              Operational Reason / Justification
-            </div>
-            <p className="mt-1 text-sm text-amber-900 dark:text-amber-200 leading-relaxed">
-              {parsed.reason}
-            </p>
+          <div className="rounded border border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20 px-3.5 py-2 text-xs text-amber-950 dark:text-amber-200">
+            <span className="font-semibold text-amber-900 dark:text-amber-300">Reason: </span>
+            {parsed.reason}
           </div>
         )}
 
-        {/* Change Diff Table */}
+        {/* Changes Table (Standard, clean enterprise table) */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-              Detailed Changes & State Transition
-            </div>
-            {parsed.diffs.length > 0 ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-white dark:bg-zinc-900 dark:text-emerald-300 px-2.5 py-0.5 rounded-md border border-emerald-300 dark:border-emerald-700 shadow-2xs">
-                <span className="size-1.5 rounded-full bg-emerald-500" />
-                Domain State Transition (Before & After)
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-white dark:bg-zinc-900 dark:text-zinc-300 px-2 py-0.5 rounded-md border border-slate-300 dark:border-zinc-700 shadow-2xs">
-                <span className="size-1.5 rounded-full bg-slate-400" />
-                HTTP Telemetry Record
-              </span>
-            )}
+          <div className="text-[11px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5">
+            Changes
           </div>
 
           {parsed.diffs.length > 0 ? (
-            <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
+            <div className="overflow-hidden rounded border border-[var(--color-border)]">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)] font-medium">
+                <thead className="bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] font-medium border-b border-[var(--color-border)]">
                   <tr>
-                    <th className="py-2.5 px-4 border-b border-[var(--color-border)]">Field</th>
-                    <th className="py-2.5 px-4 border-b border-[var(--color-border)]">Before State</th>
-                    <th className="py-2.5 px-4 border-b border-[var(--color-border)]">After State</th>
+                    <th className="py-2 px-3 font-semibold w-1/3">Field</th>
+                    <th className="py-2 px-3 font-semibold w-1/3">Previous</th>
+                    <th className="py-2 px-3 font-semibold w-1/3">New</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--color-border)]">
+                <tbody className="divide-y divide-[var(--color-border)] font-mono text-xs">
                   {parsed.diffs.map((diff) => (
                     <tr
                       key={diff.field}
-                      className={
-                        diff.isChanged
-                          ? 'bg-amber-50/40 dark:bg-amber-950/10'
-                          : undefined
-                      }
+                      className={diff.isChanged ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : undefined}
                     >
-                      <td className="py-2.5 px-4 font-mono font-medium text-[var(--color-text-primary)]">
+                      <td className="py-2 px-3 font-medium text-[var(--color-text-primary)]">
                         {diff.field}
                       </td>
-                      <td className="py-2.5 px-4 font-mono text-[var(--color-text-secondary)]">
+                      <td className="py-2 px-3 text-[var(--color-text-muted)]">
                         {diff.beforeValue}
                       </td>
-                      <td className="py-2.5 px-4 font-mono">
+                      <td className="py-2 px-3">
                         <span
                           className={
                             diff.isChanged
@@ -254,39 +208,10 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
               </table>
             </div>
           ) : (
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3.5 space-y-2.5">
-              <pre className="text-xs font-mono whitespace-pre-wrap break-all text-[var(--color-text-secondary)]">
-                {parsed.raw || 'No detailed payload recorded for this operation.'}
-              </pre>
-              <div className="border-t border-[var(--color-border)]/70 pt-2 flex items-start gap-2 text-xs text-[var(--color-text-muted)]">
-                <Icon name="info" className="size-3.5 mt-0.5 shrink-0 text-slate-400" />
-                <span>
-                  This record captures HTTP request telemetry. Detailed Before & After state comparisons and operational reasons are recorded for domain business mutations (such as Admission Reviews, Medical Decisions, Stall Allocations, and Horse Status updates).
-                </span>
-              </div>
+            <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs font-mono text-[var(--color-text-secondary)] whitespace-pre-wrap break-all">
+              {parsed.raw || 'No change payload recorded for this operation.'}
             </div>
           )}
-        </div>
-
-        {/* Technical HTTP Metadata */}
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 p-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
-            HTTP Trace Metadata
-          </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono text-[var(--color-text-secondary)]">
-            <div>
-              <span className="text-[var(--color-text-muted)]">Method: </span>
-              <span className="font-semibold text-[var(--color-text-primary)]">{item.httpMethod}</span>
-            </div>
-            <div>
-              <span className="text-[var(--color-text-muted)]">Status: </span>
-              <span>{item.statusCode}</span>
-            </div>
-            <div>
-              <span className="text-[var(--color-text-muted)]">Path: </span>
-              <span>{item.requestPath}</span>
-            </div>
-          </div>
         </div>
       </div>
     </Modal>

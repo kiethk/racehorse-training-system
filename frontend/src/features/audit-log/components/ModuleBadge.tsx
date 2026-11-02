@@ -47,8 +47,7 @@ export function ModuleBadge({ moduleName }: { moduleName: string | null | undefi
   }
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border bg-white text-[11px] font-bold tracking-wider shadow-2xs ${style}`}>
-      <span className={`size-1.5 rounded-full ${dotColor}`} />
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-sm border bg-white text-[11px] font-bold tracking-wider shadow-2xs ${style}`}>
       {mod}
     </span>
   );

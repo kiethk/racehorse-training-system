@@ -100,3 +100,4 @@ SELECT
 WHERE NOT EXISTS (
     SELECT 1 FROM audit_logs WHERE action = 'REALLOCATE_STALL' AND entity_name = 'StableStall' AND entity_id = 4
 );
+
