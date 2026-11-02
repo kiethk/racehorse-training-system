@@ -13,11 +13,9 @@ import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
-import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.service.PedigreeBirthDateValidator;
 
 
-import java.util.Comparator;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -30,7 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.time.LocalDate;
+
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -378,9 +376,25 @@ public class OwnerAdmissionService {
                 c.getDateOfBirth(), c.getSex(), c.getRegistrationNumber(), c.getRegistryName(),
                 c.getSireName(), c.getSireRegistrationNumber(),
                 c.getDamName(), c.getDamRegistrationNumber(), c.getPedigreeNotes());
-        return new OwnerAdmissionDetailResponse(a.getId(), a.getStatus(), a.getSubmittedAt(),
-                candidate, docs.stream().map(this::toDocumentResponse).toList(),
-                a.getGroomFeedback(), a.getVetFeedback(), a.getTrainerFeedback(), a.getManagerFeedback());
+        return new OwnerAdmissionDetailResponse(
+                a.getId(),
+                a.getStatus(),
+                a.getSubmittedAt(),
+                candidate,
+                docs.stream().map(this::toDocumentResponse).toList(),
+                a.getGroomDecision(),
+                a.getGroomReviewedAt(),
+                a.getGroomFeedback(),
+                a.getArrivedAt(),
+                a.getArrivalDeadlineAt(),
+                a.getVetTrainingDecision(),
+                a.getVetReviewedAt(),
+                a.getVetFeedback(),
+                a.getTrainerReviewedAt(),
+                a.getTrainerFeedback(),
+                a.getManagerDecision(),
+                a.getManagerReviewedAt(),
+                a.getManagerFeedback());
     }
 
     private CandidateHorseProfile findCandidate(Long admissionId) {

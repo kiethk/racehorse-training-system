@@ -5,12 +5,14 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { Notice } from '@/components/ui/Notice';
+import { Pill } from '@/components/ui/StatusBadge';
+import { formatDateTime } from '@/lib/display';
 import { ownerAdmissionApi, type OwnerAdmissionDetail } from '../services/ownerApi';
 import { admissionsApi } from '../services/api';
 import { AdmissionDetailLayout } from '../shared/components/AdmissionDetailLayout';
 import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeader';
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
-import { AdmissionInfoSection, AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { AdmissionInfoSection, AdmissionSideCard, InfoGroupTitle, InfoRow } from '../shared/components/AdmissionInfoSection';
 import { EditAdmissionModal } from './EditAdmissionModal';
 import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
@@ -64,16 +66,26 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
 
   const candidate = detail.candidate;
   const photo = detail.documents.find(document => document.documentType === 'HORSE_PHOTO');
-  const activeStage = currentReviewStage(detail.status);
   const feedback = reviewFeedback.flatMap(({ label, field }) => {
     const value = detail[field]?.trim();
     return value ? [{ label, value }] : [];
   });
-  const feedbackValue = (field: typeof reviewFeedback[number]['field'], stage: number) => {
-    const value = detail[field];
-    if (value?.trim()) return value;
-    return activeStage !== null && stage > activeStage ? 'Not yet in review' : 'No feedback recorded';
-  };
+
+  const hasAnyReview = Boolean(
+    detail.groomReviewedAt ||
+    detail.arrivedAt ||
+    detail.arrivalDeadlineAt ||
+    detail.vetReviewedAt ||
+    detail.trainerReviewedAt ||
+    detail.managerReviewedAt ||
+    detail.groomFeedback ||
+    detail.vetFeedback ||
+    detail.trainerFeedback ||
+    detail.managerFeedback ||
+    detail.groomDecision ||
+    detail.vetTrainingDecision ||
+    detail.managerDecision
+  );
   return (
     <div className="space-y-5">
       {created && <Notice tone="success">Admission and supporting documents submitted for Groom review.</Notice>}
@@ -142,11 +154,110 @@ export function OwnerAdmissionDetailView({ admissionId, created }: { admissionId
                 id: 'history',
                 label: 'Review History',
                 content: (
-                  <AdmissionInfoSection title="Review feedback">
-                    <InfoRow label="Groom" value={feedbackValue('groomFeedback', 0)} />
-                    <InfoRow label="Veterinarian" value={feedbackValue('vetFeedback', 2)} />
-                    <InfoRow label="Trainer" value={feedbackValue('trainerFeedback', 3)} />
-                    <InfoRow label="Manager" value={feedbackValue('managerFeedback', 4)} />
+                  <AdmissionInfoSection title="Review History">
+                    {!hasAnyReview ? (
+                      <p className="text-[var(--color-text-secondary)] italic">
+                        Application is currently awaiting review. Review notes and decisions will appear here as the application progresses.
+                      </p>
+                    ) : (
+                      <div className="space-y-6">
+                        {/* 1. Groom Review & Arrival */}
+                        {(detail.groomReviewedAt || detail.groomFeedback || detail.groomDecision || detail.arrivedAt || detail.arrivalDeadlineAt) && (
+                          <div className="space-y-3">
+                            <InfoGroupTitle>Quarantine Groom Review</InfoGroupTitle>
+                            {detail.groomDecision && (
+                              <InfoRow
+                                label="Decision"
+                                value={
+                                  <Pill tone={detail.groomDecision === 'APPROVED' ? 'success' : 'danger'}>
+                                    {detail.groomDecision === 'APPROVED' ? 'Accepted for Quarantine' : 'Rejected'}
+                                  </Pill>
+                                }
+                              />
+                            )}
+                            {detail.groomReviewedAt && (
+                              <InfoRow label="Reviewed At" value={formatDateTime(detail.groomReviewedAt)} />
+                            )}
+                            {detail.arrivalDeadlineAt && (
+                              <InfoRow label="Arrival Deadline" value={formatDateTime(detail.arrivalDeadlineAt)} />
+                            )}
+                            {detail.arrivedAt && (
+                              <InfoRow label="Checked In At" value={formatDateTime(detail.arrivedAt)} />
+                            )}
+                            <InfoRow
+                              label="Groom Notes"
+                              value={detail.groomFeedback?.trim() || <span className="text-[var(--color-text-muted)] italic">No notes recorded</span>}
+                            />
+                          </div>
+                        )}
+
+                        {/* 2. Veterinarian Review */}
+                        {(detail.vetReviewedAt || detail.vetFeedback || detail.vetTrainingDecision) && (
+                          <div className="space-y-3 pt-5 border-t border-[var(--color-border)]">
+                            <InfoGroupTitle>Veterinarian Clinical Examination</InfoGroupTitle>
+                            {detail.vetTrainingDecision && (
+                              <InfoRow
+                                label="Clinical Conclusion"
+                                value={
+                                  <Pill
+                                    tone={detail.vetTrainingDecision === 'ALLOWED' ? 'success' : 'warning'}
+                                  >
+                                    {detail.vetTrainingDecision === 'ALLOWED'
+                                      ? 'Approved for Training'
+                                      : 'Temporarily Blocked from Training'}
+                                  </Pill>
+                                }
+                              />
+                            )}
+                            {detail.vetReviewedAt && (
+                              <InfoRow label="Examined At" value={formatDateTime(detail.vetReviewedAt)} />
+                            )}
+                            <InfoRow
+                              label="Clinical Notes"
+                              value={detail.vetFeedback?.trim() || <span className="text-[var(--color-text-muted)] italic">No notes recorded</span>}
+                            />
+                          </div>
+                        )}
+
+                        {/* 3. Trainer Review */}
+                        {(detail.trainerReviewedAt || detail.trainerFeedback) && (
+                          <div className="space-y-3 pt-5 border-t border-[var(--color-border)]">
+                            <InfoGroupTitle>Trainer Assessment</InfoGroupTitle>
+                            {detail.trainerReviewedAt && (
+                              <InfoRow label="Assessed At" value={formatDateTime(detail.trainerReviewedAt)} />
+                            )}
+                            <InfoRow
+                              label="Assessment Notes"
+                              value={detail.trainerFeedback?.trim() || <span className="text-[var(--color-text-muted)] italic">No notes recorded</span>}
+                            />
+                          </div>
+                        )}
+
+                        {/* 4. Manager Review */}
+                        {(detail.managerReviewedAt || detail.managerFeedback || detail.managerDecision) && (
+                          <div className="space-y-3 pt-5 border-t border-[var(--color-border)]">
+                            <InfoGroupTitle>Manager Final Decision</InfoGroupTitle>
+                            {detail.managerDecision && (
+                              <InfoRow
+                                label="Final Decision"
+                                value={
+                                  <Pill tone={detail.managerDecision === 'APPROVED' ? 'success' : 'danger'}>
+                                    {detail.managerDecision === 'APPROVED' ? 'Approved into Club' : 'Rejected'}
+                                  </Pill>
+                                }
+                              />
+                            )}
+                            {detail.managerReviewedAt && (
+                              <InfoRow label="Decided At" value={formatDateTime(detail.managerReviewedAt)} />
+                            )}
+                            <InfoRow
+                              label="Manager Notes"
+                              value={detail.managerFeedback?.trim() || <span className="text-[var(--color-text-muted)] italic">No notes recorded</span>}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </AdmissionInfoSection>
                 ),
               },

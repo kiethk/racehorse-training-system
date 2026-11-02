@@ -269,23 +269,10 @@ export function TrainerStableView() {
                 area={selectedArea}
                 horse={selectedHorse}
                 specialty={specialty && specialty.horseId === selectedHorse?.id ? specialty.value : null}
+                groomName={selectedGroom?.fullName ?? (selectedStall.groomId ? `Groom #${selectedStall.groomId}` : 'Unassigned')}
+                trainerName={selectedTrainer?.fullName ?? 'Unassigned'}
                 hint="Pick a stall on the map to see its horse and the groom who looks after it."
-              >
-                {selectedStall && (
-                  <dl className="space-y-2 text-sm">
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-[var(--color-text-secondary)]">Assigned Groom</dt>
-                      <dd className="text-right font-medium text-[var(--color-text-primary)]">
-                        {selectedGroom?.fullName ?? (selectedStall.groomId ? `Groom #${selectedStall.groomId}` : 'Unassigned')}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-[var(--color-text-secondary)]">Assigned Trainer</dt>
-                      <dd className="text-right font-medium text-[var(--color-text-primary)]">{selectedTrainer?.fullName ?? 'Unassigned'}</dd>
-                    </div>
-                  </dl>
-                )}
-              </StallDetailPanel>
+              />
             ) : null}
           />
       ) : (
@@ -437,24 +424,13 @@ export function TrainerStableView() {
             specialty={
               specialty && specialty.horseId === selectedHorse?.id ? specialty.value : null
             }
+            groomName={
+              selectedGroom?.fullName ??
+              (selectedStall.groomId ? `Groom #${selectedStall.groomId}` : 'Unassigned')
+            }
+            trainerName={selectedTrainer?.fullName ?? 'Unassigned'}
             hint="View stall status, horse profile, and assigned staff."
-          >
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-secondary)]">Assigned Groom</dt>
-                <dd className="text-right font-medium text-[var(--color-text-primary)]">
-                  {selectedGroom?.fullName ??
-                    (selectedStall.groomId ? `Groom #${selectedStall.groomId}` : 'Unassigned')}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-secondary)]">Assigned Trainer</dt>
-                <dd className="text-right font-medium text-[var(--color-text-primary)]">
-                  {selectedTrainer?.fullName ?? 'Unassigned'}
-                </dd>
-              </div>
-            </dl>
-          </StallDetailPanel>
+          />
         )}
       </Modal>
     </ScreenLayout>

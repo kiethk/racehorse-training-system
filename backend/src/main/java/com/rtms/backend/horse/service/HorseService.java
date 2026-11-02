@@ -121,6 +121,12 @@ public class HorseService {
                 ? horseRepository.findByOwnerId(currentUser.getUserId())
                 : horseRepository.findAll();
 
+        if (horses != null && !horses.isEmpty()) {
+            horses = horses.stream()
+                    .sorted(Comparator.comparing(Horse::getId, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .collect(Collectors.toList());
+        }
+
         // Groom chỉ thấy ngựa đang ở trong chuồng mình chăm, áp dụng trước mọi bộ lọc khác.
         // (A groom sees only horses in the stalls they look after, before any other filter.)
         if (GROOM_ROLE.equals(currentUser.getRole())) {

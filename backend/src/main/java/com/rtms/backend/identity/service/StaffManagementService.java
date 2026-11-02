@@ -35,6 +35,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.Locale;
@@ -94,6 +95,7 @@ public class StaffManagementService {
     public List<StaffSummaryResponse> getAllStaff() {
         return userRepository.findAll().stream()
                 .filter(u -> u.getRole() != null && STAFF_ROLES.contains(u.getRole().getName()))
+                .sorted(Comparator.comparing(User::getId, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(this::mapToSummary)
                 .collect(Collectors.toList());
     }

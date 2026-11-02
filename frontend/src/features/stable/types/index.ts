@@ -36,6 +36,7 @@ export interface Horse {
   statusReasonCode?: string | null;
   currentStallId: number | null;
   ownerId: number | null;
+  ownerName?: string | null;
   trainingDecision?: TrainingDecision;
   /** Why the vet blocked training; null when ALLOWED. */
   trainingDecisionReason?: string | null;
