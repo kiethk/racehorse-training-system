@@ -9,3 +9,4 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'CLUB_MANAGER' AND p.code IN ('AUDIT_LOG_VIEW', 'AUDIT_LOG_MANAGE')
 ON CONFLICT DO NOTHING;
+
