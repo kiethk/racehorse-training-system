@@ -1,7 +1,12 @@
+'use client';
+
 import type { ReactNode } from 'react';
-import { EmptyState, HorseAvatar, IconButton, Panel, Pill } from '@/components/ui';
+import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import { EmptyState, HorseAvatar, Icon, IconButton, Panel, Pill } from '@/components/ui';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import type { HorseSpecialty } from '@/features/horses/types';
+import { formatDate, formatEnumLabel } from '@/lib/display';
 import type { Area, Horse, StableStall } from '../../types';
 import { stallState } from './StallCell';
 
@@ -11,7 +16,17 @@ interface StallDetailPanelProps {
   horse: Horse | undefined;
   /** Null while loading or when the viewer may not read it; the badges then render nothing. */
   specialty?: HorseSpecialty | null;
-  /** What the role wants to see about this stall (tasks, incidents, groom…). */
+  /** Assigned groom's display name */
+  groomName?: string | null;
+  /** Assigned groom's user ID for direct profile redirection */
+  groomId?: number | null;
+  /** Assigned trainer's display name */
+  trainerName?: string | null;
+  /** Assigned trainer's user ID for direct profile redirection */
+  trainerId?: number | null;
+  /** Custom destination for the horse link if different from the default role route. */
+  horseHref?: string | null;
+  /** What the role wants to see about this stall (tasks, incidents, etc.). */
   children?: ReactNode;
   /** What the role can do with this stall. */
   actions?: ReactNode;
@@ -21,8 +36,37 @@ interface StallDetailPanelProps {
   onClose?: () => void;
 }
 
+function calculateAge(dateOfBirth: string | null | undefined): string | null {
+  if (!dateOfBirth) return null;
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let years = now.getFullYear() - dob.getFullYear();
+  const m = now.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
+    years--;
+  }
+  return years >= 0 ? `${years} years old` : null;
+}
+
 /** The side panel next to the floor plan. Sticks under the top bar while the map scrolls. */
-export function StallDetailPanel({ stall, area, horse, specialty, children, actions, hint, onClose }: StallDetailPanelProps) {
+export function StallDetailPanel({
+  stall,
+  area,
+  horse,
+  specialty,
+  groomName,
+  groomId,
+  trainerName,
+  trainerId,
+  horseHref,
+  children,
+  actions,
+  hint,
+  onClose,
+}: StallDetailPanelProps) {
+  const { user } = useAuth();
+
   if (!stall) {
     return (
       <Panel className="xl:sticky xl:top-[var(--sticky-top)]">
@@ -34,19 +78,47 @@ export function StallDetailPanel({ stall, area, horse, specialty, children, acti
   const state = stallState(stall, horse);
   const occupancy = state.tone === 'danger' ? 'Occupied' : state.label;
 
+  const rolePath =
+    user?.role === 'HEAD_TRAINER'
+      ? 'trainer'
+      : user?.role === 'VETERINARIAN'
+        ? 'veterinarian'
+        : user?.role === 'GROOM'
+          ? 'groom'
+          : 'manager';
+  const targetHorseHref = horseHref ?? (horse ? `/${rolePath}/horses/${horse.id}` : '#');
+
+  const effectiveGroomId = groomId ?? stall?.groomId ?? null;
+  const effectiveTrainerId = trainerId ?? area?.trainerId ?? null;
+  const effectiveOwnerId = horse?.ownerId ?? null;
+  const isManager = user?.role === 'CLUB_MANAGER';
+
+  const ownerAccountHref =
+    isManager && effectiveOwnerId
+      ? `/manager/accounts?userId=${effectiveOwnerId}`
+      : null;
+  const groomStaffHref =
+    isManager && effectiveGroomId
+      ? `/manager/accounts?userId=${effectiveGroomId}`
+      : null;
+  const trainerStaffHref =
+    isManager && effectiveTrainerId
+      ? `/manager/accounts?userId=${effectiveTrainerId}`
+      : null;
+
   return (
     <Panel
       key={stall.id}
       padded
-      className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-200 xl:sticky xl:top-[var(--sticky-top)]"
+      className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-200 xl:sticky xl:top-[var(--sticky-top)]"
     >
-      <div className="flex items-start justify-between gap-2 border-b border-[var(--color-border)] pb-3">
+      {/* Header: Stall code & occupancy */}
+      <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] pb-3">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Stall {stall.stallCode}</h2>
-          <p className="truncate text-xs text-[var(--color-text-muted)]">{area?.name ?? 'Unknown area'}</p>
+          <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">Stall {stall.stallCode}</h2>
+          <p className="mt-0.5 truncate text-xs font-medium text-[var(--color-text-muted)]">{area?.name ?? 'Unknown area'}</p>
         </div>
-        {/* Occupancy only: whether the horse may train is shown once, with the horse below. */}
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1.5">
           <Pill size="sm" tone={occupancy === 'Occupied' ? 'success' : occupancy === 'Reserved' ? 'info' : 'neutral'}>
             {occupancy}
           </Pill>
@@ -55,26 +127,168 @@ export function StallDetailPanel({ stall, area, horse, specialty, children, acti
       </div>
 
       {horse ? (
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <HorseAvatar name={horse.name} image={horse.imageUrl} size={44} rounded="md" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{horse.name}</p>
-              <p className="truncate text-xs text-[var(--color-text-secondary)]">{horse.breed ?? 'Breed not recorded'}</p>
+        <div className="space-y-4">
+          {/* Horse Identity Banner */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <HorseAvatar name={horse.name} image={horse.imageUrl} size={48} rounded="md" />
+              <div className="min-w-0">
+                <Link
+                  href={targetHorseHref}
+                  className="group inline-flex items-center gap-1.5 font-bold text-base text-[var(--color-text-primary)] hover:text-[var(--color-primary)] transition-colors truncate"
+                  title="View full horse profile"
+                >
+                  <span className="truncate">{horse.name}</span>
+                  <Icon name="external-link" size={13} className="shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
+                </Link>
+                <p className="truncate text-xs font-medium text-[var(--color-text-secondary)]">{horse.breed ?? 'Breed not recorded'}</p>
+              </div>
             </div>
+            {horse.trainingDecision && (
+              <Pill size="sm" tone={horse.trainingDecision === 'BLOCKED' ? 'danger' : 'success'}>
+                {horse.trainingDecision === 'BLOCKED' ? 'Training blocked' : 'Training allowed'}
+              </Pill>
+            )}
           </div>
-          {horse.trainingDecision && (
-            <Pill size="sm" tone={horse.trainingDecision === 'BLOCKED' ? 'danger' : 'success'}>
-              {horse.trainingDecision === 'BLOCKED' ? 'Training blocked' : 'Training allowed'}
-            </Pill>
-          )}
+
+          {/* Blocked alert banner */}
           {horse.trainingDecision === 'BLOCKED' && horse.trainingDecisionReason && (
-            <p className="text-xs text-[var(--color-danger)]">{horse.trainingDecisionReason}</p>
+            <div className="rounded-lg bg-[var(--color-danger-soft)] border border-[var(--color-danger)]/20 p-2.5 text-xs text-[var(--color-danger)] leading-relaxed">
+              ⚠️ {horse.trainingDecisionReason}
+            </div>
           )}
+
+          {/* Full Key-Value Specifications */}
+          <div className="space-y-2.5 pt-2 border-t border-[var(--color-border)] text-xs">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[var(--color-text-muted)] font-medium">UELN</span>
+              <span className="font-mono font-semibold text-[var(--color-text-primary)] text-right">
+                {horse.registrationNumber || '—'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[var(--color-text-muted)] font-medium">Sex</span>
+              <span className="font-semibold text-[var(--color-text-primary)] text-right">
+                {formatEnumLabel(horse.sex)}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[var(--color-text-muted)] font-medium">Age</span>
+              <span className="font-semibold text-[var(--color-text-primary)] text-right">
+                {calculateAge(horse.dateOfBirth) || '—'}
+              </span>
+            </div>
+
+            {horse.dateOfBirth && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[var(--color-text-muted)] font-medium">Date of Birth</span>
+                <span className="text-[var(--color-text-primary)] font-medium text-right">
+                  {formatDate(horse.dateOfBirth)}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[var(--color-text-muted)] font-medium">Owner</span>
+              {ownerAccountHref ? (
+                <Link
+                  href={ownerAccountHref}
+                  className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline truncate max-w-[200px] text-right"
+                  title="View owner account details"
+                >
+                  <span className="truncate">{horse.ownerName || `Owner #${effectiveOwnerId}`}</span>
+                  <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              ) : (
+                <span className="font-semibold text-[var(--color-text-primary)] truncate max-w-[200px] text-right">
+                  {horse.ownerName || (effectiveOwnerId ? `Owner #${effectiveOwnerId}` : 'Riverside Club')}
+                </span>
+              )}
+            </div>
+
+            {groomName && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[var(--color-text-muted)] font-medium">Assigned Groom</span>
+                {groomStaffHref ? (
+                  <Link
+                    href={groomStaffHref}
+                    className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline truncate max-w-[200px] text-right"
+                    title="View groom account details"
+                  >
+                    <span className="truncate">{groomName}</span>
+                    <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                  </Link>
+                ) : (
+                  <span className="font-semibold text-[var(--color-text-primary)] text-right">{groomName}</span>
+                )}
+              </div>
+            )}
+
+            {trainerName && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[var(--color-text-muted)] font-medium">Assigned Trainer</span>
+                {trainerStaffHref ? (
+                  <Link
+                    href={trainerStaffHref}
+                    className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline truncate max-w-[200px] text-right"
+                    title="View trainer account details"
+                  >
+                    <span className="truncate">{trainerName}</span>
+                    <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                  </Link>
+                ) : (
+                  <span className="font-semibold text-[var(--color-text-primary)] text-right">{trainerName}</span>
+                )}
+              </div>
+            )}
+          </div>
+
           <HorseSpecialtyBadges specialty={specialty} />
         </div>
       ) : (
-        <p className="text-sm italic text-[var(--color-text-muted)]">No horse is stabled here.</p>
+        <div className="space-y-3">
+          <p className="text-sm italic text-[var(--color-text-muted)]">No horse is stabled here.</p>
+          {(groomName || trainerName) && (
+            <div className="space-y-2 pt-2 border-t border-[var(--color-border)] text-xs">
+              {groomName && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[var(--color-text-muted)] font-medium">Assigned Groom</span>
+                  {groomStaffHref ? (
+                    <Link
+                      href={groomStaffHref}
+                      className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline truncate max-w-[200px] text-right"
+                      title="View groom account details"
+                    >
+                      <span className="truncate">{groomName}</span>
+                      <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                  ) : (
+                    <span className="font-semibold text-[var(--color-text-primary)] text-right">{groomName}</span>
+                  )}
+                </div>
+              )}
+              {trainerName && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[var(--color-text-muted)] font-medium">Assigned Trainer</span>
+                  {trainerStaffHref ? (
+                    <Link
+                      href={trainerStaffHref}
+                      className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline truncate max-w-[200px] text-right"
+                      title="View trainer account details"
+                    >
+                      <span className="truncate">{trainerName}</span>
+                      <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                  ) : (
+                    <span className="font-semibold text-[var(--color-text-primary)] text-right">{trainerName}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {children}

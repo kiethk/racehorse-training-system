@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
-import { Button, EmptyState, Panel, Skeleton } from '@/components/ui';
+import { Button, EmptyState, Icon, Panel, Skeleton } from '@/components/ui';
 import type { Area, StableStall } from '@/features/stable/types';
 import { HorseInfoRow, HorseInfoSection } from '../shared/components/HorseInfoSection';
 import { managerHorseService, type UserSummaryResponse } from '../services/managerHorseService';
@@ -108,45 +109,100 @@ export function StableTeamTab({ ownerId, currentStallId }: StableTeamTabProps) {
     );
   }
 
-  const NOT_ASSIGNED = <span className="font-normal text-[var(--color-text-muted)]">Not assigned</span>;
+  const NOT_ASSIGNED = <span className="font-normal italic text-[var(--color-text-muted)]">Not assigned</span>;
   const d = data!;
 
   return (
     <div className="space-y-5">
       {/* Owner */}
       <HorseInfoSection title="Owner" icon="user">
-        <HorseInfoRow
-          stacked
-          label="Name"
-          value={d.owner ? d.owner.fullName : NOT_ASSIGNED}
-        />
+        <div className="space-y-3.5">
+          <HorseInfoRow
+            label="Owner Name"
+            value={
+              d.owner ? (
+                <Link
+                  href={`/manager/accounts?userId=${d.owner.id}`}
+                  className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline"
+                  title="View owner account details"
+                >
+                  <span>{d.owner.fullName}</span>
+                  <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              ) : (
+                NOT_ASSIGNED
+              )
+            }
+          />
+          {d.owner?.email && (
+            <HorseInfoRow label="Email" value={d.owner.email} />
+          )}
+        </div>
       </HorseInfoSection>
 
       {/* Stable assignment */}
       <HorseInfoSection title="Stable Assignment" icon="home">
         {d.stall ? (
-          <>
-            <HorseInfoRow stacked label="Area" value={d.area ? `${d.area.name} (${d.area.code})` : '—'} />
-            <HorseInfoRow stacked label="Stall" value={d.stall.stallCode} />
-            <HorseInfoRow stacked label="Area type" value={d.area?.type ?? '—'} />
-          </>
+          <div className="space-y-3.5">
+            <HorseInfoRow
+              label="Stall Location"
+              value={
+                <Link
+                  href="/manager/stable"
+                  className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline"
+                  title="View stall on stable board"
+                >
+                  <span>Stall {d.stall.stallCode}</span>
+                  <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              }
+            />
+            <HorseInfoRow label="Area" value={d.area ? `${d.area.name}` : '—'} />
+            <HorseInfoRow label="Area Type" value={d.area?.type ?? '—'} />
+          </div>
         ) : (
-          <p className="text-sm text-[var(--color-text-muted)]">Not assigned to a stall.</p>
+          <p className="text-sm text-[var(--color-text-muted)] italic">Not assigned to a stall.</p>
         )}
       </HorseInfoSection>
 
       {/* Care team */}
       <HorseInfoSection title="Care Team" icon="users">
-        <HorseInfoRow
-          stacked
-          label="Trainer"
-          value={d.trainer ? d.trainer.fullName : NOT_ASSIGNED}
-        />
-        <HorseInfoRow
-          stacked
-          label="Groom"
-          value={d.groom ? d.groom.fullName : NOT_ASSIGNED}
-        />
+        <div className="space-y-3.5">
+          <HorseInfoRow
+            label="Assigned Trainer"
+            value={
+              d.trainer ? (
+                <Link
+                  href={`/manager/accounts?userId=${d.trainer.id}`}
+                  className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline"
+                  title="View trainer account details"
+                >
+                  <span>{d.trainer.fullName}</span>
+                  <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              ) : (
+                NOT_ASSIGNED
+              )
+            }
+          />
+          <HorseInfoRow
+            label="Assigned Groom"
+            value={
+              d.groom ? (
+                <Link
+                  href={`/manager/accounts?userId=${d.groom.id}`}
+                  className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline"
+                  title="View groom account details"
+                >
+                  <span>{d.groom.fullName}</span>
+                  <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              ) : (
+                NOT_ASSIGNED
+              )
+            }
+          />
+        </div>
       </HorseInfoSection>
     </div>
   );

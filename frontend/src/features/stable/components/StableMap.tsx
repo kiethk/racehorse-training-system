@@ -203,6 +203,7 @@ export function StableMap() {
           area={areas.find((area) => area.id === selectedStall?.areaId)}
           horse={selectedHorse}
           specialty={specialty && specialty.horseId === selectedHorseId ? specialty.value : null}
+          groomName={selectedStall ? (selectedGroom?.fullName ?? (selectedStall.groomId ? `Groom #${selectedStall.groomId}` : 'Unassigned')) : undefined}
           hint="Pick a stall to assign a horse to it, remove its horse, or see which groom looks after it."
           actions={
             selectedStall && (
@@ -234,18 +235,7 @@ export function StableMap() {
               )
             )
           }
-        >
-          {selectedStall && (
-            <div>
-              <FieldLabel>Assigned groom</FieldLabel>
-              <p className="mt-1 text-sm text-[var(--color-text-primary)]">
-                {selectedStall.groomId
-                  ? selectedGroom?.fullName ?? `Groom #${selectedStall.groomId}`
-                  : <span className="italic text-[var(--color-text-muted)]">Unassigned</span>}
-              </p>
-            </div>
-          )}
-        </StallDetailPanel>
+        />
       </div>
 
       {/* Dialogs */}

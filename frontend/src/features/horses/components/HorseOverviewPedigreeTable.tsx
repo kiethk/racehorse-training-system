@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 import {
   Icon,
   Pill,
@@ -22,6 +24,18 @@ interface HorseOverviewPedigreeTableProps {
 }
 
 export function HorseOverviewPedigreeTable({ horse, pedigree }: HorseOverviewPedigreeTableProps) {
+  const { user } = useAuth();
+  const rolePath =
+    user?.role === 'HEAD_TRAINER'
+      ? 'trainer'
+      : user?.role === 'VETERINARIAN'
+        ? 'veterinarian'
+        : user?.role === 'HORSE_OWNER'
+          ? 'owner'
+          : user?.role === 'GROOM'
+            ? 'groom'
+            : 'manager';
+
   const hasSire = Boolean(pedigree?.sire || pedigree?.sireName || pedigree?.sireRegistrationNumber);
   const hasDam = Boolean(pedigree?.dam || pedigree?.damName || pedigree?.damRegistrationNumber);
 
@@ -130,7 +144,18 @@ export function HorseOverviewPedigreeTable({ horse, pedigree }: HorseOverviewPed
             Stable Location
           </Td>
           <Td className="font-medium text-[var(--color-text-primary)]">
-            {horse.currentStallId ? `Stall #${horse.currentStallId}` : 'Unassigned'}
+            {horse.currentStallId ? (
+              <Link
+                href={`/${rolePath}/stable`}
+                className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline"
+                title="View in stable map"
+              >
+                <span>Stall #{horse.currentStallId}</span>
+                <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+              </Link>
+            ) : (
+              'Unassigned'
+            )}
           </Td>
           <Td className="font-medium text-[var(--color-text-muted)] bg-[var(--color-surface-subtle)]/40 text-xs uppercase tracking-wide">
             Status Detail
@@ -168,7 +193,18 @@ export function HorseOverviewPedigreeTable({ horse, pedigree }: HorseOverviewPed
               <Td>
                 <div className="space-y-0.5">
                   <div className="font-semibold text-[var(--color-text-primary)]">
-                    {sireName}
+                    {pedigree.sire?.id ? (
+                      <Link
+                        href={`/${rolePath}/horses/${pedigree.sire.id}`}
+                        className="group inline-flex items-center gap-1.5 font-bold text-[var(--color-primary)] hover:underline"
+                        title="View sire profile"
+                      >
+                        <span>{sireName}</span>
+                        <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                    ) : (
+                      sireName
+                    )}
                   </div>
                   {(sireBreed || sireDob) && (
                     <div className="text-xs text-[var(--color-text-muted)]">
@@ -200,7 +236,18 @@ export function HorseOverviewPedigreeTable({ horse, pedigree }: HorseOverviewPed
               <Td>
                 <div className="space-y-0.5">
                   <div className="font-semibold text-[var(--color-text-primary)]">
-                    {damName}
+                    {pedigree.dam?.id ? (
+                      <Link
+                        href={`/${rolePath}/horses/${pedigree.dam.id}`}
+                        className="group inline-flex items-center gap-1.5 font-bold text-[var(--color-info)] hover:underline"
+                        title="View dam profile"
+                      >
+                        <span>{damName}</span>
+                        <Icon name="external-link" size={12} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                    ) : (
+                      damName
+                    )}
                   </div>
                   {(damBreed || damDob) && (
                     <div className="text-xs text-[var(--color-text-muted)]">
