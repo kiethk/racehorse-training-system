@@ -381,7 +381,6 @@ export function ManagerAuditLogView() {
                                   #{log.entityId}
                                 </span>
                               )}
-                              <Icon name="external-link" className="size-3 shrink-0" />
                             </Link>
                           ) : (
                             <div className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-primary)]">
