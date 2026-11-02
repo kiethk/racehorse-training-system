@@ -16,8 +16,9 @@ import { auditLogApi } from '../services/api';
 import { downloadAuditLogsCsv, extractAuditSummary } from '../lib/auditExport';
 import { resolveEntityUrl, resolveLogModule } from '../lib/auditDiff';
 import { AuditLogDetailModal } from './AuditLogDetailModal';
+import { AuditLogArchiveModal } from './AuditLogArchiveModal';
 import { ModuleBadge } from './ModuleBadge';
-import type { AuditLogItem, AuditLogFilters, PageResponse } from '../types';
+import type { AuditLogItem, AuditLogFilters, PageResponse, AuditArchiveStatus } from '../types';
 
 const STATUS_OPTIONS = [
   { label: 'All Results', value: 'ALL' },
@@ -132,8 +133,23 @@ export function ManagerAuditLogView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
+  const [archiveStatus, setArchiveStatus] = useState<AuditArchiveStatus | null>(null);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   
   const [draft, setDraft] = useState<AuditLogFilters>(urlFilters);
+
+  const loadArchiveStatus = async () => {
+    try {
+      const status = await auditLogApi.getArchiveStatus();
+      setArchiveStatus(status);
+    } catch (err) {
+      console.error('Failed to load archive status:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadArchiveStatus();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -215,6 +231,30 @@ export function ManagerAuditLogView() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setIsArchiveModalOpen(true)}
+            className={
+              archiveStatus?.requiresMaintenance
+                ? 'border-rose-400 text-rose-700 bg-rose-50/50 hover:bg-rose-100/50 dark:border-rose-800 dark:text-rose-300 dark:bg-rose-950/30'
+                : ''
+            }
+            title={
+              archiveStatus?.requiresMaintenance
+                ? `Maintenance Notice: ${archiveStatus.agedCount} logs older than 30 days detected`
+                : 'Archive and clean database audit trail'
+            }
+          >
+            {archiveStatus?.requiresMaintenance && (
+              <span className="relative flex size-2 mr-1">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-rose-600" />
+              </span>
+            )}
+            <Icon name="archive" className="size-4 mr-1.5" />
+            Archive &amp; Purge
+          </Button>
           <Button
             type="button"
             variant="secondary"
@@ -449,6 +489,17 @@ export function ManagerAuditLogView() {
         item={selectedLog}
         open={selectedLog != null}
         onClose={() => setSelectedLog(null)}
+      />
+
+      {/* Archive & Purge Modal */}
+      <AuditLogArchiveModal
+        open={isArchiveModalOpen}
+        onClose={() => setIsArchiveModalOpen(false)}
+        status={archiveStatus}
+        onPurged={() => {
+          auditLogApi.getAuditLogs(urlFilters).then(setData).catch(console.error);
+          loadArchiveStatus();
+        }}
       />
     </div>
   );
