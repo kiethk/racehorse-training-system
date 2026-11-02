@@ -36,6 +36,16 @@ public class AuditLogService {
     private static final int MAX_PAGE_SIZE = 50;
     private static final int DEFAULT_PAGE_SIZE = 20;
 
+    private static final Map<String, java.util.List<String>> MODULE_ENTITY_MAP = Map.of(
+            "ADMISSIONS", java.util.List.of("AdmissionApplication"),
+            "MEDICAL", java.util.List.of("CareSchedule", "HealthRecord", "TreatmentPlan", "PreventiveCareSchedule", "IncidentReport"),
+            "STABLE", java.util.List.of("StableStall", "Area", "GroomDailyTask"),
+            "HORSES", java.util.List.of("Horse"),
+            "STAFF", java.util.List.of("User", "Staff"),
+            "TRAINING", java.util.List.of("Course", "HorseTrainingPlan", "Subject", "TrainingLot", "TrainingWorkout", "TrainingRule"),
+            "RACING", java.util.List.of("RaceRegistration")
+    );
+
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final AuditActivityResolver activityResolver;
@@ -144,6 +154,21 @@ public class AuditLogService {
             String search,
             Pageable pageable
     ) {
+        return getAuditLogs(userId, httpMethod, statusCode, from, to, search, null, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AuditLogResponse> getAuditLogs(
+            Long userId,
+            String httpMethod,
+            Integer statusCode,
+            LocalDateTime from,
+            LocalDateTime to,
+            String search,
+            String module,
+            String role,
+            Pageable pageable
+    ) {
         // Validate httpMethod filter
         String normalizedMethod = null;
         if (httpMethod != null && !httpMethod.isBlank()) {
@@ -164,6 +189,8 @@ public class AuditLogService {
 
         String searchTerm = (search != null && !search.isBlank()) ? search.trim().toLowerCase() : null;
         String finalMethod = normalizedMethod;
+        String targetModule = (module != null && !module.isBlank() && !"ALL".equalsIgnoreCase(module.trim())) ? module.trim().toUpperCase() : null;
+        String targetRole = (role != null && !role.isBlank() && !"ALL".equalsIgnoreCase(role.trim())) ? role.trim().toUpperCase() : null;
 
         Page<AuditLog> page = auditLogRepository.findAll((root, query, cb) -> {
             java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
@@ -182,6 +209,21 @@ public class AuditLogService {
             }
             if (to != null) {
                 predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), to));
+            }
+            if (targetModule != null) {
+                var moduleJson = cb.like(cb.lower(root.get("details")), "%\"module\":\"" + targetModule.toLowerCase() + "\"%");
+                var entityList = MODULE_ENTITY_MAP.get(targetModule);
+                if (entityList != null && !entityList.isEmpty()) {
+                    var entityIn = root.get("entityName").in(entityList);
+                    predicates.add(cb.or(moduleJson, entityIn));
+                } else {
+                    predicates.add(moduleJson);
+                }
+            }
+            if (targetRole != null) {
+                var userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
+                var roleJoin = userJoin.join("role", jakarta.persistence.criteria.JoinType.LEFT);
+                predicates.add(cb.equal(cb.upper(roleJoin.get("name")), targetRole));
             }
             if (searchTerm != null) {
                 var pathLike = cb.like(cb.lower(root.get("requestPath")), "%" + searchTerm + "%");

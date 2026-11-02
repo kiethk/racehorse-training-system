@@ -198,4 +198,33 @@ class AuditLogServiceReadTest {
 
         assertTrue(result.isEmpty());
     }
+
+    // 13. Filter by module and role passed to repository
+    @Test
+    void filterByModuleAndRole_passedToRepository() {
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        service.getAuditLogs(null, null, null, null, null, null, "MEDICAL", "VETERINARIAN", PageRequest.of(0, 20));
+
+        verify(repository).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class));
+    }
+
+    // 14. Response DTO resolves module from JSON or entityName correctly
+    @Test
+    void resolveModule_extractsFromEntityNameOrJsonDetails() {
+        AuditLog legacyLog = new AuditLog();
+        legacyLog.setEntityName("AdmissionApplication");
+        legacyLog.setDetails("Legacy text review");
+        assertEquals("ADMISSIONS", AuditLogResponse.from(legacyLog).getModule());
+
+        AuditLog jsonLog = new AuditLog();
+        jsonLog.setEntityName("UnknownEntity");
+        jsonLog.setDetails("{\"module\":\"MEDICAL\",\"reason\":\"vaccine\"}");
+        assertEquals("MEDICAL", AuditLogResponse.from(jsonLog).getModule());
+
+        AuditLog horseLog = new AuditLog();
+        horseLog.setEntityName("Horse");
+        assertEquals("HORSES", AuditLogResponse.from(horseLog).getModule());
+    }
 }

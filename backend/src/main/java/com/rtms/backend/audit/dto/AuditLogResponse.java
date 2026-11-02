@@ -17,6 +17,7 @@ public class AuditLogResponse {
     private String entityName;
     private Long entityId;
     private String details;
+    private String module;
     private boolean success;
     private LocalDateTime createdAt;
 
@@ -58,6 +59,9 @@ public class AuditLogResponse {
     public String getDetails() { return details; }
     public void setDetails(String details) { this.details = details; }
 
+    public String getModule() { return module; }
+    public void setModule(String module) { this.module = module; }
+
     public boolean isSuccess() { return success; }
     public void setSuccess(boolean success) { this.success = success; }
 
@@ -74,6 +78,7 @@ public class AuditLogResponse {
         dto.setEntityName(log.getEntityName());
         dto.setEntityId(log.getEntityId());
         dto.setDetails(log.getDetails());
+        dto.setModule(resolveModule(log.getEntityName(), log.getDetails()));
         dto.setSuccess(log.getStatusCode() == null || (log.getStatusCode() >= 200 && log.getStatusCode() < 300));
         dto.setCreatedAt(log.getCreatedAt());
 
@@ -85,5 +90,29 @@ public class AuditLogResponse {
         }
 
         return dto;
+    }
+
+    public static String resolveModule(String entityName, String details) {
+        if (details != null && details.startsWith("{") && details.contains("\"module\":")) {
+            int idx = details.indexOf("\"module\":");
+            int startQuote = details.indexOf("\"", idx + 9);
+            if (startQuote != -1) {
+                int endQuote = details.indexOf("\"", startQuote + 1);
+                if (endQuote != -1) {
+                    return details.substring(startQuote + 1, endQuote).toUpperCase();
+                }
+            }
+        }
+        if (entityName == null) return "SYSTEM";
+        return switch (entityName) {
+            case "AdmissionApplication" -> "ADMISSIONS";
+            case "CareSchedule", "HealthRecord", "TreatmentPlan", "PreventiveCareSchedule", "IncidentReport" -> "MEDICAL";
+            case "StableStall", "Area", "GroomDailyTask" -> "STABLE";
+            case "Horse" -> "HORSES";
+            case "User", "Staff" -> "STAFF";
+            case "Course", "HorseTrainingPlan", "Subject", "TrainingLot", "TrainingWorkout", "TrainingRule" -> "TRAINING";
+            case "RaceRegistration" -> "RACING";
+            default -> "SYSTEM";
+        };
     }
 }
