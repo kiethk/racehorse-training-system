@@ -486,9 +486,9 @@ public class CareScheduleService {
         }
 
         // C7/B1: không auto-recovery hàng loạt. Vet tick điều kiện cụ thể (resolvedConditionIds)
-        // thì điều kiện đó + phác đồ OLD của bệnh án liên quan mới được đóng; thuốc kê
-        // trong chính ca này luôn giữ ACTIVE (B1).
-        if (decision == TrainingDecision.ALLOWED && request.getResolvedConditionIds() != null) {
+        // thì điều kiện đó mới được đánh dấu RECOVERED; nếu decision == ALLOWED thì phác đồ OLD
+        // của bệnh án liên quan cũng được đóng (COMPLETED); thuốc kê trong chính ca này luôn giữ ACTIVE (B1).
+        if (request.getResolvedConditionIds() != null) {
             for (Long conditionId : request.getResolvedConditionIds()) {
                 if (conditionId == null) continue;
                 InjuryRecord ir = injuryRecordRepository.findById(conditionId)
@@ -499,7 +499,7 @@ public class CareScheduleService {
                 ir.setStatus("RECOVERED");
                 ir.setRecoveredAt(now);
                 injuryRecordRepository.save(ir);
-                if (ir.getHealthRecordId() != null) {
+                if (ir.getHealthRecordId() != null && decision == TrainingDecision.ALLOWED) {
                     for (TreatmentPlan oldPlan : treatmentPlanRepository
                             .findByHealthRecordIdAndStatusIgnoreCase(ir.getHealthRecordId(), "ACTIVE")) {
                         oldPlan.setStatus("COMPLETED");
@@ -639,6 +639,31 @@ public class CareScheduleService {
                     }
                 }
             }
+        }
+
+        // Bắn thông báo kết quả khám định kỳ / tái khám cho Trainer phụ trách ngựa
+        if (schedule.getCareType() == CareType.ROUTINE) {
+            horseRepository.findTrainerIdByHorseId(horse.getId()).ifPresent(trainerId -> {
+                String horseName = horse.getName() != null ? horse.getName() : ("#" + horse.getId());
+                String title = "Routine Examination Completed: " + horseName;
+                String decisionText = effectiveDecision == TrainingDecision.ALLOWED
+                        ? "Cleared for training (ALLOWED)."
+                        : "Training on hold (BLOCKED)." + (effectiveReason != null && !effectiveReason.isBlank() ? " Note: " + effectiveReason : "");
+                String message = "Veterinarian has completed routine examination for " + horseName + ". Decision: " + decisionText;
+                try {
+                    notificationService.sendAssignmentNotification(
+                            trainerId,
+                            NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                            schedule.getId(),
+                            horse.getId(),
+                            NotificationTypes.CARE_SCHEDULE_ROUTINE_COMPLETED,
+                            title,
+                            message
+                    );
+                } catch (Exception ex) {
+                    // Bỏ qua lỗi gửi notification để bảo toàn giao dịch khám bệnh
+                }
+            });
         }
 
         // Atomic next schedule creation if provided. Multiple follow-ups let vets

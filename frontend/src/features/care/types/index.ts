@@ -103,6 +103,9 @@ export interface CompleteCareScheduleRequest {
     normalZ?: number | null;
     meshName?: string | null;
   }>;
+  prescriptions?: PrescriptionItemRequest[];
+  generalCareInstructions?: string;
+  resolvedConditionIds?: number[];
 }
 
 export interface CancelCareScheduleRequest {

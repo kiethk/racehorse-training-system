@@ -15,7 +15,9 @@ import { VitalsSection } from './VitalsSection';
 import { DiagnosisSection } from './DiagnosisSection';
 import { TrainingDecisionSection } from './TrainingDecisionSection';
 import { FollowUpSection } from './FollowUpSection';
-import { PrescriptionSection, type PrescriptionFormItem } from './PrescriptionSection';
+import { PrescriptionSection, toPrescriptionRequests, type PrescriptionFormItem } from './PrescriptionSection';
+import { computeSuggestedRecheckDate } from './prescriptionDrafts';
+import { ActiveConditionsSection } from './ActiveConditionsSection';
 import type { MedicationCatalogItem } from '@/features/care/types';
 import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
@@ -50,7 +52,7 @@ import {
   type ExamVariant,
 } from './examVariantConfig';
 import { healthApi } from '@/features/health/services/healthApi';
-import type { HorseBodyRegion } from '@/features/health/types';
+import type { HorseBodyRegion, InjuryRecord } from '@/features/health/types';
 import {
   InjuryMarkerPanel,
   buildInjuryMarkerRequests,
@@ -153,6 +155,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     } = props;
 
     const config = EXAM_VARIANT_CONFIG[variant];
+    const isPrescriptionActive = config.prescription || careType === 'ROUTINE';
 
     const draftStorageKey = careScheduleId
       ? `draft:care-schedule:${careScheduleId}`
@@ -200,6 +203,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     const [metrics, setMetrics] = useState<Record<MetricField, string>>(emptyMetrics);
 
+    const [activeInjuries, setActiveInjuries] = useState<InjuryRecord[]>([]);
+    const [resolvedConditionIds, setResolvedConditionIds] = useState<number[]>([]);
     const [catalogMedications, setCatalogMedications] = useState<MedicationCatalogItem[]>([]);
     const [prescriptions, setPrescriptions] = useState<PrescriptionFormItem[]>([]);
     const [generalCareInstructions, setGeneralCareInstructions] = useState('');
@@ -229,6 +234,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       followUpIdempotencyKey?: string;
       followUps?: Array<{ key: string; date: string; description: string }>;
       markers?: InjuryMarker[];
+      resolvedConditionIds?: number[];
       timestamp: string;
     } | null>(() => {
       if (!config.draft || typeof window === 'undefined') return null;
@@ -279,17 +285,18 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     }, []);
 
     useEffect(() => {
-      if (!horseId || !config.markersEnabled) return;
+      if (!horseId) return;
       let active = true;
       healthApi
         .getActiveInjuries(horseId)
-        .then((activeInjuries) => {
+        .then((injuries) => {
           if (!active) return;
-          if (activeInjuries.length > 0) {
+          setActiveInjuries(injuries);
+          if (config.markersEnabled && injuries.length > 0) {
             setMarkers((prev) =>
               prev.length > 0
                 ? prev
-                : activeInjuries.map((inj, idx) => {
+                : injuries.map((inj, idx) => {
                     const worldPos = resolveInjuryWorldPosition(inj);
                     const normal =
                       inj.normalX != null && inj.normalY != null && inj.normalZ != null
@@ -325,7 +332,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     }, [show3DTab, anatomyTab]);
 
     useEffect(() => {
-      if (!config.prescription) return;
+      if (!isPrescriptionActive) return;
       let active = true;
       healthApi
         .getClinicalMedications()
@@ -336,7 +343,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       return () => {
         active = false;
       };
-    }, [config.prescription]);
+    }, [isPrescriptionActive]);
 
     const isGated = scheduleStatus != null && scheduleStatus !== 'IN_PROGRESS';
     const followUpRequired = config.followUpMode === 'single-required-select';
@@ -408,6 +415,9 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       if (availableDraft.markers && Array.isArray(availableDraft.markers)) {
         setMarkers(availableDraft.markers);
       }
+      if (availableDraft.resolvedConditionIds) {
+        setResolvedConditionIds(availableDraft.resolvedConditionIds);
+      }
       setDraftSavedTime(availableDraft.timestamp);
       setAvailableDraft(null);
     };
@@ -449,6 +459,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           followUpIdempotencyKey,
           followUps,
           markers,
+          resolvedConditionIds,
           timestamp,
         };
         localStorage.setItem(draftStorageKey, JSON.stringify(payload));
@@ -479,6 +490,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       followUpIdempotencyKey,
       followUps,
       markers,
+      resolvedConditionIds,
     ]);
 
     const handleClearDraft = () => {
@@ -509,6 +521,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         },
       ]);
       setMarkers([]);
+      setResolvedConditionIds([]);
       setVerdict('ACCEPT');
       setRejectReason('');
       setPhysicalExamConfirmed(true);
@@ -727,7 +740,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         }
       }
 
-      if (config.prescription && prescriptions.length > 0) {
+      if (isPrescriptionActive && prescriptions.length > 0) {
         for (const rx of prescriptions) {
           if (!rx.medicationId) {
             errors["rx." + rx.id + ".medicationId"] = "Select a medication from the catalog.";
@@ -944,6 +957,16 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             vaccinations: vaccinationDrafts.length ? toVaccinationRequests(vaccinationDrafts) : undefined,
             deferVaccinationDays: deferVaccinationDays ?? undefined,
             injuryMarkers: markers.length ? buildInjuryMarkerRequests(markers) : injuryMarkers,
+            prescriptions:
+              isPrescriptionActive && prescriptions.length > 0
+                ? toPrescriptionRequests(prescriptions)
+                : undefined,
+            generalCareInstructions:
+              isPrescriptionActive && generalCareInstructions.trim()
+                ? generalCareInstructions.trim()
+                : undefined,
+            resolvedConditionIds:
+              resolvedConditionIds.length > 0 ? resolvedConditionIds : undefined,
           };
           result = await admissionsApi.completeCareSchedule(careScheduleId, request as CompleteCareScheduleRequest);
           completionKind = 'CARE_SCHEDULE';
@@ -998,8 +1021,20 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       </>
     );
 
+    const renderActiveConditions = () => {
+      if (activeInjuries.length === 0) return null;
+      return (
+        <ActiveConditionsSection
+          activeInjuries={activeInjuries}
+          resolvedConditionIds={resolvedConditionIds}
+          setResolvedConditionIds={setResolvedConditionIds}
+          isFormDisabled={isFormDisabled}
+        />
+      );
+    };
+
     const renderPrescription = () => {
-      if (!config.prescription) return null;
+      if (!isPrescriptionActive) return null;
       return (
         <PrescriptionSection
           isFormDisabled={isFormDisabled}
@@ -1238,6 +1273,10 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     };
 
     const renderFollowUps = () => {
+      const activeRxEndDates = prescriptions.map((p) => p.endDate).filter(Boolean);
+      const activeInjuryRecoveryDates = activeInjuries.map((inj) => inj.expectedRecoveryDate).filter(Boolean) as string[];
+      const suggestedRecheckDate = computeSuggestedRecheckDate(activeRxEndDates, activeInjuryRecoveryDates);
+
       if (config.followUpMode === 'single-required-select') {
         return (
           <FollowUpSection
@@ -1256,6 +1295,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             setFieldErrors={setFieldErrors}
             businessDateFromToday={businessDateFromToday}
             tomorrowBusinessDate={tomorrowBusinessDate}
+            suggestedRecheckDate={suggestedRecheckDate}
           />
         );
       }
@@ -1604,6 +1644,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
               <>
                 {renderVitals()}
                 {renderSection2()}
+                {verdict !== 'REJECT' && renderActiveConditions()}
                 {verdict !== 'REJECT' && renderVaccination()}
                 {verdict !== 'REJECT' && renderPrescription()}
               </>
@@ -1886,6 +1927,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             {renderVitals()}
             {renderSection2()}
             {renderTrainingDecision()}
+            {renderActiveConditions()}
             {renderPrescription()}
             <div className="border-t border-[var(--color-border)] pt-5">
               <Button

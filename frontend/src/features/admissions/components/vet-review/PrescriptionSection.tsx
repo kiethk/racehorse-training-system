@@ -7,18 +7,8 @@ import { Input, Select, Textarea } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
 import { Notice } from '@/components/ui/Notice';
 import type { MedicationCatalogItem, MedicationRoute } from '@/features/care/types';
-
-export interface PrescriptionFormItem {
-  id: string;
-  medicationId: number | null;
-  dosage: string;
-  route: MedicationRoute;
-  frequency: string;
-  startDate: string;
-  endDate: string;
-  withdrawalDays: number;
-  instructions: string;
-}
+export { toPrescriptionRequests, type PrescriptionFormItem } from './prescriptionDrafts';
+import type { PrescriptionFormItem } from './prescriptionDrafts';
 
 export interface PrescriptionSectionProps {
   isFormDisabled: boolean;

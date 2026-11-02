@@ -18,6 +18,7 @@ public final class NotificationTypes {
     public static final String VACCINE_OVERDUE = "VACCINE_OVERDUE";
     public static final String VACCINE_COMPLETED = "VACCINE_COMPLETED";
     public static final String ROUTINE_ASSIGNED = "ROUTINE_ASSIGNED";
+    public static final String CARE_SCHEDULE_ROUTINE_COMPLETED = "CARE_SCHEDULE_ROUTINE_COMPLETED";
     /** A new admission is waiting in the quarantine grooms' review pool. */
     public static final String ADMISSION_NEW_FOR_GROOM = "ADMISSION_NEW_FOR_GROOM";
     /** The admission's horse was given a stall this groom looks after. */

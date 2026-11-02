@@ -318,6 +318,8 @@ export interface CompleteCareScheduleRequest {
   prescriptions?: PrescriptionItemRequest[];
   /** Huong dan cham soc chung cho toan dot dieu tri (WF-04 §3.4). */
   generalCareInstructions?: string;
+  /** Active condition IDs marked resolved by the vet during this exam (Track 3b). */
+  resolvedConditionIds?: number[];
 }
 
 export interface CreateInjuryMarkerRequest {
@@ -432,6 +434,8 @@ export interface VetReviewRequest {
   prescriptions?: PrescriptionItemRequest[];
   /** Huong dan cham soc chung cho toan dot dieu tri (WF-04 §3.4). */
   generalCareInstructions?: string;
+  /** Active condition IDs marked resolved by the vet during this exam (Track 3b). */
+  resolvedConditionIds?: number[];
 }
 
 export interface VetReviewResponse {
