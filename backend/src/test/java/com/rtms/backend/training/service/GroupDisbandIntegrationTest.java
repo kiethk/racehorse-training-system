@@ -4,6 +4,7 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
+import com.rtms.backend.training.dto.GroupMemberResponse;
 import com.rtms.backend.training.dto.GroupPlanDetailResponse;
 import com.rtms.backend.training.dto.GroupPlanRequest;
 import com.rtms.backend.training.dto.PlanSessionResponse;
@@ -108,8 +109,8 @@ class GroupDisbandIntegrationTest {
         assertEquals("CANCELLED", after.plan().status());
         assertEquals(List.of("SCHEDULED", "CANCELLED", "CANCELLED"),
                 after.sessions().stream().map(PlanSessionResponse::status).toList());
-        assertTrue(members.findByHorseId(horseId).isEmpty());
-        assertEquals(0, members.countByGroupId(group.id()));
+        assertTrue(members.findByHorseIdAndLeftAtIsNull(horseId).isEmpty());
+        assertEquals(0, members.countByGroupIdAndLeftAtIsNull(group.id()));
 
         clock.set(monday.atTime(12, 0));
         settlement.settle();
@@ -117,9 +118,11 @@ class GroupDisbandIntegrationTest {
     }
 
     @Test
-    void aDisbandedGroupLeavesTheLiveListAndShowsInTheDisbandedList() {
-        TrainingGroupResponse group = groupWithHorses("Nhom 1", "Thunder");
+    void aDisbandedGroupLeavesTheLiveListAndShowsTheHorsesItHadWhenDisbanded() {
+        TrainingGroupResponse group = groupWithHorses("Nhom 1", "Thunder", "Blaze");
         assignCourse(group);
+        groupService.removeHorse(group.id(), group.members().get(1).horseId(), trainer);
+        clock.set(monday.minusDays(1).atTime(9, 0));
 
         groupService.disbandGroup(group.id(), trainer);
 
@@ -128,7 +131,7 @@ class GroupDisbandIntegrationTest {
         assertEquals(1, disbanded.size());
         assertTrue(disbanded.get(0).disbanded());
         assertEquals("Nhom 1", disbanded.get(0).name());
-        assertTrue(disbanded.get(0).members().isEmpty());
+        assertEquals(List.of("Thunder"), disbanded.get(0).members().stream().map(GroupMemberResponse::horseName).toList());
     }
 
     @Test
@@ -139,7 +142,7 @@ class GroupDisbandIntegrationTest {
 
         assertTrue(groupService.getGroups(trainer).isEmpty());
         assertTrue(groupService.getDisbandedGroups(trainer).isEmpty());
-        assertTrue(members.findByHorseId(group.members().get(0).horseId()).isEmpty());
+        assertTrue(members.findByHorseIdAndLeftAtIsNull(group.members().get(0).horseId()).isEmpty());
     }
 
     @Test
@@ -207,7 +210,7 @@ class GroupDisbandIntegrationTest {
         entityManager.clear();
 
         assertNull(groups.findById(group.id()).orElseThrow().getDisbandedAt());
-        assertEquals(2, members.countByGroupId(group.id()));
+        assertEquals(2, members.countByGroupIdAndLeftAtIsNull(group.id()));
         assertEquals("UPCOMING", plans.findById(plan.plan().id()).orElseThrow().getStatus().name());
         assertEquals(List.of("SCHEDULED", "SCHEDULED", "SCHEDULED"),
                 planService.getPlan(plan.plan().id(), trainer).sessions().stream().map(PlanSessionResponse::status).toList());

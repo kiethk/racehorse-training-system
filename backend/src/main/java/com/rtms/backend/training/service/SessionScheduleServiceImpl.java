@@ -137,8 +137,8 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
                 .map(workout -> new SessionHorseResponse(workout.getId(), workout.getHorseId(),
                         horseNames.get(workout.getHorseId()),
                         workout.getAssignedToId() == null ? null : groomNames.get(workout.getAssignedToId()),
-                        workout.getStatus().name(), workout.getActualDistanceMeters() != null, workout.getPerformanceRating(),
-                        workout.getActualDistanceMeters() != null ? SessionWorkoutResponse.of(workout) : null))
+                        workout.getStatus().name(), workout.getPerformanceRating(),
+                        workout.getStatus() == WorkoutStatus.RAN ? SessionWorkoutResponse.of(workout) : null))
                 .toList();
         return new SessionDetailResponse(toSummary(session, workouts, visible, lookups), horses);
     }
@@ -203,7 +203,7 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
         List<TrainingWorkout> mine = workouts.stream().filter(visible).toList();
         int horseCount = (int) mine.stream().filter(workout -> workout.getStatus() != WorkoutStatus.CANCELLED).count();
         int needsResult = (int) mine.stream()
-                .filter(workout -> workout.getStatus() == WorkoutStatus.HELD && workout.getActualDistanceMeters() == null).count();
+                .filter(workout -> workout.getStatus() == WorkoutStatus.HELD).count();
         return new ScheduleSessionResponse(session.getId(), plan.getId(), plan.getGroupId(),
                 plan.getGroupId() == null ? null : lookups.groups().get(plan.getGroupId()).getName(),
                 plan.getGroupId() != null && lookups.groups().get(plan.getGroupId()).isDisbanded(),

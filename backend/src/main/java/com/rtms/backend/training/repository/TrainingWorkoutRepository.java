@@ -4,6 +4,7 @@ import com.rtms.backend.training.dto.GroomConflictRow;
 import com.rtms.backend.training.dto.GroomWorkoutRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
+import com.rtms.backend.training.dto.PastWorkoutRow;
 import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
 import com.rtms.backend.training.dto.SessionCountRow;
@@ -58,7 +59,27 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
 
     long countBySessionIdAndStatusNot(Long sessionId, WorkoutStatus status);
 
-    List<TrainingWorkout> findByHorseIdOrderByCreatedAtDesc(Long horseId);
+    /**
+     * Workout của một chiến mã trong các buổi đến hôm nay đã diễn ra hoặc đã hủy, mới nhất trước. Workout được tạo một lượt khi giao
+     * khóa, nên thứ tự phải theo ngày của buổi chứ không theo ngày tạo.
+     * (A horse's Workouts in Sessions up to today that took place or were cancelled, newest first. Workouts are all created when a
+     * course is assigned, so the order follows the Session date, never the creation date.)
+     */
+    @Query("""
+           SELECT new com.rtms.backend.training.dto.PastWorkoutRow(
+                      w, s.sessionDate, s.startTime, s.endTime, sub.name, g.name,
+                      CASE WHEN g.disbandedAt IS NULL THEN false ELSE true END, s.status)
+           FROM TrainingWorkout w
+           JOIN TrainingSession s ON w.sessionId = s.id
+           JOIN Subject sub ON s.subjectId = sub.id
+           JOIN GroupPlan p ON s.groupPlanId = p.id
+           LEFT JOIN TrainingGroup g ON p.groupId = g.id
+           WHERE w.horseId = :horseId
+             AND s.status <> com.rtms.backend.training.enums.SessionStatus.SCHEDULED
+             AND s.sessionDate <= :today
+           ORDER BY s.sessionDate DESC, s.startTime DESC
+           """)
+    List<PastWorkoutRow> findPastWorkouts(@Param("horseId") Long horseId, @Param("today") LocalDate today);
 
     /** Mọi Workout của chiến mã, mọi trạng thái. (Every Workout of a horse, any status.) */
     List<TrainingWorkout> findByHorseIdAndSessionIdIsNotNull(Long horseId);
@@ -137,8 +158,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            JOIN TrainingSession s ON w.sessionId = s.id
            JOIN Subject sub ON s.subjectId = sub.id
            WHERE w.horseId = :horseId
-             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.HELD
-             AND w.actualDistanceMeters IS NOT NULL
+             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN
              AND s.sessionDate BETWEEN :fromDate AND :toDate
            ORDER BY s.sessionDate ASC, s.startTime ASC
            """)
@@ -158,8 +178,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
            WHERE w.horseId IN :horseIds
-             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.HELD
-             AND w.actualDistanceMeters IS NOT NULL
+             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN
              AND s.sessionDate BETWEEN :fromDate AND :toDate
            ORDER BY s.sessionDate ASC
            """)
@@ -173,12 +192,11 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      */
     @Query("""
            SELECT new com.rtms.backend.training.dto.RecentWorkoutRow(
-                      w.horseId, s.sessionDate, s.endTime, w.maxHeartRate, w.recoveryHeartRate, w.performanceRating)
+                      w.horseId, s.sessionDate, s.endTime, w.maxHeartRate, w.averageHeartRate, w.recoveryHeartRate, w.performanceRating)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
            WHERE w.horseId IN :horseIds
-             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.HELD
-             AND w.actualDistanceMeters IS NOT NULL
+             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN
              AND s.sessionDate >= :since
            ORDER BY w.horseId ASC, s.sessionDate DESC, s.startTime DESC
            """)
@@ -199,8 +217,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            JOIN TrainingSession s ON w.sessionId = s.id
            JOIN Subject sub ON s.subjectId = sub.id
            WHERE w.horseId IN :horseIds
-             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.HELD
-             AND w.actualDistanceMeters IS NOT NULL
+             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN
              AND w.performanceRating IS NOT NULL
              AND sub.category <> com.rtms.backend.training.enums.SubjectCategory.RECOVERY
              AND s.sessionDate >= :since

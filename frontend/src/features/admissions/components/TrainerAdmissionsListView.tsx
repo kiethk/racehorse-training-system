@@ -113,6 +113,9 @@ export function TrainerAdmissionsListView() {
     });
   }, [queue, urlFilters]);
 
+  // A page past the end of the filtered list falls back to the first one.
+  const page = tablePage * 10 >= filteredAdmissions.length ? 0 : tablePage;
+
   const updateUrl = (filters: TrainerQueueFilters) => {
     const params = new URLSearchParams();
     if (filters.tab !== 'PENDING') params.set('tab', filters.tab);
@@ -225,7 +228,7 @@ export function TrainerAdmissionsListView() {
         emptyTitle="No admission records found"
         emptyDescription="Try adjusting your search filters or switch the application type."
         emptyAction={<Button size="sm" onClick={clearFilters}>Clear filters</Button>}
-        pagination={{ page: tablePage, pageSize: 10, total: filteredAdmissions.length, onPageChange: setTablePage }}
+        pagination={{ page, pageSize: 10, total: filteredAdmissions.length, onPageChange: setTablePage }}
       />
     </AdmissionListLayout>
   );

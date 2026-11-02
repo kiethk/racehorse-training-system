@@ -27,6 +27,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -107,6 +108,19 @@ class SessionSettlementIntegrationTest {
 
         assertEquals(SessionStatus.SCHEDULED, allSessions().get(0).getStatus());
         assertEquals(TrainingPlanStatus.ACTIVE, planStatus());
+    }
+
+    @Test
+    void settlingInsideAReadOnlyTransactionLeavesItToTheScheduler() {
+        clock.set(monday.atTime(12, 0));
+        TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);   // as inside the AI tools
+        try {
+            settlement.settle();
+        } finally {
+            TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
+        }
+
+        assertEquals(SessionStatus.SCHEDULED, allSessions().get(0).getStatus());
     }
 
     @Test

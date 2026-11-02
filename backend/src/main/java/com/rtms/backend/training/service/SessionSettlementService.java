@@ -9,6 +9,10 @@ package com.rtms.backend.training.service;
  */
 public interface SessionSettlementService {
 
-    /** Áp theo giờ hiện tại của hệ thống; gọi lại là vô hại. (Applies at the current system time; calling again is harmless.) */
+    /**
+     * Áp theo giờ hiện tại của hệ thống; gọi lại là vô hại. Trong transaction chỉ đọc thì không làm gì (job định kỳ lo phần đó).
+     * (Applies at the current system time; calling again is harmless. Does nothing inside a read-only transaction, where the
+     * periodic job covers it.)
+     */
     void settle();
 }

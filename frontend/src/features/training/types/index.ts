@@ -1,5 +1,6 @@
 export type PlanStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
-export type WorkoutStatus = 'SCHEDULED' | 'HELD' | 'CANCELLED';
+/** HELD: the Session took place but the Workout is not yet confirmed; RAN: results recorded, so the horse took part. */
+export type WorkoutStatus = 'SCHEDULED' | 'HELD' | 'RAN' | 'CANCELLED';
 export type SurfaceType = 'TURF' | 'DIRT' | 'SYNTHETIC';
 export type IntensityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -143,6 +144,8 @@ export interface TrainingRules {
   maxHorsesPerPlan: number;
   /** A maximum heart rate above this raises an alert. */
   maxHeartRateLimit: number;
+  /** An average heart rate above this raises an alert. */
+  averageHeartRateLimit?: number;
   /** A recovery heart rate above this raises an alert. */
   recoveryHeartRateLimit: number;
 }
@@ -167,7 +170,8 @@ export interface TrainingGroup {
   members: GroupMember[];
   currentCourseName: string | null;
   currentPlanStatus: PlanStatus | null;
-  currentPlanEndDate: string | null;
+  currentPlanStartDate?: string | null;
+  currentPlanEndDate?: string | null;
   disbanded: boolean;
 }
 
@@ -250,7 +254,7 @@ export interface PlanSessionItem {
   horseCount: number;
 }
 
-export type SessionHorseOutcome = 'TO_RUN' | 'RAN' | 'CANCELLED' | 'DID_NOT_RUN';
+export type SessionHorseOutcome = 'TO_RUN' | 'NEEDS_RESULT' | 'RAN' | 'CANCELLED' | 'DID_NOT_RUN';
 
 /** A horse of a plan with its Attendance (attended of total Sessions). */
 export interface PlanHorse {
@@ -300,8 +304,7 @@ export interface SessionHorse {
   horseId: number;
   horseName: string;
   groomName: string | null;
-  status: 'SCHEDULED' | 'HELD' | 'CANCELLED';
-  hasResult: boolean;
+  status: WorkoutStatus;
   performanceRating: number | null;
   /** The stored result, null until one is recorded; the edit form is pre-filled from it. */
   result: SessionWorkoutResult | null;
@@ -316,8 +319,7 @@ export interface SessionWorkoutResult {
   id: number;
   sessionId: number;
   horseId: number;
-  status: 'SCHEDULED' | 'HELD' | 'CANCELLED';
-  hasResult: boolean;
+  status: WorkoutStatus;
   actualDistanceMeters: number | null;
   actualDurationMinutes: number | null;
   topSpeedKmh: number | null;

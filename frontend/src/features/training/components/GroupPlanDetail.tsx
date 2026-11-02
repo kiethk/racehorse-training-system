@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useState } from 'react';
-import { BackLink, Button, ConfirmDialog, DetailSkeleton, EmptyState, PageHeader, Panel, ProgressBar, ScreenLayout, Table, TBody, Td, Th, THead, Tr } from '@/components/ui';
+import { BackLink, Button, ConfirmDialog, DetailSkeleton, EmptyState, HorseAvatar, PageHeader, Panel, Pill, ProgressBar, ScreenLayout, Table, TBody, Td, Th, THead, Tr } from '@/components/ui';
 import { displayError, formatDate, formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { planProgress } from '../lib/planProgress';
@@ -11,7 +11,7 @@ import { trainingService } from '../services/trainingService';
 import type { GroupPlanDetail as GroupPlanDetailData, PlanHorse } from '../types';
 import { PlanSessionHorses } from './PlanSessionHorses';
 import { StatusPill } from './StatusPill';
-import { groupLabel, isViewOnlyPlan } from '../lib/groupLifecycle';
+import { isViewOnlyPlan } from '../lib/groupLifecycle';
 
 const DAY: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: 'short' };
 
@@ -43,10 +43,10 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
     setCancelling(true);
     try {
       setDetail(await trainingService.cancelGroupPlan(planId));
-      toast.success('Course cancelled.');
+      toast.success('Plan cancelled.');
       setConfirmCancel(false);
     } catch (cause) {
-      toast.error(displayError(cause, 'Unable to cancel the course.'));
+      toast.error(displayError(cause, 'Unable to cancel the plan.'));
     } finally {
       setCancelling(false);
     }
@@ -74,7 +74,7 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
           <>
             <StatusPill status={PLAN_STATUS[plan.status]} size="md" />
             {!isViewOnlyPlan(plan.status, plan.groupDisbanded) && (plan.status === 'UPCOMING' || plan.status === 'ACTIVE') && (
-              <Button variant="destructive" size="sm" onClick={() => setConfirmCancel(true)}>Cancel course</Button>
+              <Button variant="destructive" size="sm" onClick={() => setConfirmCancel(true)}>Cancel plan</Button>
             )}
           </>
         }
@@ -82,30 +82,46 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
 
       <Panel padded className="space-y-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-[var(--color-text-secondary)]">
-          <span>{groupLabel(plan.groupName, plan.groupDisbanded)}</span>
+          <span className="flex items-center gap-1.5 font-medium text-[var(--color-text-primary)]">
+            {plan.groupName ?? 'Removed group'}
+            {plan.groupDisbanded && <Pill tone="neutral" size="sm">Disbanded</Pill>}
+          </span>
           <span>{formatDate(plan.startDate)} – {formatDate(plan.endDate)}</span>
         </div>
         <ProgressBar label="Plan progress" value={progress.percent} />
         <p className="text-xs text-[var(--color-text-muted)]">{progress.completed}/{progress.total} sessions</p>
       </Panel>
 
-      <Panel padded className="space-y-2">
-        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Horses in this plan</h2>
+      <Panel padded className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Horses in this plan</h2>
+          <span className="text-xs text-[var(--color-text-muted)]">
+            {planHorses.length} {planHorses.length === 1 ? 'horse' : 'horses'}
+          </span>
+        </div>
         {planHorses.length === 0 ? (
           <p className="text-sm text-[var(--color-text-muted)]">No horses.</p>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {planHorses.map((horse) => (
-              <li key={horse.horseId} className="flex items-center justify-between gap-2 text-sm">
-                <Link
-                  href={`/trainer/horses/${horse.horseId}?tab=training-history`}
-                  className="font-medium text-[var(--color-primary)] hover:underline"
-                >
-                  {horse.horseName}
-                </Link>
-                <span className="text-[var(--color-text-muted)]" title="Sessions attended out of sessions held or still to come">
-                  {horse.attended} of {horse.total}
-                </span>
+              <li
+                key={horse.horseId}
+                className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2.5"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <HorseAvatar name={horse.horseName} size={28} rounded="md" />
+                  <Link
+                    href={`/trainer/horses/${horse.horseId}?tab=training-plans`}
+                    className="truncate text-sm font-medium text-[var(--color-primary)] hover:underline"
+                  >
+                    {horse.horseName}
+                  </Link>
+                </div>
+                <div className="shrink-0" title="Sessions attended out of sessions held or still to come">
+                  <Pill tone="neutral" size="sm">
+                    {horse.attended} / {horse.total} sessions
+                  </Pill>
+                </div>
               </li>
             ))}
           </ul>
@@ -116,13 +132,13 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
         <Table bare>
           <THead>
             <Tr>
-              <Th><span className="sr-only">Open</span></Th>
               <Th>#</Th>
               <Th>Date</Th>
               <Th>Time</Th>
               <Th>Subject</Th>
               <Th>Horses</Th>
               <Th>Status</Th>
+              <Th className="text-right">Action</Th>
             </Tr>
           </THead>
           <TBody>
@@ -130,27 +146,34 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
               const open = openSessionId === session.id;
               return (
                 <Fragment key={session.id}>
-                  <Tr>
-                    <Td>
-                      <Button
-                        variant="tertiary"
-                        size="sm"
-                        icon={open ? 'chevron-down' : 'chevron-right'}
-                        aria-expanded={open}
-                        aria-label={`Horses of session ${index + 1}`}
-                        onClick={() => setOpenSessionId(open ? null : session.id)}
-                      />
-                    </Td>
+                  <Tr className={open ? 'bg-[var(--color-surface-subtle)]' : undefined}>
                     <Td>{index + 1}</Td>
                     <Td>{formatDate(session.date, DAY)}</Td>
                     <Td>{formatTime(session.startTime)} – {formatTime(session.endTime)}</Td>
-                    <Td>{session.subjectName}</Td>
-                    <Td>{session.horseCount}</Td>
+                    <Td className="font-medium text-[var(--color-text-primary)]">{session.subjectName}</Td>
+                    <Td>
+                      <span className="font-medium">{session.horseCount}</span>{' '}
+                      <span className="text-xs text-[var(--color-text-muted)]">
+                        {session.horseCount === 1 ? 'horse' : 'horses'}
+                      </span>
+                    </Td>
                     <Td><StatusPill status={SESSION_STATUS[session.status]} /></Td>
+                    <Td className="text-right">
+                      <Button
+                        variant={open ? 'secondary' : 'tertiary'}
+                        size="sm"
+                        icon={open ? 'chevron-up' : 'chevron-down'}
+                        aria-expanded={open}
+                        aria-label={`${open ? 'Hide' : 'View'} horses of session ${index + 1}`}
+                        onClick={() => setOpenSessionId(open ? null : session.id)}
+                      >
+                        {open ? 'Hide horses' : 'View horses'}
+                      </Button>
+                    </Td>
                   </Tr>
                   {open && (
                     <Tr>
-                      <Td colSpan={7} className="bg-[var(--color-surface-subtle)]">
+                      <Td colSpan={7} className="bg-[var(--color-surface-subtle)] p-4 border-t border-[var(--color-border)]">
                         <PlanSessionHorses planId={planId} sessionId={session.id} />
                       </Td>
                     </Tr>
@@ -163,9 +186,9 @@ export function GroupPlanDetail({ planId }: { planId: number }) {
       </Panel>
       <ConfirmDialog
         open={confirmCancel}
-        title="Cancel course"
+        title="Cancel plan"
         description="Every session that has not started is cancelled for the whole group, and the dates are released. Sessions already held keep their results."
-        confirmLabel="Cancel course"
+        confirmLabel="Cancel plan"
         tone="danger"
         loading={cancelling}
         onConfirm={cancelPlan}

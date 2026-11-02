@@ -88,9 +88,10 @@ class GroupPlanHorsesIntegrationTest {
     }
 
     @Test
-    void everyHorseOfThePlanShowsItsAttendanceAsHeldOverSessionsNotCancelled() {
+    void everyHorseOfThePlanShowsItsAttendanceAsRanOverSessionsNotCancelled() {
         clock.set(monday.plusDays(2).atTime(12, 0));   // Monday and Wednesday are over
         settlement.settle();
+        fixtures.recordHeldResults(thunder, blaze);
 
         Map<String, PlanHorseResponse> byName = planHorses();
 
@@ -107,15 +108,26 @@ class GroupPlanHorsesIntegrationTest {
         Long thunderMonday = sessionHorse(plan.sessions().get(0).id(), "Thunder").workoutId();
 
         workoutService.markDidNotRun(thunderMonday, trainer);
+        fixtures.recordHeldResults(blaze);
 
         assertEquals(0, planHorses().get("Thunder").attended());
         assertEquals(1, planHorses().get("Blaze").attended());
     }
 
     @Test
+    void aHeldWorkoutWithoutResultsDoesNotCountInAttendance() {
+        clock.set(monday.atTime(12, 0));
+        settlement.settle();
+
+        assertEquals(0, planHorses().get("Thunder").attended());
+        assertEquals("NEEDS_RESULT", sessionHorse(plan.sessions().get(0).id(), "Thunder").outcome());
+    }
+
+    @Test
     void sessionHorsesShowOutcomeToRunRanCancelledAndDidNotRun() {
         clock.set(monday.atTime(12, 0));
         settlement.settle();
+        fixtures.recordHeldResults(blaze);
         workoutService.markDidNotRun(sessionHorse(plan.sessions().get(0).id(), "Thunder").workoutId(), trainer);
         groupService.removeHorse(group.id(), blaze.getId(), trainer);
 
@@ -142,6 +154,7 @@ class GroupPlanHorsesIntegrationTest {
     void listsStayCompleteWhenTheGroupHasNoMembersLeft() {
         clock.set(monday.plusDays(4).atTime(12, 0));   // whole course is over
         settlement.settle();
+        fixtures.recordHeldResults(thunder);
         groupService.removeHorse(group.id(), thunder.getId(), trainer);
         groupService.removeHorse(group.id(), blaze.getId(), trainer);
 

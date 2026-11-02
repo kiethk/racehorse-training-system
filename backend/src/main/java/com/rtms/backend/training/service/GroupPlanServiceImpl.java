@@ -276,7 +276,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
         int total = (int) sessions.stream().filter(session -> session.getStatus() != SessionStatus.CANCELLED).count();
         List<TrainingWorkout> workouts = workoutRepository.findBySessionIdIn(sessions.stream().map(TrainingSession::getId).toList());
         Map<Long, String> names = horseNames(workouts);
-        Map<Long, Long> attended = workouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.HELD)
+        Map<Long, Long> attended = workouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.RAN)
                 .collect(Collectors.groupingBy(TrainingWorkout::getHorseId, Collectors.counting()));
         return workouts.stream().map(TrainingWorkout::getHorseId).distinct()
                 .map(horseId -> new PlanHorseResponse(horseId, names.get(horseId), attended.getOrDefault(horseId, 0L).intValue(), total))
@@ -305,7 +305,8 @@ public class GroupPlanServiceImpl implements GroupPlanService {
     private String outcome(TrainingSession session, TrainingWorkout workout) {
         return switch (workout.getStatus()) {
             case SCHEDULED -> "TO_RUN";
-            case HELD -> "RAN";
+            case HELD -> "NEEDS_RESULT";
+            case RAN -> "RAN";
             case CANCELLED -> session.getStatus() == SessionStatus.HELD ? "DID_NOT_RUN" : "CANCELLED";
         };
     }
@@ -420,7 +421,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
             throw new ApiException(HttpStatus.CONFLICT, "COURSE_HAS_NO_SUBJECTS",
                     "This course has no subjects yet, so it cannot be assigned to a group!");
         }
-        List<TrainingGroupMember> members = memberRepository.findByGroupIdOrderByJoinedAtAsc(group.getId());
+        List<TrainingGroupMember> members = memberRepository.findByGroupIdAndLeftAtIsNullOrderByJoinedAtAsc(group.getId());
         if (members.isEmpty()) {
             throw new ApiException(HttpStatus.CONFLICT, "GROUP_EMPTY",
                     "Group '" + group.getName() + "' has no horses yet. Add horses before assigning a course!");

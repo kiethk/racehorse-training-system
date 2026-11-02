@@ -38,19 +38,24 @@ export function GroupPlanPreviewPanel({
         </span>
       </div>
 
-      {preview.overlaps.map((overlap) => (
-        <Notice key={overlap.planId} tone="warning">
-          <span className="flex flex-wrap items-center gap-2">
-            Busy with {overlap.courseName} ({formatDate(overlap.startDate)} – {formatDate(overlap.endDate)})
-            <StatusPill status={PLAN_STATUS[overlap.status]} />
-          </span>
-        </Notice>
-      ))}
-      {preview.overlaps.length > 0 && (
-        <Button size="sm" onClick={() => onUseDate(preview.earliestFreeStart)}>
-          Start on {formatDate(preview.earliestFreeStart, DAY)}
-        </Button>
-      )}
+      {preview.overlaps.map((overlap, index) => {
+        const isLast = index === preview.overlaps.length - 1;
+        return (
+          <Notice key={overlap.planId} tone="warning">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="flex flex-wrap items-center gap-2">
+                Busy with {overlap.courseName} ({formatDate(overlap.startDate)} – {formatDate(overlap.endDate)})
+                <StatusPill status={PLAN_STATUS[overlap.status]} />
+              </span>
+              {isLast && preview.earliestFreeStart && (
+                <Button variant="link" size="sm" icon="chevron-right" onClick={() => onUseDate(preview.earliestFreeStart)}>
+                  Start on {formatDate(preview.earliestFreeStart, DAY)}
+                </Button>
+              )}
+            </div>
+          </Notice>
+        );
+      })}
       {preview.fullDates.length > 0 && (
         <Notice tone="warning">
           Schedule full on {preview.fullDates.map((day) => formatDate(day, DAY)).join(', ')}

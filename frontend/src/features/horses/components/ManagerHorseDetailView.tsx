@@ -7,6 +7,10 @@ import type { Horse } from '@/features/stable/types';
 import { ChangeHorseStatusModal } from './ChangeHorseStatusModal';
 import { StableTeamTab } from './StableTeamTab';
 import { HistoryTab } from './HistoryTab';
+import { HorseAttendanceList } from '@/features/training/components/HorseAttendanceList';
+import { HorseFitnessTrendView } from '@/features/training/components/HorseFitnessTrendView';
+import { HorseScheduleView } from '@/features/training/components/HorseScheduleDialog';
+import { toIsoDate } from '@/features/training/lib/dateRange';
 
 interface ManagerHorseDetailViewProps {
   horseId: number;
@@ -14,7 +18,8 @@ interface ManagerHorseDetailViewProps {
 
 /**
  * Manager-specific horse detail view.
- * Wraps the shared HorseProfileView and adds "Stable & Team" and "History" tabs
+ * Wraps the shared HorseProfileView and adds "Training schedule", "Training plans",
+ * "Fitness & Trends", "Stable & Team", and "History" tabs
  * via the extraTabs callback so the loaded horse is reused without a second fetch.
  * Provides status transition controls (ELIGIBLE <-> INACTIVE) for Club Manager.
  */
@@ -22,6 +27,7 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
   const [modalHorse, setModalHorse] = useState<Horse | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [onSuccessCallback, setOnSuccessCallback] = useState<(() => void) | null>(null);
+  const today = toIsoDate(new Date());
 
   return (
     <>
@@ -52,6 +58,25 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
           );
         }}
         extraTabs={({ horse }) => [
+          {
+            id: 'training-schedule',
+            label: 'Training schedule',
+            content: (
+              <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                <HorseScheduleView target={{ horseId: horse.id, name: horse.name, horse }} startDate={today} hideHeader />
+              </div>
+            ),
+          },
+          {
+            id: 'training-plans',
+            label: 'Training plans',
+            content: <HorseAttendanceList horseId={horse.id} />,
+          },
+          {
+            id: 'fitness-trends',
+            label: 'Fitness & Trends',
+            content: <HorseFitnessTrendView horseId={horse.id} hideHeader />,
+          },
           {
             id: 'stable-team',
             label: 'Stable & Team',
@@ -86,4 +111,3 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
     </>
   );
 }
-

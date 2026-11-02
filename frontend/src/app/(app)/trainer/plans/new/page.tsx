@@ -5,7 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { GroupPlanWizard } from '@/features/training/components/GroupPlanWizard';
 
 export const metadata: Metadata = {
-  title: 'Assign a course | Trainer | RTMS',
+  title: 'Create plan | Trainer | RTMS',
 };
 
 export default function NewTrainingPlanPage() {

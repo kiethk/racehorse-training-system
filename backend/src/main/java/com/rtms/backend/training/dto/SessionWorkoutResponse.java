@@ -5,14 +5,13 @@ import com.rtms.backend.training.entity.TrainingWorkout;
 import java.math.BigDecimal;
 
 /**
- * Workout của một chiến mã trong một buổi của nhóm. hasResult cho biết đã ghi kết quả chưa: đó là dữ liệu, không phải trạng thái.
- * (One horse's Workout in a group Session. hasResult says whether results were recorded: that is data, not a status.)
+ * Workout của một chiến mã trong một buổi của nhóm; status RAN nghĩa là đã ghi kết quả.
+ * (One horse's Workout in a group Session; status RAN means results were recorded.)
  */
 public record SessionWorkoutResponse(Long id,
                                      Long sessionId,
                                      Long horseId,
                                      String status,
-                                     boolean hasResult,
                                      BigDecimal actualDistanceMeters,
                                      BigDecimal actualDurationMinutes,
                                      BigDecimal topSpeedKmh,
@@ -25,7 +24,7 @@ public record SessionWorkoutResponse(Long id,
 
     public static SessionWorkoutResponse of(TrainingWorkout workout) {
         return new SessionWorkoutResponse(workout.getId(), workout.getSessionId(), workout.getHorseId(),
-                workout.getStatus().name(), workout.getActualDistanceMeters() != null,
+                workout.getStatus().name(),
                 workout.getActualDistanceMeters(), workout.getActualDurationMinutes(), workout.getTopSpeedKmh(),
                 workout.getAverageSpeedKmh(), workout.getAverageHeartRate(), workout.getMaxHeartRate(),
                 workout.getRecoveryHeartRate(), workout.getPerformanceRating(), workout.getTrainerFeedback());

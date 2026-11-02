@@ -28,6 +28,16 @@ export function disbandMessage(groupName: string, impact: DisbandImpact): string
   return `Disband ${groupName}? ${plural(impact.plans, 'plan')} and ${plural(impact.sessions, 'session')} not yet started will be cancelled. ${horses}`;
 }
 
+/** Confirmation text for a horse leaving a group (removed, or moved to another): says when its upcoming workouts are cancelled. */
+export function leaveMessage(
+  horseName: string,
+  from: { name: string; currentPlanStatus: string | null },
+  to?: { name: string },
+): string {
+  const question = to ? `Move ${horseName} from ${from.name} to ${to.name}?` : `Remove ${horseName} from ${from.name}?`;
+  return from.currentPlanStatus ? `${question} Its workouts in sessions not yet started will be cancelled.` : question;
+}
+
 /** A CANCELLED plan, or the plan of a Disbanded group, only shows its history: no cancel or reschedule actions. */
 export function isViewOnlyPlan(status: string, groupDisbanded: boolean): boolean {
   return groupDisbanded || status === 'CANCELLED';

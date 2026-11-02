@@ -36,6 +36,9 @@ public class TrainingGroupMember {
     @Column(name = "joined_at", updatable = false)
     private LocalDateTime joinedAt;
 
+    @Column(name = "left_at")
+    private LocalDateTime leftAt;
+
     @PrePersist
     protected void onCreate() {
         joinedAt = LocalDateTime.now();
@@ -55,4 +58,7 @@ public class TrainingGroupMember {
     public void setGroomId(Long groomId) { this.groomId = groomId; }
 
     public LocalDateTime getJoinedAt() { return joinedAt; }
+
+    public LocalDateTime getLeftAt() { return leftAt; }
+    public void setLeftAt(LocalDateTime leftAt) { this.leftAt = leftAt; }
 }

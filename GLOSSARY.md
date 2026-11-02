@@ -25,15 +25,19 @@ One horse's result within a Session.
 _Avoid_: Session (that is the group's outing)
 
 **Held**:
-The state of a Session, and of the Workouts in it, once its end time has passed without being cancelled. It follows the clock, never whether results have been recorded.
+The state of a Session, and of the Workouts in it, once its end time has passed without being cancelled. It follows the clock, never whether results have been recorded. A Held Workout is not yet confirmed: it waits until its horse is shown to have Ran or marked Did not run, and stays waiting for as long as nobody does.
 _Avoid_: Completed (that mixes "took place" with "result entered")
+
+**Ran**:
+The state of a Held Workout once its results are recorded; the recorded results are the proof the horse took part. Only the Trainer records them.
+_Avoid_: Attended, present, completed
 
 **Cancel**:
 Withdrawing a Session, one horse's Workout, or a whole Group Plan before it begins; nothing is made up. Cancelling a single Workout keeps the horse in its Training Group and leaves its other Workouts alone.
 _Avoid_: Skip, postpone
 
 **Did not run**:
-A mark set while recording results on a Held Workout whose horse did not actually take part; the Workout becomes cancelled and no longer counts in Attendance.
+A mark set on a Held Workout whose horse did not actually take part; the Workout becomes cancelled. No reason is given: a horse unfit to train is blocked by the Vet instead.
 _Avoid_: No-show, absent
 
 **Golden Window**:
@@ -41,7 +45,7 @@ The morning hours, 06:00 to 10:00, in which every Session must start and end; Se
 _Avoid_: Training hours, time slot
 
 **Attendance**:
-How many of a Course's Sessions a horse took part in (its Held Workouts), shown against the Course total (for example 7 of 20).
+How many of a Course's Sessions a horse took part in (its Workouts that Ran), shown against the Course total (for example 7 of 20). A missed Session is never made up: the horse simply goes on with its group.
 
 **Course**:
 An ordered list of Subjects that a Training Group works through over a number of Sessions.

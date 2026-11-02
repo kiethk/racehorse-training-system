@@ -1,8 +1,10 @@
 'use client';
 
 import { HorseProfileView } from '@/features/horses/shared/components/HorseProfileView';
+import { toIsoDate } from '../lib/dateRange';
 import { HorseAttendanceList } from './HorseAttendanceList';
 import { HorseFitnessTrendView } from './HorseFitnessTrendView';
+import { HorseScheduleView } from './HorseScheduleDialog';
 import { TrainerHorseIncidentsTab } from './TrainerHorseIncidentsTab';
 
 interface TrainerHorseDetailViewProps {
@@ -11,10 +13,11 @@ interface TrainerHorseDetailViewProps {
 
 /**
  * Head Trainer's horse detail view.
- * Wraps the shared HorseProfileView and adds "Fitness & Trends" and "Incident Reports" tabs.
- * Mirrors the structure of ManagerHorseDetailView without an arbitrary horse selector.
+ * Wraps the shared HorseProfileView and adds "Training schedule", "Training plans", "Fitness & Trends" and "Incident Reports" tabs.
  */
 export function TrainerHorseDetailView({ horseId }: TrainerHorseDetailViewProps) {
+  const today = toIsoDate(new Date());
+
   return (
     <HorseProfileView
       horseId={horseId}
@@ -22,14 +25,23 @@ export function TrainerHorseDetailView({ horseId }: TrainerHorseDetailViewProps)
       backLabel="Back to horses"
       extraTabs={({ horse }) => [
         {
+          id: 'training-schedule',
+          label: 'Training schedule',
+          content: (
+            <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <HorseScheduleView target={{ horseId: horse.id, name: horse.name, horse }} startDate={today} hideHeader />
+            </div>
+          ),
+        },
+        {
+          id: 'training-plans',
+          label: 'Training plans',
+          content: <HorseAttendanceList horseId={horse.id} />,
+        },
+        {
           id: 'fitness-trends',
           label: 'Fitness & Trends',
           content: <HorseFitnessTrendView horseId={horse.id} hideHeader />,
-        },
-        {
-          id: 'training-history',
-          label: 'Training history',
-          content: <HorseAttendanceList horseId={horse.id} />,
         },
         {
           id: 'incidents',

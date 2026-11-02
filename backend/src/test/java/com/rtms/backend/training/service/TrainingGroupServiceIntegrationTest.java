@@ -233,7 +233,7 @@ class TrainingGroupServiceIntegrationTest {
         TrainingGroupResponse moved = service.moveHorse(to.id(), thunder.getId(), trainerPrincipal);
 
         assertEquals(1, moved.members().size());
-        assertEquals(0, members.countByGroupId(from.id()));
+        assertEquals(0, members.countByGroupIdAndLeftAtIsNull(from.id()));
     }
 
     // -------------------------------------------------------------- visibility

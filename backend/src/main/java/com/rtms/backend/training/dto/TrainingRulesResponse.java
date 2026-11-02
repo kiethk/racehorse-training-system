@@ -18,6 +18,7 @@ import java.time.LocalTime;
  * @param minSubjectDurationMinutes thời lượng tối thiểu của một bài tập (shortest allowed subject duration)
  * @param maxSubjectDurationMinutes thời lượng tối đa của một bài tập (longest allowed subject duration)
  * @param maxHeartRateLimit         nhịp tim tối đa an toàn, vượt thì cảnh báo (safe maximum heart rate)
+ * @param averageHeartRateLimit     nhịp tim trung bình an toàn, vượt thì cảnh báo (safe average heart rate)
  * @param recoveryHeartRateLimit    nhịp tim hồi phục an toàn, vượt thì cảnh báo (safe recovery heart rate)
  */
 public record TrainingRulesResponse(LocalTime goldenHoursStart,
@@ -30,5 +31,6 @@ public record TrainingRulesResponse(LocalTime goldenHoursStart,
                                     int minSubjectDurationMinutes,
                                     int maxSubjectDurationMinutes,
                                     int maxHeartRateLimit,
+                                    int averageHeartRateLimit,
                                     int recoveryHeartRateLimit) {
 }

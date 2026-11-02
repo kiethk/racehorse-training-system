@@ -13,12 +13,15 @@ import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.CourseSubject;
 import com.rtms.backend.training.entity.Subject;
+import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.IntensityLevel;
 import com.rtms.backend.training.enums.SubjectCategory;
 import com.rtms.backend.training.enums.SurfaceType;
+import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
 import com.rtms.backend.training.repository.CourseSubjectRepository;
 import com.rtms.backend.training.repository.SubjectRepository;
+import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestComponent;
 
@@ -41,6 +44,7 @@ public class TrainingFixtures {
     @Autowired private SubjectRepository subjects;
     @Autowired private CourseRepository courses;
     @Autowired private CourseSubjectRepository courseSubjects;
+    @Autowired private TrainingWorkoutRepository workouts;
 
     private Area area;
     private int stallNumber = 500;
@@ -119,5 +123,29 @@ public class TrainingFixtures {
             courseSubjects.saveAndFlush(link);
         }
         return course;
+    }
+
+    /**
+     * Ghi kết quả cho mọi Workout HELD của các ngựa này, để chúng thành RAN (tính vào Attendance).
+     * (Records results on every HELD Workout of these horses, so they become RAN and count in Attendance.)
+     */
+    public void recordHeldResults(Horse... ofHorses) {
+        for (Horse horse : ofHorses) {
+            for (TrainingWorkout workout : workouts.findByHorseIdAndSessionIdIsNotNull(horse.getId())) {
+                if (workout.getStatus() != WorkoutStatus.HELD) {
+                    continue;
+                }
+                workout.setActualDistanceMeters(BigDecimal.valueOf(1200));
+                workout.setActualDurationMinutes(BigDecimal.valueOf(30));
+                workout.setTopSpeedKmh(BigDecimal.valueOf(55));
+                workout.setAverageSpeedKmh(BigDecimal.valueOf(40));
+                workout.setAverageHeartRate(150);
+                workout.setMaxHeartRate(200);
+                workout.setRecoveryHeartRate(90);
+                workout.setPerformanceRating(7);
+                workout.setStatus(WorkoutStatus.RAN);
+                workouts.saveAndFlush(workout);
+            }
+        }
     }
 }

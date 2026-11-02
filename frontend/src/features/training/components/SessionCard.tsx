@@ -5,7 +5,6 @@ import { formatTime } from '@/lib/display';
 import { SESSION_STATUS } from '../lib/status';
 import type { ScheduleSession } from '../types';
 import { StatusPill } from './StatusPill';
-import { groupLabel } from '../lib/groupLifecycle';
 
 /**
  * One Session as a card: time, group, subject, how many horses and its status. A Held Session that still misses results carries a
@@ -20,7 +19,10 @@ export function SessionCard({ session, onOpen }: { session: ScheduleSession; onO
         </span>
         <StatusPill status={SESSION_STATUS[session.status]} />
       </div>
-      <p className="mt-1 truncate text-sm text-[var(--color-text-primary)]">{groupLabel(session.groupName, session.groupDisbanded)}</p>
+      <div className="mt-1 flex items-center gap-1.5 min-w-0">
+        <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{session.groupName}</p>
+        {session.groupDisbanded && <Pill tone="neutral" size="sm">Disbanded</Pill>}
+      </div>
       <p className="truncate text-xs text-[var(--color-text-secondary)]">{session.subjectName}</p>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-muted)]">
         <span className="flex items-center gap-1">

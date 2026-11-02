@@ -11,7 +11,7 @@ export const SCHEDULE_DAYS = 7;
  */
 export function sessionState(item: HorseScheduleItem, now: Date): SessionState {
   if (item.sessionStatus === 'CANCELLED' || item.workoutStatus === 'CANCELLED') return 'CANCELLED';
-  if (item.sessionStatus === 'HELD' || item.workoutStatus === 'HELD') return 'HELD';
+  if (item.sessionStatus === 'HELD' || item.workoutStatus === 'HELD' || item.workoutStatus === 'RAN') return 'HELD';
   return new Date(`${item.sessionDate}T${item.endTime}`).getTime() <= now.getTime() ? 'HELD' : 'UPCOMING';
 }
 

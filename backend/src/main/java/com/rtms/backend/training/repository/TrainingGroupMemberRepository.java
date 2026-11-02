@@ -14,15 +14,31 @@ import java.util.Optional;
 @Repository
 public interface TrainingGroupMemberRepository extends JpaRepository<TrainingGroupMember, Long> {
 
-    List<TrainingGroupMember> findByGroupIdOrderByJoinedAtAsc(Long groupId);
+    List<TrainingGroupMember> findByGroupIdAndLeftAtIsNullOrderByJoinedAtAsc(Long groupId);
 
-    List<TrainingGroupMember> findByGroupIdIn(Collection<Long> groupIds);
+    List<TrainingGroupMember> findByGroupIdInAndLeftAtIsNull(Collection<Long> groupIds);
 
-    Optional<TrainingGroupMember> findByHorseId(Long horseId);
+    Optional<TrainingGroupMember> findByHorseIdAndLeftAtIsNull(Long horseId);
 
-    List<TrainingGroupMember> findByHorseIdIn(Collection<Long> horseIds);
+    List<TrainingGroupMember> findByHorseIdInAndLeftAtIsNull(Collection<Long> horseIds);
 
-    long countByGroupId(Long groupId);
+    long countByGroupIdAndLeftAtIsNull(Long groupId);
+
+    /**
+     * Danh sách hiển thị của nhiều nhóm: nhóm còn hoạt động lấy ngựa đang ở; nhóm Disbanded lấy những con rời đúng lúc giải tán.
+     * (The roster shown for many groups: a live group shows its current horses; a Disbanded group the ones that left when it was disbanded.)
+     */
+    @Query("""
+           SELECT m
+           FROM TrainingGroupMember m
+           JOIN TrainingGroup g ON m.groupId = g.id
+           WHERE g.id IN :groupIds
+             AND ((g.disbandedAt IS NULL AND m.leftAt IS NULL) OR m.leftAt = g.disbandedAt)
+           ORDER BY m.joinedAt, m.id
+           """)
+    List<TrainingGroupMember> findRostersOfGroups(@Param("groupIds") Collection<Long> groupIds);
+
+    void deleteByGroupId(Long groupId);
 
     /**
      * Chuồng và khu của nhiều chiến mã bằng MỘT câu JOIN. Ngựa chưa có chuồng sẽ không xuất hiện.

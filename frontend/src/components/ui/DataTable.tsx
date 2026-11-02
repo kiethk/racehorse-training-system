@@ -96,7 +96,8 @@ export function DataTable<Row>({
 
   const activePage = pagination?.page ?? localPage;
   const activePageSize = pagination?.pageSize ?? pageSize;
-  const visibleRows = activePageSize && !pagination
+  const shouldSlice = activePageSize !== undefined && (!pagination || rows.length > activePageSize);
+  const visibleRows = shouldSlice && activePageSize !== undefined
     ? sorted.slice(activePage * activePageSize, (activePage + 1) * activePageSize)
     : sorted;
   const pageChange = pagination?.onPageChange ?? setLocalPage;

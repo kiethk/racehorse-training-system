@@ -57,7 +57,7 @@ SELECT r.horse_id, r.at,
         -- Sau buổi tập mệt. (After a tiring session.)
         SELECT DISTINCT w.horse_id, s.session_date + TIME '15:00', 'fatigue'
           FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id
-         WHERE w.status = 'HELD' AND w.recovery_heart_rate >= 118 AND s.session_date >= pg_temp.today() - 34
+         WHERE w.status = 'RAN' AND w.recovery_heart_rate >= 118 AND s.session_date >= pg_temp.today() - 34
        ) r
  WHERE r.at <= pg_temp.clock()
  ORDER BY r.at, r.horse_id;

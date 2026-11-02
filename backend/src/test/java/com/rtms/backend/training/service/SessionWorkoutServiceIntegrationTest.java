@@ -107,14 +107,13 @@ class SessionWorkoutServiceIntegrationTest {
     }
 
     @Test
-    void resultsAreRecordedOnAHeldWorkoutWithoutChangingAnyStatus() {
+    void recordingResultsMakesTheWorkoutRanAndLeavesTheSessionAndPlanAlone() {
         clock.set(monday.atTime(12, 0));
         Long workoutId = firstWorkoutOfSession(0).getId();
 
         SessionWorkoutResponse recorded = service.recordResult(workoutId, validResult(), trainer);
 
-        assertEquals("HELD", recorded.status());
-        assertTrue(recorded.hasResult());
+        assertEquals("RAN", recorded.status());
         assertNotNull(recorded.performanceRating());
         assertEquals(SessionStatus.HELD, sessions.findById(recorded.sessionId()).orElseThrow().getStatus());
         assertEquals(TrainingPlanStatus.ACTIVE, plans.findById(plan.plan().id()).orElseThrow().getStatus());
@@ -127,7 +126,7 @@ class SessionWorkoutServiceIntegrationTest {
 
         SessionWorkoutResponse recorded = service.recordResult(workoutId, validResult(), trainer);
 
-        assertTrue(recorded.hasResult());
+        assertEquals("RAN", recorded.status());
         assertEquals(TrainingPlanStatus.COMPLETED, plans.findById(plan.plan().id()).orElseThrow().getStatus());
     }
 

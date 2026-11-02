@@ -11,6 +11,7 @@ public record RecentWorkoutRow(Long horseId,
                                LocalDate sessionDate,
                                LocalTime sessionEndTime,
                                Integer maxHeartRate,
+                               Integer averageHeartRate,
                                Integer recoveryHeartRate,
                                Integer performanceRating) {
 }

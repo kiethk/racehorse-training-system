@@ -9,6 +9,7 @@ import com.rtms.backend.training.entity.TrainingGroup;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.SessionStatus;
+import com.rtms.backend.training.enums.TrainingPlanStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
 import com.rtms.backend.training.repository.GroupPlanRepository;
@@ -28,10 +29,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Cài đặt HorseAttendanceService. Đã học (X) là số Workout HELD của ngựa, dù đã ghi kết quả hay chưa. Tổng (Y) là các buổi chưa bị
+ * Cài đặt HorseAttendanceService. Đã học (X) là số Workout RAN của ngựa (đã ghi kết quả). Tổng (Y) là các buổi chưa bị
  * hủy của chính kế hoạch (kể cả buổi trước khi ngựa vào và buổi mà Workout riêng của ngựa bị hủy), không lấy từ Course nên sửa Course
  * về sau không làm đổi lịch sử cũ.
- * (Implements HorseAttendanceService. Attended (X) is the horse's HELD Workouts, whether or not results were recorded. Total (Y) is
+ * (Implements HorseAttendanceService. Attended (X) is the horse's Workouts that Ran (results recorded). Total (Y) is
  * the plan's own Sessions that were not cancelled (including Sessions before the horse joined and Sessions where only its own
  * Workout was cancelled), never taken from the Course, so editing a Course later does not rewrite old history.)
  */
@@ -93,17 +94,34 @@ public class HorseAttendanceServiceImpl implements HorseAttendanceService {
         List<HorseAttendanceResponse> history = new ArrayList<>();
         for (Map.Entry<Long, List<TrainingWorkout>> entry : workoutsByPlan.entrySet()) {
             GroupPlan plan = plansById.get(entry.getKey());
-            int attended = (int) entry.getValue().stream().filter(workout -> workout.getStatus() == WorkoutStatus.HELD).count();
+            List<TrainingWorkout> planWorkouts = entry.getValue();
+            int attended = (int) planWorkouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.RAN).count();
+            long tookPlace = attended + planWorkouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.HELD).count();
+            long scheduled = planWorkouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.SCHEDULED).count();
+
+            String effectiveStatus;
+            if (plan.getStatus() == TrainingPlanStatus.CANCELLED) {
+                effectiveStatus = TrainingPlanStatus.CANCELLED.name();
+            } else if (plan.getStatus() == TrainingPlanStatus.COMPLETED) {
+                effectiveStatus = TrainingPlanStatus.COMPLETED.name();
+            } else if (scheduled > 0) {
+                effectiveStatus = plan.getStatus().name();
+            } else if (tookPlace > 0) {
+                effectiveStatus = TrainingPlanStatus.COMPLETED.name();
+            } else {
+                effectiveStatus = TrainingPlanStatus.CANCELLED.name();
+            }
+
             Map<SessionStatus, Long> byStatus = counts.getOrDefault(plan.getId(), Map.of());
             int total = byStatus.getOrDefault(SessionStatus.HELD, 0L).intValue()
                     + byStatus.getOrDefault(SessionStatus.SCHEDULED, 0L).intValue();
-            LocalDate joinedOn = entry.getValue().stream()
+            LocalDate joinedOn = planWorkouts.stream()
                     .map(workout -> sessionsById.get(workout.getSessionId()).getSessionDate())
                     .min(Comparator.naturalOrder()).orElse(plan.getStartDate());
             history.add(new HorseAttendanceResponse(plan.getId(),
                     plan.getGroupId() == null ? null : groupsById.get(plan.getGroupId()).getName(),
                     plan.getGroupId() != null && groupsById.get(plan.getGroupId()).isDisbanded(),
-                    courseNames.get(plan.getCourseId()), plan.getStatus().name(), plan.getStartDate(), plan.getEndDate(),
+                    courseNames.get(plan.getCourseId()), effectiveStatus, plan.getStartDate(), plan.getEndDate(),
                     attended, total, joinedOn));
         }
         history.sort(Comparator.comparing(HorseAttendanceResponse::startDate).reversed());

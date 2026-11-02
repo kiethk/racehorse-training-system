@@ -77,10 +77,10 @@ export function GroupPlanWizard() {
     setSubmitError(null);
     try {
       const created = await trainingService.createGroupPlan({ groupId, courseId, startDate, trainingDays });
-      toast.success('Course assigned.');
+      toast.success('Plan created.');
       router.push(`/trainer/plans/${created.plan.id}`);
     } catch (cause) {
-      setSubmitError(displayError(cause, 'Unable to assign the course.'));
+      setSubmitError(displayError(cause, 'Unable to create the plan.'));
       setSubmitting(false);
     }
   }
@@ -100,7 +100,7 @@ export function GroupPlanWizard() {
   return (
     <ScreenLayout variant="form">
       <BackLink href="/trainer/plans">Back to plans</BackLink>
-      <PageHeader title="Assign a course" />
+      <PageHeader title="Create plan" />
 
       <Panel padded className="space-y-4">
         <SectionTitle>1. Group and course</SectionTitle>
@@ -185,7 +185,7 @@ export function GroupPlanWizard() {
               disabled={submitting || pending || !preview?.canCreate || inPast}
               onClick={create}
             >
-              {submitting ? 'Assigning...' : 'Assign course'}
+              {submitting ? 'Creating...' : 'Create plan'}
             </Button>
           </div>
         </Panel>

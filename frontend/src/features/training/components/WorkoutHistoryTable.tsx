@@ -37,11 +37,13 @@ function buildColumns(rules: TrainingRules | null): DataTableColumn<HorseFitness
       header: 'Heart rate (avg / max / recovery)',
       align: 'right',
       render: (row) => {
+        const avgLimit = rules?.averageHeartRateLimit ?? 180;
+        const avgOver = rules != null && row.averageHeartRate != null && row.averageHeartRate > avgLimit;
         const maxOver = rules != null && row.maxHeartRate != null && row.maxHeartRate > rules.maxHeartRateLimit;
         const recoveryOver = rules != null && row.recoveryHeartRate != null && row.recoveryHeartRate > rules.recoveryHeartRateLimit;
         return (
           <span className="whitespace-nowrap">
-            {row.averageHeartRate ?? '—'} /{' '}
+            <strong className={cn(avgOver && 'text-[var(--color-warning)]')}>{row.averageHeartRate ?? '—'}</strong> /{' '}
             <strong className={cn(maxOver && 'text-[var(--color-danger)]')}>{row.maxHeartRate ?? '—'}</strong> /{' '}
             <strong className={cn(recoveryOver && 'text-[var(--color-warning)]')}>{row.recoveryHeartRate ?? '—'}</strong> bpm
           </span>

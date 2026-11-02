@@ -148,13 +148,13 @@ INSERT INTO seed_check VALUES
 ('Group member outside the trainer areas, resting, or not admitted',
  $q$ SELECT m.id FROM training_group_members m JOIN training_groups g ON g.id = m.group_id JOIN horses h ON h.id = m.horse_id
      JOIN stable_stalls s ON s.id = h.current_stall_id JOIN areas a ON a.id = s.area_id
-     WHERE a.trainer_id <> g.trainer_id OR h.training_decision = 'BLOCKED' OR h.current_status <> 'ELIGIBLE' $q$),
+     WHERE (a.trainer_id <> g.trainer_id OR h.training_decision = 'BLOCKED' OR h.current_status <> 'ELIGIBLE') AND m.left_at IS NULL $q$),
 ('Group member groom is not the stall groom',
  $q$ SELECT m.id FROM training_group_members m JOIN horses h ON h.id = m.horse_id JOIN stable_stalls s ON s.id = h.current_stall_id
-     WHERE m.groom_id IS DISTINCT FROM s.groom_id $q$),
+     WHERE m.groom_id IS DISTINCT FROM s.groom_id AND m.left_at IS NULL $q$),
 ('Group with more than 6 horses or a groom twice (BR-10, BR-09)',
- $q$ SELECT group_id FROM training_group_members GROUP BY group_id HAVING count(*) > 6
-     UNION ALL SELECT group_id FROM training_group_members WHERE groom_id IS NOT NULL GROUP BY group_id, groom_id HAVING count(*) > 1 $q$),
+ $q$ SELECT group_id FROM training_group_members WHERE left_at IS NULL GROUP BY group_id HAVING count(*) > 6
+     UNION ALL SELECT group_id FROM training_group_members WHERE groom_id IS NOT NULL AND left_at IS NULL GROUP BY group_id, groom_id HAVING count(*) > 1 $q$),
 ('Plan does not have exactly total_sessions sessions',
  $q$ SELECT p.id FROM group_plans p JOIN courses c ON c.id = p.course_id
      WHERE (SELECT count(*) FROM training_sessions s WHERE s.group_plan_id = p.id) <> c.total_sessions $q$),
@@ -175,7 +175,7 @@ INSERT INTO seed_check VALUES
 ('Workout status does not match its session',
  $q$ SELECT w.id FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id
      WHERE (s.status = 'CANCELLED' AND w.status <> 'CANCELLED')
-        OR (s.status = 'SCHEDULED' AND w.status = 'HELD')
+        OR (s.status = 'SCHEDULED' AND w.status IN ('HELD', 'RAN'))
         OR (s.status = 'HELD' AND w.status = 'SCHEDULED') $q$),
 ('Scheduled session with no effective workout',
  $q$ SELECT s.id FROM training_sessions s
@@ -189,16 +189,16 @@ INSERT INTO seed_check VALUES
      WHERE w.status <> 'CANCELLED' AND pg_temp.blocked_at(w.horse_id, s.session_date + s.start_time) $q$),
 ('BLOCKED horse in a group or with a Workout still to come',
  $q$ SELECT h.id FROM horses h WHERE h.training_decision = 'BLOCKED'
-       AND (EXISTS (SELECT 1 FROM training_group_members m WHERE m.horse_id = h.id)
+       AND (EXISTS (SELECT 1 FROM training_group_members m WHERE m.horse_id = h.id AND m.left_at IS NULL)
             OR EXISTS (SELECT 1 FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id
                         WHERE w.horse_id = h.id AND w.status = 'SCHEDULED' AND s.session_date + s.start_time > pg_temp.clock())) $q$),
 ('Recorded rating differs from the app formula',
- $q$ SELECT id FROM training_workouts WHERE status = 'HELD' AND actual_distance_meters IS NOT NULL
+ $q$ SELECT id FROM training_workouts WHERE status = 'RAN'
        AND performance_rating <> pg_temp.rating(actual_distance_meters, actual_duration_minutes, top_speed_kmh, average_speed_kmh,
                                                 average_heart_rate, max_heart_rate, recovery_heart_rate) $q$),
 ('Result recorded before the session ended or in the future',
  $q$ SELECT w.id FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id
-     WHERE w.status = 'HELD' AND w.actual_distance_meters IS NOT NULL
+     WHERE w.status = 'RAN'
        AND (w.updated_at < s.session_date + s.end_time OR w.updated_at > pg_temp.clock()) $q$),
 ('Unfinished plans of one group overlap',
  $q$ SELECT a.id FROM group_plans a JOIN group_plans b ON b.group_id = a.group_id AND b.id < a.id
@@ -206,7 +206,7 @@ INSERT INTO seed_check VALUES
        AND a.start_date <= b.end_date AND b.start_date <= a.end_date $q$),
 ('Disbanded group with members or an unfinished plan',
  $q$ SELECT g.id FROM training_groups g WHERE g.disbanded_at IS NOT NULL
-       AND (EXISTS (SELECT 1 FROM training_group_members m WHERE m.group_id = g.id)
+       AND (EXISTS (SELECT 1 FROM training_group_members m WHERE m.group_id = g.id AND m.left_at IS NULL)
             OR EXISTS (SELECT 1 FROM group_plans p WHERE p.group_id = g.id AND p.status IN ('UPCOMING', 'ACTIVE'))) $q$),
 ('Disbanded group dated before it was created or in the future',
  $q$ SELECT id FROM training_groups WHERE disbanded_at IS NOT NULL AND (disbanded_at < created_at OR disbanded_at > pg_temp.clock()) $q$),

@@ -108,8 +108,8 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
                 }
             }
         }
-        memberRepository.deleteById(member.getId());
-        memberRepository.flush();
+        member.setLeftAt(LocalDateTime.now(clock));
+        memberRepository.saveAndFlush(member);
         settlement.settle();
     }
 
@@ -128,7 +128,7 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
             return 0;
         }
         settlement.settle();
-        List<TrainingGroupMember> changing = memberRepository.findByHorseIdIn(groomByHorse.keySet()).stream()
+        List<TrainingGroupMember> changing = memberRepository.findByHorseIdInAndLeftAtIsNull(groomByHorse.keySet()).stream()
                 .filter(member -> !Objects.equals(member.getGroomId(), groomByHorse.get(member.getHorseId())))
                 .toList();
         if (changing.isEmpty()) {
@@ -150,7 +150,7 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
     /** BR-09 trên phân bổ cuối cùng của từng nhóm bị ảnh hưởng. (BR-09 on the final allocation of every affected group.) */
     private void assertNoGroomClash(List<TrainingGroupMember> changing, Map<Long, Long> groomByHorse) {
         List<Long> groupIds = changing.stream().map(TrainingGroupMember::getGroupId).distinct().toList();
-        Map<Long, List<TrainingGroupMember>> byGroup = memberRepository.findByGroupIdIn(groupIds).stream()
+        Map<Long, List<TrainingGroupMember>> byGroup = memberRepository.findByGroupIdInAndLeftAtIsNull(groupIds).stream()
                 .collect(Collectors.groupingBy(TrainingGroupMember::getGroupId));
         for (Map.Entry<Long, List<TrainingGroupMember>> entry : byGroup.entrySet()) {
             Map<Long, Integer> perGroom = new HashMap<>();
@@ -168,7 +168,7 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
     @Override
     @Transactional
     public void exitAnyGroup(Long horseId) {
-        memberRepository.findByHorseId(horseId).ifPresent(this::exitGroup);
+        memberRepository.findByHorseIdAndLeftAtIsNull(horseId).ifPresent(this::exitGroup);
     }
 
     // =================================================================

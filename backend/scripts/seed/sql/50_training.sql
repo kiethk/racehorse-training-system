@@ -60,10 +60,49 @@ BEGIN
     RETURN GREATEST(1, LEAST(10, floor(0.35 * p_speed + 0.40 * p_cardio + 0.25 * p_eff + 0.5)::INT));
 END $$ LANGUAGE plpgsql IMMUTABLE;
 
+-- Nhóm cự ly như DistanceBand trong Java. (Distance band, the same cut-offs as DistanceBand in Java.)
+CREATE FUNCTION pg_temp.band(p_meters NUMERIC) RETURNS TEXT AS $$
+    SELECT CASE WHEN p_meters < 1400 THEN 'SPRINT' WHEN p_meters < 1800 THEN 'MILE'
+                WHEN p_meters < 2400 THEN 'MIDDLE' ELSE 'STAYER' END
+$$ LANGUAGE sql IMMUTABLE;
+
+-- Sở trường của một nhóm: ngựa trong nhóm chạy tốt ở các cự ly này và đuối ở cự ly khác, nên cùng nhóm thì cùng huy hiệu. Chỉ
+-- chọn trong các cự ly nhóm đã chạy ít nhất 4 buổi trong 90 ngày (khung tính huy hiệu), để mọi con đủ 3 buổi; xoay vòng theo thứ
+-- tự tạo nhóm: cự ly chạy nhiều nhất, cự ly thứ hai, hoặc cả hai. Nhóm chạy quá ít thì lấy cự ly chạy nhiều nhất.
+-- (A group's specialty: its horses run well at these distances and struggle at the others, so horses of one group earn the same
+-- badges. Chosen among the distances the group ran at least 4 times in the 90-day badge window, so every horse has 3; in turn by
+-- group creation order: the most-run distance, the second, or both. A group that ran too little takes its most-run distance.)
+CREATE FUNCTION pg_temp.group_bands(p_group BIGINT) RETURNS TEXT[] AS $$
+    WITH ran AS (
+        SELECT pg_temp.band(sub.target_distance_meters) AS band, count(*) AS n
+          FROM training_sessions s
+          JOIN group_plans p ON p.id = s.group_plan_id
+          JOIN subjects sub ON sub.id = s.subject_id
+         WHERE p.group_id = p_group AND s.status = 'HELD' AND sub.category <> 'RECOVERY'
+           AND s.session_date >= pg_temp.today() - 90
+         GROUP BY 1),
+    -- Cự ly đủ 4 buổi; nhóm chạy quá ít thì lấy cự ly chạy nhiều nhất. (Distances with 4 runs; else the most-run one.)
+    enough AS (SELECT * FROM ran WHERE n >= 4
+               UNION ALL
+               SELECT * FROM (SELECT * FROM ran ORDER BY n DESC, band LIMIT 1) top WHERE NOT EXISTS (SELECT 1 FROM ran WHERE n >= 4)),
+    ranked AS (SELECT band, row_number() OVER (ORDER BY n DESC, band) AS rk, count(*) OVER () AS total FROM enough),
+    turn AS (SELECT (SELECT count(*) FROM training_groups g WHERE g.id < p_group) % 3 AS k)
+    SELECT ARRAY(SELECT band FROM ranked, turn
+                  WHERE CASE turn.k WHEN 0 THEN rk = 1 WHEN 1 THEN rk = LEAST(2, total) ELSE rk <= 2 END)
+$$ LANGUAGE sql STABLE;
+
+-- Nhận xét của Trainer theo điểm. (The Trainer's note for a rating.)
+CREATE FUNCTION pg_temp.feedback(p_rating INT) RETURNS TEXT AS $$
+    SELECT CASE WHEN p_rating >= 8 THEN 'Strong, even rhythm; recovered quickly after the final furlong.'
+                WHEN p_rating >= 6 THEN 'Solid session; pace dropped slightly in the second half.'
+                WHEN p_rating >= 4 THEN 'Laboured in the last part; heart rate slow to come down.'
+                ELSE 'Tired early and slow to recover. Rest day advised; ask the vet if it continues.' END
+$$ LANGUAGE sql IMMUTABLE;
+
 -- Kết quả một buổi tập theo cách WorkoutResultSimulationService sinh số liệu, chỉnh theo "năng lực" của ngựa
 -- (0..1, cao = khỏe) và cờ mệt mỏi. (Workout result the way WorkoutResultSimulationService generates it, tuned by the
 -- horse's ability (0..1) and a fatigue flag.)
-CREATE FUNCTION pg_temp.workout_result(p_seed TEXT, p_subject BIGINT, p_ability NUMERIC, p_fatigue BOOLEAN,
+CREATE FUNCTION pg_temp.workout_result(p_seed TEXT, p_subject BIGINT, p_ability NUMERIC, p_fatigue BOOLEAN, p_bands TEXT[],
     OUT dist NUMERIC, OUT dur NUMERIC, OUT top NUMERIC, OUT avg NUMERIC, OUT hr INT, OUT hr_max INT, OUT hr_rec INT,
     OUT rating INT) AS $$
 DECLARE
@@ -73,20 +112,41 @@ DECLARE
 BEGIN
     SELECT * INTO s FROM subjects WHERE id = p_subject;
     SELECT x.lo, x.hi, x.hlo, x.hhi INTO v_lo, v_hi, v_hr_lo, v_hr_hi
-      FROM (VALUES ('LOW', 15.0, 24.0, 115, 145), ('MEDIUM', 24.0, 36.0, 145, 175), ('HIGH', 36.0, 50.0, 170, 195))
+      FROM (VALUES ('LOW', 15.0, 24.0, 115, 140), ('MEDIUM', 24.0, 36.0, 140, 165), ('HIGH', 36.0, 50.0, 155, 175))
            x(level, lo, hi, hlo, hhi)
      WHERE x.level = s.intensity_level;
     dist := round(COALESCE(s.target_distance_meters, 1000) * pg_temp.rnd(p_seed || 'd', 0.95, 1.05), 1);
+    -- Đúng sở trường của nhóm thì ngựa chạy khỏe, kể cả bài cường độ thấp. (At the group's specialty the horse runs strongly.)
+    IF p_bands IS NOT NULL AND s.category <> 'RECOVERY' AND pg_temp.band(dist) = ANY (p_bands) THEN
+        a := GREATEST(a, 0.85);
+    END IF;
     dur := round(s.duration_minutes * pg_temp.rnd(p_seed || 't', 0.92, 1.03), 1);
     avg := round(v_lo + (v_hi - v_lo) * (0.2 + 0.8 * a), 1);
     top := round(avg * pg_temp.rnd(p_seed || 's', 1.15, 1.30), 1);
     hr := round(v_hr_hi - (v_hr_hi - v_hr_lo) * a * pg_temp.rnd(p_seed || 'h', 0.8, 1.0));
-    -- Nhịp tối đa còn xa 220; hồi phục 60-98 bpm theo năng lực (dưới ngưỡng 100). Chỉ buổi mệt mới vượt ngưỡng hồi phục,
-    -- để cảnh báo trên màn hình là trường hợp có chủ đích. (Max HR stays well under 220; recovery is 60-98 bpm by
-    -- ability, under the 100 limit. Only tiring sessions break the recovery limit, so on-screen alerts are deliberate.)
-    hr_max := LEAST(220, hr + pg_temp.rndi(p_seed || 'm', 8, 18));
+    -- Thỉnh thoảng có buổi nhịp tim trung bình vượt ngưỡng 180 bpm (chỉ ~3.5% buổi tập cường độ cao)
+    IF s.intensity_level = 'HIGH' AND pg_temp.rnd(p_seed || 'spk_avg', 0.0, 1.0) < 0.035 THEN
+        hr := pg_temp.rndi(p_seed || 'avg_val', 182, 188);
+    END IF;
+    -- Nhịp tim tối đa bình thường dưới 220; thỉnh thoảng (~4% buổi tập cao) vượt ngưỡng an toàn 220 bpm (222-228 bpm) để đối chiếu
+    IF s.intensity_level = 'HIGH' AND pg_temp.rnd(p_seed || 'spk_max', 0.0, 1.0) < 0.04 THEN
+        hr_max := pg_temp.rndi(p_seed || 'max_val', 222, 228);
+    ELSE
+        hr_max := LEAST(218, hr + pg_temp.rndi(p_seed || 'm', 12, 26));
+    END IF;
     hr_rec := CASE WHEN p_fatigue THEN LEAST(hr - 9, pg_temp.rndi(p_seed || 'f', 118, 130))
-                   ELSE round(60 + 38 * (1 - a) * pg_temp.rnd(p_seed || 'r', 0.9, 1.0))::INT END;
+                   WHEN s.intensity_level = 'HIGH' AND pg_temp.rnd(p_seed || 'spk_rec', 0.0, 1.0) < 0.03 THEN pg_temp.rndi(p_seed || 'rec_val', 104, 116)
+                   ELSE round(60 + 36 * (1 - a) * pg_temp.rnd(p_seed || 'r', 0.9, 1.0))::INT END;
+    -- Ngoài sở trường của nhóm: chậm hơn, tốc độ không đều, tim hồi phục kém, nhưng vẫn dưới mọi ngưỡng cảnh báo (trung bình 180,
+    -- tối đa 220, hồi phục 100), nên điểm thường dưới 7. (Outside the group's specialty: slower, uneven pace, poorer recovery, yet
+    -- below every alert limit, so the rating usually stays under 7.)
+    IF p_bands IS NOT NULL AND s.category <> 'RECOVERY' AND pg_temp.band(dist) <> ALL (p_bands) AND NOT p_fatigue THEN
+        avg := round(avg * 0.7, 1);
+        top := round(avg * pg_temp.rnd(p_seed || 'so', 1.55, 1.65), 1);
+        hr := LEAST(179, hr + 12);
+        hr_max := hr + pg_temp.rndi(p_seed || 'mo', 3, 6);
+        hr_rec := pg_temp.rndi(p_seed || 'ro', 92, 99);
+    END IF;
     rating := pg_temp.rating(dist, dur, top, avg, hr, hr_max, hr_rec);
 END $$ LANGUAGE plpgsql;
 
@@ -180,7 +240,7 @@ BEGIN
     RETURN v_groups;
 END $$ LANGUAGE plpgsql;
 
--- Ghi một Workout kèm kết quả (hoặc không). (Writes one Workout, with a result or without.)
+-- Ghi một Workout kèm kết quả (hoặc không); Workout có kết quả là RAN. (Writes one Workout, with a result or without; one with a result is RAN.)
 CREATE FUNCTION pg_temp.put_workout(p_session BIGINT, p_plan BIGINT, p_horse BIGINT, p_groom BIGINT, p_status TEXT,
                                     p_recorded BOOLEAN, p_ability NUMERIC, p_fatigue BOOLEAN, p_created TIMESTAMP,
                                     p_updated TIMESTAMP) RETURNS VOID AS $$
@@ -190,15 +250,12 @@ DECLARE
 BEGIN
     SELECT * INTO s FROM training_sessions WHERE id = p_session;
     IF p_recorded THEN
-        r := pg_temp.workout_result(p_plan || '-' || p_horse || '-' || p_session, s.subject_id, p_ability, p_fatigue);
+        r := pg_temp.workout_result(p_plan || '-' || p_horse || '-' || p_session, s.subject_id, p_ability, p_fatigue, NULL);
         INSERT INTO training_workouts (session_id, horse_id, assigned_to_id, status, actual_distance_meters, actual_duration_minutes,
                                        top_speed_kmh, average_speed_kmh, average_heart_rate, max_heart_rate, recovery_heart_rate,
                                        performance_rating, trainer_feedback, created_at, updated_at)
-        VALUES (p_session, p_horse, p_groom, p_status, r.dist, r.dur, r.top, r.avg, r.hr, r.hr_max, r.hr_rec, r.rating,
-                CASE WHEN r.rating >= 8 THEN 'Strong, even rhythm; recovered quickly after the final furlong.'
-                     WHEN r.rating >= 6 THEN 'Solid session; pace dropped slightly in the second half.'
-                     WHEN r.rating >= 4 THEN 'Laboured in the last part; heart rate slow to come down.'
-                     ELSE 'Tired early and slow to recover. Rest day advised; ask the vet if it continues.' END,
+        VALUES (p_session, p_horse, p_groom, 'RAN', r.dist, r.dur, r.top, r.avg, r.hr, r.hr_max, r.hr_rec, r.rating,
+                pg_temp.feedback(r.rating),
                 p_created, p_updated);
     ELSE
         INSERT INTO training_workouts (session_id, horse_id, assigned_to_id, status, created_at, updated_at)
@@ -256,7 +313,8 @@ BEGIN
      WHERE x.status = 'HELD' AND x.session_date < pg_temp.today();
 
     FOR m IN SELECT hm.horse_id, hm.groom_id FROM training_group_members hm
-              WHERE hm.group_id = p_group AND NOT (hm.horse_id = ANY (p_exclude)) ORDER BY hm.id LOOP
+              WHERE hm.group_id = p_group AND (hm.left_at IS NULL OR hm.left_at > v_created)
+                AND NOT (hm.horse_id = ANY (p_exclude)) ORDER BY hm.id LOOP
         SELECT manager_reviewed_at INTO v_approved FROM admission_applications WHERE horse_id = m.horse_id AND status = 'APPROVED';
         IF v_approved IS NULL OR v_created < v_approved OR pg_temp.blocked_at(m.horse_id, v_created) THEN
             CONTINUE;      -- not admitted yet, or resting when the plan was made: not part of this plan
@@ -280,6 +338,10 @@ BEGIN
                 PERFORM pg_temp.put_workout(s.id, v_plan, m.horse_id, m.groom_id, 'SCHEDULED', FALSE, v_ability, FALSE, v_created, v_created);
             END IF;
         END LOOP;
+        IF v_block IS NOT NULL THEN
+            UPDATE training_group_members SET left_at = v_block
+             WHERE group_id = p_group AND horse_id = m.horse_id AND left_at IS NULL;
+        END IF;
     END LOOP;
 
     PERFORM pg_temp.audit(v_trainer, 'Create Training Plan', 'GroupPlan', v_plan,
@@ -376,7 +438,7 @@ BEGIN
             v_current := v_dates[1] <= pg_temp.today() AND v_dates[v_total] >= pg_temp.today();
             v_late := NULL;
             IF v_current AND p_late_group = gi THEN
-                SELECT horse_id INTO v_late FROM training_group_members WHERE group_id = p_groups[gi] ORDER BY id DESC LIMIT 1;
+                SELECT horse_id INTO v_late FROM training_group_members WHERE group_id = p_groups[gi] AND left_at IS NULL ORDER BY id DESC LIMIT 1;
             END IF;
             v_plan := pg_temp.make_group_plan(p_groups[gi], v_course, v_start, v_days,
                                               v_current AND p_unrecorded_group = gi,
@@ -388,6 +450,36 @@ BEGIN
             v_start := v_dates[v_total] + 1;
             v_ci := v_ci + 1;
         END LOOP;
+    END LOOP;
+END $$ LANGUAGE plpgsql;
+
+-- Sau khi mọi nhóm đã chạy xong chuỗi khóa: ghi lại kết quả mọi buổi đã chạy theo sở trường của nhóm (cùng hạt giống, cùng năng
+-- lực ngựa, cờ mệt suy từ nhịp tim hồi phục), nên ngựa cùng nhóm có cùng huy hiệu cự ly.
+-- (Once every group's course timeline exists: rewrite the result of every Workout that Ran by its group's specialty (same seed,
+-- same horse ability, fatigue read back from the recovery heart rate), so horses of one group share their distance badges.)
+CREATE FUNCTION pg_temp.apply_group_specialties() RETURNS VOID AS $$
+DECLARE
+    r RECORD;
+    x RECORD;
+BEGIN
+    CREATE TEMP TABLE seed_group_bands ON COMMIT DROP AS
+        SELECT g.id AS group_id, pg_temp.group_bands(g.id) AS bands FROM training_groups g;
+    FOR r IN SELECT w.id, w.horse_id, w.session_id, s.subject_id, s.group_plan_id AS plan_id, b.bands,
+                    w.recovery_heart_rate >= 118 AS fatigue,
+                    (SELECT count(*) FROM training_sessions o WHERE o.group_plan_id = s.group_plan_id
+                        AND (o.session_date, o.start_time) <= (s.session_date, s.start_time)) AS idx
+               FROM training_workouts w
+               JOIN training_sessions s ON s.id = w.session_id
+               JOIN group_plans p ON p.id = s.group_plan_id
+               JOIN seed_group_bands b ON b.group_id = p.group_id
+              WHERE w.status = 'RAN' LOOP
+        x := pg_temp.workout_result(r.plan_id || '-' || r.horse_id || '-' || r.session_id, r.subject_id,
+                                    pg_temp.rnd('ability' || r.horse_id, 0.0, 1.0) + 0.015 * r.idx, r.fatigue, r.bands);
+        UPDATE training_workouts
+           SET actual_distance_meters = x.dist, actual_duration_minutes = x.dur, top_speed_kmh = x.top, average_speed_kmh = x.avg,
+               average_heart_rate = x.hr, max_heart_rate = x.hr_max, recovery_heart_rate = x.hr_rec,
+               performance_rating = x.rating, trainer_feedback = pg_temp.feedback(x.rating)
+         WHERE id = r.id;
     END LOOP;
 END $$ LANGUAGE plpgsql;
 
@@ -483,8 +575,8 @@ BEGIN
         PERFORM pg_temp.cancel_plan(v_plan, (SELECT session_date + end_time FROM (
             SELECT session_date, end_time, row_number() OVER (ORDER BY session_date, start_time) idx
               FROM training_sessions WHERE group_plan_id = v_plan) q WHERE idx = 4) + INTERVAL '30 minutes');
-        -- Disband (TrainingGroupService.disband): the horses leave, the group row stays with its disbanded_at.
-        DELETE FROM training_group_members WHERE group_id = v_old;
+        -- Disband (TrainingGroupService.disband): the horses leave at the disband time, the group row stays with its disbanded_at.
+        UPDATE training_group_members SET left_at = v_gone WHERE group_id = v_old AND left_at IS NULL;
         UPDATE training_groups SET disbanded_at = v_gone, updated_at = v_gone WHERE id = v_old;
         PERFORM pg_temp.audit(v_trainer, 'Disband Training Group', 'TrainingGroup', v_old,
                               'Trainer disbanded a training group', v_gone, 'POST', '/api/training-groups/' || v_old || '/disband');
@@ -528,6 +620,20 @@ BEGIN
               FROM training_sessions WHERE group_plan_id = v_plan) q
             WHERE q.status = 'SCHEDULED' ORDER BY idx LIMIT 1));
     END IF;
+
+    -- ----------------------------------------------------------------- distance specialty per group
+    PERFORM pg_temp.apply_group_specialties();
+
+    -- Trainer1: Demo cảnh báo nhịp tim tối đa (> 220 bpm) ở một buổi tập gần đây để đối chiếu
+    UPDATE training_workouts w
+       SET max_heart_rate = 225,
+           performance_rating = pg_temp.rating(w.actual_distance_meters, w.actual_duration_minutes, w.top_speed_kmh, w.average_speed_kmh, w.average_heart_rate, 225, w.recovery_heart_rate)
+     WHERE w.id = (SELECT w2.id FROM training_workouts w2
+                     JOIN training_sessions s2 ON s2.id = w2.session_id
+                     JOIN group_plans p2 ON p2.id = s2.group_plan_id
+                     JOIN training_groups g2 ON g2.id = p2.group_id
+                    WHERE g2.trainer_id = pg_temp.uid('TR01') AND w2.status = 'RAN'
+                    ORDER BY s2.session_date DESC, s2.start_time DESC LIMIT 1 OFFSET 3);
 
     -- Trainer2, group 1, second course: dropped part-way (Cancel plan after the fourth Session).
     SELECT p.id INTO v_plan FROM group_plans p JOIN training_groups g ON g.id = p.group_id

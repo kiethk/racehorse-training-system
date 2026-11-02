@@ -37,13 +37,16 @@ export function SessionResultDialog({
       open={horse !== null}
       onClose={onClose}
       title={horse ? `${horse.result ? 'Edit result' : 'Result'} for ${horse.horseName}` : ''}
-      size="md"
+      size="lg"
       layer="confirm"
     >
       {horse && <ResultForm key={horse.workoutId} horse={horse} onClose={onClose} onRecorded={onRecorded} />}
     </Modal>
   );
 }
+
+const MOVEMENT_KEYS = ['actualDistanceMeters', 'actualDurationMinutes', 'averageSpeedKmh', 'topSpeedKmh'] as const;
+const HEART_KEYS = ['averageHeartRate', 'maxHeartRate', 'recoveryHeartRate'] as const;
 
 function ResultForm({
   horse,
@@ -102,32 +105,99 @@ function ResultForm({
     }
   }
 
+  const movementFields = READING_FIELDS.filter((f) =>
+    (MOVEMENT_KEYS as readonly string[]).includes(f.key),
+  );
+  const heartFields = READING_FIELDS.filter((f) =>
+    (HEART_KEYS as readonly string[]).includes(f.key),
+  );
+
   return (
     <form id={FORM_ID} onSubmit={submit} noValidate className="space-y-4">
-      <div className="flex justify-end">
-        <Button type="button" size="sm" variant="secondary" icon="sparkles" onClick={generate} disabled={generating || submitting}>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          Copy metrics from the tracking device or generate sample data for this workout.
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          icon="sparkles"
+          onClick={generate}
+          disabled={generating || submitting}
+          className="shrink-0"
+        >
           {generating ? 'Generating...' : 'Generate sample data'}
         </Button>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {READING_FIELDS.map((field) => (
-          <FormField key={field.key} label={`${field.label} (${field.unit})`} required error={fieldErrors[field.key]}>
-            <Input
-              type="number"
-              inputMode="decimal"
-              step={field.step}
-              value={readings[field.key]}
-              onChange={(event) => setReadings((current) => ({ ...current, [field.key]: event.target.value }))}
-            />
-          </FormField>
-        ))}
+
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+            Distance & Speed
+          </h4>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {movementFields.map((field) => (
+              <FormField
+                key={field.key}
+                label={`${field.label} (${field.unit})`}
+                required
+                error={fieldErrors[field.key]}
+              >
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step={field.step}
+                  value={readings[field.key]}
+                  onChange={(event) => setReadings((current) => ({ ...current, [field.key]: event.target.value }))}
+                />
+              </FormField>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+            Heart Rate (bpm)
+          </h4>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {heartFields.map((field) => (
+              <FormField
+                key={field.key}
+                label={`${field.label} (${field.unit})`}
+                required
+                error={fieldErrors[field.key]}
+                className="[&>label]:min-h-[2rem] [&>label]:flex [&>label]:items-end"
+              >
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step={field.step}
+                  value={readings[field.key]}
+                  onChange={(event) => setReadings((current) => ({ ...current, [field.key]: event.target.value }))}
+                />
+              </FormField>
+            ))}
+          </div>
+        </div>
       </div>
+
       <FormField label="Feedback">
-        <Textarea value={feedback} maxLength={2000} onChange={(event) => setFeedback(event.target.value)} />
+        <Textarea
+          placeholder="Add trainer notes or feedback on horse performance..."
+          value={feedback}
+          maxLength={2000}
+          rows={3}
+          onChange={(event) => setFeedback(event.target.value)}
+        />
       </FormField>
+
       {error && <Notice tone="error">{error}</Notice>}
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="tertiary" onClick={onClose} disabled={submitting}>Cancel</Button>
+
+      <div className="flex justify-end gap-2 border-t border-[var(--color-border)] pt-3">
+        <Button type="button" variant="tertiary" onClick={onClose} disabled={submitting}>
+          Cancel
+        </Button>
         <Button type="submit" variant="primary" disabled={submitting}>
           {submitting ? 'Saving...' : editing ? 'Save changes' : 'Record result'}
         </Button>
