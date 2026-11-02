@@ -59,7 +59,7 @@ class InjuryRecordServiceTest {
         injury.setHealthRecordId(50L);
         injury.setBodyRegionId(2L);
         injury.setInjuryType("Sprain");
-        injury.setSeverity("HIGH");
+        injury.setSeverity("SEVERE");
         injury.setStatus("ACTIVE");
     }
 
@@ -115,7 +115,7 @@ class InjuryRecordServiceTest {
 
         assertEquals(java.math.BigDecimal.valueOf(2.5), corrected.getPositionX());
         assertEquals("hindquarters", corrected.getZoneId());
-        assertEquals("HIGH", corrected.getSeverity());
+        assertEquals("SEVERE", corrected.getSeverity());
     }
 
     @Test
@@ -127,12 +127,12 @@ class InjuryRecordServiceTest {
         when(injuryRecordRepository.save(any(InjuryRecord.class))).thenAnswer(i -> i.getArgument(0));
 
         CorrectInjuryRecordRequest req = new CorrectInjuryRecordRequest(
-                "Severity correction only", "Sprain", "MEDIUM", null, "ACTIVE");
+                "Severity correction only", "Sprain", "MODERATE", null, "ACTIVE");
 
         InjuryRecord corrected = injuryRecordService.correctInjuryRecord(10L, 100L, req, 20L);
 
         assertEquals(java.math.BigDecimal.valueOf(1.1), corrected.getPositionX());
         assertEquals("foreleg", corrected.getZoneId());
-        assertEquals("MEDIUM", corrected.getSeverity());
+        assertEquals("MODERATE", corrected.getSeverity());
     }
 }

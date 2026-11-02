@@ -1,13 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState, type FormEvent } from 'react';
-import { z } from 'zod';
-import dynamic from 'next/dynamic';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Notice } from '@/components/ui/Notice';
-import { ChoiceInput, Input, Textarea } from '@/components/ui/Input';
-import { FormField } from '@/components/ui/FormField';
-import { ApiError } from '@/services/api';
 import { Button, LinkButton } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Panel } from '@/components/ui/Panel';
@@ -15,127 +10,28 @@ import { Pill } from '@/components/ui/StatusBadge';
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { HorseVitalsPanel } from '@/features/health/components/HorseVitalsPanel';
-import {
-  zoneById,
-  resolveInjuryWorldPosition,
-  resolveInjuryNormal,
-  worldToNormalized,
-} from '@/features/vet/lib/injuryZones';
 import { admissionsApi } from '../services/api';
 import { healthApi } from '@/features/health/services/healthApi';
-
-const UrgentHorseInjuryViewer = dynamic(
-  () => import('@/features/vet/components/UrgentHorseInjuryViewer'),
-  { ssr: false },
-);
 import { displayError, formatDateTime } from '@/lib/display';
-import { VitalsSection } from './vet-review/VitalsSection';
-import { randomizeUrgentVitals, pickFindingScenario } from './vet-review/urgentSimulation';
-import { emptyMetrics, metricConfigs, type MetricField } from './vet-review/constants';
-import { toast } from '@/lib/toast';
+import { ClinicalExamForm, type ClinicalExamFormHandle } from './vet-review/ClinicalExamForm';
+import { ApiError } from '@/services/api';
 import type { HorseHealthMetric } from '@/features/horses/types';
 import type {
   CompleteCareScheduleRequest,
-  HorseHealthMetricRequest,
-  TrainingDecision,
   UrgentAssignmentAlert,
   UrgentCaseReport,
 } from '../types';
 
-/** Date in Vietnam time, plus dayOffset days, as yyyy-MM-dd (matches the backend). */
-function businessDate(dayOffset: number) {
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
-  const [year, month, day] = today.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day + dayOffset)).toISOString().slice(0, 10);
-}
-
-function newIdempotencyKey() {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `follow-up-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [urgentCase, setUrgentCase] = useState<UrgentAssignmentAlert | null>(null);
-  // One-shot auto-start on open (same rule as the initial exam workspace); re-armed when the id changes.
   const autoStartRef = useRef(false);
+  const formRef = useRef<ClinicalExamFormHandle>(null);
   const [reports, setReports] = useState<UrgentCaseReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [submitError, setSubmitError] = useState('');
   const [completedData, setCompletedData] = useState<CompleteCareScheduleRequest | null>(null);
-
-  // Form states
-  const [findings, setFindings] = useState('');
-  const [diagnosis, setDiagnosis] = useState('');
-  const [treatment, setTreatment] = useState('');
-  const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>('BLOCKED');
-  const [restrictionDetails, setRestrictionDetails] = useState('');
-  // Blocking training requires follow-up rechecks; a vet can book several on
-  // consecutive days so colleagues rotate the visits.
-  const [followUps, setFollowUps] = useState<Array<{ key: string; date: string; description: string }>>(() => [{
-    key: newIdempotencyKey(),
-    date: businessDate(3),
-    description: 'Follow-up after the urgent examination',
-  }]);
-  const [notes, setNotes] = useState('');
-  // Same vitals model as the admission examination form (shared VitalsSection).
-  const [metrics, setMetrics] = useState<Record<MetricField, string>>(emptyMetrics);
   const [completedMetrics, setCompletedMetrics] = useState<HorseHealthMetric[]>([]);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  type InjuryMarker = {
-    id: string;
-    position: [number, number, number];
-    normal: [number, number, number];
-    zoneId?: string;
-    label: string;
-    description?: string;
-    severity?: string;
-  };
-
-  const [injuryMarkers, setInjuryMarkers] = useState<InjuryMarker[]>([]);
-  const [isAddMode, setIsAddMode] = useState(false);
-  const [anatomyTab, setAnatomyTab] = useState<'form' | 'anatomy3d'>('form');
-
-  const handleInjuryHit = (hit: {
-    position: [number, number, number];
-    normal: [number, number, number];
-    zoneId: string;
-  }) => {
-    const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `marker-${Date.now()}`;
-    const zone = hit.zoneId ? zoneById(hit.zoneId) : undefined;
-    const zoneName = zone?.label || 'Chấn thương';
-    const label = `${zoneName} (#${injuryMarkers.length + 1})`;
-    setInjuryMarkers((prev) => [
-      ...prev,
-      {
-        id,
-        position: hit.position,
-        normal: hit.normal,
-        zoneId: hit.zoneId,
-        label,
-        description: '',
-        severity: 'MODERATE',
-      },
-    ]);
-    setFindings((prev) => {
-      const line = `- 3D injury marker [${zoneName}] at [${hit.position.map((n) => n.toFixed(2)).join(', ')}]`;
-      return prev ? `${prev}\n${line}` : line;
-    });
-  };
-
-  const handleDeleteMarker = (id: string) => {
-    setInjuryMarkers((prev) => prev.filter((m) => m.id !== id));
-  };
-
-  const handleUpdateMarker = (id: string, updates: Partial<InjuryMarker>) => {
-    setInjuryMarkers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, ...updates } : m)),
-    );
-  };
 
   useEffect(() => {
     let active = true;
@@ -144,71 +40,19 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     setLoading(true);
     setReports([]);
     setError('');
-    setSubmitError('');
     setCompletedData(null);
     setStarting(false);
     autoStartRef.current = false;
-    setSubmitting(false);
-    setFindings('');
-    setDiagnosis('');
-    setTreatment('');
-    setTrainingDecision('BLOCKED');
-    setRestrictionDetails('');
-    setFollowUps([{ key: newIdempotencyKey(), date: businessDate(3), description: 'Follow-up after the urgent examination' }]);
-    setNotes('');
-    setMetrics(emptyMetrics);
     setCompletedMetrics([]);
-    setFieldErrors({});
-    setInjuryMarkers([]);
-    setIsAddMode(false);
-    setAnatomyTab('form');
 
     admissionsApi
       .getUrgentCase(scheduleId)
       .then((data) => {
         if (!active) return;
         setUrgentCase(data);
-        if (data.description) {
-          setFindings((prev) => prev || data.description);
-        }
-
-        // Load active injury markers (persisted) for read-only display on the 3D model.
-        healthApi
-          .getActiveInjuries(data.horseId)
-          .then((injuries) => {
-            if (!active) return;
-            setInjuryMarkers(
-              injuries.map((inj, idx) => {
-                const worldPos = resolveInjuryWorldPosition(inj);
-                const normal =
-                  inj.normalX != null && inj.normalY != null && inj.normalZ != null
-                    ? resolveInjuryNormal(
-                        [Number(inj.normalX), Number(inj.normalY), Number(inj.normalZ)],
-                        worldPos,
-                      )
-                    : resolveInjuryNormal(undefined, worldPos);
-                return {
-                  id: String(inj.id),
-                  position: worldPos,
-                  normal,
-                  zoneId: inj.zoneId ?? undefined,
-                  label: (inj.zoneId && zoneById(inj.zoneId)?.label) || `Injury ${idx + 1}`,
-                  description: inj.description ?? undefined,
-                  severity: inj.severity ?? 'MODERATE',
-                };
-              }),
-            );
-          })
-          .catch(() => {
-            // Keep empty marker list if active injuries fail to load
-          });
 
         if (data.status === 'COMPLETED') {
-          // The full HealthRecord has the vet's notes; the schedule-detail summary does not.
-          Promise.all([
-            healthApi.getHealthRecords(data.horseId),
-            healthApi.getHealthMetrics(data.horseId),
-          ])
+          Promise.all([healthApi.getHealthRecords(data.horseId), healthApi.getHealthMetrics(data.horseId)])
             .then(([records, allMetrics]) => {
               if (!active) return;
               const rec = records.find((r) => r.careScheduleId === scheduleId) ?? null;
@@ -251,34 +95,6 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     };
   }, [scheduleId]);
 
-  // Simulated telemetry scan: fills the vitals section with one of three post-exercise
-  // profiles measured in racehorse physiology (peak HR 200-214, 141-188 at 1 min post-gallop,
-  // ~100 by 15 min, RR 49-77, exhaustion temps >= 40 C). An urgent case arrives hot, so a
-  // resting-only scan would mislead. Hydration grade in section 1 cross-checks the numbers.
-  function handleRandomizeVitals() {
-    setMetrics(randomizeUrgentVitals());
-  }
-
-  // Fills only the EMPTY clinical-text fields with one coherent scenario narrative.
-  function handleSampleFindings() {
-    const scenario = pickFindingScenario();
-    const inserted: string[] = [];
-    if (!findings.trim()) { setFindings(scenario.findings); inserted.push('findings'); }
-    if (!diagnosis.trim()) { setDiagnosis(scenario.diagnosis); inserted.push('diagnosis'); }
-    if (!treatment.trim()) { setTreatment(scenario.treatment); inserted.push('treatment'); }
-    if (!notes.trim()) { setNotes(scenario.notes); inserted.push('notes'); }
-    if (!inserted.length) {
-      toast.info('Nothing to insert', 'Every findings field already contains text.');
-      return;
-    }
-    setFieldErrors((prev) => {
-      const next = { ...prev };
-      for (const key of inserted) delete next[key];
-      return next;
-    });
-    toast.success('Sample findings inserted', `${inserted.length} empty field(s) filled from the ${scenario.name} scenario.`);
-  }
-
   async function startExam() {
     if (!urgentCase || urgentCase.status !== 'SCHEDULED') return;
     setStarting(true);
@@ -297,10 +113,6 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     }
   }
 
-  // Entering a SCHEDULED urgent case from ANY entry (list card, Intake Case, dashboard
-  // emergency card, notification, deep link) starts the exam once and opens the form
-  // directly — same rule the initial exam workspace applies. On failure the
-  // "Awaiting Clinical Intake" callout and Start Examination button stay as the manual retry.
   useEffect(() => {
     if (urgentCase?.status === 'SCHEDULED' && !autoStartRef.current) {
       autoStartRef.current = true;
@@ -309,162 +121,30 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot, guarded by the ref above
   }, [urgentCase]);
 
-  function validateForm(): boolean {
-    const schema = z
-      .object({
-        findings: z.string().min(1, 'Examination findings are required.'),
-        diagnosis: z.string().min(1, 'A clinical diagnosis is required.'),
-        restrictionDetails: z.string().optional(),
-        followUps: z.array(z.object({
-          key: z.string(),
-          date: z.string(),
-          description: z.string(),
-        })),
-      })
-      .superRefine((data, ctx) => {
-        if (trainingDecision === 'BLOCKED') {
-          if (!data.restrictionDetails?.trim()) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['restrictionDetails'], message: 'Restriction details are required when training is blocked.' });
-          }
-          if (data.followUps.length === 0) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['followUps'], message: 'Schedule at least one follow-up examination when training is blocked.' });
-          }
-          for (const row of data.followUps) {
-            if (!row.date) {
-              ctx.addIssue({ code: z.ZodIssueCode.custom, path: [`followUpDate:${row.key}`], message: 'Select a follow-up date when training is blocked.' });
-            } else if (row.date < businessDate(1)) {
-              ctx.addIssue({ code: z.ZodIssueCode.custom, path: [`followUpDate:${row.key}`], message: 'The follow-up date must be tomorrow or later.' });
-            }
-            if (!row.description.trim()) {
-              ctx.addIssue({ code: z.ZodIssueCode.custom, path: [`followUpDescription:${row.key}`], message: 'A follow-up description is required.' });
-            }
-          }
-        }
-      });
-
-    const parsed = schema.safeParse({
-      findings: findings.trim(),
-      diagnosis: diagnosis.trim(),
-      restrictionDetails: restrictionDetails.trim(),
-      followUps,
-    });
-
-    const errors: Record<string, string> = {};
-    if (!parsed.success) {
-      for (const issue of parsed.error.issues) {
-        const field = issue.path[0];
-        if (typeof field === 'string' && !errors[field]) errors[field] = issue.message;
-      }
-    }
-
-    // Vitals validation mirrors the admission examination form.
-    for (const cfg of metricConfigs) {
-      const val = metrics[cfg.key];
-      if (val && val.trim()) {
-        const num = Number(val);
-        if (Number.isNaN(num) || num <= 0) errors[cfg.key] = `${cfg.label} must be a valid positive number.`;
-      }
-    }
-    const hasVital = metricConfigs.some((cfg) => metrics[cfg.key]?.trim()) || metrics.hydrationStatus.trim() !== '';
-    if (!hasVital) errors.metrics = 'At least one vital sign is required before submitting.';
-
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  const handleSuccess = (
+    _result: unknown,
+    _kind: unknown,
+    request: CompleteCareScheduleRequest | { findings?: unknown },
+  ) => {
     if (!urgentCase) return;
-
-    if (!validateForm()) {
-      setSubmitError('Check the required fields and try again.');
-      return;
-    }
-
-    setSubmitting(true);
-    setSubmitError('');
-
-    // Same metrics shape as the admission examination form.
-    const metricValues = Object.fromEntries(
-      Object.entries(metrics)
-        .filter(([, value]) => value.trim())
-        .map(([key, value]) => [
-          key,
-          ['hydrationStatus', 'notes'].includes(key) ? value.trim() : Number(value),
-        ]),
-    ) as HorseHealthMetricRequest;
-    const hasMetrics = Object.keys(metricValues).length > 0;
-
-    const payload: CompleteCareScheduleRequest = {
-      findings: findings.trim(),
-      diagnosis: diagnosis.trim(),
-      treatment: treatment.trim() || undefined,
-      trainingDecision,
-      restrictionDetails: restrictionDetails.trim() || undefined,
-      notes: notes.trim() || undefined,
-      metrics: hasMetrics ? [metricValues] : undefined,
-      injuryMarkers:
-        injuryMarkers.length > 0
-          ? injuryMarkers.map((m) => ({
-              injuryType: 'UNSPECIFIED',
-              bodyRegionId: 1,
-              severity: m.severity || 'MODERATE',
-              description: m.description?.trim() || m.label,
-              diagnosedAt: new Date().toISOString(),
-              positionX: m.position[0],
-              positionY: m.position[1],
-              positionZ: m.position[2],
-              zoneId: m.zoneId ?? null,
-              localX: Number(worldToNormalized(m.position).x.toFixed(4)),
-              localY: Number(worldToNormalized(m.position).y.toFixed(4)),
-              localZ: Number(worldToNormalized(m.position).z.toFixed(4)),
-              normalX: m.normal[0],
-              normalY: m.normal[1],
-              normalZ: m.normal[2],
-              meshName: 'Horse.001_M_Body_0',
-            }))
-          : undefined,
-      nextSchedules:
-        trainingDecision === 'BLOCKED'
-          ? followUps.map((row) => ({
-              horseId: urgentCase.horseId,
-              careType: 'ROUTINE' as const,
-              scheduledDate: row.date,
-              description: row.description.trim(),
-              idempotencyKey: row.key,
-            }))
-          : undefined,
-    };
-
-    try {
-      await admissionsApi.completeCareSchedule(urgentCase.scheduleId, payload);
-      setCompletedData(payload);
-      setUrgentCase((current) => (current ? { ...current, status: 'COMPLETED' } : current));
-      void healthApi
-        .getHealthRecords(urgentCase.horseId)
-        .then((records) => {
-          const rec = records.find((r) => r.careScheduleId === urgentCase.scheduleId);
-          if (!rec) return undefined;
-          return healthApi.getHealthMetrics(urgentCase.horseId).then((m) => {
-            setCompletedMetrics((m || []).filter((x) => x.healthRecordId === rec.id));
-          });
-        })
-        .catch(() => {});
-    } catch (cause) {
-      setSubmitError(
-        cause instanceof ApiError
-          ? cause.message
-          : 'Unable to complete the examination. Your entries have been kept; please try again.',
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
+    setCompletedData(request as CompleteCareScheduleRequest);
+    setUrgentCase((current) => (current ? { ...current, status: 'COMPLETED' } : current));
+    void healthApi
+      .getHealthRecords(urgentCase.horseId)
+      .then((records) => {
+        const rec = records.find((r) => r.careScheduleId === scheduleId);
+        if (!rec) return undefined;
+        return healthApi.getHealthMetrics(urgentCase.horseId).then((m) => {
+          setCompletedMetrics((m || []).filter((x) => x.healthRecordId === rec.id));
+        });
+      })
+      .catch(() => {});
+  };
 
   if (loading) {
     return (
       <Panel className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
-        <Icon name="refresh" size={20} className="animate-spin inline-block mr-2" />
+        <Icon name="refresh" size={20} className="mr-2 inline-block animate-spin" />
         Loading urgent case…
       </Panel>
     );
@@ -489,7 +169,6 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
   return (
     <div className="space-y-5">
-      {/* Top Breadcrumb Navigation */}
       <div>
         <Link
           href="/veterinarian/urgent"
@@ -500,24 +179,40 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
         </Link>
       </div>
 
-      {/* Clinical Case Header */}
-      <Panel className="overflow-hidden border border-[var(--color-border)] p-5 sm:p-6 border-l-4 border-l-[var(--color-medical)] bg-[var(--color-surface)]">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <Panel className="overflow-hidden border border-[var(--color-border)] border-l-4 border-l-[var(--color-medical)] bg-[var(--color-surface)] p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-4">
-            <HorseAvatar name={urgentCase.horseName} image={urgentCase.horseId ? `/api/horses/${urgentCase.horseId}/photo` : null} size={56} rounded="md" />
+            <HorseAvatar
+              name={urgentCase.horseName}
+              image={urgentCase.horseId ? `/api/horses/${urgentCase.horseId}/photo` : null}
+              size={56}
+              rounded="md"
+            />
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xl font-bold text-[var(--color-text-primary)]">
                   {urgentCase.horseName}
                 </span>
-                <span className="text-xs font-mono text-[var(--color-text-muted)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 rounded-[var(--radius-xs)] border border-[var(--color-border)]">
+                <span className="rounded-[var(--radius-xs)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 font-mono text-xs text-[var(--color-text-muted)]">
                   #{urgentCase.horseId}
                 </span>
                 <Pill tone={urgentCase.severity === 'CRITICAL' ? 'danger' : 'warning'}>
                   {urgentCase.severity}
                 </Pill>
-                <Pill tone={urgentCase.status === 'COMPLETED' ? 'success' : urgentCase.status === 'IN_PROGRESS' ? 'info' : 'warning'}>
-                  {urgentCase.status === 'SCHEDULED' ? 'Pending Intake' : urgentCase.status === 'IN_PROGRESS' ? 'In Progress' : 'Completed'}
+                <Pill
+                  tone={
+                    urgentCase.status === 'COMPLETED'
+                      ? 'success'
+                      : urgentCase.status === 'IN_PROGRESS'
+                        ? 'info'
+                        : 'warning'
+                  }
+                >
+                  {urgentCase.status === 'SCHEDULED'
+                    ? 'Pending Intake'
+                    : urgentCase.status === 'IN_PROGRESS'
+                      ? 'In Progress'
+                      : 'Completed'}
                 </Pill>
               </div>
 
@@ -525,13 +220,15 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 {urgentCase.title}
               </h1>
 
-              <div className="mt-1.5 flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-[var(--color-text-muted)]">
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)]">
                 {urgentCase.stallCode && (
                   <span className="flex items-center gap-1 font-medium text-[var(--color-text-secondary)]">
                     <Icon name="building" size={12} />
                     <span>Stall {urgentCase.stallCode}</span>
                     {urgentCase.stableLocation && (
-                      <span className="text-[var(--color-text-muted)]">({urgentCase.stableLocation})</span>
+                      <span className="text-[var(--color-text-muted)]">
+                        ({urgentCase.stableLocation})
+                      </span>
                     )}
                   </span>
                 )}
@@ -539,9 +236,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   <Icon name="clock" size={12} />
                   <span>Reported: {formatDateTime(urgentCase.reportedAt)}</span>
                 </span>
-                <span className="font-mono text-[11px]">
-                  Case #{urgentCase.scheduleId}
-                </span>
+                <span className="font-mono text-[11px]">Case #{urgentCase.scheduleId}</span>
               </div>
             </div>
           </div>
@@ -562,17 +257,14 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
         </div>
       </Panel>
 
-      {/* 2-Column Responsive Clinical Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Main Column (8 / 12) */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Incident Observation & Evidence */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <div className="space-y-6 lg:col-span-8">
           <Panel padded className="space-y-4">
             <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
               <div className="flex items-center gap-2">
                 <Icon name="file-text" size={16} className="text-[var(--color-medical)]" />
                 <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
-                  Reported Incident & Observation
+                  Reported Incident &amp; Observation
                 </h2>
               </div>
               <span className="text-xs text-[var(--color-text-muted)]">
@@ -586,7 +278,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
             {urgentCase.imageUrl && (
               <div className="pt-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-2">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
                   Photo Evidence
                 </label>
                 <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2">
@@ -594,7 +286,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                     src={urgentCase.imageUrl}
                     alt="Urgent case report incident photo"
                     openOnClick
-                    className="max-h-72 w-full object-contain rounded-[var(--radius-sm)]"
+                    className="max-h-72 w-full rounded-[var(--radius-sm)] object-contain"
                   />
                   <p className="mt-1.5 text-center text-[11px] text-[var(--color-text-muted)]">
                     Click photo to open full resolution view
@@ -604,7 +296,6 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             )}
           </Panel>
 
-          {/* Merged Secondary Reports (if any) */}
           {additionalReports.length > 0 && (
             <Panel padded className="space-y-3">
               <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
@@ -614,10 +305,12 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 {additionalReports.map((report) => (
                   <li
                     key={report.id}
-                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3.5 space-y-2"
+                    className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3.5"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <strong className="text-sm text-[var(--color-text-primary)]">{report.title}</strong>
+                      <strong className="text-sm text-[var(--color-text-primary)]">
+                        {report.title}
+                      </strong>
                       <Pill tone="danger">{report.severity}</Pill>
                     </div>
                     <p className="whitespace-pre-wrap break-words text-xs leading-relaxed text-[var(--color-text-secondary)]">
@@ -636,7 +329,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                         src={report.imageUrl}
                         alt={`Report: ${report.title}`}
                         openOnClick
-                        className="max-h-48 w-full object-contain rounded-[var(--radius-sm)]"
+                        className="max-h-48 w-full rounded-[var(--radius-sm)] object-contain"
                       />
                     )}
                   </li>
@@ -645,16 +338,16 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             </Panel>
           )}
 
-          {/* Workflow: Awaiting Intake Callout */}
           {urgentCase.status === 'SCHEDULED' && (
             <Panel padded className="border-l-4 border-l-[var(--color-warning)] bg-[var(--color-warning-soft)]/20">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
                   <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
                     Awaiting Clinical Intake
                   </h3>
                   <p className="text-xs text-[var(--color-text-secondary)]">
-                    This urgent case is currently scheduled and assigned to you. Click Start Examination to begin recording clinical findings.
+                    This urgent case is currently scheduled and assigned to you. Click Start
+                    Examination to begin recording clinical findings.
                   </p>
                 </div>
                 <Button
@@ -670,449 +363,22 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             </Panel>
           )}
 
-          {/* Workflow: In Progress Examination Form */}
           {urgentCase.status === 'IN_PROGRESS' && (
             <Panel padded className="space-y-6">
-              <div className="border-b border-[var(--color-border)] pb-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant={anatomyTab === 'form' ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => setAnatomyTab('form')}
-                  >
-                    Examination Form
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={anatomyTab === 'anatomy3d' ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => setAnatomyTab('anatomy3d')}
-                  >
-                    3D Anatomy
-                  </Button>
-                </div>
-                {anatomyTab === 'form' ? (
-                  <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                    Record vitals telemetry, clinical diagnosis, and immediate training restriction decision.
-                  </p>
-                ) : (
-                  <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                    Click the horse to place injury markers. Markers are appended to examination findings.
-                  </p>
-                )}
-              </div>
-
-              {submitError && anatomyTab === 'form' && <Notice tone="error">{submitError}</Notice>}
-
-              {anatomyTab === 'anatomy3d' ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    {urgentCase.status === 'IN_PROGRESS' && (
-                      <Button
-                        type="button"
-                        variant={isAddMode ? 'primary' : 'secondary'}
-                        onClick={() => setIsAddMode((prev) => !prev)}
-                        icon={isAddMode ? 'target' : 'plus'}
-                      >
-                        {isAddMode ? 'Adding marker: click horse' : 'Add injury marker'}
-                      </Button>
-                    )}
-                    <span className="text-xs text-[var(--color-text-secondary)]">
-                      {injuryMarkers.length} marker{injuryMarkers.length === 1 ? '' : 's'} placed
-                    </span>
-                  </div>
-
-                  <UrgentHorseInjuryViewer
-                    injuries={injuryMarkers}
-                    isAddMode={isAddMode}
-                    readOnly={urgentCase.status !== 'IN_PROGRESS'}
-                    onPointerHit={handleInjuryHit}
-                    onDeleteInjury={handleDeleteMarker}
-                    onUpdateInjury={handleUpdateMarker}
-                  />
-
-                  {/* Marked Injuries Management Panel */}
-                  <div className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-                    <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-                      <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                        <Icon name="alert-triangle" size={14} className="text-[var(--color-danger)]" />
-                        <span>Marked Injuries ({injuryMarkers.length})</span>
-                      </h4>
-                      {injuryMarkers.length > 0 && urgentCase.status === 'IN_PROGRESS' && (
-                        <Button
-                          type="button"
-                          variant="tertiary"
-                          size="sm"
-                          onClick={() => setInjuryMarkers([])}
-                          className="text-[11px] text-[var(--color-danger)] hover:bg-[var(--color-danger-subtle)]"
-                        >
-                          Clear all markers
-                        </Button>
-                      )}
-                    </div>
-
-                    {injuryMarkers.length === 0 ? (
-                      <p className="py-4 text-center text-xs text-[var(--color-text-muted)]">
-                        No injury markers placed yet. Click &quot;Add injury marker&quot; above and click on the 3D horse model to mark injuries.
-                      </p>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {injuryMarkers.map((marker, index) => {
-                          const zoneName = (marker.zoneId && zoneById(marker.zoneId)?.label) || 'Unspecified';
-                          return (
-                            <div
-                              key={marker.id}
-                              className="flex flex-col gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2.5"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-danger)] text-[10px] font-bold text-white">
-                                    {index + 1}
-                                  </span>
-                                  <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                                    {marker.label}
-                                  </span>
-                                  <span className="rounded bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-secondary)]">
-                                    Zone: {zoneName}
-                                  </span>
-                                </div>
-                                {urgentCase.status === 'IN_PROGRESS' && (
-                                  <Button
-                                    type="button"
-                                    variant="tertiary"
-                                    size="sm"
-                                    icon="x"
-                                    onClick={() => handleDeleteMarker(marker.id)}
-                                    className="h-7 text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-subtle)]"
-                                    title="Delete this marker"
-                                  >
-                                    Delete
-                                  </Button>
-                                )}
-                              </div>
-
-                              <div className="space-y-1">
-                                <label
-                                  htmlFor={`marker-note-${marker.id}`}
-                                  className="block text-[11px] font-medium text-[var(--color-text-secondary)]"
-                                >
-                                  Clinical Note / Description:
-                                </label>
-                                <Input
-                                  id={`marker-note-${marker.id}`}
-                                  type="text"
-                                  placeholder="Enter clinical observation, swelling, pain response, wound details..."
-                                  value={marker.description || ''}
-                                  disabled={urgentCase.status !== 'IN_PROGRESS'}
-                                  onChange={(e) => handleUpdateMarker(marker.id, { description: e.target.value })}
-                                  className="text-xs"
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-              <form onSubmit={handleSubmit} noValidate className="space-y-6">
-                {/* 1. Vitals — the same section as the admission examination form */}
-                <VitalsSection
-                  metrics={metrics}
-                  setMetrics={setMetrics}
-                  fieldErrors={fieldErrors}
-                  isFormDisabled={false}
-                  onRandomize={handleRandomizeVitals}
-                />
-                {fieldErrors.metrics && (
-                  <p className="text-xs text-[var(--color-danger)]">{fieldErrors.metrics}</p>
-                )}
-
-                {/* 2. Clinical Findings & Diagnosis */}
-                <div className="space-y-4 border-t border-[var(--color-border)] pt-5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                      <Icon name="stethoscope" size={14} className="text-[var(--color-medical)]" />
-                      <span>2. Examination Findings & Clinical Diagnosis</span>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      icon="sparkles"
-                      onClick={handleSampleFindings}
-                      className="transition-all active:scale-[0.97]"
-                      title="Insert a complete sample clinical narrative into the empty fields"
-                    >
-                      Sample Findings
-                    </Button>
-                  </div>
-
-                  <div>
-                    <FormField label="Physical examination findings" htmlFor="urgent-findings" required>
-                      <Textarea
-                        id="urgent-findings"
-                        rows={3}
-                        value={findings}
-                        onChange={(e) => {
-                          setFindings(e.target.value);
-                          if (fieldErrors.findings) setFieldErrors((prev) => ({ ...prev, findings: '' }));
-                        }}
-                        placeholder="Detail physical inspection: palpation, limb flexion, swellings, wounds, pain responses…"
-                      />
-                    </FormField>
-                    {fieldErrors.findings && (
-                      <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.findings}</p>
-                    )}
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <FormField label="Clinical diagnosis" htmlFor="urgent-diagnosis" required>
-                        <Input
-                          id="urgent-diagnosis"
-                          type="text"
-                          value={diagnosis}
-                          onChange={(e) => {
-                            setDiagnosis(e.target.value);
-                            if (fieldErrors.diagnosis) setFieldErrors((prev) => ({ ...prev, diagnosis: '' }));
-                          }}
-                          placeholder="e.g. Acute superficial digital flexor tendon strain"
-                        />
-                      </FormField>
-                      {fieldErrors.diagnosis && (
-                        <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.diagnosis}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <FormField label="Immediate treatment / First aid" htmlFor="urgent-treatment">
-                        <Input
-                          id="urgent-treatment"
-                          type="text"
-                          value={treatment}
-                          onChange={(e) => setTreatment(e.target.value)}
-                          placeholder="Medication, cold hose, anti-inflammatory, support bandage…"
-                        />
-                      </FormField>
-                    </div>
-                  </div>
-
-                  <div>
-                    <FormField label="Additional clinical notes" htmlFor="urgent-notes">
-                      <Textarea
-                        id="urgent-notes"
-                        rows={2}
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Observation notes, stable restrictions, or special care instructions…"
-                      />
-                    </FormField>
-                  </div>
-                </div>
-
-                {/* 3. Training Clearance Decision */}
-                <div className="space-y-4 border-t border-[var(--color-border)] pt-5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                    <Icon name="shield" size={14} className="text-[var(--color-primary)]" />
-                    <span>3. Veterinary Training Clearance Decision</span>
-                    <span className="text-[var(--color-danger)]">*</span>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {[
-                      {
-                        value: 'ALLOWED' as const,
-                        label: 'ALLOWED',
-                        desc: 'Fit for training. Horse may resume normal training schedule.',
-                      },
-                      {
-                        value: 'BLOCKED' as const,
-                        label: 'BLOCKED',
-                        desc: 'Training suspended. Workouts cancelled until follow-up clearance.',
-                      },
-                    ].map((option) => (
-                      <label
-                        key={option.value}
-                        className={`flex cursor-pointer flex-col rounded-[var(--radius-md)] border p-3.5 transition-all ${
-                          trainingDecision === option.value
-                            ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
-                            : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-strong)]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <ChoiceInput
-                            type="radio"
-                            name="trainingDecision"
-                            value={option.value}
-                            checked={trainingDecision === option.value}
-                            onChange={() => {
-                              setTrainingDecision(option.value);
-                              if (option.value === 'ALLOWED') {
-                                setFieldErrors((prev) => Object.fromEntries(
-                                  Object.entries(prev).filter(([field]) => !field.startsWith('followUp')),
-                                ));
-                              }
-                            }}
-                          />
-                          <span className="text-xs font-bold tracking-wide">{option.label}</span>
-                        </div>
-                        <p className="mt-1.5 text-xs text-[var(--color-text-secondary)] pl-6">
-                          {option.desc}
-                        </p>
-                      </label>
-                    ))}
-                  </div>
-
-                  {trainingDecision === 'BLOCKED' && (
-                    <div className="mt-4 space-y-4 rounded-[var(--radius-md)] border border-[var(--color-warning)]/40 bg-[var(--color-warning-soft)]/20 p-4">
-                      <div>
-                        <FormField label="Training restriction & rest details" htmlFor="restriction-details" required>
-                          <Textarea
-                            id="restriction-details"
-                            rows={2}
-                            value={restrictionDetails}
-                            onChange={(e) => {
-                              setRestrictionDetails(e.target.value);
-                              if (fieldErrors.restrictionDetails) {
-                                setFieldErrors((prev) => ({ ...prev, restrictionDetails: '' }));
-                              }
-                            }}
-                            placeholder="e.g. Strict box rest for 3 days, followed by 15-minute hand walking twice daily…"
-                          />
-                        </FormField>
-                        {fieldErrors.restrictionDetails && (
-                          <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.restrictionDetails}</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-[var(--color-text-secondary)]">
-                            Follow-up recheck days
-                            <span className="ml-1 text-[var(--color-danger)]">*</span>
-                          </span>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            icon="plus"
-                            onClick={() => setFollowUps((rows) => [
-                              ...rows,
-                              { key: newIdempotencyKey(), date: '', description: 'Follow-up after the urgent examination' },
-                            ])}
-                          >
-                            Add another day
-                          </Button>
-                        </div>
-                        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                          Book several days so veterinarians can rotate the rechecks.
-                        </p>
-                        <div className="mt-2 space-y-3">
-                          {followUps.map((row, index) => (
-                            <div key={row.key} className="rounded-[var(--radius-sm)] border border-[var(--color-border)] p-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                                  Recheck #{index + 1}
-                                </span>
-                                {followUps.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="tertiary"
-                                    onClick={() => setFollowUps((rows) => rows.filter((r) => r.key !== row.key))}
-                                  >
-                                    Remove
-                                  </Button>
-                                )}
-                              </div>
-                              <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                                <div>
-                                  <FormField label="Examination date" htmlFor={`follow-up-date-${row.key}`} required>
-                                    <Input
-                                      id={`follow-up-date-${row.key}`}
-                                      type="date"
-                                      min={businessDate(1)}
-                                      value={row.date}
-                                      onChange={(e) => {
-                                        const value = e.target.value;
-                                        setFollowUps((rows) => rows.map((r) => (r.key === row.key ? { ...r, date: value } : r)));
-                                        if (fieldErrors[`followUpDate:${row.key}`]) {
-                                          setFieldErrors((prev) => ({ ...prev, [`followUpDate:${row.key}`]: '' }));
-                                        }
-                                      }}
-                                    />
-                                  </FormField>
-                                  <div className="mt-1.5 flex gap-1.5">
-                                    {[3, 7, 14].map((days) => (
-                                      <Button
-                                        type="button"
-                                        key={days}
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() => setFollowUps((rows) => rows.map((r) => (r.key === row.key ? { ...r, date: businessDate(days) } : r)))}
-                                        className="transition-all active:scale-[0.97]"
-                                      >
-                                        +{days} days
-                                      </Button>
-                                    ))}
-                                  </div>
-                                  {fieldErrors[`followUpDate:${row.key}`] && (
-                                    <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors[`followUpDate:${row.key}`]}</p>
-                                  )}
-                                </div>
-
-                                <div>
-                                  <FormField label="Clinical purpose" htmlFor={`follow-up-desc-${row.key}`} required>
-                                    <Input
-                                      id={`follow-up-desc-${row.key}`}
-                                      type="text"
-                                      value={row.description}
-                                      onChange={(e) => {
-                                        const value = e.target.value;
-                                        setFollowUps((rows) => rows.map((r) => (r.key === row.key ? { ...r, description: value } : r)));
-                                        if (fieldErrors[`followUpDescription:${row.key}`]) {
-                                          setFieldErrors((prev) => ({ ...prev, [`followUpDescription:${row.key}`]: '' }));
-                                        }
-                                      }}
-                                    />
-                                  </FormField>
-                                  {fieldErrors[`followUpDescription:${row.key}`] && (
-                                    <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors[`followUpDescription:${row.key}`]}</p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        {fieldErrors.followUps && (
-                          <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUps}</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Submit Action */}
-                <div className="border-t border-[var(--color-border)] pt-5">
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    loading={submitting}
-                    icon="check"
-                    className="w-full sm:w-auto transition-all active:scale-[0.97]"
-                  >
-                    Complete Urgent Examination
-                  </Button>
-                </div>
-              </form>
-              )}
+              <ClinicalExamForm
+                ref={formRef}
+                variant="URGENT"
+                admissionId={0}
+                horseId={urgentCase.horseId}
+                careScheduleId={urgentCase.scheduleId}
+                careType="URGENT"
+                scheduleStatus={urgentCase.status}
+                onSuccess={handleSuccess}
+                prefillFindings={urgentCase.description}
+              />
             </Panel>
           )}
 
-          {/* Workflow: Examination Completed Summary */}
           {urgentCase.status === 'COMPLETED' && (
             <Panel padded className="space-y-4 border-l-4 border-l-[var(--color-success)] bg-[var(--color-surface)]">
               <div className="flex items-center gap-2.5 text-[var(--color-success)]">
@@ -1120,14 +386,15 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 <h3 className="text-base font-bold">Urgent Examination Completed</h3>
               </div>
               <p className="text-xs text-[var(--color-text-secondary)]">
-                The veterinary clinical record and training decision have been recorded in the medical system.
+                The veterinary clinical record and training decision have been recorded in the
+                medical system.
               </p>
 
               {completedData && (
                 <dl className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4 text-xs sm:grid-cols-2">
                   <div>
                     <dt className="font-semibold text-[var(--color-text-muted)]">Diagnosis</dt>
-                    <dd className="mt-1 font-bold text-sm text-[var(--color-text-primary)]">
+                    <dd className="mt-1 text-sm font-bold text-[var(--color-text-primary)]">
                       {completedData.diagnosis}
                     </dd>
                   </div>
@@ -1141,14 +408,16 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   </div>
                   <div className="sm:col-span-2">
                     <dt className="font-semibold text-[var(--color-text-muted)]">Examination Findings</dt>
-                    <dd className="mt-1 text-[var(--color-text-secondary)] leading-relaxed">
+                    <dd className="mt-1 leading-relaxed text-[var(--color-text-secondary)]">
                       {completedData.findings}
                     </dd>
                   </div>
                   {completedData.restrictionDetails && (
                     <div className="sm:col-span-2">
-                      <dt className="font-semibold text-[var(--color-text-muted)]">Restriction Instructions</dt>
-                      <dd className="mt-1 text-[var(--color-danger)] font-medium">
+                      <dt className="font-semibold text-[var(--color-text-muted)]">
+                        Restriction Instructions
+                      </dt>
+                      <dd className="mt-1 font-medium text-[var(--color-danger)]">
                         {completedData.restrictionDetails}
                       </dd>
                     </div>
@@ -1156,7 +425,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   {completedData.treatment && (
                     <div className="sm:col-span-2">
                       <dt className="font-semibold text-[var(--color-text-muted)]">Treatment</dt>
-                      <dd className="mt-1 text-[var(--color-text-secondary)] leading-relaxed">
+                      <dd className="mt-1 leading-relaxed text-[var(--color-text-secondary)]">
                         {completedData.treatment}
                       </dd>
                     </div>
@@ -1164,16 +433,21 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   {completedData.notes && (
                     <div className="sm:col-span-2">
                       <dt className="font-semibold text-[var(--color-text-muted)]">Vet Assessment Notes</dt>
-                      <dd className="mt-1 whitespace-pre-wrap text-[var(--color-text-primary)] leading-relaxed">
+                      <dd className="mt-1 whitespace-pre-wrap leading-relaxed text-[var(--color-text-primary)]">
                         {completedData.notes}
                       </dd>
                     </div>
                   )}
                   {(completedData.nextSchedules?.length || 0) > 0 && (
                     <div className="sm:col-span-2">
-                      <dt className="font-semibold text-[var(--color-text-muted)]">Scheduled Follow-ups</dt>
+                      <dt className="font-semibold text-[var(--color-text-muted)]">
+                        Scheduled Follow-ups
+                      </dt>
                       {completedData.nextSchedules?.map((row) => (
-                        <dd key={row.idempotencyKey} className="mt-1 text-[var(--color-text-primary)] font-semibold">
+                        <dd
+                          key={row.idempotencyKey}
+                          className="mt-1 font-semibold text-[var(--color-text-primary)]"
+                        >
                           {row.scheduledDate} — {row.description}
                         </dd>
                       ))}
@@ -1181,8 +455,10 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                   )}
                   {completedData.nextSchedule && (
                     <div className="sm:col-span-2">
-                      <dt className="font-semibold text-[var(--color-text-muted)]">Scheduled Follow-up</dt>
-                      <dd className="mt-1 text-[var(--color-text-primary)] font-semibold">
+                      <dt className="font-semibold text-[var(--color-text-muted)]">
+                        Scheduled Follow-up
+                      </dt>
+                      <dd className="mt-1 font-semibold text-[var(--color-text-primary)]">
                         {completedData.nextSchedule.scheduledDate} — {completedData.nextSchedule.description}
                       </dd>
                     </div>
@@ -1206,14 +482,12 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           )}
         </div>
 
-        {/* Side Column (4 / 12) */}
-        <div className="lg:col-span-4 space-y-5">
-          {/* Horse Location & Medical Context */}
+        <div className="space-y-5 lg:col-span-4">
           <Panel padded className="space-y-3">
             <div className="flex items-center gap-2 border-b border-[var(--color-border)] pb-2.5">
               <Icon name="building" size={15} className="text-[var(--color-primary)]" />
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-primary)]">
-                Location & Patient Context
+                Location &amp; Patient Context
               </h3>
             </div>
 
@@ -1227,7 +501,8 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
               <div className="flex items-center justify-between">
                 <dt className="text-[var(--color-text-muted)]">Stall Location</dt>
                 <dd className="font-semibold text-[var(--color-text-primary)]">
-                  {[urgentCase.stallCode, urgentCase.stableLocation].filter(Boolean).join(' · ') || 'Not assigned'}
+                  {[urgentCase.stallCode, urgentCase.stableLocation].filter(Boolean).join(' · ') ||
+                    'Not assigned'}
                 </dd>
               </div>
               <div className="flex items-center justify-between">
@@ -1240,13 +515,15 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
             {urgentCase.previousTrainingDecision === 'BLOCKED' && (
               <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)]/30 p-2.5 text-xs text-[var(--color-warning)]">
-                <strong>Pre-existing training hold:</strong> Horse was already blocked prior to this incident
-                {urgentCase.previousTrainingDecisionReason ? `: ${urgentCase.previousTrainingDecisionReason}.` : '.'}
+                <strong>Pre-existing training hold:</strong> Horse was already blocked prior to this
+                incident
+                {urgentCase.previousTrainingDecisionReason
+                  ? `: ${urgentCase.previousTrainingDecisionReason}.`
+                  : '.'}
               </div>
             )}
           </Panel>
 
-          {/* Reporter & Assignment Meta */}
           <Panel padded className="space-y-3">
             <div className="flex items-center gap-2 border-b border-[var(--color-border)] pb-2.5">
               <Icon name="user" size={15} className="text-[var(--color-primary)]" />
@@ -1261,7 +538,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 <dd className="flex items-center gap-1.5 font-semibold text-[var(--color-text-primary)]">
                   <span>{urgentCase.reportedByName || 'Staff'}</span>
                   {urgentCase.reportedByRole && (
-                    <span className="rounded bg-[var(--color-surface-muted)] px-1 py-0.5 text-[9px] font-bold uppercase text-[var(--color-text-secondary)] border border-[var(--color-border)]">
+                    <span className="rounded border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-1 py-0.5 text-[9px] font-bold uppercase text-[var(--color-text-secondary)]">
                       {urgentCase.reportedByRole}
                     </span>
                   )}
@@ -1290,7 +567,6 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             </dl>
           </Panel>
 
-          {/* Clinical Protocol Checklist */}
           <Panel padded className="space-y-3 bg-[var(--color-surface-subtle)]">
             <div className="flex items-center gap-2 border-b border-[var(--color-border)] pb-2.5">
               <Icon name="clipboard" size={15} className="text-[var(--color-text-muted)]" />
@@ -1301,19 +577,19 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
             <ul className="space-y-2 text-xs text-[var(--color-text-secondary)]">
               <li className="flex items-start gap-2">
-                <Icon name="check" size={13} className="text-[var(--color-success)] mt-0.5 shrink-0" />
+                <Icon name="check" size={13} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
                 <span>Verify horse is securely haltered and handler is positioned safely.</span>
               </li>
               <li className="flex items-start gap-2">
-                <Icon name="check" size={13} className="text-[var(--color-success)] mt-0.5 shrink-0" />
+                <Icon name="check" size={13} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
                 <span>Record baseline vitals before administering any sedation or NSAIDs.</span>
               </li>
               <li className="flex items-start gap-2">
-                <Icon name="check" size={13} className="text-[var(--color-success)] mt-0.5 shrink-0" />
+                <Icon name="check" size={13} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
                 <span>Palpate distal extremities for heat, digital pulse, or focal swelling.</span>
               </li>
               <li className="flex items-start gap-2">
-                <Icon name="check" size={13} className="text-[var(--color-success)] mt-0.5 shrink-0" />
+                <Icon name="check" size={13} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
                 <span>If blocking training, establish a mandatory follow-up reassessment.</span>
               </li>
             </ul>

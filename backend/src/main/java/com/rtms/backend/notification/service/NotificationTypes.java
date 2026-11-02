@@ -9,6 +9,10 @@ public final class NotificationTypes {
     public static final String ADMISSION_VET_ASSIGNED = "ADMISSION_VET_ASSIGNED";
     public static final String ADMISSION_TRAINER_ASSIGNED = "ADMISSION_TRAINER_ASSIGNED";
     public static final String CARE_SCHEDULE_URGENT_ASSIGNED = "CARE_SCHEDULE_URGENT_ASSIGNED";
+    /** D1: ca INITIAL/ROUTINE chưa xong bị dời qua ngày kế lúc 17:00. */
+    public static final String CARE_SCHEDULE_EOD_ROLLED = "CARE_SCHEDULE_EOD_ROLLED";
+    /** D1: ca URGENT quá hạn KHÔNG rollover — escalate cho vet giữ ca. */
+    public static final String CARE_SCHEDULE_URGENT_ESCALATED = "CARE_SCHEDULE_URGENT_ESCALATED";
     public static final String URGENT_CASE_CLOSED = "URGENT_CASE_CLOSED";
     public static final String VACCINE_DUE_SOON = "VACCINE_DUE_SOON";
     public static final String VACCINE_OVERDUE = "VACCINE_OVERDUE";
@@ -28,6 +32,7 @@ public final class NotificationTypes {
     public static final String ADMISSION_ARRIVAL_EXPIRED = "ADMISSION_ARRIVAL_EXPIRED";
     public static final String HORSE_EDIT_REQUESTED = "HORSE_EDIT_REQUESTED";
     public static final String HORSE_EDIT_REVIEWED = "HORSE_EDIT_REVIEWED";
+    public static final String PRESCRIPTION_CREATED = "PRESCRIPTION_CREATED";
 
     public static final String REFERENCE_ADMISSION = "ADMISSION";
     public static final String REFERENCE_CARE_SCHEDULE = "CARE_SCHEDULE";

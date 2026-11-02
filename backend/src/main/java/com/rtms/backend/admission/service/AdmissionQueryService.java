@@ -567,7 +567,8 @@ public class AdmissionQueryService {
         List<CareScheduleStatus> activeStatuses = List.of(
                 CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED,
                 CareScheduleStatus.IN_PROGRESS);
-        long total = careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses);
+        long total = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
+                vetId, activeStatuses);
         long active = careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses);
         long awaiting = careScheduleRepository.countActiveVetQueueItems(
                 vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));

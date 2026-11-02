@@ -1,3 +1,4 @@
+import type { PrescriptionItemRequest } from '@/features/care/types';
 import type { VaccinationRequest } from '@/features/care/types/preventive';
 export type AdmissionStatus =
   | 'GROOM_REVIEW'
@@ -183,6 +184,7 @@ export type CareScheduleStatus =
   | 'REQUESTED'
   | 'SCHEDULED'
   | 'IN_PROGRESS'
+  | 'PAUSED'
   | 'COMPLETED'
   | 'CANCELLED';
 
@@ -251,6 +253,9 @@ export interface CareSchedule {
   createdAt?: string;
   purpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   requestedAt?: string | null;
+  /** D1 cờ dẫn xuất từ BE: ca IN_PROGRESS quá 30' so với giờ hẹn (không phải trạng thái DB). */
+  overdue?: boolean;
+  pausedFrom?: string | null;
 }
 
 export type CareScheduleResponse = CareSchedule;
@@ -309,6 +314,10 @@ export interface CompleteCareScheduleRequest {
   deferVaccinationDays?: number;
   /** Marker chấn thương ghi nhận cùng ca khám (T4). */
   injuryMarkers?: CreateInjuryMarkerRequest[];
+  /** Don thuoc ke tu danh muc chuan (Track 2a/3a). */
+  prescriptions?: PrescriptionItemRequest[];
+  /** Huong dan cham soc chung cho toan dot dieu tri (WF-04 §3.4). */
+  generalCareInstructions?: string;
 }
 
 export interface CreateInjuryMarkerRequest {
@@ -360,7 +369,7 @@ export type VetQueueSummaryResponse = VetQueueSummary;
 
 export interface VetQueueFilters {
   search?: string;
-  pill?: 'ALL' | 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'APPROVED';
+  pill?: 'ALL' | 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'PAUSED' | 'APPROVED';
   admissionStatus?: AdmissionStatus | 'ALL';
   scheduleStatus?: CareScheduleStatus | 'ALL';
   careType?: CareType | 'ALL';
@@ -400,20 +409,29 @@ export interface HorseHealthMetricResponse extends HorseHealthMetricRequest {
   recordedAt: string;
 }
 
+export type VetReviewDecision = 'ACCEPT' | 'REJECT';
+
 export interface VetReviewRequest {
   careScheduleId?: number;
-  trainingDecision: TrainingDecision;
+  decision?: VetReviewDecision;
+  rejectReason?: string;
+  trainingDecision?: TrainingDecision;
   restrictionDetails?: string;
   feedback?: string;
-  physicalExamConfirmed: boolean;
+  physicalExamConfirmed?: boolean;
   symptoms?: string;
-  findings: string;
+  findings?: string;
   diagnosis?: string;
   treatment?: string;
   notes?: string;
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
   vaccinations?: VaccinationRequest[];
+  injuryMarkers?: CreateInjuryMarkerRequest[];
+  /** Don thuoc ke tu danh muc chuan (Track 2a/3a). */
+  prescriptions?: PrescriptionItemRequest[];
+  /** Huong dan cham soc chung cho toan dot dieu tri (WF-04 §3.4). */
+  generalCareInstructions?: string;
 }
 
 export interface VetReviewResponse {

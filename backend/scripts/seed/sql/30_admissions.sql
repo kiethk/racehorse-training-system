@@ -44,7 +44,7 @@ BEGIN
                 p_findings => 'Recheck: the problem noted at the last visit has resolved; gait, temperature and appetite normal.',
                 p_diagnosis => 'Recovered; fit to resume training', p_decision => 'ALLOWED',
                 p_notes => 'Cleared to return to normal work.',
-                p_temp => 37.8, p_hr => 36, p_rr => 12, p_bcs => 5.5);
+                p_temp => 37.8, p_hr => 36, p_rr => 12, p_weight => round(pg_temp.rnd('rw' || c.id, 400, 470), 1), p_bcs => 5.5);
         ELSE
             v_assign := c.updated_at + INTERVAL '1 day';
             EXIT WHEN v_assign > v_limit OR v_assign >= c.scheduled_at;
@@ -101,10 +101,12 @@ BEGIN
                     VALUES (v_hr, 'Vaccination', 'Vaccination / deworming per preventive protocol', v_done::DATE, v_done::DATE,
                             'COMPLETED', v_done, v_done);
                     INSERT INTO prescriptions (treatment_plan_id, medication_name, dosage, frequency, route, start_date,
-                                               end_date, instructions, created_at, updated_at, preventive_protocol_id)
+                                               end_date, instructions, created_at, updated_at, preventive_protocol_id,
+                                               status, administered_by_role)
                     SELECT (SELECT id FROM treatment_plans WHERE health_record_id = v_hr), pp.name, pp.default_dosage, 'ONCE',
                            pp.default_route, v_done::DATE, v_done::DATE, 'Given during the morning round from the To do list.',
-                           v_done, v_done, pp.id
+                           v_done, v_done, pp.id, 'COMPLETED',
+                           CASE WHEN UPPER(pp.default_route) IN ('IV', 'IM', 'INJECTION_IV', 'INJECTION_IM') THEN 'VETERINARIAN' ELSE 'GROOM' END
                       FROM preventive_protocols pp WHERE pp.code = ANY (v_codes);
                     PERFORM pg_temp.upsert_milestone(p_horse, 'preventive:' || v_hr, p_vet, v_done::DATE, v_done);
                     v_visits := v_visits + 1;

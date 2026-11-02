@@ -74,6 +74,10 @@ public class InjuryRecordService {
 
     @Transactional
     public InjuryRecord createInjuryRecord(Long horseId, CreateInjuryRecordRequest req) {
+        if (!InjuryRecord.isValidSeverity(req.severity())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Severity must be one of " + InjuryRecord.SEVERITY_VALUES);
+        }
         InjuryRecord r = new InjuryRecord();
         r.setHorseId(horseId);
         r.setHealthRecordId(req.healthRecordId());
@@ -208,6 +212,11 @@ public class InjuryRecordService {
 
         if (existing.getStatus() != null && "SUPERSEDED".equalsIgnoreCase(existing.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "INJURY_ALREADY_SUPERSEDED", "Cannot correct an injury record that has already been superseded");
+        }
+
+        if (req.severity() != null && !InjuryRecord.isValidSeverity(req.severity())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Severity must be one of " + InjuryRecord.SEVERITY_VALUES);
         }
 
         // Tạo bản mới hiệu chỉnh

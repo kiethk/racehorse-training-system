@@ -111,12 +111,14 @@ export interface MetricConfig {
 }
 
 export const metricConfigs: MetricConfig[] = [
-  { key: 'temperature', label: 'Temperature', unit: '°C', step: '0.1', placeholder: '38.0', normalMin: 37.2, normalMax: 38.3, criticalMin: 36.5, criticalMax: 38.8 },
+  { key: 'temperature', label: 'Temperature', unit: '°C', step: '0.1', placeholder: '38.0', normalMin: 37.0, normalMax: 38.5, criticalMin: 36.5, criticalMax: 38.8 },
   { key: 'heartRate', label: 'Heart Rate', unit: 'bpm', step: '1', placeholder: '36', normalMin: 28, normalMax: 44, criticalMin: 24, criticalMax: 55 },
   { key: 'respiratoryRate', label: 'Resp Rate', unit: 'rpm', step: '1', placeholder: '12', normalMin: 8, normalMax: 16, criticalMin: 6, criticalMax: 24 },
   { key: 'weight', label: 'Weight', unit: 'kg', step: '0.5', placeholder: '500', normalMin: 400, normalMax: 600, criticalMin: 350, criticalMax: 650 },
   { key: 'bodyConditionScore', label: 'BCS', unit: '/ 9', step: '0.5', placeholder: '5.0', normalMin: 4.0, normalMax: 6.0, criticalMin: 3.0, criticalMax: 7.0 },
 ];
+
+export const INJURY_SEVERITY_OPTIONS = ['MILD', 'MODERATE', 'SEVERE', 'CRITICAL'] as const;
 
 export const emptyMetrics: Record<MetricField, string> = {
   heartRate: '',

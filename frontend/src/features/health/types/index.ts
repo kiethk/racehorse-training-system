@@ -45,6 +45,16 @@ export interface HorseHealthSummary {
   pendingAdmissionOwnerName?: string | null;
 }
 
+export interface HorseBodyRegion {
+  id: number;
+  code: string;
+  displayName: string;
+  modelNodeKey?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface CorrectInjuryRequest {
   correctionReason: string;
   injuryType?: string;

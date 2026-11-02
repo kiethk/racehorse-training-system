@@ -10,6 +10,15 @@ import java.util.Date;
 @Table(name = "prescriptions")
 public class Prescription {
 
+    /** B5: tiêm (IV/IM) do Vet thực hiện; đường khác Groom chăm tại chuồng. Accept cả 'IV' lẫn 'INJECTION_IV'. */
+    public static String roleForRoute(String route) {
+        String r = route == null ? "" : route.trim().toUpperCase();
+        return switch (r) {
+            case "IV", "IM", "INJECTION_IV", "INJECTION_IM" -> "VETERINARIAN";
+            default -> "GROOM";
+        };
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -44,6 +53,14 @@ public class Prescription {
 
     @Column(name = "withdrawal_days", nullable = false)
     private Integer withdrawalDays = 0;
+
+    /** ACTIVE đang chạy / COMPLETED hết liệu trình / DISCONTINUED ngưng sớm (A1 contract). */
+    @Column(name = "status", nullable = false)
+    private String status = "ACTIVE";
+
+    /** B5: IV/IM → VETERINARIAN; ORAL/TOPICAL/FEED_ADDITIVE → GROOM. Gán lúc Vet lưu đơn. */
+    @Column(name = "administered_by_role", nullable = false)
+    private String administeredByRole = "GROOM";
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -148,6 +165,22 @@ public class Prescription {
 
     public void setWithdrawalDays(Integer withdrawalDays) {
         this.withdrawalDays = withdrawalDays != null ? withdrawalDays : 0;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getAdministeredByRole() {
+        return administeredByRole;
+    }
+
+    public void setAdministeredByRole(String administeredByRole) {
+        this.administeredByRole = administeredByRole;
     }
 
     public LocalDateTime getCreatedAt() {

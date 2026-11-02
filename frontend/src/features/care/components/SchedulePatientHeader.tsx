@@ -19,6 +19,7 @@ interface SchedulePatientHeaderProps {
 const STATUS_TONE: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'neutral'> = {
   COMPLETED: 'success',
   IN_PROGRESS: 'info',
+  PAUSED: 'warning',
   SCHEDULED: 'warning',
   REQUESTED: 'warning',
   CANCELLED: 'danger',
@@ -48,7 +49,7 @@ export function SchedulePatientHeader({
               <span className="text-xs text-[var(--color-text-muted)] font-medium">({horseBreed})</span>
             )}
             <Pill tone={STATUS_TONE[status] ?? 'neutral'} size="sm">
-              {status === 'IN_PROGRESS' ? 'In Progress' : formatEnumLabel(status)}
+              {status === 'PAUSED' ? 'Paused' : status === 'IN_PROGRESS' ? 'In Progress' : formatEnumLabel(status)}
             </Pill>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--color-text-secondary)]">

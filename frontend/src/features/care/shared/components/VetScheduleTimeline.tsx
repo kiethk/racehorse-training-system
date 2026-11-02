@@ -381,6 +381,7 @@ export function VetScheduleTimeline() {
             <option value="ALL">All Statuses</option>
             <option value="SCHEDULED">Scheduled</option>
             <option value="IN_PROGRESS">In Progress</option>
+            <option value="PAUSED">Paused</option>
             <option value="COMPLETED">Completed</option>
           </Select>
         </div>
@@ -461,6 +462,8 @@ export function VetScheduleTimeline() {
                         tone={
                           cs.status === 'COMPLETED'
                             ? 'success'
+                            : cs.status === 'PAUSED'
+                            ? 'warning'
                             : cs.status === 'IN_PROGRESS'
                             ? 'primary'
                             : 'neutral'
@@ -469,6 +472,8 @@ export function VetScheduleTimeline() {
                       >
                         {cs.status === 'SCHEDULED'
                           ? 'Scheduled'
+                          : cs.status === 'PAUSED'
+                          ? 'Paused'
                           : cs.status === 'IN_PROGRESS'
                           ? 'In Progress'
                           : 'Completed'}
@@ -505,6 +510,8 @@ export function VetScheduleTimeline() {
                   >
                     {isCompleted
                       ? 'View Record'
+                      : cs.status === 'PAUSED'
+                      ? 'Continue (Paused)'
                       : cs.status === 'IN_PROGRESS'
                       ? 'Continue Exam'
                       : 'Start Exam'}

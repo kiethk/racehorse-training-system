@@ -3,8 +3,10 @@ import com.rtms.backend.admission.dto.VetReviewRequest;
 import com.rtms.backend.admission.dto.VetReviewResponse;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
+import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
@@ -16,6 +18,7 @@ import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.stable.entity.StableStall;
+import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 
@@ -27,6 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /** Compatibility adapter for Admission Vet UI delegating to CareScheduleService */
@@ -38,25 +43,33 @@ public class AdmissionReviewService {
     private final StableStallRepository stalls;
     private final CareScheduleService careScheduleService;
     private final HealthRecordRepository healthRecordRepository;
+    private final AdmissionNotificationService admissionNotificationService;
+    private final AdmissionGroomReviewService admissionGroomReviewService;
 
     @Autowired
     public AdmissionReviewService(AdmissionApplicationRepository admissions,
             CareScheduleRepository careSchedules,
             HorseRepository horses, StableStallRepository stalls,
             CareScheduleService careScheduleService,
-            HealthRecordRepository healthRecordRepository) {
+            HealthRecordRepository healthRecordRepository,
+            AdmissionNotificationService admissionNotificationService,
+            AdmissionGroomReviewService admissionGroomReviewService) {
         this.admissions = admissions;
         this.careSchedules = careSchedules;
         this.horses = horses;
         this.stalls = stalls;
         this.careScheduleService = careScheduleService;
         this.healthRecordRepository = healthRecordRepository;
+        this.admissionNotificationService = admissionNotificationService;
+        this.admissionGroomReviewService = admissionGroomReviewService;
     }
 
 
     @Transactional
     public VetReviewResponse reviewByVet(Long admissionId, VetReviewRequest request, Long actorId) {
-        if (request.getTrainingDecision() == null) {
+        boolean isReject = request.getDecision() == ReviewDecision.REJECT
+                || request.getDecision() == ReviewDecision.REJECTED;
+        if (request.getTrainingDecision() == null && !isReject) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Training decision is required");
         }
 
@@ -105,11 +118,15 @@ public class AdmissionReviewService {
                 throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
                         "Only the assigned veterinarian can review this examination");
             }
-        } else if (schedule.getStatus() == CareScheduleStatus.SCHEDULED) {
+        } else if (schedule.getStatus() == CareScheduleStatus.SCHEDULED || schedule.getStatus() == CareScheduleStatus.PAUSED) {
             careScheduleService.startCareSchedule(schedule.getId(), actorId);
         } else if (schedule.getStatus() != CareScheduleStatus.IN_PROGRESS) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE",
                     "Start the examination before submitting a review");
+        }
+
+        if (isReject) {
+            return rejectByVet(admissionId, schedule, request, actorId);
         }
 
         return completeCareScheduleReview(admissionId, schedule, request, actorId);
@@ -162,6 +179,7 @@ public class AdmissionReviewService {
         compReq.setTreatment(request.getTreatment());
         compReq.setNotes(request.getNotes() != null ? request.getNotes() : request.getFeedback());
         compReq.setMetrics(request.getMetrics());
+        compReq.setInjuryMarkers(request.getInjuryMarkers());
         compReq.setNextSchedule(request.getNextSchedule());
         compReq.setVaccinations(request.getVaccinations());
         compReq.setTrainingDecision(request.getTrainingDecision());
@@ -170,6 +188,91 @@ public class AdmissionReviewService {
                         ? request.getRestrictionDetails()
                         : request.getFeedback());
         return compReq;
+    }
+
+    private VetReviewResponse rejectByVet(Long admissionId, CareSchedule schedule,
+            VetReviewRequest request, Long actorId) {
+        if (!Objects.equals(schedule.getVeterinarianId(), actorId)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
+                    "Only the assigned veterinarian can reject this admission");
+        }
+
+        String reason = request.getRejectReason();
+        if (reason == null || reason.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "A rejection reason is required");
+        }
+        reason = reason.trim();
+
+        AdmissionApplication admission = admissions.findById(admissionId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Admission not found"));
+        Long horseId = admission.getHorseId();
+        Horse horse = horseId != null ? horses.findById(horseId).orElse(null) : null;
+        LocalDateTime now = LocalDateTime.now();
+
+        // Cancel every open schedule for this horse; keep completed history untouched.
+        if (horseId != null) {
+            List<CareSchedule> openSchedules = careSchedules.findByHorseIdAndStatusIn(horseId,
+                    List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+            for (CareSchedule cs : openSchedules) {
+                cs.setStatus(CareScheduleStatus.CANCELLED);
+                cs.setCancelReason("Admission rejected by veterinarian");
+            }
+            careSchedules.saveAll(openSchedules);
+        }
+
+        // Release the quarantine stall if one is recorded for this admission.
+        Long quarantineStallId = admission.getQuarantineStallId();
+        if (quarantineStallId != null) {
+            StableStall quarantineStall = stalls.findById(quarantineStallId).orElse(null);
+            if (quarantineStall != null) {
+                quarantineStall.setStatus(StallStatus.AVAILABLE);
+                stalls.save(quarantineStall);
+            }
+        }
+
+        if (horse != null) {
+            horse.setCurrentStatus(HorseStatus.REJECTED);
+            horse.setCurrentStallId(null);
+            horses.save(horse);
+        }
+
+        admission.setVeterinarianId(actorId);
+        admission.setVetReviewedAt(now);
+        admission.setVetFeedback(reason);
+        // vetTrainingDecision intentionally left null: the horse never entered training.
+        admission.setStatus(AdmissionStatus.REJECTED);
+        admissions.save(admission);
+
+        String horseName = horse != null ? horse.getName() : null;
+        admissionNotificationService.notifyOwnerRejected(admission, horseName,
+                "Veterinary Clinical Review", reason);
+        admissionNotificationService.notifyManagersOfAdmissionRejection(admission, horseName,
+                "Veterinary Clinical Review", reason);
+
+        admissionGroomReviewService.allocateWaitingAdmissions();
+
+        String qStallCode = quarantineStallId != null
+                ? stalls.findById(quarantineStallId).map(StableStall::getStallCode).orElse(null)
+                : null;
+
+        return new VetReviewResponse(
+                admission.getId(),
+                admission.getStatus(),
+                actorId,
+                null,
+                null,
+                admission.getVetFeedback(),
+                admission.getVetReviewedAt(),
+                horseId,
+                horse != null ? horse.getCurrentStatus() : null,
+                quarantineStallId,
+                qStallCode,
+                schedule.getStatus(),
+                null,
+                schedule.getId(),
+                schedule.getId()
+        );
     }
 
 }

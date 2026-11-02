@@ -57,6 +57,7 @@ export function filterTodayAppointments(
 ): CareSchedule[] {
   return schedules
     .filter((s) => {
+      if (s.careType === 'URGENT') return false;
       if (s.scheduledAt) {
         return s.scheduledAt.startsWith(targetDateYMD);
       }

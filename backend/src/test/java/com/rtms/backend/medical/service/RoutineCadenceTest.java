@@ -14,6 +14,8 @@ import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
+import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
+import com.rtms.backend.medical.enums.HydrationStatus;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.enums.CareSchedulePurpose;
@@ -40,6 +42,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
@@ -91,7 +94,10 @@ class RoutineCadenceTest {
         service = new CareScheduleService(schedules, horses, healthRecords, metrics, admissions, stalls, users,
                 incidents, profiles, audits, events, entityManager, notifications,
                 new TrainingDecisionService(horses, schedules, workouts), vaccinations,
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class));
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -293,6 +299,14 @@ class RoutineCadenceTest {
         req.setFindings("Examined");
         req.setDiagnosis("Healthy");
         req.setTrainingDecision(decision);
+        HorseHealthMetricRequest m = new HorseHealthMetricRequest();
+        m.setHeartRate(BigDecimal.valueOf(36));
+        m.setTemperature(BigDecimal.valueOf(37.8));
+        m.setWeight(BigDecimal.valueOf(450));
+        m.setRespiratoryRate(BigDecimal.valueOf(12));
+        m.setHydrationStatus(HydrationStatus.NORMAL);
+        m.setBodyConditionScore(BigDecimal.valueOf(5.5));
+        req.setMetrics(List.of(m));
         return req;
     }
 

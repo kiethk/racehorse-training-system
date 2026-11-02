@@ -55,7 +55,9 @@ BEGIN
     IF p_state = 'COMPLETED' THEN
         PERFORM pg_temp.complete_care(v_child, v_slot + INTERVAL '25 minutes',
             p_findings => p_findings, p_diagnosis => p_diagnosis, p_decision => p_decision, p_restriction => p_restriction,
-            p_treatment => p_treatment, p_next_at => p_next_at, p_temp => 37.7, p_hr => 36, p_rr => 12, p_bcs => 5.5);
+            p_treatment => p_treatment, p_next_at => p_next_at, p_temp => 37.7, p_hr => 36, p_rr => 12, p_bcs => 5.5,
+            p_weight => (SELECT round(pg_temp.rnd('uw' || horse_id, 410, 480), 1) FROM care_schedule WHERE id = v_child),
+            p_hydration => 'NORMAL');
     END IF;
     RETURN v_child;
 END $$ LANGUAGE plpgsql;
@@ -80,8 +82,10 @@ BEGIN
     VALUES (p_record, p_name, p_instructions, p_start, p_end, p_status, v_at, v_at) RETURNING id INTO v_plan;
     FOR i IN 1..COALESCE(array_length(p_drugs, 1), 0) LOOP
         INSERT INTO prescriptions (treatment_plan_id, medication_name, dosage, frequency, route, start_date, end_date,
-                                   instructions, created_at, updated_at)
-        VALUES (v_plan, p_drugs[i][1], p_drugs[i][2], p_drugs[i][3], p_drugs[i][4], p_start, p_end, p_drugs[i][5], v_at, v_at);
+                                   instructions, created_at, updated_at, status, administered_by_role)
+        VALUES (v_plan, p_drugs[i][1], p_drugs[i][2], p_drugs[i][3], p_drugs[i][4], p_start, p_end, p_drugs[i][5], v_at, v_at,
+                CASE WHEN p_status = 'ACTIVE' AND (p_end IS NULL OR p_end >= pg_temp.today()) THEN 'ACTIVE' ELSE 'COMPLETED' END,
+                CASE WHEN UPPER(p_drugs[i][4]) IN ('IV', 'IM', 'INJECTION_IV', 'INJECTION_IM') THEN 'VETERINARIAN' ELSE 'GROOM' END);
     END LOOP;
     RETURN v_plan;
 END $$ LANGUAGE plpgsql;
@@ -121,10 +125,10 @@ BEGIN
                               pg_temp.today() - 20, pg_temp.today() - 15, 'COMPLETED',
                               ARRAY[['Povidone-iodine 10%', 'Apply to the wound', 'Twice daily', 'Topical', 'Clean the wound first.'],
                                     ['Silver sulfadiazine cream', 'Thin layer', 'Once daily', 'Topical', 'Under a light dressing.']]);
-    INSERT INTO injury_records (horse_id, health_record_id, injury_type, body_region_id, severity, description, diagnosed_at,
+    INSERT INTO health_conditions (horse_id, health_record_id, condition_type, body_region_id, severity, description,
                                 expected_recovery_date, recovered_at, status, position_x, position_y, position_z, created_at, updated_at)
-    VALUES (pg_temp.hid('H010'), r, 'Laceration', pg_temp.region('FORELEG_LEFT'), 'LOW',
-            'Superficial cut above the left fore coronet band.', pg_temp.at(-20, TIME '09:00'), pg_temp.today() - 13,
+    VALUES (pg_temp.hid('H010'), r, 'Laceration', pg_temp.region('FORELEG_LEFT'), 'MILD',
+            'Superficial cut above the left fore coronet band.', pg_temp.today() - 13,
             pg_temp.at(-12, TIME '15:00'), 'RECOVERED', 0.4200, 0.1800, 0.5500, pg_temp.at(-20, TIME '09:00'),
             pg_temp.at(-12, TIME '15:00'));
 
@@ -145,10 +149,10 @@ BEGIN
                               pg_temp.today() - 35, pg_temp.today() + 14, 'ACTIVE',
                               ARRAY[['Phenylbutazone', '2.2 mg/kg', 'Twice daily', 'Oral', 'With feed, maximum 5 days.'],
                                     ['Omeprazole paste', '1 mg/kg', 'Once daily', 'Oral', 'Stomach protection while on bute.']]);
-    INSERT INTO injury_records (horse_id, health_record_id, injury_type, body_region_id, severity, description, diagnosed_at,
+    INSERT INTO health_conditions (horse_id, health_record_id, condition_type, body_region_id, severity, description,
                                 expected_recovery_date, status, position_x, position_y, position_z, created_at, updated_at)
-    VALUES (pg_temp.hid('H014'), r, 'Tendon strain', pg_temp.region('FORELEG_RIGHT'), 'HIGH',
-            'Core lesion in the superficial digital flexor tendon, right fore.', pg_temp.at(-35, TIME '08:40'),
+    VALUES (pg_temp.hid('H014'), r, 'Tendon strain', pg_temp.region('FORELEG_RIGHT'), 'SEVERE',
+            'Core lesion in the superficial digital flexor tendon, right fore.',
             pg_temp.today() + 20, 'ACTIVE', 0.4400, 0.2000, 0.4800, pg_temp.at(-35, TIME '08:40'), pg_temp.at(-35, TIME '08:40'))
     RETURNING id INTO v_injury;
     c := pg_temp.recheck(s, 'VT02', 'COMPLETED', 'BLOCKED',
@@ -157,13 +161,13 @@ BEGIN
     c := pg_temp.recheck(c, 'VT02', 'COMPLETED', 'ALLOWED',
                          'Recheck: no heat or swelling; sound at walk and trot; ultrasound shows good fibre alignment.',
                          'Tendon strain, resolved', 'Return to light work for two weeks before fast work.');
-    INSERT INTO injury_records (horse_id, health_record_id, injury_type, body_region_id, severity, description, diagnosed_at,
+    INSERT INTO health_conditions (horse_id, health_record_id, condition_type, body_region_id, severity, description,
                                 expected_recovery_date, status, position_x, position_y, position_z, created_at, updated_at)
-    VALUES (pg_temp.hid('H014'), r, 'Tendon strain', pg_temp.region('FORELEG_RIGHT'), 'MEDIUM',
-            'Mild core lesion, healing well; monitoring during the return to work.', pg_temp.at(-35, TIME '08:40'),
+    VALUES (pg_temp.hid('H014'), r, 'Tendon strain', pg_temp.region('FORELEG_RIGHT'), 'MODERATE',
+            'Mild core lesion, healing well; monitoring during the return to work.',
             pg_temp.today() + 20, 'MONITORING', 0.4400, 0.2000, 0.4800, pg_temp.at(-7, TIME '15:00'), pg_temp.at(-7, TIME '15:00'))
     RETURNING id INTO v_new;
-    UPDATE injury_records SET status = 'SUPERSEDED', updated_at = pg_temp.at(-7, TIME '15:00') WHERE id = v_injury;
+    UPDATE health_conditions SET status = 'SUPERSEDED', updated_at = pg_temp.at(-7, TIME '15:00') WHERE id = v_injury;
     PERFORM pg_temp.audit(pg_temp.uid('VT02'), 'INJURY_RECORD_CORRECTION: Severity lowered after the ultrasound recheck',
                           'InjuryRecord', v_new, NULL, pg_temp.at(-7, TIME '15:00'), NULL, NULL);
     -- Lịch tái khám tự động sau lần cho tập lại: đã xếp giờ trong tuần tới. (The automatic recheck is booked next week.)
@@ -220,10 +224,10 @@ BEGIN
     PERFORM pg_temp.treatment(r, 'Hoof abscess care', 'Poultice daily for 5 days, then keep the foot dry and padded.',
                               pg_temp.today() - 10, NULL, 'ACTIVE',
                               ARRAY[['Magnesium sulphate poultice', 'One poultice', 'Once daily', 'Topical', 'Change daily.']]);
-    INSERT INTO injury_records (horse_id, health_record_id, injury_type, body_region_id, severity, description, diagnosed_at,
+    INSERT INTO health_conditions (horse_id, health_record_id, condition_type, body_region_id, severity, description,
                                 expected_recovery_date, status, position_x, position_y, position_z, created_at, updated_at)
-    VALUES (pg_temp.hid('H038'), r, 'Hoof abscess', pg_temp.region('FORELEG_RIGHT'), 'MEDIUM',
-            'Subsolar abscess at the toe of the right fore, drained.', pg_temp.at(-10, TIME '08:15'), pg_temp.today() + 4,
+    VALUES (pg_temp.hid('H038'), r, 'Hoof abscess', pg_temp.region('FORELEG_RIGHT'), 'MODERATE',
+            'Subsolar abscess at the toe of the right fore, drained.', pg_temp.today() + 4,
             'ACTIVE', 0.4500, 0.0500, 0.5200, pg_temp.at(-10, TIME '08:15'), pg_temp.at(-10, TIME '08:15'));
     PERFORM pg_temp.recheck(s, 'VT03', 'SCHEDULED');
 

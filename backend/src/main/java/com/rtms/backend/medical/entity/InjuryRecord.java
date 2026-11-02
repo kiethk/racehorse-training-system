@@ -9,6 +9,14 @@ import java.time.LocalDateTime;
 @Table(name = "health_conditions")
 public class InjuryRecord {
 
+    /** D4 (WF-02 §3.3): một bộ từ vựng severity duy nhất cho bệnh lý/chấn thương. */
+    public static final java.util.Set<String> SEVERITY_VALUES =
+            java.util.Set.of("MILD", "MODERATE", "SEVERE", "CRITICAL");
+
+    public static boolean isValidSeverity(String severity) {
+        return severity != null && SEVERITY_VALUES.contains(severity.trim().toUpperCase());
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -34,7 +42,8 @@ public class InjuryRecord {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Transient
+    /** Ngày chẩn đoán ≈ thời điểm ghi nhận condition (health_conditions không còn diagnosed_at sau V202610311800). Read-only mapping onto created_at. */
+    @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime diagnosedAt;
 
     @Column(name = "expected_recovery_date")

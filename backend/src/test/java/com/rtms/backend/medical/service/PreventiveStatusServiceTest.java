@@ -283,10 +283,12 @@ class PreventiveStatusServiceTest {
         var rejected = new com.rtms.backend.admission.entity.AdmissionApplication();
         rejected.setId(8L);
         rejected.setStatus(com.rtms.backend.admission.enums.AdmissionStatus.REJECTED);
-        var approved = new com.rtms.backend.admission.entity.AdmissionApplication();
-        approved.setId(5L);
-        approved.setStatus(com.rtms.backend.admission.enums.AdmissionStatus.APPROVED);
-        when(admissions.findByHorseIdOrderBySubmittedAtDesc(HORSE)).thenReturn(List.of(rejected, approved));
+        // U6 (112e7d37): admission APPROVED không còn là nguồn link cho milestone mới —
+        // "live" ở đây là đơn đang trong pipeline review.
+        var inReview = new com.rtms.backend.admission.entity.AdmissionApplication();
+        inReview.setId(5L);
+        inReview.setStatus(com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW);
+        when(admissions.findByHorseIdOrderBySubmittedAtDesc(HORSE)).thenReturn(List.of(rejected, inReview));
         dose(1L, TODAY);
         dose(2L, TODAY);
 

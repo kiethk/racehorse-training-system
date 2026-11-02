@@ -88,7 +88,10 @@ class CareScheduleHardeningTests {
                 notificationService,
                 new TrainingDecisionService(horses, schedules, workoutService),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class)
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
         );
 
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

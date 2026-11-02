@@ -139,7 +139,30 @@ export function VetTodayAgenda({
                       {tone.label}
                     </Pill>
 
-                    {schedule.status === "IN_PROGRESS" ? (
+                    {schedule.status === "PAUSED" && (
+                      <Pill tone="warning" size="sm">
+                        Paused
+                      </Pill>
+                    )}
+
+                    {schedule.overdue && (
+                      <Pill tone="warning" icon="clock" size="sm">
+                        Overdue
+                      </Pill>
+                    )}
+
+                    {schedule.status === "PAUSED" ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onStartExam(schedule);
+                        }}
+                      >
+                        Continue (Paused)
+                      </Button>
+                    ) : schedule.status === "IN_PROGRESS" ? (
                       <Button
                         variant="primary"
                         size="sm"

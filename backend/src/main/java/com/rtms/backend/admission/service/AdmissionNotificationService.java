@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class AdmissionNotificationService {
@@ -185,6 +186,37 @@ public class AdmissionNotificationService {
                 feedback,
                 admissionUrl
         ));
+    }
+
+    /**
+     * In-app notification to every active CLUB_MANAGER when a vet rejects an admission.
+     */
+    public void notifyManagersOfAdmissionRejection(AdmissionApplication admission, String horseName, String stage, String feedback) {
+        List<User> managers = userRepository.findActiveClubManagers();
+        if (managers.isEmpty()) {
+            return;
+        }
+
+        String effectiveHorseName = (horseName != null && !horseName.isBlank()) ? horseName : "a horse";
+        String stageLabel = stage != null ? stage : "Review";
+        String reason = (feedback != null && !feedback.isBlank()) ? feedback : "No specific details provided";
+
+        for (User manager : managers) {
+            if (manager == null) {
+                continue;
+            }
+            notificationService.createNotification(
+                    manager.getId(),
+                    "Admission application rejected at " + stageLabel,
+                    "Admission #" + admission.getId() + " for " + effectiveHorseName
+                            + " was rejected at " + stageLabel + ". Reason: " + reason,
+                    NotificationTypes.ADMISSION_REJECTED,
+                    NotificationTypes.REFERENCE_ADMISSION,
+                    admission.getId(),
+                    Notification.buildDeduplicationKey(manager.getId(), NotificationTypes.REFERENCE_ADMISSION,
+                            admission.getId(), NotificationTypes.ADMISSION_REJECTED) + ":manager:" + stageLabel
+            );
+        }
     }
 
     /**

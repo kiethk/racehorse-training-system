@@ -127,6 +127,8 @@ INSERT INTO seed_check VALUES
      WHERE (i.status IN ('REPORTED', 'IN_REVIEW') AND c.status NOT IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS'))
         OR (i.status = 'RESOLVED' AND (c.status <> 'COMPLETED' OR i.handled_by_id IS DISTINCT FROM c.veterinarian_id))
         OR i.care_schedule_id IS NULL $q$),
+('PAUSED schedule without a paused_from timestamp',
+ $q$ SELECT id FROM care_schedule WHERE status = 'PAUSED' AND paused_from IS NULL $q$),
 ('Cancelled schedule without a reason',
  $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' AND (cancel_reason IS NULL OR btrim(cancel_reason) = '') $q$),
 ('Health metric hydration status outside the HydrationStatus enum',
@@ -142,6 +144,17 @@ INSERT INTO seed_check VALUES
  $q$ SELECT id FROM horse_health_metrics
      WHERE temperature NOT BETWEEN 35.5 AND 41.5 OR heart_rate NOT BETWEEN 24 AND 90 OR respiratory_rate NOT BETWEEN 8 AND 60
         OR body_condition_score NOT BETWEEN 1 AND 9 OR weight NOT BETWEEN 250 AND 800 OR recorded_at > pg_temp.clock() $q$),
+('INITIAL or ROUTINE-FOLLOW_UP completed exam missing full 6-field vitals',
+ $q$ SELECT c.id FROM care_schedule c
+     JOIN health_records h ON h.care_schedule_id = c.id
+     WHERE c.status = 'COMPLETED'
+       AND (c.care_type = 'INITIAL' OR (c.care_type = 'ROUTINE' AND c.purpose = 'FOLLOW_UP'))
+       AND NOT EXISTS (
+         SELECT 1 FROM horse_health_metrics m
+         WHERE m.health_record_id = h.id
+           AND m.heart_rate IS NOT NULL AND m.temperature IS NOT NULL AND m.weight IS NOT NULL
+           AND m.respiratory_rate IS NOT NULL AND m.hydration_status IS NOT NULL AND m.body_condition_score IS NOT NULL
+       ) $q$),
 ('Prescription or treatment plan ending before it starts',
  $q$ SELECT id FROM prescriptions WHERE end_date < start_date UNION ALL SELECT id FROM treatment_plans WHERE end_date < start_date $q$),
 -- ---------------- Huấn luyện (Training)
@@ -220,7 +233,21 @@ INSERT INTO seed_check VALUES
  $q$ SELECT r.id FROM race_registrations r JOIN horses h ON h.id = r.horse_id JOIN stable_stalls s ON s.id = h.current_stall_id
      JOIN areas a ON a.id = s.area_id
      WHERE a.trainer_id <> r.trainer_id OR r.event_date < r.created_at::DATE OR r.nomination_deadline > r.event_date
-        OR (r.status = 'PENDING') <> (r.reviewed_at IS NULL) $q$);
+        OR (r.status = 'PENDING') <> (r.reviewed_at IS NULL) $q$),
+-- ---------------- Dược lâm sàng (Track 0: catalog + đơn thuốc + severity D4)
+('Medication catalog missing or incomplete (needs 10+ active FEI entries)',
+ $q$ SELECT 1 WHERE (SELECT count(*) FROM clinical_medications WHERE active) < 10 $q$),
+('Health condition severity outside the MILD/MODERATE/SEVERE/CRITICAL vocabulary',
+ $q$ SELECT id FROM health_conditions
+     WHERE UPPER(severity) NOT IN ('MILD', 'MODERATE', 'SEVERE', 'CRITICAL') $q$),
+('Prescription with invalid status or administered_by_role',
+ $q$ SELECT id FROM prescriptions
+     WHERE status NOT IN ('ACTIVE', 'COMPLETED', 'DISCONTINUED')
+        OR administered_by_role NOT IN ('GROOM', 'VETERINARIAN') $q$),
+('Injectable prescription (IV/IM) not assigned to the veterinarian (B5)',
+ $q$ SELECT id FROM prescriptions
+     WHERE UPPER(COALESCE(route, '')) IN ('IV', 'IM', 'INJECTION_IV', 'INJECTION_IM')
+       AND administered_by_role <> 'VETERINARIAN' $q$);
 
 DO $$
 DECLARE

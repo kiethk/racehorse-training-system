@@ -445,7 +445,7 @@ BEGIN
         SELECT * INTO v_prev FROM health_records
          WHERE horse_id = h.id AND training_decision IS NOT NULL AND examined_at < c.created_at
          ORDER BY examined_at DESC LIMIT 1;
-        IF v_prev.training_decision = 'BLOCKED' THEN PERFORM pg_temp.block(h.id, v_prev.restriction_details, p_at);
+        IF v_prev.training_decision = 'BLOCKED' THEN PERFORM pg_temp.block(h.id, v_prev.assessment_note, p_at);
         ELSE PERFORM pg_temp.allow(h.id, p_at); END IF;
     ELSIF p_decision = 'ALLOWED' THEN
         PERFORM pg_temp.allow(h.id, p_at);
@@ -458,7 +458,7 @@ BEGIN
     END IF;
 
     INSERT INTO health_records (horse_id, veterinarian_id, examined_at, findings, diagnosis, notes, created_at,
-                                updated_at, record_type, treatment, care_schedule_id, training_decision, restriction_details)
+                                updated_at, record_type, treatment, care_schedule_id, training_decision, assessment_note)
     VALUES (h.id, c.veterinarian_id, p_at, p_findings, p_diagnosis, p_notes, p_at, p_at, c.care_type,
             p_treatment, c.id, p_decision, p_restriction)
     RETURNING id INTO v_hr;
@@ -471,15 +471,21 @@ BEGIN
         RETURNING id INTO v_plan;
         FOR i IN 1..COALESCE(array_length(p_history_codes, 1), 0) LOOP
             INSERT INTO prescriptions (treatment_plan_id, medication_name, dosage, frequency, route, start_date, end_date,
-                                       instructions, created_at, updated_at, preventive_protocol_id)
+                                       instructions, created_at, updated_at, preventive_protocol_id,
+                                       status, administered_by_role)
             SELECT v_plan, pp.name, 'Not recorded', 'ONCE', pp.default_route, p_history_dates[i], p_history_dates[i],
-                   '[HISTORICAL] Entered from the vaccination record supplied with the admission', p_at, p_at, pp.id
+                   '[HISTORICAL] Entered from the vaccination record supplied with the admission', p_at, p_at, pp.id,
+                   'COMPLETED',
+                   CASE WHEN UPPER(pp.default_route) IN ('IV', 'IM', 'INJECTION_IV', 'INJECTION_IM') THEN 'VETERINARIAN' ELSE 'GROOM' END
               FROM preventive_protocols pp WHERE pp.code = p_history_codes[i];
         END LOOP;
         FOREACH v_code IN ARRAY COALESCE(p_vaccines, '{}') LOOP
             INSERT INTO prescriptions (treatment_plan_id, medication_name, dosage, frequency, route, start_date, end_date,
-                                       instructions, created_at, updated_at, preventive_protocol_id)
-            SELECT v_plan, pp.name, pp.default_dosage, 'ONCE', pp.default_route, p_at::DATE, p_at::DATE, NULL, p_at, p_at, pp.id
+                                       instructions, created_at, updated_at, preventive_protocol_id,
+                                       status, administered_by_role)
+            SELECT v_plan, pp.name, pp.default_dosage, 'ONCE', pp.default_route, p_at::DATE, p_at::DATE, NULL, p_at, p_at, pp.id,
+                   'COMPLETED',
+                   CASE WHEN UPPER(pp.default_route) IN ('IV', 'IM', 'INJECTION_IV', 'INJECTION_IM') THEN 'VETERINARIAN' ELSE 'GROOM' END
               FROM preventive_protocols pp WHERE pp.code = v_code;
         END LOOP;
     END IF;

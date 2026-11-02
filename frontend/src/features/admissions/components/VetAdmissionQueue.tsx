@@ -92,6 +92,7 @@ function calculateAge(dateOfBirth: string | null | undefined): string {
 function examTone(status: CareScheduleStatus | undefined) {
   if (status === 'COMPLETED') return 'success' as const;
   if (status === 'IN_PROGRESS') return 'primary' as const;
+  if (status === 'PAUSED') return 'warning' as const;
   if (status === 'SCHEDULED') return 'info' as const;
   if (status === 'REQUESTED') return 'warning' as const;
   return 'neutral' as const;
@@ -100,6 +101,7 @@ function examTone(status: CareScheduleStatus | undefined) {
 function examIcon(status: CareScheduleStatus | undefined) {
   if (status === 'COMPLETED') return 'check' as const;
   if (status === 'IN_PROGRESS') return 'activity' as const;
+  if (status === 'PAUSED') return 'clock' as const;
   if (status === 'SCHEDULED') return 'calendar' as const;
   if (status === 'REQUESTED') return 'clock' as const;
   return 'circle' as const;
@@ -673,9 +675,14 @@ export function VetAdmissionQueue() {
       id: 'exam',
       header: 'Exam',
       render: (row) => row.careSchedule ? (
-        <Pill tone={examTone(row.careSchedule.status)} size="sm" icon={examIcon(row.careSchedule.status)}>
-          {formatLabel(row.careSchedule.status)}
-        </Pill>
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <Pill tone={examTone(row.careSchedule.status)} size="sm" icon={examIcon(row.careSchedule.status)}>
+            {formatLabel(row.careSchedule.status)}
+          </Pill>
+          {row.careSchedule.overdue && (
+            <Pill tone="warning" size="sm" icon="clock">Overdue</Pill>
+          )}
+        </span>
       ) : (
         <Pill tone="neutral" size="sm">No schedule</Pill>
       ),
@@ -733,7 +740,8 @@ export function VetAdmissionQueue() {
         }
         const status = row.careSchedule?.status;
         const action =
-          status === 'IN_PROGRESS' ? ({ label: 'Continue', icon: 'activity', primary: true } as const)
+          status === 'PAUSED' ? ({ label: 'Continue (Paused)', icon: 'activity', primary: true } as const)
+          : status === 'IN_PROGRESS' ? ({ label: 'Continue', icon: 'activity', primary: true } as const)
           : status === 'SCHEDULED' ? ({ label: 'Examine', icon: 'stethoscope', primary: true } as const)
           : status === 'COMPLETED' ? ({ label: 'View results', icon: 'check', primary: false } as const)
           : ({ label: 'Details', icon: 'chevron-right', primary: false } as const);

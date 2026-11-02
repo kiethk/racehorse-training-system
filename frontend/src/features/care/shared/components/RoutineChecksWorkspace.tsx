@@ -97,15 +97,17 @@ export function RoutineChecksWorkspace() {
   const stats = useMemo(() => {
     let scheduled = 0;
     let inProgress = 0;
+    let paused = 0;
     let completed = 0;
 
     for (const s of schedules) {
       if (s.status === 'SCHEDULED') scheduled++;
       else if (s.status === 'IN_PROGRESS') inProgress++;
+      else if (s.status === 'PAUSED') paused++;
       else if (s.status === 'COMPLETED') completed++;
     }
 
-    return { total: schedules.length, scheduled, inProgress, completed };
+    return { total: schedules.length, scheduled, inProgress, paused, completed };
   }, [schedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
@@ -198,6 +200,7 @@ export function RoutineChecksWorkspace() {
             { value: 'ALL', label: 'All', count: schedules.length },
             { value: 'SCHEDULED', label: 'Scheduled', count: stats.scheduled },
             { value: 'IN_PROGRESS', label: 'In Progress', count: stats.inProgress },
+            { value: 'PAUSED', label: 'Paused', count: stats.paused },
             { value: 'COMPLETED', label: 'Completed', count: stats.completed },
           ]}
         />
@@ -295,6 +298,8 @@ export function RoutineChecksWorkspace() {
                         tone={
                           cs.status === 'COMPLETED'
                             ? 'success'
+                            : cs.status === 'PAUSED'
+                            ? 'warning'
                             : cs.status === 'IN_PROGRESS'
                             ? 'primary'
                             : 'warning'
@@ -303,6 +308,8 @@ export function RoutineChecksWorkspace() {
                       >
                         {cs.status === 'SCHEDULED'
                           ? 'Scheduled'
+                          : cs.status === 'PAUSED'
+                          ? 'Paused'
                           : cs.status === 'IN_PROGRESS'
                           ? 'In Progress'
                           : 'Completed'}
@@ -330,6 +337,8 @@ export function RoutineChecksWorkspace() {
                   >
                     {cs.status === 'COMPLETED'
                       ? 'View Record'
+                      : cs.status === 'PAUSED'
+                      ? 'Continue (Paused)'
                       : cs.status === 'IN_PROGRESS'
                       ? 'Continue Exam'
                       : 'Start Exam'}

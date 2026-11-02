@@ -10,6 +10,8 @@ import com.rtms.backend.admission.service.*;
 import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.horse.enums.HorseSex;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
+import com.rtms.backend.medical.enums.HydrationStatus;
 import com.rtms.backend.identity.dto.*;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
@@ -383,6 +385,14 @@ abstract class DemoSeedWorkflow {
             vet.setFindings("Demo admission examination: alert, normal gait at walk, no visible injury or respiratory distress.");
             vet.setDiagnosis("No contraindication identified in this simulated intake examination.");
             vet.setNotes("DEMO intake examination after arrival; supplied certificates checked. No treatment indicated.");
+            HorseHealthMetricRequest metric=new HorseHealthMetricRequest();
+            metric.setHeartRate(BigDecimal.valueOf(36));
+            metric.setTemperature(BigDecimal.valueOf(37.8));
+            metric.setWeight(BigDecimal.valueOf(450));
+            metric.setRespiratoryRate(BigDecimal.valueOf(12));
+            metric.setHydrationStatus(HydrationStatus.NORMAL);
+            metric.setBodyConditionScore(BigDecimal.valueOf(5.5));
+            vet.setMetrics(List.of(metric));
             vets.reviewByVet(created,vet,adm.getVeterinarianId());
 
             // Sau khi reviewByVet hoan tat, chia deu lich su kham cho 3 Vet theo khu vuc
