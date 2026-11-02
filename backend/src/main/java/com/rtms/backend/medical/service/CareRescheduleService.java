@@ -2,6 +2,8 @@ package com.rtms.backend.medical.service;
 
 import com.rtms.backend.audit.entity.AuditLog;
 import com.rtms.backend.audit.repository.AuditLogRepository;
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
@@ -24,6 +26,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -43,32 +46,41 @@ public class CareRescheduleService {
     private final AuditLogRepository auditLogs;
     private final PreventiveStatusService preventiveStatus;
     private final CareScheduleService careScheduleService;
+    private final AuditLogService auditLogService;
     private final Clock clock;
 
     @Autowired
     public CareRescheduleService(CareScheduleRepository schedules, UserRepository users,
             AuditLogRepository auditLogs, PreventiveStatusService preventiveStatus,
+            CareScheduleService careScheduleService, AuditLogService auditLogService) {
+        this(schedules, users, auditLogs, preventiveStatus, careScheduleService, auditLogService, Clock.systemDefaultZone());
+    }
+
+    public CareRescheduleService(CareScheduleRepository schedules, UserRepository users,
+            AuditLogRepository auditLogs, PreventiveStatusService preventiveStatus,
             CareScheduleService careScheduleService) {
-        this(schedules, users, auditLogs, preventiveStatus, careScheduleService, Clock.systemDefaultZone());
+        this(schedules, users, auditLogs, preventiveStatus, careScheduleService, null, Clock.systemDefaultZone());
     }
 
     public CareRescheduleService(CareScheduleRepository schedules, UserRepository users,
             AuditLogRepository auditLogs, PreventiveStatusService preventiveStatus) {
-        this(schedules, users, auditLogs, preventiveStatus, null, Clock.systemDefaultZone());
+        this(schedules, users, auditLogs, preventiveStatus, null, null, Clock.systemDefaultZone());
     }
 
     CareRescheduleService(CareScheduleRepository schedules, UserRepository users, AuditLogRepository auditLogs,
             PreventiveStatusService preventiveStatus, Clock clock) {
-        this(schedules, users, auditLogs, preventiveStatus, null, clock);
+        this(schedules, users, auditLogs, preventiveStatus, null, null, clock);
     }
 
     CareRescheduleService(CareScheduleRepository schedules, UserRepository users, AuditLogRepository auditLogs,
-            PreventiveStatusService preventiveStatus, CareScheduleService careScheduleService, Clock clock) {
+            PreventiveStatusService preventiveStatus, CareScheduleService careScheduleService,
+            AuditLogService auditLogService, Clock clock) {
         this.schedules = schedules;
         this.users = users;
         this.auditLogs = auditLogs;
         this.preventiveStatus = preventiveStatus;
         this.careScheduleService = careScheduleService;
+        this.auditLogService = auditLogService;
         this.clock = clock;
     }
 
@@ -94,6 +106,9 @@ public class CareRescheduleService {
         }
         authorize(schedule, actor);
 
+        LocalDate oldDate = schedule.getRequestedAt() != null ? schedule.getRequestedAt().toLocalDate() : null;
+        CareScheduleStatus oldStatus = schedule.getStatus();
+
         if (schedule.getStatus() == CareScheduleStatus.SCHEDULED) {
             schedule.setVeterinarianId(null);
             schedule.setScheduledAt(null);
@@ -107,13 +122,34 @@ public class CareRescheduleService {
             careScheduleService.assignRequestedSchedule(saved);
         }
 
-        AuditLog audit = new AuditLog();
-        audit.setAction(AUDIT_ACTION);
-        audit.setEntityName("CareSchedule");
-        audit.setEntityId(saved.getId());
-        audit.setUser(users.findById(actor.getUserId()).orElse(null));
-        audit.setDetails("Care schedule #" + saved.getId() + " rescheduled to " + request.getNewDate() + (request.getReason() != null ? " (Reason: " + request.getReason() + ")" : ""));
-        auditLogs.save(audit);
+        if (auditLogService != null) {
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .userId(actor.getUserId())
+                    .action(AUDIT_ACTION)
+                    .entityName("CareSchedule")
+                    .entityId(saved.getId())
+                    .module("MEDICAL")
+                    .summary("Medical care schedule #" + saved.getId() + " rescheduled to " + request.getNewDate())
+                    .reason(request.getReason() != null ? request.getReason().name() : request.getNote())
+                    .targetUrl("/manager/horses/" + saved.getHorseId())
+                    .before(Map.of(
+                            "scheduledDate", oldDate != null ? oldDate.toString() : "None",
+                            "status", oldStatus != null ? oldStatus.name() : "None"
+                    ))
+                    .after(Map.of(
+                            "scheduledDate", request.getNewDate().toString(),
+                            "status", saved.getStatus().name()
+                    ))
+                    .build());
+        } else {
+            AuditLog audit = new AuditLog();
+            audit.setAction(AUDIT_ACTION);
+            audit.setEntityName("CareSchedule");
+            audit.setEntityId(saved.getId());
+            audit.setUser(users.findById(actor.getUserId()).orElse(null));
+            audit.setDetails("Care schedule #" + saved.getId() + " rescheduled to " + request.getNewDate() + (request.getReason() != null ? " (Reason: " + request.getReason() + ")" : ""));
+            auditLogs.save(audit);
+        }
 
         return new RescheduleCareScheduleResponse(CareScheduleResponse.from(saved), warnings(saved, request.getNewDate()));
     }

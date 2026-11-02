@@ -32,7 +32,11 @@ import com.rtms.backend.training.enums.TrainingPlanStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.HorseTrainingPlanRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
@@ -55,13 +59,28 @@ public class HorseService {
     private final CareScheduleRepository careScheduleRepository;
     private final GroomDailyTaskRepository groomDailyTaskRepository;
     private final NotificationService notificationService;
+    private final AuditLogService auditLogService;
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
                         TrainingWorkoutService workoutService,
                         AreaRepository areaRepository) {
         this(horseRepository, stableStallRepository, workoutService, areaRepository,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
+    }
+
+    public HorseService(HorseRepository horseRepository,
+                        StableStallRepository stableStallRepository,
+                        TrainingWorkoutService workoutService,
+                        AreaRepository areaRepository,
+                        TrainingWorkoutRepository workoutRepository,
+                        HorseTrainingPlanRepository planRepository,
+                        CareScheduleRepository careScheduleRepository,
+                        GroomDailyTaskRepository groomDailyTaskRepository,
+                        NotificationService notificationService) {
+        this(horseRepository, stableStallRepository, workoutService, areaRepository,
+                workoutRepository, planRepository, careScheduleRepository,
+                groomDailyTaskRepository, notificationService, null);
     }
 
     @Autowired
@@ -73,7 +92,8 @@ public class HorseService {
                         HorseTrainingPlanRepository planRepository,
                         CareScheduleRepository careScheduleRepository,
                         GroomDailyTaskRepository groomDailyTaskRepository,
-                        NotificationService notificationService) {
+                        NotificationService notificationService,
+                        AuditLogService auditLogService) {
         this.horseRepository = horseRepository;
         this.stableStallRepository = stableStallRepository;
         this.workoutService = workoutService;
@@ -83,6 +103,7 @@ public class HorseService {
         this.careScheduleRepository = careScheduleRepository;
         this.groomDailyTaskRepository = groomDailyTaskRepository;
         this.notificationService = notificationService;
+        this.auditLogService = auditLogService;
     }
 
     /** Giữ chữ ký 3 tham số cho các lời gọi đã có. */
@@ -444,6 +465,27 @@ public class HorseService {
         horse.setCurrentStatus(targetStatus);
         horse.setStatusReason(effectiveReason);
         horse.setStatusReasonCode(reasonCode);
-        return horseRepository.save(horse);
+        Horse saved = horseRepository.save(horse);
+
+        if (auditLogService != null) {
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .userId(currentUser.getUserId())
+                    .action("HORSE_STATUS_CHANGE")
+                    .entityName("Horse")
+                    .entityId(horse.getId())
+                    .module("HORSES")
+                    .summary("Horse " + horse.getName() + " lifecycle status updated to " + targetStatus)
+                    .reason(effectiveReason)
+                    .targetUrl("/manager/horses/" + horse.getId())
+                    .before(Map.of(
+                            "status", currentStatus != null ? currentStatus.name() : "None"
+                    ))
+                    .after(Map.of(
+                            "status", targetStatus.name()
+                    ))
+                    .build());
+        }
+
+        return saved;
     }
 }

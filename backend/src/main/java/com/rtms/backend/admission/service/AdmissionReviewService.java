@@ -4,6 +4,8 @@ import com.rtms.backend.admission.dto.VetReviewResponse;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
@@ -19,7 +21,6 @@ import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 
-
 import com.rtms.backend.config.ApiException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
 
 /** Compatibility adapter for Admission Vet UI delegating to CareScheduleService */
@@ -38,19 +40,30 @@ public class AdmissionReviewService {
     private final StableStallRepository stalls;
     private final CareScheduleService careScheduleService;
     private final HealthRecordRepository healthRecordRepository;
+    private final AuditLogService auditLogService;
 
     @Autowired
     public AdmissionReviewService(AdmissionApplicationRepository admissions,
             CareScheduleRepository careSchedules,
             HorseRepository horses, StableStallRepository stalls,
             CareScheduleService careScheduleService,
-            HealthRecordRepository healthRecordRepository) {
+            HealthRecordRepository healthRecordRepository,
+            AuditLogService auditLogService) {
         this.admissions = admissions;
         this.careSchedules = careSchedules;
         this.horses = horses;
         this.stalls = stalls;
         this.careScheduleService = careScheduleService;
         this.healthRecordRepository = healthRecordRepository;
+        this.auditLogService = auditLogService;
+    }
+
+    public AdmissionReviewService(AdmissionApplicationRepository admissions,
+            CareScheduleRepository careSchedules,
+            HorseRepository horses, StableStallRepository stalls,
+            CareScheduleService careScheduleService,
+            HealthRecordRepository healthRecordRepository) {
+        this(admissions, careSchedules, horses, stalls, careScheduleService, healthRecordRepository, null);
     }
 
 
@@ -135,6 +148,31 @@ public class AdmissionReviewService {
                 : compReq.getRestrictionDetails();
         Long careScheduleId = completed != null ? completed.id() : schedule.getId();
         Long vetExamId = careScheduleId;
+
+        if (auditLogService != null) {
+            String noteOrReason = request.getNotes() != null && !request.getNotes().isBlank()
+                    ? request.getNotes()
+                    : request.getFeedback();
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .userId(actorId)
+                    .action("VET_INTAKE_EXAM")
+                    .entityName("AdmissionApplication")
+                    .entityId(admissionId)
+                    .module("MEDICAL")
+                    .summary("Veterinarian completed intake exam and evaluated training eligibility as " + trainingDecision)
+                    .reason(noteOrReason)
+                    .targetUrl("/manager/admissions/" + admissionId)
+                    .before(Map.of(
+                            "admissionStatus", "VET_REVIEW",
+                            "horseStatus", horse.getCurrentStatus() != null ? horse.getCurrentStatus().name() : "PENDING"
+                    ))
+                    .after(Map.of(
+                            "admissionStatus", admission.getStatus().name(),
+                            "trainingDecision", trainingDecision.name(),
+                            "horseStatus", horse.getCurrentStatus() != null ? horse.getCurrentStatus().name() : "PENDING"
+                    ))
+                    .build());
+        }
 
         return new VetReviewResponse(
                 admission.getId(),
