@@ -43,6 +43,56 @@ export function resolveEntityUrl(
   return null;
 }
 
+export function resolveValueLink(field: string, value: string): string | null {
+  if (!value || value === 'None' || value === 'null' || value === 'undefined') {
+    return null;
+  }
+
+  const f = field.toLowerCase();
+
+  // 1. Trainer / Staff / Vet / Groom / User references
+  if (
+    f.includes('trainer') ||
+    f.includes('vet') ||
+    f.includes('groom') ||
+    f.includes('user') ||
+    f.includes('owner') ||
+    f.includes('actor') ||
+    f.includes('staff')
+  ) {
+    const idMatch = value.match(/#(\d+)/);
+    if (idMatch) {
+      return `/manager/accounts?userId=${idMatch[1]}`;
+    }
+    return `/manager/accounts?search=${encodeURIComponent(value.trim())}`;
+  }
+
+  // 2. Horse references
+  if (f.includes('horse') || f.includes('occupant')) {
+    const idMatch = value.match(/#(\d+)/);
+    if (idMatch) {
+      return `/manager/horses/${idMatch[1]}`;
+    }
+    return `/manager/horses`;
+  }
+
+  // 3. Stall / Barn / Area references
+  if (f.includes('stall') || f.includes('barn') || f.includes('area')) {
+    return `/manager/stable`;
+  }
+
+  // 4. Admission references
+  if (f.includes('admission')) {
+    const idMatch = value.match(/#(\d+)/);
+    if (idMatch) {
+      return `/manager/admissions/${idMatch[1]}`;
+    }
+    return `/manager/admissions`;
+  }
+
+  return null;
+}
+
 export function resolveLogModule(
   module?: string | null,
   entityName?: string | null,

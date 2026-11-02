@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAuditDetails, resolveEntityUrl, resolveLogModule } from '../auditDiff.ts';
+import { parseAuditDetails, resolveEntityUrl, resolveLogModule, resolveValueLink } from '../auditDiff.ts';
 
 describe('Audit Diff Parser', () => {
   it('parses structured JSON with before and after states and detects changes', () => {
@@ -71,6 +71,17 @@ describe('Audit Diff Parser', () => {
     assert.equal(resolveLogModule(null, null, '/api/stalls/occupancy', null), 'STABLE');
     assert.equal(resolveLogModule(null, null, null, 'CARE_SCHEDULE_RESCHEDULED'), 'MEDICAL');
     assert.equal(resolveLogModule(null, null, null, null), 'SYSTEM');
+  });
+
+  it('resolves value entity links for trainers, staff, stalls, and horses in changes diffs', () => {
+    assert.equal(resolveValueLink('assignedTrainer', 'Head Trainer (#2)'), '/manager/accounts?userId=2');
+    assert.equal(resolveValueLink('assignedTrainer', 'Head Trainer'), '/manager/accounts?search=Head%20Trainer');
+    assert.equal(resolveValueLink('assignedVet', 'Dr. Sarah Jenkins'), '/manager/accounts?search=Dr.%20Sarah%20Jenkins');
+    assert.equal(resolveValueLink('stallCode', 'A-04'), '/manager/stable');
+    assert.equal(resolveValueLink('occupantHorse', 'Thunder Spirit (#1)'), '/manager/horses/1');
+    assert.equal(resolveValueLink('status', 'ELIGIBLE'), null);
+    assert.equal(resolveValueLink('reason', 'None'), null);
+    assert.equal(resolveValueLink('field', ''), null);
   });
 });
 

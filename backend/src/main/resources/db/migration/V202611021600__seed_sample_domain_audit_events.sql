@@ -70,11 +70,15 @@ SELECT
     'DOMAIN',
     '/manager/horses/1',
     200,
-    '{"module":"HORSES","summary":"Updated horse lifecycle status to ELIGIBLE","reason":"Passed 14-day training readiness baseline tests with high scores.","targetUrl":"/manager/horses/1","before":{"lifecycleStatus":"CANDIDATE","competitionReadiness":"PENDING","assignedTrainer":null},"after":{"lifecycleStatus":"ELIGIBLE","competitionReadiness":"READY","assignedTrainer":"Head Trainer"}}',
+    '{"module":"HORSES","summary":"Updated horse lifecycle status to ELIGIBLE","reason":"Passed 14-day training readiness baseline tests with high scores.","targetUrl":"/manager/horses/1","before":{"lifecycleStatus":"CANDIDATE","competitionReadiness":"PENDING","assignedTrainer":null},"after":{"lifecycleStatus":"ELIGIBLE","competitionReadiness":"READY","assignedTrainer":"Head Trainer (#2)"}}',
     NOW() - INTERVAL '30 minutes'
 WHERE NOT EXISTS (
     SELECT 1 FROM audit_logs WHERE action = 'UPDATE_HORSE_STATUS' AND entity_name = 'Horse' AND entity_id = 1
 );
+
+UPDATE audit_logs
+SET details = '{"module":"HORSES","summary":"Updated horse lifecycle status to ELIGIBLE","reason":"Passed 14-day training readiness baseline tests with high scores.","targetUrl":"/manager/horses/1","before":{"lifecycleStatus":"CANDIDATE","competitionReadiness":"PENDING","assignedTrainer":null},"after":{"lifecycleStatus":"ELIGIBLE","competitionReadiness":"READY","assignedTrainer":"Head Trainer (#2)"}}'
+WHERE action = 'UPDATE_HORSE_STATUS' AND entity_name = 'Horse';
 
 INSERT INTO audit_logs (
     user_id,

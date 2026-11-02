@@ -6,7 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { ModuleBadge } from './ModuleBadge';
-import { parseAuditDetails, resolveLogModule } from '../lib/auditDiff';
+import { parseAuditDetails, resolveLogModule, resolveValueLink } from '../lib/auditDiff';
 import type { AuditLogItem } from '../types';
 
 interface AuditLogDetailModalProps {
@@ -92,27 +92,15 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
       <div className="space-y-4 pt-1">
         {/* Unified Overview Card */}
         <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--color-border)] pb-2.5">
-            <div>
-              <div className="text-[11px] font-medium text-[var(--color-text-muted)]">Action</div>
-              <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-                {actionTitle}
-              </div>
-              {parsed.summary && (
-                <div className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-                  {parsed.summary}
-                </div>
-              )}
+          <div className="border-b border-[var(--color-border)] pb-2.5">
+            <div className="text-[11px] font-medium text-[var(--color-text-muted)]">Action</div>
+            <div className="text-sm font-semibold text-[var(--color-text-primary)]">
+              {actionTitle}
             </div>
-
-            {parsed.targetUrl && (
-              <Link
-                href={parsed.targetUrl}
-                className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-text-primary)] hover:underline pt-0.5"
-              >
-                <span>View {item.entityName || 'Entity'}</span>
-                <Icon name="external-link" className="size-3" />
-              </Link>
+            {parsed.summary && (
+              <div className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+                {parsed.summary}
+              </div>
             )}
           </div>
 
@@ -120,14 +108,19 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
             <div>
               <span className="text-[var(--color-text-muted)]">Actor: </span>
               {item.actorUserId ? (
-                <span className="font-medium text-[var(--color-text-primary)]">
-                  {item.actorName || `User #${item.actorUserId}`}
+                <Link
+                  href={`/manager/accounts?userId=${item.actorUserId}`}
+                  className="font-medium text-[var(--color-text-primary)] hover:underline inline-flex items-center gap-1"
+                  title="View user account"
+                >
+                  <span>{item.actorName || `User #${item.actorUserId}`}</span>
                   {item.actorRole && (
-                    <span className="ml-1 text-[var(--color-text-muted)]">
+                    <span className="text-[var(--color-text-muted)]">
                       ({formatRole(item.actorRole)})
                     </span>
                   )}
-                </span>
+                  <Icon name="external-link" className="size-3 opacity-60 ml-0.5" />
+                </Link>
               ) : (
                 <span className="text-[var(--color-text-secondary)]">System</span>
               )}
@@ -141,12 +134,26 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
             <div>
               <span className="text-[var(--color-text-muted)]">Target: </span>
               {item.entityName ? (
-                <span className="font-medium text-[var(--color-text-primary)]">
-                  {item.entityName}
-                  {item.entityId != null && (
-                    <span className="ml-1 font-mono text-[var(--color-text-muted)]">#{item.entityId}</span>
-                  )}
-                </span>
+                parsed.targetUrl ? (
+                  <Link
+                    href={parsed.targetUrl}
+                    className="font-medium text-[var(--color-text-primary)] hover:underline inline-flex items-center gap-1"
+                    title={`View ${item.entityName} ${item.entityId != null ? '#' + item.entityId : ''}`}
+                  >
+                    <span>{item.entityName}</span>
+                    {item.entityId != null && (
+                      <span className="font-mono text-[var(--color-text-muted)]">#{item.entityId}</span>
+                    )}
+                    <Icon name="external-link" className="size-3 opacity-60 ml-0.5" />
+                  </Link>
+                ) : (
+                  <span className="font-medium text-[var(--color-text-primary)]">
+                    {item.entityName}
+                    {item.entityId != null && (
+                      <span className="ml-1 font-mono text-[var(--color-text-muted)]">#{item.entityId}</span>
+                    )}
+                  </span>
+                )
               ) : (
                 <span className="text-[var(--color-text-secondary)]">System</span>
               )}
@@ -162,7 +169,7 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
           </div>
         )}
 
-        {/* Changes Table (Standard, clean enterprise table with normal black text) */}
+        {/* Changes Table (Standard, clean enterprise table with normal black text and entity deep links) */}
         <div>
           <div className="text-[11px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5">
             Changes
@@ -179,21 +186,50 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border)] font-mono text-xs">
-                  {parsed.diffs.map((diff) => (
-                    <tr key={diff.field}>
-                      <td className="py-2 px-3 font-medium text-[var(--color-text-primary)]">
-                        {diff.field}
-                      </td>
-                      <td className="py-2 px-3 text-[var(--color-text-primary)]">
-                        {diff.beforeValue}
-                      </td>
-                      <td className="py-2 px-3">
-                        <span className={`text-[var(--color-text-primary)] ${diff.isChanged ? 'font-bold' : ''}`}>
-                          {diff.afterValue}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {parsed.diffs.map((diff) => {
+                    const beforeLink = resolveValueLink(diff.field, diff.beforeValue);
+                    const afterLink = resolveValueLink(diff.field, diff.afterValue);
+
+                    return (
+                      <tr key={diff.field}>
+                        <td className="py-2 px-3 font-medium text-[var(--color-text-primary)]">
+                          {diff.field}
+                        </td>
+                        <td className="py-2 px-3 text-[var(--color-text-primary)]">
+                          {beforeLink ? (
+                            <Link
+                              href={beforeLink}
+                              className="inline-flex items-center gap-1 hover:underline font-mono"
+                              title={`View ${diff.field}`}
+                            >
+                              <span>{diff.beforeValue}</span>
+                              <Icon name="external-link" className="size-3 opacity-60" />
+                            </Link>
+                          ) : (
+                            diff.beforeValue
+                          )}
+                        </td>
+                        <td className="py-2 px-3">
+                          {afterLink ? (
+                            <Link
+                              href={afterLink}
+                              className={`inline-flex items-center gap-1 hover:underline text-[var(--color-text-primary)] font-mono ${
+                                diff.isChanged ? 'font-bold' : ''
+                              }`}
+                              title={`View ${diff.field}`}
+                            >
+                              <span>{diff.afterValue}</span>
+                              <Icon name="external-link" className="size-3 opacity-60" />
+                            </Link>
+                          ) : (
+                            <span className={`text-[var(--color-text-primary)] ${diff.isChanged ? 'font-bold' : ''}`}>
+                              {diff.afterValue}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
