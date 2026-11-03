@@ -1,9 +1,8 @@
 /* eslint-disable no-restricted-syntax */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/lib/toast';
@@ -18,6 +17,7 @@ interface AuditLogArchiveModalProps {
 }
 
 type ArchivePreset = '30_days' | '60_days' | 'custom';
+type Step = 'config' | 'confirm';
 
 export function AuditLogArchiveModal({
   open,
@@ -25,12 +25,19 @@ export function AuditLogArchiveModal({
   status,
   onPurged,
 }: AuditLogArchiveModalProps) {
+  const [step, setStep] = useState<Step>('config');
   const [preset, setPreset] = useState<ArchivePreset>('30_days');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [showConfirm, setShowConfirm] = useState<boolean>(false);
+
+  // Reset to initial step when opened
+  useEffect(() => {
+    if (open) {
+      setStep('config');
+    }
+  }, [open]);
 
   const getPresetDescription = () => {
     if (preset === '30_days') {
@@ -42,12 +49,12 @@ export function AuditLogArchiveModal({
     return `Custom range (${fromDate || 'beginning'} to ${toDate || 'now'})`;
   };
 
-  const promptConfirm = () => {
+  const handleNextStep = () => {
     if (preset === 'custom' && !fromDate && !toDate) {
       toast.error('Date range required', 'Please select at least a start or end date.');
       return;
     }
-    setShowConfirm(true);
+    setStep('confirm');
   };
 
   const handleArchiveAndPurge = async () => {
@@ -95,7 +102,6 @@ export function AuditLogArchiveModal({
         `Downloaded CSV file and purged ${purgeResult.purgedCount} records from the database.`
       );
 
-      setShowConfirm(false);
       onPurged();
       onClose();
     } catch (err: unknown) {
@@ -107,203 +113,228 @@ export function AuditLogArchiveModal({
   };
 
   return (
-    <>
-      <Modal
-        open={open}
-        onClose={submitting ? () => {} : onClose}
-        size="md"
-        title={
-          <div className="flex items-center gap-2">
-            <Icon name="archive" className="size-5 text-[var(--color-text-primary)]" />
-            <span className="text-base font-bold text-[var(--color-text-primary)]">
-              Archive & Purge Audit Trail
-            </span>
-          </div>
-        }
-        footer={
-          <div className="flex items-center justify-end gap-2 w-full">
-            <Button variant="secondary" onClick={onClose} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              icon="download"
-              disabled={submitting}
-              onClick={promptConfirm}
-            >
-              Download CSV & Purge
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4 pt-1 text-xs text-[var(--color-text-primary)]">
-          {/* Database Status Overview */}
-          {status && (
-            <div className="grid grid-cols-3 gap-2 p-2.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)]">
-              <div>
-                <div className="text-[11px] text-[var(--color-text-muted)]">Total Records</div>
-                <div className="font-semibold text-sm">{status.totalCount.toLocaleString()}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-[var(--color-text-muted)]">Logs &gt; 30 Days</div>
-                <div className="font-semibold text-sm text-rose-600 dark:text-rose-400">
-                  {status.agedCount.toLocaleString()}
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] text-[var(--color-text-muted)]">Oldest Record</div>
-                <div className="font-semibold text-sm">
-                  {status.oldestLogDate ? new Date(status.oldestLogDate).toLocaleDateString('en-GB') : 'None'}
-                </div>
-              </div>
-            </div>
+    <Modal
+      open={open}
+      onClose={submitting ? () => {} : onClose}
+      size="md"
+      title={
+        <div className="flex items-center gap-2">
+          <Icon
+            name={step === 'confirm' ? 'alert-triangle' : 'archive'}
+            className={`size-5 ${
+              step === 'confirm'
+                ? 'text-rose-600 dark:text-rose-400'
+                : 'text-[var(--color-text-primary)]'
+            }`}
+          />
+          <span className="text-base font-bold text-[var(--color-text-primary)]">
+            {step === 'confirm' ? 'Confirm Database Purge' : 'Archive & Purge Audit Trail'}
+          </span>
+        </div>
+      }
+      description={
+        <span className="text-xs text-[var(--color-text-muted)]">
+          {step === 'confirm'
+            ? 'Final verification: review scope before initiating permanent deletion.'
+            : 'Select retention range and export parameters.'}
+        </span>
+      }
+      footer={
+        <div className="flex items-center justify-end gap-2 w-full">
+          {step === 'config' ? (
+            <>
+              <Button variant="secondary" onClick={onClose} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleNextStep}>
+                Review &amp; Purge &rarr;
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setStep('config')}
+                disabled={submitting}
+              >
+                &larr; Back
+              </Button>
+              <Button
+                variant="destructive"
+                icon={submitting ? undefined : 'download'}
+                loading={submitting}
+                onClick={handleArchiveAndPurge}
+              >
+                Download CSV &amp; Purge
+              </Button>
+            </>
           )}
-
-          {/* Retention Range Presets */}
-          <div className="space-y-2">
-            <div className="font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider text-[11px]">
-              Retention & Purge Range
-            </div>
-
-            <div className="space-y-2">
-              <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
-                <input
-                  type="radio"
-                  name="archive_preset"
-                  value="30_days"
-                  checked={preset === '30_days'}
-                  onChange={() => setPreset('30_days')}
-                  className="mt-0.5"
-                />
-                <div className="space-y-0.5">
-                  <div className="font-medium text-[var(--color-text-primary)]">
-                    Logs older than 30 days (Recommended)
-                  </div>
-                  <div className="text-[11px] text-[var(--color-text-muted)]">
-                    Keeps recent operational history intact while clearing older logs ({status?.agedCount ?? 0} records).
-                  </div>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
-                <input
-                  type="radio"
-                  name="archive_preset"
-                  value="60_days"
-                  checked={preset === '60_days'}
-                  onChange={() => setPreset('60_days')}
-                  className="mt-0.5"
-                />
-                <div className="space-y-0.5">
-                  <div className="font-medium text-[var(--color-text-primary)]">
-                    Logs older than 60 days
-                  </div>
-                  <div className="text-[11px] text-[var(--color-text-muted)]">
-                    Retains 2 full months of history and purges older records.
-                  </div>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
-                <input
-                  type="radio"
-                  name="archive_preset"
-                  value="custom"
-                  checked={preset === 'custom'}
-                  onChange={() => setPreset('custom')}
-                  className="mt-0.5"
-                />
-                <div className="space-y-0.5 flex-1">
-                  <div className="font-medium text-[var(--color-text-primary)]">Custom Date Range</div>
-                  <div className="text-[11px] text-[var(--color-text-muted)]">
-                    Specify exact start and end cutoff dates.
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            {preset === 'custom' && (
-              <div className="grid grid-cols-2 gap-2 pt-1 pl-6">
+        </div>
+      }
+    >
+      <div className="space-y-4 pt-1 text-xs text-[var(--color-text-primary)]">
+        {step === 'config' ? (
+          <>
+            {/* Database Status Overview */}
+            {status && (
+              <div className="grid grid-cols-3 gap-2 p-2.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)]">
                 <div>
-                  <label className="block text-[11px] font-medium text-[var(--color-text-muted)] mb-1">
-                    From Date
-                  </label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full h-8 px-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]"
-                  />
+                  <div className="text-[11px] text-[var(--color-text-muted)]">Total Records</div>
+                  <div className="font-semibold text-sm">{status.totalCount.toLocaleString()}</div>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-[var(--color-text-muted)] mb-1">
-                    To Date
-                  </label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="w-full h-8 px-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]"
-                  />
+                  <div className="text-[11px] text-[var(--color-text-muted)]">Logs &gt; 30 Days</div>
+                  <div className="font-semibold text-sm text-rose-600 dark:text-rose-400">
+                    {status.agedCount.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-[var(--color-text-muted)]">Oldest Record</div>
+                  <div className="font-semibold text-sm">
+                    {status.oldestLogDate ? new Date(status.oldestLogDate).toLocaleDateString('en-GB') : 'None'}
+                  </div>
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Justification / Note */}
-          <div>
-            <label className="block text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-1">
-              Reason (Optional)
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Routine storage optimization for semester audit"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="w-full h-8 px-2.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]"
-            />
-          </div>
-        </div>
-      </Modal>
-
-      {/* Confirmation Step Dialog */}
-      <ConfirmDialog
-        open={showConfirm}
-        title="Confirm Archive & Purge"
-        tone="danger"
-        confirmLabel="Download CSV & Purge"
-        cancelLabel="Back"
-        loading={submitting}
-        onCancel={() => setShowConfirm(false)}
-        onConfirm={handleArchiveAndPurge}
-        description={
-          <div className="space-y-3 text-xs">
-            <div className="flex items-start gap-2 rounded border border-amber-300 bg-amber-50/70 p-2.5 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200">
-              <Icon name="alert-triangle" className="size-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-              <div className="leading-relaxed">
-                All records matching this selection will be downloaded as a permanent CSV archive first, then <strong>permanently deleted</strong> from the database.
+            {/* Retention Range Presets */}
+            <div className="space-y-2">
+              <div className="font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider text-[11px]">
+                Retention &amp; Purge Range
               </div>
-            </div>
 
-            <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2.5 space-y-1 font-mono text-[11px] text-[var(--color-text-primary)]">
-              <div>
-                <span className="text-[var(--color-text-muted)] font-sans">Scope: </span>
-                {getPresetDescription()}
+              <div className="space-y-2">
+                <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
+                  <input
+                    type="radio"
+                    name="archive_preset"
+                    value="30_days"
+                    checked={preset === '30_days'}
+                    onChange={() => setPreset('30_days')}
+                    className="mt-0.5"
+                  />
+                  <div className="space-y-0.5">
+                    <div className="font-medium text-[var(--color-text-primary)]">
+                      Logs older than 30 days (Recommended)
+                    </div>
+                    <div className="text-[11px] text-[var(--color-text-muted)]">
+                      Keeps recent operational history intact while clearing older logs ({status?.agedCount ?? 0} records).
+                    </div>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
+                  <input
+                    type="radio"
+                    name="archive_preset"
+                    value="60_days"
+                    checked={preset === '60_days'}
+                    onChange={() => setPreset('60_days')}
+                    className="mt-0.5"
+                  />
+                  <div className="space-y-0.5">
+                    <div className="font-medium text-[var(--color-text-primary)]">
+                      Logs older than 60 days
+                    </div>
+                    <div className="text-[11px] text-[var(--color-text-muted)]">
+                      Retains 2 full months of history and purges older records.
+                    </div>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
+                  <input
+                    type="radio"
+                    name="archive_preset"
+                    value="custom"
+                    checked={preset === 'custom'}
+                    onChange={() => setPreset('custom')}
+                    className="mt-0.5"
+                  />
+                  <div className="space-y-0.5 flex-1">
+                    <div className="font-medium text-[var(--color-text-primary)]">Custom Date Range</div>
+                    <div className="text-[11px] text-[var(--color-text-muted)]">
+                      Specify exact start and end cutoff dates.
+                    </div>
+                  </div>
+                </label>
               </div>
-              {reason.trim() && (
-                <div>
-                  <span className="text-[var(--color-text-muted)] font-sans">Reason: </span>
-                  {reason.trim()}
+
+              {preset === 'custom' && (
+                <div className="grid grid-cols-2 gap-2 pt-1 pl-6">
+                  <div>
+                    <label className="block text-[11px] font-medium text-[var(--color-text-muted)] mb-1">
+                      From Date
+                    </label>
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="w-full h-8 px-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-[var(--color-text-muted)] mb-1">
+                      To Date
+                    </label>
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="w-full h-8 px-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]"
+                    />
+                  </div>
                 </div>
               )}
             </div>
 
-            <p className="text-[var(--color-text-muted)] text-[11px]">
-              An immutable audit trail entry will record this purge action and your account ID.
+            {/* Justification / Note */}
+            <div>
+              <label className="block text-[11px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-1">
+                Reason (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., Routine storage optimization for semester audit"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full h-8 px-2.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]"
+              />
+            </div>
+          </>
+        ) : (
+          /* Step 2: Confirmation Screen inside the same Modal */
+          <div className="space-y-3.5 py-1">
+            <div className="flex items-start gap-2.5 rounded border border-amber-300 bg-amber-50/70 p-3 text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200">
+              <Icon name="alert-triangle" className="size-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div className="leading-relaxed text-xs">
+                All records matching this selection will be exported and downloaded to your computer as a permanent CSV archive first, then <strong>permanently deleted</strong> from the database.
+              </div>
+            </div>
+
+            <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2 font-mono text-[11px]">
+              <div className="flex items-center justify-between pb-1.5 border-b border-[var(--color-border)] font-sans">
+                <span className="text-[var(--color-text-muted)] font-medium">Operation</span>
+                <span className="font-semibold text-rose-600 dark:text-rose-400">ARCHIVE &amp; PURGE</span>
+              </div>
+              <div>
+                <span className="text-[var(--color-text-muted)] font-sans">Target Scope: </span>
+                <span className="font-semibold text-[var(--color-text-primary)]">{getPresetDescription()}</span>
+              </div>
+              {reason.trim() && (
+                <div>
+                  <span className="text-[var(--color-text-muted)] font-sans">Reason: </span>
+                  <span className="text-[var(--color-text-secondary)]">{reason.trim()}</span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-[var(--color-text-muted)] leading-relaxed">
+              This action cannot be undone once executed. Exactly one immutable Domain Audit Event will be created recording your account ID and the number of removed rows.
             </p>
           </div>
-        }
-      />
-    </>
+        )}
+      </div>
+    </Modal>
   );
 }
