@@ -4,7 +4,7 @@ export type ProtocolCategory = 'VACCINE' | 'DEWORMING';
 export type PreventiveDueStatus = 'OK' | 'DUE_SOON' | 'OVERDUE' | 'MISSING' | 'NONE';
 export type VaccinationSource = 'ADMINISTERED' | 'HISTORICAL';
 export type CareSchedulePurpose = 'FOLLOW_UP' | 'PREVENTIVE';
-export type RescheduleReason = 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'OTHER';
+export type RescheduleReason = 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'EOD_ROLLOVER' | 'OTHER';
 export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED' | 'INACTIVE';
 
 export interface PreventiveProtocol {

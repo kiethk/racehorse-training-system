@@ -6,6 +6,7 @@ import {
   Button,
   EmptyState,
   Icon,
+  LinkButton,
   ListSkeleton,
   Modal,
   Notice,
@@ -18,6 +19,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { horseService } from '@/features/horses/services/horseService';
 import type { HorseSpecialty } from '@/features/horses/types';
+import { ReportIncidentDialog } from '@/features/training/components/ReportIncidentDialog';
 import { displayError } from '@/lib/display';
 import { compareAreas } from '../lib/managerAssignments';
 import { stableApi } from '../services/stableService';
@@ -179,6 +181,18 @@ export function TrainerStableView() {
   const selectedArea = selectedStall ? areas.find((a) => a.id === selectedStall.areaId) : undefined;
   const selectedTrainer = selectedArea?.trainerId ? trainerById.get(selectedArea.trainerId) : undefined;
 
+  const [reportOpen, setReportOpen] = useState(false);
+  const stallActions = selectedHorse ? (
+    <>
+      <LinkButton href={`/trainer/horses/${selectedHorse.id}`} variant="secondary" icon="external-link">
+        Horse details
+      </LinkButton>
+      <Button variant="warning" icon="alert-triangle" onClick={() => setReportOpen(true)}>
+        Report incident
+      </Button>
+    </>
+  ) : undefined;
+
   useEffect(() => {
     if (!selectedHorse?.id) return;
     let active = true;
@@ -272,6 +286,7 @@ export function TrainerStableView() {
                 groomName={selectedGroom?.fullName ?? (selectedStall.groomId ? `Groom #${selectedStall.groomId}` : 'Unassigned')}
                 trainerName={selectedTrainer?.fullName ?? 'Unassigned'}
                 hint="Pick a stall on the map to see its horse and the groom who looks after it."
+                actions={stallActions}
               />
             ) : null}
           />
@@ -430,9 +445,21 @@ export function TrainerStableView() {
             }
             trainerName={selectedTrainer?.fullName ?? 'Unassigned'}
             hint="View stall status, horse profile, and assigned staff."
+            actions={stallActions}
           />
         )}
       </Modal>
+
+      {selectedHorse && (
+        <ReportIncidentDialog
+          key={selectedHorse.id}
+          horseId={selectedHorse.id}
+          horseName={selectedHorse.name}
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          onSuccess={() => setReportOpen(false)}
+        />
+      )}
     </ScreenLayout>
   );
 }

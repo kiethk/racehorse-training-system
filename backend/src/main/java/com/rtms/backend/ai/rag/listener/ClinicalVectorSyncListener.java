@@ -50,8 +50,8 @@ public class ClinicalVectorSyncListener {
 
         try {
             // 1. Tiền xử lý mở rộng triệu chứng sang thuật ngữ y khoa chuyên sâu
-            String rawSymptoms = event.symptoms() != null ? event.symptoms() : "";
-            String expandedSymptoms = symptomExpander.expand(rawSymptoms);
+            String rawFindings = event.findings() != null ? event.findings() : "";
+            String expandedFindings = symptomExpander.expand(rawFindings);
             String diagnosis = event.diagnosis() != null ? event.diagnosis() : "";
 
             // 2. Đóng gói nội dung ngữ nghĩa để RAG vector hóa
@@ -59,8 +59,8 @@ public class ClinicalVectorSyncListener {
                     event.registrationNumber() != null ? event.registrationNumber() : event.horseId(),
                     event.healthRecordId());
 
-            String content = String.format("Horse UELN: %s (ID: %d). Clinical symptoms: %s. Medical diagnosis: %s.",
-                    event.registrationNumber(), event.horseId(), expandedSymptoms, diagnosis);
+            String content = String.format("Horse UELN: %s (ID: %d). Clinical findings: %s. Medical diagnosis: %s.",
+                    event.registrationNumber(), event.horseId(), expandedFindings, diagnosis);
 
             // 3. Sinh vector embedding 1536 chiều
             float[] vector = embeddingService.embed(content);

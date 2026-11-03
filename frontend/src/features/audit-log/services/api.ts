@@ -1,5 +1,12 @@
-import { apiGet } from '@/services/api';
-import { AuditLogItem, AuditLogFilters, PageResponse } from '../types';
+import { apiGet, apiGetBlob, apiPost } from '@/services/api';
+import {
+  AuditLogItem,
+  AuditLogFilters,
+  PageResponse,
+  AuditArchiveStatus,
+  AuditPurgeRequest,
+  AuditPurgeResponse,
+} from '../types';
 
 interface ApiResponse<T> {
   data: T;
@@ -32,6 +39,47 @@ export const auditLogApi = {
     params.set('size', String(filters.size));
     
     const response = await apiGet<ApiResponse<PageResponse<AuditLogItem>>>(`/api/manager/audit-logs?${params}`);
+    return response.data;
+  },
+
+  getArchiveStatus: async (): Promise<AuditArchiveStatus> => {
+    const response = await apiGet<ApiResponse<AuditArchiveStatus>>('/api/manager/audit-logs/archive-status');
+    return response.data;
+  },
+
+  downloadArchiveCsv: async (params?: { from?: string; to?: string; before?: string }): Promise<void> => {
+    const query = new URLSearchParams();
+    if (params?.from) query.set('from', params.from);
+    if (params?.to) query.set('to', params.to);
+    if (params?.before) query.set('before', params.before);
+
+    const qs = query.toString();
+    const path = `/api/manager/audit-logs/export-archive${qs ? `?${qs}` : ''}`;
+    const blob = await apiGetBlob(path);
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    const formatDate = (iso: string) => iso.slice(0, 10).replace(/-/g, '');
+    let filename = `audit_logs_all_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.csv`;
+    if (params?.from && params?.to) {
+      filename = `audit_logs_from_${formatDate(params.from)}_to_${formatDate(params.to)}.csv`;
+    } else if (params?.before) {
+      filename = `audit_archive_before_${formatDate(params.before)}.csv`;
+    } else if (params?.from) {
+      filename = `audit_logs_from_${formatDate(params.from)}.csv`;
+    }
+
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
+  purgeAuditLogs: async (request: AuditPurgeRequest): Promise<AuditPurgeResponse> => {
+    const response = await apiPost<ApiResponse<AuditPurgeResponse>>('/api/manager/audit-logs/purge', request);
     return response.data;
   },
 };

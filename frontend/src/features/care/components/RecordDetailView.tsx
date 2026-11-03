@@ -216,11 +216,13 @@ export function RecordDetailView({
 
   const backLabel = backHref.includes('health')
     ? 'Back to Health'
-    : backHref.includes('routine')
-      ? 'Back to Routine Care'
-      : backHref.includes('schedule')
-        ? 'Back to Schedule'
-        : 'Back to dashboard';
+    : backHref.includes('urgent')
+      ? 'Back to Urgent Cases'
+      : backHref.includes('routine')
+        ? 'Back to Routine Care'
+        : backHref.includes('schedule')
+          ? 'Back to Schedule'
+          : 'Back to dashboard';
 
   // Horse mode with no records at all: a clear empty state instead of a bare warning.
   if (!loading && !error && !detail?.schedule && !fullRecord) {
@@ -398,14 +400,6 @@ export function RecordDetailView({
               </div>
 
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 text-sm">
-                <div>
-                  <span className="text-[var(--color-text-muted)] text-[11px] uppercase font-semibold block">
-                    Symptoms:
-                  </span>
-                  <p className="text-[var(--color-text-primary)]">
-                    {fullRecord?.symptoms || 'None reported.'}
-                  </p>
-                </div>
                 <div>
                   <span className="text-[var(--color-text-muted)] text-[11px] uppercase font-semibold block">
                     Diagnosis:

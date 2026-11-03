@@ -208,10 +208,10 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, onMoveGr
             <div className="flex items-start gap-2">
             <p data-scene-overlay className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] shadow-[var(--shadow-panel)]">
               {hint ?? (onMoveGroom
-                ? 'Drag to orbit · Scroll to zoom · Drag a groom to another block · Click the trainer to change them'
+                ? 'Hover a stall or groom to see names · Drag a groom to another block · Click the trainer to change them'
                 : onMoveHorse
-                  ? 'Drag to orbit · Scroll to zoom · Click a stall · Drag a horse to an empty stall'
-                  : 'Drag to orbit · Scroll to zoom · Click a stall or a groom in the key')}
+                  ? 'Hover a stall or groom to see names · Click a stall · Drag a horse to an empty stall'
+                  : 'Hover a stall or groom to see names · Click a stall or a groom in the key')}
             </p>
             {fullscreen && (
               <span data-scene-overlay className="pointer-events-auto">

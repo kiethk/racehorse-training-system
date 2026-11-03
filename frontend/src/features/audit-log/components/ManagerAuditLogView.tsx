@@ -13,11 +13,13 @@ import { Input, SearchInput, Select } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { auditLogApi } from '../services/api';
-import { downloadAuditLogsCsv, extractAuditSummary } from '../lib/auditExport';
+import { extractAuditSummary } from '../lib/auditExport';
 import { resolveEntityUrl, resolveLogModule } from '../lib/auditDiff';
 import { AuditLogDetailModal } from './AuditLogDetailModal';
+import { AuditLogArchiveModal } from './AuditLogArchiveModal';
+import { AuditLogExportModal } from './AuditLogExportModal';
 import { ModuleBadge } from './ModuleBadge';
-import type { AuditLogItem, AuditLogFilters, PageResponse } from '../types';
+import type { AuditLogItem, AuditLogFilters, PageResponse, AuditArchiveStatus } from '../types';
 
 const STATUS_OPTIONS = [
   { label: 'All Results', value: 'ALL' },
@@ -132,8 +134,25 @@ export function ManagerAuditLogView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
+  const [archiveStatus, setArchiveStatus] = useState<AuditArchiveStatus | null>(null);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   
   const [draft, setDraft] = useState<AuditLogFilters>(urlFilters);
+
+  const loadArchiveStatus = async () => {
+    try {
+      const status = await auditLogApi.getArchiveStatus();
+      setArchiveStatus(status);
+    } catch (err) {
+      console.error('Failed to load archive status:', err);
+    }
+  };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadArchiveStatus();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -188,12 +207,6 @@ export function ManagerAuditLogView() {
     updateUrl({ ...urlFilters, page: newPage });
   };
 
-  const handleExportCsv = () => {
-    if (!data || data.content.length === 0) return;
-    const dateStr = new Date().toISOString().slice(0, 10);
-    downloadAuditLogsCsv(data.content, `audit-logs-${dateStr}.csv`);
-  };
-
   if (loading && !data) {
     return (
       <Panel>
@@ -210,16 +223,36 @@ export function ManagerAuditLogView() {
           <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
             Activity & Audit Logs
           </h1>
-          <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-            Review historical staff activities, domain approvals, and intake decisions across the club.
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             type="button"
             variant="secondary"
-            onClick={handleExportCsv}
-            disabled={!data || data.content.length === 0}
+            onClick={() => setIsArchiveModalOpen(true)}
+            className={
+              archiveStatus?.requiresMaintenance
+                ? 'border-rose-400 text-rose-700 bg-rose-50/50 hover:bg-rose-100/50 dark:border-rose-800 dark:text-rose-300 dark:bg-rose-950/30'
+                : ''
+            }
+            title={
+              archiveStatus?.requiresMaintenance
+                ? `Maintenance Notice: ${archiveStatus.agedCount} logs older than 30 days detected`
+                : 'Archive and clean database audit trail'
+            }
+          >
+            {archiveStatus?.requiresMaintenance && (
+              <span className="relative flex size-2 mr-1">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-rose-600" />
+              </span>
+            )}
+            <Icon name="archive" className="size-4 mr-1.5" />
+            Archive &amp; Purge
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setIsExportModalOpen(true)}
           >
             <Icon name="download" className="size-4 mr-1.5" />
             Export CSV
@@ -449,6 +482,26 @@ export function ManagerAuditLogView() {
         item={selectedLog}
         open={selectedLog != null}
         onClose={() => setSelectedLog(null)}
+      />
+
+      {/* Archive & Purge Modal */}
+      <AuditLogArchiveModal
+        open={isArchiveModalOpen}
+        onClose={() => setIsArchiveModalOpen(false)}
+        status={archiveStatus}
+        onPurged={() => {
+          auditLogApi.getAuditLogs(urlFilters).then(setData).catch(console.error);
+          loadArchiveStatus();
+        }}
+      />
+
+      {/* Export CSV Modal (Export without purging) */}
+      <AuditLogExportModal
+        open={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        currentFilters={urlFilters}
+        totalCount={archiveStatus?.totalCount ?? data?.totalElements}
+        filteredCount={data?.totalElements}
       />
     </div>
   );

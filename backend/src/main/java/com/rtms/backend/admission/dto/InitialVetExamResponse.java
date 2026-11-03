@@ -29,7 +29,6 @@ public class InitialVetExamResponse {
     private String restrictionDetails;
 
     // Clinical notes captured at examination time
-    private String symptoms;
     private String findings;
     private String diagnosis;
     private String treatment;
@@ -46,7 +45,6 @@ public class InitialVetExamResponse {
     public LocalDateTime getExaminedAt() { return examinedAt; }
     public TrainingDecision getTrainingDecision() { return trainingDecision; }
     public String getRestrictionDetails() { return restrictionDetails; }
-    public String getSymptoms() { return symptoms; }
     public String getFindings() { return findings; }
     public String getDiagnosis() { return diagnosis; }
     public String getTreatment() { return treatment; }
@@ -61,7 +59,6 @@ public class InitialVetExamResponse {
     public void setExaminedAt(LocalDateTime examinedAt) { this.examinedAt = examinedAt; }
     public void setTrainingDecision(TrainingDecision trainingDecision) { this.trainingDecision = trainingDecision; }
     public void setRestrictionDetails(String restrictionDetails) { this.restrictionDetails = restrictionDetails; }
-    public void setSymptoms(String symptoms) { this.symptoms = symptoms; }
     public void setFindings(String findings) { this.findings = findings; }
     public void setDiagnosis(String diagnosis) { this.diagnosis = diagnosis; }
     public void setTreatment(String treatment) { this.treatment = treatment; }

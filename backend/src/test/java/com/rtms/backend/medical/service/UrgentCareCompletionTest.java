@@ -84,7 +84,10 @@ class UrgentCareCompletionTest {
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class));
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -144,8 +147,8 @@ class UrgentCareCompletionTest {
     }
 
     @Test
-    @DisplayName("Khám xong kết luận ALLOWED: mở chặn tập, xóa lý do, đóng sự cố")
-    void testCompleteUrgentSchedule_allowed_releasesBlock() {
+    @DisplayName("Khám xong kết luận ALLOWED: ngựa giữ BLOCKED chờ ca ROUTINE tái khám theo WF-02, đóng sự cố")
+    void testCompleteUrgentSchedule_allowed_keepsBlockUntilRoutineRecheck() {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         horse.setTrainingDecision(TrainingDecision.BLOCKED);
         horse.setTrainingDecisionReason("Urgent veterinary care pending");
@@ -154,45 +157,80 @@ class UrgentCareCompletionTest {
         when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
 
         var response = careScheduleService.completeCareSchedule(urgentSchedule.getId(),
-                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+                completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
 
         assertEquals(CareScheduleStatus.COMPLETED, response.status());
-        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
-        assertNull(horse.getTrainingDecisionReason());
-        assertTrue(horse.canTrain());
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
+        assertEquals("Urgent veterinary care pending", horse.getTrainingDecisionReason());
+        assertFalse(horse.canTrain());
         assertEquals(IncidentStatus.RESOLVED, incident.getStatus());
         assertNotNull(incident.getHandlerNote(), "the reporting Groom should be told the outcome");
         assertTrue(incident.getHandlerNote().startsWith("Diagnosis: "));
-        assertTrue(incident.getHandlerNote().endsWith("Training: allowed"));
+        assertTrue(incident.getHandlerNote().contains("Training: blocked"));
         verify(healthRecordRepository).save(any(HealthRecord.class));
         verify(workoutService, never()).exitAnyGroup(anyLong());
     }
 
     @Test
-    @DisplayName("Trạng thái khóa cũ được giữ lại: đóng ca khẩn cấp cuối vẫn BLOCKED vì lý do trước đó")
-    void testCompleteUrgentSchedule_restoresPreviousBlock() {
-        HealthRecord previous = new HealthRecord();
-        previous.setTrainingDecision(TrainingDecision.BLOCKED);
-        previous.setRestrictionDetails("Injury rest");
-        when(healthRecordRepository.findTopByHorseIdAndRecordTypeNotAndTrainingDecisionIsNotNullOrderByExaminedAtDesc(
-                horse.getId(), CareType.URGENT.name())).thenReturn(Optional.of(previous));
+    @DisplayName("Kết luận ALLOWED ca Urgent mà không có lịch khám lại -> 400 FOLLOW_UP_REQUIRED theo WF-02")
+    void testCompleteUrgentSchedule_allowedWithoutFollowUp_rejected() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(horseRepository.findByIdForUpdate(horse.getId())).thenReturn(Optional.of(horse));
+        when(careScheduleRepository.findByIdForUpdate(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
 
+        CompleteCareScheduleRequest req = completeRequest(TrainingDecision.ALLOWED);
+        // req has no nextSchedule
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> careScheduleService.completeCareSchedule(urgentSchedule.getId(), req, vet.getId()));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("FOLLOW_UP_REQUIRED", ex.getErrorCode());
+        verifyNoInteractions(healthRecordRepository, workoutService);
+    }
+
+    @Test
+    @DisplayName("handlerNote trả cả ghi chú đánh giá của thú y về người báo cáo, không chỉ kết luận chẩn đoán")
+    void testCompleteUrgentSchedule_handlerNoteCarriesAssessmentNote() {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        horse.setTrainingDecisionReason("Urgent veterinary care pending");
+
+        stubCompletion();
+        when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+
+        CompleteCareScheduleRequest req = completeRequestWithFollowUp(TrainingDecision.ALLOWED);
+        req.setTreatment("Cold hosing and NSAID for five days");
+        req.setNotes("Mild flexor strain; recheck before returning to work.");
+
+        careScheduleService.completeCareSchedule(urgentSchedule.getId(), req, vet.getId());
+
+        assertTrue(incident.getHandlerNote().contains("Treatment: Cold hosing and NSAID for five days"));
+        assertTrue(incident.getHandlerNote().contains("Assessment: Mild flexor strain; recheck before returning to work."));
+        assertTrue(incident.getHandlerNote().contains("Training: blocked"));
+    }
+
+    @Test
+    @DisplayName("WF-02: đóng ca khẩn cấp ALLOWED không gọi restoreTrainingDecisionBeforeUrgent, giữ nguyên block-at-report")
+    void testCompleteUrgentSchedule_restoresPreviousBlock() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        horse.setTrainingDecisionReason("Urgent veterinary care pending");
         stubCompletion();
         incident.setGroomId(55L);
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(horse.getId()), anyCollection()))
                 .thenReturn(java.util.List.of(incident));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
-                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+                completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
 
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
-        assertEquals("Injury rest", horse.getTrainingDecisionReason());
+        assertEquals("Urgent veterinary care pending", horse.getTrainingDecisionReason());
         assertFalse(horse.canTrain());
         // Groom and Trainer must be told the effective state, not the raw ALLOWED conclusion.
         assertTrue(incident.getHandlerNote().contains("Training: blocked"));
-        assertTrue(incident.getHandlerNote().contains("Injury rest"));
+        assertTrue(incident.getHandlerNote().contains("Urgent veterinary care pending"));
         verify(notificationService).sendAssignmentNotification(
                 eq(55L),
                 eq(NotificationTypes.REFERENCE_CARE_SCHEDULE),
@@ -209,7 +247,7 @@ class UrgentCareCompletionTest {
                 eq(horse.getId()),
                 eq(NotificationTypes.URGENT_CASE_CLOSED),
                 anyString(),
-                contains("Injury rest")
+                contains("Urgent veterinary care pending")
         );
     }
 
@@ -230,7 +268,7 @@ class UrgentCareCompletionTest {
                 .thenReturn(java.util.List.of(incident, second, third));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
-                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+                completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
 
         for (HorseIncidentReport r : java.util.List.of(incident, second, third)) {
             assertEquals(IncidentStatus.RESOLVED, r.getStatus());
@@ -263,7 +301,7 @@ class UrgentCareCompletionTest {
                 .thenReturn(java.util.List.of(incident));
 
         var response = careScheduleService.completeCareSchedule(urgentSchedule.getId(),
-                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+                completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
 
         assertEquals(CareScheduleStatus.COMPLETED, response.status());
         assertEquals(IncidentStatus.RESOLVED, incident.getStatus());
@@ -280,7 +318,7 @@ class UrgentCareCompletionTest {
         when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
-                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+                completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
 
         assertEquals(IncidentStatus.RESOLVED, incident.getStatus());
     }
@@ -358,6 +396,11 @@ class UrgentCareCompletionTest {
     @Test
     @DisplayName("Kết luận BLOCKED mà không có lịch khám lại -> 400 FOLLOW_UP_REQUIRED, không ghi gì")
     void testCompleteUrgentSchedule_blockedWithoutFollowUp_rejected() {
+        urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+        when(horseRepository.findByIdForUpdate(horse.getId())).thenReturn(Optional.of(horse));
+        when(careScheduleRepository.findByIdForUpdate(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
+
         CompleteCareScheduleRequest req = completeRequest(TrainingDecision.BLOCKED);
         req.setRestrictionDetails("Walk only for 5 days");
 
@@ -374,7 +417,6 @@ class UrgentCareCompletionTest {
     void testCompleteUrgentSchedule_blockedWithFollowUp_blocksAndSchedulesRecheck() {
         urgentSchedule.setStatus(CareScheduleStatus.IN_PROGRESS);
         stubCompletion();
-        when(careScheduleRepository.saveAndFlush(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
 
         LocalDateTime recheckAt = LocalDateTime.now().plusDays(5).withHour(14).withMinute(0).withSecond(0).withNano(0);
         CreateNextScheduleRequest next = new CreateNextScheduleRequest();
@@ -415,7 +457,7 @@ class UrgentCareCompletionTest {
                 .thenReturn(java.util.List.of(incident));
 
         careScheduleService.completeCareSchedule(urgentSchedule.getId(),
-                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+                completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
 
         assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
         assertEquals("Urgent veterinary care pending", horse.getTrainingDecisionReason());
@@ -447,7 +489,7 @@ class UrgentCareCompletionTest {
         when(careScheduleRepository.findByIdForUpdate(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
 
         var response = careScheduleService.completeCareSchedule(urgentSchedule.getId(),
-                completeRequest(TrainingDecision.ALLOWED), vet.getId());
+                completeRequestWithFollowUp(TrainingDecision.ALLOWED), vet.getId());
 
         assertEquals(CareScheduleStatus.COMPLETED, response.status());
         verify(healthRecordRepository, never()).save(any());
@@ -516,6 +558,7 @@ class UrgentCareCompletionTest {
             return hr;
         });
         when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+        when(careScheduleRepository.saveAndFlush(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
     }
 
     private CompleteCareScheduleRequest completeRequest(TrainingDecision decision) {
@@ -523,6 +566,16 @@ class UrgentCareCompletionTest {
         req.setFindings("Examined");
         req.setDiagnosis("Diagnosis");
         req.setTrainingDecision(decision);
+        return req;
+    }
+
+    private CompleteCareScheduleRequest completeRequestWithFollowUp(TrainingDecision decision) {
+        CompleteCareScheduleRequest req = completeRequest(decision);
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setScheduledDate(java.time.LocalDate.now().plusDays(3).toString());
+        next.setDescription("Recheck after urgent examination");
+        req.setNextSchedule(next);
         return req;
     }
 
