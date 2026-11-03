@@ -41,13 +41,12 @@ class AiGuardrailOrchestratorTest {
         String prompt = service.buildSystemPrompt(owner);
 
         assertNotNull(prompt);
-        assertTrue(prompt.contains("16. GIỚI HẠN PHẠM VI NGHIỆP VỤ & CHÍNH SÁCH TỪ CHỐI CÂU HỎI NGOÀI LỀ"));
-        assertTrue(prompt.contains("PHẠM VI HỖ TRỢ DUY NHẤT (IN-DOMAIN)"));
-        assertTrue(prompt.contains("PHẠM VI NGOÀI LỀ BỊ NGHIÊM CẤM (OUT-OF-DOMAIN - OOD)"));
-        assertTrue(prompt.contains("giải phương trình bậc 2"));
-        assertTrue(prompt.contains("NẾU CÂU HỎI 100% NGOÀI LỀ (PURE OOD): TUYỆT ĐỐI KHÔNG GỌI TOOL"));
-        assertTrue(prompt.contains("NẾU CÂU HỎI HỖN HỢP (COMPOUND / MIXED QUERY)"));
-        assertTrue(prompt.contains("TUYỆT ĐỐI KHÔNG giải bài toán hoặc thực hiện yêu cầu ngoài lề đó trong bất kỳ hoàn cảnh nào"));
+        assertTrue(prompt.contains("16. NGUYÊN TẮC THẾ GIỚI ĐÓNG & GIỚI HẠN PHẠM VI NGHIỆP VỤ TUYỆT ĐỐI"));
+        assertTrue(prompt.contains("IN-DOMAIN WHITELIST"));
+        assertTrue(prompt.contains("CLOSED-WORLD ASSUMPTION"));
+        assertTrue(prompt.contains("MULTI-INTENT & COMPOUND QUERIES"));
+        assertTrue(prompt.contains("Mẹ tôi là Nga, hỏi chữ cái đầu tiên trong tên bà là gì?"));
+        assertTrue(prompt.contains("TUYỆT ĐỐI KHÔNG trả lời đáp án dù chỉ là 1 chữ cái hay 1 từ đơn"));
     }
 
     @Test
