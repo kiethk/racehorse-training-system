@@ -438,7 +438,10 @@ public class AiToolExecutionService {
 
         List<SessionRow> sessionRows = trainingSessionRepository.findOwnerSessionRows(ownerId, from, to);
         if (sessionRows.isEmpty()) {
-            return Collections.emptyList();
+            Map<String, Object> emptyResp = new LinkedHashMap<>();
+            emptyResp.put("totalUpcomingWorkouts", 0);
+            emptyResp.put("workoutScheduleList", Collections.emptyList());
+            return emptyResp;
         }
 
         List<Long> sessionIds = sessionRows.stream().map(SessionRow::sessionId).toList();
@@ -2205,7 +2208,11 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         Long groomId = currentUser.getUserId();
         List<StableStall> stalls = stableStallRepository.findByGroomId(groomId);
         if (stalls.isEmpty()) {
-            return Map.of("message", "Hiện tại bạn chưa được phân công phụ trách chuồng nào.", "stallAndHorseList", Collections.emptyList()
+            return Map.of(
+                    "message", "Hiện tại bạn chưa được phân công phụ trách chuồng nào.",
+                    "assignedStallsCount", 0,
+                    "stallsWithHorsesCount", 0,
+                    "stallAndHorseList", Collections.emptyList()
             );
         }
 
@@ -2869,7 +2876,11 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
 
     private Object handleGetRecentAuditLogs(Map<String, Object> args) {
         if (auditLogRepository == null) {
-            return Collections.emptyList();
+            Map<String, Object> emptyResp = new LinkedHashMap<>();
+            emptyResp.put("totalAuditLogs", 0);
+            emptyResp.put("auditLogList", Collections.emptyList());
+            emptyResp.put("actionUrl", "/manager/audit-log");
+            return emptyResp;
         }
         int limit = parseInteger(args.get("limit"), 10);
         if (limit <= 0) limit = 10;

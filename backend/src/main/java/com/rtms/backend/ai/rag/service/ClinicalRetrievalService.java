@@ -194,6 +194,45 @@ public class ClinicalRetrievalService {
         }
     }
 
+    /**
+     * Đồng bộ lại (re-index) vector embeddings cho toàn bộ bản ghi tri thức lâm sàng
+     * sử dụng mô hình embedding đang kích hoạt (OpenAI text-embedding-3-small hoặc fallback).
+     *
+     * @return Số lượng bản ghi đã được cập nhật vector thành công
+     */
+    @Transactional
+    public int reindexAllEmbeddings() {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT id, content FROM rag_knowledge_embeddings WHERE content IS NOT NULL ORDER BY id ASC"
+            );
+            if (rows.isEmpty()) {
+                return 0;
+            }
+
+            List<String> contents = rows.stream()
+                    .map(r -> (String) r.get("content"))
+                    .toList();
+
+            List<float[]> vectors = embeddingService.embedBatch(contents);
+
+            for (int i = 0; i < rows.size(); i++) {
+                Long id = ((Number) rows.get(i).get("id")).longValue();
+                String vectorStr = formatVectorForPgvector(vectors.get(i));
+                jdbcTemplate.update(
+                        "UPDATE rag_knowledge_embeddings SET embedding = ?::vector WHERE id = ?",
+                        vectorStr, id
+                );
+            }
+
+            log.info("ClinicalRetrievalService: Đã re-index thành công {} bản ghi embeddings.", rows.size());
+            return rows.size();
+        } catch (Exception ex) {
+            log.error("ClinicalRetrievalService: Lỗi trong quá trình re-index embeddings: {}", ex.getMessage(), ex);
+            return 0;
+        }
+    }
+
     private ClinicalChunkResponseDto mapChunk(java.sql.ResultSet rs) throws java.sql.SQLException {
         Long embeddingId = rs.getLong("embedding_id");
         String title = rs.getString("doc_title");

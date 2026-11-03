@@ -103,6 +103,8 @@ class AgentOrchestratorServiceTest {
         assertTrue(prompt.contains("PHÂN BIỆT RÕ RÀNG GIỮA SỐ LƯỢNG NGỰA VÀ SỐ LƯỢNG CHUỒNG TRẠI"));
         assertTrue(prompt.contains("THỐNG KÊ ĐƠN ĐĂNG KÝ NHẬP ĐÀN"));
         assertTrue(prompt.contains("XẾP HẠNG SỞ TRƯỜNG & ĐIỂM TRUNG BÌNH PHONG ĐỘ"));
+        assertTrue(prompt.contains("NGUYÊN TẮC THẾ GIỚI ĐÓNG & GIỚI HẠN PHẠM VI NGHIỆP VỤ TUYỆT ĐỐI"));
+        assertTrue(prompt.contains("CLOSED-WORLD ASSUMPTION"));
     }
 
     @Test
