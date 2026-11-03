@@ -132,13 +132,6 @@ export function AuditLogArchiveModal({
           </span>
         </div>
       }
-      description={
-        <span className="text-xs text-[var(--color-text-muted)]">
-          {step === 'confirm'
-            ? 'Final verification: review scope before initiating permanent deletion.'
-            : 'Select retention range and export parameters.'}
-        </span>
-      }
       footer={
         <div className="flex items-center justify-end gap-2 w-full">
           {step === 'config' ? (
@@ -303,35 +296,22 @@ export function AuditLogArchiveModal({
             </div>
           </>
         ) : (
-          /* Step 2: Confirmation Screen inside the same Modal */
-          <div className="space-y-3.5 py-1">
-            <div className="flex items-start gap-2.5 rounded border border-amber-300 bg-amber-50/70 p-3 text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200">
-              <Icon name="alert-triangle" className="size-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-              <div className="leading-relaxed text-xs">
-                All records matching this selection will be exported and downloaded to your computer as a permanent CSV archive first, then <strong>permanently deleted</strong> from the database.
-              </div>
-            </div>
+          /* Step 2: Minimal Direct Confirmation */
+          <div className="space-y-3 py-1 text-sm text-[var(--color-text-primary)]">
+            <p className="leading-relaxed">
+              Once you click <strong>Download CSV &amp; Purge</strong>, a CSV copy will be downloaded to your computer and these records will be <strong>permanently deleted from the database</strong>.
+            </p>
 
-            <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2 font-mono text-[11px]">
-              <div className="flex items-center justify-between pb-1.5 border-b border-[var(--color-border)] font-sans">
-                <span className="text-[var(--color-text-muted)] font-medium">Operation</span>
-                <span className="font-semibold text-rose-600 dark:text-rose-400">ARCHIVE &amp; PURGE</span>
-              </div>
-              <div>
-                <span className="text-[var(--color-text-muted)] font-sans">Target Scope: </span>
-                <span className="font-semibold text-[var(--color-text-primary)]">{getPresetDescription()}</span>
-              </div>
+            <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs font-mono">
+              <span className="text-[var(--color-text-muted)] font-sans">Scope: </span>
+              <span className="font-semibold text-[var(--color-text-primary)]">{getPresetDescription()}</span>
               {reason.trim() && (
-                <div>
+                <div className="mt-1 pt-1 border-t border-[var(--color-border)]">
                   <span className="text-[var(--color-text-muted)] font-sans">Reason: </span>
                   <span className="text-[var(--color-text-secondary)]">{reason.trim()}</span>
                 </div>
               )}
             </div>
-
-            <p className="text-[11px] text-[var(--color-text-muted)] leading-relaxed">
-              This action cannot be undone once executed. Exactly one immutable Domain Audit Event will be created recording your account ID and the number of removed rows.
-            </p>
           </div>
         )}
       </div>
