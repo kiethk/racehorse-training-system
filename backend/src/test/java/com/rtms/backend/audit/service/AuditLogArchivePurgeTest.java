@@ -8,6 +8,7 @@ import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.identity.entity.Role;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
+import com.rtms.backend.config.ApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -19,6 +20,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -119,5 +121,29 @@ class AuditLogArchivePurgeTest {
         assertEquals("AuditLog", domainEvent.getEntityName());
         assertTrue(domainEvent.getDetails().contains("Routine archive and purge"));
         assertTrue(domainEvent.getDetails().contains("125 records removed"));
+    }
+
+    @Test
+    void exportArchiveCsv_throwsWhenNoLogsFound() {
+        when(repository.findByCreatedAtBeforeOrderByCreatedAtAsc(any(LocalDateTime.class)))
+                .thenReturn(List.of());
+
+        ApiException ex = assertThrows(ApiException.class, () ->
+                service.exportArchiveCsv(null, null, LocalDateTime.now().minusDays(30))
+        );
+
+        assertEquals("NO_LOGS_TO_EXPORT", ex.getErrorCode());
+    }
+
+    @Test
+    void purgeAuditLogs_throwsWhenNoLogsPurged() {
+        when(repository.deleteByCreatedAtBefore(any(LocalDateTime.class))).thenReturn(0);
+
+        AuditPurgeRequest request = new AuditPurgeRequest(LocalDateTime.now().minusDays(30), null, "Routine purge");
+        ApiException ex = assertThrows(ApiException.class, () ->
+                service.purgeAuditLogs(10L, request)
+        );
+
+        assertEquals("NO_LOGS_TO_PURGE", ex.getErrorCode());
     }
 }

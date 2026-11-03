@@ -13,6 +13,8 @@ interface AuditLogExportModalProps {
   open: boolean;
   onClose: () => void;
   currentFilters: AuditLogFilters;
+  totalCount?: number;
+  filteredCount?: number;
 }
 
 type ExportMode = 'current_filter' | 'all' | 'custom';
@@ -21,6 +23,8 @@ export function AuditLogExportModal({
   open,
   onClose,
   currentFilters,
+  totalCount,
+  filteredCount,
 }: AuditLogExportModalProps) {
   const hasActiveDateFilter = Boolean(currentFilters.from || currentFilters.to);
   const [mode, setMode] = useState<ExportMode>(hasActiveDateFilter ? 'current_filter' : 'all');
@@ -28,7 +32,21 @@ export function AuditLogExportModal({
   const [toDate, setToDate] = useState<string>(currentFilters.to || '');
   const [downloading, setDownloading] = useState<boolean>(false);
 
+  const isSelectionEmpty = (() => {
+    if (mode === 'all') {
+      return totalCount !== undefined && totalCount === 0;
+    }
+    if (mode === 'current_filter') {
+      return filteredCount !== undefined && filteredCount === 0;
+    }
+    return false;
+  })();
+
   const handleExport = async () => {
+    if (isSelectionEmpty) {
+      toast.error('No logs to export', 'There are no audit logs found for the selected export scope.');
+      return;
+    }
     try {
       setDownloading(true);
 
@@ -89,11 +107,6 @@ export function AuditLogExportModal({
           </span>
         </div>
       }
-      description={
-        <span className="text-xs text-[var(--color-text-muted)]">
-          Export audit and activity records without modifying or deleting database data.
-        </span>
-      }
       footer={
         <div className="flex items-center justify-end gap-2 w-full">
           <Button variant="secondary" onClick={onClose} disabled={downloading}>
@@ -104,6 +117,8 @@ export function AuditLogExportModal({
             icon={downloading ? undefined : 'download'}
             loading={downloading}
             onClick={handleExport}
+            disabled={isSelectionEmpty || downloading}
+            title={isSelectionEmpty ? 'No matching logs available to export' : undefined}
           >
             Download CSV
           </Button>
@@ -111,6 +126,18 @@ export function AuditLogExportModal({
       }
     >
       <div className="space-y-4 pt-1 text-xs text-[var(--color-text-primary)]">
+        {/* Alert when selection has 0 records */}
+        {isSelectionEmpty && (
+          <div className="flex items-center gap-2 p-2.5 rounded border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-xs font-medium">
+            <Icon name="alert-triangle" className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>
+              {mode === 'all'
+                ? 'The database contains no audit log records (0 total records).'
+                : 'Current filter criteria matches 0 records.'} CSV export is disabled.
+            </span>
+          </div>
+        )}
+
         <div className="space-y-2">
           <div className="font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider text-[11px]">
             Export Scope

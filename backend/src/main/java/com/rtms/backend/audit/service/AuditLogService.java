@@ -348,11 +348,18 @@ public class AuditLogService {
         List<AuditLog> logs;
         if (fromDate != null && toDate != null) {
             logs = auditLogRepository.findByCreatedAtBetweenOrderByCreatedAtAsc(fromDate, toDate);
+        } else if (fromDate != null) {
+            logs = auditLogRepository.findByCreatedAtBetweenOrderByCreatedAtAsc(fromDate, LocalDateTime.now());
+        } else if (toDate != null) {
+            logs = auditLogRepository.findByCreatedAtBeforeOrderByCreatedAtAsc(toDate);
         } else if (beforeDate != null) {
             logs = auditLogRepository.findByCreatedAtBeforeOrderByCreatedAtAsc(beforeDate);
         } else {
-            LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
-            logs = auditLogRepository.findByCreatedAtBeforeOrderByCreatedAtAsc(thirtyDaysAgo);
+            logs = auditLogRepository.findAll(Sort.by(Sort.Direction.ASC, "createdAt"));
+        }
+
+        if (logs.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NO_LOGS_TO_EXPORT", "No audit log records found for the specified period.");
         }
 
         StringBuilder sb = new StringBuilder();
@@ -399,6 +406,10 @@ public class AuditLogService {
         } else {
             LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
             purgedCount = auditLogRepository.deleteByCreatedAtBefore(thirtyDaysAgo);
+        }
+
+        if (purgedCount == 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NO_LOGS_TO_PURGE", "No audit log records found to purge for the specified period.");
         }
 
         String reason = (request != null && request.reason() != null && !request.reason().isBlank())

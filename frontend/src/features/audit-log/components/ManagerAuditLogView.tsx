@@ -503,6 +503,8 @@ export function ManagerAuditLogView() {
         open={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         currentFilters={urlFilters}
+        totalCount={archiveStatus?.totalCount ?? data?.totalElements}
+        filteredCount={data?.totalElements}
       />
     </div>
   );

@@ -35,21 +35,41 @@ export function AuditLogArchiveModal({
   // Reset to initial step when opened
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep('config');
     }
   }, [open]);
+
+  const isTotalEmpty = (status?.totalCount ?? 0) === 0;
+  const isAgedEmpty = (status?.agedCount ?? 0) === 0;
+
+  const isSelectionEmpty = (() => {
+    if (!status || isTotalEmpty) return true;
+    if (preset === '30_days') return isAgedEmpty;
+    if (preset === '60_days') return isAgedEmpty;
+    if (preset === 'custom') {
+      if (toDate && status.oldestLogDate && new Date(toDate) < new Date(status.oldestLogDate)) {
+        return true;
+      }
+    }
+    return false;
+  })();
 
   const getPresetDescription = () => {
     if (preset === '30_days') {
       return `Logs older than 30 days (${status?.agedCount ?? 0} records)`;
     }
     if (preset === '60_days') {
-      return 'Logs older than 60 days';
+      return `Logs older than 60 days (${isAgedEmpty ? '0' : 'older than 60d'} records)`;
     }
     return `Custom range (${fromDate || 'beginning'} to ${toDate || 'now'})`;
   };
 
   const handleNextStep = () => {
+    if (isSelectionEmpty) {
+      toast.error('No records to purge', 'There are no audit logs matching the selected retention criteria.');
+      return;
+    }
     if (preset === 'custom' && !fromDate && !toDate) {
       toast.error('Date range required', 'Please select at least a start or end date.');
       return;
@@ -58,6 +78,10 @@ export function AuditLogArchiveModal({
   };
 
   const handleArchiveAndPurge = async () => {
+    if (isSelectionEmpty) {
+      toast.error('No records to purge', 'No audit logs found for the selected criteria.');
+      return;
+    }
     try {
       setSubmitting(true);
 
@@ -139,7 +163,12 @@ export function AuditLogArchiveModal({
               <Button variant="secondary" onClick={onClose} disabled={submitting}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleNextStep}>
+              <Button
+                variant="destructive"
+                onClick={handleNextStep}
+                disabled={isSelectionEmpty || submitting}
+                title={isSelectionEmpty ? 'No matching logs available to purge' : undefined}
+              >
                 Review &amp; Purge &rarr;
               </Button>
             </>
@@ -157,6 +186,8 @@ export function AuditLogArchiveModal({
                 icon={submitting ? undefined : 'download'}
                 loading={submitting}
                 onClick={handleArchiveAndPurge}
+                disabled={isSelectionEmpty || submitting}
+                title={isSelectionEmpty ? 'No matching logs available to purge' : undefined}
               >
                 Download CSV &amp; Purge
               </Button>
@@ -177,7 +208,7 @@ export function AuditLogArchiveModal({
                 </div>
                 <div>
                   <div className="text-[11px] text-[var(--color-text-muted)]">Logs &gt; 30 Days</div>
-                  <div className="font-semibold text-sm text-rose-600 dark:text-rose-400">
+                  <div className={`font-semibold text-sm ${status.agedCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-[var(--color-text-muted)]'}`}>
                     {status.agedCount.toLocaleString()}
                   </div>
                 </div>
@@ -187,6 +218,16 @@ export function AuditLogArchiveModal({
                     {status.oldestLogDate ? new Date(status.oldestLogDate).toLocaleDateString('en-GB') : 'None'}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Alert when selection has 0 records */}
+            {isSelectionEmpty && (
+              <div className="flex items-center gap-2 p-2.5 rounded border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-xs">
+                <Icon name="alert-triangle" className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>
+                  No audit logs match this criteria ({preset === '30_days' || preset === '60_days' ? '0 records older than threshold' : '0 records'}). Export and purge are disabled.
+                </span>
               </div>
             )}
 
@@ -207,8 +248,13 @@ export function AuditLogArchiveModal({
                     className="mt-0.5"
                   />
                   <div className="space-y-0.5">
-                    <div className="font-medium text-[var(--color-text-primary)]">
-                      Logs older than 30 days (Recommended)
+                    <div className="font-medium text-[var(--color-text-primary)] flex items-center gap-1.5">
+                      <span>Logs older than 30 days (Recommended)</span>
+                      {isAgedEmpty && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                          0 records
+                        </span>
+                      )}
                     </div>
                     <div className="text-[11px] text-[var(--color-text-muted)]">
                       Keeps recent operational history intact while clearing older logs ({status?.agedCount ?? 0} records).
@@ -226,8 +272,13 @@ export function AuditLogArchiveModal({
                     className="mt-0.5"
                   />
                   <div className="space-y-0.5">
-                    <div className="font-medium text-[var(--color-text-primary)]">
-                      Logs older than 60 days
+                    <div className="font-medium text-[var(--color-text-primary)] flex items-center gap-1.5">
+                      <span>Logs older than 60 days</span>
+                      {isAgedEmpty && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                          0 records
+                        </span>
+                      )}
                     </div>
                     <div className="text-[11px] text-[var(--color-text-muted)]">
                       Retains 2 full months of history and purges older records.
@@ -298,9 +349,16 @@ export function AuditLogArchiveModal({
         ) : (
           /* Step 2: Minimal Direct Confirmation */
           <div className="space-y-3 py-1 text-sm text-[var(--color-text-primary)]">
-            <p className="leading-relaxed">
-              Once you click <strong>Download CSV &amp; Purge</strong>, a CSV copy will be downloaded to your computer and these records will be <strong>permanently deleted from the database</strong>.
-            </p>
+            {isSelectionEmpty ? (
+              <div className="flex items-center gap-2 p-2.5 rounded border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-xs">
+                <Icon name="alert-triangle" className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>Selected scope has 0 matching records. Purge cannot be initiated.</span>
+              </div>
+            ) : (
+              <p className="leading-relaxed">
+                Once you click <strong>Download CSV &amp; Purge</strong>, a CSV copy will be downloaded to your computer and these records will be <strong>permanently deleted from the database</strong>.
+              </p>
+            )}
 
             <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs font-mono">
               <span className="text-[var(--color-text-muted)] font-sans">Scope: </span>
