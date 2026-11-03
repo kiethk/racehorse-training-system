@@ -10,18 +10,49 @@ import { EdaScatterChart, type ChartDataPoint } from './EdaScatterChart';
 
 type ViewMode = 'FLEET' | 'INDIVIDUAL';
 
-interface HorseEdaAnalyticsCardProps {
-  initialHorseId?: number;
+export interface HorseEdaOption {
+  id: number;
+  name: string;
+  breed?: string;
 }
 
-export function HorseEdaAnalyticsCard({ initialHorseId }: HorseEdaAnalyticsCardProps) {
+export interface HorseEdaAnalyticsCardProps {
+  initialHorseId?: number;
+  availableHorses?: HorseEdaOption[];
+}
+
+export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: HorseEdaAnalyticsCardProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(initialHorseId ? 'INDIVIDUAL' : 'FLEET');
   const [fleetData, setFleetData] = useState<FleetEdaResponse | null>(null);
   const [individualData, setIndividualData] = useState<IndividualHorseEdaResponse | null>(null);
-  const [selectedHorseId, setSelectedHorseId] = useState<number | null>(initialHorseId || null);
+  const [selectedHorseId, setSelectedHorseId] = useState<number | null>(
+    initialHorseId || (availableHorses && availableHorses.length > 0 ? availableHorses[0].id : null)
+  );
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Danh sách ngựa để chọn: ưu tiên availableHorses hoặc trích xuất từ fleetData.points
+  const horseOptions: HorseEdaOption[] = useMemo(() => {
+    if (availableHorses && availableHorses.length > 0) {
+      return availableHorses;
+    }
+    if (fleetData?.points && fleetData.points.length > 0) {
+      return fleetData.points.map((p) => ({
+        id: p.horseId,
+        name: p.horseName,
+        breed: p.breed,
+      }));
+    }
+    return [];
+  }, [availableHorses, fleetData]);
+
+  // Tự động gán selectedHorseId nếu chưa có
+  useEffect(() => {
+    if (!selectedHorseId && horseOptions.length > 0) {
+      setSelectedHorseId(horseOptions[0].id);
+    }
+  }, [selectedHorseId, horseOptions]);
 
   // Tải dữ liệu toàn đàn
   useEffect(() => {
@@ -51,7 +82,11 @@ export function HorseEdaAnalyticsCard({ initialHorseId }: HorseEdaAnalyticsCardP
 
   // Tải dữ liệu cá nhân khi chuyển sang mode INDIVIDUAL hoặc đổi ngựa
   useEffect(() => {
-    if (viewMode === 'INDIVIDUAL' && selectedHorseId) {
+    if (viewMode === 'INDIVIDUAL') {
+      if (!selectedHorseId) {
+        setLoading(false);
+        return;
+      }
       let active = true;
       setLoading(true);
       edaAnalyticsService
@@ -135,16 +170,16 @@ export function HorseEdaAnalyticsCard({ initialHorseId }: HorseEdaAnalyticsCardP
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          {viewMode === 'INDIVIDUAL' && fleetData?.points && fleetData.points.length > 0 && (
+          {viewMode === 'INDIVIDUAL' && horseOptions.length > 0 && (
             <select
               aria-label="Chọn ngựa cần phân tích"
               value={selectedHorseId ?? ''}
               onChange={(e) => setSelectedHorseId(Number(e.target.value))}
               className="text-xs bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-sm)] px-2.5 py-1.5 font-medium text-[var(--color-text-primary)]"
             >
-              {fleetData.points.map((h) => (
-                <option key={h.horseId} value={h.horseId}>
-                  {h.horseName} ({h.breed})
+              {horseOptions.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name} {h.breed ? `(${h.breed})` : ''}
                 </option>
               ))}
             </select>

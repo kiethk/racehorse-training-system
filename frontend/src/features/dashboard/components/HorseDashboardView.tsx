@@ -234,7 +234,13 @@ export function HorseDashboardView({
       <PerformanceTrendCard />
       {showHealth && <HealthTrendCard />}
 
-      <HorseEdaAnalyticsCard />
+      <HorseEdaAnalyticsCard
+        availableHorses={horses.map((h) => ({
+          id: h.horseId,
+          name: h.horseName,
+          breed: h.breed,
+        }))}
+      />
 
       <Panel padded className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
