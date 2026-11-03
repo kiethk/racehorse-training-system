@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, ConfirmDialog, EmptyState, FilterBar, IconButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, SearchInput, SegmentedControl, Tabs } from '@/components/ui';
+import { Button, ConfirmDialog, EmptyState, FilterBar, IconButton, LinkButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, SearchInput, SegmentedControl, Tabs } from '@/components/ui';
 import type { Area, AreaType, StableStall } from '../types';
 import type { AssignmentDraft, AssignmentTarget, DragStaff } from '../types/manager';
 import { useManagerStable } from '../hooks/useManagerStable';
 import { areaView, compareAreas, editCount, horseMap, overlayDraft, personName, planAssignment, staffLocations, trainerChangeReason } from '../lib/managerAssignments';
 import { toast } from '@/lib/toast';
+import { ChangeHorseStatusModal } from '@/features/horses/components/ChangeHorseStatusModal';
 import { StallDetailPanel } from '../shared/components/StallDetailPanel';
 import { StableMapView } from '../shared/components/StableMapView';
 import { blockNumberOf } from '../shared/lib/stallLayout';
@@ -37,6 +38,7 @@ function ManagerStableContent() {
   const [pendingAction, setPendingAction] = useState<{ run: () => void } | null>(null);
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Area | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
   // Cards hold the drag-and-drop staffing; the map shows the same (draft) state as a plan or 3D barn.
   const [layout, setLayout] = useState<'cards' | 'map'>('cards');
   const count = data && draft ? editCount(data, draft) : 0;
@@ -139,6 +141,32 @@ function ManagerStableContent() {
   const selected = projected?.stalls.find(s => s.id === selectedStall?.id) ?? null;
   const mapAreas = projected ? projected.areas.filter(a => a.type === activeTab) : [];
 
+  const selectedHorse = selected ? horses.get(selected.id) : undefined;
+  const selectedArea = selected ? projected?.areas.find((a) => a.id === selected.areaId) : undefined;
+  const canChangeStatus = selectedHorse?.currentStatus === 'ELIGIBLE' || selectedHorse?.currentStatus === 'INACTIVE';
+  const stallDetail = selected && projected ? (
+    <StallDetailPanel
+      onClose={layout === 'map' ? () => setSelectedStall(null) : undefined}
+      stall={selected}
+      area={selectedArea}
+      horse={selectedHorse}
+      groomName={personName(projected, 'groom', selected.groomId)}
+      groomId={selected.groomId}
+      trainerName={selectedArea?.type === 'REGULAR' ? personName(projected, 'trainer', draft?.trainers[selected.areaId] ?? null) : undefined}
+      trainerId={selectedArea?.type === 'REGULAR' ? (draft?.trainers[selected.areaId] ?? selectedArea.trainerId ?? null) : null}
+      hint=""
+      actions={selectedHorse ? <>
+        <LinkButton href={`/manager/horses/${selectedHorse.id}`} variant="secondary" icon="external-link">Horse details</LinkButton>
+        {canChangeStatus && <Button variant={selectedHorse.currentStatus === 'INACTIVE' ? 'primary' : 'warning'}
+          icon={selectedHorse.currentStatus === 'INACTIVE' ? 'check' : 'alert-triangle'} disabled={busy}
+          // A status change reloads the stable, so unsaved staffing changes are confirmed first.
+          onClick={() => guard(() => setStatusOpen(true))}>
+          {selectedHorse.currentStatus === 'INACTIVE' ? 'Restore to Active' : 'Change status'}
+        </Button>}
+      </> : undefined}
+    />
+  ) : null;
+
   return (
     <ScreenLayout variant="dashboard">
       <PageHeader title="Stable" actions={<div className="flex items-center gap-2">
@@ -230,6 +258,7 @@ function ManagerStableContent() {
               else setPicker({ kind: 'trainer', areaId: area.id });
             }}
             personName={(kind, id) => personName(projected, kind, id)}
+            detail={stallDetail}
             legendNote={dirty ? 'Unsaved staffing changes are shown on the map.' : undefined}
             emptyTitle="No areas yet"
             cellFooter={(stall) => (
@@ -304,28 +333,16 @@ function ManagerStableContent() {
         confirmLabel="Discard and continue" onCancel={() => setPendingAction(null)} onConfirm={() => {
           const action = pendingAction; discard(); setSelectedStaff(null); setPendingAction(null); action?.run();
         }} />
-      <Modal open={selected != null} title="Stall details" onClose={() => setSelectedStall(null)}>
-        {selected && projected && (
-          <StallDetailPanel
-            stall={selected}
-            area={projected.areas.find((a) => a.id === selected.areaId)}
-            horse={horses.get(selected.id)}
-            groomName={personName(projected, 'groom', selected.groomId)}
-            groomId={selected.groomId}
-            trainerName={
-              projected.areas.find((a) => a.id === selected.areaId)?.type === 'REGULAR'
-                ? personName(projected, 'trainer', draft?.trainers[selected.areaId] ?? null)
-                : undefined
-            }
-            trainerId={
-              projected.areas.find((a) => a.id === selected.areaId)?.type === 'REGULAR'
-                ? (draft?.trainers[selected.areaId] ?? projected.areas.find((a) => a.id === selected.areaId)?.trainerId ?? null)
-                : null
-            }
-            hint=""
-          />
-        )}
+      {/* The map shows the stall in its side column; the cards open it here. */}
+      <Modal open={layout === 'cards' && selected != null} title="Stall details" onClose={() => setSelectedStall(null)}>
+        {layout === 'cards' && stallDetail}
       </Modal>
+      <ChangeHorseStatusModal
+        horse={statusOpen ? selectedHorse ?? null : null}
+        open={statusOpen && selectedHorse != null}
+        onClose={() => setStatusOpen(false)}
+        onSuccess={() => { setStatusOpen(false); void reload(); }}
+      />
     </ScreenLayout>
   );
 }

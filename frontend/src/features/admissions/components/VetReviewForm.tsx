@@ -510,14 +510,14 @@ export function VetReviewForm({
   const generatedSymptoms =
     examMode === 'NORMAL'
       ? 'No symptoms observed'
-      : selectedSymptoms.join('; ') || 'No presenting symptoms selected';
+      : selectedSymptoms.join(', ') || 'No presenting symptoms selected';
 
   const generatedFindings =
     examMode === 'NORMAL'
       ? 'Physical examination completed in person. General condition, respiratory, cardiovascular, musculoskeletal, neurological, skin and coat, hooves, and digestive systems were within normal limits.'
       : `Physical examination completed in person. ${bodySystems
           .map(({ key, label }) => `${label}: ${findingLevelLabels[systemFindings[key]].toLowerCase()}`)
-          .join('; ')}.`;
+          .join(', ')}.`;
 
   const effectiveSymptoms = isUrgent ? symptoms.trim() : generatedSymptoms;
   const effectiveFindings = isUrgent ? findings.trim() : generatedFindings;
