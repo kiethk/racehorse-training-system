@@ -19,6 +19,18 @@ interface AuditLogExportModalProps {
 
 type ExportMode = 'current_filter' | 'all' | 'custom';
 
+function parseLocalDateStart(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d, 0, 0, 0, 0);
+  return date.toISOString();
+}
+
+function parseLocalDateEnd(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d, 23, 59, 59, 999);
+  return date.toISOString();
+}
+
 export function AuditLogExportModal({
   open,
   onClose,
@@ -68,13 +80,16 @@ export function AuditLogExportModal({
           setDownloading(false);
           return;
         }
+        if (fromDate && toDate && fromDate > toDate) {
+          toast.error('Invalid date range', 'From date cannot be after to date.');
+          setDownloading(false);
+          return;
+        }
         if (fromDate) {
-          fromIso = new Date(fromDate).toISOString();
+          fromIso = parseLocalDateStart(fromDate);
         }
         if (toDate) {
-          const t = new Date(toDate);
-          t.setHours(23, 59, 59, 999);
-          toIso = t.toISOString();
+          toIso = parseLocalDateEnd(toDate);
         }
       }
 

@@ -19,6 +19,18 @@ interface AuditLogArchiveModalProps {
 type ArchivePreset = '30_days' | '60_days' | 'custom';
 type Step = 'config' | 'confirm';
 
+function parseLocalDateStart(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d, 0, 0, 0, 0);
+  return date.toISOString();
+}
+
+function parseLocalDateEnd(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d, 23, 59, 59, 999);
+  return date.toISOString();
+}
+
 export function AuditLogArchiveModal({
   open,
   onClose,
@@ -47,13 +59,12 @@ export function AuditLogArchiveModal({
     if (!status || isTotalEmpty) return true;
     if (preset === '30_days') return isAgedEmpty;
     if (preset === '60_days') return isAgedEmpty;
-    if (preset === 'custom') {
-      if (toDate && status.oldestLogDate && new Date(toDate) < new Date(status.oldestLogDate)) {
-        return true;
-      }
-    }
     return false;
   })();
+
+  const isCustomMissingDates = preset === 'custom' && !fromDate && !toDate;
+  const isCustomInvalidRange = Boolean(preset === 'custom' && fromDate && toDate && fromDate > toDate);
+  const canProceed = !isSelectionEmpty && !isCustomMissingDates && !isCustomInvalidRange;
 
   const getPresetDescription = () => {
     if (preset === '30_days') {
@@ -70,9 +81,15 @@ export function AuditLogArchiveModal({
       toast.error('No records to purge', 'There are no audit logs matching the selected retention criteria.');
       return;
     }
-    if (preset === 'custom' && !fromDate && !toDate) {
-      toast.error('Date range required', 'Please select at least a start or end date.');
-      return;
+    if (preset === 'custom') {
+      if (!fromDate && !toDate) {
+        toast.error('Date range required', 'Please select at least a start or end date.');
+        return;
+      }
+      if (fromDate && toDate && fromDate > toDate) {
+        toast.error('Invalid date range', 'From date cannot be after to date.');
+        return;
+      }
     }
     setStep('confirm');
   };
@@ -98,12 +115,10 @@ export function AuditLogArchiveModal({
         beforeIso = d.toISOString();
       } else {
         if (fromDate) {
-          fromIso = new Date(fromDate).toISOString();
+          fromIso = parseLocalDateStart(fromDate);
         }
         if (toDate) {
-          const t = new Date(toDate);
-          t.setHours(23, 59, 59, 999);
-          beforeIso = t.toISOString();
+          beforeIso = parseLocalDateEnd(toDate);
         }
       }
 
@@ -166,8 +181,8 @@ export function AuditLogArchiveModal({
               <Button
                 variant="destructive"
                 onClick={handleNextStep}
-                disabled={isSelectionEmpty || submitting}
-                title={isSelectionEmpty ? 'No matching logs available to purge' : undefined}
+                disabled={!canProceed || submitting}
+                title={!canProceed ? 'Please select retention criteria with logs to purge' : undefined}
               >
                 Review &amp; Purge &rarr;
               </Button>
@@ -280,7 +295,7 @@ export function AuditLogArchiveModal({
 
                 <label
                   className={`flex items-start gap-2 p-2.5 rounded border ${
-                    preset === 'custom' && isSelectionEmpty
+                    preset === 'custom' && isTotalEmpty
                       ? 'border-amber-400 dark:border-amber-500'
                       : 'border-[var(--color-border)]'
                   } hover:bg-[var(--color-surface-muted)] cursor-pointer`}

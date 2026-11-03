@@ -124,6 +124,37 @@ class AuditLogArchivePurgeTest {
     }
 
     @Test
+    void exportArchiveCsv_withCustomRange_usesBetweenQuery() {
+        LocalDateTime from = LocalDateTime.of(2026, 10, 1, 0, 0);
+        LocalDateTime before = LocalDateTime.of(2026, 10, 5, 23, 59);
+
+        AuditLog log1 = new AuditLog();
+        log1.setCreatedAt(LocalDateTime.of(2026, 10, 2, 10, 0));
+        log1.setAction("CREATE");
+        log1.setEntityName("Horse");
+
+        when(repository.findByCreatedAtBetweenOrderByCreatedAtAsc(from, before))
+                .thenReturn(List.of(log1));
+
+        String csv = service.exportArchiveCsv(from, null, before);
+        assertNotNull(csv);
+        assertTrue(csv.contains("Horse"));
+    }
+
+    @Test
+    void purgeAuditLogs_withCustomRange_usesBetweenDelete() {
+        LocalDateTime from = LocalDateTime.of(2026, 10, 1, 0, 0);
+        LocalDateTime before = LocalDateTime.of(2026, 10, 5, 23, 59);
+
+        when(repository.deleteByCreatedAtBetween(from, before)).thenReturn(25);
+
+        AuditPurgeRequest request = new AuditPurgeRequest(before, from, "Custom purge");
+        AuditPurgeResponse response = service.purgeAuditLogs(10L, request);
+
+        assertEquals(25, response.purgedCount());
+    }
+
+    @Test
     void exportArchiveCsv_throwsWhenNoLogsFound() {
         when(repository.findByCreatedAtBeforeOrderByCreatedAtAsc(any(LocalDateTime.class)))
                 .thenReturn(List.of());

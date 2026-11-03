@@ -75,11 +75,12 @@ public class ManagerAuditLogController {
         byte[] csvBytes = csvContent.getBytes(StandardCharsets.UTF_8);
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+        LocalDateTime effectiveEnd = to != null ? to : before;
         String filename;
-        if (from != null && to != null) {
-            filename = "audit_logs_from_" + from.format(formatter) + "_to_" + to.format(formatter) + ".csv";
-        } else if (before != null) {
-            filename = "audit_archive_before_" + before.format(formatter) + ".csv";
+        if (from != null && effectiveEnd != null) {
+            filename = "audit_logs_from_" + from.format(formatter) + "_to_" + effectiveEnd.format(formatter) + ".csv";
+        } else if (effectiveEnd != null) {
+            filename = "audit_archive_before_" + effectiveEnd.format(formatter) + ".csv";
         } else if (from != null) {
             filename = "audit_logs_from_" + from.format(formatter) + ".csv";
         } else {

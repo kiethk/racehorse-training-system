@@ -345,15 +345,14 @@ public class AuditLogService {
 
     @Transactional(readOnly = true)
     public String exportArchiveCsv(LocalDateTime fromDate, LocalDateTime toDate, LocalDateTime beforeDate) {
+        LocalDateTime effectiveTo = toDate != null ? toDate : beforeDate;
         List<AuditLog> logs;
-        if (fromDate != null && toDate != null) {
-            logs = auditLogRepository.findByCreatedAtBetweenOrderByCreatedAtAsc(fromDate, toDate);
+        if (fromDate != null && effectiveTo != null) {
+            logs = auditLogRepository.findByCreatedAtBetweenOrderByCreatedAtAsc(fromDate, effectiveTo);
         } else if (fromDate != null) {
             logs = auditLogRepository.findByCreatedAtBetweenOrderByCreatedAtAsc(fromDate, LocalDateTime.now());
-        } else if (toDate != null) {
-            logs = auditLogRepository.findByCreatedAtBeforeOrderByCreatedAtAsc(toDate);
-        } else if (beforeDate != null) {
-            logs = auditLogRepository.findByCreatedAtBeforeOrderByCreatedAtAsc(beforeDate);
+        } else if (effectiveTo != null) {
+            logs = auditLogRepository.findByCreatedAtBeforeOrderByCreatedAtAsc(effectiveTo);
         } else {
             logs = auditLogRepository.findAll(Sort.by(Sort.Direction.ASC, "createdAt"));
         }
@@ -401,6 +400,8 @@ public class AuditLogService {
 
         if (fromDate != null && beforeDate != null) {
             purgedCount = auditLogRepository.deleteByCreatedAtBetween(fromDate, beforeDate);
+        } else if (fromDate != null) {
+            purgedCount = auditLogRepository.deleteByCreatedAtBetween(fromDate, LocalDateTime.now());
         } else if (beforeDate != null) {
             purgedCount = auditLogRepository.deleteByCreatedAtBefore(beforeDate);
         } else {
