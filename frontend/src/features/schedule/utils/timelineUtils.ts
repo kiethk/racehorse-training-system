@@ -150,3 +150,31 @@ export function getCareTypeTone(careType: CareType, purpose?: string | null): Ca
       };
   }
 }
+
+/** Formats a Date object to YYYY-MM-DD string in Vietnam timezone Asia/Ho_Chi_Minh. */
+export function formatIsoDateString(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(d);
+}
+
+/** Returns the Monday of the week containing the given ISO date string (YYYY-MM-DD). */
+export function getMondayOf(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diff);
+  return formatIsoDateString(monday);
+}
+
+/** Returns an array of 7 ISO date strings [Mon..Sun] starting from mondayIso. */
+export function getWeekDates(mondayIso: string): string[] {
+  const [y, m, d] = mondayIso.split('-').map(Number);
+  const monday = new Date(y, m - 1, d);
+  return Array.from({ length: 7 }, (_, i) => {
+    const next = new Date(monday);
+    next.setDate(monday.getDate() + i);
+    return formatIsoDateString(next);
+  });
+}
+

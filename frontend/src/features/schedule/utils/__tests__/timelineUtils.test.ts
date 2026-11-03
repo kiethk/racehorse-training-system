@@ -5,6 +5,8 @@ import {
   computeTimelinePosition,
   formatClockLabel,
   getCareTypeTone,
+  getMondayOf,
+  getWeekDates,
   isOutsideWorkday,
   timelineRulerMarks,
   VET_WINDOW_END,
@@ -126,4 +128,18 @@ test('assignTimelineLanes stacks overlapping blocks on separate lanes', () => {
   assert.equal(laneOf.get(2), 1);
   // Lane 0 ends at 880, so block 3 (890) can reuse it.
   assert.equal(laneOf.get(3), 0);
+});
+
+test('getMondayOf and getWeekDates compute accurate 7-day week intervals', () => {
+  // 2026-11-02 is Monday
+  assert.equal(getMondayOf('2026-11-02'), '2026-11-02');
+  // 2026-11-08 is Sunday of the same week
+  assert.equal(getMondayOf('2026-11-08'), '2026-11-02');
+  // 2026-11-05 is Thursday
+  assert.equal(getMondayOf('2026-11-05'), '2026-11-02');
+
+  const days = getWeekDates('2026-11-02');
+  assert.equal(days.length, 7);
+  assert.equal(days[0], '2026-11-02');
+  assert.equal(days[6], '2026-11-08');
 });
