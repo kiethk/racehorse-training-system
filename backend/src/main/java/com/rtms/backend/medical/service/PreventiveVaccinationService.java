@@ -132,6 +132,7 @@ public class PreventiveVaccinationService {
                     ? DOSAGE_NOT_RECORDED : request.getDosage().trim());
             prescription.setRoute(request.getRoute() != null && !request.getRoute().isBlank()
                     ? request.getRoute().trim() : protocol.getDefaultRoute());
+            prescription.setAdministeredByRole(Prescription.roleForRoute(prescription.getRoute()));
             prescription.setFrequency("ONCE");
             prescription.setStartDate(vaccination.administeredOn());
             prescription.setEndDate(vaccination.administeredOn());

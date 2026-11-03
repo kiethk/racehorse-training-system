@@ -27,8 +27,8 @@ public class HealthRecord {
     @Column(name = "examined_at", nullable = false)
     private LocalDateTime examinedAt;
 
-    @Column(name = "symptoms", columnDefinition = "TEXT")
-    private String symptoms;
+
+
 
     @Column(name = "findings", columnDefinition = "TEXT")
     private String findings;
@@ -43,18 +43,17 @@ public class HealthRecord {
     @Column(name = "training_decision", length = 30)
     private TrainingDecision trainingDecision;
 
-    @Column(name = "restriction_details", columnDefinition = "TEXT")
+    @Column(name = "assessment_note", columnDefinition = "TEXT")
     private String restrictionDetails;
 
     @Column(name = "record_type", nullable = false)
     private String recordType = "ILLNESS";
 
-
-    @Column(name = "product_or_service")
-    private String productOrService;
-
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    @Transient
+    private String productOrService;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -92,8 +91,8 @@ public class HealthRecord {
     public LocalDateTime getExaminedAt() { return examinedAt; }
     public void setExaminedAt(LocalDateTime examinedAt) { this.examinedAt = examinedAt; }
 
-    public String getSymptoms() { return symptoms; }
-    public void setSymptoms(String symptoms) { this.symptoms = symptoms; }
+
+
 
     public String getFindings() { return findings; }
     public void setFindings(String findings) { this.findings = findings; }
@@ -110,17 +109,20 @@ public class HealthRecord {
     public String getRestrictionDetails() { return restrictionDetails; }
     public void setRestrictionDetails(String restrictionDetails) { this.restrictionDetails = restrictionDetails; }
 
+    public String getAssessmentNote() { return restrictionDetails; }
+    public void setAssessmentNote(String assessmentNote) { this.restrictionDetails = assessmentNote; }
+
 
 
     public String getRecordType() { return recordType; }
     public void setRecordType(String recordType) { this.recordType = recordType; }
 
 
-    public String getProductOrService() { return productOrService; }
-    public void setProductOrService(String productOrService) { this.productOrService = productOrService; }
-
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public String getProductOrService() { return productOrService; }
+    public void setProductOrService(String productOrService) { this.productOrService = productOrService; }
 
 
     public LocalDateTime getCreatedAt() { return createdAt; }

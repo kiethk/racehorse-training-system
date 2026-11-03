@@ -52,14 +52,14 @@ class CareScheduleReadAuthorizationTest {
             var controller = context.getBean(CareScheduleController.class);
             var service = context.getBean(CareScheduleService.class);
             var page = PageRequest.of(0, 10);
-            when(service.listSchedules(null, null, null, null, 2L, null, page)).thenReturn(Page.empty());
+            when(service.listSchedules(null, null, null, null, null, 2L, null, page)).thenReturn(Page.empty());
             SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                     "vet", "", List.of(new SimpleGrantedAuthority("VET_EXAM_VIEW"))));
             var manager = new AuthenticatedUser(9L, "manager@example.com", "CLUB_MANAGER");
             assertDoesNotThrow(() -> controller.getById(1L, manager));
             assertDoesNotThrow(() -> controller.list(null, null, null, null, 2L, null, page, manager));
             verify(service).getScheduleDetail(1L);
-            verify(service).listSchedules(null, null, null, null, 2L, null, page);
+            verify(service).listSchedules(null, null, null, null, null, 2L, null, page);
         } finally {
             SecurityContextHolder.clearContext();
         }

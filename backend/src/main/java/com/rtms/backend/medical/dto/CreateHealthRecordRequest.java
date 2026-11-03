@@ -12,7 +12,6 @@ public class CreateHealthRecordRequest {
     @NotNull
     private LocalDateTime examinedAt;
 
-    private String symptoms;
     private String findings;
     private String diagnosis;
     private String recordType = "ILLNESS";
@@ -38,13 +37,6 @@ public class CreateHealthRecordRequest {
         this.examinedAt = examinedAt;
     }
 
-    public String getSymptoms() {
-        return symptoms;
-    }
-
-    public void setSymptoms(String symptoms) {
-        this.symptoms = symptoms;
-    }
 
     public String getFindings() {
         return findings;

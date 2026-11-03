@@ -1,11 +1,12 @@
 'use client';
 
 import { FormField } from '@/components/ui/FormField';
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
+import { useMemo } from 'react';
 import { Input, Select } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import type { MetricField } from './constants';
-import { metricConfigs } from './constants';
+import { assessHydrationFromVitals, metricConfigs } from './constants';
 import { HYDRATION_STATUS_LABELS, HYDRATION_STATUS_OPTIONS } from '@/features/health/lib/hydrationStatus';
 
 export interface VitalsSectionProps {
@@ -17,6 +18,39 @@ export interface VitalsSectionProps {
 }
 
 export function VitalsSection({ metrics, setMetrics, fieldErrors, isFormDisabled, onRandomize }: VitalsSectionProps) {
+  // Derived dehydration grade from the vitals actually typed in (screening aid, not a diagnosis).
+  const hydrationHint = useMemo(
+    () => assessHydrationFromVitals({ heartRate: metrics.heartRate, temperature: metrics.temperature, respiratoryRate: metrics.respiratoryRate }),
+    [metrics.heartRate, metrics.temperature, metrics.respiratoryRate],
+  );
+  const hintTone = !hydrationHint
+    ? ''
+    : hydrationHint.status === 'NORMAL'
+      ? 'text-[var(--color-success)]'
+      : hydrationHint.status === 'MILD_DEHYDRATION'
+        ? 'text-[var(--color-warning)]'
+        : 'text-[var(--color-danger)]';
+  let hintNode: ReactNode = null;
+  if (hydrationHint) {
+    hintNode = (
+      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+        <span className={`font-medium ${hintTone}`}>
+          {`Assessment from vitals: ${HYDRATION_STATUS_LABELS[hydrationHint.status]} — ${hydrationHint.reason}`}
+        </span>
+        {hydrationHint.status !== metrics.hydrationStatus && (
+          <Button
+            type="button"
+            size="sm"
+            variant="tertiary"
+            disabled={isFormDisabled}
+            onClick={() => setMetrics((curr) => ({ ...curr, hydrationStatus: hydrationHint.status }))}
+          >
+            Apply
+          </Button>
+        )}
+      </p>
+    );
+  }
   return (
     <fieldset disabled={isFormDisabled} className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)] space-y-4">
       <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
@@ -133,6 +167,7 @@ export function VitalsSection({ metrics, setMetrics, fieldErrors, isFormDisabled
               ))}
             </Select>
           </FormField>
+          {hintNode}
         </div>
         <div>
           <FormField label="Telemetry &amp; Observation Context" htmlFor="metric-notes">

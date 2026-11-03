@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -16,9 +17,11 @@ import { MetricCard } from '@/components/ui/MetricCard';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Notice } from '@/components/ui/Notice';
 import { admissionsApi } from '@/features/admissions/services/api';
+import { formatDateTime } from '@/lib/display';
 import type { UrgentAssignmentAlert } from '@/features/admissions/types';
 
 export default function UrgentCasesPage() {
+  const router = useRouter();
   const [urgentCases, setUrgentCases] = useState<UrgentAssignmentAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -222,99 +225,79 @@ export default function UrgentCasesPage() {
               />
             </Panel>
           ) : (
-            <div className="grid gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {filteredCases.map((item) => (
                 <Panel
                   key={item.scheduleId}
-                  className={`overflow-hidden border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)] ${
+                  padded
+                  onClick={() => router.push(`/veterinarian/urgent/${item.scheduleId}`)}
+                  className={`cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)] ${
                     item.status === 'SCHEDULED'
                       ? 'border-l-4 border-l-[var(--color-danger)]'
                       : 'border-l-4 border-l-[var(--color-warning)]'
                   }`}
                 >
-                  <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                      <HorseAvatar name={item.horseName} image={item.horseId ? `/api/horses/${item.horseId}/photo` : null} size={48} rounded="md" />
-
-                      <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-3">
+                    {/* Left: Avatar + Details */}
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <HorseAvatar
+                        name={item.horseName}
+                        image={item.horseId ? `/api/horses/${item.horseId}/photo` : null}
+                        size={42}
+                        rounded="md"
+                      />
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-sm sm:text-base text-[var(--color-text-primary)]">
+                          <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
                             {item.horseName}
                           </span>
-                          <span className="text-[11px] font-mono text-[var(--color-text-muted)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 rounded-[var(--radius-xs)] border border-[var(--color-border)]">
-                            #{item.horseId}
-                          </span>
-                          <Pill tone={item.severity === 'CRITICAL' ? 'danger' : 'warning'}>
+                          <Pill
+                            tone={item.severity === 'CRITICAL' ? 'danger' : 'warning'}
+                            size="sm"
+                            icon="alert-triangle"
+                          >
                             {item.severity}
                           </Pill>
-                          <Pill tone={item.status === 'SCHEDULED' ? 'warning' : 'info'}>
+                          <Pill
+                            tone={item.status === 'SCHEDULED' ? 'warning' : 'primary'}
+                            size="sm"
+                          >
                             {item.status === 'SCHEDULED' ? 'Pending Intake' : 'In Progress'}
                           </Pill>
-                          {item.stallCode && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--color-text-secondary)] bg-[var(--color-surface-subtle)] px-2 py-0.5 rounded-[var(--radius-xs)] border border-[var(--color-border)]">
-                              <Icon name="building" size={11} />
-                              <span>Stall {item.stallCode}</span>
-                              {item.stableLocation && (
-                                <span className="text-[var(--color-text-muted)]">({item.stableLocation})</span>
-                              )}
-                            </span>
-                          )}
                         </div>
-
-                        <h2 className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
-                          {item.title}
-                        </h2>
-
-                        <p className="text-xs text-[var(--color-text-secondary)] line-clamp-2 leading-relaxed">
-                          {item.description || 'No detailed clinical description provided by reporter.'}
-                        </p>
-
-                        <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-[var(--color-text-muted)] pt-1">
-                          <span className="flex items-center gap-1">
-                            <Icon name="user" size={12} />
-                            <span>Reported by:</span>
-                            <strong className="text-[var(--color-text-secondary)]">
-                              {item.reportedByName || 'Staff'}
-                            </strong>
-                            {item.reportedByRole && (
-                              <span className="rounded bg-[var(--color-surface-muted)] px-1 py-0.5 text-[9px] font-bold uppercase text-[var(--color-text-secondary)] border border-[var(--color-border)]">
-                                {item.reportedByRole}
-                              </span>
-                            )}
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                          <span className="inline-flex items-center gap-1 min-w-0 max-w-[200px] truncate">
+                            <Icon name="alert-triangle" size={12} className="text-[var(--color-danger)] shrink-0" />
+                            <strong className="truncate">{item.title}</strong>
                           </span>
-
-                          <span className="flex items-center gap-1">
+                          <span>·</span>
+                          <span className="inline-flex items-center gap-1 shrink-0">
+                            <Icon name="building" size={12} />
+                            <span>Stall: <strong>{item.stallCode || 'Unassigned'}</strong></span>
+                          </span>
+                          <span>·</span>
+                          <span className="inline-flex items-center gap-1 shrink-0">
                             <Icon name="clock" size={12} />
-                            <span>
-                              {new Date(item.reportedAt).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                              })}{' '}
-                              at{' '}
-                              {new Date(item.reportedAt).toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </span>
-                          </span>
-
-                          <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
-                            Case #{item.scheduleId}
+                            <span>{formatDateTime(item.reportedAt)}</span>
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="shrink-0 flex items-center md:self-center">
-                      <Link href={`/veterinarian/urgent/${item.scheduleId}`}>
-                        <Button
-                          variant={item.status === 'SCHEDULED' ? 'destructive' : 'primary'}
-                          icon="chevron-right"
-                          className="transition-all active:scale-[0.97]"
-                        >
-                          {item.status === 'SCHEDULED' ? 'Intake Case' : 'Examine'}
-                        </Button>
-                      </Link>
+                    {/* Right: Action Button */}
+                    <div className="shrink-0">
+                      <Button
+                        variant={item.status === 'SCHEDULED' ? 'destructive' : 'primary'}
+                        size="sm"
+                        icon="chevron-right"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/veterinarian/urgent/${item.scheduleId}`);
+                        }}
+                        className="transition-all active:scale-[0.97]"
+                      >
+                        {item.status === 'SCHEDULED' ? 'Intake Case' : 'Examine'}
+                      </Button>
                     </div>
                   </div>
                 </Panel>

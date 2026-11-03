@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -92,6 +93,32 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.horseId = :horseId AND cs.status = :status AND cs.scheduledAt IS NOT NULL")
     List<CareSchedule> findScheduledForHorse(@Param("horseId") Long horseId, @Param("status") CareScheduleStatus status);
 
+    /** D1 auto-activate: mọi ca SCHEDULED đã đến giờ (job chạy trong 08:00–17:00). */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE CareSchedule cs SET cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.IN_PROGRESS, "
+            + "cs.updatedAt = :now "
+            + "WHERE cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.SCHEDULED "
+            + "AND cs.careType IN (com.rtms.backend.medical.enums.CareType.INITIAL, "
+            + "com.rtms.backend.medical.enums.CareType.ROUTINE, "
+            + "com.rtms.backend.medical.enums.CareType.URGENT) "
+            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now")
+    int autoActivateDueSchedules(@Param("now") LocalDateTime now);
+
+    /** D1 EOD rollover: INITIAL/ROUTINE chưa hoàn tất còn nằm ở giờ đã qua. */
+    @Query("SELECT cs FROM CareSchedule cs WHERE cs.status IN :statuses "
+            + "AND cs.careType IN (com.rtms.backend.medical.enums.CareType.INITIAL, "
+            + "com.rtms.backend.medical.enums.CareType.ROUTINE) "
+            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now")
+    List<CareSchedule> findRollableEodCandidates(@Param("statuses") Collection<CareScheduleStatus> statuses,
+            @Param("now") LocalDateTime now);
+
+    /** D1 escalate: URGENT vẫn mở quá giờ hẹn (không bao giờ rollover). */
+    @Query("SELECT cs FROM CareSchedule cs WHERE cs.status IN :statuses "
+            + "AND cs.careType = com.rtms.backend.medical.enums.CareType.URGENT "
+            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now")
+    List<CareSchedule> findStaleUrgentForEscalation(@Param("statuses") Collection<CareScheduleStatus> statuses,
+            @Param("now") LocalDateTime now);
+
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.veterinarianId = :vetId AND cs.status = :status AND cs.scheduledAt IS NOT NULL")
     List<CareSchedule> findScheduledForVet(@Param("vetId") Long vetId, @Param("status") CareScheduleStatus status);
 
@@ -145,6 +172,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
      * Hàng đợi khám của bác sĩ thú y. Mặc định (scheduleStatus = null) ẩn các ca
      * COMPLETED và CANCELLED; khi người dùng chọn một trạng thái cụ thể thì bộ lọc
      * đó được ưu tiên, nên ca đã hoàn thành vẫn xem được qua bộ lọc Completed.
+     * Khi chọn một stage admission cụ thể (admissionStatus != null) thì ca COMPLETED
+     * được hiện lại, vì khám xong là điều kiện cần để admission chuyển stage.
      * Bộ lọc pill (Awaiting / In exam) chỉ mô tả ca đang chờ nên bị bỏ qua khi
      * đã chọn trạng thái cụ thể.
      */
@@ -153,7 +182,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
         WHERE cs.admissionId = a.id AND c.admissionId = a.id
           AND cs.veterinarianId = :vetId
           AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
-               OR (:scheduleStatus IS NULL AND cs.status NOT IN ('COMPLETED','CANCELLED')))
+               OR (:scheduleStatus IS NULL AND cs.status <> 'CANCELLED'
+                   AND (:admissionStatus IS NOT NULL OR cs.status <> 'COMPLETED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
@@ -176,7 +206,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
         WHERE cs.admissionId = a.id AND c.admissionId = a.id
           AND cs.veterinarianId = :vetId
           AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
-               OR (:scheduleStatus IS NULL AND cs.status NOT IN ('COMPLETED','CANCELLED')))
+               OR (:scheduleStatus IS NULL AND cs.status <> 'CANCELLED'
+                   AND (:admissionStatus IS NOT NULL OR cs.status <> 'COMPLETED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))

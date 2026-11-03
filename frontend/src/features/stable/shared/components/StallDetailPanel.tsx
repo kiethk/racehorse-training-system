@@ -24,7 +24,7 @@ interface StallDetailPanelProps {
   trainerName?: string | null;
   /** Assigned trainer's user ID for direct profile redirection */
   trainerId?: number | null;
-  /** Custom destination for the horse link if different from the default role route. */
+  /** Custom destination for the horse link if different from the default role route; null shows the name without a link. */
   horseHref?: string | null;
   /** What the role wants to see about this stall (tasks, incidents, etc.). */
   children?: ReactNode;
@@ -86,7 +86,11 @@ export function StallDetailPanel({
         : user?.role === 'GROOM'
           ? 'groom'
           : 'manager';
-  const targetHorseHref = horseHref ?? (horse ? `/${rolePath}/horses/${horse.id}` : '#');
+  // Grooms and vets have no horse profile page, so their horse name is plain text.
+  const hasHorsePage = rolePath === 'trainer' || rolePath === 'manager';
+  const targetHorseHref = horseHref !== undefined
+    ? horseHref
+    : horse && hasHorsePage ? `/${rolePath}/horses/${horse.id}` : null;
 
   const effectiveGroomId = groomId ?? stall?.groomId ?? null;
   const effectiveTrainerId = trainerId ?? area?.trainerId ?? null;
@@ -133,14 +137,18 @@ export function StallDetailPanel({
             <div className="flex items-center gap-3.5 min-w-0">
               <HorseAvatar name={horse.name} image={horse.imageUrl} size={48} rounded="md" />
               <div className="min-w-0">
-                <Link
-                  href={targetHorseHref}
-                  className="group inline-flex items-center gap-1.5 font-bold text-base text-[var(--color-text-primary)] hover:text-[var(--color-primary)] transition-colors truncate"
-                  title="View full horse profile"
-                >
-                  <span className="truncate">{horse.name}</span>
-                  <Icon name="external-link" size={13} className="shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
-                </Link>
+                {targetHorseHref ? (
+                  <Link
+                    href={targetHorseHref}
+                    className="group inline-flex items-center gap-1.5 font-bold text-base text-[var(--color-text-primary)] hover:text-[var(--color-primary)] transition-colors truncate"
+                    title="View full horse profile"
+                  >
+                    <span className="truncate">{horse.name}</span>
+                    <Icon name="external-link" size={13} className="shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
+                  </Link>
+                ) : (
+                  <p className="truncate text-base font-bold text-[var(--color-text-primary)]">{horse.name}</p>
+                )}
                 <p className="truncate text-xs font-medium text-[var(--color-text-secondary)]">{horse.breed ?? 'Breed not recorded'}</p>
               </div>
             </div>

@@ -325,7 +325,6 @@ public class AdmissionQueryService {
                                     exam.setExaminedAt(hr.getExaminedAt());
                                     exam.setTrainingDecision(hr.getTrainingDecision());
                                     exam.setRestrictionDetails(hr.getRestrictionDetails());
-                                    exam.setSymptoms(hr.getSymptoms());
                                     exam.setFindings(hr.getFindings());
                                     exam.setDiagnosis(hr.getDiagnosis());
                                     exam.setTreatment(hr.getTreatment());
@@ -568,7 +567,8 @@ public class AdmissionQueryService {
         List<CareScheduleStatus> activeStatuses = List.of(
                 CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED,
                 CareScheduleStatus.IN_PROGRESS);
-        long total = careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses);
+        long total = careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(
+                vetId, activeStatuses);
         long active = careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses);
         long awaiting = careScheduleRepository.countActiveVetQueueItems(
                 vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));

@@ -58,6 +58,9 @@ public class CareSchedule {
     @Column(name = "reschedule_note", columnDefinition = "TEXT")
     private String rescheduleNote;
 
+    @Column(name = "paused_from")
+    private LocalDateTime pausedFrom;
+
     @Column(name = "requested_at")
     private LocalDateTime requestedAt;
 
@@ -139,6 +142,9 @@ public class CareSchedule {
 
     public String getRescheduleNote() { return rescheduleNote; }
     public void setRescheduleNote(String rescheduleNote) { this.rescheduleNote = rescheduleNote; }
+
+    public LocalDateTime getPausedFrom() { return pausedFrom; }
+    public void setPausedFrom(LocalDateTime pausedFrom) { this.pausedFrom = pausedFrom; }
 
     public LocalDateTime getRequestedAt() { return requestedAt; }
     public void setRequestedAt(LocalDateTime requestedAt) { this.requestedAt = requestedAt; }

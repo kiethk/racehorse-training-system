@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface TreatmentPlanRepository extends JpaRepository<TreatmentPlan,Long> {
     List<TreatmentPlan> findByHealthRecordId(Long healthRecordId);
+
+    List<TreatmentPlan> findByHealthRecordIdAndStatusIgnoreCase(Long healthRecordId, String status);
 }

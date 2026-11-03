@@ -10,6 +10,8 @@ interface LabelBase {
   position: [number, number, number];
   /** Higher wins when two labels would overlap on screen; the loser is hidden until there is room. */
   priority: number;
+  /** False keeps the label hidden and out of the collision pass, so it takes no room from the revealed ones. */
+  revealed: boolean;
 }
 
 export type SceneLabel =
@@ -78,6 +80,13 @@ export function LabelProjector({ labels, elements }: { labels: SceneLabel[]; ele
         })
       : [];
     for (const item of items) {
+      if (!item.label.revealed) {
+        // Still moved with the camera, so it fades in at the right spot when revealed.
+        item.element.style.transform = `translate3d(${(item.x - item.width / 2).toFixed(1)}px, ${(item.y - item.height).toFixed(1)}px, 0)`;
+        item.element.style.opacity = '0';
+        item.element.style.visibility = item.inFront ? 'visible' : 'hidden';
+        continue;
+      }
       // Stall tags may slide one row up or down to make room. People's tags never move: a name drifting
       // next to someone else's horses would say the wrong thing, so they hide instead (the groom key lists them).
       const step = item.height + GAP;
@@ -162,7 +171,7 @@ export function LabelLayer({ labels, elements }: { labels: SceneLabel[]; element
       {labels.map((label) => (
         <div
           key={label.key}
-          className="absolute left-0 top-0 transition-opacity duration-[var(--duration-fast)]"
+          className="absolute left-0 top-0 transition-opacity duration-[var(--duration-fast)] motion-reduce:transition-none"
           // Hidden until the projector has placed it, so nothing flashes at the corner.
           style={{ visibility: 'hidden', zIndex: label.priority }}
           ref={(element) => {

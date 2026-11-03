@@ -5,6 +5,7 @@ import {
   getNextSnoozeExpiry,
   shouldPlayEmergencySound,
   selectP1OverlayAlert,
+  getEligibleP1Alerts,
   DEFAULT_SNOOZE_MS,
 } from '../lib/urgentOverlayUtils.ts';
 
@@ -66,6 +67,21 @@ describe('Urgent P1 Overlay Utility Tests', () => {
     assert.equal(selected?.scheduleId, 102);
   });
 
+  it('getEligibleP1Alerts returns all eligible alerts in chronological queue order', () => {
+    const alerts = [
+      { scheduleId: 101, reportedAt: '2026-11-02T10:00:00Z' },
+      { scheduleId: 102, reportedAt: '2026-11-02T09:30:00Z' },
+      { scheduleId: 103, reportedAt: '2026-11-02T11:00:00Z' },
+    ];
+
+    const snoozedMap = new Map<number, number>();
+    const dismissedSet = new Set<number>();
+
+    const eligible = getEligibleP1Alerts(alerts, '/veterinarian', snoozedMap, dismissedSet, baseNow);
+    assert.equal(eligible.length, 3);
+    assert.deepEqual(eligible.map((a) => a.scheduleId), [102, 101, 103]);
+  });
+
   it('skips snoozed or dismissed alerts when selecting P1 candidate', () => {
     const alerts = [
       { scheduleId: 101, reportedAt: '2026-11-02T09:00:00Z' },
@@ -78,6 +94,10 @@ describe('Urgent P1 Overlay Utility Tests', () => {
     const selected = selectP1OverlayAlert(alerts, '/veterinarian', snoozedMap, dismissedSet, baseNow);
     assert.notEqual(selected, null);
     assert.equal(selected?.scheduleId, 102);
+
+    const eligible = getEligibleP1Alerts(alerts, '/veterinarian', snoozedMap, dismissedSet, baseNow);
+    assert.equal(eligible.length, 1);
+    assert.equal(eligible[0].scheduleId, 102);
   });
 
   it('returns null when all alerts are suppressed', () => {
@@ -87,5 +107,8 @@ describe('Urgent P1 Overlay Utility Tests', () => {
 
     const selected = selectP1OverlayAlert(alerts, '/veterinarian', snoozedMap, dismissedSet, baseNow);
     assert.equal(selected, null);
+
+    const eligible = getEligibleP1Alerts(alerts, '/veterinarian', snoozedMap, dismissedSet, baseNow);
+    assert.equal(eligible.length, 0);
   });
 });

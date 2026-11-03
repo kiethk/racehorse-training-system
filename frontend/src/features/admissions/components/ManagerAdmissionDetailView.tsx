@@ -406,7 +406,7 @@ export function ManagerAdmissionDetailView({ admissionId, returnTo }: ManagerAdm
               )}
               {trainerUnassigned && (
                 <Notice tone="warning" title="No Head Trainer assigned yet">
-                  No eligible Head Trainer is available. The system retries automatically; check that at
+                  No eligible Head Trainer is available. The system retries automatically. Check that at
                   least one active Head Trainer has a certification number.
                 </Notice>
               )}
