@@ -223,9 +223,6 @@ export function ManagerAuditLogView() {
           <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
             Activity & Audit Logs
           </h1>
-          <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-            Review historical staff activities, domain approvals, and intake decisions across the club.
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button

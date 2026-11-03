@@ -6,3 +6,4 @@ WHERE action = 'Update System'
    OR request_path LIKE '/api/v1/ai/conversations%'
    OR request_path = '/api/owner/admissions/ocr-scan'
    OR request_path = '/api/group-plans/preview';
+
