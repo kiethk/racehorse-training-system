@@ -289,4 +289,24 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            """)
     List<TrainingWorkout> findNotStartedOfHorses(@Param("horseIds") Collection<Long> horseIds,
                                                  @Param("today") LocalDate today, @Param("time") LocalTime time);
+
+    @Query("""
+           SELECT new com.rtms.backend.analytics.dto.FleetWorkoutSummaryRow(
+               w.horseId,
+               AVG(w.averageSpeedKmh),
+               AVG(w.recoveryHeartRate),
+               MAX(w.maxHeartRate)
+           )
+           FROM TrainingWorkout w
+           JOIN TrainingSession s ON w.sessionId = s.id
+           WHERE w.horseId IN :horseIds
+             AND w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN
+             AND w.averageSpeedKmh IS NOT NULL
+             AND w.recoveryHeartRate IS NOT NULL
+             AND s.sessionDate >= :since
+           GROUP BY w.horseId
+           """)
+    List<com.rtms.backend.analytics.dto.FleetWorkoutSummaryRow> findFleetWorkoutSummaries(
+            @Param("horseIds") java.util.Collection<Long> horseIds,
+            @Param("since") java.time.LocalDate since);
 }

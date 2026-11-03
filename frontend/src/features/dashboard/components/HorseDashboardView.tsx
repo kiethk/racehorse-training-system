@@ -26,6 +26,7 @@ import { dashboardService } from '../services/dashboardService';
 import type { DashboardHorse } from '../types';
 import { HealthTrendCard } from './HealthTrendCard';
 import { PerformanceTrendCard } from './PerformanceTrendCard';
+import { HorseEdaAnalyticsCard } from '@/features/analytics';
 
 type HorseFilter = 'ALL' | 'ACTIVE' | 'ALERT';
 
@@ -232,6 +233,8 @@ export function HorseDashboardView({
 
       <PerformanceTrendCard />
       {showHealth && <HealthTrendCard />}
+
+      <HorseEdaAnalyticsCard />
 
       <Panel padded className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
