@@ -2,8 +2,10 @@ import type { CorrelationStrength } from '../types/eda';
 
 export interface CorrelationToneInfo {
   label: string;
+  qualitativeLabel: string;
   tone: 'success' | 'warning' | 'info' | 'neutral' | 'danger';
   description: string;
+  tooltip: string;
 }
 
 export function formatCorrelationStrength(strength: CorrelationStrength, pearsonR: number): CorrelationToneInfo {
@@ -13,46 +15,60 @@ export function formatCorrelationStrength(strength: CorrelationStrength, pearson
   switch (strength) {
     case 'STRONG_POSITIVE':
       return {
-        label: `Tương quan thuận mạnh (${rFormatted})`,
+        label: `Strong Positive (${rFormatted})`,
+        qualitativeLabel: 'Strong Positive',
         tone: 'info',
-        description: 'Tốc độ tăng cao đi kèm với nhịp tim hồi phục tăng rõ rệt.',
+        description: 'Higher workout speed correlates with significantly higher recovery heart rate.',
+        tooltip: `Pearson r = ${rFormatted}`,
       };
     case 'MODERATE_POSITIVE':
       return {
-        label: `Tương quan thuận vừa (${rFormatted})`,
+        label: `Moderate Positive (${rFormatted})`,
+        qualitativeLabel: 'Moderate Positive',
         tone: 'neutral',
-        description: 'Có xu hướng tăng nhịp tim khi tăng tốc độ bài tập.',
+        description: 'Moderate tendency of increasing recovery heart rate with higher speed.',
+        tooltip: `Pearson r = ${rFormatted}`,
       };
     case 'STRONG_NEGATIVE':
       return {
-        label: `Tương quan nghịch mạnh (${rFormatted})`,
+        label: `Strong Negative (${rFormatted})`,
+        qualitativeLabel: 'Strong Negative',
         tone: 'success',
-        description: 'Tốc độ cao nhưng nhịp tim hồi phục lại thấp (chỉ dấu thể lực vượt trội).',
+        description: 'High speed with low recovery HR indicates exceptional cardiovascular fitness.',
+        tooltip: `Pearson r = ${rFormatted}`,
       };
     case 'MODERATE_NEGATIVE':
       return {
-        label: `Tương quan nghịch vừa (${rFormatted})`,
+        label: `Moderate Negative (${rFormatted})`,
+        qualitativeLabel: 'Moderate Negative',
         tone: 'success',
-        description: 'Chiến mã duy trì tốc độ tốt với mức tiêu hao nhịp tim vừa phải.',
+        description: 'Horse maintains solid speed with moderate cardiovascular exertion.',
+        tooltip: `Pearson r = ${rFormatted}`,
       };
     case 'WEAK':
       return {
-        label: `Tương quan yếu (${rFormatted})`,
+        label: `Weak (${rFormatted})`,
+        qualitativeLabel: 'Weak',
         tone: 'neutral',
-        description: 'Không có mối liên hệ tuyến tính rõ rệt giữa hai chỉ số này.',
+        description: 'No significant linear correlation observed between speed and recovery HR.',
+        tooltip: `Pearson r = ${rFormatted}`,
       };
     case 'NO_VARIANCE':
       return {
-        label: 'Dữ liệu đồng nhất',
+        label: 'Zero / Insufficient Variance',
+        qualitativeLabel: 'Zero / Insufficient variance',
         tone: 'neutral',
-        description: 'Các giá trị đo được đều bằng nhau nên không xác định được hệ số tương quan.',
+        description: 'Uniform values observed; correlation coefficient is mathematically undefined.',
+        tooltip: 'Pearson r = N/A (zero variance)',
       };
     case 'INSUFFICIENT_DATA':
     default:
       return {
-        label: 'Chưa đủ dữ liệu',
+        label: 'Insufficient Data',
+        qualitativeLabel: 'Insufficient Data',
         tone: 'warning',
-        description: 'Cần ít nhất 2 buổi tập có đầy đủ chỉ số tốc độ và nhịp tim để phân tích.',
+        description: 'At least 2 data points with speed and recovery HR are required for analysis.',
+        tooltip: 'Pearson r = N/A (insufficient data)',
       };
   }
 }
