@@ -1,9 +1,12 @@
 package com.rtms.backend.audit.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rtms.backend.audit.dto.AuditArchiveStatusResponse;
+import com.rtms.backend.audit.dto.AuditLogResponse;
+import com.rtms.backend.audit.dto.AuditPurgeRequest;
+import com.rtms.backend.audit.dto.AuditPurgeResponse;
 import com.rtms.backend.audit.dto.DomainAuditEvent;
 import com.rtms.backend.config.ApiException;
-import com.rtms.backend.audit.dto.AuditLogResponse;
 import com.rtms.backend.audit.entity.AuditLog;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.audit.repository.AuditLogRepository;
@@ -325,6 +328,112 @@ public class AuditLogService {
             return sb.toString();
         }
         return action;
+    }
+
+    @Transactional(readOnly = true)
+    public AuditArchiveStatusResponse getArchiveStatus() {
+        long totalCount = auditLogRepository.count();
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        long agedCount = auditLogRepository.countByCreatedAtBefore(thirtyDaysAgo);
+        LocalDateTime oldestLogDate = auditLogRepository.findTopByOrderByCreatedAtAsc()
+                .map(AuditLog::getCreatedAt)
+                .orElse(null);
+        boolean requiresMaintenance = agedCount > 0 || totalCount > 1000;
+
+        return new AuditArchiveStatusResponse(totalCount, agedCount, oldestLogDate, requiresMaintenance);
+    }
+
+    @Transactional(readOnly = true)
+    public String exportArchiveCsv(LocalDateTime fromDate, LocalDateTime toDate, LocalDateTime beforeDate) {
+        LocalDateTime effectiveTo = toDate != null ? toDate : beforeDate;
+        List<AuditLog> logs;
+        if (fromDate != null && effectiveTo != null) {
+            logs = auditLogRepository.findByCreatedAtBetweenOrderByCreatedAtAsc(fromDate, effectiveTo);
+        } else if (fromDate != null) {
+            logs = auditLogRepository.findByCreatedAtBetweenOrderByCreatedAtAsc(fromDate, LocalDateTime.now());
+        } else if (effectiveTo != null) {
+            logs = auditLogRepository.findByCreatedAtBeforeOrderByCreatedAtAsc(effectiveTo);
+        } else {
+            logs = auditLogRepository.findAll(Sort.by(Sort.Direction.ASC, "createdAt"));
+        }
+
+        if (logs.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NO_LOGS_TO_EXPORT", "No audit log records found for the specified period.");
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\"Timestamp\",\"Actor\",\"Role\",\"Module\",\"Action\",\"Target Entity\",\"Target ID\",\"Details / Summary\"\r\n");
+
+        for (AuditLog log : logs) {
+            String timestamp = log.getCreatedAt() != null ? log.getCreatedAt().toString() : "";
+            String actor = log.getUser() != null ? log.getUser().getFullName() : "System";
+            String role = (log.getUser() != null && log.getUser().getRole() != null) ? log.getUser().getRole().getName() : "-";
+            String action = formatAction(log.getAction());
+            String entity = log.getEntityName() != null ? log.getEntityName() : "-";
+            String entityId = log.getEntityId() != null ? log.getEntityId().toString() : "-";
+            String details = log.getDetails() != null ? log.getDetails() : "";
+            String module = AuditLogResponse.resolveModule(log.getEntityName(), details, log.getRequestPath(), action);
+
+            sb.append(escapeCsv(timestamp)).append(",")
+              .append(escapeCsv(actor)).append(",")
+              .append(escapeCsv(role)).append(",")
+              .append(escapeCsv(module)).append(",")
+              .append(escapeCsv(action)).append(",")
+              .append(escapeCsv(entity)).append(",")
+              .append(escapeCsv(entityId)).append(",")
+              .append(escapeCsv(details)).append("\r\n");
+        }
+
+        return sb.toString();
+    }
+
+    private String escapeCsv(String value) {
+        if (value == null) return "\"\"";
+        return "\"" + value.replace("\"", "\"\"") + "\"";
+    }
+
+    @Transactional
+    public AuditPurgeResponse purgeAuditLogs(Long actorUserId, AuditPurgeRequest request) {
+        int purgedCount;
+        LocalDateTime beforeDate = request != null ? request.beforeDate() : null;
+        LocalDateTime fromDate = request != null ? request.fromDate() : null;
+
+        if (fromDate != null && beforeDate != null) {
+            purgedCount = auditLogRepository.deleteByCreatedAtBetween(fromDate, beforeDate);
+        } else if (fromDate != null) {
+            purgedCount = auditLogRepository.deleteByCreatedAtBetween(fromDate, LocalDateTime.now());
+        } else if (beforeDate != null) {
+            purgedCount = auditLogRepository.deleteByCreatedAtBefore(beforeDate);
+        } else {
+            LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+            purgedCount = auditLogRepository.deleteByCreatedAtBefore(thirtyDaysAgo);
+        }
+
+        if (purgedCount == 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NO_LOGS_TO_PURGE", "No audit log records found to purge for the specified period.");
+        }
+
+        String reason = (request != null && request.reason() != null && !request.reason().isBlank())
+                ? request.reason()
+                : "Routine database maintenance & storage optimization";
+
+        recordDomainEvent(DomainAuditEvent.builder()
+                .userId(actorUserId)
+                .action("ARCHIVE_AND_PURGE_AUDIT_LOGS")
+                .entityName("AuditLog")
+                .module("SYSTEM")
+                .summary("Manager executed audit log archive & purge (" + purgedCount + " records removed)")
+                .reason(reason)
+                .targetUrl("/manager/audit-log")
+                .before(Map.of("action", "PRE_PURGE", "purgedCount", 0))
+                .after(Map.of("action", "POST_PURGE", "purgedCount", purgedCount))
+                .build());
+
+        return new AuditPurgeResponse(
+                purgedCount,
+                LocalDateTime.now(),
+                "Successfully purged " + purgedCount + " audit log records from database."
+        );
     }
 }
 

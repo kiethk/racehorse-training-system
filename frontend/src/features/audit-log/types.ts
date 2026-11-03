@@ -52,3 +52,23 @@ export interface AuditLogFilters {
   page: number;
   size: number;
 }
+
+export interface AuditArchiveStatus {
+  totalCount: number;
+  agedCount: number;
+  oldestLogDate: string | null;
+  requiresMaintenance: boolean;
+}
+
+export interface AuditPurgeRequest {
+  beforeDate?: string;
+  fromDate?: string;
+  reason?: string;
+}
+
+export interface AuditPurgeResponse {
+  purgedCount: number;
+  purgedAt: string;
+  message: string;
+}
+

@@ -211,6 +211,61 @@ class HttpAuditInterceptorTest {
         verifyNoInteractions(auditLogService);
     }
 
+    @Test
+    void givenNotificationReadAllEndpoint_thenNoAuditCall() throws Exception {
+        when(request.getMethod()).thenReturn("PATCH");
+        when(request.getRequestURI()).thenReturn("/api/notifications/read-all");
+        when(response.getStatus()).thenReturn(200);
+
+        interceptor.afterCompletion(request, response, null, null);
+
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void givenNotificationSingleReadEndpoint_thenNoAuditCall() throws Exception {
+        when(request.getMethod()).thenReturn("PATCH");
+        when(request.getRequestURI()).thenReturn("/api/notifications/42/read");
+        when(response.getStatus()).thenReturn(200);
+
+        interceptor.afterCompletion(request, response, null, null);
+
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void givenAiConversationEndpoint_thenNoAuditCall() throws Exception {
+        when(request.getMethod()).thenReturn("PUT");
+        when(request.getRequestURI()).thenReturn("/api/v1/ai/conversations/15/title");
+        when(response.getStatus()).thenReturn(200);
+
+        interceptor.afterCompletion(request, response, null, null);
+
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void givenOcrScanEndpoint_thenNoAuditCall() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/owner/admissions/ocr-scan");
+        when(response.getStatus()).thenReturn(200);
+
+        interceptor.afterCompletion(request, response, null, null);
+
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void givenPlanPreviewEndpoint_thenNoAuditCall() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/group-plans/preview");
+        when(response.getStatus()).thenReturn(200);
+
+        interceptor.afterCompletion(request, response, null, null);
+
+        verifyNoInteractions(auditLogService);
+    }
+
     // 11. AuditLogService throws → interceptor does not rethrow
     @Test
     void givenAuditServiceThrows_thenInterceptorDoesNotRethrow() throws Exception {

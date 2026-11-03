@@ -58,6 +58,7 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus 
     <>
       <header className="flex min-w-0 shrink-0 items-start gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:items-center sm:gap-4 sm:px-6 sm:py-5">
         {protectedPhotoUrl ? (
+          // eslint-disable-next-line no-restricted-syntax
           <button
             type="button"
             onClick={() => setPhotoOpen(true)}
