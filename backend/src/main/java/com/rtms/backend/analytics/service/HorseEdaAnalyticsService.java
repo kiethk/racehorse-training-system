@@ -27,6 +27,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -136,7 +137,7 @@ public class HorseEdaAnalyticsService {
         accessService.assertCanViewHorse(horseId, currentUser);
 
         Horse horse = horseRepository.findById(horseId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Không tìm thấy ngựa #" + horseId));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found with ID: " + horseId));
 
         int windowDays = (days != null && days > 0) ? days : 365;
         LocalDate from = LocalDate.now().minusDays(windowDays);
@@ -179,7 +180,7 @@ public class HorseEdaAnalyticsService {
                 points.add(new IndividualWorkoutEdaPoint(
                         w.getWorkoutId(),
                         w.getDate() != null ? w.getDate().toString() : "N/A",
-                        w.getSubjectName() != null ? w.getSubjectName() : "Bài tập",
+                        w.getSubjectName() != null ? w.getSubjectName() : "Workout",
                         spd,
                         rec,
                         maxHr,
@@ -207,16 +208,16 @@ public class HorseEdaAnalyticsService {
         List<String> reasons = new ArrayList<>();
         if (isSpeedOutlier) {
             if (spd > speedDist.q3()) {
-                reasons.add(String.format("Tốc độ vượt trội (%.1f km/h > Q3)", spd));
+                reasons.add(String.format(Locale.US, "Exceptional speed (%.1f km/h > Q3)", spd));
             } else {
-                reasons.add(String.format("Tốc độ thấp bất thường (%.1f km/h < Q1)", spd));
+                reasons.add(String.format(Locale.US, "Low speed anomaly (%.1f km/h < Q1)", spd));
             }
         }
         if (isHrOutlier) {
             if (rec > hrDist.q3()) {
-                reasons.add(String.format("Nhịp tim hồi phục cao bất thường (%.0f bpm > Q3)", rec));
+                reasons.add(String.format(Locale.US, "High recovery heart rate anomaly (%.0f bpm > Q3)", rec));
             } else {
-                reasons.add(String.format("Hồi phục tim cực tốt (%.0f bpm < Q1)", rec));
+                reasons.add(String.format(Locale.US, "Exceptional cardio recovery (%.0f bpm < Q1)", rec));
             }
         }
         return String.join(" | ", reasons);

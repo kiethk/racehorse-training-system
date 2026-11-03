@@ -71,14 +71,18 @@ class HorseEdaAnalyticsServiceTest {
         List<DashboardHorseRow> horses = List.of(
                 new DashboardHorseRow(1L, "Thunder Flash", "Thoroughbred", "A-01"),
                 new DashboardHorseRow(2L, "Storm Wind", "Thoroughbred", "A-02"),
-                new DashboardHorseRow(3L, "Shadow Runner", "Arabian", "A-03")
+                new DashboardHorseRow(3L, "Blaze Spirit", "Thoroughbred", "A-03"),
+                new DashboardHorseRow(4L, "Desert Star", "Arabian", "A-04"),
+                new DashboardHorseRow(5L, "Shadow Runner", "Arabian", "A-05")
         );
         when(scopeService.horsesOf(mockUser)).thenReturn(horses);
 
         List<FleetWorkoutSummaryRow> summaries = List.of(
-                new FleetWorkoutSummaryRow(1L, 48.0, 95.0, 210),
-                new FleetWorkoutSummaryRow(2L, 50.0, 100.0, 215),
-                new FleetWorkoutSummaryRow(3L, 68.0, 145.0, 230) // outlier
+                new FleetWorkoutSummaryRow(1L, 48.0, 92.0, 210),
+                new FleetWorkoutSummaryRow(2L, 49.0, 94.0, 212),
+                new FleetWorkoutSummaryRow(3L, 50.0, 95.0, 215),
+                new FleetWorkoutSummaryRow(4L, 51.0, 96.0, 218),
+                new FleetWorkoutSummaryRow(5L, 85.0, 150.0, 240) // upper outlier
         );
         when(workoutRepository.findFleetWorkoutSummaries(anyCollection(), any(LocalDate.class)))
                 .thenReturn(summaries);
@@ -86,11 +90,44 @@ class HorseEdaAnalyticsServiceTest {
         FleetEdaResponse res = edaService.getFleetEdaAnalytics(mockUser, 180);
 
         assertNotNull(res);
-        assertEquals(3, res.speedStats().sampleSize());
-        assertEquals(3, res.recoveryHeartRateStats().sampleSize());
-        assertEquals(3, res.points().size());
+        assertEquals(5, res.speedStats().sampleSize());
+        assertEquals(5, res.recoveryHeartRateStats().sampleSize());
+        assertEquals(5, res.points().size());
         assertNotNull(res.correlation());
         assertTrue(res.correlation().pearsonR() > 0.8);
+        assertTrue(res.points().get(4).isOutlier());
+        assertEquals("Exceptional speed (85.0 km/h > Q3) | High recovery heart rate anomaly (150 bpm > Q3)",
+                res.points().get(4).outlierReason());
+    }
+
+    @Test
+    @DisplayName("getFleetEdaAnalytics generates English outlier reasons for low values below Q1")
+    void testGetFleetEdaAnalytics_LowOutlierReasons() {
+        List<DashboardHorseRow> horses = List.of(
+                new DashboardHorseRow(1L, "H1", "Thoroughbred", "A-01"),
+                new DashboardHorseRow(2L, "H2", "Thoroughbred", "A-02"),
+                new DashboardHorseRow(3L, "H3", "Thoroughbred", "A-03"),
+                new DashboardHorseRow(4L, "H4", "Thoroughbred", "A-04"),
+                new DashboardHorseRow(5L, "H5", "Thoroughbred", "A-05")
+        );
+        when(scopeService.horsesOf(mockUser)).thenReturn(horses);
+
+        List<FleetWorkoutSummaryRow> summaries = List.of(
+                new FleetWorkoutSummaryRow(1L, 20.0, 60.0, 190), // lower outlier
+                new FleetWorkoutSummaryRow(2L, 49.0, 94.0, 212),
+                new FleetWorkoutSummaryRow(3L, 50.0, 95.0, 215),
+                new FleetWorkoutSummaryRow(4L, 51.0, 96.0, 218),
+                new FleetWorkoutSummaryRow(5L, 52.0, 98.0, 220)
+        );
+        when(workoutRepository.findFleetWorkoutSummaries(anyCollection(), any(LocalDate.class)))
+                .thenReturn(summaries);
+
+        FleetEdaResponse res = edaService.getFleetEdaAnalytics(mockUser, 180);
+
+        assertNotNull(res);
+        assertTrue(res.points().get(0).isOutlier());
+        assertEquals("Low speed anomaly (20.0 km/h < Q1) | Exceptional cardio recovery (60 bpm < Q1)",
+                res.points().get(0).outlierReason());
     }
 
     @Test
@@ -125,6 +162,7 @@ class HorseEdaAnalyticsServiceTest {
         assertEquals(10L, res.horseId());
         assertEquals("Thunder Flash", res.horseName());
         assertEquals(2, res.points().size());
+        assertEquals("Workout", res.points().get(0).sessionName());
         assertEquals(2, res.speedStats().sampleSize());
         verify(accessService).assertCanViewHorse(10L, mockUser);
     }

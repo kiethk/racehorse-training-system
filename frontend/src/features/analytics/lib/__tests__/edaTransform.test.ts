@@ -7,24 +7,32 @@ describe('EDA Transform & Helper Unit Tests', () => {
     const res = formatCorrelationStrength('STRONG_POSITIVE', 0.85);
     assert.equal(res.tone, 'info');
     assert.match(res.label, /\+0\.85/);
-    assert.match(res.label, /Tương quan thuận mạnh/);
+    assert.match(res.label, /Strong Positive/);
+    assert.equal(res.qualitativeLabel, 'Strong Positive');
+    assert.equal(res.tooltip, 'Pearson r = +0.85');
   });
 
   it('formatCorrelationStrength maps STRONG_NEGATIVE as success', () => {
     const res = formatCorrelationStrength('STRONG_NEGATIVE', -0.72);
     assert.equal(res.tone, 'success');
     assert.match(res.label, /-0\.72/);
-    assert.match(res.label, /Tương quan nghịch mạnh/);
+    assert.match(res.label, /Strong Negative/);
+    assert.equal(res.qualitativeLabel, 'Strong Negative');
+    assert.equal(res.tooltip, 'Pearson r = -0.72');
   });
 
   it('formatCorrelationStrength handles INSUFFICIENT_DATA and NO_VARIANCE', () => {
     const insufficient = formatCorrelationStrength('INSUFFICIENT_DATA', 0);
     assert.equal(insufficient.tone, 'warning');
-    assert.equal(insufficient.label, 'Chưa đủ dữ liệu');
+    assert.equal(insufficient.label, 'Insufficient Data');
+    assert.equal(insufficient.qualitativeLabel, 'Insufficient Data');
+    assert.equal(insufficient.tooltip, 'Pearson r = N/A (insufficient data)');
 
     const noVar = formatCorrelationStrength('NO_VARIANCE', 0);
     assert.equal(noVar.tone, 'neutral');
-    assert.equal(noVar.label, 'Dữ liệu đồng nhất');
+    assert.equal(noVar.label, 'Zero / Insufficient Variance');
+    assert.equal(noVar.qualitativeLabel, 'Zero / Insufficient variance');
+    assert.equal(noVar.tooltip, 'Pearson r = N/A (zero variance)');
   });
 
   it('calculateTrendLinePoints generates endpoints for regression line', () => {
