@@ -238,7 +238,7 @@ export function HorseDashboardView({
         availableHorses={horses.map((h) => ({
           id: h.horseId,
           name: h.horseName,
-          breed: h.breed,
+          breed: h.breed ?? undefined,
         }))}
       />
 

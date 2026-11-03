@@ -13,7 +13,7 @@ type ViewMode = 'FLEET' | 'INDIVIDUAL';
 export interface HorseEdaOption {
   id: number;
   name: string;
-  breed?: string;
+  breed?: string | null;
 }
 
 export interface HorseEdaAnalyticsCardProps {
