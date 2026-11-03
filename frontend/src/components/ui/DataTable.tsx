@@ -226,9 +226,19 @@ export function DataTable<Row>({
                   <tr
                     key={getRowKey(row)}
                     tabIndex={onRowClick ? 0 : undefined}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    onClick={onRowClick ? (event) => {
+                      const target = event.target as HTMLElement | null;
+                      if (target?.closest('a, button, input, select, textarea, [role="button"], [data-prevent-row-click]')) {
+                        return;
+                      }
+                      onRowClick(row);
+                    } : undefined}
                     onKeyDown={onRowClick ? (event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
+                        const target = event.target as HTMLElement | null;
+                        if (target?.closest('a, button, input, select, textarea, [role="button"], [data-prevent-row-click]')) {
+                          return;
+                        }
                         event.preventDefault();
                         onRowClick(row);
                       }

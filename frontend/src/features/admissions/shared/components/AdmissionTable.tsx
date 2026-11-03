@@ -1,3 +1,4 @@
+import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { DataTable, type DataTableColumn, type DataTablePagination } from '@/components/ui/DataTable';
 import { LinkButton } from '@/components/ui/Button';
@@ -54,6 +55,7 @@ export function AdmissionTable<Row extends AdmissionRow>({
   loading,
   pagination,
 }: AdmissionTableProps<Row>) {
+  const router = useRouter();
   const columns: DataTableColumn<Row>[] = [
     {
       id: 'horse',
@@ -109,6 +111,7 @@ export function AdmissionTable<Row extends AdmissionRow>({
       rows={admissions}
       columns={columns}
       getRowKey={(admission) => admission.admissionId}
+      onRowClick={(admission) => router.push(detailHref(admission.admissionId))}
       ariaLabel="Admission records"
       loading={loading}
       emptyTitle={emptyTitle ?? 'No admissions found'}

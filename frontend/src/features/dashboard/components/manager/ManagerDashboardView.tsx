@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
@@ -45,7 +46,17 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
             {horse.horseName}
           </Link>
           <div className="text-xs text-[var(--color-text-muted)]">
-            {[horse.stallCode ? `Stall ${horse.stallCode}` : null, horse.breed].filter(Boolean).join(' · ') || '—'}
+            {horse.stallCode ? (
+              <Link
+                href={`/manager/stable?stall=${encodeURIComponent(horse.stallCode)}`}
+                className="hover:text-[var(--color-primary)] hover:underline"
+              >
+                Stall {horse.stallCode}
+              </Link>
+            ) : null}
+            {horse.stallCode && horse.breed ? ' · ' : null}
+            {horse.breed}
+            {!horse.stallCode && !horse.breed ? '—' : null}
           </div>
         </div>
       ),
@@ -62,7 +73,12 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
         horse.planStatus === 'NONE' ? (
           <span className="text-[var(--color-text-muted)]">Not enrolled</span>
         ) : (
-          <span className="text-[var(--color-text-secondary)]">{horse.courseName}</span>
+          <Link
+            href={`${horseBasePath}/${horse.horseId}`}
+            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] hover:underline"
+          >
+            {horse.courseName}
+          </Link>
         ),
     },
     {
@@ -145,6 +161,7 @@ export function ManagerDashboardView() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HorseFilter>('ALL');
 
+  const router = useRouter();
   const horseBasePath = '/manager/horses';
   const columns = useMemo(() => columnsFor(horseBasePath), [horseBasePath]);
 
@@ -302,6 +319,7 @@ export function ManagerDashboardView() {
           rows={visibleHorses}
           columns={columns}
           getRowKey={(horse) => horse.horseId}
+          onRowClick={(horse) => router.push(`${horseBasePath}/${horse.horseId}`)}
           loading={loading}
           pageSize={8}
           getSearchText={(horse) => `${horse.horseName} ${horse.courseName} ${horse.stallCode ?? ''} ${horse.breed ?? ''}`}

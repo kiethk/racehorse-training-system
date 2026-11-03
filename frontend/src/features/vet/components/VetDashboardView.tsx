@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { Panel, SectionTitle } from "@/components/ui/Panel";
@@ -304,17 +305,22 @@ export function VetDashboardView() {
                       className="flex flex-col gap-3 py-3.5 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-center gap-3">
-                        <HorseAvatar
-                          name={horseName}
-                          image={horse?.imageUrl}
-                          size={44}
-                          rounded="md"
-                        />
+                        <Link href={`/veterinarian/records?horseId=${schedule.horseId}`} className="shrink-0">
+                          <HorseAvatar
+                            name={horseName}
+                            image={horse?.imageUrl}
+                            size={44}
+                            rounded="md"
+                          />
+                        </Link>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="truncate font-semibold text-[var(--color-text-primary)]">
+                            <Link
+                              href={`/veterinarian/records?horseId=${schedule.horseId}`}
+                              className="truncate font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] hover:underline"
+                            >
                               {horseName}
-                            </span>
+                            </Link>
                             {horse?.breed && (
                               <span className="text-xs text-[var(--color-text-muted)]">
                                 · {horse.breed}
@@ -331,11 +337,16 @@ export function VetDashboardView() {
                             <span className="text-[var(--color-border-strong)]">
                               ·
                             </span>
-                            <span>
-                              {stallCode
-                                ? `Stall: ${stallCode}`
-                                : "Stall: Unassigned"}
-                            </span>
+                            {stallCode ? (
+                              <Link
+                                href={`/veterinarian/routine?stallCode=${encodeURIComponent(stallCode)}`}
+                                className="hover:text-[var(--color-primary)] hover:underline"
+                              >
+                                Stall: {stallCode}
+                              </Link>
+                            ) : (
+                              <span>Stall: Unassigned</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -451,18 +462,32 @@ export function VetDashboardView() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <HorseAvatar
-                            name={horseName}
-                            image={horse?.imageUrl}
-                            size={32}
-                            rounded="sm"
-                          />
+                          <Link href={`/veterinarian/urgent/${schedule.id}`} className="shrink-0">
+                            <HorseAvatar
+                              name={horseName}
+                              image={horse?.imageUrl}
+                              size={32}
+                              rounded="sm"
+                            />
+                          </Link>
                           <div>
-                            <span className="font-semibold text-[var(--color-text-primary)]">
+                            <Link
+                              href={`/veterinarian/urgent/${schedule.id}`}
+                              className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] hover:underline"
+                            >
                               {horseName}
-                            </span>
+                            </Link>
                             <span className="ml-2 text-xs text-[var(--color-text-muted)]">
-                              {stallCode ? `Stall ${stallCode}` : "Unassigned"}
+                              {stallCode ? (
+                                <Link
+                                  href={`/veterinarian/routine?stallCode=${encodeURIComponent(stallCode)}`}
+                                  className="hover:text-[var(--color-primary)] hover:underline"
+                                >
+                                  Stall {stallCode}
+                                </Link>
+                              ) : (
+                                "Unassigned"
+                              )}
                             </span>
                           </div>
                         </div>
@@ -523,17 +548,22 @@ export function VetDashboardView() {
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
-                        <HorseAvatar
-                          name={item.name}
-                          image={horseMap.get(item.id)?.imageUrl}
-                          size={32}
-                          rounded="sm"
-                        />
+                        <Link href={`/veterinarian/records?horseId=${item.id}`} className="shrink-0">
+                          <HorseAvatar
+                            name={item.name}
+                            image={horseMap.get(item.id)?.imageUrl}
+                            size={32}
+                            rounded="sm"
+                          />
+                        </Link>
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-[var(--color-text-primary)]">
+                            <Link
+                              href={`/veterinarian/records?horseId=${item.id}`}
+                              className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] hover:underline"
+                            >
                               {item.name}
-                            </span>
+                            </Link>
                             {item.breed && (
                               <span className="text-xs text-[var(--color-text-muted)]">
                                 · {item.breed}
@@ -541,7 +571,17 @@ export function VetDashboardView() {
                             )}
                           </div>
                           <p className="text-xs text-[var(--color-text-muted)]">
-                            Stall: {item.stallCode}
+                            Stall:{" "}
+                            {item.stallCode ? (
+                              <Link
+                                href={`/veterinarian/routine?stallCode=${encodeURIComponent(item.stallCode)}`}
+                                className="hover:text-[var(--color-primary)] hover:underline"
+                              >
+                                {item.stallCode}
+                              </Link>
+                            ) : (
+                              "Unassigned"
+                            )}
                           </p>
                         </div>
                       </div>

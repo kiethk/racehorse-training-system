@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import {
   Button,
@@ -152,7 +153,12 @@ export function DueWorkTab({ protocols, canRecord }: DueWorkTabProps) {
       sortValue: (row) => row.horseName?.toLowerCase(),
       render: (row) => (
         <div className="flex items-center gap-2">
-          <span className="font-semibold">{row.horseName}</span>
+          <Link
+            href={`/veterinarian/records?horseId=${row.horseId}`}
+            className="font-semibold hover:text-[var(--color-primary)] hover:underline"
+          >
+            {row.horseName}
+          </Link>
           <StatusBadge status={row.horseStatus} size="sm" />
         </div>
       ),

@@ -171,6 +171,7 @@ export function IncidentList() {
           rows={reports}
           columns={columns}
           getRowKey={(report) => report.id}
+          onRowClick={(report) => setSelected(report)}
           loading={loading}
           pageSize={PAGE_SIZE}
           getSearchText={horseName}

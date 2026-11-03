@@ -849,6 +849,7 @@ export function VetAdmissionQueue() {
         rows={displayedItems}
         columns={queueColumns}
         getRowKey={(row) => (row.careSchedule?.id ? `schedule-${row.careSchedule.id}` : `admission-${row.admissionId}`)}
+        onRowClick={(row) => handleOpenAdmission(row.admissionId, row.careSchedule)}
         ariaLabel="Veterinary admission queue"
         loading={loading}
         emptyTitle="No matching admissions found"
