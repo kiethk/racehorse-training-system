@@ -6,7 +6,7 @@ public record ClinicalRecordCreatedEvent(
         Long healthRecordId,
         Long horseId,
         String registrationNumber,
-        String symptoms,
+        String findings,
         String diagnosis,
         List<String> allowedRoles
 ) {}

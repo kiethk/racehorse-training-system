@@ -154,7 +154,7 @@ The codebase is fully on the shared primitives. Use this task when a file drifts
 
 Known clean-up (safe to pick up when working nearby):
 
-- Local date formatting instead of `formatDate` / `formatDateTime` in `UrgentCaseView`, `VetAdmissionQueue`, `ManagerAuditLogView`, `IncidentList`, `TrainerRaceDetail`, `TrainerRaceList`, `FitnessTrendChart`, `HorseFitnessTrendView`. Switching changes the displayed date string, so confirm with the user first.
+- Local date formatting instead of `formatDate` / `formatDateTime`: `ManagerAuditLogView` (output already byte-identical, code-only), groom `lib/incidentDisplay.ts` (feeds `IncidentList` and `IncidentDetailModal`), `training/charts/ChartParts.tsx` `DateLabels` (ISO x-axis labels), raw dates in `TrainerReviewActionPanel` and `OwnerAdmissionDetailView`, `HorseRacingHistory` (`eventTime` DTO shape unverified), shared `NotificationBell` and `AiChatWidget`. Switching changes the displayed date string, so confirm with the user first. (`UrgentCaseView` and `VetAdmissionQueue` are DONE — vet group 3.1, now display-only. `TrainerRaceList`, `TrainerRaceDetail`, `HorseFitnessTrendView` were stale list entries; they already use `@/lib/display`.)
 - `VetReviewForm` and `VetAdmissionQueue` are far over the 400-line guideline.
 - `AdmissionDocumentPreview` uses a native `<dialog>` instead of `Modal`.
 - `StatusBadge` in `src/components/ui/StatusBadge.tsx` knows about `HorseStatus`; that map belongs in the horses feature.

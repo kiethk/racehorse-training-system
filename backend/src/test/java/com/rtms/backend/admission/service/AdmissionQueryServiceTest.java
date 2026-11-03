@@ -252,7 +252,6 @@ class AdmissionQueryServiceTest {
         record.setVeterinarianId(performingVetId); // Vet who actually conducted the exam
         record.setExaminedAt(LocalDateTime.of(2026, 3, 2, 14, 0));
         record.setTrainingDecision(TrainingDecision.ALLOWED);
-        record.setSymptoms("None");
         record.setFindings("Clear lungs, sound gait");
         when(healthRecords.findByCareScheduleId(careScheduleId)).thenReturn(Optional.of(record));
 

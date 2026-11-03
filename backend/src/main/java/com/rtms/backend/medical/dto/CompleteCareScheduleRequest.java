@@ -21,13 +21,15 @@ public class CompleteCareScheduleRequest {
 
     private String treatment;
 
+    /** Hướng dẫn chăm sóc chung cho toàn đợt điều trị (WF-04 §3.4) — lưu vào treatment_plan.instructions. */
+    private String generalCareInstructions;
+
     @NotNull(message = "Training decision is required")
     private TrainingDecision trainingDecision;
 
     /** Lý do chặn tập — bắt buộc khi BLOCKED, Trainer đọc thấy khi lập kế hoạch. */
     private String restrictionDetails;
 
-    private String symptoms;
     private String notes;
     private List<@NotNull @Valid HorseHealthMetricRequest> metrics;
 
@@ -54,6 +56,18 @@ public class CompleteCareScheduleRequest {
     @Max(value = 10, message = "Vaccination can be deferred by 7 to 10 days")
     private Integer deferVaccinationDays;
 
+    /** Đơn thuốc kê từ danh mục chuẩn, lưu nguyên tử cùng bệnh án khi hoàn tất ca. */
+    private List<@NotNull @Valid PrescriptionItemRequest> prescriptions;
+
+    /** Bệnh lý/chấn thương cũ Vet xác nhận khỏi — CHỈ các id này được đóng (C7: không auto mass-recovery). */
+    private List<Long> resolvedConditionIds;
+
+    public List<PrescriptionItemRequest> getPrescriptions() { return prescriptions; }
+    public void setPrescriptions(List<PrescriptionItemRequest> prescriptions) { this.prescriptions = prescriptions; }
+
+    public List<Long> getResolvedConditionIds() { return resolvedConditionIds; }
+    public void setResolvedConditionIds(List<Long> resolvedConditionIds) { this.resolvedConditionIds = resolvedConditionIds; }
+
     public Integer getDeferVaccinationDays() { return deferVaccinationDays; }
     public void setDeferVaccinationDays(Integer deferVaccinationDays) { this.deferVaccinationDays = deferVaccinationDays; }
 
@@ -69,14 +83,15 @@ public class CompleteCareScheduleRequest {
     public String getTreatment() { return treatment; }
     public void setTreatment(String treatment) { this.treatment = treatment; }
 
+    public String getGeneralCareInstructions() { return generalCareInstructions; }
+    public void setGeneralCareInstructions(String generalCareInstructions) { this.generalCareInstructions = generalCareInstructions; }
+
     public TrainingDecision getTrainingDecision() { return trainingDecision; }
     public void setTrainingDecision(TrainingDecision trainingDecision) { this.trainingDecision = trainingDecision; }
 
     public String getRestrictionDetails() { return restrictionDetails; }
     public void setRestrictionDetails(String restrictionDetails) { this.restrictionDetails = restrictionDetails; }
 
-    public String getSymptoms() { return symptoms; }
-    public void setSymptoms(String symptoms) { this.symptoms = symptoms; }
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }

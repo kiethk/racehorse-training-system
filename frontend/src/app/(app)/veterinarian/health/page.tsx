@@ -12,6 +12,7 @@ import { FilterChips, SearchInput, MetricCard, Notice, PageHeader } from '@/comp
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { toast } from '@/lib/toast';
 import { InjuryCorrectionModal } from '@/features/health/components/InjuryCorrectionModal';
 import { TreatmentPlanModal } from '@/features/care/shared/components/TreatmentPlanModal';
 import { healthApi } from '@/features/health/services/healthApi';
@@ -191,6 +192,44 @@ function HealthRecordsContent() {
     }
     return map;
   }, [vetAdmissions]);
+
+  // Clicking a row does exactly what that row's Action button would do; rows whose case
+  // is held by someone else (or still in intake) answer with a warning toast instead.
+  const handleHorseRow = (row: HorseListItem) => {
+    const { pendingUrgentScheduleId, pendingUrgentVetId, pendingUrgentVetName, pendingAdmissionId } = row.summary ?? {};
+    if (pendingUrgentScheduleId) {
+      if (pendingUrgentVetId != null && pendingUrgentVetId === user?.userId) {
+        router.push(`/veterinarian/urgent/${pendingUrgentScheduleId}`);
+      } else if (pendingUrgentVetName) {
+        toast.warning('Urgent case held by another vet', `${pendingUrgentVetName} is examining ${row.horse.name}; no record opens until that case is closed.`);
+      } else {
+        toast.warning('Urgent case awaiting assignment', `${row.horse.name} has an open urgent case; it is assigned from the Admissions queue.`);
+      }
+      return;
+    }
+    if (pendingAdmissionId) {
+      const admission = admissionByHorse.get(row.horse.id);
+      if (admission?.admissionStatus === 'VET_REVIEW') {
+        router.push(`/veterinarian/admissions?id=${pendingAdmissionId}`);
+        return;
+      }
+      const stage =
+        admission?.admissionStatus === 'TRAINER_REVIEW' ? 'trainer review'
+        : admission?.admissionStatus === 'MANAGER_REVIEW' ? 'manager review'
+        : 'intake review';
+      toast.warning('No health record yet', `${row.horse.name} is still in admission intake (${stage}).`);
+      return;
+    }
+    // Dead-end guard: horses that have never been examined (in-progress intake exams
+    // create their record only on completion) must not land on an empty record page.
+    if (!row.summary?.lastExaminedAt) {
+      toast.warning('No health record yet', `${row.horse.name} has no examination on file. Complete the in-progress exam, or schedule a routine exam from Routine Checks.`);
+      return;
+    }
+    router.push(
+      `/veterinarian/records?horseId=${row.horse.id}${row.horse.name ? `&horseName=${encodeURIComponent(row.horse.name)}` : ''}`,
+    );
+  };
 
   // Rejected horses are out of the clinical roster: no training to clear, so keep them out of the list and metrics.
   const activeHorses = useMemo(
@@ -1098,7 +1137,10 @@ function HealthRecordsContent() {
                               variant="warning"
                               size="sm"
                               icon="activity"
-                              onClick={() => router.push(`/veterinarian/urgent/${pendingUrgentScheduleId}`)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleHorseRow(row);
+                              }}
                               className="transition-all active:scale-[0.97]"
                             >
                               Examine
@@ -1120,9 +1162,10 @@ function HealthRecordsContent() {
                               variant="primary"
                               size="sm"
                               icon="clipboard"
-                              onClick={() =>
-                                router.push(`/veterinarian/admissions?id=${pendingAdmissionId}`)
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleHorseRow(row);
+                              }}
                               className="transition-all active:scale-[0.97]"
                             >
                               Review admission
@@ -1144,13 +1187,10 @@ function HealthRecordsContent() {
                           variant="secondary"
                           size="sm"
                           icon="chevron-right"
-                          onClick={() =>
-                            router.push(
-                              `/veterinarian/records?horseId=${row.horse.id}${
-                                row.horse.name ? `&horseName=${encodeURIComponent(row.horse.name)}` : ''
-                              }`,
-                            )
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleHorseRow(row);
+                          }}
                           className="transition-all active:scale-[0.97]"
                         >
                           View record
@@ -1160,6 +1200,7 @@ function HealthRecordsContent() {
                   },
                 ]}
                 getRowKey={(row: HorseListItem) => row.horse.id}
+                onRowClick={handleHorseRow}
                 pagination={{
                   page,
                   pageSize,

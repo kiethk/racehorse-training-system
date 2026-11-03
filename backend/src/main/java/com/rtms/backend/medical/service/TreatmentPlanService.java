@@ -121,6 +121,7 @@ public class TreatmentPlanService {
         prescription.setStartDate(request.getStartDate());
         prescription.setEndDate(request.getEndDate());
         prescription.setInstructions(request.getInstructions());
+        prescription.setAdministeredByRole(Prescription.roleForRoute(request.getRoute()));
 
         Prescription saved = prescriptionRepository.save(prescription);
 
@@ -189,7 +190,9 @@ public class TreatmentPlanService {
                 prescription.getRoute(),
                 prescription.getStartDate(),
                 prescription.getEndDate(),
-                prescription.getInstructions()
+                prescription.getInstructions(),
+                prescription.getStatus(),
+                prescription.getAdministeredByRole()
         );
     }
 

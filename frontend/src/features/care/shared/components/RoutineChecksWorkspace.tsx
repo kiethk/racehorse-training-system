@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Icon } from '@/components/ui/Icon';
-import { FilterChips, SearchInput, Notice, PageHeader, MetricCard } from '@/components/ui';
+import { FilterChips, SearchInput, Notice, PageHeader, MetricCard, Pagination } from '@/components/ui';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { admissionsApi } from '@/features/admissions/services/api';
@@ -14,6 +14,8 @@ import { stableApi } from '@/features/stable/services/stableService';
 import type { CareSchedule, CareScheduleStatus } from '@/features/admissions/types';
 import type { Horse, StableStall } from '@/features/stable/types';
 import { useAuth } from '@/context/AuthContext';
+import { formatDate } from '@/lib/display';
+import { getCareTypeTone } from '@/features/schedule/utils/timelineUtils';
 import { CreateRoutineModal } from './CreateRoutineModal';
 import { filterRoutineSchedules } from '@/features/routine/utils/routineValidation';
 
@@ -29,6 +31,8 @@ export function RoutineChecksWorkspace() {
   // Filters & Search
   const [statusFilter, setStatusFilter] = useState<CareScheduleStatus | 'ALL'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 8;
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
@@ -83,19 +87,29 @@ export function RoutineChecksWorkspace() {
     return filterRoutineSchedules(schedules, statusFilter, searchTerm, horseInfoMap);
   }, [schedules, statusFilter, searchTerm, horseInfoMap]);
 
+  // Pagination slice
+  const pageCount = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const paginatedList = useMemo(() => {
+    const start = currentPage * PAGE_SIZE;
+    return filteredList.slice(start, start + PAGE_SIZE);
+  }, [filteredList, currentPage]);
+
   // Stats calculation
   const stats = useMemo(() => {
     let scheduled = 0;
     let inProgress = 0;
+    let paused = 0;
     let completed = 0;
 
     for (const s of schedules) {
       if (s.status === 'SCHEDULED') scheduled++;
       else if (s.status === 'IN_PROGRESS') inProgress++;
+      else if (s.status === 'PAUSED') paused++;
       else if (s.status === 'COMPLETED') completed++;
     }
 
-    return { total: schedules.length, scheduled, inProgress, completed };
+    return { total: schedules.length, scheduled, inProgress, paused, completed };
   }, [schedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
@@ -180,11 +194,15 @@ export function RoutineChecksWorkspace() {
         <FilterChips
           label="Status"
           value={statusFilter}
-          onChange={(v) => setStatusFilter(v as CareScheduleStatus | 'ALL')}
+          onChange={(v) => {
+            setStatusFilter(v as CareScheduleStatus | 'ALL');
+            setPage(0);
+          }}
           options={[
             { value: 'ALL', label: 'All', count: schedules.length },
             { value: 'SCHEDULED', label: 'Scheduled', count: stats.scheduled },
             { value: 'IN_PROGRESS', label: 'In Progress', count: stats.inProgress },
+            { value: 'PAUSED', label: 'Paused', count: stats.paused },
             { value: 'COMPLETED', label: 'Completed', count: stats.completed },
           ]}
         />
@@ -192,7 +210,10 @@ export function RoutineChecksWorkspace() {
         <div className="w-full sm:w-64">
           <SearchInput
             value={searchTerm}
-            onChange={setSearchTerm}
+            onChange={(term) => {
+              setSearchTerm(term);
+              setPage(0);
+            }}
             placeholder="Search horse name, stall..."
             label="Search routine care"
           />
@@ -226,101 +247,117 @@ export function RoutineChecksWorkspace() {
           />
         </Panel>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {filteredList.map((cs) => {
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {paginatedList.map((cs) => {
             const horse = horseMap.get(cs.horseId);
             const horseName = horse?.name || `Horse #${cs.horseId}`;
             const stallCode = horse?.currentStallId ? stallMap.get(horse.currentStallId) : 'Unassigned';
-            const dateStr = cs.scheduledAt
-              ? new Date(cs.scheduledAt).toLocaleDateString('en-US')
-              : cs.scheduledDate || 'Unscheduled';
+            const dateStr = cs.scheduledDate
+              ? formatDate(cs.scheduledDate)
+              : cs.scheduledAt
+              ? formatDate(cs.scheduledAt)
+              : 'Unscheduled';
+            const tone = getCareTypeTone(cs.careType, cs.purpose);
+            const isCompleted = cs.status === 'COMPLETED';
 
             return (
               <Panel
                 key={cs.id}
                 padded
-                className="flex flex-col justify-between border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]"
+                onClick={() => handleOpenSchedule(cs)}
+                className="cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]"
               >
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <HorseAvatar name={horseName} image={horse?.imageUrl} size={42} rounded="md" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
-                            {horseName}
-                          </span>
-                          <span className="text-[11px] font-mono text-[var(--color-text-muted)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 rounded-[var(--radius-xs)] border border-[var(--color-border)]">
-                            #{cs.horseId}
-                          </span>
-                          {horse?.breed && (
-                            <span className="text-xs text-[var(--color-text-muted)] truncate">
-                              ({horse.breed})
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                          <span className="inline-flex items-center gap-1">
-                            <Icon name="calendar" size={12} className="text-[var(--color-primary)]" />
-                            <strong>{dateStr}</strong>
-                          </span>
-                          <span>·</span>
-                          <span className="inline-flex items-center gap-1">
-                            <Icon name="building" size={12} />
-                            <span>Stall: <strong>{stallCode}</strong></span>
-                          </span>
-                        </div>
+                <div className="flex items-center justify-between gap-3">
+                  {/* Left: Avatar + Details */}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <HorseAvatar name={horseName} image={horse?.imageUrl} size={42} rounded="md" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                          {horseName}
+                        </span>
+                        <Pill tone={tone.pillTone} icon={tone.icon} size="sm">
+                          {tone.label}
+                        </Pill>
+                        <Pill
+                          tone={
+                            cs.status === 'COMPLETED'
+                              ? 'success'
+                              : cs.status === 'PAUSED'
+                              ? 'warning'
+                              : cs.status === 'IN_PROGRESS'
+                              ? 'primary'
+                              : 'warning'
+                          }
+                          size="sm"
+                        >
+                          {cs.status === 'SCHEDULED'
+                            ? 'Scheduled'
+                            : cs.status === 'PAUSED'
+                            ? 'Paused'
+                            : cs.status === 'IN_PROGRESS'
+                            ? 'In Progress'
+                            : 'Completed'}
+                        </Pill>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                        <span className="inline-flex items-center gap-1">
+                          <Icon name="calendar" size={12} className="text-[var(--color-primary)]" />
+                          <strong>{dateStr}</strong>
+                        </span>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1">
+                          <Icon name="building" size={12} />
+                          <span>Stall: <strong>{stallCode}</strong></span>
+                        </span>
                       </div>
                     </div>
-
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <Pill
-                        tone={
-                          cs.status === 'COMPLETED'
-                            ? 'success'
-                            : cs.status === 'IN_PROGRESS'
-                            ? 'primary'
-                            : 'warning'
-                        }
-                        size="sm"
-                      >
-                        {cs.status === 'SCHEDULED'
-                          ? 'Scheduled'
-                          : cs.status === 'IN_PROGRESS'
-                          ? 'In Progress'
-                          : 'Completed'}
-                      </Pill>
-                    </div>
                   </div>
-                </div>
 
-                <div className="mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-3">
-                  <span className="text-[11px] font-mono text-[var(--color-text-muted)]">
-                    Schedule #{cs.id}
-                  </span>
-                  <Button
-                    variant={cs.status === 'COMPLETED' ? 'secondary' : 'primary'}
-                    size="sm"
-                    icon={
-                      cs.status === 'COMPLETED'
-                        ? 'file-text'
+                  {/* Right: Action Button */}
+                  <div className="shrink-0">
+                    <Button
+                      variant={isCompleted ? 'secondary' : 'primary'}
+                      size="sm"
+                      icon={
+                        isCompleted
+                          ? 'file-text'
+                          : cs.status === 'IN_PROGRESS'
+                          ? 'activity'
+                          : 'chevron-right'
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenSchedule(cs);
+                      }}
+                      className="transition-all active:scale-[0.97]"
+                    >
+                      {isCompleted
+                        ? 'View Record'
+                        : cs.status === 'PAUSED'
+                        ? 'Continue (Paused)'
                         : cs.status === 'IN_PROGRESS'
-                        ? 'activity'
-                        : 'chevron-right'
-                    }
-                    onClick={() => handleOpenSchedule(cs)}
-                    className="transition-all active:scale-[0.97]"
-                  >
-                    {cs.status === 'COMPLETED'
-                      ? 'View Record'
-                      : cs.status === 'IN_PROGRESS'
-                      ? 'Continue Exam'
-                      : 'Start Exam'}
-                  </Button>
+                        ? 'Continue Exam'
+                        : 'Start Exam'}
+                    </Button>
+                  </div>
                 </div>
               </Panel>
             );
           })}
+          </div>
+
+          <Panel className="overflow-hidden">
+            <Pagination
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              total={filteredList.length}
+              onPageChange={setPage}
+              disabled={loading}
+              className="border-t-0"
+            />
+          </Panel>
         </div>
       )}
 

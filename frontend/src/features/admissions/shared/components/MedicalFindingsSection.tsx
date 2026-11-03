@@ -123,7 +123,7 @@ export function MedicalFindingsSection({ exam }: MedicalFindingsSectionProps) {
 
       {/* ── 2. Clinical notes ───────────────────────────────────────────── */}
       <AdmissionInfoSection title="Clinical Notes">
-        <InfoRow label="Symptoms" value={txt(exam.symptoms)} />
+        {exam.symptoms && <InfoRow label="Symptoms" value={txt(exam.symptoms)} />}
         <InfoRow label="Findings" value={txt(exam.findings)} />
         <InfoRow label="Diagnosis" value={txt(exam.diagnosis)} />
         <InfoRow label="Treatment" value={txt(exam.treatment)} />

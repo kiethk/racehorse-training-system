@@ -11,8 +11,10 @@ public class PrescriptionResponse {
     private LocalDate startDate;
     private LocalDate endDate;
     private String instructions;
+    private String status;
+    private String administeredByRole;
 
-    public PrescriptionResponse(Long id, String medicationName, String dosage, String frequency, String route, LocalDate startDate, LocalDate endDate, String instructions) {
+    public PrescriptionResponse(Long id, String medicationName, String dosage, String frequency, String route, LocalDate startDate, LocalDate endDate, String instructions, String status, String administeredByRole) {
         this.id = id;
         this.medicationName = medicationName;
         this.dosage = dosage;
@@ -21,6 +23,8 @@ public class PrescriptionResponse {
         this.startDate = startDate;
         this.endDate = endDate;
         this.instructions = instructions;
+        this.status = status;
+        this.administeredByRole = administeredByRole;
     }
 
     public Long getId() {
@@ -85,5 +89,13 @@ public class PrescriptionResponse {
 
     public void setInstructions(String instructions) {
         this.instructions = instructions;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public String getAdministeredByRole() {
+        return administeredByRole;
     }
 }

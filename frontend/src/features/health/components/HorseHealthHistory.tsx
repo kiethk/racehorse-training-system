@@ -66,7 +66,7 @@ export function HorseHealthHistory({ records }: { records: HealthRecord[] }) {
                 {record.diagnosis || 'No diagnosis recorded'}
               </p>
               <Detail label="Findings" value={record.findings} />
-              <Detail label="Symptoms" value={record.symptoms} />
+
               <Detail label="Treatment" value={record.treatment} />
               <Detail label="Restriction" value={record.restrictionDetails} />
               <Detail label="Product or service" value={record.productOrService} />
