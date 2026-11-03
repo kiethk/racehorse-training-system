@@ -1,6 +1,7 @@
+import type { MedicationCatalogItem } from '@/features/care/types';
 import { apiGet, apiPost } from '@/services/api';
 import type { HorseHealthMetric } from '@/features/horses/types';
-import type { HealthRecord, InjuryRecord, HorseHealthSummary, CorrectInjuryRequest } from '../types';
+import type { HealthRecord, InjuryRecord, HorseHealthSummary, CorrectInjuryRequest, HorseBodyRegion } from '../types';
 
 export interface CreateInjuryPayload {
   healthRecordId: number;
@@ -59,6 +60,13 @@ export const healthApi = {
     return [];
   },
 
+  getHorseBodyRegions: async (): Promise<HorseBodyRegion[]> => {
+    const res = await apiGet<ApiResponse<HorseBodyRegion[]> | HorseBodyRegion[]>('/api/horse-body-regions');
+    if (res && 'data' in res && Array.isArray(res.data)) return res.data;
+    if (Array.isArray(res)) return res;
+    return [];
+  },
+
   // Tạo bản ghi chấn thương mới (kèm marker 3D)
   createInjury: async (
     horseId: number,
@@ -112,6 +120,16 @@ export const healthApi = {
   },
 
   // Hiệu chỉnh bản ghi bệnh/chấn thương
+  // Danh mục thuốc lâm sàng cho Vet kê đơn (Track 2a/3a)
+  getClinicalMedications: async (): Promise<MedicationCatalogItem[]> => {
+    const res = await apiGet<ApiResponse<MedicationCatalogItem[]> | MedicationCatalogItem[]>(
+      '/api/clinical-medications'
+    );
+    if (res && 'data' in res && Array.isArray(res.data)) return res.data;
+    if (Array.isArray(res)) return res;
+    return [];
+  },
+
   correctInjury: async (
     horseId: number,
     injuryId: number,

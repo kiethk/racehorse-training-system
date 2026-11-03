@@ -9,7 +9,9 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
+import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
 import com.rtms.backend.medical.dto.VaccinationRequest;
+import com.rtms.backend.medical.enums.HydrationStatus;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.PreventiveProtocol;
@@ -37,6 +39,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -76,7 +79,10 @@ class CareSchedulePreventiveIntegrationTest {
         service = new CareScheduleService(schedules, horses, healthRecords, metrics, admissions, stalls, users,
                 incidents, profiles, audits, events, entityManager, notifications,
                 new TrainingDecisionService(horses, schedules, workouts), vaccinations,
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class));
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -283,6 +289,14 @@ class CareSchedulePreventiveIntegrationTest {
         request.setFindings("Normal");
         request.setDiagnosis("Healthy");
         request.setTrainingDecision(TrainingDecision.ALLOWED);
+        HorseHealthMetricRequest m = new HorseHealthMetricRequest();
+        m.setHeartRate(BigDecimal.valueOf(36));
+        m.setTemperature(BigDecimal.valueOf(37.8));
+        m.setWeight(BigDecimal.valueOf(450));
+        m.setRespiratoryRate(BigDecimal.valueOf(12));
+        m.setHydrationStatus(HydrationStatus.NORMAL);
+        m.setBodyConditionScore(BigDecimal.valueOf(5.5));
+        request.setMetrics(List.of(m));
         return request;
     }
 

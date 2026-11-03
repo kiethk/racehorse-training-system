@@ -27,11 +27,11 @@ function countAxis(days: HealthDay[]) {
  * The horses that need attention: how many horses in the viewer's scope had a health reading outside the normal range
  * on each day. Averaging the readings would say more about which horses were examined that day than about their health.
  */
-export function HealthTrendCard() {
+export function HealthTrendCard({ hideCaption = false }: { hideCaption?: boolean } = {}) {
   return (
     <TrendCard<HealthDay>
       title="Health"
-      caption="Horses with an abnormal health reading per day"
+      caption={hideCaption ? undefined : "Horses with an abnormal health reading per day"}
       emptyText="No health readings in this period."
       load={loadHealth}
       chart={(days) => ({

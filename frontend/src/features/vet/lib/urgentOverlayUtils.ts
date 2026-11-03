@@ -50,6 +50,27 @@ export interface CandidateAlert {
 }
 
 /**
+ * Returns all active unsuppressed P1 alerts sorted by oldest report time first.
+ */
+export function getEligibleP1Alerts<T extends CandidateAlert>(
+  alerts: T[],
+  pathname: string,
+  snoozedMap: Map<number, number>,
+  dismissedSet: Set<number>,
+  now: number = Date.now(),
+): T[] {
+  const eligible = alerts.filter((alert) => {
+    const snoozedUntil = snoozedMap.get(alert.scheduleId);
+    const dismissed = dismissedSet.has(alert.scheduleId);
+    return !isOverlaySuppressed(alert.scheduleId, pathname, snoozedUntil, dismissed, now);
+  });
+
+  return [...eligible].sort(
+    (a, b) => new Date(a.reportedAt).getTime() - new Date(b.reportedAt).getTime(),
+  );
+}
+
+/**
  * Finds the top candidate alert to show in the P1 overlay from the active alert queue.
  */
 export function selectP1OverlayAlert<T extends CandidateAlert>(
@@ -59,16 +80,6 @@ export function selectP1OverlayAlert<T extends CandidateAlert>(
   dismissedSet: Set<number>,
   now: number = Date.now(),
 ): T | null {
-  const eligible = alerts.filter((alert) => {
-    const snoozedUntil = snoozedMap.get(alert.scheduleId);
-    const dismissed = dismissedSet.has(alert.scheduleId);
-    return !isOverlaySuppressed(alert.scheduleId, pathname, snoozedUntil, dismissed, now);
-  });
-
-  if (eligible.length === 0) return null;
-
-  // Pick the oldest reported case first
-  return [...eligible].sort(
-    (a, b) => new Date(a.reportedAt).getTime() - new Date(b.reportedAt).getTime(),
-  )[0];
+  const eligible = getEligibleP1Alerts(alerts, pathname, snoozedMap, dismissedSet, now);
+  return eligible.length > 0 ? eligible[0] : null;
 }

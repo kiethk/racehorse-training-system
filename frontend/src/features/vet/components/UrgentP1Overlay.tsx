@@ -17,6 +17,7 @@ import {
   DEFAULT_SNOOZE_MS,
   DISMISSED_SESSION_KEY,
   getNextSnoozeExpiry,
+  getEligibleP1Alerts,
   selectP1OverlayAlert,
   shouldPlayEmergencySound,
   SNOOZE_STORAGE_KEY,
@@ -117,7 +118,10 @@ export function UrgentP1Overlay({ alerts, onOpenCase, onSnooze }: Props) {
     };
   }, []);
 
-  const targetAlert = selectP1OverlayAlert(alerts, pathname, snoozed, dismissed);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const eligibleAlerts = getEligibleP1Alerts(alerts, pathname, snoozed, dismissed);
+  const safeIndex = Math.min(currentIndex, Math.max(0, eligibleAlerts.length - 1));
+  const targetAlert = eligibleAlerts[safeIndex] ?? null;
 
   // Trigger emergency alarm once when an unhandled P1 alert first appears
   useEffect(() => {
@@ -137,6 +141,7 @@ export function UrgentP1Overlay({ alerts, onOpenCase, onSnooze }: Props) {
         writeStorageMap(SNOOZE_STORAGE_KEY, next);
         return next;
       });
+      setCurrentIndex((prev) => Math.max(0, prev - 1));
       onSnooze(alert);
     },
     [onSnooze],
@@ -158,6 +163,7 @@ export function UrgentP1Overlay({ alerts, onOpenCase, onSnooze }: Props) {
   const handleOpenCase = useCallback(
     (alert: UrgentAssignmentAlert) => {
       handleDismiss(alert);
+      setCurrentIndex((prev) => Math.max(0, prev - 1));
       onOpenCase(alert);
     },
     [handleDismiss, onOpenCase],
@@ -177,7 +183,12 @@ export function UrgentP1Overlay({ alerts, onOpenCase, onSnooze }: Props) {
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-danger-light,#fee2e2)] text-[var(--color-danger)]">
             <Icon name="alert-triangle" size={18} />
           </span>
-          <span>P1 Emergency Alert: Urgent Case Assigned</span>
+          <span className="font-bold">Urgent Case Assigned</span>
+          {eligibleAlerts.length > 1 && (
+            <span className="ml-1 rounded-full border border-[var(--color-danger)]/30 bg-[var(--color-danger-light,#fee2e2)] px-2 py-0.5 text-xs font-semibold text-[var(--color-danger)]">
+              Case {safeIndex + 1} of {eligibleAlerts.length}
+            </span>
+          )}
         </div>
       }
       description="Immediate clinical attention required. The horse has been locked from all training activities."
@@ -190,6 +201,35 @@ export function UrgentP1Overlay({ alerts, onOpenCase, onSnooze }: Props) {
           >
             Snooze 10 minutes
           </Button>
+
+          {eligibleAlerts.length > 1 && (
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="chevron-left"
+                disabled={safeIndex === 0}
+                onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+                aria-label="Previous urgent case"
+              >
+                Prev
+              </Button>
+              <span className="px-1 text-xs font-semibold text-[var(--color-text-secondary)]">
+                {safeIndex + 1} / {eligibleAlerts.length}
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={safeIndex >= eligibleAlerts.length - 1}
+                onClick={() => setCurrentIndex((prev) => Math.min(eligibleAlerts.length - 1, prev + 1))}
+                aria-label="Next urgent case"
+              >
+                Next
+                <Icon name="chevron-right" size={14} className="ml-1" />
+              </Button>
+            </div>
+          )}
+
           <Button
             variant="primary"
             size="md"

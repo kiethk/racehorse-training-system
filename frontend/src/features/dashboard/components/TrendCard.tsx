@@ -22,7 +22,7 @@ export function TrendCard<TItem>({
 }: {
   title: string;
   /** What the bars show, for example "Average performance rating per week". The date range is appended. */
-  caption: string;
+  caption?: string;
   emptyText: string;
   /** Must be a stable function (a module-level function), because it is the dependency of the loading effect. */
   load: () => Promise<Trend<TItem>>;
@@ -55,9 +55,11 @@ export function TrendCard<TItem>({
     <Panel padded className="space-y-2">
       <div>
         <SectionTitle>{title}</SectionTitle>
-        <p className="text-xs text-[var(--color-text-secondary)]">
+        {caption && (
+          <p className="text-xs text-[var(--color-text-secondary)]">
           {caption}, {formatDate(trend.fromDate, SHORT_DATE)} – {formatDate(trend.toDate, SHORT_DATE)}.
-        </p>
+          </p>
+        )}
       </div>
 
       {trend.items.length === 0 ? (

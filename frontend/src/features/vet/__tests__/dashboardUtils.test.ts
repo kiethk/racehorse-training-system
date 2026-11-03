@@ -70,3 +70,17 @@ test('filterTodayAppointments sorts chronologically and filters by target date',
   assert.equal(today[0].id, 2); // 13:30 first
   assert.equal(today[1].id, 1); // 14:30 second
 });
+
+test('filterTodayAppointments excludes URGENT cases from daily clinical agenda', () => {
+  const mockSchedules = [
+    { id: 1, careType: 'ROUTINE', scheduledAt: '2026-10-22T14:30:00' },
+    { id: 2, careType: 'INITIAL', scheduledAt: '2026-10-22T13:30:00' },
+    { id: 3, careType: 'URGENT', scheduledAt: '2026-10-22T11:00:00' },
+  ] as CareScheduleResponse[];
+
+  const today = filterTodayAppointments(mockSchedules, '2026-10-22');
+  assert.equal(today.length, 2);
+  assert.equal(today[0].id, 2);
+  assert.equal(today[1].id, 1);
+  assert.ok(!today.some((s) => s.careType === 'URGENT'));
+});

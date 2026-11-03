@@ -3,6 +3,7 @@
 import { FormField } from '@/components/ui/FormField';
 import { ChoiceInput, Input, Select } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { formatDate } from '@/lib/display';
 import { followUpDescriptionOptions } from './constants';
 import type { Dispatch, SetStateAction } from 'react';
 
@@ -22,6 +23,7 @@ export interface FollowUpSectionProps {
   setFieldErrors: Dispatch<SetStateAction<Record<string, string>>>;
   businessDateFromToday: (offset: number) => string;
   tomorrowBusinessDate: () => string;
+  suggestedRecheckDate?: string;
 }
 
 export function FollowUpSection(props: FollowUpSectionProps) {
@@ -29,7 +31,7 @@ export function FollowUpSection(props: FollowUpSectionProps) {
     isFormDisabled, careType, schedulePurpose, followUpRequired, followUpActive,
     scheduleFollowUp, setScheduleFollowUp, followUpDate, setFollowUpDate,
     followUpDescription, setFollowUpDescription, fieldErrors, setFieldErrors,
-    businessDateFromToday, tomorrowBusinessDate,
+    businessDateFromToday, tomorrowBusinessDate, suggestedRecheckDate,
   } = props;
 
   return (
@@ -90,6 +92,11 @@ export function FollowUpSection(props: FollowUpSectionProps) {
                 );
               })}
             </div>
+            {suggestedRecheckDate && (
+              <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary)]">
+                <span>💡 Suggested recheck: on or after {formatDate(suggestedRecheckDate)} (active medication schedule)</span>
+              </p>
+            )}
             {fieldErrors.followUpDate && (
               <p className="mt-0.5 text-xs font-medium text-[var(--color-danger)]">{fieldErrors.followUpDate}</p>
             )}
