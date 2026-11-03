@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, EmptyState, LinkButton, ListSkeleton, PageHeader, Panel, ScreenLayout, Tabs } from '@/components/ui';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
@@ -78,6 +79,7 @@ const columns: DataTableColumn<RaceRegistrationResponse>[] = [
 ];
 
 export function TrainerRaceList() {
+  const router = useRouter();
   const [items, setItems] = useState<RaceRegistrationResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +145,7 @@ export function TrainerRaceList() {
           defaultOrder={newestNominationFirst}
           columns={columns}
           getRowKey={(item) => item.id}
+          onRowClick={(item) => router.push(`/trainer/racing/${item.id}`)}
           getSearchText={(item) => `${item.raceName} ${item.raceCategory} ${item.horseName ?? ''} ${item.location}`}
           searchPlaceholder="Search races, horses or locations…"
           emptyTitle={items.length === 0 ? 'You have not submitted any nominations' : 'No matching nominations found'}

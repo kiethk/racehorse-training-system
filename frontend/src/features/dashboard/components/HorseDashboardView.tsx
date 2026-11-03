@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FilterChips,
@@ -76,7 +77,21 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
           {horse.horseName}
         </Link>
         <div className="text-xs text-[var(--color-text-muted)]">
-          {[horse.stallCode, horse.breed].filter(Boolean).join(' · ') || '—'}
+          {horse.stallCode ? (
+            horseBasePath.startsWith('/trainer') ? (
+              <Link
+                href={`/trainer/stable?stall=${encodeURIComponent(horse.stallCode)}`}
+                className="hover:text-[var(--color-primary)] hover:underline"
+              >
+                Stall {horse.stallCode}
+              </Link>
+            ) : (
+              `Stall ${horse.stallCode}`
+            )
+          ) : null}
+          {horse.stallCode && horse.breed ? ' · ' : null}
+          {horse.breed}
+          {!horse.stallCode && !horse.breed ? '—' : null}
         </div>
       </div>
     ),
@@ -98,7 +113,18 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
       ) : (
         // Always three lines (course, status, progress) so every row reads the same way.
         <div className="space-y-1">
-          <div className="text-[var(--color-text-secondary)]">{horse.courseName}</div>
+          <div className="text-[var(--color-text-secondary)]">
+            {horseBasePath.startsWith('/trainer') && horse.planId ? (
+              <Link
+                href={`/trainer/plans/${horse.planId}`}
+                className="hover:text-[var(--color-primary)] hover:underline"
+              >
+                {horse.courseName}
+              </Link>
+            ) : (
+              horse.courseName
+            )}
+          </div>
           <StatusPill status={PLAN_STATUS[horse.planStatus]} />
           <CourseProgress horse={horse} />
         </div>
@@ -168,6 +194,7 @@ export function HorseDashboardView({
   /** Adds the health chart below the performance chart. */
   showHealth?: boolean;
 }) {
+  const router = useRouter();
   const columns = useMemo(() => columnsFor(horseBasePath), [horseBasePath]);
   const [horses, setHorses] = useState<DashboardHorse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -283,6 +310,7 @@ export function HorseDashboardView({
           defaultOrder={newestHorseFirst}
           columns={columns}
           getRowKey={(horse) => horse.horseId}
+          onRowClick={(horse) => router.push(`${horseBasePath}/${horse.horseId}`)}
           loading={loading}
           pageSize={8}
           getSearchText={(horse) => `${horse.horseName} ${horse.courseName} ${horse.stallCode ?? ''}`}
