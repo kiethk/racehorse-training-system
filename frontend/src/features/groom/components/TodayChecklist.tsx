@@ -1,7 +1,8 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { groomApi } from '../services/groomService';
@@ -13,8 +14,10 @@ import { TaskRow } from './TaskRow';
 import { displayError } from '@/lib/display';
 import { toast } from '@/lib/toast';
 
-export function TodayChecklist() {
-  const [tasks, setTasks] = useState<TodayTaskItem[]>([]);
+/** `horseId` narrows the checklist to one horse (opened from its stall on the Stable screen). */
+export function TodayChecklist({ horseId }: { horseId?: number }) {
+  const router = useRouter();
+  const [allTasks, setTasks] = useState<TodayTaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   /** The block whose completion dialog is open. */
@@ -52,6 +55,12 @@ export function TodayChecklist() {
     }
   }
 
+  const tasks = useMemo(
+    () => (horseId != null ? allTasks.filter((task) => task.horseId === horseId) : allTasks),
+    [allTasks, horseId],
+  );
+  const filterHorseName = horseId != null ? allTasks.find((task) => task.horseId === horseId)?.horseName ?? `Horse #${horseId}` : null;
+
   // Routine tasks of one duty at one time become one block; workouts and vet visits stay single rows.
   const entries = useMemo(() => groupTasks(tasks), [tasks]);
 
@@ -78,6 +87,13 @@ export function TodayChecklist() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             Today&apos;s Task Checklist
           </h1>
+          {filterHorseName && (
+            <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] py-0.5 pl-3 pr-0.5 text-xs font-medium text-[var(--color-text-primary)]">
+              Horse: {filterHorseName}
+              <IconButton icon="x" label="Show tasks for every horse" size="sm" variant="tertiary"
+                onClick={() => router.replace('/groom/tasks')} />
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

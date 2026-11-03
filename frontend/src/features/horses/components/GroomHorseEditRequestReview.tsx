@@ -178,7 +178,7 @@ export function GroomHorseEditRequestReview({ requestId }: { requestId: number }
                 content: (
                   <AdmissionInfoSection title="Horse details">
                     {changes.length === 0 ? (
-                      <p className="text-sm text-[var(--color-text-muted)]">No detail changes; this request only updates documents.</p>
+                      <p className="text-sm text-[var(--color-text-muted)]">No detail changes. This request only updates documents.</p>
                     ) : (
                       <Table bare>
                         <THead><Tr><Th>Field</Th><Th>Current</Th><Th>Requested</Th></Tr></THead>

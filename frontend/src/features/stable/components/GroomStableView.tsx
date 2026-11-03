@@ -198,11 +198,11 @@ export function GroomStableView() {
             actions={
               selectedHorse && selectedIsOwn ? (
                 <>
+                  <LinkButton href={`/groom/tasks?horseId=${selectedHorse.id}`} variant="secondary" icon="list">
+                    Open daily tasks
+                  </LinkButton>
                   <LinkButton href={`/groom/incidents/new?horseId=${selectedHorse.id}`} variant="warning" icon="alert-triangle">
                     Report incident
-                  </LinkButton>
-                  <LinkButton href="/groom/tasks" variant="secondary" icon="list">
-                    Open daily tasks
                   </LinkButton>
                 </>
               ) : undefined

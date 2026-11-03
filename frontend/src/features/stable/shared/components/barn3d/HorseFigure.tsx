@@ -33,13 +33,16 @@ interface HorseFigureProps {
   dimmed: boolean;
   draggable: boolean;
   onPointerDown?: (event: ThreeEvent<PointerEvent>) => void;
+  stallId: number;
+  /** Hovering the horse counts as hovering its stall, so its groom's names show up the same way. */
+  onHover: (stallId: number | null) => void;
 }
 
 /**
  * One horse. Every horse clones the same loaded model (a rigged mesh needs its own skeleton) but shares
  * its geometry and materials, so twelve horses cost twelve skeletons, not twelve models.
  */
-function HorseFigureComponent({ x, z, y = 0, row, ringMaterial, dimmed, draggable, onPointerDown }: HorseFigureProps) {
+function HorseFigureComponent({ x, z, y = 0, row, ringMaterial, dimmed, draggable, onPointerDown, stallId, onHover }: HorseFigureProps) {
   const { scene } = useGLTF(HORSE_MODEL_URL);
   const horse = useMemo(() => cloneSkinned(prepare(scene)), [scene]);
   const geo = sharedGeometries();
@@ -55,7 +58,8 @@ function HorseFigureComponent({ x, z, y = 0, row, ringMaterial, dimmed, draggabl
         rotation={[0, row === 0 ? 0 : Math.PI, 0]}
         scale={dimmed ? 0.7 : 0.75}
         onPointerDown={draggable ? onPointerDown : undefined}
-        onPointerOver={draggable ? (event) => { event.stopPropagation(); } : undefined}
+        onPointerOver={(event) => { event.stopPropagation(); onHover(stallId); }}
+        onPointerOut={() => onHover(null)}
       >
         <primitive object={horse} position={[0, 0, -0.95]} />
       </group>
