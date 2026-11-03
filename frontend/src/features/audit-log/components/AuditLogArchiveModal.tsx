@@ -62,9 +62,7 @@ export function AuditLogArchiveModal({
     return false;
   })();
 
-  const isCustomMissingDates = preset === 'custom' && !fromDate && !toDate;
   const isCustomInvalidRange = Boolean(preset === 'custom' && fromDate && toDate && fromDate > toDate);
-  const canProceed = !isSelectionEmpty && !isCustomMissingDates && !isCustomInvalidRange;
 
   const getPresetDescription = () => {
     if (preset === '30_days') {
@@ -77,7 +75,7 @@ export function AuditLogArchiveModal({
   };
 
   const handleNextStep = () => {
-    if (isSelectionEmpty) {
+    if (preset !== 'custom' && isSelectionEmpty) {
       toast.error('No records to purge', 'There are no audit logs matching the selected retention criteria.');
       return;
     }
@@ -87,7 +85,7 @@ export function AuditLogArchiveModal({
         return;
       }
       if (fromDate && toDate && fromDate > toDate) {
-        toast.error('Invalid date range', 'From date cannot be after to date.');
+        toast.error('Invalid date range', 'From Date cannot be later than To Date. Please swap the dates.');
         return;
       }
     }
@@ -181,8 +179,8 @@ export function AuditLogArchiveModal({
               <Button
                 variant="destructive"
                 onClick={handleNextStep}
-                disabled={!canProceed || submitting}
-                title={!canProceed ? 'Please select retention criteria with logs to purge' : undefined}
+                disabled={submitting || (preset !== 'custom' && isSelectionEmpty)}
+                title={preset !== 'custom' && isSelectionEmpty ? 'No matching logs available to purge' : undefined}
               >
                 Review &amp; Purge &rarr;
               </Button>
@@ -327,7 +325,11 @@ export function AuditLogArchiveModal({
                       type="date"
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
-                      className="w-full h-8 px-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]"
+                      className={`w-full h-8 px-2 rounded border ${
+                        isCustomInvalidRange
+                          ? 'border-rose-400 dark:border-rose-600'
+                          : 'border-[var(--color-border)]'
+                      } bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]`}
                     />
                   </div>
                   <div>
@@ -338,9 +340,29 @@ export function AuditLogArchiveModal({
                       type="date"
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
-                      className="w-full h-8 px-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]"
+                      className={`w-full h-8 px-2 rounded border ${
+                        isCustomInvalidRange
+                          ? 'border-rose-400 dark:border-rose-600'
+                          : 'border-[var(--color-border)]'
+                      } bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]`}
                     />
                   </div>
+                  {isCustomInvalidRange && (
+                    <div className="col-span-2 flex items-center justify-between text-[11px] text-rose-500 dark:text-rose-400 pt-0.5">
+                      <span>From Date cannot be later than To Date.</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const temp = fromDate;
+                          setFromDate(toDate);
+                          setToDate(temp);
+                        }}
+                        className="underline hover:text-rose-600 dark:hover:text-rose-300 font-medium cursor-pointer"
+                      >
+                        ⇄ Swap Dates
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

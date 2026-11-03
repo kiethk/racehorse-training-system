@@ -54,10 +54,22 @@ export function AuditLogExportModal({
     return false;
   })();
 
+  const isCustomInvalidRange = Boolean(mode === 'custom' && fromDate && toDate && fromDate > toDate);
+
   const handleExport = async () => {
-    if (isSelectionEmpty) {
+    if (mode !== 'custom' && isSelectionEmpty) {
       toast.error('No logs to export', 'There are no audit logs found for the selected export scope.');
       return;
+    }
+    if (mode === 'custom') {
+      if (!fromDate && !toDate) {
+        toast.error('Date range required', 'Please select at least a start or end date.');
+        return;
+      }
+      if (fromDate && toDate && fromDate > toDate) {
+        toast.error('Invalid date range', 'From Date cannot be later than To Date. Please swap the dates.');
+        return;
+      }
     }
     try {
       setDownloading(true);
@@ -132,8 +144,8 @@ export function AuditLogExportModal({
             icon={downloading ? undefined : 'download'}
             loading={downloading}
             onClick={handleExport}
-            disabled={isSelectionEmpty || downloading}
-            title={isSelectionEmpty ? 'No matching logs available to export' : undefined}
+            disabled={downloading || (mode !== 'custom' && isSelectionEmpty)}
+            title={mode !== 'custom' && isSelectionEmpty ? 'No matching logs available to export' : undefined}
           >
             Download CSV
           </Button>
@@ -233,7 +245,11 @@ export function AuditLogExportModal({
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full h-8 px-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]"
+                  className={`w-full h-8 px-2 rounded border ${
+                    isCustomInvalidRange
+                      ? 'border-rose-400 dark:border-rose-600'
+                      : 'border-[var(--color-border)]'
+                  } bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]`}
                 />
               </div>
               <div>
@@ -244,9 +260,29 @@ export function AuditLogExportModal({
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="w-full h-8 px-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]"
+                  className={`w-full h-8 px-2 rounded border ${
+                    isCustomInvalidRange
+                      ? 'border-rose-400 dark:border-rose-600'
+                      : 'border-[var(--color-border)]'
+                  } bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]`}
                 />
               </div>
+              {isCustomInvalidRange && (
+                <div className="col-span-2 flex items-center justify-between text-[11px] text-rose-500 dark:text-rose-400 pt-0.5">
+                  <span>From Date cannot be later than To Date.</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const temp = fromDate;
+                      setFromDate(toDate);
+                      setToDate(temp);
+                    }}
+                    className="underline hover:text-rose-600 dark:hover:text-rose-300 font-medium cursor-pointer"
+                  >
+                    ⇄ Swap Dates
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
