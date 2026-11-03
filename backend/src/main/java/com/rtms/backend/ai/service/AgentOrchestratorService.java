@@ -45,6 +45,7 @@ public class AgentOrchestratorService {
     private final DynamicToolRegistryService toolRegistryService;
     private final AiToolExecutionService toolExecutionService;
     private final AiConversationService conversationService;
+    private final IntentDecompositionService intentDecompositionService;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
@@ -56,6 +57,7 @@ public class AgentOrchestratorService {
             DynamicToolRegistryService toolRegistryService,
             AiToolExecutionService toolExecutionService,
             @Autowired(required = false) AiConversationService conversationService,
+            @Autowired(required = false) IntentDecompositionService intentDecompositionService,
             ObjectMapper objectMapper) {
         this.aiBaseUrl = aiBaseUrl != null && !aiBaseUrl.isBlank() ? aiBaseUrl.trim() : "https://api.openai.com/v1";
         this.aiApiKey = aiApiKey != null ? aiApiKey.trim() : "";
@@ -67,6 +69,9 @@ public class AgentOrchestratorService {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(20))
                 .build();
+        this.intentDecompositionService = intentDecompositionService != null
+                ? intentDecompositionService
+                : new DefaultIntentDecompositionService(this.aiBaseUrl, this.aiApiKey, this.aiModel, objectMapper);
     }
 
     public AgentOrchestratorService(
@@ -76,7 +81,18 @@ public class AgentOrchestratorService {
             DynamicToolRegistryService toolRegistryService,
             AiToolExecutionService toolExecutionService,
             ObjectMapper objectMapper) {
-        this(aiBaseUrl, aiApiKey, aiModel, toolRegistryService, toolExecutionService, null, objectMapper);
+        this(aiBaseUrl, aiApiKey, aiModel, toolRegistryService, toolExecutionService, null, null, objectMapper);
+    }
+
+    public AgentOrchestratorService(
+            String aiBaseUrl,
+            String aiApiKey,
+            String aiModel,
+            DynamicToolRegistryService toolRegistryService,
+            AiToolExecutionService toolExecutionService,
+            IntentDecompositionService intentDecompositionService,
+            ObjectMapper objectMapper) {
+        this(aiBaseUrl, aiApiKey, aiModel, toolRegistryService, toolExecutionService, null, intentDecompositionService, objectMapper);
     }
 
     @PostConstruct
@@ -127,9 +143,28 @@ public class AgentOrchestratorService {
             );
         }
 
+        // 2. Pre-Flight Intent Decomposition (Phân rã ý định & Cách ly OOD)
+        IntentDecompositionService.DecomposedIntents intents = intentDecompositionService != null
+                ? intentDecompositionService.decompose(request.message(), currentUser != null ? currentUser.getRole() : null)
+                : new IntentDecompositionService.DecomposedIntents(List.of(request.message()), Collections.emptyList());
+
+        // Fast Short-Circuit: Nếu 100% câu hỏi nằm ngoài phạm vi RTMS, từ chối ngay mà không kích hoạt ReAct loop
+        if (intents.isPureOutOfDomain()) {
+            log.info("AgentOrchestratorService: Phát hiện câu hỏi 100% Out-of-Domain. Kích hoạt Pre-Flight Refusal.");
+            String cannedRefusal = "Tôi là Trợ lý AI RTMS, được thiết kế chuyên biệt để hỗ trợ vận hành và quản lý trường đua ngựa (chiến mã, lịch tập, chuồng trại, y tế và giải đua). Yêu cầu của bạn nằm ngoài phạm vi nghiệp vụ được phân công nên tôi không thể hỗ trợ.";
+            if (conversationService != null && conversationId != null) {
+                try {
+                    conversationService.saveMessage(conversationId, "assistant", cannedRefusal, null);
+                } catch (Exception e) {
+                    log.error("Lỗi khi lưu phản hồi từ chối OOD vào DB: {}", e.getMessage());
+                }
+            }
+            return new AiChatResponseDto(cannedRefusal, conversationId, Collections.emptyList(), Collections.emptyList());
+        }
+
         List<Map<String, Object>> executedTools = new ArrayList<>();
 
-        // 2. Xây dựng danh sách tin nhắn hội thoại
+        // 3. Xây dựng danh sách tin nhắn hội thoại
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of(
                 "role", "system",
@@ -165,12 +200,17 @@ public class AgentOrchestratorService {
             }
         }
 
+        // Cách ly vật lý: Chỉ đưa vế In-Domain vào ReAct context để loại bỏ 100% khả năng rò rỉ đáp án OOD
+        String sanitizedUserPrompt = intents.hasInDomain()
+                ? String.join("\n", intents.inDomainIntents())
+                : request.message();
+
         messages.add(Map.of(
                 "role", "user",
-                "content", request.message()
+                "content", sanitizedUserPrompt
         ));
 
-        // 3. Lấy danh sách công cụ theo vai trò người dùng (Dynamic Tool Scoping)
+        // 4. Lấy danh sách công cụ theo vai trò người dùng (Dynamic Tool Scoping)
         List<Map<String, Object>> tools = toolRegistryService.getFunctionSpecsForRole(currentUser.getRole());
 
         // 4. Vòng lặp suy luận và gọi công cụ (ReAct Loop)
@@ -295,6 +335,12 @@ public class AgentOrchestratorService {
             }
         } else if (finalAnswer == null || finalAnswer.isBlank()) {
             finalAnswer = "Tôi đã hoàn thành việc tra cứu dữ liệu theo yêu cầu của bạn.";
+        }
+
+        // Bổ sung ghi chú từ chối xác định cho các vế Out-of-Domain nếu có
+        if (intents.hasOutOfDomain()) {
+            String oodItems = String.join(", ", intents.outOfDomainIntents());
+            finalAnswer += "\n\n*Lưu ý: Về yêu cầu ngoài nghiệp vụ [" + oodItems + "], Trợ lý AI RTMS được thiết kế chuyên biệt cho hệ thống quản lý trường đua ngựa nên xin phép từ chối giải đáp các câu hỏi không liên quan.*";
         }
 
         // 5. Lưu phản hồi của trợ lý vào Database
