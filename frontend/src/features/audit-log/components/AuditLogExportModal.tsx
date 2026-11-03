@@ -126,25 +126,19 @@ export function AuditLogExportModal({
       }
     >
       <div className="space-y-4 pt-1 text-xs text-[var(--color-text-primary)]">
-        {/* Alert when selection has 0 records */}
-        {isSelectionEmpty && (
-          <div className="flex items-center gap-2 p-2.5 rounded border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-xs font-medium">
-            <Icon name="alert-triangle" className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-            <span>
-              {mode === 'all'
-                ? 'The database contains no audit log records (0 total records).'
-                : 'Current filter criteria matches 0 records.'} CSV export is disabled.
-            </span>
-          </div>
-        )}
-
         <div className="space-y-2">
           <div className="font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider text-[11px]">
             Export Scope
           </div>
 
           <div className="space-y-2">
-            <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
+            <label
+              className={`flex items-start gap-2 p-2.5 rounded border ${
+                mode === 'all' && isSelectionEmpty
+                  ? 'border-amber-400 dark:border-amber-500'
+                  : 'border-[var(--color-border)]'
+              } hover:bg-[var(--color-surface-muted)] cursor-pointer`}
+            >
               <input
                 type="radio"
                 name="export_mode"
@@ -158,12 +152,18 @@ export function AuditLogExportModal({
                   All recorded logs (Complete History)
                 </div>
                 <div className="text-[11px] text-[var(--color-text-muted)]">
-                  Exports every activity record in the database from inception to date.
+                  Exports every activity record in the database from inception to date{totalCount === 0 ? ' (0 records — nothing to export)' : ''}.
                 </div>
               </div>
             </label>
 
-            <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
+            <label
+              className={`flex items-start gap-2 p-2.5 rounded border ${
+                mode === 'current_filter' && isSelectionEmpty
+                  ? 'border-amber-400 dark:border-amber-500'
+                  : 'border-[var(--color-border)]'
+              } hover:bg-[var(--color-surface-muted)] cursor-pointer`}
+            >
               <input
                 type="radio"
                 name="export_mode"
@@ -178,13 +178,19 @@ export function AuditLogExportModal({
                 </div>
                 <div className="text-[11px] text-[var(--color-text-muted)]">
                   {hasActiveDateFilter
-                    ? `From ${currentFilters.from || 'beginning'} to ${currentFilters.to || 'now'}`
+                    ? `From ${currentFilters.from || 'beginning'} to ${currentFilters.to || 'now'}${filteredCount === 0 ? ' (0 records — nothing to export)' : ''}`
                     : 'No date filter currently applied on the search toolbar.'}
                 </div>
               </div>
             </label>
 
-            <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
+            <label
+              className={`flex items-start gap-2 p-2.5 rounded border ${
+                mode === 'custom' && isSelectionEmpty
+                  ? 'border-amber-400 dark:border-amber-500'
+                  : 'border-[var(--color-border)]'
+              } hover:bg-[var(--color-surface-muted)] cursor-pointer`}
+            >
               <input
                 type="radio"
                 name="export_mode"

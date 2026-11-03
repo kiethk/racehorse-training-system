@@ -208,7 +208,7 @@ export function AuditLogArchiveModal({
                 </div>
                 <div>
                   <div className="text-[11px] text-[var(--color-text-muted)]">Logs &gt; 30 Days</div>
-                  <div className={`font-semibold text-sm ${status.agedCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-[var(--color-text-muted)]'}`}>
+                  <div className="font-semibold text-sm">
                     {status.agedCount.toLocaleString()}
                   </div>
                 </div>
@@ -221,16 +221,6 @@ export function AuditLogArchiveModal({
               </div>
             )}
 
-            {/* Alert when selection has 0 records */}
-            {isSelectionEmpty && (
-              <div className="flex items-center gap-2 p-2.5 rounded border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-xs">
-                <Icon name="alert-triangle" className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                <span>
-                  No audit logs match this criteria ({preset === '30_days' || preset === '60_days' ? '0 records older than threshold' : '0 records'}). Export and purge are disabled.
-                </span>
-              </div>
-            )}
-
             {/* Retention Range Presets */}
             <div className="space-y-2">
               <div className="font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider text-[11px]">
@@ -238,7 +228,13 @@ export function AuditLogArchiveModal({
               </div>
 
               <div className="space-y-2">
-                <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
+                <label
+                  className={`flex items-start gap-2 p-2.5 rounded border ${
+                    preset === '30_days' && isAgedEmpty
+                      ? 'border-amber-400 dark:border-amber-500'
+                      : 'border-[var(--color-border)]'
+                  } hover:bg-[var(--color-surface-muted)] cursor-pointer`}
+                >
                   <input
                     type="radio"
                     name="archive_preset"
@@ -248,21 +244,22 @@ export function AuditLogArchiveModal({
                     className="mt-0.5"
                   />
                   <div className="space-y-0.5">
-                    <div className="font-medium text-[var(--color-text-primary)] flex items-center gap-1.5">
-                      <span>Logs older than 30 days (Recommended)</span>
-                      {isAgedEmpty && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                          0 records
-                        </span>
-                      )}
+                    <div className="font-medium text-[var(--color-text-primary)]">
+                      Logs older than 30 days (Recommended)
                     </div>
                     <div className="text-[11px] text-[var(--color-text-muted)]">
-                      Keeps recent operational history intact while clearing older logs ({status?.agedCount ?? 0} records).
+                      Keeps recent operational history intact while clearing older logs ({status?.agedCount ?? 0} records{isAgedEmpty ? ' — nothing to purge' : ''}).
                     </div>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
+                <label
+                  className={`flex items-start gap-2 p-2.5 rounded border ${
+                    preset === '60_days' && isAgedEmpty
+                      ? 'border-amber-400 dark:border-amber-500'
+                      : 'border-[var(--color-border)]'
+                  } hover:bg-[var(--color-surface-muted)] cursor-pointer`}
+                >
                   <input
                     type="radio"
                     name="archive_preset"
@@ -272,21 +269,22 @@ export function AuditLogArchiveModal({
                     className="mt-0.5"
                   />
                   <div className="space-y-0.5">
-                    <div className="font-medium text-[var(--color-text-primary)] flex items-center gap-1.5">
-                      <span>Logs older than 60 days</span>
-                      {isAgedEmpty && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                          0 records
-                        </span>
-                      )}
+                    <div className="font-medium text-[var(--color-text-primary)]">
+                      Logs older than 60 days
                     </div>
                     <div className="text-[11px] text-[var(--color-text-muted)]">
-                      Retains 2 full months of history and purges older records.
+                      Retains 2 full months of history and purges older records{isAgedEmpty ? ' (0 records — nothing to purge)' : ''}.
                     </div>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-2 p-2.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)] cursor-pointer">
+                <label
+                  className={`flex items-start gap-2 p-2.5 rounded border ${
+                    preset === 'custom' && isSelectionEmpty
+                      ? 'border-amber-400 dark:border-amber-500'
+                      : 'border-[var(--color-border)]'
+                  } hover:bg-[var(--color-surface-muted)] cursor-pointer`}
+                >
                   <input
                     type="radio"
                     name="archive_preset"
@@ -349,16 +347,9 @@ export function AuditLogArchiveModal({
         ) : (
           /* Step 2: Minimal Direct Confirmation */
           <div className="space-y-3 py-1 text-sm text-[var(--color-text-primary)]">
-            {isSelectionEmpty ? (
-              <div className="flex items-center gap-2 p-2.5 rounded border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-xs">
-                <Icon name="alert-triangle" className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                <span>Selected scope has 0 matching records. Purge cannot be initiated.</span>
-              </div>
-            ) : (
-              <p className="leading-relaxed">
-                Once you click <strong>Download CSV &amp; Purge</strong>, a CSV copy will be downloaded to your computer and these records will be <strong>permanently deleted from the database</strong>.
-              </p>
-            )}
+            <p className="leading-relaxed">
+              Once you click <strong>Download CSV &amp; Purge</strong>, a CSV copy will be downloaded to your computer and these records will be <strong>permanently deleted from the database</strong>.
+            </p>
 
             <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs font-mono">
               <span className="text-[var(--color-text-muted)] font-sans">Scope: </span>
