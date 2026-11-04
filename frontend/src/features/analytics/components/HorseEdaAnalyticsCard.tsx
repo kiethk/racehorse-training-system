@@ -32,7 +32,7 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Danh sách ngựa để chọn: ưu tiên availableHorses hoặc trích xuất từ fleetData.points
+  // Candidate horses for selection: prefer availableHorses or extract from fleetData.points
   const horseOptions: HorseEdaOption[] = useMemo(() => {
     if (availableHorses && availableHorses.length > 0) {
       return availableHorses;
@@ -47,14 +47,14 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
     return [];
   }, [availableHorses, fleetData]);
 
-  // Tự động gán selectedHorseId nếu chưa có
+  // Auto-assign selectedHorseId if not already set
   useEffect(() => {
     if (!selectedHorseId && horseOptions.length > 0) {
       setSelectedHorseId(horseOptions[0].id);
     }
   }, [selectedHorseId, horseOptions]);
 
-  // Tải dữ liệu toàn đàn
+  // Fetch fleet EDA analytics data
   useEffect(() => {
     let active = true;
     edaAnalyticsService
@@ -70,7 +70,7 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
       })
       .catch((err) => {
         if (active) {
-          setError(err?.message || 'Không thể tải dữ liệu phân tích EDA');
+          setError(err?.message || 'Failed to load fleet EDA analytics data');
           setLoading(false);
         }
       });
@@ -80,7 +80,7 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
     };
   }, []);
 
-  // Tải dữ liệu cá nhân khi chuyển sang mode INDIVIDUAL hoặc đổi ngựa
+  // Fetch individual horse data when switching to INDIVIDUAL or changing horse
   useEffect(() => {
     if (viewMode === 'INDIVIDUAL') {
       if (!selectedHorseId) {
@@ -99,7 +99,7 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
         })
         .catch((err) => {
           if (active) {
-            setError(err?.message || 'Không thể tải phân tích chi tiết của chiến mã');
+            setError(err?.message || 'Failed to load individual horse analytics');
             setLoading(false);
           }
         });
@@ -110,31 +110,37 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
     }
   }, [viewMode, selectedHorseId]);
 
-  // Chuyển đổi dữ liệu points sang format của Chart
+  // Transform points for chart display
   const chartPoints: ChartDataPoint[] = useMemo(() => {
     if (viewMode === 'FLEET') {
       if (!fleetData?.points) return [];
       return fleetData.points.map((p) => ({
         id: p.horseId,
         label: p.horseName,
-        subLabel: `${p.breed} · Chuồng: ${p.stallCode || 'N/A'}`,
+        horseName: p.horseName,
+        subLabel: `${p.breed} · Stall: ${p.stallCode || 'N/A'}`,
         x: p.avgSpeedKmh,
         y: p.recoveryHeartRateBpm,
         maxHr: p.maxHeartRateBpm,
         isOutlier: p.isOutlier,
         outlierReason: p.outlierReason,
+        isFleet: true,
       }));
     } else {
       if (!individualData?.points) return [];
       return individualData.points.map((p) => ({
         id: p.workoutId,
-        label: `Buổi tập: ${p.sessionName}`,
-        subLabel: `Ngày: ${p.sessionDate} ${p.distanceMeters ? `· ${p.distanceMeters}m` : ''}`,
+        label: `Session: ${p.sessionName}`,
+        subject: p.sessionName,
+        date: p.sessionDate,
+        distanceMeters: p.distanceMeters,
+        subLabel: `Date: ${p.sessionDate} ${p.distanceMeters ? `· ${p.distanceMeters}m` : ''}`,
         x: p.speedKmh,
         y: p.recoveryHeartRateBpm,
         maxHr: p.maxHeartRateBpm,
         isOutlier: p.isOutlier,
         outlierReason: p.outlierReason,
+        isFleet: false,
       }));
     }
   }, [viewMode, fleetData, individualData]);
@@ -148,7 +154,7 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
   if (error) {
     return (
       <Panel padded>
-        <EmptyState icon="alert-triangle" title="Không thể hiển thị phân tích EDA" description={error} />
+        <EmptyState icon="alert-triangle" title="Unable to load EDA analytics" description={error} />
       </Panel>
     );
   }
@@ -159,52 +165,63 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <SectionTitle>Phân Tích Tương Quan & Đặc Trưng EDA</SectionTitle>
+            <SectionTitle>EDA Correlation & Feature Analysis</SectionTitle>
             <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--color-surface-muted)] text-[var(--color-text-secondary)]">
               AI Analytics
             </span>
           </div>
           <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Khám phá mối tương quan giữa tốc độ bài tập và nhịp tim hồi phục, tự động phát hiện các điểm dị biệt (Tukey 1.5×IQR).
+            Explore correlation between workout speed and recovery heart rate, with automated Tukey 1.5×IQR outlier detection.
           </p>
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          {viewMode === 'INDIVIDUAL' && horseOptions.length > 0 && (
+          {viewMode === 'INDIVIDUAL' && (
             <select
-              aria-label="Chọn ngựa cần phân tích"
+              aria-label="Select horse to analyze"
               value={selectedHorseId ?? ''}
               onChange={(e) => setSelectedHorseId(Number(e.target.value))}
               className="text-xs bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-sm)] px-2.5 py-1.5 font-medium text-[var(--color-text-primary)]"
             >
-              {horseOptions.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name} {h.breed ? `(${h.breed})` : ''}
+              {horseOptions.length === 0 ? (
+                <option value="" disabled>
+                  Select horse...
                 </option>
-              ))}
+              ) : (
+                horseOptions.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name} {h.breed ? `(${h.breed})` : ''}
+                  </option>
+                ))
+              )}
             </select>
           )}
 
           <SegmentedControl<ViewMode>
-            label="Chế độ phân tích EDA"
+            label="EDA Analysis Mode"
             value={viewMode}
             onChange={setViewMode}
             options={[
-              { value: 'FLEET', label: 'Toàn đàn (Fleet)' },
-              { value: 'INDIVIDUAL', label: 'Cá nhân (Horse)' },
+              { value: 'FLEET', label: 'Fleet Overview' },
+              { value: 'INDIVIDUAL', label: 'Individual Horse' },
             ]}
           />
         </div>
       </div>
 
-      {loading || !activeStats ? (
+      {loading ? (
         <div className="space-y-3 py-6">
           <Skeleton className="h-6 w-1/3" />
           <Skeleton className="h-[280px] w-full" />
-          <div className="grid grid-cols-2 gap-3">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ) : !activeStats || chartPoints.length === 0 ? (
+        <div className="py-6">
+          <EmptyState
+            icon="activity"
+            title="No workout data available"
+            description="There are no completed workouts with recorded speed and recovery heart rate in this time period."
+          />
         </div>
       ) : (
         <div className="space-y-4">
@@ -217,10 +234,10 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
 
             <div className="text-right text-xs text-[var(--color-text-secondary)]">
               <div>
-                Phương trình hồi quy: <code className="text-[var(--color-text-primary)] font-semibold">y = {activeStats.correlation.slope.toFixed(2)}x + {activeStats.correlation.intercept.toFixed(1)}</code>
+                Regression Equation: <code className="text-[var(--color-text-primary)] font-semibold">y = {activeStats.correlation.slope.toFixed(2)}x + {activeStats.correlation.intercept.toFixed(1)}</code>
               </div>
               <div className="text-[11px] mt-0.5">
-                Mẫu quan sát: <b>{activeStats.correlation.sampleSize}</b> điểm dữ liệu
+                Sample Size: <b>{activeStats.correlation.sampleSize}</b> data points
               </div>
             </div>
           </div>
@@ -228,33 +245,28 @@ export function HorseEdaAnalyticsCard({ initialHorseId, availableHorses }: Horse
           {/* Scatter Chart */}
           <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-3">
             <EdaScatterChart
+              title={viewMode === 'FLEET' ? 'Fleet Bivariate Distribution' : 'Workout Bivariate Distribution'}
               points={chartPoints}
               slope={activeStats.correlation.slope}
               intercept={activeStats.correlation.intercept}
-              xAxisLabel={viewMode === 'FLEET' ? 'Tốc độ TB toàn đàn (km/h)' : 'Tốc độ buổi tập (km/h)'}
-              yAxisLabel="Nhịp tim hồi phục sau bài tập (bpm)"
+              xAxisLabel={viewMode === 'FLEET' ? 'Fleet Average Speed (km/h)' : 'Workout Speed (km/h)'}
+              yAxisLabel="Post-Workout Recovery Heart Rate (bpm)"
             />
           </div>
 
-          {/* Descriptive Statistics Tables */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <StatisticalSummaryTable
-              title="Phân bố Tốc độ (Speed Distribution)"
-              unit="km/h"
-              stats={activeStats.speedStats}
-            />
-            <StatisticalSummaryTable
-              title="Phân bố Nhịp tim hồi phục (Recovery HR Distribution)"
-              unit="bpm"
-              stats={activeStats.recoveryHeartRateStats}
-            />
-          </div>
+          {/* Descriptive Statistics Table */}
+          <StatisticalSummaryTable
+            speedStats={activeStats.speedStats}
+            recoveryHeartRateStats={activeStats.recoveryHeartRateStats}
+            speedHeader={viewMode === 'FLEET' ? 'Average Speed (km/h)' : 'Workout Speed (km/h)'}
+            recoveryHrHeader="Recovery HR (bpm)"
+          />
 
           {/* Outlier Insights Panel if any */}
           {outliersList.length > 0 && (
             <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)]/30 bg-[var(--color-warning-subtle)]/40 p-3 text-xs">
               <div className="flex items-center gap-1.5 font-semibold text-[var(--color-warning)] mb-1">
-                <span>⚠️ Phát hiện {outliersList.length} điểm dữ liệu dị biệt (Tukey's Outliers):</span>
+                <span>⚠️ Detected {outliersList.length} outlier data point(s) (Tukey's Outliers):</span>
               </div>
               <ul className="list-disc list-inside space-y-0.5 text-[var(--color-text-secondary)]">
                 {outliersList.map((p) => (

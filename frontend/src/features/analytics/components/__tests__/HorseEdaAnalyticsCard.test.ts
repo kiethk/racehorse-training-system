@@ -10,7 +10,7 @@ describe('HorseEdaAnalyticsCard Data Transformation Tests', () => {
     points: [
       { horseId: 1, horseName: 'Thunder Flash', breed: 'Thoroughbred', stallCode: 'A-01', avgSpeedKmh: 48.0, recoveryHeartRateBpm: 97.0, maxHeartRateBpm: 210, isOutlier: false },
       { horseId: 2, horseName: 'Storm Wind', breed: 'Thoroughbred', stallCode: 'A-02', avgSpeedKmh: 50.0, recoveryHeartRateBpm: 100.0, maxHeartRateBpm: 215, isOutlier: false },
-      { horseId: 3, horseName: 'Shadow Runner', breed: 'Arabian', stallCode: 'A-03', avgSpeedKmh: 65.0, recoveryHeartRateBpm: 130.0, maxHeartRateBpm: 230, isOutlier: true, outlierReason: 'Tốc độ vượt trội (65.0 km/h > Q3)' }
+      { horseId: 3, horseName: 'Shadow Runner', breed: 'Arabian', stallCode: 'A-03', avgSpeedKmh: 65.0, recoveryHeartRateBpm: 130.0, maxHeartRateBpm: 230, isOutlier: true, outlierReason: 'Exceptional speed (65.0 km/h > Q3)' }
     ]
   };
 
@@ -18,17 +18,21 @@ describe('HorseEdaAnalyticsCard Data Transformation Tests', () => {
     const points = mockFleetData.points.map((p) => ({
       id: p.horseId,
       label: p.horseName,
-      subLabel: `${p.breed} · Chuồng: ${p.stallCode || 'N/A'}`,
+      horseName: p.horseName,
+      subLabel: `${p.breed} · Stall: ${p.stallCode || 'N/A'}`,
       x: p.avgSpeedKmh,
       y: p.recoveryHeartRateBpm,
       isOutlier: p.isOutlier,
+      isFleet: true,
     }));
 
     assert.equal(points.length, 3);
     assert.equal(points[0].isOutlier, false);
     assert.equal(points[2].isOutlier, true);
     assert.equal(points[2].label, 'Shadow Runner');
-    assert.equal(points[2].subLabel, 'Arabian · Chuồng: A-03');
+    assert.equal(points[2].horseName, 'Shadow Runner');
+    assert.equal(points[2].subLabel, 'Arabian · Stall: A-03');
+    assert.equal(points[2].isFleet, true);
   });
 
   it('correctly maps individual horse workout history', () => {
@@ -40,23 +44,31 @@ describe('HorseEdaAnalyticsCard Data Transformation Tests', () => {
       recoveryHeartRateStats: mockFleetData.recoveryHeartRateStats,
       correlation: mockFleetData.correlation,
       points: [
-        { workoutId: 101, sessionDate: '2026-10-15', sessionName: 'Canter Practice', speedKmh: 46.5, recoveryHeartRateBpm: 94.0, isOutlier: false },
-        { workoutId: 102, sessionDate: '2026-10-20', sessionName: 'Sprint 800m', speedKmh: 52.0, recoveryHeartRateBpm: 105.0, isOutlier: false }
+        { workoutId: 101, sessionDate: '2026-10-15', sessionName: 'Canter Practice', speedKmh: 46.5, recoveryHeartRateBpm: 94.0, distanceMeters: 1200, isOutlier: false },
+        { workoutId: 102, sessionDate: '2026-10-20', sessionName: 'Sprint 800m', speedKmh: 52.0, recoveryHeartRateBpm: 105.0, distanceMeters: 800, isOutlier: false }
       ]
     };
 
     const points = mockIndividualData.points.map((p) => ({
       id: p.workoutId,
-      label: `Buổi tập: ${p.sessionName}`,
-      subLabel: `Ngày: ${p.sessionDate}`,
+      label: `Session: ${p.sessionName}`,
+      subject: p.sessionName,
+      date: p.sessionDate,
+      distanceMeters: p.distanceMeters,
+      subLabel: `Date: ${p.sessionDate} ${p.distanceMeters ? `· ${p.distanceMeters}m` : ''}`,
       x: p.speedKmh,
       y: p.recoveryHeartRateBpm,
       isOutlier: p.isOutlier,
+      isFleet: false,
     }));
 
     assert.equal(points.length, 2);
-    assert.equal(points[0].label, 'Buổi tập: Canter Practice');
-    assert.equal(points[0].subLabel, 'Ngày: 2026-10-15');
+    assert.equal(points[0].label, 'Session: Canter Practice');
+    assert.equal(points[0].subject, 'Canter Practice');
+    assert.equal(points[0].date, '2026-10-15');
+    assert.equal(points[0].distanceMeters, 1200);
+    assert.equal(points[0].subLabel, 'Date: 2026-10-15 · 1200m');
     assert.equal(points[1].x, 52.0);
+    assert.equal(points[1].isFleet, false);
   });
 });

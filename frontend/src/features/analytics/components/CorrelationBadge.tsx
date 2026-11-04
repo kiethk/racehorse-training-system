@@ -24,9 +24,15 @@ export function CorrelationBadge({ strength, pearsonR }: CorrelationBadgeProps) 
 
   return (
     <div className="inline-flex flex-col gap-0.5">
-      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeClass}`}>
+      <div
+        title={info.tooltip}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border cursor-help ${badgeClass}`}
+      >
         <span className="w-1.5 h-1.5 rounded-full bg-current" />
-        <span>{info.label}</span>
+        <span>{info.qualitativeLabel}</span>
+        {info.tooltip.startsWith('Pearson r =') && !info.tooltip.includes('N/A') && (
+          <span className="text-[11px] font-mono opacity-85">({pearsonR > 0 ? `+${pearsonR.toFixed(2)}` : pearsonR.toFixed(2)})</span>
+        )}
       </div>
       <span className="text-[11px] text-[var(--color-text-secondary)] italic">
         {info.description}
