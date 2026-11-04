@@ -15,8 +15,12 @@ import { VitalsSection } from './VitalsSection';
 import { DiagnosisSection } from './DiagnosisSection';
 import { TrainingDecisionSection } from './TrainingDecisionSection';
 import { FollowUpSection } from './FollowUpSection';
-import { PrescriptionSection, toPrescriptionRequests, type PrescriptionFormItem } from './PrescriptionSection';
-import { computeSuggestedRecheckDate } from './prescriptionDrafts';
+import {
+  PrescriptionSection,
+  toPrescriptionRequests,
+  computeSuggestedRecheckDate,
+  type PrescriptionFormItem,
+} from '@/features/medical';
 import { ActiveConditionsSection } from './ActiveConditionsSection';
 import type { MedicationCatalogItem } from '@/features/care/types';
 import { ApiError } from '@/services/api';
@@ -205,7 +209,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     const [activeInjuries, setActiveInjuries] = useState<InjuryRecord[]>([]);
     const [resolvedConditionIds, setResolvedConditionIds] = useState<number[]>([]);
-    const [catalogMedications, setCatalogMedications] = useState<MedicationCatalogItem[]>([]);
     const [prescriptions, setPrescriptions] = useState<PrescriptionFormItem[]>([]);
     const [generalCareInstructions, setGeneralCareInstructions] = useState('');
     const [vaccinationDrafts, setVaccinationDrafts] = useState<VaccinationDraft[]>([]);
@@ -330,20 +333,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         setAnatomyTab('form');
       }
     }, [show3DTab, anatomyTab]);
-
-    useEffect(() => {
-      if (!isPrescriptionActive) return;
-      let active = true;
-      healthApi
-        .getClinicalMedications()
-        .then((meds) => {
-          if (active) setCatalogMedications(meds);
-        })
-        .catch(() => {});
-      return () => {
-        active = false;
-      };
-    }, [isPrescriptionActive]);
 
     const isGated = scheduleStatus != null && scheduleStatus !== 'IN_PROGRESS';
     const followUpRequired = config.followUpMode === 'single-required-select';
@@ -742,8 +731,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
       if (isPrescriptionActive && prescriptions.length > 0) {
         for (const rx of prescriptions) {
-          if (!rx.medicationId) {
-            errors["rx." + rx.id + ".medicationId"] = "Select a medication from the catalog.";
+          if (!rx.medicationName.trim()) {
+            errors["rx." + rx.id + ".medicationName"] = "Medication name is required.";
           }
           if (!rx.dosage.trim()) {
             errors["rx." + rx.id + ".dosage"] = "Dosage is required.";
@@ -751,17 +740,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           if (!rx.frequency.trim()) {
             errors["rx." + rx.id + ".frequency"] = "Frequency is required.";
           }
-          if (!rx.startDate) {
-            errors["rx." + rx.id + ".startDate"] = "Start date is required.";
-          }
-          if (!rx.endDate) {
-            errors["rx." + rx.id + ".endDate"] = "End date is required.";
-          } else if (rx.startDate && rx.endDate < rx.startDate) {
-            errors["rx." + rx.id + ".endDate"] = "End date must be on or after start date.";
-          }
-          const med = catalogMedications.find((m) => m.id === rx.medicationId);
-          if (med && rx.withdrawalDays < med.standardWithdrawalDays) {
-            errors["rx." + rx.id + ".withdrawalDays"] = "Withdrawal days cannot be below regulatory standard (" + med.standardWithdrawalDays + " days).";
+          if (!rx.duration || rx.duration < 1) {
+            errors["rx." + rx.id + ".duration"] = "Duration must be at least 1 day.";
           }
         }
       }
@@ -1038,14 +1018,12 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       return (
         <PrescriptionSection
           isFormDisabled={isFormDisabled}
-          catalog={catalogMedications}
           prescriptions={prescriptions}
           setPrescriptions={setPrescriptions}
           generalCareInstructions={generalCareInstructions}
           setGeneralCareInstructions={setGeneralCareInstructions}
           fieldErrors={fieldErrors}
           setFieldErrors={setFieldErrors}
-          todayLocalDate={businessDateFromToday(0)}
         />
       );
     };

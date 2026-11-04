@@ -23,23 +23,18 @@ import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
 import com.rtms.backend.medical.dto.PrescriptionItemRequest;
 import com.rtms.backend.medical.dto.UrgentCaseReportResponse;
 import com.rtms.backend.medical.entity.CareSchedule;
-import com.rtms.backend.medical.entity.ClinicalMedication;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
-import com.rtms.backend.medical.entity.Prescription;
 import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.RescheduleReason;
-import com.rtms.backend.medical.event.PrescriptionCreatedEvent;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
-import com.rtms.backend.medical.repository.ClinicalMedicationRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
-import com.rtms.backend.medical.repository.PrescriptionRepository;
 import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.dto.UrgentAssignmentAlert;
 import com.rtms.backend.notification.service.NotificationService;
@@ -107,9 +102,8 @@ public class CareScheduleService {
     private final TrainingDecisionService trainingDecisionService;
     private final PreventiveVaccinationService preventiveVaccinationService;
     private final InjuryRecordRepository injuryRecordRepository;
-    private final ClinicalMedicationRepository clinicalMedicationRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
-    private final PrescriptionRepository prescriptionRepository;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     public CareScheduleService(
             CareScheduleRepository careScheduleRepository,
@@ -128,9 +122,8 @@ public class CareScheduleService {
             TrainingDecisionService trainingDecisionService,
             PreventiveVaccinationService preventiveVaccinationService,
             InjuryRecordRepository injuryRecordRepository,
-            ClinicalMedicationRepository clinicalMedicationRepository,
             TreatmentPlanRepository treatmentPlanRepository,
-            PrescriptionRepository prescriptionRepository) {
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.careScheduleRepository = careScheduleRepository;
         this.horseRepository = horseRepository;
         this.healthRecordRepository = healthRecordRepository;
@@ -147,9 +140,8 @@ public class CareScheduleService {
         this.trainingDecisionService = trainingDecisionService;
         this.preventiveVaccinationService = preventiveVaccinationService;
         this.injuryRecordRepository = injuryRecordRepository;
-        this.clinicalMedicationRepository = clinicalMedicationRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;
-        this.prescriptionRepository = prescriptionRepository;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -331,7 +323,6 @@ public class CareScheduleService {
                 }
             }
         }
-        validatePrescriptionCatalog(request.getPrescriptions());
 
         CareSchedule schedule = lockClinicalSchedule(scheduleId);
 
@@ -456,7 +447,7 @@ public class CareScheduleService {
         if (!vaccinations.isEmpty()) {
             preventiveVaccinationService.record(savedRecord.getId(), vaccinations);
         }
-        persistPrescriptions(request.getPrescriptions(), horse, savedRecord, request);
+        persistPrescriptionInstructions(request.getPrescriptions(), horse, savedRecord, request);
 
         // Persist injury markers captured on the 3D model (T4).
         if (request.getInjuryMarkers() != null) {
@@ -761,70 +752,56 @@ public class CareScheduleService {
     }
 
     /**
-     * A3: mọi đơn phải khớp danh mục chuẩn — thuốc tồn tại & đang hoạt động,
-     * không trùng trong cùng lần nộp, withdrawal không dưới mốc FEI.
+     * Track 0 (ROADMAP v3.0): serialize đơn thuốc Vet kê thành JSON snake_case
+     * và lưu vào treatment_plans.instructions. Không lưu bảng prescriptions,
+     * không validate catalog/withdrawal, không phát event.
      */
-    private void validatePrescriptionCatalog(List<PrescriptionItemRequest> prescriptions) {
-        if (prescriptions == null || prescriptions.isEmpty()) return;
-        Set<Long> seen = new HashSet<>();
-        for (PrescriptionItemRequest item : prescriptions) {
-            if (!seen.add(item.getMedicationId())) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "DUPLICATE_MEDICATION",
-                        "Medication " + item.getMedicationId() + " is already prescribed in this examination");
-            }
-            ClinicalMedication med = clinicalMedicationRepository.findById(item.getMedicationId())
-                    .filter(ClinicalMedication::getActive)
-                    .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "MEDICATION_NOT_FOUND",
-                            "Medication " + item.getMedicationId() + " is not in the active catalog"));
-            if (item.getWithdrawalDays() < med.getStandardWithdrawalDays()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_WITHDRAWAL_DAYS",
-                        "Withdrawal days cannot be lower than regulatory standard: "
-                                + med.getStandardWithdrawalDays());
-            }
-        }
-    }
-
-    /** Lưu nguyên tử plan + đơn trong transaction hoàn tất ca khám (Luồng 1). */
-    private void persistPrescriptions(List<PrescriptionItemRequest> prescriptions, Horse horse,
+    private void persistPrescriptionInstructions(List<PrescriptionItemRequest> prescriptions, Horse horse,
             HealthRecord record, CompleteCareScheduleRequest request) {
         if (prescriptions == null || prescriptions.isEmpty()) return;
+
+        LocalDate today = LocalDate.now();
+        LocalDate planStart = today;
+        LocalDate planEnd = prescriptions.stream()
+                .map(item -> today.plusDays(item.getDuration()))
+                .max(LocalDate::compareTo)
+                .orElse(today);
+
+        List<LinkedHashMap<String, Object>> items = new ArrayList<>();
+        for (PrescriptionItemRequest item : prescriptions) {
+            LinkedHashMap<String, Object> json = new LinkedHashMap<>();
+            json.put("medication_name", item.getMedicationName());
+            json.put("dosage", item.getDosage());
+            json.put("frequency", item.getFrequency());
+            json.put("route", item.getRoute().name());
+            json.put("duration", item.getDuration());
+            json.put("notes", item.getNotes() != null ? item.getNotes() : "");
+            items.add(json);
+        }
+
+        String jsonInstructions;
+        try {
+            jsonInstructions = objectMapper.writeValueAsString(items);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "RX_SERIALIZATION_FAILED",
+                    "Failed to serialize prescription instructions");
+        }
+
+        String generalCare = request.getGeneralCareInstructions() != null
+                && !request.getGeneralCareInstructions().isBlank()
+                        ? request.getGeneralCareInstructions().trim()
+                        : (request.getTreatment() != null && !request.getTreatment().isBlank()
+                                ? request.getTreatment().trim()
+                                : "Follow dosage and instructions on each prescription.");
+
         TreatmentPlan plan = new TreatmentPlan();
         plan.setHealthRecordId(record.getId());
         plan.setTreatmentName("Treatment course (" + prescriptions.size() + " medications)");
-        String instructions = request.getGeneralCareInstructions() != null && !request.getGeneralCareInstructions().isBlank()
-                ? request.getGeneralCareInstructions().trim()
-                : (request.getTreatment() != null && !request.getTreatment().isBlank()
-                        ? request.getTreatment().trim()
-                        : "Follow dosage and instructions on each prescription.");
-        plan.setInstructions(instructions);
-        plan.setStartDate(prescriptions.stream().map(PrescriptionItemRequest::getStartDate)
-                .min(LocalDate::compareTo).orElse(LocalDate.now()));
-        plan.setEndDate(prescriptions.stream().map(PrescriptionItemRequest::getEndDate)
-                .max(LocalDate::compareTo).orElse(null));
+        plan.setInstructions(jsonInstructions);
+        plan.setStartDate(planStart);
+        plan.setEndDate(planEnd);
         plan.setStatus("ACTIVE");
-        TreatmentPlan savedPlan = treatmentPlanRepository.save(plan);
-
-        List<Long> rxIds = new ArrayList<>();
-        for (PrescriptionItemRequest item : prescriptions) {
-            ClinicalMedication med = clinicalMedicationRepository.findById(item.getMedicationId())
-                    .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "MEDICATION_NOT_FOUND",
-                            "Medication " + item.getMedicationId() + " disappeared from the catalog"));
-            Prescription rx = new Prescription();
-            rx.setTreatmentPlanId(savedPlan.getId());
-            rx.setMedicationName(med.getName());
-            rx.setDosage(item.getDosage());
-            rx.setFrequency(item.getFrequency());
-            rx.setRoute(item.getRoute().name());
-            rx.setStartDate(item.getStartDate());
-            rx.setEndDate(item.getEndDate());
-            rx.setInstructions(item.getInstructions());
-            rx.setWithdrawalDays(item.getWithdrawalDays());
-            rx.setStatus("ACTIVE");
-            rx.setAdministeredByRole(item.getRoute().requiresVeterinarian() ? "VETERINARIAN" : "GROOM");
-            rxIds.add(prescriptionRepository.save(rx).getId());
-        }
-        eventPublisher.publishEvent(new PrescriptionCreatedEvent(
-                record.getCareScheduleId(), record.getId(), horse.getId(), rxIds));
+        treatmentPlanRepository.save(plan);
     }
 
     @Transactional

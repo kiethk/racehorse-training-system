@@ -65,9 +65,7 @@ class CareScheduleLifecycleSweepTest {
     @Mock private GroupWorkoutSyncService groupSync;
     @Mock private PreventiveVaccinationService preventiveVaccinationService;
     @Mock private InjuryRecordRepository injuryRecordRepository;
-    @Mock private ClinicalMedicationRepository clinicalMedicationRepository;
     @Mock private TreatmentPlanRepository treatmentPlanRepository;
-    @Mock private PrescriptionRepository prescriptionRepository;
 
     private CareScheduleService service;
 
@@ -82,7 +80,7 @@ class CareScheduleLifecycleSweepTest {
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, groupSync),
                 preventiveVaccinationService, injuryRecordRepository,
-                clinicalMedicationRepository, treatmentPlanRepository, prescriptionRepository);
+                treatmentPlanRepository, new com.fasterxml.jackson.databind.ObjectMapper());
         Horse horse = new Horse();
         horse.setId(10L);
         horse.setName("Test Horse");

@@ -79,9 +79,8 @@ class CareSchedulePreemptionTest {
                 trainingDecisionService,
                 mock(PreventiveVaccinationService.class),
                 mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
                 mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
+                new com.fasterxml.jackson.databind.ObjectMapper()
         );
 
         when(schedules.save(any())).thenAnswer(inv -> inv.getArgument(0));

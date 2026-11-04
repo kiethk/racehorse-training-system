@@ -172,12 +172,10 @@ export interface MedicationCatalogItem {
 }
 
 export interface PrescriptionItemRequest {
-  medicationId: number;
+  medicationName: string;
   dosage: string;
   route: MedicationRoute;
   frequency: string;
-  startDate: string;
-  endDate: string;
-  withdrawalDays: number;
-  instructions?: string;
+  duration: number;
+  notes?: string;
 }

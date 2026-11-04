@@ -96,9 +96,8 @@ class RoutineCompletionNotificationTest {
                 trainingDecisionService,
                 mock(PreventiveVaccinationService.class),
                 injuryRecordRepository,
-                mock(ClinicalMedicationRepository.class),
                 treatmentPlanRepository,
-                mock(PrescriptionRepository.class)
+                new com.fasterxml.jackson.databind.ObjectMapper()
         );
 
         horse = new Horse();

@@ -11,30 +11,25 @@ import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
-import java.time.LocalDateTime;
 import com.rtms.backend.medical.dto.PrescriptionItemRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
-import com.rtms.backend.medical.entity.ClinicalMedication;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
-import com.rtms.backend.medical.entity.Prescription;
 import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.MedicationRoute;
-import com.rtms.backend.medical.event.PrescriptionCreatedEvent;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
-import com.rtms.backend.medical.repository.ClinicalMedicationRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
-import com.rtms.backend.medical.repository.PrescriptionRepository;
 import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingDecisionService;
 import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +41,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -55,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** Track 0 (ROADMAP v2.2): kê đơn từ danh mục chuẩn + resolvedConditionIds + rollback US-2. */
+/** Track 0 (ROADMAP v3.0): kê đơn tự do, JSON vào treatment_plans.instructions. */
 @ExtendWith(MockitoExtension.class)
 class CareSchedulePrescriptionFlowTest {
 
@@ -75,9 +69,7 @@ class CareSchedulePrescriptionFlowTest {
     @Mock private GroupWorkoutSyncService groupSync;
     @Mock private PreventiveVaccinationService preventiveVaccinationService;
     @Mock private InjuryRecordRepository injuryRecordRepository;
-    @Mock private ClinicalMedicationRepository clinicalMedicationRepository;
     @Mock private TreatmentPlanRepository treatmentPlanRepository;
-    @Mock private PrescriptionRepository prescriptionRepository;
 
     private CareScheduleService service;
     private Horse horse;
@@ -92,7 +84,7 @@ class CareSchedulePrescriptionFlowTest {
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, groupSync),
                 preventiveVaccinationService, injuryRecordRepository,
-                clinicalMedicationRepository, treatmentPlanRepository, prescriptionRepository);
+                treatmentPlanRepository, new ObjectMapper());
 
         horse = new Horse();
         horse.setId(10L);
@@ -134,79 +126,32 @@ class CareSchedulePrescriptionFlowTest {
         return req;
     }
 
-    private ClinicalMedication medication(Long id, String name, String route, int withdrawal) {
-        ClinicalMedication m = new ClinicalMedication();
-        m.setId(id);
-        m.setName(name);
-        m.setTherapeuticClass("NSAID");
-        m.setDefaultRoute(route);
-        m.setStandardWithdrawalDays(withdrawal);
-        m.setActive(true);
-        return m;
-    }
-
-    private PrescriptionItemRequest rxItem(Long medId, MedicationRoute route, int withdrawalDays) {
+    private PrescriptionItemRequest rxItem(String name, MedicationRoute route, int duration) {
         PrescriptionItemRequest item = new PrescriptionItemRequest();
-        item.setMedicationId(medId);
+        item.setMedicationName(name);
         item.setDosage("10ml");
         item.setRoute(route);
         item.setFrequency("BID");
-        item.setStartDate(LocalDate.of(2026, 11, 1));
-        item.setEndDate(LocalDate.of(2026, 11, 5));
-        item.setWithdrawalDays(withdrawalDays);
+        item.setDuration(duration);
+        item.setNotes("With food");
         return item;
     }
 
     @Test
-    @DisplayName("Withdrawal thấp hơn chuẩn catalog: 400 INVALID_WITHDRAWAL_DAYS, không khóa/dừng ghi gì")
-    void withdrawalBelowStandard_isRejectedBeforeAnyStateChange() {
-        when(clinicalMedicationRepository.findById(1L)).thenReturn(Optional.of(medication(1L, "Flunixin Meglumine", "INJECTION_IV", 4)));
-
-        CompleteCareScheduleRequest req = baseRequest();
-        req.setPrescriptions(List.of(rxItem(1L, MedicationRoute.INJECTION_IV, 2)));
-
-        ApiException ex = assertThrows(ApiException.class,
-                () -> service.completeCareSchedule(100L, req, 20L));
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertTrue(ex.getMessage().contains("regulatory standard"));
-        verify(careScheduleRepository, never()).findByIdForUpdate(any());
-        verify(healthRecordRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("Thuốc không có trong catalog: 400 MEDICATION_NOT_FOUND")
-    void unknownMedication_isRejected() {
-        when(clinicalMedicationRepository.findById(99L)).thenReturn(Optional.empty());
-
-        CompleteCareScheduleRequest req = baseRequest();
-        req.setPrescriptions(List.of(rxItem(99L, MedicationRoute.ORAL, 4)));
-
-        ApiException ex = assertThrows(ApiException.class,
-                () -> service.completeCareSchedule(100L, req, 20L));
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        verify(careScheduleRepository, never()).findByIdForUpdate(any());
-    }
-
-    @Test
-    @DisplayName("Kê đơn thành công: plan ACTIVE với MIN/MAX dates, rx IV -> VETERINARIAN, event AFTER_COMMIT")
-    void prescriptions_persistAtomically_withRoleSplitAndPlanRange() {
+    @DisplayName("Kê đơn thành công: plan ACTIVE, instructions là JSON snake_case, không lưu prescriptions, không phát event")
+    void prescriptions_persistAsJsonInstructions_noPrescriptionTableNoEvent() {
         stubCompletion();
-        when(clinicalMedicationRepository.findById(1L)).thenReturn(Optional.of(medication(1L, "Flunixin Meglumine", "INJECTION_IV", 4)));
-        when(clinicalMedicationRepository.findById(2L)).thenReturn(Optional.of(medication(2L, "Phenylbutazone", "ORAL", 7)));
         when(treatmentPlanRepository.save(any(TreatmentPlan.class))).thenAnswer(i -> {
             TreatmentPlan p = i.getArgument(0);
             p.setId(500L);
             return p;
         });
-        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(i -> i.getArgument(0));
         when(incidentReportRepository.findByHorseIdAndStatusIn(eq(10L), anyCollection())).thenReturn(List.of());
 
         CompleteCareScheduleRequest req = baseRequest();
-        PrescriptionItemRequest iv = rxItem(1L, MedicationRoute.INJECTION_IV, 4);
-        PrescriptionItemRequest oral = rxItem(2L, MedicationRoute.ORAL, 7);
-        oral.setStartDate(LocalDate.of(2026, 11, 2));
-        oral.setEndDate(LocalDate.of(2026, 11, 9));
-        req.setPrescriptions(List.of(iv, oral));
+        req.setPrescriptions(List.of(
+                rxItem("Flunixin Meglumine", MedicationRoute.INJECTION_IV, 4),
+                rxItem("Phenylbutazone", MedicationRoute.ORAL, 7)));
 
         service.completeCareSchedule(100L, req, 20L);
 
@@ -214,37 +159,31 @@ class CareSchedulePrescriptionFlowTest {
         verify(treatmentPlanRepository).save(planCap.capture());
         TreatmentPlan plan = planCap.getValue();
         assertEquals("ACTIVE", plan.getStatus());
-        assertEquals(LocalDate.of(2026, 11, 1), plan.getStartDate());
-        assertEquals(LocalDate.of(2026, 11, 9), plan.getEndDate());
-
-        ArgumentCaptor<Prescription> rxCap = ArgumentCaptor.forClass(Prescription.class);
-        verify(prescriptionRepository, times(2)).save(rxCap.capture());
-        assertEquals("VETERINARIAN", rxCap.getAllValues().get(0).getAdministeredByRole());
-        assertEquals("GROOM", rxCap.getAllValues().get(1).getAdministeredByRole());
-        assertEquals("Flunixin Meglumine", rxCap.getAllValues().get(0).getMedicationName());
-
-        verify(eventPublisher).publishEvent(any(PrescriptionCreatedEvent.class));
+        assertNotNull(plan.getInstructions());
+        assertTrue(plan.getInstructions().contains("\"medication_name\""));
+        assertTrue(plan.getInstructions().contains("Flunixin Meglumine"));
+        assertTrue(plan.getInstructions().contains("Phenylbutazone"));
+        assertTrue(plan.getInstructions().contains("\"duration\""));
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("US-2 (C1): save HealthRecord ném exception => không có plan/rx/event, ca vẫn IN_PROGRESS")
+    @DisplayName("US-2 (C1): save HealthRecord ném exception => không có plan, ca vẫn IN_PROGRESS")
     void exceptionAfterRecordSave_leavesNoPartialWrites() {
-        when(clinicalMedicationRepository.findById(1L)).thenReturn(Optional.of(medication(1L, "Flunixin Meglumine", "INJECTION_IV", 4)));
         when(careScheduleRepository.findById(100L)).thenReturn(Optional.of(schedule));
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(careScheduleRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(schedule));
         when(healthRecordRepository.save(any(HealthRecord.class)))
-                .thenThrow(new RuntimeException("simulated FK violation on prescriptions"));
+                .thenThrow(new RuntimeException("simulated FK violation"));
 
         CompleteCareScheduleRequest req = baseRequest();
-        req.setPrescriptions(List.of(rxItem(1L, MedicationRoute.INJECTION_IV, 4)));
+        req.setPrescriptions(List.of(rxItem("Flunixin Meglumine", MedicationRoute.INJECTION_IV, 4)));
 
         assertThrows(RuntimeException.class, () -> service.completeCareSchedule(100L, req, 20L));
 
         assertEquals(CareScheduleStatus.IN_PROGRESS, schedule.getStatus(),
                 "no COMPLETED status may be flushed before the exception rolls the tx back");
         verify(treatmentPlanRepository, never()).save(any());
-        verify(prescriptionRepository, never()).save(any());
         verify(careScheduleRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
     }
