@@ -159,10 +159,10 @@ export const SIX_VITAL_FIELDS: Array<
   | { key: 'temperature' | 'heartRate' | 'respiratoryRate' | 'weight' | 'bodyConditionScore'; label: string; min: number; max: number }
   | { key: 'hydrationStatus'; label: string; enum: true }
 > = [
-  { key: 'temperature', label: 'Temperature', min: 37.0, max: 38.5 },
-  { key: 'heartRate', label: 'Heart Rate', min: 28, max: 44 },
-  { key: 'respiratoryRate', label: 'Respiratory Rate', min: 8, max: 16 },
-  { key: 'weight', label: 'Weight', min: 0, max: 1500 },
+  { key: 'temperature', label: 'Temperature', min: 35.0, max: 43.0 },
+  { key: 'heartRate', label: 'Heart Rate', min: 15, max: 250 },
+  { key: 'respiratoryRate', label: 'Respiratory Rate', min: 4, max: 100 },
+  { key: 'weight', label: 'Weight', min: 50, max: 1500 },
   { key: 'bodyConditionScore', label: 'BCS', min: 1, max: 9 },
   { key: 'hydrationStatus', label: 'Hydration', enum: true },
 ];

@@ -371,7 +371,7 @@ public class AiToolExecutionService {
         }
 
         List<CareSchedule> activeSchedules = careScheduleRepository.findByHorseIdAndStatusIn(
-                horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+                horse.getId(), CareScheduleStatus.BOOKED_OR_ACTIVE);
         List<Map<String, Object>> careList = activeSchedules.stream().map(cs -> Map.<String, Object>of(
                 "loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám tổng quát", "scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A", "purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A"
         )).toList();
@@ -1758,7 +1758,7 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
         }
         List<CareSchedule> active = careScheduleRepository.findByHorseIdAndStatusIn(
-                horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
+                horse.getId(), CareScheduleStatus.BOOKED_OR_ACTIVE
         ).stream()
                 .filter(cs -> cs.getVeterinarianId() == null || cs.getVeterinarianId().equals(currentUser.getUserId()))
                 .toList();
@@ -1951,8 +1951,7 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
         List<CareSchedule> all = careScheduleRepository.findByVeterinarianId(currentUser.getUserId());
         List<CareSchedule> urgent = all.stream()
                 .filter(cs -> cs.getCareType() == CareType.URGENT
-                        && cs.getStatus() != CareScheduleStatus.COMPLETED
-                        && cs.getStatus() != CareScheduleStatus.CANCELLED)
+                        && cs.getStatus() != CareScheduleStatus.COMPLETED)
                 .toList();
 
         Map<Long, Horse> horses = horseRepository.findAll().stream()
@@ -2279,7 +2278,7 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         }
 
         List<CareSchedule> activeSchedules = careScheduleRepository.findByHorseIdAndStatusIn(
-                horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
+                horse.getId(), CareScheduleStatus.BOOKED_OR_ACTIVE
         );
         List<Map<String, Object>> careList = activeSchedules.stream().map(cs -> Map.<String, Object>of(
                 "loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám thú y", "scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A", "purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A"

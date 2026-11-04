@@ -52,6 +52,9 @@ const examStatusOptions: Array<{ value: CareScheduleStatus | 'ALL'; label: strin
   { value: 'REQUESTED', label: 'Requested' },
   { value: 'SCHEDULED', label: 'Scheduled' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
+  { value: 'DELAYED', label: 'Delayed' },
+  { value: 'PAUSED', label: 'Paused' },
+  { value: 'OVERDUE', label: 'Overdue' },
   { value: 'COMPLETED', label: 'Completed' },
 ];
 
@@ -93,6 +96,8 @@ function calculateAge(dateOfBirth: string | null | undefined): string {
 function examTone(status: CareScheduleStatus | undefined) {
   if (status === 'COMPLETED') return 'success' as const;
   if (status === 'IN_PROGRESS') return 'primary' as const;
+  if (status === 'OVERDUE') return 'danger' as const;
+  if (status === 'DELAYED') return 'warning' as const;
   if (status === 'PAUSED') return 'warning' as const;
   if (status === 'SCHEDULED') return 'info' as const;
   if (status === 'REQUESTED') return 'warning' as const;
@@ -102,6 +107,8 @@ function examTone(status: CareScheduleStatus | undefined) {
 function examIcon(status: CareScheduleStatus | undefined) {
   if (status === 'COMPLETED') return 'check' as const;
   if (status === 'IN_PROGRESS') return 'activity' as const;
+  if (status === 'OVERDUE') return 'alert-triangle' as const;
+  if (status === 'DELAYED') return 'clock' as const;
   if (status === 'PAUSED') return 'clock' as const;
   if (status === 'SCHEDULED') return 'calendar' as const;
   if (status === 'REQUESTED') return 'clock' as const;
@@ -271,10 +278,16 @@ export function VetAdmissionQueue() {
           const approvedCount = allContent.filter((r) => r.admissionStatus === 'APPROVED').length;
           const activeRows = allContent.filter((r) => r.admissionStatus !== 'APPROVED');
           const awaitingCount = activeRows.filter(
-            (r) => r.careSchedule?.status === 'REQUESTED' || r.careSchedule?.status === 'SCHEDULED'
+            (r) =>
+              r.careSchedule?.status === 'REQUESTED' ||
+              r.careSchedule?.status === 'SCHEDULED' ||
+              r.careSchedule?.status === 'OVERDUE'
           ).length;
           const inProgressCount = activeRows.filter(
-            (r) => r.careSchedule?.status === 'IN_PROGRESS'
+            (r) =>
+              r.careSchedule?.status === 'IN_PROGRESS' ||
+              r.careSchedule?.status === 'DELAYED' ||
+              r.careSchedule?.status === 'PAUSED'
           ).length;
 
           setSummary({
@@ -292,10 +305,18 @@ export function VetAdmissionQueue() {
             filtered = activeRows;
           } else if (queuePillFilter === 'AWAITING') {
             filtered = activeRows.filter(
-              (r) => r.careSchedule?.status === 'REQUESTED' || r.careSchedule?.status === 'SCHEDULED'
+              (r) =>
+                r.careSchedule?.status === 'REQUESTED' ||
+                r.careSchedule?.status === 'SCHEDULED' ||
+                r.careSchedule?.status === 'OVERDUE'
             );
           } else if (queuePillFilter === 'IN_PROGRESS') {
-            filtered = activeRows.filter((r) => r.careSchedule?.status === 'IN_PROGRESS');
+            filtered = activeRows.filter(
+              (r) =>
+                r.careSchedule?.status === 'IN_PROGRESS' ||
+                r.careSchedule?.status === 'DELAYED' ||
+                r.careSchedule?.status === 'PAUSED'
+            );
           }
 
           setTotalElements(filtered.length);
@@ -471,11 +492,11 @@ export function VetAdmissionQueue() {
     : null;
   const assignedActiveSchedule = careSchedules
     .filter((schedule) =>
-      ['SCHEDULED', 'IN_PROGRESS'].includes(schedule.status) &&
+      ['SCHEDULED', 'IN_PROGRESS', 'DELAYED', 'OVERDUE', 'PAUSED'].includes(schedule.status) &&
       (schedule.veterinarianId ?? schedule.assignedVetId) === user?.userId,
     )
     .sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'IN_PROGRESS' ? -1 : 1;
+      if (a.status !== b.status) return a.status === 'IN_PROGRESS' || a.status === 'DELAYED' ? -1 : 1;
       return new Date(a.scheduledAt ?? a.scheduledDate ?? 0).getTime()
         - new Date(b.scheduledAt ?? b.scheduledDate ?? 0).getTime();
     })[0] ?? null;
@@ -497,19 +518,19 @@ export function VetAdmissionQueue() {
 
   const isApprovedAdmission = detail?.status === 'APPROVED' || selectedRow?.admissionStatus === 'APPROVED';
 
-  // Requirement: Disable Start for REQUESTED schedules; only allow starting when SCHEDULED
+  // Requirement: Disable Start for REQUESTED schedules; allow starting when SCHEDULED, OVERDUE, or PAUSED
   // If admission is already APPROVED, examining is disabled (read-only record viewing only).
   const canStartExam = Boolean(
     !isApprovedAdmission &&
     currentActiveSchedule &&
-      currentActiveSchedule.status === 'SCHEDULED' &&
+      ['SCHEDULED', 'OVERDUE', 'PAUSED'].includes(currentActiveSchedule.status) &&
       assignedVetId === user?.userId,
   );
 
   const canCompleteExam = Boolean(
     !isApprovedAdmission &&
     currentActiveSchedule &&
-      ['SCHEDULED', 'IN_PROGRESS'].includes(currentActiveSchedule.status) &&
+      ['SCHEDULED', 'IN_PROGRESS', 'DELAYED', 'OVERDUE', 'PAUSED'].includes(currentActiveSchedule.status) &&
       assignedVetId === user?.userId,
   );
 
@@ -635,8 +656,11 @@ export function VetAdmissionQueue() {
       return;
     }
     // Examine = go straight to the examination workspace (it auto-starts the
-    // SCHEDULED exam). Continue/View results/Details keep opening the drawer.
-    if (row.careSchedule?.status === 'SCHEDULED' && row.careSchedule.id) {
+    // SCHEDULED/OVERDUE exam). Continue/View results/Details keep opening the drawer.
+    if (
+      (row.careSchedule?.status === 'SCHEDULED' || row.careSchedule?.status === 'OVERDUE') &&
+      row.careSchedule.id
+    ) {
       router.push(`/veterinarian/schedule/${row.careSchedule.id}?back=admissions`);
       return;
     }
@@ -788,8 +812,10 @@ export function VetAdmissionQueue() {
                 ? ({ label: 'View Record', icon: 'clipboard' as const, primary: false })
                 : status === 'PAUSED'
                 ? ({ label: 'Continue (Paused)', icon: 'activity' as const, primary: true })
-                : status === 'IN_PROGRESS'
+                : status === 'IN_PROGRESS' || status === 'DELAYED'
                 ? ({ label: 'Continue', icon: 'activity' as const, primary: true })
+                : status === 'OVERDUE'
+                ? ({ label: 'Examine (Overdue)', icon: 'stethoscope' as const, primary: true })
                 : status === 'SCHEDULED'
                 ? ({ label: 'Examine', icon: 'stethoscope' as const, primary: true })
                 : status === 'COMPLETED'
@@ -832,7 +858,7 @@ export function VetAdmissionQueue() {
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                           <span className="inline-flex items-center gap-1 shrink-0">
                             <Icon name="building" size={12} />
-                            <span>Stall: <strong>{stallCode}</strong></span>
+                            <span>{isApproved ? 'Stall:' : 'Quarantine Stall:'} <strong>{stallCode}</strong></span>
                           </span>
                           <span>·</span>
                           <span className="inline-flex items-center gap-1 shrink-0">

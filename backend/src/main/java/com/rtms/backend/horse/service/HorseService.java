@@ -358,17 +358,10 @@ public class HorseService {
             // 3.2. Leave the training group: not-yet-started Workouts are cancelled, the group carries on without it.
             workoutService.exitAnyGroup(horseId);
 
-            // 3.4. Cancel pending and scheduled medical appointments
+            // 3.4. AD-022/AD-025 rule 6: xóa cứng lịch chưa diễn ra (không CANCELLED).
             if (careScheduleRepository != null) {
-                List<CareSchedule> pendingCares = careScheduleRepository.findByHorseIdAndStatusIn(
-                        horseId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));
-                if (!pendingCares.isEmpty()) {
-                    for (CareSchedule cs : pendingCares) {
-                        cs.setStatus(CareScheduleStatus.CANCELLED);
-                        cs.setCancelReason("Horse marked INACTIVE: " + effectiveReason);
-                    }
-                    careScheduleRepository.saveAll(pendingCares);
-                }
+                careScheduleRepository.deleteOpenSchedulesIfUnreferenced(horseId,
+                        List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));
             }
 
             // 3.5. Block training

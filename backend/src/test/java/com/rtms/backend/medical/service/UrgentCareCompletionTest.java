@@ -495,56 +495,17 @@ class UrgentCareCompletionTest {
     }
 
     @Test
-    @DisplayName("Không cho Manager hủy lần khám cuối cùng của ngựa đang bị chặn tập (409 LAST_FOLLOW_UP)")
+    @DisplayName("AD-022: cancelCareSchedule abolished — follow-up examinations are protected by absence of cancel API")
     void testCancel_lastPendingExamOfBlockedHorse_rejected() {
-        horse.setTrainingDecision(TrainingDecision.BLOCKED);
-        CareSchedule recheck = new CareSchedule();
-        recheck.setId(200L);
-        recheck.setHorseId(horse.getId());
-        recheck.setCareType(CareType.ROUTINE);
-        recheck.setStatus(CareScheduleStatus.SCHEDULED);
-
-        when(careScheduleRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(recheck));
-        when(userRepository.findById(1L)).thenReturn(Optional.of(manager()));
-        when(horseRepository.findById(horse.getId())).thenReturn(Optional.of(horse));
-        when(careScheduleRepository.existsByHorseIdAndPurposeAndStatusInAndIdNot(
-                eq(10L), eq(CareSchedulePurpose.FOLLOW_UP), anyList(), eq(200L)))
-                .thenReturn(false);
-
-        CancelCareScheduleRequest req = new CancelCareScheduleRequest();
-        req.setReason("Vet on leave");
-
-        ApiException ex = assertThrows(ApiException.class,
-                () -> careScheduleService.cancelCareSchedule(200L, req, 1L));
-
-        assertEquals("LAST_FOLLOW_UP", ex.getErrorCode());
-        assertEquals(CareScheduleStatus.SCHEDULED, recheck.getStatus());
-        verify(careScheduleRepository, never()).save(any());
+        // Under AD-022, cancelCareSchedule is removed entirely. The LAST_FOLLOW_UP
+        // vulnerability no longer exists because neither Vet nor Manager can delete exams.
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
     }
 
     @Test
-    @DisplayName("Hủy được nếu ngựa bị chặn nhưng còn lần khám khác đang chờ")
+    @DisplayName("AD-022: duplicate booking cancellation abolished — reschedule used instead")
     void testCancel_blockedHorseWithAnotherPendingExam_allowed() {
-        horse.setTrainingDecision(TrainingDecision.BLOCKED);
-        CareSchedule recheck = new CareSchedule();
-        recheck.setId(200L);
-        recheck.setHorseId(horse.getId());
-        recheck.setCareType(CareType.ROUTINE);
-        recheck.setStatus(CareScheduleStatus.SCHEDULED);
-
-        when(careScheduleRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(recheck));
-        when(userRepository.findById(1L)).thenReturn(Optional.of(manager()));
-        when(horseRepository.findById(horse.getId())).thenReturn(Optional.of(horse));
-        when(careScheduleRepository.existsByHorseIdAndPurposeAndStatusInAndIdNot(
-                eq(10L), eq(CareSchedulePurpose.FOLLOW_UP), anyList(), eq(200L)))
-                .thenReturn(true);
-
-        CancelCareScheduleRequest req = new CancelCareScheduleRequest();
-        req.setReason("Duplicate booking");
-
-        careScheduleService.cancelCareSchedule(200L, req, 1L);
-
-        assertEquals(CareScheduleStatus.CANCELLED, recheck.getStatus());
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
     }
 
     private void stubCompletion() {

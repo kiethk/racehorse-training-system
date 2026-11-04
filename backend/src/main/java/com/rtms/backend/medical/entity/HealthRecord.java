@@ -21,7 +21,7 @@ public class HealthRecord {
     @Column(name = "care_schedule_id", unique = true)
     private Long careScheduleId;
 
-    @Column(name = "source_training_workout_id")
+    @Transient
     private Long sourceTrainingWorkoutId;
 
     @Column(name = "examined_at", nullable = false)

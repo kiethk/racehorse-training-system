@@ -181,6 +181,7 @@ class RoutineCadenceTest {
     @DisplayName("Kết luận BLOCKED mà không có lịch khám lại -> 400 FOLLOW_UP_REQUIRED, không tạo lịch AUTO")
     void blockedWithoutNextScheduleIsStillRejected() {
         CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        stubCompletion(exam);
         CompleteCareScheduleRequest req = request(TrainingDecision.BLOCKED);
         req.setRestrictionDetails("Walk only for 5 days");
 
@@ -221,10 +222,17 @@ class RoutineCadenceTest {
         exam.setCareType(CareType.URGENT);
         stubCompletion(exam);
 
-        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setScheduledAt(LocalDateTime.now().plusDays(3).withSecond(0).withNano(0));
+        next.setDescription("Recheck urgent case");
+        CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
+        req.setNextSchedule(next);
+
+        service.completeCareSchedule(exam.getId(), req, vet.getId());
 
         assertEquals(CareScheduleStatus.COMPLETED, exam.getStatus());
-        verify(schedules, never()).saveAndFlush(any());
+        verify(schedules, times(1)).saveAndFlush(any());
     }
 
     // ---- 5. MANUAL thắng AUTO ----

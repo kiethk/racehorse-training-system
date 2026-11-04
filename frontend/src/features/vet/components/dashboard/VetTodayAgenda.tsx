@@ -162,7 +162,7 @@ export function VetTodayAgenda({
                       >
                         Continue (Paused)
                       </Button>
-                    ) : schedule.status === "IN_PROGRESS" ? (
+                    ) : schedule.status === "IN_PROGRESS" || schedule.status === "DELAYED" ? (
                       <Button
                         variant="primary"
                         size="sm"

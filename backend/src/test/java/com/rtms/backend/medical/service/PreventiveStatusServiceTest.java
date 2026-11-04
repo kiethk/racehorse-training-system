@@ -11,6 +11,8 @@ import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.PreventiveDueStatus;
 import com.rtms.backend.medical.enums.ProtocolCategory;
+import com.rtms.backend.medical.enums.RescheduleReason;
+
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.PrescriptionRepository;
 import com.rtms.backend.medical.repository.PrescriptionRepository.LastPreventiveDose;
@@ -185,7 +187,7 @@ class PreventiveStatusServiceTest {
     }
 
     @Test
-    void cancelsScheduledMilestoneWhenNothingIsDueAnymoreThenBooksTheNextOne() {
+    void deletesScheduledMilestoneWhenNothingIsDueAnymoreThenBooksTheNextOne() {
         CareSchedule booked = milestone(CareScheduleStatus.SCHEDULED, TODAY.plusDays(4).atTime(9, 0), 21L);
         when(schedules.findFirstByHorseIdAndPurposeAndStatusIn(eq(HORSE), eq(CareSchedulePurpose.PREVENTIVE), any()))
                 .thenReturn(Optional.of(booked));
@@ -194,15 +196,17 @@ class PreventiveStatusServiceTest {
 
         CareSchedule next = service.upsertMilestone(HORSE, "preventive:15", ACTOR, null).orElseThrow();
 
-        assertEquals(CareScheduleStatus.CANCELLED, booked.getStatus());
-        assertEquals("Vaccinated early in a combined visit on 18/10", booked.getCancelReason());
+        // AD-025: mốc bị vượt được xóa cứng (delete), dấu vết ghi lên mốc mới thay thế.
+        verify(schedules).delete(booked);
+        verify(schedules).flush();
         assertNotSame(booked, next);
         assertEquals(CareScheduleStatus.REQUESTED, next.getStatus());
         assertEquals(TODAY.plusDays(180).atTime(14, 0), next.getRequestedAt());
-        // Mốc cũ phải được flush trước khi INSERT mốc mới, nếu không partial unique index sẽ chặn.
-        InOrder order = inOrder(schedules);
-        order.verify(schedules).saveAndFlush(booked);
-        order.verify(schedules).save(next);
+        assertEquals(RescheduleReason.OTHER, next.getRescheduleReason());
+        assertNotNull(next.getRescheduleNote());
+        assertTrue(next.getRescheduleNote().contains("Superseded by early vaccination"));
+        assertTrue(next.getRescheduleNote().contains("schedule #" + booked.getId()));
+        verify(schedules).save(next);
     }
 
     @Test

@@ -99,17 +99,21 @@ export function RoutineChecksWorkspace() {
   const stats = useMemo(() => {
     let scheduled = 0;
     let inProgress = 0;
+    let delayed = 0;
+    let overdue = 0;
     let paused = 0;
     let completed = 0;
 
     for (const s of schedules) {
       if (s.status === 'SCHEDULED') scheduled++;
       else if (s.status === 'IN_PROGRESS') inProgress++;
+      else if (s.status === 'DELAYED') delayed++;
+      else if (s.status === 'OVERDUE') overdue++;
       else if (s.status === 'PAUSED') paused++;
       else if (s.status === 'COMPLETED') completed++;
     }
 
-    return { total: schedules.length, scheduled, inProgress, paused, completed };
+    return { total: schedules.length, scheduled, inProgress, delayed, overdue, paused, completed };
   }, [schedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
@@ -202,6 +206,8 @@ export function RoutineChecksWorkspace() {
             { value: 'ALL', label: 'All', count: schedules.length },
             { value: 'SCHEDULED', label: 'Scheduled', count: stats.scheduled },
             { value: 'IN_PROGRESS', label: 'In Progress', count: stats.inProgress },
+            ...(stats.delayed > 0 ? [{ value: 'DELAYED' as const, label: 'Delayed', count: stats.delayed }] : []),
+            ...(stats.overdue > 0 ? [{ value: 'OVERDUE' as const, label: 'Overdue', count: stats.overdue }] : []),
             { value: 'PAUSED', label: 'Paused', count: stats.paused },
             { value: 'COMPLETED', label: 'Completed', count: stats.completed },
           ]}
@@ -284,6 +290,10 @@ export function RoutineChecksWorkspace() {
                           tone={
                             cs.status === 'COMPLETED'
                               ? 'success'
+                              : cs.status === 'OVERDUE'
+                              ? 'danger'
+                              : cs.status === 'DELAYED'
+                              ? 'warning'
                               : cs.status === 'PAUSED'
                               ? 'warning'
                               : cs.status === 'IN_PROGRESS'
@@ -298,6 +308,12 @@ export function RoutineChecksWorkspace() {
                             ? 'Paused'
                             : cs.status === 'IN_PROGRESS'
                             ? 'In Progress'
+                            : cs.status === 'DELAYED'
+                            ? 'Delayed'
+                            : cs.status === 'OVERDUE'
+                            ? 'Overdue'
+                            : cs.status === 'REQUESTED'
+                            ? 'Requested'
                             : 'Completed'}
                         </Pill>
                       </div>
@@ -323,8 +339,10 @@ export function RoutineChecksWorkspace() {
                       icon={
                         isCompleted
                           ? 'file-text'
-                          : cs.status === 'IN_PROGRESS'
+                          : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
                           ? 'activity'
+                          : cs.status === 'OVERDUE'
+                          ? 'alert-triangle'
                           : 'chevron-right'
                       }
                       onClick={(e) => {
@@ -337,8 +355,10 @@ export function RoutineChecksWorkspace() {
                         ? 'View Record'
                         : cs.status === 'PAUSED'
                         ? 'Continue (Paused)'
-                        : cs.status === 'IN_PROGRESS'
+                        : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
                         ? 'Continue Exam'
+                        : cs.status === 'OVERDUE'
+                        ? 'Start Exam'
                         : 'Start Exam'}
                     </Button>
                   </div>

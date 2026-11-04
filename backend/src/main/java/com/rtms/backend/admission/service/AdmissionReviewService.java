@@ -144,7 +144,8 @@ public class AdmissionReviewService {
             }
         } else if (schedule.getStatus() == CareScheduleStatus.SCHEDULED || schedule.getStatus() == CareScheduleStatus.PAUSED) {
             careScheduleService.startCareSchedule(schedule.getId(), actorId);
-        } else if (schedule.getStatus() != CareScheduleStatus.IN_PROGRESS) {
+        } else if (!CareScheduleStatus.ACTIVE_EXAM.contains(schedule.getStatus())) {
+            // AD-022: OVERDUE is an already-started exam, so it submits like IN_PROGRESS.
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE",
                     "Start the examination before submitting a review");
         }
@@ -259,15 +260,11 @@ public class AdmissionReviewService {
         Horse horse = horseId != null ? horses.findById(horseId).orElse(null) : null;
         LocalDateTime now = LocalDateTime.now();
 
-        // Cancel every open schedule for this horse; keep completed history untouched.
+        // AD-022/AD-025 rule 6: mở rộng như nghiệp vụ cũ (mọi lịch còn mở của ngựa),
+        // nhưng xóa cứng thay vì CANCELLED. NOT EXISTS trong hàm xóa bảo vệ ca URGENT
+        // còn horse_incident_reports / health_records tham chiếu — những ca đó ở lại.
         if (horseId != null) {
-            List<CareSchedule> openSchedules = careSchedules.findByHorseIdAndStatusIn(horseId,
-                    List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
-            for (CareSchedule cs : openSchedules) {
-                cs.setStatus(CareScheduleStatus.CANCELLED);
-                cs.setCancelReason("Admission rejected by veterinarian");
-            }
-            careSchedules.saveAll(openSchedules);
+            careSchedules.deleteOpenSchedulesIfUnreferenced(horseId, CareScheduleStatus.OPEN);
         }
 
         // Release the quarantine stall if one is recorded for this admission.

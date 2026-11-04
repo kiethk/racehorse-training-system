@@ -114,67 +114,17 @@ class AssignmentEnforcementTest {
     }
 
     @Test
-    @DisplayName("7 & 9. Vet cố tình hủy/từ chối CareSchedule: nhận 403 Forbidden")
+    @DisplayName("7 & 9. AD-022: Thu y khong the tu choi ca — API cancel da bi xoa bo")
     void vet_cannotCancelSchedule_throwsForbidden() {
-        Long scheduleId = 100L;
-        Long vetId = 15L;
-
-        CareSchedule schedule = new CareSchedule();
-        schedule.setId(scheduleId);
-        schedule.setVeterinarianId(vetId);
-        schedule.setStatus(CareScheduleStatus.SCHEDULED);
-        schedule.setCareType(CareType.INITIAL);
-        schedule.setAdmissionId(1L);
-
-        User vetUser = new User();
-        vetUser.setId(vetId);
-        Role vetRole = new Role();
-        vetRole.setName("VETERINARIAN");
-        vetUser.setRole(vetRole);
-
-        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
-        when(userRepository.findById(vetId)).thenReturn(Optional.of(vetUser));
-
-        CancelCareScheduleRequest req = new CancelCareScheduleRequest();
-        req.setReason("Tôi không muốn nhận ca này");
-
-        ApiException ex = assertThrows(ApiException.class,
-                () -> careScheduleService.cancelCareSchedule(scheduleId, req, vetId));
-
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
-        assertTrue(ex.getMessage().contains("veterinarians cannot decline assignments"));
-        assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus(), "Status không được đổi sang CANCELLED");
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
     }
 
     @Test
-    @DisplayName("13. Club Manager có quyền hủy/quản lý schedule khi cần thiết")
-    void manager_canCancelSchedule() {
-        Long scheduleId = 100L;
-        Long managerId = 99L;
-
-        CareSchedule schedule = new CareSchedule();
-        schedule.setId(scheduleId);
-        schedule.setVeterinarianId(15L);
-        schedule.setStatus(CareScheduleStatus.SCHEDULED);
-        schedule.setCareType(CareType.INITIAL);
-
-        User managerUser = new User();
-        managerUser.setId(managerId);
-        Role managerRole = new Role();
-        managerRole.setName("CLUB_MANAGER");
-        managerUser.setRole(managerRole);
-
-        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
-        when(userRepository.findById(managerId)).thenReturn(Optional.of(managerUser));
-        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
-
-        CancelCareScheduleRequest req = new CancelCareScheduleRequest();
-        req.setReason("Lịch kiểm tra bị hoãn do sự cố kỹ thuật");
-
-        var response = careScheduleService.cancelCareSchedule(scheduleId, req, managerId);
-
-        assertEquals(CareScheduleStatus.CANCELLED, response.status());
-        assertEquals("Lịch kiểm tra bị hoãn do sự cố kỹ thuật", schedule.getCancelReason());
+    @DisplayName("13. AD-022: không còn API hủy ca khám — kẹt lịch chuyển qua reschedule, hết quyền cancel")
+    void cancelEndpointAbolished_underAd022() {
+        // Khóa học / API cũ POST /api/care-schedules/{id}/cancel đã bị xóa khỏi Controller.
+        // Quyền quản lý chuyển sang POST /api/care-schedules/{id}/reschedule.
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
     }
 
     @Test

@@ -44,7 +44,7 @@ export function DiagnosisSection(props: DiagnosisSectionProps) {
   return (
     <div>
       <div className="mb-1 block text-xs font-semibold text-[var(--color-text-primary)]">
-        Clinical Assessment &amp; Diagnosis <span className="text-[var(--color-danger)]">*</span>
+        2. Clinical Assessment &amp; Diagnosis <span className="text-[var(--color-danger)]">*</span>
       </div>
       {isUrgent ? (
         <>

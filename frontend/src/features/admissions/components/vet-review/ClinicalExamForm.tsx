@@ -159,7 +159,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     } = props;
 
     const config = EXAM_VARIANT_CONFIG[variant];
-    const isPrescriptionActive = config.prescription || careType === 'ROUTINE';
+    const isPrescriptionActive = config.prescription || careType === 'ROUTINE' || careType === 'URGENT';
 
     const draftStorageKey = careScheduleId
       ? `draft:care-schedule:${careScheduleId}`
@@ -169,7 +169,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const [verdict, setVerdict] = useState<VetReviewDecision>('ACCEPT');
     const [rejectReason, setRejectReason] = useState('');
 
-    const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>(config.defaultDecision);
+    const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>(careType === 'URGENT' ? 'BLOCKED' : config.defaultDecision);
     const [restrictionDetails, setRestrictionDetails] = useState('');
     const [scheduleFollowUp, setScheduleFollowUp] = useState(false);
     const [followUpDate, setFollowUpDate] = useState('');
@@ -271,6 +271,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       if (prefillFindings && !prefillApplied.current) {
         prefillApplied.current = true;
         setFindings((prev) => prev || prefillFindings);
+        setAbnormalFindings((prev) => prev || prefillFindings);
       }
     }, [prefillFindings]);
 
@@ -334,7 +335,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       }
     }, [show3DTab, anatomyTab]);
 
-    const isGated = scheduleStatus != null && scheduleStatus !== 'IN_PROGRESS';
+    // AD-022: an OVERDUE exam is still open and must remain editable so the vet can submit findings.
+    const isGated = scheduleStatus != null && scheduleStatus !== 'IN_PROGRESS' && scheduleStatus !== 'DELAYED' && scheduleStatus !== 'OVERDUE';
     const followUpRequired = config.followUpMode === 'single-required-select';
     const followUpActive =
       config.followUpMode === 'single-required-select'
@@ -519,9 +521,23 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     };
 
     const handleRandomizeData = () => {
-      if (config.simulateMode === 'hot-profiles') {
-        setMetrics(randomizeUrgentVitals());
-        setFieldErrors((prev) => ({ ...prev, metrics: '' }));
+      if (careType === 'URGENT' || config.simulateMode === 'hot-profiles') {
+        const urgentVitals = randomizeUrgentVitals();
+        setMetrics(urgentVitals);
+        setPhysicalExamConfirmed(true);
+        setExamMode('ABNORMAL');
+        setStructuredDiagnosis('Musculoskeletal condition suspected');
+        setAbnormalFindings(
+          urgentVitals.notes || 'Acute localized pain and mild vital elevation secondary to trauma.',
+        );
+        setTrainingDecision('BLOCKED');
+        setFieldErrors((prev) => ({
+          ...prev,
+          metrics: '',
+          abnormalFindings: '',
+          diagnosis: '',
+          trainingDecision: '',
+        }));
         return;
       }
 
@@ -811,7 +827,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
       event.preventDefault();
-      if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS') {
+      if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS' && scheduleStatus !== 'DELAYED' && scheduleStatus !== 'OVERDUE') {
         setFormError(
           'Care schedule is SCHEDULED. Physical examination must be started before recording and submitting findings.',
         );
@@ -837,7 +853,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     async function executeSubmit() {
       if (inFlight.current) return;
-      if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS') {
+      if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS' && scheduleStatus !== 'DELAYED' && scheduleStatus !== 'OVERDUE') {
         setFormError(
           'Care schedule is SCHEDULED. Physical examination must be started before recording and submitting findings.',
         );
@@ -1251,9 +1267,9 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     };
 
     const renderFollowUps = () => {
-      const activeRxEndDates = prescriptions.map((p) => p.endDate).filter(Boolean);
+      const activeRxDurations = prescriptions.map((p) => p.duration).filter((d): d is number => typeof d === 'number' && d > 0);
       const activeInjuryRecoveryDates = activeInjuries.map((inj) => inj.expectedRecoveryDate).filter(Boolean) as string[];
-      const suggestedRecheckDate = computeSuggestedRecheckDate(activeRxEndDates, activeInjuryRecoveryDates);
+      const suggestedRecheckDate = computeSuggestedRecheckDate(activeRxDurations, activeInjuryRecoveryDates);
 
       if (config.followUpMode === 'single-required-select') {
         return (
@@ -1426,6 +1442,47 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       );
     };
 
+    const renderInjuryMarkers = () => {
+      const isVisible =
+        careType === 'URGENT' ||
+        config.markersEnabled ||
+        trainingDecision === 'BLOCKED' ||
+        examMode === 'ABNORMAL';
+      if (!isVisible) return null;
+
+      return (
+        <fieldset
+          disabled={isFormDisabled}
+          className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)] space-y-4"
+        >
+          <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
+            <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
+              3. 3D Anatomy &amp; Injury Markers
+            </h3>
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              {markers.length} marker{markers.length === 1 ? '' : 's'} placed
+            </span>
+          </div>
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Click on the 3D model to pinpoint injury or pain locations.
+          </p>
+          <InjuryMarkerPanel
+            markers={markers}
+            setMarkers={setMarkers}
+            bodyRegions={bodyRegions}
+            readOnly={isFormDisabled}
+            fieldErrors={fieldErrors}
+            setFieldErrors={setFieldErrors}
+            onAppendToFindings={
+              config.markersAppendToFindings
+                ? (line) => setFindings((prev) => (prev ? `${prev}\n${line}` : line))
+                : undefined
+            }
+          />
+        </fieldset>
+      );
+    };
+
     const renderVaccination = () => {
       if (!config.vaccination || horseId == null) return null;
       return (
@@ -1577,56 +1634,12 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
         <div className={admissionDetailGridClassName}>
           <div className="min-w-0 space-y-5">
-            {show3DTab && (
-              <div className="border-b border-[var(--color-border)] pb-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant={anatomyTab === 'form' ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => setAnatomyTab('form')}
-                  >
-                    Examination Form
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={anatomyTab === 'anatomy3d' ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => setAnatomyTab('anatomy3d')}
-                  >
-                    3D Anatomy{markers.length > 0 ? ` (${markers.length})` : ''}
-                  </Button>
-                </div>
-                {anatomyTab === 'form' ? (
-                  <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                    Record vitals telemetry, clinical diagnosis, and training restriction decision.
-                  </p>
-                ) : (
-                  <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                    Click the horse to place injury markers. At least one marker is required when training is blocked.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {show3DTab && anatomyTab === 'anatomy3d' ? (
-              <InjuryMarkerPanel
-                markers={markers}
-                setMarkers={setMarkers}
-                bodyRegions={bodyRegions}
-                readOnly={isFormDisabled}
-                fieldErrors={fieldErrors}
-                setFieldErrors={setFieldErrors}
-              />
-            ) : (
-              <>
-                {renderVitals()}
-                {renderSection2()}
-                {verdict !== 'REJECT' && renderActiveConditions()}
-                {verdict !== 'REJECT' && renderVaccination()}
-                {verdict !== 'REJECT' && renderPrescription()}
-              </>
-            )}
+            {renderVitals()}
+            {renderSection2()}
+            {renderInjuryMarkers()}
+            {verdict !== 'REJECT' && renderActiveConditions()}
+            {verdict !== 'REJECT' && careType !== 'URGENT' && renderVaccination()}
+            {verdict !== 'REJECT' && renderPrescription()}
           </div>
 
           <div className={admissionAsideClassName}>
@@ -1841,85 +1854,23 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const renderStackedForm = () => (
       <form onSubmit={handleFormSubmit} noValidate className="space-y-6">
         {renderFormError()}
-        {show3DTab && (
-          <div className="border-b border-[var(--color-border)] pb-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant={anatomyTab === 'form' ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setAnatomyTab('form')}
-              >
-                Examination Form
-              </Button>
-              <Button
-                type="button"
-                variant={anatomyTab === 'anatomy3d' ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setAnatomyTab('anatomy3d')}
-              >
-                3D Anatomy{markers.length > 0 ? ` (${markers.length})` : ''}
-              </Button>
-            </div>
-            {anatomyTab === 'form' ? (
-              <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                Record vitals telemetry, clinical diagnosis, and immediate training restriction decision.
-              </p>
-            ) : (
-              <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                Click the horse to place injury markers. Markers are appended to examination findings.
-              </p>
-            )}
-          </div>
-        )}
-
-        {show3DTab && anatomyTab === 'anatomy3d' ? (
-          <div className="space-y-6">
-            <InjuryMarkerPanel
-              markers={markers}
-              setMarkers={setMarkers}
-              bodyRegions={bodyRegions}
-              readOnly={isFormDisabled}
-              onAppendToFindings={
-                config.markersAppendToFindings
-                  ? (line) => setFindings((prev) => (prev ? `${prev}\n${line}` : line))
-                  : undefined
-              }
-              fieldErrors={fieldErrors}
-              setFieldErrors={setFieldErrors}
-            />
-            <div className="border-t border-[var(--color-border)] pt-5">
-              <Button
-                type="submit"
-                variant="primary"
-                loading={submitting}
-                icon="check"
-                className="w-full transition-all active:scale-[0.97] sm:w-auto"
-              >
-                {config.submitLabel}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {renderVitals()}
-            {renderSection2()}
-            {renderTrainingDecision()}
-            {renderActiveConditions()}
-            {renderPrescription()}
-            <div className="border-t border-[var(--color-border)] pt-5">
-              <Button
-                type="submit"
-                variant="primary"
-                loading={submitting}
-                icon="check"
-                className="w-full transition-all active:scale-[0.97] sm:w-auto"
-              >
-                {config.submitLabel}
-              </Button>
-            </div>
-          </>
-        )}
+        {renderVitals()}
+        {renderSection2()}
+        {renderInjuryMarkers()}
+        {renderTrainingDecision()}
+        {renderActiveConditions()}
+        {renderPrescription()}
+        <div className="border-t border-[var(--color-border)] pt-5">
+          <Button
+            type="submit"
+            variant="primary"
+            loading={submitting}
+            icon="check"
+            className="w-full transition-all active:scale-[0.97] sm:w-auto"
+          >
+            {config.submitLabel}
+          </Button>
+        </div>
       </form>
     );
 

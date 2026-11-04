@@ -88,8 +88,7 @@ public class HorseIncidentReportService {
 
         HorseIncidentReport saved = incidentReportRepository.save(report);
 
-        List<CareScheduleStatus> activeStatuses = List.of(
-                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+        List<CareScheduleStatus> activeStatuses = CareScheduleStatus.OPEN;
         CareSchedule active = careScheduleRepository
                 .findFirstByHorseIdAndCareTypeAndStatusInOrderByCreatedAtDesc(
                         horse.getId(), CareType.URGENT, activeStatuses)

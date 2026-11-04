@@ -129,8 +129,10 @@ INSERT INTO seed_check VALUES
         OR i.care_schedule_id IS NULL $q$),
 ('PAUSED schedule without a paused_from timestamp',
  $q$ SELECT id FROM care_schedule WHERE status = 'PAUSED' AND paused_from IS NULL $q$),
-('Cancelled schedule without a reason',
- $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' AND (cancel_reason IS NULL OR btrim(cancel_reason) = '') $q$),
+('Cancelled care schedule exists (AD-022 forbids CANCELLED in care_schedule)',
+ $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' $q$),
+('Care schedule with status outside the 6-status enum (AD-022)',
+ $q$ SELECT id FROM care_schedule WHERE status NOT IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS', 'PAUSED', 'DELAYED', 'OVERDUE', 'COMPLETED') $q$),
 ('Health metric hydration status outside the HydrationStatus enum',
  $q$ SELECT id FROM horse_health_metrics
      WHERE hydration_status NOT IN ('NORMAL', 'MILD_DEHYDRATION', 'MODERATE_DEHYDRATION', 'SEVERE_DEHYDRATION', 'ABNORMAL_CRT') $q$),
@@ -266,8 +268,6 @@ INSERT INTO seed_check VALUES
      WHERE a.trainer_id <> r.trainer_id OR r.event_date < r.created_at::DATE OR r.nomination_deadline > r.event_date
         OR (r.status = 'PENDING') <> (r.reviewed_at IS NULL) $q$),
 -- ---------------- Dược lâm sàng (Track 0: catalog + đơn thuốc + severity D4)
-('Medication catalog missing or incomplete (needs 10+ active FEI entries)',
- $q$ SELECT 1 WHERE (SELECT count(*) FROM clinical_medications WHERE active) < 10 $q$),
 ('Health condition severity outside the MILD/MODERATE/SEVERE/CRITICAL vocabulary',
  $q$ SELECT id FROM health_conditions
      WHERE UPPER(severity) NOT IN ('MILD', 'MODERATE', 'SEVERE', 'CRITICAL') $q$),

@@ -185,8 +185,9 @@ export type CareScheduleStatus =
   | 'SCHEDULED'
   | 'IN_PROGRESS'
   | 'PAUSED'
-  | 'COMPLETED'
-  | 'CANCELLED';
+  | 'DELAYED'
+  | 'OVERDUE'
+  | 'COMPLETED';
 
 export type CareType = 'INITIAL' | 'ROUTINE' | 'URGENT';
 

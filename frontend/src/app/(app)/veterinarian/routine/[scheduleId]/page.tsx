@@ -70,9 +70,12 @@ export default function RoutineDetailPage() {
     }
   }, [isCompleted, scheduleId, router]);
 
-  // Auto-start a SCHEDULED exam on entry; on failure the gated form keeps the manual button.
+  // Auto-start a SCHEDULED/OVERDUE exam on entry; on failure the gated form keeps the manual button.
   useEffect(() => {
-    if (detail?.schedule?.status === 'SCHEDULED' && !autoStartRef.current) {
+    if (
+      (detail?.schedule?.status === 'SCHEDULED' || detail?.schedule?.status === 'OVERDUE') &&
+      !autoStartRef.current
+    ) {
       autoStartRef.current = true;
       handleStartExam().catch(() => {
         // The form stays gated; the vet can still use the manual Start Examination button.

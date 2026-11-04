@@ -58,7 +58,7 @@ class CareScheduleVetQueueQueryTest {
     private CareSchedule scheduledInitial;
     private CareSchedule scheduledFollowUp;
     private CareSchedule requestedFollowUp;
-    private CareSchedule cancelledExam;
+    private CareSchedule overdueExam;
 
     @BeforeEach
     void buildFixture() {
@@ -98,16 +98,17 @@ class CareScheduleVetQueueQueryTest {
                 LocalDateTime.now().plusDays(2));
         requestedFollowUp = schedule(CareType.ROUTINE, CareScheduleStatus.REQUESTED, null);
         // Ca đã hủy: mặc định ẩn, chỉ thấy khi lọc tường minh.
-        cancelledExam = schedule(CareType.ROUTINE, CareScheduleStatus.CANCELLED,
+        overdueExam = schedule(CareType.ROUTINE, CareScheduleStatus.OVERDUE,
                 LocalDateTime.now().plusDays(3));
     }
 
     @Test
-    void defaultQueueHidesCompletedAndCancelledExams() {
+    void defaultQueueHidesCompletedExamsButKeepsOverdue() {
         Page<CareSchedule> page = queue(null, "");
 
-        assertEquals(3L, page.getTotalElements());
-        assertEquals(Set.of(scheduledInitial.getId(), scheduledFollowUp.getId(), requestedFollowUp.getId()),
+        assertEquals(4L, page.getTotalElements());
+        assertEquals(Set.of(scheduledInitial.getId(), scheduledFollowUp.getId(),
+                requestedFollowUp.getId(), overdueExam.getId()),
                 idsOf(page));
     }
 
@@ -121,11 +122,11 @@ class CareScheduleVetQueueQueryTest {
     }
 
     @Test
-    void cancelledFilterReturnsCancelledExamsOnlyWhenAsked() {
-        Page<CareSchedule> page = queue(CareScheduleStatus.CANCELLED, "");
+    void overdueFilterReturnsOverdueExamsOnlyWhenAsked() {
+        Page<CareSchedule> page = queue(CareScheduleStatus.OVERDUE, "");
 
         assertEquals(1L, page.getTotalElements());
-        assertEquals(Set.of(cancelledExam.getId()), idsOf(page));
+        assertEquals(Set.of(overdueExam.getId()), idsOf(page));
     }
 
     @Test
@@ -153,7 +154,7 @@ class CareScheduleVetQueueQueryTest {
                 PageRequest.of(0, 1));
 
         assertEquals(1, paged.getContent().size());
-        assertEquals(3L, paged.getTotalElements());
+        assertEquals(4L, paged.getTotalElements());
 
         Page<CareSchedule> completed = careSchedules.findVetQueuePage(vetId, false, "", "", null,
                 CareScheduleStatus.COMPLETED, null, "", PageRequest.of(0, 1));
@@ -193,8 +194,9 @@ class CareScheduleVetQueueQueryTest {
 
         // ACTIVE pill should only return exams for non-approved admissions
         Page<CareSchedule> activePage = queue(null, "ACTIVE");
-        assertEquals(3L, activePage.getTotalElements());
-        assertEquals(Set.of(scheduledInitial.getId(), scheduledFollowUp.getId(), requestedFollowUp.getId()),
+        assertEquals(4L, activePage.getTotalElements());
+        assertEquals(Set.of(scheduledInitial.getId(), scheduledFollowUp.getId(),
+                requestedFollowUp.getId(), overdueExam.getId()),
                 idsOf(activePage));
 
         // APPROVED pill should only return exams for approved admissions
@@ -228,7 +230,7 @@ class CareScheduleVetQueueQueryTest {
         schedule.setScheduledAt(scheduledAt);
         schedule.setRequestedAt(scheduledAt);
         schedule.setCompletedAt(status == CareScheduleStatus.COMPLETED ? LocalDateTime.now() : null);
-        schedule.setCancelReason(status == CareScheduleStatus.CANCELLED ? "Cancelled by the test" : null);
+        
         return careSchedules.saveAndFlush(schedule);
     }
 }

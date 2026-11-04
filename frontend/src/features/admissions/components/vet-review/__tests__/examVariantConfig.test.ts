@@ -97,9 +97,9 @@ describe('examVariantConfig — per-flow behavioral contract', () => {
     assert.equal(Object.keys(missingAll).length, 6);
 
     const outOfRange = validateSixVitals({
-      temperature: '39.0',
-      heartRate: '50',
-      respiratoryRate: '20',
+      temperature: '50.0',
+      heartRate: '300',
+      respiratoryRate: '150',
       weight: '1600',
       bodyConditionScore: '0',
       hydrationStatus: 'NORMAL',

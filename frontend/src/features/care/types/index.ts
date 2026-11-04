@@ -1,4 +1,4 @@
-export type CareScheduleStatus = 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+export type CareScheduleStatus = 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'PAUSED' | 'DELAYED' | 'OVERDUE' | 'COMPLETED';
 export type CareType = 'INITIAL' | 'ROUTINE' | 'URGENT';
 export type TrainingDecision = 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
 
@@ -106,10 +106,6 @@ export interface CompleteCareScheduleRequest {
   prescriptions?: PrescriptionItemRequest[];
   generalCareInstructions?: string;
   resolvedConditionIds?: number[];
-}
-
-export interface CancelCareScheduleRequest {
-  cancelReason: string;
 }
 
 export interface Prescription {

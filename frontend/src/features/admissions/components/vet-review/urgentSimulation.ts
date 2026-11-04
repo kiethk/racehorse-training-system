@@ -22,36 +22,36 @@ export interface UrgentVitalProfile {
 
 export const URGENT_VITAL_PROFILES: UrgentVitalProfile[] = [
   {
-    key: 'still-hot',
-    heartRate: { min: 95, max: 140 },
-    temperature: { min: 39.2, max: 40.3 },
-    respiratoryRate: { min: 28, max: 48 },
-    hydration: ['MODERATE_DEHYDRATION', 'MILD_DEHYDRATION'],
-    notes: [
-      'Sweating heavily over the neck and shoulders; capillary refill about 3 seconds, membranes tacky.',
-      'Coat marked with dried sweat; pulse strong and rapid, horse markedly restless and watchful at the limb.',
-    ],
-  },
-  {
-    key: 'pain-after-effort',
-    heartRate: { min: 55, max: 95 },
-    temperature: { min: 38.4, max: 39.5 },
-    respiratoryRate: { min: 18, max: 30 },
-    hydration: ['MILD_DEHYDRATION', 'NORMAL'],
-    notes: [
-      'Heart rate stays above the expected recovery band for the time since the gallop; membranes pink, refill under 2 seconds.',
-      'Guarding the right fore; high muscle tension; offers only small drinks when water is presented.',
-    ],
-  },
-  {
-    key: 'recovered-with-pain',
-    heartRate: { min: 42, max: 58 },
-    temperature: { min: 37.9, max: 38.6 },
-    respiratoryRate: { min: 14, max: 22 },
+    key: 'acute-pain-tachycardia',
+    heartRate: { min: 52, max: 68 },
+    temperature: { min: 37.8, max: 38.4 },
+    respiratoryRate: { min: 12, max: 16 },
     hydration: ['NORMAL', 'MILD_DEHYDRATION'],
     notes: [
-      'Vitals settling toward the resting band; still reluctant to stand fully weight-bearing on the affected limb.',
-      'Calmer on examination; heart rate recovery is slow but progressive, consistent with pain-driven tachycardia.',
+      'Guarding affected limb; acute localized pain on palpation; elevated heart rate consistent with pain response while temperature and respiration remain normal.',
+      'Reluctant to bear weight; digital pulse pronounced; heart rate elevated due to discomfort; mucous membranes pink and moist.',
+    ],
+  },
+  {
+    key: 'localized-inflammation',
+    heartRate: { min: 48, max: 60 },
+    temperature: { min: 38.8, max: 39.3 },
+    respiratoryRate: { min: 14, max: 18 },
+    hydration: ['MILD_DEHYDRATION'],
+    notes: [
+      'Localized inflammatory reaction with heat over limb; mild systemic temperature elevation; pulse steady and strong.',
+      'Warmth and mild swelling detected; mild pyrexia; capillary refill ~2s; drinking small amounts.',
+    ],
+  },
+  {
+    key: 'post-exertion-distress',
+    heartRate: { min: 46, max: 58 },
+    temperature: { min: 37.9, max: 38.5 },
+    respiratoryRate: { min: 18, max: 24 },
+    hydration: ['NORMAL', 'MILD_DEHYDRATION'],
+    notes: [
+      'Mild tachypnea following exercise trauma; heart rate recovering gradually; body temperature within resting parameters.',
+      'Slight distress on examination; respiratory rate mildly elevated; clear lung sounds bilaterally.',
     ],
   },
 ];

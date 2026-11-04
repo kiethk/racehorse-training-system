@@ -11,6 +11,8 @@ import {
   resolveInjuryWorldPosition,
   computeAnatomicalNormal,
   resolveInjuryNormal,
+  resolveBodyRegionKey,
+  matchBodyRegion,
 } from '../injuryZones.ts';
 
 test('normalizePoint maps model coords to 0..1', () => {
@@ -129,4 +131,48 @@ test('resolveInjuryNormal cures degenerate vertical default normals and preserve
   // Legitimate hit face normal is preserved
   const valid = resolveInjuryNormal([0.8, 0.2, 0.1], [0.25, 0, 0]);
   assert.ok(Math.abs(valid[0] - 0.96) < 0.05, 'Valid face normal preserved');
+});
+
+
+test('resolveBodyRegionKey maps zone and hit coordinate to canonical 8 region keys', () => {
+  // Foreleg left vs right (+X is left in GLB)
+  assert.equal(resolveBodyRegionKey('foreleg', { x: 10, y: 10, z: 50 }), 'foreleg_left');
+  assert.equal(resolveBodyRegionKey('foreleg', { x: -10, y: 10, z: 50 }), 'foreleg_right');
+
+  // Hindleg left vs right
+  assert.equal(resolveBodyRegionKey('hindleg', { x: 10, y: 10, z: -60 }), 'hindleg_left');
+  assert.equal(resolveBodyRegionKey('hindleg', { x: -10, y: 10, z: -60 }), 'hindleg_right');
+
+  // Head and neck preserve direct keys
+  assert.equal(resolveBodyRegionKey('head', { x: 0, y: 200, z: 100 }), 'head');
+  assert.equal(resolveBodyRegionKey('neck', { x: 0, y: 160, z: 70 }), 'neck');
+
+  // Trunk/back (high y) vs abdomen (low y)
+  assert.equal(resolveBodyRegionKey('trunk', { x: 0, y: 180, z: 0 }), 'back');
+  assert.equal(resolveBodyRegionKey('trunk', { x: 0, y: 60, z: 0 }), 'abdomen');
+});
+
+test('matchBodyRegion finds matching horse_body_region from catalog', () => {
+  const regions = [
+    { id: 1, code: 'HEAD', displayName: 'Head', modelNodeKey: 'head' },
+    { id: 2, code: 'NECK', displayName: 'Neck', modelNodeKey: 'neck' },
+    { id: 3, code: 'BACK', displayName: 'Back', modelNodeKey: 'back' },
+    { id: 4, code: 'ABDOMEN', displayName: 'Abdomen', modelNodeKey: 'abdomen' },
+    { id: 5, code: 'FORELEG_LEFT', displayName: 'Foreleg (Left)', modelNodeKey: 'foreleg_left' },
+    { id: 6, code: 'FORELEG_RIGHT', displayName: 'Foreleg (Right)', modelNodeKey: 'foreleg_right' },
+    { id: 7, code: 'HINDLEG_LEFT', displayName: 'Hindleg (Left)', modelNodeKey: 'hindleg_left' },
+    { id: 8, code: 'HINDLEG_RIGHT', displayName: 'Hindleg (Right)', modelNodeKey: 'hindleg_right' },
+  ];
+
+  const forelegRight = matchBodyRegion(regions, 'foreleg', { x: -10, y: 10, z: 50 });
+  assert.equal(forelegRight?.id, 6);
+  assert.equal(forelegRight?.code, 'FORELEG_RIGHT');
+
+  const forelegLeft = matchBodyRegion(regions, 'foreleg', { x: 10, y: 10, z: 50 });
+  assert.equal(forelegLeft?.id, 5);
+  assert.equal(forelegLeft?.code, 'FORELEG_LEFT');
+
+  const back = matchBodyRegion(regions, 'trunk', { x: 0, y: 180, z: 0 });
+  assert.equal(back?.id, 3);
+  assert.equal(back?.code, 'BACK');
 });

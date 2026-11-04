@@ -90,31 +90,9 @@ class CareScheduleLifecycleTest {
     }
 
     @Test
-    @DisplayName("cancelCareSchedule permits CLUB_MANAGER and rejects VETERINARIAN")
-    void testCancelCareSchedule_authorization() {
-        when(careScheduleRepository.findByIdForUpdate(schedule.getId())).thenReturn(Optional.of(schedule));
-
-        Role vetRole = new Role();
-        vetRole.setName("VETERINARIAN");
-        assignedVet.setRole(vetRole);
-        when(userRepository.findById(assignedVet.getId())).thenReturn(Optional.of(assignedVet));
-
-        CancelCareScheduleRequest cancelReq = new CancelCareScheduleRequest();
-        cancelReq.setReason("Cancel request");
-
-        ApiException ex = assertThrows(ApiException.class, () ->
-                careScheduleService.cancelCareSchedule(schedule.getId(), cancelReq, assignedVet.getId()));
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
-
-        User manager = new User();
-        manager.setId(3L);
-        Role mgrRole = new Role();
-        mgrRole.setName("CLUB_MANAGER");
-        manager.setRole(mgrRole);
-        when(userRepository.findById(manager.getId())).thenReturn(Optional.of(manager));
-        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
-
-        var response = careScheduleService.cancelCareSchedule(schedule.getId(), cancelReq, manager.getId());
-        assertEquals(CareScheduleStatus.CANCELLED, response.status());
+    @DisplayName("AD-022: cancelCareSchedule abolished — lifecycle uses reschedule and OVERDUE instead")
+    void testCancelCareSchedule_abolished() {
+        // Under AD-022, cancelCareSchedule is removed; stuck exams are moved via reschedule().
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
     }
 }

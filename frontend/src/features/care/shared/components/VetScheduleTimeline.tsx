@@ -362,6 +362,8 @@ export function VetScheduleTimeline() {
                 <option value="ALL">All Statuses</option>
                 <option value="SCHEDULED">Scheduled</option>
                 <option value="IN_PROGRESS">In Progress</option>
+                <option value="DELAYED">Delayed</option>
+                <option value="OVERDUE">Overdue</option>
                 <option value="PAUSED">Paused</option>
                 <option value="COMPLETED">Completed</option>
               </Select>
@@ -417,6 +419,10 @@ export function VetScheduleTimeline() {
                               tone={
                                 cs.status === 'COMPLETED'
                                   ? 'success'
+                                  : cs.status === 'OVERDUE'
+                                  ? 'danger'
+                                  : cs.status === 'DELAYED'
+                                  ? 'warning'
                                   : cs.status === 'PAUSED'
                                   ? 'warning'
                                   : cs.status === 'IN_PROGRESS'
@@ -431,6 +437,12 @@ export function VetScheduleTimeline() {
                                 ? 'Paused'
                                 : cs.status === 'IN_PROGRESS'
                                 ? 'In Progress'
+                                : cs.status === 'DELAYED'
+                                ? 'Delayed'
+                                : cs.status === 'OVERDUE'
+                                ? 'Overdue'
+                                : cs.status === 'REQUESTED'
+                                ? 'Requested'
                                 : 'Completed'}
                             </Pill>
                           </div>
@@ -456,8 +468,10 @@ export function VetScheduleTimeline() {
                           icon={
                             isCompleted
                               ? 'file-text'
-                              : cs.status === 'IN_PROGRESS'
+                              : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
                               ? 'activity'
+                              : cs.status === 'OVERDUE'
+                              ? 'alert-triangle'
                               : 'chevron-right'
                           }
                           onClick={(e) => {
@@ -470,8 +484,10 @@ export function VetScheduleTimeline() {
                             ? 'View Record'
                             : cs.status === 'PAUSED'
                             ? 'Continue (Paused)'
-                            : cs.status === 'IN_PROGRESS'
+                            : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
                             ? 'Continue Exam'
+                            : cs.status === 'OVERDUE'
+                            ? 'Start Exam'
                             : 'Start Exam'}
                         </Button>
                       </div>

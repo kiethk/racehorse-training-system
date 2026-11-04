@@ -46,9 +46,9 @@ BEGIN
                 p_notes => 'Cleared to return to normal work.',
                 p_temp => 37.8, p_hr => 36, p_rr => 12, p_weight => round(pg_temp.rnd('rw' || c.id, 400, 470), 1), p_bcs => 5.5);
         ELSE
-            v_assign := c.updated_at + INTERVAL '1 day';
-            EXIT WHEN v_assign > v_limit OR v_assign >= c.scheduled_at;
-            PERFORM pg_temp.cancel_care(c.id, 'Horse recovered at the previous recheck; no further rechecks needed.', v_assign);
+            -- AD-022: ngua da khoi (ALLOWED) -> ket thuc chuoi tai kham dot ngot;
+            -- ca hen ke tiep (c) da duoc xep gio va giu nguyen lam lich dinh ky.
+            EXIT;
         END IF;
     END LOOP;
 END $$ LANGUAGE plpgsql;

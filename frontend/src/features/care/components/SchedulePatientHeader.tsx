@@ -20,9 +20,10 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'n
   COMPLETED: 'success',
   IN_PROGRESS: 'info',
   PAUSED: 'warning',
+  DELAYED: 'warning',
+  OVERDUE: 'danger',
   SCHEDULED: 'warning',
   REQUESTED: 'warning',
-  CANCELLED: 'danger',
 };
 
 /** Patient header shown above the examination form — the Admission-style block. */

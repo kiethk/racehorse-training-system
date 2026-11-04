@@ -18,7 +18,6 @@ describe('examActivityByWeek (vet dashboard activity chart)', () => {
         exam({ scheduledAt: '2026-10-26T09:00:00', status: 'COMPLETED', careType: 'URGENT' }),
         exam({ scheduledAt: '2026-10-27T09:00:00', status: 'IN_PROGRESS', careType: 'INITIAL' }),
         exam({ scheduledDate: '2026-10-21', status: 'COMPLETED', careType: 'ROUTINE' }),
-        exam({ scheduledAt: '2026-10-15T09:00:00', status: 'CANCELLED', careType: 'ROUTINE' }),
         exam({ scheduledAt: '2026-11-02T09:00:00', status: 'SCHEDULED', careType: 'ROUTINE' }),
       ],
       TODAY,
@@ -32,7 +31,7 @@ describe('examActivityByWeek (vet dashboard activity chart)', () => {
         ['2026-10-19', 1, 0, 0],
         ['2026-10-26', 2, 1, 1],
       ],
-      'weeks ascending; cancelled and future exams draw nothing',
+      'weeks ascending; future scheduled exams draw nothing in completed',
     );
   });
 

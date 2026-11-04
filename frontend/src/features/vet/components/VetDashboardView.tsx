@@ -112,7 +112,11 @@ export function VetDashboardView() {
 
   const handleStartExam = async (schedule: CareSchedule) => {
     try {
-      if (schedule.status === "SCHEDULED") {
+      if (
+        schedule.status === "SCHEDULED" ||
+        schedule.status === "OVERDUE" ||
+        schedule.status === "PAUSED"
+      ) {
         await admissionsApi.startCareSchedule(schedule.id);
       }
     } catch (err: unknown) {

@@ -75,7 +75,10 @@ export default function ScheduleDetailPage() {
   // The timeline card already asked to start the exam; entering this page auto-starts it once.
   const autoStartRef = useRef(false);
   useEffect(() => {
-    if (detail?.schedule?.status === 'SCHEDULED' && !autoStartRef.current) {
+    if (
+      (detail?.schedule?.status === 'SCHEDULED' || detail?.schedule?.status === 'OVERDUE') &&
+      !autoStartRef.current
+    ) {
       autoStartRef.current = true;
       handleStartExam().catch(() => {
         // The form stays gated; the vet can still use the manual Start Examination button.

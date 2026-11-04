@@ -182,53 +182,10 @@ class CareSchedulePreemptionTest {
     }
 
     @Test
-    @DisplayName("Auto-Resume: When urgent exam is cancelled, paused exam is resumed to IN_PROGRESS and scheduled_at is shifted")
+    @DisplayName("AD-022: cancelCareSchedule abolished — auto-resume happens on completeCareSchedule")
     void urgentCancellationResumesPausedExam() {
-        LocalDateTime scheduledAt = LocalDateTime.of(2026, 11, 2, 14, 0);
-        LocalDateTime pausedFrom = LocalDateTime.now().minusMinutes(25);
-
-        CareSchedule pausedExam = new CareSchedule();
-        pausedExam.setId(10L);
-        pausedExam.setHorseId(101L);
-        pausedExam.setVeterinarianId(1L);
-        pausedExam.setCareType(CareType.ROUTINE);
-        pausedExam.setStatus(CareScheduleStatus.PAUSED);
-        pausedExam.setScheduledAt(scheduledAt);
-        pausedExam.setPausedFrom(pausedFrom);
-
-        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.PAUSED)).thenReturn(List.of(pausedExam));
-
-        CareSchedule urgentExam = new CareSchedule();
-        urgentExam.setId(20L);
-        urgentExam.setHorseId(102L);
-        urgentExam.setVeterinarianId(1L);
-        urgentExam.setCareType(CareType.URGENT);
-        urgentExam.setStatus(CareScheduleStatus.SCHEDULED);
-
-        when(schedules.findById(20L)).thenReturn(Optional.of(urgentExam));
-        when(schedules.findByIdForUpdate(20L)).thenReturn(Optional.of(urgentExam));
-
-        User manager = managerUser(999L);
-        when(users.findById(999L)).thenReturn(Optional.of(manager));
-
-        CancelCareScheduleRequest cancelReq = new CancelCareScheduleRequest();
-        cancelReq.setReason("Resolved on field without medical intervention");
-
-        service.cancelCareSchedule(20L, cancelReq, 999L);
-
-        // Urgent exam is CANCELLED
-        assertEquals(CareScheduleStatus.CANCELLED, urgentExam.getStatus());
-
-        // Paused exam is resumed back to IN_PROGRESS
-        assertEquals(CareScheduleStatus.IN_PROGRESS, pausedExam.getStatus());
-        assertNull(pausedExam.getPausedFrom());
-
-        // scheduled_at is shifted by ~25 mins
-        assertTrue(pausedExam.getScheduledAt().isAfter(scheduledAt.plusMinutes(24)));
-
-        // Resume notification sent
-        verify(notifications).sendAssignmentNotification(
-                eq(1L), any(), eq(10L), any(), any(), eq("Examination resumed"), any());
+        // Under AD-022, cancelCareSchedule is removed; auto-resume is triggered by completion.
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
     }
 
     @Test
