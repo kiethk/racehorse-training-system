@@ -91,30 +91,30 @@ export interface FindingScenario {
 export const FINDING_SCENARIOS: FindingScenario[] = [
   {
     name: 'right-fore tendon strain',
-    symptoms: 'Short, uneven stride on the right fore after galloping; reluctant to turn on the affected side.',
+    symptoms: 'Short, uneven stride on the right fore after galloping, reluctant to turn on the affected side.',
     findings:
-      'Heat and mild swelling along the palmar aspect of the right fore cannon; strong digital pulse; pain on flexion of the proximal sesamoids; lameness 3/5 at walk, worse on firm ground.',
+      'Heat and mild swelling along the palmar aspect of the right fore cannon, strong digital pulse, pain on flexion of the proximal sesamoids, lameness 3/5 at walk, worse on firm ground.',
     diagnosis: 'Acute superficial digital flexor tendon strain, right fore',
-    treatment: 'Cold hosing 20 minutes, pressure bandage with support wrap; phenylbutazone at body weight; strict stall rest.',
-    notes: 'Ultrasound recheck before any work is reintroduced; icing twice daily and daily gait notes recorded by the groom.',
+    treatment: 'Cold hosing 20 minutes, pressure bandage with support wrap, phenylbutazone at body weight, strict stall rest.',
+    notes: 'Ultrasound recheck before any work is reintroduced, icing twice daily and daily gait notes recorded by the groom.',
   },
   {
     name: 'mild spasmodic colic',
     symptoms: 'Pawing the bedding, looking at the flank and attempting to roll after the evening feed.',
     findings:
-      'Mild right-side flank distension; reduced gut sounds on the right; heart rate raised for rest; dry faecal balls on rectal exam, no obstruction.',
+      'Mild right-side flank distension, reduced gut sounds on the right, heart rate raised for rest, dry faecal balls on rectal exam, no obstruction.',
     diagnosis: 'Mild spasmodic colic',
-    treatment: 'Butylscopolamine IV; hand walking as tolerated; feed withheld two hours then small soaked feeds.',
-    notes: 'Recheck pain score and gut sounds in two hours; night staff to call back immediately if rolling restarts.',
+    treatment: 'Butylscopolamine IV, hand walking as tolerated, feed withheld two hours then small soaked feeds.',
+    notes: 'Recheck pain score and gut sounds in two hours, night staff to call back immediately if rolling restarts.',
   },
   {
     name: 'fetlock laceration',
     symptoms: 'Bleeding wound over the left fore fetlock found at the morning feed.',
     findings:
-      '5 cm laceration above the left fore coronet; haemorrhage controlled with pressure; wound bed clean, joint and tendon untouched; lameness 1/5; tetanus status uncertain.',
+      '5 cm laceration above the left fore coronet, haemorrhage controlled with pressure, wound bed clean, joint and tendon untouched, lameness 1/5, tetanus status uncertain.',
     diagnosis: 'Superficial laceration, left fore fetlock',
-    treatment: 'Irrigation and debridement under sedation; pressure bandage; topical antiseptic; referral for tetanus booster.',
-    notes: 'Bandage change at 48 hours; discharge and odour checked daily; stall rest until the walk is completely sound.',
+    treatment: 'Irrigation and debridement under sedation, pressure bandage, topical antiseptic, referral for tetanus booster.',
+    notes: 'Bandage change at 48 hours, discharge and odour checked daily, stall rest until the walk is completely sound.',
   },
 ];
 

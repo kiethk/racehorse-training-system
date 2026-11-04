@@ -10,6 +10,7 @@ import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -30,7 +31,7 @@ public class HorseIncidentReportController {
     @PostMapping
     @PreAuthorize("hasAuthority('GROOM_INCIDENT_REPORT_CREATE')")
     public ApiResponse<HorseIncidentReport> createReport(
-            @RequestBody CreateIncidentReportRequest request,
+            @Valid @RequestBody CreateIncidentReportRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         HorseIncidentReport created = incidentReportService.createReport(request, currentUser);
         return ApiResponse.success(created);

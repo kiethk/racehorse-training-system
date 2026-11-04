@@ -264,8 +264,8 @@ export function RoutineChecksWorkspace() {
               : cs.scheduledAt
               ? formatDate(cs.scheduledAt)
               : 'Unscheduled';
-            const tone = getCareTypeTone(cs.careType, cs.purpose);
-            const isCompleted = cs.status === 'COMPLETED';
+            const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
+            const isClosed = cs.status === 'COMPLETED';
 
             return (
               <Panel
@@ -334,10 +334,10 @@ export function RoutineChecksWorkspace() {
                   {/* Right: Action Button */}
                   <div className="shrink-0">
                     <Button
-                      variant={isCompleted ? 'secondary' : 'primary'}
+                      variant={isClosed ? 'secondary' : 'primary'}
                       size="sm"
                       icon={
-                        isCompleted
+                        isClosed
                           ? 'file-text'
                           : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
                           ? 'activity'
@@ -351,7 +351,7 @@ export function RoutineChecksWorkspace() {
                       }}
                       className="transition-all active:scale-[0.97]"
                     >
-                      {isCompleted
+                      {isClosed
                         ? 'View Record'
                         : cs.status === 'PAUSED'
                         ? 'Continue (Paused)'

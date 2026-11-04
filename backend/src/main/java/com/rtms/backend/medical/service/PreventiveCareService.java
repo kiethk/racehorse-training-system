@@ -59,7 +59,7 @@ public class PreventiveCareService {
     public CareSchedule createSchedule(CreatePreventiveCareScheduleRequest request, AuthenticatedUser user) {
         if (!TYPES.contains(request.getCareType() == null ? "" : request.getCareType())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
-                    "Only ROUTINE_EXAM, VACCINATION and DEWORMING can be created here; INITIAL_EXAM is created by the Groom/admission flow");
+                    "Only ROUTINE_EXAM, VACCINATION and DEWORMING can be created here. INITIAL_EXAM is created by the Groom/admission flow");
         }
         if (request.getHorseId() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "horseId is required");
@@ -152,7 +152,7 @@ public class PreventiveCareService {
                 CareSchedule active = milestone.get();
                 if (active.getStatus() != CareScheduleStatus.REQUESTED) {
                     throw new ApiException(HttpStatus.CONFLICT, "PREVENTIVE_ALREADY_SCHEDULED",
-                            "This horse already has an active preventive care visit; reschedule that visit instead");
+                            "This horse already has an active preventive care visit. Reschedule that visit instead");
                 }
                 // Mốc chưa xếp vet: dời tới ngày Vet chọn rồi xếp cho chính Vet đó.
                 active.setRequestedAt(requestedAt);

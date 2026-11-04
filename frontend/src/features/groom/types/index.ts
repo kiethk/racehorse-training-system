@@ -56,6 +56,5 @@ export interface CreateIncidentRequest {
   horseId: number;
   title: string;
   description: string;
-  imageUrl?: string | null;
   severity: IncidentSeverity;
 }

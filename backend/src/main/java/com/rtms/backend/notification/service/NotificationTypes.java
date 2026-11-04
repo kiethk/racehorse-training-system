@@ -14,6 +14,10 @@ public final class NotificationTypes {
     /** D1: ca URGENT quá hạn KHÔNG rollover — escalate cho vet giữ ca. */
     public static final String CARE_SCHEDULE_URGENT_ESCALATED = "CARE_SCHEDULE_URGENT_ESCALATED";
     public static final String URGENT_CASE_CLOSED = "URGENT_CASE_CLOSED";
+    /** Ca đang khám bị tạm dừng để Vet qua ca khẩn cấp. */
+    public static final String CARE_SCHEDULE_PAUSED = "CARE_SCHEDULE_PAUSED";
+    /** Ca ROUTINE từ báo cáo bị thay bằng ca khẩn cấp. */
+    public static final String CARE_SCHEDULE_CANCELLED = "CARE_SCHEDULE_CANCELLED";
     public static final String VACCINE_DUE_SOON = "VACCINE_DUE_SOON";
     public static final String VACCINE_OVERDUE = "VACCINE_OVERDUE";
     public static final String VACCINE_COMPLETED = "VACCINE_COMPLETED";

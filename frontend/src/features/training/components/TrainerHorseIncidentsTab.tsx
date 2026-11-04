@@ -6,7 +6,8 @@ import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { formatDateTime } from '@/lib/display';
 import { incidentApi } from '@/features/groom/services/incidentService';
 import { assignedVetLabel } from '@/features/groom/lib/assignedVet';
-import type { IncidentReport, IncidentSeverity, IncidentStatus } from '@/features/groom/types';
+import type { IncidentReport, IncidentStatus } from '@/features/groom/types';
+import { INCIDENT_SEVERITY_MAP } from '@/features/groom/lib/incidentDisplay';
 import { ReportIncidentDialog } from './ReportIncidentDialog';
 
 const STATUS_MAP: Record<
@@ -16,17 +17,18 @@ const STATUS_MAP: Record<
   REPORTED: { tone: 'warning', label: 'Reported — Awaiting Vet Review' },
   IN_REVIEW: { tone: 'info', label: 'Under Vet Review' },
   RESOLVED: { tone: 'success', label: 'Resolved' },
-  DISMISSED: { tone: 'neutral', label: 'No Issue' },
+  DISMISSED: { tone: 'neutral', label: 'Closed' },
 };
 
-const SEVERITY_MAP: Record<IncidentSeverity, { tone: 'neutral' | 'info' | 'warning' | 'danger'; label: string }> = {
-  LOW: { tone: 'neutral', label: 'Minor' },
-  MEDIUM: { tone: 'info', label: 'Moderate' },
-  HIGH: { tone: 'warning', label: 'Major' },
-  CRITICAL: { tone: 'danger', label: 'Critical' },
-};
-
-export function TrainerHorseIncidentsTab({ horseId, horseName }: { horseId: number; horseName?: string }) {
+export function TrainerHorseIncidentsTab({
+  horseId,
+  horseName,
+  onReported,
+}: {
+  horseId: number;
+  horseName?: string;
+  onReported?: () => void;
+}) {
   const [reports, setReports] = useState<IncidentReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export function TrainerHorseIncidentsTab({ horseId, horseName }: { horseId: numb
         <div className="space-y-3">
           {reports.map((report) => {
             const statusConfig = STATUS_MAP[report.status] ?? { tone: 'neutral', label: report.status };
-            const severityConfig = SEVERITY_MAP[report.severity] ?? { tone: 'neutral', label: report.severity };
+            const severityConfig = INCIDENT_SEVERITY_MAP[report.severity] ?? { tone: 'neutral', label: report.severity };
             const imgPath = incidentApi.imageSrc(report);
 
             return (
@@ -128,7 +130,9 @@ export function TrainerHorseIncidentsTab({ horseId, horseName }: { horseId: numb
 
                 {report.handlerNote && (
                   <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-3 text-xs">
-                    <span className="font-semibold text-[var(--color-text-primary)]">Veterinary Note: </span>
+                    <span className="font-semibold text-[var(--color-text-primary)]">
+                      {report.status === 'DISMISSED' ? 'Closed: ' : 'Veterinary Note: '}
+                    </span>
                     <span className="text-[var(--color-text-secondary)]">{report.handlerNote}</span>
                   </div>
                 )}
@@ -143,7 +147,10 @@ export function TrainerHorseIncidentsTab({ horseId, horseName }: { horseId: numb
         horseName={horseName}
         open={isReportOpen}
         onClose={() => setIsReportOpen(false)}
-        onSuccess={fetchReports}
+        onSuccess={() => {
+          void fetchReports();
+          onReported?.();
+        }}
       />
     </div>
   );

@@ -407,7 +407,7 @@ class SceneErrorBoundary extends Component<{ children: ReactNode; onError: () =>
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch(error: unknown) {
-    console.error('3D barn failed; falling back to the plan.', error);
+    console.error('3D barn failed, falling back to the plan.', error);
     this.props.onError();
   }
   render() { return this.state.failed ? null : this.props.children; }
