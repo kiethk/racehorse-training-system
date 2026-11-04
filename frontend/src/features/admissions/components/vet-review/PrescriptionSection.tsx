@@ -270,7 +270,7 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
                 >
                   <Input
                     disabled={isFormDisabled}
-                    placeholder="e.g. Administer with morning grain feed; monitor for colic signs"
+                    placeholder="e.g. Administer with morning grain feed, monitor for colic signs"
                     value={rx.instructions}
                     onChange={(e) => handleFieldChange(rx.id, 'instructions', e.target.value)}
                   />

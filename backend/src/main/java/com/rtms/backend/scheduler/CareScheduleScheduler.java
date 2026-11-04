@@ -32,5 +32,10 @@ public class CareScheduleScheduler {
         } catch (RuntimeException ex) {
             log.warn("careScheduleLifecycleSweep failed: {}", ex.getMessage());
         }
+        try {
+            careScheduleService.closeReportsOfCancelledCases();
+        } catch (RuntimeException ex) {
+            log.warn("closeReportsOfCancelledCases failed: {}", ex.getMessage());
+        }
     }
 }

@@ -262,7 +262,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     /**
      * Lần khám sắp tới của ngựa (đã xếp giờ thì lấy giờ xếp, chưa thì lấy giờ
      * yêu cầu). Ngựa đang tạm nghỉ thì đây chính là mốc "tạm nghỉ đến".
-     * Mốc tiêm phòng không tính: nó không phải lần tái khám để mở khóa tập.
+     * Mốc tiêm phòng và ca ROUTINE từ báo cáo không tính: chúng không phải lần tái khám để mở khóa tập.
      * null nếu không còn lần khám nào đang chờ.
      */
     @Query("""
@@ -270,6 +270,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             FROM CareSchedule cs
             WHERE cs.horseId = :horseId AND cs.status IN :statuses
               AND cs.purpose = com.rtms.backend.medical.enums.CareSchedulePurpose.FOLLOW_UP
+              AND NOT (cs.careType = com.rtms.backend.medical.enums.CareType.ROUTINE AND cs.sourceIncidentId IS NOT NULL)
             """)
     LocalDateTime findNextExamTime(@Param("horseId") Long horseId,
                                    @Param("statuses") Collection<CareScheduleStatus> statuses);

@@ -58,7 +58,7 @@ export function formatCorrelationStrength(strength: CorrelationStrength, pearson
         label: 'Zero / Insufficient Variance',
         qualitativeLabel: 'Zero / Insufficient variance',
         tone: 'neutral',
-        description: 'Uniform values observed; correlation coefficient is mathematically undefined.',
+        description: 'Uniform values observed. Correlation coefficient is mathematically undefined.',
         tooltip: 'Pearson r = N/A (zero variance)',
       };
     case 'INSUFFICIENT_DATA':

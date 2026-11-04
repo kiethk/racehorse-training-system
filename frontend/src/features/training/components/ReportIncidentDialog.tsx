@@ -19,10 +19,10 @@ interface ReportIncidentDialogProps {
 }
 
 const SEVERITY_OPTIONS: { value: IncidentSeverity; label: string }[] = [
-  { value: 'LOW', label: 'Low — Monitor, no urgent intervention required' },
-  { value: 'MEDIUM', label: 'Medium — Veterinary review needed today' },
-  { value: 'HIGH', label: 'High — Immediate veterinary review required' },
-  { value: 'CRITICAL', label: 'Critical — Health emergency, immediate intervention' },
+  { value: 'LOW', label: 'Low — Next routine vet slot, keeps training' },
+  { value: 'MEDIUM', label: 'Medium — Next routine vet slot, keeps training' },
+  { value: 'HIGH', label: 'High — Vet called now, stops training and leaves its group' },
+  { value: 'CRITICAL', label: 'Critical — Vet called now, stops training and leaves its group' },
 ];
 
 export function ReportIncidentDialog({
@@ -30,7 +30,7 @@ export function ReportIncidentDialog({
   horseName,
   initialTitle = '',
   initialDescription = '',
-  initialSeverity = 'HIGH',
+  initialSeverity = 'MEDIUM',
   open,
   onClose,
   onSuccess,
@@ -99,7 +99,7 @@ export function ReportIncidentDialog({
       onClose={handleClose}
       dismissible={!submitting}
       title="Report health incident to veterinarian"
-      description={`Submit an urgent incident report for ${horseName ?? `Horse #${horseId}`}. This will notify the veterinary team.`}
+      description={`Submit an incident report for ${horseName ?? `Horse #${horseId}`}. This will notify the veterinary team.`}
       footer={(
         <>
           <Button variant="secondary" onClick={handleClose} disabled={submitting}>
@@ -119,6 +119,7 @@ export function ReportIncidentDialog({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Heart rate exceeded safety threshold during workout"
+            maxLength={255}
             required
           />
         </FormField>

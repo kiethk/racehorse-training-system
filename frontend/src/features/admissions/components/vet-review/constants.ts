@@ -63,10 +63,11 @@ export const diagnosisOptions = [
 ];
 
 export const followUpDescriptionOptions = [
-  'Routine follow-up recheck examination',
+  'Routine follow-up examination',
+  'Follow-up after the urgent examination',
   'Post-treatment clinical reassessment',
   'Lameness and gait reassessment',
-  'Respiratory and infectious disease recheck',
+  'Respiratory and infectious disease follow-up',
   'Training restriction clearance examination',
 ];
 

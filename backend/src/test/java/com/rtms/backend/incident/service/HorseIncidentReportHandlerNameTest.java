@@ -42,6 +42,7 @@ class HorseIncidentReportHandlerNameTest {
     @Mock CareScheduleService careScheduleService;
     @Mock TrainingDecisionService trainingDecisions;
     @Mock UserRepository users;
+    @Mock com.rtms.backend.stable.repository.StableStallRepository stalls;
 
     private HorseIncidentReportService service;
     private final AuthenticatedUser groom = new AuthenticatedUser(10L, "groom1@rtms.com", "GROOM");
@@ -49,7 +50,7 @@ class HorseIncidentReportHandlerNameTest {
     @BeforeEach
     void setUp() {
         service = new HorseIncidentReportService(reports, horses, files, schedules, careScheduleService,
-                trainingDecisions, users);
+                trainingDecisions, users, stalls);
         when(users.findAllById(anyCollection())).thenAnswer(call -> {
             Collection<Long> ids = call.getArgument(0);
             return ids.stream().map(id -> user(id, id == 6L ? "James Carter" : "Hannah Reed")).toList();

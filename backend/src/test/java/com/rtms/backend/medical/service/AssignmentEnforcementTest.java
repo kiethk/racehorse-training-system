@@ -143,7 +143,7 @@ class AssignmentEnforcementTest {
                 () -> careScheduleService.cancelCareSchedule(scheduleId, req, vetId));
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
-        assertTrue(ex.getMessage().contains("veterinarians cannot decline assignments"));
+        assertTrue(ex.getMessage().contains("Veterinarians cannot decline assignments"));
         assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus(), "Status không được đổi sang CANCELLED");
     }
 

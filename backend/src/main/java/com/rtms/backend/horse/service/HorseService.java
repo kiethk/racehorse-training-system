@@ -5,6 +5,7 @@ import com.rtms.backend.training.service.GroupWorkoutSyncService;
 
 import com.rtms.backend.horse.dto.CreateHorseRequest;
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.medical.service.CareScheduleService;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.stable.enums.StallStatus;
@@ -51,13 +52,14 @@ public class HorseService {
     private final GroomDailyTaskRepository groomDailyTaskRepository;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
+    private final CareScheduleService careScheduleService;
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
                         GroupWorkoutSyncService workoutService,
                         AreaRepository areaRepository) {
         this(horseRepository, stableStallRepository, workoutService, areaRepository,
-                null, null, null, null);
+                null, null, null, null, null);
     }
 
     public HorseService(HorseRepository horseRepository,
@@ -68,7 +70,7 @@ public class HorseService {
                         GroomDailyTaskRepository groomDailyTaskRepository,
                         NotificationService notificationService) {
         this(horseRepository, stableStallRepository, workoutService, areaRepository,
-                careScheduleRepository, groomDailyTaskRepository, notificationService, null);
+                careScheduleRepository, groomDailyTaskRepository, notificationService, null, null);
     }
 
     @Autowired
@@ -79,7 +81,8 @@ public class HorseService {
                         CareScheduleRepository careScheduleRepository,
                         GroomDailyTaskRepository groomDailyTaskRepository,
                         NotificationService notificationService,
-                        AuditLogService auditLogService) {
+                        AuditLogService auditLogService,
+                        CareScheduleService careScheduleService) {
         this.horseRepository = horseRepository;
         this.stableStallRepository = stableStallRepository;
         this.workoutService = workoutService;
@@ -88,6 +91,7 @@ public class HorseService {
         this.groomDailyTaskRepository = groomDailyTaskRepository;
         this.notificationService = notificationService;
         this.auditLogService = auditLogService;
+        this.careScheduleService = careScheduleService;
     }
 
     /** Giữ chữ ký 3 tham số cho các lời gọi đã có. */
@@ -371,10 +375,6 @@ public class HorseService {
                 }
             }
 
-            // 3.5. Block training
-            horse.setTrainingDecision(TrainingDecision.BLOCKED);
-            horse.setTrainingDecisionReason(effectiveReason);
-
             // 3.6. Clean uncompleted groom daily tasks
             if (groomDailyTaskRepository != null) {
                 List<GroomDailyTask> uncompletedTasks = groomDailyTaskRepository.findByHorseIdAndIsCompletedFalse(horseId);
@@ -422,8 +422,10 @@ public class HorseService {
                 workoutService.reassignFutureWorkoutsToGroom(horseId, regularStall.getGroomId());
             }
 
-            horse.setTrainingDecision(TrainingDecision.ALLOWED);
-            horse.setTrainingDecisionReason(null);
+            // Quyết định tập giữ nguyên qua INACTIVE: chỉ Vet mới mở được lệnh chặn.
+            if (careScheduleService != null) {
+                careScheduleService.scheduleFollowUpIfBlocked(horse, currentUser.getUserId());
+            }
         }
 
         // 4. Update status, statusReason, and statusReasonCode

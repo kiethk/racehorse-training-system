@@ -34,6 +34,26 @@ public interface HorseIncidentReportRepository extends JpaRepository<HorseIncide
 
     List<HorseIncidentReport> findByCareScheduleIdOrderByReportedAtAsc(Long careScheduleId);
 
+    /** Báo cáo Trainer được xem: của ngựa đang ở khu mình phụ trách, và báo cáo do chính mình gửi. */
+    @Query("""
+            SELECT r FROM HorseIncidentReport r
+            WHERE r.reportedById = :trainerId
+               OR r.horseId IN (SELECT h.id FROM Horse h
+                                JOIN StableStall s ON h.currentStallId = s.id
+                                JOIN Area a ON s.areaId = a.id
+                                WHERE a.trainerId = :trainerId)
+            """)
+    List<HorseIncidentReport> findVisibleToTrainer(@Param("trainerId") Long trainerId);
+
+    /** Báo cáo còn mở nhưng ca khám của nó đã bị hủy, nên không còn ai khám để đóng nó. */
+    @Query("""
+            SELECT r FROM HorseIncidentReport r JOIN CareSchedule cs ON r.careScheduleId = cs.id
+            WHERE r.status IN (com.rtms.backend.incident.enums.IncidentStatus.REPORTED,
+                               com.rtms.backend.incident.enums.IncidentStatus.IN_REVIEW)
+              AND cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.CANCELLED
+            """)
+    List<HorseIncidentReport> findOpenReportsOfCancelledCases();
+
     List<HorseIncidentReport> findAllByOrderByReportedAtDesc();
 
     List<HorseIncidentReport> findByReportedAtAfterOrderByReportedAtDesc(LocalDateTime after);

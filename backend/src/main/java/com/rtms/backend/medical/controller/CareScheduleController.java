@@ -57,7 +57,7 @@ public class CareScheduleController {
     public ApiResponse<List<UrgentCaseReportResponse>> urgentCaseReports(
             @PathVariable Long scheduleId,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(careScheduleService.getUrgentCaseReports(scheduleId, currentUser.getUserId()));
+        return ApiResponse.success(careScheduleService.getIncidentCaseReports(scheduleId, currentUser.getUserId()));
     }
 
     @GetMapping(value = "/urgent-alerts/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

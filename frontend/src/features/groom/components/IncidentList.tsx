@@ -89,7 +89,7 @@ export function IncidentList() {
     {
       id: 'veterinarian',
       header: 'Veterinarian',
-      render: (report) => report.handlerName
+      render: (report) => report.handlerName && report.status !== 'DISMISSED'
         ? report.handlerName
         : (
           <span className="italic text-[var(--color-text-muted)]">
@@ -157,7 +157,7 @@ export function IncidentList() {
           { value: 'REPORTED', label: 'Awaiting veterinary review' },
           { value: 'IN_REVIEW', label: 'Under review' },
           { value: 'RESOLVED', label: 'Resolved' },
-          { value: 'DISMISSED', label: 'No issue' },
+          { value: 'DISMISSED', label: 'Closed' },
         ]}
       />
 

@@ -33,7 +33,15 @@ import { WorkoutHistoryTable } from './WorkoutHistoryTable';
  * Everything about one horse: profile, the period to look at, headline numbers, alerts, charts and the session
  * history. The period bar sits above the numbers so the reader knows what period they describe before reading them.
  */
-export function HorseFitnessTrendView({ horseId, hideHeader = false }: { horseId: number; hideHeader?: boolean }) {
+export function HorseFitnessTrendView({
+  horseId,
+  hideHeader = false,
+  onReported,
+}: {
+  horseId: number;
+  hideHeader?: boolean;
+  onReported?: () => void;
+}) {
   const rules = useTrainingRules();
 
   const [horse, setHorse] = useState<Horse | null>(null);
@@ -143,6 +151,7 @@ export function HorseFitnessTrendView({ horseId, hideHeader = false }: { horseId
         initialSeverity={reportingAlert?.severity === 'DANGER' ? 'CRITICAL' : 'HIGH'}
         open={reportingAlert !== null}
         onClose={() => setReportingAlert(null)}
+        onSuccess={onReported}
       />
     </div>
   );

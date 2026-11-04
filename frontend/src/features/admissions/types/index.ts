@@ -236,6 +236,8 @@ export interface UrgentCaseReport {
 }
 
 export interface CareSchedule {
+  sourceIncidentId?: number | null;
+  cancelReason?: string | null;
   id: number;
   horseId: number;
   veterinarianId?: number | null;
@@ -264,6 +266,10 @@ export interface CareScheduleDetail {
   schedule: CareSchedule;
   horse: HorseSummary | null;
   veterinarian: { id: number; fullName: string; email: string } | null;
+  /** The exam that decides the block when this incident visit cannot lift it. */
+  blockHeldUntil?: string | null;
+  /** The horse's waiting Follow-up: a new date merges into it. */
+  waitingFollowUp?: { at: string; veterinarianName: string | null } | null;
   healthRecord: {
     id: number;
     findings: string;
@@ -308,7 +314,6 @@ export interface CompleteCareScheduleRequest {
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
   /** Multiple follow-up rechecks (rotating vets on consecutive days). */
-  nextSchedules?: CreateNextScheduleRequest[];
   vaccinations?: VaccinationRequest[];
   /** 7–10 days; only on a preventive visit without vaccinations. */
   deferVaccinationDays?: number;

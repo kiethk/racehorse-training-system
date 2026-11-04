@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Notice } from '@/components/ui/Notice';
 import { Button, LinkButton } from '@/components/ui/Button';
@@ -14,9 +14,11 @@ import { admissionsApi } from '../services/api';
 import { healthApi } from '@/features/health/services/healthApi';
 import { displayError, formatDateTime } from '@/lib/display';
 import { ClinicalExamForm, type ClinicalExamFormHandle } from './vet-review/ClinicalExamForm';
+import { IncidentCaseReports } from './IncidentCaseReports';
 import { ApiError } from '@/services/api';
 import type { HorseHealthMetric } from '@/features/horses/types';
 import type {
+  CareScheduleDetail,
   CompleteCareScheduleRequest,
   UrgentAssignmentAlert,
   UrgentCaseReport,
@@ -32,6 +34,18 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const [error, setError] = useState('');
   const [completedData, setCompletedData] = useState<CompleteCareScheduleRequest | null>(null);
   const [completedMetrics, setCompletedMetrics] = useState<HorseHealthMetric[]>([]);
+  const [waitingFollowUp, setWaitingFollowUp] = useState<CareScheduleDetail['waitingFollowUp']>(null);
+
+  const loadWaitingFollowUp = useCallback(() => {
+    admissionsApi
+      .getCareScheduleDetail(scheduleId)
+      .then((detail) => setWaitingFollowUp(detail.waitingFollowUp ?? null))
+      .catch(() => undefined);
+  }, [scheduleId]);
+
+  useEffect(() => {
+    loadWaitingFollowUp();
+  }, [loadWaitingFollowUp]);
 
   useEffect(() => {
     let active = true;
@@ -129,6 +143,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
     if (!urgentCase) return;
     setCompletedData(request as CompleteCareScheduleRequest);
     setUrgentCase((current) => (current ? { ...current, status: 'COMPLETED' } : current));
+    loadWaitingFollowUp();
     void healthApi
       .getHealthRecords(urgentCase.horseId)
       .then((records) => {
@@ -296,47 +311,10 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             )}
           </Panel>
 
-          {additionalReports.length > 0 && (
-            <Panel padded className="space-y-3">
-              <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
-                Additional reports merged into this case ({additionalReports.length})
-              </h2>
-              <ul className="space-y-3">
-                {additionalReports.map((report) => (
-                  <li
-                    key={report.id}
-                    className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3.5"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <strong className="text-sm text-[var(--color-text-primary)]">
-                        {report.title}
-                      </strong>
-                      <Pill tone="danger">{report.severity}</Pill>
-                    </div>
-                    <p className="whitespace-pre-wrap break-words text-xs leading-relaxed text-[var(--color-text-secondary)]">
-                      {report.description}
-                    </p>
-                    <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
-                      <span>
-                        {[report.reportedByRole, report.reportedByName].filter(Boolean).join(' ') ||
-                          `#${report.reportedById}`}
-                      </span>
-                      <span>·</span>
-                      <span>{formatDateTime(report.reportedAt)}</span>
-                    </div>
-                    {report.imageUrl && (
-                      <ProtectedImage
-                        src={report.imageUrl}
-                        alt={`Report: ${report.title}`}
-                        openOnClick
-                        className="max-h-48 w-full rounded-[var(--radius-sm)] object-contain"
-                      />
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          )}
+          <IncidentCaseReports
+            title={`Additional reports merged into this case (${additionalReports.length})`}
+            reports={additionalReports}
+          />
 
           {urgentCase.status === 'SCHEDULED' && (
             <Panel padded className="border-l-4 border-l-[var(--color-warning)] bg-[var(--color-warning-soft)]/20">
@@ -375,6 +353,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                 scheduleStatus={urgentCase.status}
                 onSuccess={handleSuccess}
                 prefillFindings={urgentCase.description}
+                waitingFollowUpAt={waitingFollowUp?.at}
               />
             </Panel>
           )}
@@ -438,28 +417,16 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
                       </dd>
                     </div>
                   )}
-                  {(completedData.nextSchedules?.length || 0) > 0 && (
-                    <div className="sm:col-span-2">
-                      <dt className="font-semibold text-[var(--color-text-muted)]">
-                        Scheduled Follow-ups
-                      </dt>
-                      {completedData.nextSchedules?.map((row) => (
-                        <dd
-                          key={row.idempotencyKey}
-                          className="mt-1 font-semibold text-[var(--color-text-primary)]"
-                        >
-                          {row.scheduledDate} — {row.description}
-                        </dd>
-                      ))}
-                    </div>
-                  )}
                   {completedData.nextSchedule && (
                     <div className="sm:col-span-2">
                       <dt className="font-semibold text-[var(--color-text-muted)]">
                         Scheduled Follow-up
                       </dt>
                       <dd className="mt-1 font-semibold text-[var(--color-text-primary)]">
-                        {completedData.nextSchedule.scheduledDate} — {completedData.nextSchedule.description}
+                        {waitingFollowUp
+                          ? `${formatDateTime(waitingFollowUp.at)}, ${waitingFollowUp.veterinarianName ?? 'awaiting a vet'}`
+                          : completedData.nextSchedule.scheduledDate}{' '}
+                        — {completedData.nextSchedule.description}
                       </dd>
                     </div>
                   )}

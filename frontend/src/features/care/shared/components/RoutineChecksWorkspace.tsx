@@ -101,15 +101,17 @@ export function RoutineChecksWorkspace() {
     let inProgress = 0;
     let paused = 0;
     let completed = 0;
+    let cancelled = 0;
 
     for (const s of schedules) {
       if (s.status === 'SCHEDULED') scheduled++;
       else if (s.status === 'IN_PROGRESS') inProgress++;
       else if (s.status === 'PAUSED') paused++;
       else if (s.status === 'COMPLETED') completed++;
+      else if (s.status === 'CANCELLED') cancelled++;
     }
 
-    return { total: schedules.length, scheduled, inProgress, paused, completed };
+    return { total: schedules.length, scheduled, inProgress, paused, completed, cancelled };
   }, [schedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
@@ -204,6 +206,7 @@ export function RoutineChecksWorkspace() {
             { value: 'IN_PROGRESS', label: 'In Progress', count: stats.inProgress },
             { value: 'PAUSED', label: 'Paused', count: stats.paused },
             { value: 'COMPLETED', label: 'Completed', count: stats.completed },
+            { value: 'CANCELLED', label: 'Cancelled', count: stats.cancelled },
           ]}
         />
 
@@ -258,8 +261,8 @@ export function RoutineChecksWorkspace() {
               : cs.scheduledAt
               ? formatDate(cs.scheduledAt)
               : 'Unscheduled';
-            const tone = getCareTypeTone(cs.careType, cs.purpose);
-            const isCompleted = cs.status === 'COMPLETED';
+            const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
+            const isClosed = cs.status === 'COMPLETED' || cs.status === 'CANCELLED';
 
             return (
               <Panel
@@ -284,6 +287,8 @@ export function RoutineChecksWorkspace() {
                           tone={
                             cs.status === 'COMPLETED'
                               ? 'success'
+                              : cs.status === 'CANCELLED'
+                              ? 'neutral'
                               : cs.status === 'PAUSED'
                               ? 'warning'
                               : cs.status === 'IN_PROGRESS'
@@ -298,6 +303,8 @@ export function RoutineChecksWorkspace() {
                             ? 'Paused'
                             : cs.status === 'IN_PROGRESS'
                             ? 'In Progress'
+                            : cs.status === 'CANCELLED'
+                            ? 'Cancelled'
                             : 'Completed'}
                         </Pill>
                       </div>
@@ -318,10 +325,10 @@ export function RoutineChecksWorkspace() {
                   {/* Right: Action Button */}
                   <div className="shrink-0">
                     <Button
-                      variant={isCompleted ? 'secondary' : 'primary'}
+                      variant={isClosed ? 'secondary' : 'primary'}
                       size="sm"
                       icon={
-                        isCompleted
+                        isClosed
                           ? 'file-text'
                           : cs.status === 'IN_PROGRESS'
                           ? 'activity'
@@ -333,7 +340,9 @@ export function RoutineChecksWorkspace() {
                       }}
                       className="transition-all active:scale-[0.97]"
                     >
-                      {isCompleted
+                      {cs.status === 'CANCELLED'
+                        ? 'View'
+                        : isClosed
                         ? 'View Record'
                         : cs.status === 'PAUSED'
                         ? 'Continue (Paused)'

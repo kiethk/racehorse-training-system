@@ -52,3 +52,25 @@ An ordered list of Subjects that a Training Group works through over a number of
 
 **Subject**:
 A single exercise (distance, surface, intensity, duration) run in a Session.
+
+### Incidents
+
+**Incident Report**:
+A notice from a horse's Groom or Trainer that a horse in a stall has a health problem, rated with a Severity.
+_Avoid_: Ticket, complaint
+
+**Severity**:
+How serious the reporter judges an Incident Report to be. Low and Medium wait for the next routine vet slot and the horse keeps training; High and Critical stop training and call a vet at once, even from another examination.
+_Avoid_: Priority
+
+**Incident Case**:
+The one open examination that handles every Incident Report of a horse. A horse has at most one, and a High or Critical report replaces a routine Incident Case that has not started.
+_Avoid_: Urgent case (only a High or Critical one is urgent)
+
+**Follow-up**:
+An examination booked to see how a horse is progressing and decide whether it may train. A horse has at most one waiting; a visit opened by an Incident Report is not a Follow-up.
+_Avoid_: Recheck, Re-examination
+
+**Closed**:
+The end of an Incident Report whose Incident Case was cancelled, so no vet examined it; the reason stays on the report.
+_Avoid_: Dismissed, No issue

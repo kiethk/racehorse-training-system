@@ -5,6 +5,7 @@ import type { IncidentReport } from '../types';
  * Null when there is nothing useful to say (e.g. dismissed before any vet was assigned).
  */
 export function assignedVetLabel(report: Pick<IncidentReport, 'status' | 'handlerName'>): string | null {
+  if (report.status === 'DISMISSED') return null;
   if (report.handlerName) return `Vet: ${report.handlerName}`;
   if (report.status === 'REPORTED') return 'Vet: awaiting assignment';
   return null;

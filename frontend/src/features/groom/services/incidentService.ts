@@ -46,10 +46,6 @@ export const incidentApi = {
    * so render it with <ProtectedImage>, never a plain <img>.
    */
   imageSrc: (report: IncidentReport): string | null => {
-    if (!report.imageUrl) return null;
-    if (report.imageUrl.startsWith('http://') || report.imageUrl.startsWith('https://')) {
-      return report.imageUrl;
-    }
-    return `/api/incidents/${report.id}/image`;
+    return report.imageUrl ? `/api/incidents/${report.id}/image` : null;
   },
 };

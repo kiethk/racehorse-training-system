@@ -100,10 +100,6 @@ END $$ LANGUAGE plpgsql STABLE;
 -- Khóa file của một ảnh seed dựng sẵn trong backend\uploads: "local:<uuid>.<đuôi>", uuid = md5 của đường dẫn
 -- trong bộ hồ sơ. report_incident dùng để ảnh sự cố render từ đĩa local (hướng 3.3 local-only, không qua
 -- Cloudinary như admission_documents của develop). (Storage key of a locally seeded picture.)
-CREATE FUNCTION pg_temp.file_key(p_path TEXT) RETURNS TEXT AS $$
-    SELECT 'local:' || md5('rtms-seed/' || p_path)::UUID::TEXT || lower(substring(p_path FROM '\.[A-Za-z0-9]+$'))
-$$ LANGUAGE sql IMMUTABLE;
-
 -- Ngày giờ theo kiểu LocalDateTime.toString() của Java (bỏ giây khi bằng 0), dùng cho request_fingerprint.
 -- (Date-time as Java LocalDateTime.toString(), used by request_fingerprint.)
 CREATE FUNCTION pg_temp.java_ts(p TIMESTAMP) RETURNS TEXT AS $$
@@ -568,7 +564,10 @@ DECLARE
 BEGIN
     INSERT INTO horse_incident_reports (reported_by_id, horse_id, title, description, severity, reported_at, status,
                                         image_url)
-    VALUES (p_reporter, p_horse, p_title, p_desc, p_severity, p_at, 'REPORTED', pg_temp.file_key(p_image)) RETURNING id INTO v_incident;
+    VALUES (p_reporter, p_horse, p_title, p_desc, p_severity, p_at, 'REPORTED',
+            (SELECT doc.file_url FROM seed_doc doc WHERE doc.doc_type = 'HORSE_PHOTO'
+              AND lower(doc.horse_k) = substring(p_image FROM '/(h[0-9]+)-')))
+    RETURNING id INTO v_incident;
     SELECT id INTO v_schedule FROM care_schedule
      WHERE horse_id = p_horse AND care_type = 'URGENT' AND status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS');
     IF v_schedule IS NULL THEN
@@ -582,6 +581,8 @@ BEGIN
         UPDATE horse_incident_reports SET status = 'IN_REVIEW', handled_by_id = v_vet, handled_at = p_at WHERE id = v_incident;
     ELSE
         PERFORM pg_temp.block(p_horse, 'Urgent veterinary care pending', p_at);
+        UPDATE horse_incident_reports r SET status = 'IN_REVIEW', handled_by_id = c.veterinarian_id, handled_at = p_at
+          FROM care_schedule c WHERE r.id = v_incident AND c.id = v_schedule AND c.veterinarian_id IS NOT NULL;
     END IF;
     UPDATE horse_incident_reports SET care_schedule_id = v_schedule WHERE id = v_incident;
     RETURN v_incident;

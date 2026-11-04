@@ -57,16 +57,27 @@ public class HorseIncidentReport {
     @Transient
     private String handlerName;
 
+    /** Tên ngựa, vì Groom không còn thấy ngựa đã rời chuồng của mình. Chỉ để trả ra API, không lưu DB. */
+    @Transient
+    private String horseName;
+
+    public String getHorseName() {
+        return horseName;
+    }
+
+    public void setHorseName(String horseName) {
+        this.horseName = horseName;
+    }
+
     public HorseIncidentReport() {
     }
 
     public HorseIncidentReport(Long reportedById, Long horseId, String title, String description,
-                               String imageUrl, IncidentSeverity severity) {
+                               IncidentSeverity severity) {
         this.reportedById = reportedById;
         this.horseId = horseId;
         this.title = title;
         this.description = description;
-        this.imageUrl = imageUrl;
         this.severity = severity != null ? severity : IncidentSeverity.MEDIUM;
         this.reportedAt = LocalDateTime.now();
         this.status = IncidentStatus.REPORTED;

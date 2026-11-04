@@ -614,7 +614,7 @@ class AdmissionVetReviewWorkflowTest {
         req.setDiagnosis("Diagnosis");
         req.setTrainingDecision(TrainingDecision.ALLOWED);
         HorseHealthMetricRequest m = fullMetric();
-        m.setTemperature(BigDecimal.valueOf(39.0)); // out of range
+        m.setTemperature(BigDecimal.valueOf(50)); // out of range
         req.setMetrics(List.of(m));
 
         ApiException ex = assertThrows(ApiException.class,

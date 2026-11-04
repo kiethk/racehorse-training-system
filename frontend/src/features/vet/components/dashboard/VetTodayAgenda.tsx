@@ -74,7 +74,7 @@ export function VetTodayAgenda({
                   : null;
               const timeStr = formatAppointmentTime(schedule.scheduledAt);
               const duration = schedule.durationMinutes ?? 30;
-              const tone = getCareTypeTone(schedule.careType, schedule.purpose);
+              const tone = getCareTypeTone(schedule.careType, schedule.purpose, schedule.sourceIncidentId);
               // Whole-row click mirrors the status button, so compute the action once for mouse + keyboard.
               const openRow = () =>
                 schedule.status === "COMPLETED"

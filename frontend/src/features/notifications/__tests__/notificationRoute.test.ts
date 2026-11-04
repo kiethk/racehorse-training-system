@@ -68,6 +68,15 @@ describe('Notification routing for groom and owner workflow notifications', () =
     assert.equal(getNotificationHref(item('ADMISSION_GROOM_ASSIGNED', 'ADMISSION', 13), 'GROOM'), '/groom/admissions/13');
   });
 
+  it('sends the vet to routine care when a visit is paused or replaced', () => {
+    assert.equal(getNotificationHref(item('CARE_SCHEDULE_PAUSED', 'CARE_SCHEDULE', 9), 'VETERINARIAN'), '/veterinarian/routine');
+    assert.equal(getNotificationHref(item('CARE_SCHEDULE_CANCELLED', 'CARE_SCHEDULE', 9), 'VETERINARIAN'), '/veterinarian/routine');
+  });
+
+  it('sends the groom to the incident list when a case closes', () => {
+    assert.equal(getNotificationHref(item('URGENT_CASE_CLOSED', 'CARE_SCHEDULE', 9), 'GROOM'), '/groom/incidents');
+  });
+
   it('opens the edit request for the groom and the horse for the owner', () => {
     assert.equal(getNotificationHref(item('HORSE_EDIT_REQUESTED', 'HORSE_EDIT_REQUEST', 5), 'GROOM'), '/groom/horse-edit-requests/5');
     assert.equal(getNotificationHref(item('HORSE_EDIT_REVIEWED', 'HORSE', 40), 'HORSE_OWNER'), '/owner/horses/40');

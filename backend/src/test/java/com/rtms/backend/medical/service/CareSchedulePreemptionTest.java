@@ -30,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
+import com.rtms.backend.notification.service.NotificationTypes;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -129,7 +130,7 @@ class CareSchedulePreemptionTest {
         HorseIncidentReport incident = new HorseIncidentReport();
         incident.setId(500L);
         incident.setStatus(IncidentStatus.REPORTED);
-        incident.setSeverity(IncidentSeverity.HIGH);
+        incident.setSeverity(IncidentSeverity.CRITICAL);
         when(incidents.findByIdForUpdate(500L)).thenReturn(Optional.of(incident));
 
         CareSchedule urgent = urgentRequest(999L, 500L);
@@ -287,6 +288,173 @@ class CareSchedulePreemptionTest {
         h.setId(id);
         h.setName("Horse " + id);
         return h;
+    }
+
+    @Test
+    @DisplayName("Vet rảnh có hẹn ROUTINE sắp tới: nhận ca khẩn cấp, lịch hẹn quay lại hàng chờ")
+    void aBookedRoutineVisitYieldsToAnUrgentCase() {
+        User vet = busyVet();
+        CareSchedule booked = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
+        booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
+        report(IncidentSeverity.HIGH);
+
+        CareSchedule urgent = urgentRequest(999L, 500L);
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(vet.getId(), urgent.getVeterinarianId());
+        assertEquals(CareScheduleStatus.SCHEDULED, urgent.getStatus());
+        assertEquals(CareScheduleStatus.REQUESTED, booked.getStatus());
+        assertNull(booked.getVeterinarianId());
+        assertNull(booked.getScheduledAt());
+    }
+
+    @Test
+    @DisplayName("Lịch INITIAL bị trùng giữ nguyên Vet đã giao, chỉ xếp lại giờ")
+    void aBookedInitialExamKeepsItsVet() {
+        busyVet();
+        CareSchedule booked = activeExam(10L, 1L, 101L, CareType.INITIAL, CareScheduleStatus.SCHEDULED);
+        booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
+        report(IncidentSeverity.HIGH);
+
+        service.assignRequestedSchedule(urgentRequest(999L, 500L));
+
+        assertEquals(CareScheduleStatus.REQUESTED, booked.getStatus());
+        assertEquals(1L, booked.getVeterinarianId());
+        assertNull(booked.getScheduledAt());
+    }
+
+    @Test
+    @DisplayName("Vet có hẹn ROUTINE ngay sau ca đang khám vẫn bị ngắt để nhận ca khẩn cấp")
+    void aBookingDoesNotStopPreemption() {
+        User vet = busyVet();
+        CareSchedule exam = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS))
+                .thenAnswer(inv -> exam.getStatus() == CareScheduleStatus.IN_PROGRESS ? List.of(exam) : List.of());
+        when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(exam));
+        CareSchedule booked = activeExam(11L, 1L, 102L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
+        booked.setScheduledAt(LocalDateTime.now().plusMinutes(10));
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(booked));
+        report(IncidentSeverity.HIGH);
+
+        CareSchedule urgent = urgentRequest(999L, 500L);
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(CareScheduleStatus.PAUSED, exam.getStatus());
+        assertEquals(vet.getId(), urgent.getVeterinarianId());
+        assertEquals(CareScheduleStatus.REQUESTED, booked.getStatus());
+    }
+
+    @Test
+    @DisplayName("Vet có ca khẩn cấp đã hẹn trùng giờ: không ngắt ca đang khám của Vet đó")
+    void anExamIsNotPausedWhenTheVetCannotTakeTheCase() {
+        busyVet();
+        CareSchedule exam = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenReturn(List.of(exam));
+        when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(exam));
+        CareSchedule otherUrgent = activeExam(11L, 1L, 102L, CareType.URGENT, CareScheduleStatus.SCHEDULED);
+        otherUrgent.setScheduledAt(LocalDateTime.now().plusMinutes(10));
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(List.of(otherUrgent));
+        report(IncidentSeverity.CRITICAL);
+
+        CareSchedule urgent = urgentRequest(999L, 500L);
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(CareScheduleStatus.IN_PROGRESS, exam.getStatus());
+        assertNull(exam.getPausedFrom());
+        assertEquals(CareScheduleStatus.REQUESTED, urgent.getStatus());
+    }
+
+    @Test
+    @DisplayName("Vet còn ca IN_PROGRESS cũ quá giờ: dừng ca đang khám thật, không dừng ca cũ")
+    void aStaleExamIsNotTheOnePaused() {
+        busyVet();
+        CareSchedule stale = activeExam(9L, 1L, 100L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        stale.setScheduledAt(LocalDateTime.now().minusDays(2));
+        CareSchedule current = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenAnswer(inv ->
+                current.getStatus() == CareScheduleStatus.IN_PROGRESS ? List.of(stale, current) : List.of(stale));
+        when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(current));
+        report(IncidentSeverity.HIGH);
+
+        CareSchedule urgent = urgentRequest(999L, 500L);
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(CareScheduleStatus.PAUSED, current.getStatus());
+        assertEquals(CareScheduleStatus.IN_PROGRESS, stale.getStatus());
+        assertEquals(1L, urgent.getVeterinarianId());
+    }
+
+    @Test
+    @DisplayName("Ca URGENT cũ bị bỏ quên không che Vet: ca đang khám thật vẫn bị ngắt")
+    void aForgottenUrgentExamDoesNotShieldTheVet() {
+        busyVet();
+        CareSchedule forgotten = activeExam(9L, 1L, 100L, CareType.URGENT, CareScheduleStatus.IN_PROGRESS);
+        forgotten.setScheduledAt(LocalDateTime.now().minusDays(2));
+        CareSchedule current = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS);
+        when(schedules.findByVeterinarianIdAndStatus(1L, CareScheduleStatus.IN_PROGRESS)).thenAnswer(inv ->
+                current.getStatus() == CareScheduleStatus.IN_PROGRESS ? List.of(forgotten, current) : List.of(forgotten));
+        when(schedules.findByIdForUpdate(10L)).thenReturn(Optional.of(current));
+        report(IncidentSeverity.HIGH);
+
+        CareSchedule urgent = urgentRequest(999L, 500L);
+        service.assignRequestedSchedule(urgent);
+
+        assertEquals(CareScheduleStatus.PAUSED, current.getStatus());
+        assertEquals(1L, urgent.getVeterinarianId());
+    }
+
+    @Test
+    @DisplayName("Ca ROUTINE bị thay bằng ca khẩn cấp: Vet cũ được báo")
+    void theVetOfASupersededVisitIsTold() {
+        CareSchedule routine = activeExam(10L, 1L, 101L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED);
+
+        service.cancelSupersededCase(routine);
+
+        assertEquals(CareScheduleStatus.CANCELLED, routine.getStatus());
+        verify(notifications).sendAssignmentNotification(eq(1L), any(), eq(10L), eq(101L),
+                eq(NotificationTypes.CARE_SCHEDULE_CANCELLED), any(), any());
+    }
+
+    @Test
+    @DisplayName("Ca sự cố bị hủy: báo cáo còn mở thành DISMISSED kèm lý do và báo người gửi")
+    void cancelledCaseClosesItsOpenReports() {
+        CareSchedule cancelled = urgentRequest(999L, 500L);
+        cancelled.setStatus(CareScheduleStatus.CANCELLED);
+        cancelled.setCancelReason("Horse marked INACTIVE: retired");
+        HorseIncidentReport open = new HorseIncidentReport();
+        open.setStatus(IncidentStatus.IN_REVIEW);
+        open.setCareScheduleId(999L);
+        open.setReportedById(7L);
+        open.setTitle("Lame");
+        when(incidents.findOpenReportsOfCancelledCases()).thenReturn(List.of(open));
+        when(schedules.findAllById(anyList())).thenReturn(List.of(cancelled));
+
+        service.closeReportsOfCancelledCases();
+
+        assertEquals(IncidentStatus.DISMISSED, open.getStatus());
+        assertEquals("Closed without an examination: Horse marked INACTIVE: retired", open.getHandlerNote());
+        assertNotNull(open.getHandledAt());
+        verify(notifications).sendAssignmentNotification(eq(7L), any(), eq(999L), any(), any(),
+                eq("Incident report closed"), contains("Lame"));
+    }
+
+    private User busyVet() {
+        User vet = eligibleVet(1L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+        when(users.findById(1L)).thenReturn(Optional.of(vet));
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(vet));
+        return vet;
+    }
+
+    private HorseIncidentReport report(IncidentSeverity severity) {
+        HorseIncidentReport report = new HorseIncidentReport();
+        report.setId(500L);
+        report.setStatus(IncidentStatus.REPORTED);
+        report.setSeverity(severity);
+        when(incidents.findByIdForUpdate(500L)).thenReturn(Optional.of(report));
+        return report;
     }
 
     private CareSchedule activeExam(Long id, Long vetId, Long horseId, CareType type, CareScheduleStatus status) {

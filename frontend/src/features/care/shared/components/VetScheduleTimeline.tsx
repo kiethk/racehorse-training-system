@@ -298,7 +298,7 @@ export function VetScheduleTimeline() {
                   cs.scheduledAt,
                   cs.durationMinutes || 30
                 );
-                const tone = getCareTypeTone(cs.careType, cs.purpose);
+                const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
                 const horse = horseMap.get(cs.horseId);
                 const horseName = horse?.name || `Horse #${cs.horseId}`;
                 const offHours = isOutsideWorkday(cs.scheduledAt);
@@ -390,7 +390,7 @@ export function VetScheduleTimeline() {
                 const horse = horseMap.get(cs.horseId);
                 const horseName = horse?.name || `Horse #${cs.horseId}`;
                 const stallCode = horse?.currentStallId ? stallMap.get(horse.currentStallId) : 'Unassigned';
-                const tone = getCareTypeTone(cs.careType, cs.purpose);
+                const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
                 const timeStr = cs.scheduledAt ? clockLabel(cs.scheduledAt) : 'Unscheduled';
                 const isCompleted = cs.status === 'COMPLETED';
 
@@ -544,7 +544,7 @@ export function VetScheduleTimeline() {
                           const horse = horseMap.get(cs.horseId);
                           const horseName = horse?.name || `Horse #${cs.horseId}`;
                           const timeStr = cs.scheduledAt ? clockLabel(cs.scheduledAt) : '';
-                          const tone = getCareTypeTone(cs.careType, cs.purpose);
+                          const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
 
                           return (
                             <div

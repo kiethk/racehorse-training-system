@@ -98,7 +98,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
       onUpdated?.();
       if (updated.status === 'ARRIVAL_EXPIRED') {
         toast.warning('Arrival window expired',
-          'The reservation was released; ask an authorized manager to reopen the admission.');
+          'The reservation was released. Ask an authorized manager to reopen the admission.');
       } else {
         toast.success('Arrival confirmed',
           'The horse was registered and the initial veterinary exam is being scheduled.');

@@ -117,8 +117,8 @@ class HorseStatusChangeTest {
         assertEquals(HorseStatus.INACTIVE, updated.getCurrentStatus());
         assertEquals("Passed away from natural causes", updated.getStatusReason());
         assertNull(updated.getCurrentStallId());
-        assertEquals(TrainingDecision.BLOCKED, updated.getTrainingDecision());
-        assertEquals("Passed away from natural causes", updated.getTrainingDecisionReason());
+        // INACTIVE không đụng tới quyết định tập: chỉ Vet mới đổi được.
+        assertEquals(TrainingDecision.ALLOWED, updated.getTrainingDecision());
 
         // Assert Stall vacated
         assertEquals(StallStatus.AVAILABLE, stall.getStatus());
@@ -171,8 +171,7 @@ class HorseStatusChangeTest {
 
         assertEquals(HorseStatus.ELIGIBLE, updated.getCurrentStatus());
         assertEquals("Horse returned to training", updated.getStatusReason());
-        assertEquals(TrainingDecision.ALLOWED, updated.getTrainingDecision());
-        assertNull(updated.getTrainingDecisionReason());
+        assertEquals(TrainingDecision.BLOCKED, updated.getTrainingDecision());
         assertEquals(105L, updated.getCurrentStallId());
         assertEquals(StallStatus.OCCUPIED, stall.getStatus());
         verify(workoutService).reassignFutureWorkoutsToGroom(horseId, 10L);

@@ -118,17 +118,15 @@ class UrgentCareCompletionTest {
     }
 
     @Test
-    @DisplayName("createSchedule URGENT: chặn tập, ghi lý do mặc định, hủy buổi tập tương lai")
-    void testCreateUrgentSchedule_blocksAndCancelsTraining() {
+    @DisplayName("createSchedule URGENT không tự chặn tập: báo cáo sự cố quyết định việc đó")
+    void testCreateUrgentSchedule_leavesTrainingDecisionToTheReport() {
         when(horseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(horse));
         when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
 
         careScheduleService.createSchedule(10L, CareType.URGENT, null, LocalDateTime.now(), 30L);
 
-        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
-        assertEquals("Urgent veterinary care pending", horse.getTrainingDecisionReason());
-        assertFalse(horse.canTrain());
-        verify(workoutService).exitAnyGroup(10L);
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
+        verify(workoutService, never()).exitAnyGroup(10L);
     }
 
     @Test
@@ -353,7 +351,7 @@ class UrgentCareCompletionTest {
         when(incidentReportRepository.findByCareScheduleIdOrderByReportedAtAsc(urgentSchedule.getId()))
                 .thenReturn(java.util.List.of(incident, merged));
 
-        var reports = careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), vet.getId());
+        var reports = careScheduleService.getIncidentCaseReports(urgentSchedule.getId(), vet.getId());
 
         assertEquals(java.util.List.of(30L, 31L), reports.stream().map(r -> r.id()).toList());
     }
@@ -367,7 +365,7 @@ class UrgentCareCompletionTest {
                 .thenReturn(java.util.List.of());
         when(incidentReportRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
 
-        var reports = careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), vet.getId());
+        var reports = careScheduleService.getIncidentCaseReports(urgentSchedule.getId(), vet.getId());
 
         assertEquals(1, reports.size());
         assertEquals(incident.getId(), reports.get(0).id());
@@ -379,7 +377,7 @@ class UrgentCareCompletionTest {
         when(careScheduleRepository.findById(urgentSchedule.getId())).thenReturn(Optional.of(urgentSchedule));
 
         ApiException error = assertThrows(ApiException.class,
-                () -> careScheduleService.getUrgentCaseReports(urgentSchedule.getId(), 999L));
+                () -> careScheduleService.getIncidentCaseReports(urgentSchedule.getId(), 999L));
 
         assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
         verify(incidentReportRepository, never()).findByCareScheduleIdOrderByReportedAtAsc(anyLong());

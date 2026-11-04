@@ -10,6 +10,7 @@ interface SchedulePatientHeaderProps {
   status: string;
   careType?: string | null;
   purpose?: string | null;
+  sourceIncidentId?: number | null;
   scheduledAt?: string | null;
   horseName?: string | null;
   horseBreed?: string | null;
@@ -31,6 +32,7 @@ export function SchedulePatientHeader({
   status,
   careType,
   purpose,
+  sourceIncidentId,
   scheduledAt,
   horseName,
   horseBreed,
@@ -61,16 +63,16 @@ export function SchedulePatientHeader({
             )}
             {careType && (
               <span>
-                {getCareTypeTone(careType as 'INITIAL' | 'ROUTINE' | 'URGENT', purpose).label}
-                {careType === 'INITIAL' ? ' Examination' : ' Care'}
+                {getCareTypeTone(careType as 'INITIAL' | 'ROUTINE' | 'URGENT', purpose, sourceIncidentId).label}
+                {sourceIncidentId && careType === 'ROUTINE' ? '' : careType === 'INITIAL' ? ' Examination' : ' Care'}
               </span>
             )}
-            {purpose && (
+            {purpose && !sourceIncidentId && (
               <span>
                 {formatEnumLabel(purpose)}
               </span>
             )}
-            <span className="font-mono text-[11px]">Schedule #{scheduleId}</span>
+            <span className="font-mono text-xs">Schedule #{scheduleId}</span>
             {veterinarianName && (
               <span>
                 Veterinarian: <strong>{veterinarianName}</strong>

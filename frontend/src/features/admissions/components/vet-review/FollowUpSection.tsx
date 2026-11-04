@@ -5,12 +5,15 @@ import { ChoiceInput, Input, Select } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { formatDate } from '@/lib/display';
 import { followUpDescriptionOptions } from './constants';
+import { followUpMerge } from './examVariantConfig';
 import type { Dispatch, SetStateAction } from 'react';
 
 export interface FollowUpSectionProps {
   isFormDisabled: boolean;
   careType: string;
   schedulePurpose?: 'FOLLOW_UP' | 'PREVENTIVE';
+  fromIncident?: boolean;
+  waitingFollowUpAt?: string | null;
   followUpRequired: boolean;
   followUpActive: boolean;
   scheduleFollowUp: boolean;
@@ -26,9 +29,22 @@ export interface FollowUpSectionProps {
   suggestedRecheckDate?: string;
 }
 
+/** Tells the Vet what the chosen date does to the Follow-up already waiting. */
+export function FollowUpMergeNotice({ chosenDate, waitingAt }: { chosenDate: string; waitingAt?: string | null }) {
+  const merge = followUpMerge(chosenDate, waitingAt);
+  if (!merge || !waitingAt) return null;
+  return (
+    <p className="rounded-[var(--radius-sm)] bg-[var(--color-warning-soft)] p-2 text-xs font-medium text-[var(--color-warning)]">
+      {merge === 'MOVED'
+        ? `The Follow-up on ${formatDate(waitingAt)} moves to ${formatDate(chosenDate)}.`
+        : `This horse already has a Follow-up on ${formatDate(waitingAt)}. That date stays, no new visit is booked.`}
+    </p>
+  );
+}
+
 export function FollowUpSection(props: FollowUpSectionProps) {
   const {
-    isFormDisabled, careType, schedulePurpose, followUpRequired, followUpActive,
+    isFormDisabled, careType, schedulePurpose, fromIncident, waitingFollowUpAt, followUpRequired, followUpActive,
     scheduleFollowUp, setScheduleFollowUp, followUpDate, setFollowUpDate,
     followUpDescription, setFollowUpDescription, fieldErrors, setFieldErrors,
     businessDateFromToday, tomorrowBusinessDate, suggestedRecheckDate,
@@ -59,10 +75,10 @@ export function FollowUpSection(props: FollowUpSectionProps) {
           A follow-up schedule is required before submitting.
         </p>
       )}
-      {careType === 'ROUTINE' && !followUpRequired && schedulePurpose !== 'PREVENTIVE' && (
+      {careType === 'ROUTINE' && !followUpRequired && schedulePurpose !== 'PREVENTIVE' && !fromIncident && (
         <p className="text-xs text-[var(--color-text-secondary)]">
           Without a follow-up date the system books the next visit automatically — routine
-          rechecks repeat every 14 days.
+          follow-ups repeat every 14 days.
         </p>
       )}
       {followUpActive && (
@@ -94,9 +110,12 @@ export function FollowUpSection(props: FollowUpSectionProps) {
             </div>
             {suggestedRecheckDate && (
               <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary)]">
-                <span>💡 Suggested recheck: on or after {formatDate(suggestedRecheckDate)} (active medication schedule)</span>
+                <span>💡 Suggested follow-up: on or after {formatDate(suggestedRecheckDate)} (active medication schedule)</span>
               </p>
             )}
+            <div className="mt-1.5">
+              <FollowUpMergeNotice chosenDate={followUpDate} waitingAt={waitingFollowUpAt} />
+            </div>
             {fieldErrors.followUpDate && (
               <p className="mt-0.5 text-xs font-medium text-[var(--color-danger)]">{fieldErrors.followUpDate}</p>
             )}

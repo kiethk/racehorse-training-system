@@ -28,8 +28,8 @@ export const URGENT_VITAL_PROFILES: UrgentVitalProfile[] = [
     respiratoryRate: { min: 28, max: 48 },
     hydration: ['MODERATE_DEHYDRATION', 'MILD_DEHYDRATION'],
     notes: [
-      'Sweating heavily over the neck and shoulders; capillary refill about 3 seconds, membranes tacky.',
-      'Coat marked with dried sweat; pulse strong and rapid, horse markedly restless and watchful at the limb.',
+      'Sweating heavily over the neck and shoulders, capillary refill about 3 seconds, membranes tacky.',
+      'Coat marked with dried sweat, pulse strong and rapid, horse markedly restless and watchful at the limb.',
     ],
   },
   {
@@ -39,8 +39,8 @@ export const URGENT_VITAL_PROFILES: UrgentVitalProfile[] = [
     respiratoryRate: { min: 18, max: 30 },
     hydration: ['MILD_DEHYDRATION', 'NORMAL'],
     notes: [
-      'Heart rate stays above the expected recovery band for the time since the gallop; membranes pink, refill under 2 seconds.',
-      'Guarding the right fore; high muscle tension; offers only small drinks when water is presented.',
+      'Heart rate stays above the expected recovery band for the time since the gallop, membranes pink, refill under 2 seconds.',
+      'Guarding the right fore, high muscle tension, offers only small drinks when water is presented.',
     ],
   },
   {
@@ -50,8 +50,8 @@ export const URGENT_VITAL_PROFILES: UrgentVitalProfile[] = [
     respiratoryRate: { min: 14, max: 22 },
     hydration: ['NORMAL', 'MILD_DEHYDRATION'],
     notes: [
-      'Vitals settling toward the resting band; still reluctant to stand fully weight-bearing on the affected limb.',
-      'Calmer on examination; heart rate recovery is slow but progressive, consistent with pain-driven tachycardia.',
+      'Vitals settling toward the resting band, still reluctant to stand fully weight-bearing on the affected limb.',
+      'Calmer on examination, heart rate recovery is slow but progressive, consistent with pain-driven tachycardia.',
     ],
   },
 ];
@@ -91,30 +91,30 @@ export interface FindingScenario {
 export const FINDING_SCENARIOS: FindingScenario[] = [
   {
     name: 'right-fore tendon strain',
-    symptoms: 'Short, uneven stride on the right fore after galloping; reluctant to turn on the affected side.',
+    symptoms: 'Short, uneven stride on the right fore after galloping, reluctant to turn on the affected side.',
     findings:
-      'Heat and mild swelling along the palmar aspect of the right fore cannon; strong digital pulse; pain on flexion of the proximal sesamoids; lameness 3/5 at walk, worse on firm ground.',
+      'Heat and mild swelling along the palmar aspect of the right fore cannon, strong digital pulse, pain on flexion of the proximal sesamoids, lameness 3/5 at walk, worse on firm ground.',
     diagnosis: 'Acute superficial digital flexor tendon strain, right fore',
-    treatment: 'Cold hosing 20 minutes, pressure bandage with support wrap; phenylbutazone at body weight; strict stall rest.',
-    notes: 'Ultrasound recheck before any work is reintroduced; icing twice daily and daily gait notes recorded by the groom.',
+    treatment: 'Cold hosing 20 minutes, pressure bandage with support wrap, phenylbutazone at body weight, strict stall rest.',
+    notes: 'Ultrasound recheck before any work is reintroduced, icing twice daily and daily gait notes recorded by the groom.',
   },
   {
     name: 'mild spasmodic colic',
     symptoms: 'Pawing the bedding, looking at the flank and attempting to roll after the evening feed.',
     findings:
-      'Mild right-side flank distension; reduced gut sounds on the right; heart rate raised for rest; dry faecal balls on rectal exam, no obstruction.',
+      'Mild right-side flank distension, reduced gut sounds on the right, heart rate raised for rest, dry faecal balls on rectal exam, no obstruction.',
     diagnosis: 'Mild spasmodic colic',
-    treatment: 'Butylscopolamine IV; hand walking as tolerated; feed withheld two hours then small soaked feeds.',
-    notes: 'Recheck pain score and gut sounds in two hours; night staff to call back immediately if rolling restarts.',
+    treatment: 'Butylscopolamine IV, hand walking as tolerated, feed withheld two hours then small soaked feeds.',
+    notes: 'Recheck pain score and gut sounds in two hours, night staff to call back immediately if rolling restarts.',
   },
   {
     name: 'fetlock laceration',
     symptoms: 'Bleeding wound over the left fore fetlock found at the morning feed.',
     findings:
-      '5 cm laceration above the left fore coronet; haemorrhage controlled with pressure; wound bed clean, joint and tendon untouched; lameness 1/5; tetanus status uncertain.',
+      '5 cm laceration above the left fore coronet, haemorrhage controlled with pressure, wound bed clean, joint and tendon untouched, lameness 1/5, tetanus status uncertain.',
     diagnosis: 'Superficial laceration, left fore fetlock',
-    treatment: 'Irrigation and debridement under sedation; pressure bandage; topical antiseptic; referral for tetanus booster.',
-    notes: 'Bandage change at 48 hours; discharge and odour checked daily; stall rest until the walk is completely sound.',
+    treatment: 'Irrigation and debridement under sedation, pressure bandage, topical antiseptic, referral for tetanus booster.',
+    notes: 'Bandage change at 48 hours, discharge and odour checked daily, stall rest until the walk is completely sound.',
   },
 ];
 
