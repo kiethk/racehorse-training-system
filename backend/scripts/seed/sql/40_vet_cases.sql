@@ -204,7 +204,7 @@ BEGIN
                              p_note => 'She is bright and eating well; an early antibiotic response is expected. Recheck before returning to work.',
                              p_image => 'admission-packs/h031-bv-karol/horse-photo.jpg');
     r := pg_temp.record_of(s);
-    PERFORM pg_temp.treatment(r, 'Respiratory infection treatment', 'Full antibiotic course; temperature twice daily; soaked hay.',
+    PERFORM pg_temp.treatment(r, 'Respiratory infection treatment', '[{"medication_name":"Doxycycline","dosage":"10 mg/kg","frequency":"Twice daily","route":"ORAL","duration":7,"notes":"Give with morning and evening feed. Ensure full feed consumption."},{"medication_name":"Vitamin B Complex","dosage":"10 mL","frequency":"Once daily","route":"INJECTION_IM","duration":5,"notes":"Deep intramuscular injection into alternate neck sides. Vet administration only."}]',
                               pg_temp.today() - 3, pg_temp.today() + 4, 'ACTIVE',
                               ARRAY[['Doxycycline', '10 mg/kg', 'Twice daily', 'Oral', 'After feed.'],
                                     ['Vitamin B complex', '10 mL', 'Once daily', 'IM', 'Alternate sides.']]);
