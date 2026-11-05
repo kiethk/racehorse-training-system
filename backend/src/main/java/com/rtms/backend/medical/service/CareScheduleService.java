@@ -1352,8 +1352,8 @@ public class CareScheduleService {
         if (slot == null) return; // shortcut: 7 ngày kề đều kín — thử lại ở tick job sau
         CareScheduleStatus previous = cs.getStatus();
         cs.setStatus(CareScheduleStatus.SCHEDULED);
-        cs.setScheduledAt(slot);
         cs.setScheduledDate(slot.toLocalDate());
+        cs.setScheduledAt(null);
         cs.setRolloverCount(cs.getRolloverCount() + 1);
 
         RescheduleReason reason = cs.getCareType() == CareType.ROUTINE && vetHandledUrgentToday(cs.getVeterinarianId(), now.toLocalDate())
@@ -1541,7 +1541,8 @@ public class CareScheduleService {
             }
 
             schedule.setVeterinarianId(lockedVet.getId());
-            schedule.setScheduledAt(slot);
+            schedule.setScheduledDate(slot.toLocalDate());
+            schedule.setScheduledAt(schedule.getCareType() == CareType.URGENT ? slot : null);
             schedule.setStatus(CareScheduleStatus.SCHEDULED);
 
             careScheduleRepository.save(schedule);
@@ -1832,7 +1833,7 @@ public class CareScheduleService {
                 LocalDateTime slot = day.atTime(time);
                 if (requested != null && slot.isBefore(requested)) continue;
                 if (slot.isBefore(LocalDateTime.now())) continue;
-                if (horseHasConflict(schedule, slot, scheduledForHorse)) continue;
+                if (horseHasConflict(schedule, day, slot, scheduledForHorse)) continue;
 
                 if (assignedInDay == null) {
                     LocalDateTime dayStart = day.atStartOfDay();
@@ -1849,8 +1850,16 @@ public class CareScheduleService {
         return null;
     }
 
-    private boolean horseHasConflict(CareSchedule schedule, LocalDateTime slot, List<CareSchedule> scheduledForHorse) {
-        return scheduledForHorse.stream().anyMatch(other -> !Objects.equals(other.getId(), schedule.getId()) && overlaps(schedule, slot, other));
+    private boolean horseHasConflict(CareSchedule schedule, LocalDate day, LocalDateTime slot, List<CareSchedule> scheduledForHorse) {
+        return scheduledForHorse.stream().anyMatch(other -> {
+            if (Objects.equals(other.getId(), schedule.getId())) return false;
+            if (schedule.getCareType() != CareType.URGENT && other.getCareType() != CareType.URGENT) {
+                LocalDate otherDate = other.getScheduledDate() != null ? other.getScheduledDate()
+                        : (other.getScheduledAt() != null ? other.getScheduledAt().toLocalDate() : null);
+                if (day.equals(otherDate)) return true;
+            }
+            return overlaps(schedule, slot, other);
+        });
     }
 
     private List<User> rankVeterinarians(CareSchedule schedule, LocalDateTime slot,

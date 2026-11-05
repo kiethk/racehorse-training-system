@@ -199,8 +199,8 @@ class CareScheduleDirectAssignmentTest {
         service.assignRequestedSchedule(requested);
 
         assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
-        assertEquals(day.atTime(8, 0), requested.getScheduledAt(),
-                "Admission exams must fill the working day outside 13:30-15:30 before touching the routine window");
+        assertEquals(day, requested.getScheduledDate());
+        assertNull(requested.getScheduledAt(), "Admission exams are date-based and do not store a minute slot");
     }
 
     @Test
@@ -235,8 +235,8 @@ class CareScheduleDirectAssignmentTest {
         service.assignRequestedSchedule(requested);
 
         assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
-        assertEquals(day.atTime(13, 30), requested.getScheduledAt(),
-                "When the hours outside the window are full, the exam takes a free slot inside it");
+        assertEquals(day, requested.getScheduledDate());
+        assertNull(requested.getScheduledAt(), "When scheduled, admission exams remain date-based with null scheduledAt");
     }
 
     private CareSchedule initialRequest(Long horseId, LocalDateTime requestedAt) {

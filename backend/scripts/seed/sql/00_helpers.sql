@@ -249,7 +249,11 @@ DECLARE
     v_horse TEXT;
     v_type TEXT; v_title TEXT; v_message TEXT;
 BEGIN
-    UPDATE care_schedule SET veterinarian_id = p_vet, scheduled_at = p_slot, scheduled_date = CAST(p_slot AS DATE), status = 'SCHEDULED', updated_at = p_at
+    UPDATE care_schedule SET veterinarian_id = p_vet,
+                             scheduled_at = CASE WHEN care_type = 'URGENT' THEN p_slot ELSE NULL END,
+                             scheduled_date = CAST(p_slot AS DATE),
+                             status = 'SCHEDULED',
+                             updated_at = p_at
      WHERE id = p_schedule RETURNING * INTO c;
     SELECT name INTO v_horse FROM horses WHERE id = c.horse_id;
     IF c.care_type = 'INITIAL' AND c.admission_id IS NOT NULL THEN
@@ -292,7 +296,7 @@ BEGIN
 END $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION pg_temp.start_care(p_schedule BIGINT) RETURNS VOID AS $$
-    UPDATE care_schedule SET status = 'IN_PROGRESS', updated_at = scheduled_at WHERE id = p_schedule
+    UPDATE care_schedule SET status = 'IN_PROGRESS', updated_at = COALESCE(scheduled_at, created_at, pg_temp.clock()) WHERE id = p_schedule
 $$ LANGUAGE sql;
 
 -- AD-022 / AD-025: Xóa một lịch đã xếp chưa diễn ra (thay thế cho việc hủy ca).

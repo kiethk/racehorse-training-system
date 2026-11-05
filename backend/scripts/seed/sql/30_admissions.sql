@@ -39,8 +39,9 @@ BEGIN
             SELECT * INTO c FROM care_schedule WHERE id = c.id;
         END IF;
         IF (SELECT training_decision FROM horses WHERE id = p_horse) = 'BLOCKED' THEN
-            EXIT WHEN c.scheduled_at + INTERVAL '25 minutes' > v_limit;
-            PERFORM pg_temp.complete_care(c.id, c.scheduled_at + INTERVAL '25 minutes',
+            v_slot := COALESCE(c.scheduled_at, c.scheduled_date::timestamp + time '14:00');
+            EXIT WHEN v_slot + INTERVAL '25 minutes' > v_limit;
+            PERFORM pg_temp.complete_care(c.id, v_slot + INTERVAL '25 minutes',
                 p_findings => 'Recheck: the problem noted at the last visit has resolved, gait, temperature and appetite normal.',
                 p_diagnosis => 'Recovered, fit to resume training', p_decision => 'ALLOWED',
                 p_notes => 'Cleared to return to normal work.',
@@ -76,6 +77,7 @@ DECLARE
     v_visits INT := 0;
     v_hr BIGINT;
     v_rest seed_block;
+    v_slot TIMESTAMP;
 BEGIN
     LOOP
         SELECT * INTO m FROM care_schedule
@@ -125,13 +127,14 @@ BEGIN
             PERFORM pg_temp.book(m.id, p_vet, v_block);
             SELECT * INTO m FROM care_schedule WHERE id = m.id;
         END IF;
-        v_done := m.scheduled_at + make_interval(mins => pg_temp.rndi('pv' || m.id, 18, 28));
+        v_slot := COALESCE(m.scheduled_at, m.scheduled_date::timestamp + time '14:00');
+        v_done := v_slot + make_interval(mins => pg_temp.rndi('pv' || m.id, 18, 28));
         EXIT WHEN v_done > v_limit;
-        EXIT WHEN p_leave_overdue AND m.scheduled_at > pg_temp.clock() - INTERVAL '4 days';
-        IF pg_temp.blocked_at(p_horse, m.scheduled_at) THEN
+        EXIT WHEN p_leave_overdue AND v_slot > pg_temp.clock() - INTERVAL '4 days';
+        IF pg_temp.blocked_at(p_horse, v_slot) THEN
             -- Ngựa bị chặn sau khi lịch đã xếp: Manager dời ca tiêm tới sau đợt nghỉ (CareRescheduleService: lịch về
             -- REQUESTED ở ngày mới). (Blocked after booking: the manager moves the visit after the rest period.)
-            SELECT * INTO v_rest FROM seed_block WHERE horse_id = p_horse AND from_ts <= m.scheduled_at
+            SELECT * INTO v_rest FROM seed_block WHERE horse_id = p_horse AND from_ts <= v_slot
              ORDER BY from_ts DESC LIMIT 1;
             UPDATE care_schedule SET status = 'REQUESTED', veterinarian_id = NULL, scheduled_at = NULL,
                                      requested_at = (COALESCE(v_rest.to_ts, pg_temp.clock())::DATE + 1) + TIME '14:00',

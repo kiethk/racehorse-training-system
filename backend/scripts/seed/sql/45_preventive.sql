@@ -42,62 +42,76 @@ BEGIN
     -- (Enrich the Routine slots of VT01 on Today's bucket for showcase)
     -- ---------------------------------------------------------------------
     DECLARE
-        v_slots care_schedule[];
-        v_slot_times TIME[] := ARRAY[TIME '13:30', TIME '14:00', TIME '14:30', TIME '15:00'];
+        v_ids BIGINT[];
         v_cs RECORD;
-        v_idx INT := 0;
     BEGIN
-        -- Nếu VT01 chưa đủ 4 ca hôm nay, lấy thêm ca từ ngày mai chuyển về slot còn trống hôm nay
-        FOR v_t IN 1..4 LOOP
-            IF NOT EXISTS (SELECT 1 FROM care_schedule WHERE veterinarian_id = pg_temp.uid('VT01') AND scheduled_at = pg_temp.at(0, v_slot_times[v_t])) THEN
-                SELECT id INTO v_cs FROM care_schedule
-                 WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE' AND status = 'SCHEDULED'
-                   AND scheduled_date > pg_temp.today()
-                 ORDER BY scheduled_at ASC LIMIT 1;
-                IF v_cs.id IS NOT NULL THEN
-                    UPDATE care_schedule
-                       SET scheduled_at = pg_temp.at(0, v_slot_times[v_t]),
-                           scheduled_date = pg_temp.today()
-                     WHERE id = v_cs.id;
-                END IF;
-            END IF;
-        END LOOP;
+        -- Đảm bảo tất cả ca Routine và Initial đều có scheduled_at = NULL (lên lịch theo ngày)
+        UPDATE care_schedule SET scheduled_at = NULL WHERE care_type IN ('ROUTINE', 'INITIAL');
 
-        -- Slot 1 (13:30): Ca bình thường chờ khám (Normal pending)
-        UPDATE care_schedule
-           SET rollover_count = 0, reschedule_reason = NULL, reschedule_note = NULL
-         WHERE veterinarian_id = pg_temp.uid('VT01') AND scheduled_at = pg_temp.at(0, TIME '13:30');
+        SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_ids
+          FROM (SELECT id FROM care_schedule
+                 WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                   AND scheduled_date = pg_temp.today()
+                 LIMIT 4) s;
 
-        -- Slot 2 (14:00): Ca dời lịch từ hôm qua do hết giờ (Rolled 1x - TIME_EXCEEDED)
-        UPDATE care_schedule
-           SET rollover_count = 1,
-               reschedule_reason = 'TIME_EXCEEDED',
-               reschedule_note = 'Daily routine examination window ended at 15:30, rescheduled to next day'
-         WHERE veterinarian_id = pg_temp.uid('VT01') AND scheduled_at = pg_temp.at(0, TIME '14:00');
+        -- Nếu VT01 chưa đủ 4 ca hôm nay, lấy thêm ca từ ngày mai chuyển về hôm nay
+        IF COALESCE(array_length(v_ids, 1), 0) < 4 THEN
+            FOR v_cs IN SELECT id FROM care_schedule
+                         WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE' AND status = 'SCHEDULED'
+                           AND scheduled_date > pg_temp.today()
+                         ORDER BY id ASC LIMIT (4 - COALESCE(array_length(v_ids, 1), 0)) LOOP
+                UPDATE care_schedule SET scheduled_date = pg_temp.today(), scheduled_at = NULL WHERE id = v_cs.id;
+            END LOOP;
+            SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_ids
+              FROM (SELECT id FROM care_schedule
+                     WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE'
+                       AND scheduled_date = pg_temp.today()
+                     LIMIT 4) s;
+        END IF;
 
-        -- Slot 3 (14:30): Ca dời lịch do ưu tiên ca cấp cứu (Emergency Priority - URGENT_PREEMPTION)
-        UPDATE care_schedule
-           SET rollover_count = 1,
-               reschedule_reason = 'URGENT_PREEMPTION',
-               reschedule_note = 'Routine examination deferred to prioritize acute emergency response'
-         WHERE veterinarian_id = pg_temp.uid('VT01') AND scheduled_at = pg_temp.at(0, TIME '14:30');
+        -- Slot 1: Ca bình thường chờ khám (Normal pending)
+        IF v_ids[1] IS NOT NULL THEN
+            UPDATE care_schedule
+               SET rollover_count = 0, reschedule_reason = NULL, reschedule_note = NULL
+             WHERE id = v_ids[1];
+        END IF;
 
-        -- Slot 4 (15:00): Ca san sẻ từ Bác sĩ khác (Transferred - PEER_OFFLOAD)
-        UPDATE care_schedule
-           SET rollover_count = 0,
-               reschedule_reason = 'PEER_OFFLOAD',
-               reschedule_note = 'Transferred from Dr. Emily Wilson (VT02) due to emergency case workload'
-         WHERE veterinarian_id = pg_temp.uid('VT01') AND scheduled_at = pg_temp.at(0, TIME '15:00');
+        -- Slot 2: Ca dời lịch từ hôm qua do hết giờ (Rolled 1x - TIME_EXCEEDED)
+        IF v_ids[2] IS NOT NULL THEN
+            UPDATE care_schedule
+               SET rollover_count = 1,
+                   reschedule_reason = 'TIME_EXCEEDED',
+                   reschedule_note = 'Daily routine examination window ended at 15:30, rescheduled to next day'
+             WHERE id = v_ids[2];
+        END IF;
+
+        -- Slot 3: Ca dời lịch do ưu tiên ca cấp cứu (Emergency Priority - URGENT_PREEMPTION)
+        IF v_ids[3] IS NOT NULL THEN
+            UPDATE care_schedule
+               SET rollover_count = 1,
+                   reschedule_reason = 'URGENT_PREEMPTION',
+                   reschedule_note = 'Routine examination deferred to prioritize acute emergency response'
+             WHERE id = v_ids[3];
+        END IF;
+
+        -- Slot 4: Ca san sẻ từ Bác sĩ khác (Transferred - PEER_OFFLOAD)
+        IF v_ids[4] IS NOT NULL THEN
+            UPDATE care_schedule
+               SET rollover_count = 0,
+                   reschedule_reason = 'PEER_OFFLOAD',
+                   reschedule_note = 'Transferred from Dr. Emily Wilson (VT02) due to emergency case workload'
+             WHERE id = v_ids[4];
+        END IF;
 
         -- Làm đẹp thêm cho ngày mai (Saturday 2026-11-07): xếp 2 ca Routine để thanh quota hiện R: 2/4 · A: 1/2
         UPDATE care_schedule
-           SET scheduled_at = pg_temp.at(1, TIME '13:30'),
+           SET scheduled_at = NULL,
                scheduled_date = pg_temp.today() + 1
-         WHERE id = (SELECT id FROM care_schedule WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE' AND scheduled_date > pg_temp.today() + 1 ORDER BY scheduled_at ASC LIMIT 1);
+         WHERE id = (SELECT id FROM care_schedule WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE' AND scheduled_date > pg_temp.today() + 1 ORDER BY id ASC LIMIT 1);
 
         UPDATE care_schedule
-           SET scheduled_at = pg_temp.at(1, TIME '14:00'),
+           SET scheduled_at = NULL,
                scheduled_date = pg_temp.today() + 1
-         WHERE id = (SELECT id FROM care_schedule WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE' AND scheduled_date > pg_temp.today() + 1 ORDER BY scheduled_at ASC LIMIT 1);
+         WHERE id = (SELECT id FROM care_schedule WHERE veterinarian_id = pg_temp.uid('VT01') AND care_type = 'ROUTINE' AND scheduled_date > pg_temp.today() + 1 ORDER BY id ASC LIMIT 1);
     END;
 END $$;
