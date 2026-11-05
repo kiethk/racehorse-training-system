@@ -61,9 +61,11 @@ test('filterRoutineSchedules correctly filters by status and search keyword', ()
   assert.equal(res3.length, 1);
   assert.equal(res3[0].id, 3);
 
-  // Search by stall code
+  // Search by stall code - returns matching horses sorted by newest created first
   const res4 = filterRoutineSchedules(schedules, 'ALL', 'a-01', horseMap);
   assert.equal(res4.length, 2);
+  assert.equal(res4[0].id, 3);
+  assert.equal(res4[1].id, 1);
 
   // Search by ID
   const res5 = filterRoutineSchedules(schedules, 'ALL', '2', horseMap);
@@ -82,4 +84,18 @@ test('filterRoutineSchedules correctly filters by status and search keyword', ()
   assert.equal(res7.length, 1);
   const res8 = filterRoutineSchedules(unmappedSchedules, 'SCHEDULED', '99', horseMap);
   assert.equal(res8.length, 1);
+});
+
+test('filterRoutineSchedules sorts newest created first (Option 1: createdAt DESC, id DESC)', () => {
+  const horseMap = new Map<number, { name: string; stallCode?: string }>([
+    [10, { name: 'Thunderbolt', stallCode: 'A-01' }],
+  ]);
+  const schedules: CareSchedule[] = [
+    { id: 1, horseId: 10, careType: 'ROUTINE', status: 'SCHEDULED', createdAt: '2026-11-01T10:00:00Z' },
+    { id: 2, horseId: 10, careType: 'ROUTINE', status: 'SCHEDULED', createdAt: '2026-11-05T14:30:00Z' },
+    { id: 3, horseId: 10, careType: 'ROUTINE', status: 'SCHEDULED', createdAt: '2026-11-03T08:00:00Z' },
+  ];
+
+  const sorted = filterRoutineSchedules(schedules, 'ALL', '', horseMap);
+  assert.deepEqual(sorted.map((s) => s.id), [2, 3, 1]);
 });

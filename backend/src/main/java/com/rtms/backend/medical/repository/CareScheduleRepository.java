@@ -189,7 +189,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             + "AND (:requestedById IS NULL OR cs.requestedById = :requestedById) "
             + "AND (:admissionId IS NULL OR cs.admissionId = :admissionId) "
             + "AND (cast(:dayStart as timestamp) IS NULL OR cs.scheduledAt >= :dayStart) "
-            + "AND (cast(:dayEnd as timestamp) IS NULL OR cs.scheduledAt < :dayEnd)")
+            + "AND (cast(:dayEnd as timestamp) IS NULL OR cs.scheduledAt < :dayEnd) "
+            + "ORDER BY cs.createdAt DESC, cs.id DESC")
     Page<CareSchedule> findFiltered(@Param("status") CareScheduleStatus status,
             @Param("careType") CareType careType, @Param("horseId") Long horseId,
             @Param("vetId") Long vetId, @Param("requestedById") Long requestedById,
@@ -201,7 +202,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             + "AND (:status IS NULL OR cs.status = :status) AND (:careType IS NULL OR cs.careType = :careType) "
             + "AND (:horseId IS NULL OR cs.horseId = :horseId) AND (:vetId IS NULL OR cs.veterinarianId = :vetId) "
             + "AND (:admissionId IS NULL OR cs.admissionId = :admissionId) "
-            + "AND a.groomId = :userId")
+            + "AND a.groomId = :userId "
+            + "ORDER BY cs.createdAt DESC, cs.id DESC")
     Page<CareSchedule> findFilteredForGroom(@Param("status") CareScheduleStatus status,
             @Param("careType") CareType careType, @Param("horseId") Long horseId,
             @Param("vetId") Long vetId, @Param("admissionId") Long admissionId,
