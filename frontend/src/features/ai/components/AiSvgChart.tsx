@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { formatNumber } from '@/lib/display';
 import {
   ChartConfig,
   describeArc,
@@ -145,7 +146,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                         onMouseEnter={() => setHoveredIndex(idx)}
                         onMouseLeave={() => setHoveredIndex(null)}
                       >
-                        <title>{`${slice.label}: ${slice.value.toLocaleString()} (${slice.percentage.toFixed(1)}%)`}</title>
+                        <title>{`${slice.label}: ${formatNumber(slice.value)} (${slice.percentage.toFixed(1)}%)`}</title>
                       </path>
                     );
                   })
@@ -178,7 +179,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                           fill="currentColor"
                           className="text-emerald-600 dark:text-emerald-400 font-mono"
                         >
-                          {activeItem.value.toLocaleString()}{' '}
+                          {formatNumber(activeItem.value)}{' '}
                           <tspan fontSize="10" fontWeight="500">
                             ({activeItem.percentage.toFixed(0)}%)
                           </tspan>
@@ -207,7 +208,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                           fill="currentColor"
                           className="text-[var(--color-text-primary)] font-mono"
                         >
-                          {config.total.toLocaleString()}
+                          {formatNumber(config.total)}
                         </text>
                       </>
                     )}
@@ -251,7 +252,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                     </div>
                     <div className="shrink-0 text-right font-mono text-[11px]">
                       <span className="font-semibold text-[var(--color-text-primary)]">
-                        {item.value.toLocaleString()}
+                        {formatNumber(item.value)}
                       </span>
                       <span className="ml-1 text-[10px] text-[var(--color-text-secondary)]">
                         ({item.percentage.toFixed(1)}%)
@@ -318,7 +319,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                                 }
                                 className="transition-all duration-200"
                               >
-                                <title>{`${item.label}: ${item.value.toLocaleString()} (${item.percentage.toFixed(1)}%)`}</title>
+                                <title>{`${item.label}: ${formatNumber(item.value)} (${item.percentage.toFixed(1)}%)`}</title>
                               </rect>
                               <text
                                 x={x + colWidth / 2}
@@ -329,7 +330,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                                 fill="currentColor"
                                 className="text-[var(--color-text-secondary)] font-mono"
                               >
-                                {item.value.toLocaleString()}
+                                {formatNumber(item.value)}
                               </text>
                               <text
                                 x={x + colWidth / 2}
@@ -420,7 +421,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                             }
                             className="transition-all duration-200"
                           >
-                            <title>{`${item.label}: ${item.value.toLocaleString()} (${item.percentage.toFixed(1)}%)`}</title>
+                            <title>{`${item.label}: ${formatNumber(item.value)} (${item.percentage.toFixed(1)}%)`}</title>
                           </rect>
 
                           {/* Giá trị số lượng hiển thị bên phải thanh */}
@@ -432,7 +433,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                             fill="currentColor"
                             className="text-[var(--color-text-secondary)] font-mono"
                           >
-                            {item.value.toLocaleString()}
+                            {formatNumber(item.value)}
                             {config.unit ? ` ${config.unit}` : ''}
                           </text>
                         </g>
@@ -458,7 +459,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
               </span>
             </span>
             <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-              {activeItem.value.toLocaleString()}{' '}
+              {formatNumber(activeItem.value)}{' '}
               <span className="text-[10px] text-[var(--color-text-secondary)]">
                 ({activeItem.percentage.toFixed(1)}%)
               </span>

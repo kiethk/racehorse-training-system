@@ -12,8 +12,8 @@ import { FormField } from '@/components/ui/FormField';
 import { Input, SearchInput, Select } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
+import { formatDateTime } from '@/lib/display';
 import { auditLogApi } from '../services/api';
-import { extractAuditSummary } from '../lib/auditExport';
 import { resolveEntityUrl, resolveLogModule } from '../lib/auditDiff';
 import { AuditLogDetailModal } from './AuditLogDetailModal';
 import { AuditLogArchiveModal } from './AuditLogArchiveModal';
@@ -359,10 +359,7 @@ export function ManagerAuditLogView() {
                     >
                       {/* 1. Timestamp */}
                       <Td className="px-5 py-3.5 text-[var(--color-text-secondary)] text-xs font-mono whitespace-nowrap">
-                        {new Date(log.createdAt).toLocaleString('en-GB', { 
-                          day: '2-digit', month: 'short', year: 'numeric',
-                          hour: '2-digit', minute: '2-digit'
-                        })}
+                        {formatDateTime(log.createdAt)}
                       </Td>
 
                       {/* 2. Actor & Role (stacked) */}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { formatDate } from '@/lib/display';
 import { ModuleBadge } from './ModuleBadge';
 import { parseAuditDetails, resolveLogModule, resolveValueLink } from '../lib/auditDiff';
 import type { AuditLogItem } from '../types';
@@ -75,7 +76,7 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
       }
       description={
         <span className="text-xs text-[var(--color-text-muted)] font-mono">
-          {new Date(item.createdAt).toLocaleString('en-GB', {
+          {formatDate(item.createdAt, {
             dateStyle: 'full',
             timeStyle: 'medium',
           })}

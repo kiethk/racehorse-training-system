@@ -1,12 +1,15 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { EmptyState, HorseAvatar, Icon, IconButton, Panel, Pill } from '@/components/ui';
+import { Button, EmptyState, HorseAvatar, Icon, IconButton, Panel, Pill } from '@/components/ui';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import type { HorseSpecialty } from '@/features/horses/types';
-import { formatDate, formatEnumLabel } from '@/lib/display';
+import { formatDate, formatEnumLabel, formatLocalDateIso } from '@/lib/display';
+import { treatmentPlanService } from '@/services/treatmentPlanService';
+import type { TreatmentPlan } from '@/features/care/types';
+import { MedicationInstructionModal } from '@/features/care/components/MedicationInstructionModal';
 import type { Area, Horse, StableStall } from '../../types';
 import { stallState } from './StallCell';
 
@@ -66,6 +69,36 @@ export function StallDetailPanel({
   onClose,
 }: StallDetailPanelProps) {
   const { user } = useAuth();
+  const [activePlan, setActivePlan] = useState<TreatmentPlan | null>(null);
+  const [isMedModalOpen, setIsMedModalOpen] = useState(false);
+
+  const horseId = horse?.id;
+  useEffect(() => {
+    let active = true;
+    if (!horseId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActivePlan(null);
+      return;
+    }
+    treatmentPlanService
+      .getActiveByHorseId(horseId)
+      .then((plan) => {
+        if (active) setActivePlan(plan);
+      })
+      .catch(() => {
+        if (active) setActivePlan(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [horseId]);
+
+  const todayStr = formatLocalDateIso();
+  const hasActiveTreatment = Boolean(
+    activePlan &&
+      activePlan.status === 'ACTIVE' &&
+      (!activePlan.endDate || activePlan.endDate >= todayStr),
+  );
 
   if (!stall) {
     return (
@@ -163,6 +196,33 @@ export function StallDetailPanel({
           {horse.trainingDecision === 'BLOCKED' && horse.trainingDecisionReason && (
             <div className="rounded-lg bg-[var(--color-danger-soft)] border border-[var(--color-danger)]/20 p-2.5 text-xs text-[var(--color-danger)] leading-relaxed">
               ⚠️ {horse.trainingDecisionReason}
+            </div>
+          )}
+
+          {/* Active Medication Treatment Banner */}
+          {hasActiveTreatment && activePlan && (
+            <div className="rounded-lg border border-[var(--color-warning)]/60 bg-[var(--color-warning-soft)]/30 p-3 flex items-center justify-between gap-3 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Icon name="pill" size={18} className="text-[var(--color-warning)] shrink-0" />
+                <div className="min-w-0 text-xs">
+                  <p className="font-semibold text-[var(--color-text-primary)]">
+                    Active Medication Treatment
+                  </p>
+                  <p className="text-[var(--color-text-muted)] truncate">
+                    {activePlan.endDate
+                      ? `Prescribed through ${formatDate(activePlan.endDate)}`
+                      : 'Ongoing treatment plan'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsMedModalOpen(true)}
+                className="shrink-0"
+              >
+                View Instructions
+              </Button>
             </div>
           )}
 
@@ -300,6 +360,19 @@ export function StallDetailPanel({
       )}
 
       {children}
+
+      {horse && activePlan && (
+        <MedicationInstructionModal
+          open={isMedModalOpen}
+          onClose={() => setIsMedModalOpen(false)}
+          horseName={horse.name}
+          stallCode={stall.stallCode}
+          diagnosis={activePlan.diagnosis}
+          veterinarianName={activePlan.veterinarianName}
+          instructions={activePlan.instructions}
+          endDate={activePlan.endDate ? formatDate(activePlan.endDate) : null}
+        />
+      )}
 
       {actions && <div className="flex flex-col gap-2 border-t border-[var(--color-border)] pt-3">{actions}</div>}
     </Panel>
