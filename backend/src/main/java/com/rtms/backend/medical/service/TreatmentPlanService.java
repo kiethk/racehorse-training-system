@@ -13,6 +13,8 @@ import com.rtms.backend.medical.repository.PrescriptionRepository;
 import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import jakarta.transaction.Transactional;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -26,15 +28,27 @@ public class TreatmentPlanService {
     private final HealthRecordRepository healthRecordRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final PrescriptionRepository prescriptionRepository;
+    private final com.rtms.backend.identity.repository.UserRepository userRepository;
 
     public TreatmentPlanService(
             HealthRecordRepository healthRecordRepository,
             TreatmentPlanRepository treatmentPlanRepository,
             PrescriptionRepository prescriptionRepository)
     {
+        this(healthRecordRepository, treatmentPlanRepository, prescriptionRepository, null);
+    }
+
+    @Autowired
+    public TreatmentPlanService(
+            HealthRecordRepository healthRecordRepository,
+            TreatmentPlanRepository treatmentPlanRepository,
+            PrescriptionRepository prescriptionRepository,
+            com.rtms.backend.identity.repository.UserRepository userRepository)
+    {
         this.healthRecordRepository = healthRecordRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;
         this.prescriptionRepository = prescriptionRepository;
+        this.userRepository = userRepository;
     }
 
     private void verifyVetAccess(HealthRecord record, AuthenticatedUser currentUser) {
@@ -121,6 +135,7 @@ public class TreatmentPlanService {
         prescription.setStartDate(request.getStartDate());
         prescription.setEndDate(request.getEndDate());
         prescription.setInstructions(request.getInstructions());
+        prescription.setAdministeredByRole(Prescription.roleForRoute(request.getRoute()));
 
         Prescription saved = prescriptionRepository.save(prescription);
 
@@ -189,8 +204,33 @@ public class TreatmentPlanService {
                 prescription.getRoute(),
                 prescription.getStartDate(),
                 prescription.getEndDate(),
-                prescription.getInstructions()
+                prescription.getInstructions(),
+                prescription.getStatus(),
+                prescription.getAdministeredByRole()
         );
+    }
+
+    public TreatmentPlanResponse getActiveTreatmentPlanByHorseId(Long horseId) {
+        if (horseId == null) {
+            return null;
+        }
+        List<TreatmentPlan> activePlans = treatmentPlanRepository.findActivePlansByHorseId(horseId);
+        if (activePlans.isEmpty()) {
+            return null;
+        }
+        TreatmentPlan plan = activePlans.get(0);
+        TreatmentPlanResponse response = toTreatmentPlanResponse(plan);
+        if (plan.getHealthRecordId() != null) {
+            healthRecordRepository.findById(plan.getHealthRecordId()).ifPresent(record -> {
+                response.setDiagnosis(record.getDiagnosis());
+                if (record.getVeterinarianId() != null && userRepository != null) {
+                    userRepository.findById(record.getVeterinarianId()).ifPresent(user -> {
+                        response.setVeterinarianName(user.getFullName());
+                    });
+                }
+            });
+        }
+        return response;
     }
 
     private void validateDates(LocalDate startDate, LocalDate endDate) {

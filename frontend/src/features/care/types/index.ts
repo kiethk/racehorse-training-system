@@ -1,4 +1,4 @@
-export type CareScheduleStatus = 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type CareScheduleStatus = 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'PAUSED' | 'DELAYED' | 'OVERDUE' | 'COMPLETED';
 export type CareType = 'INITIAL' | 'ROUTINE' | 'URGENT';
 export type TrainingDecision = 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
 
@@ -19,8 +19,11 @@ export interface CareScheduleResponse {
   updatedAt: string;
   purpose: 'FOLLOW_UP' | 'PREVENTIVE';
   requestedAt: string | null;
-  rescheduleReason: 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'OTHER' | null;
+  rescheduleReason: 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'EOD_ROLLOVER' | 'OTHER' | null;
   rescheduleNote: string | null;
+  /** D1 cờ dẫn xuất từ BE: ca IN_PROGRESS quá 30' so với giờ hẹn (không phải trạng thái DB). */
+  overdue?: boolean;
+  pausedFrom?: string | null;
 }
 
 export interface CareScheduleDetailResponse {
@@ -59,7 +62,7 @@ export interface CreateNextScheduleRequest {
 }
 
 export interface CompleteCareScheduleRequest {
-  symptoms: string;
+  symptoms?: string;
   findings: string;
   diagnosis: string;
   treatment?: string;
@@ -100,10 +103,9 @@ export interface CompleteCareScheduleRequest {
     normalZ?: number | null;
     meshName?: string | null;
   }>;
-}
-
-export interface CancelCareScheduleRequest {
-  cancelReason: string;
+  prescriptions?: PrescriptionItemRequest[];
+  generalCareInstructions?: string;
+  resolvedConditionIds?: number[];
 }
 
 export interface Prescription {
@@ -135,7 +137,20 @@ export interface TreatmentPlan {
   startDate: string;
   endDate: string;
   status: string;
+  diagnosis?: string;
+  veterinarianName?: string;
   prescriptions?: Prescription[];
+}
+
+export type PrescriptionRoute = 'ORAL' | 'FEED_ADDITIVE' | 'TOPICAL' | 'INJECTION_IV' | 'INJECTION_IM';
+
+export interface PrescriptionJsonItem {
+  medication_name: string;
+  dosage: string;
+  frequency: string;
+  route: PrescriptionRoute;
+  duration: number;
+  notes?: string;
 }
 
 export interface CreateTreatmentPlanRequest {
@@ -151,4 +166,25 @@ export interface PageResponse<T> {
   totalPages: number;
   size: number;
   number: number;
+}
+
+export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'INJECTION_IV' | 'INJECTION_IM' | 'FEED_ADDITIVE';
+
+export interface MedicationCatalogItem {
+  id: number;
+  name: string;
+  therapeuticClass: string;
+  defaultRoute: string;
+  standardWithdrawalDays: number;
+  defaultDosage: string | null;
+  defaultFrequency: string | null;
+}
+
+export interface PrescriptionItemRequest {
+  medicationName: string;
+  dosage: string;
+  route: MedicationRoute;
+  frequency: string;
+  duration: number;
+  notes?: string;
 }

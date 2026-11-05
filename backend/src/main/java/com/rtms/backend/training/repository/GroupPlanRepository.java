@@ -20,6 +20,8 @@ public interface GroupPlanRepository extends JpaRepository<GroupPlan, Long> {
 
     List<GroupPlan> findByGroupIdAndStatusIn(Long groupId, Collection<TrainingPlanStatus> statuses);
 
+    boolean existsByGroupId(Long groupId);
+
     boolean existsByGroupIdAndStatusIn(Long groupId, Collection<TrainingPlanStatus> statuses);
 
     List<GroupPlan> findByGroupIdInAndStatusIn(Collection<Long> groupIds, Collection<TrainingPlanStatus> statuses);
@@ -43,28 +45,34 @@ public interface GroupPlanRepository extends JpaRepository<GroupPlan, Long> {
 
     long countByStatus(TrainingPlanStatus status);
 
-    /** Các kế hoạch chưa đóng của một chiến mã (qua Workout của nó), kế hoạch kết thúc muộn nhất trước. (A horse's unfinished plans, through its Workouts, latest end first.) */
+    /**
+     * Các kế hoạch có trạng thái cho trước mà chiến mã còn Workout chưa hủy, kế hoạch kết thúc muộn nhất trước. Ngựa đã rời nhóm thì
+     * Workout còn lại đã bị hủy, nên plan của nhóm cũ không còn tính là của nó.
+     * (The plans in the given statuses where the horse still has a Workout that is not cancelled, latest end first. A horse that left
+     * its group had its remaining Workouts cancelled, so the old group's plan no longer counts as its own.)
+     */
     @Query("""
            SELECT DISTINCT p FROM GroupPlan p
            JOIN TrainingSession s ON s.groupPlanId = p.id
            JOIN TrainingWorkout w ON w.sessionId = s.id
            WHERE w.horseId = :horseId AND p.status IN :statuses
+             AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
            ORDER BY p.endDate DESC
            """)
     List<GroupPlan> findPlansOfHorse(@Param("horseId") Long horseId, @Param("statuses") Collection<TrainingPlanStatus> statuses);
 
     /**
      * Danh sách kế hoạch theo từng chiến mã kèm tên ngựa, tên khóa và ba con số tiến độ. totalSessions là số buổi của chính kế
-     * hoạch, cancelledSessions là số buổi đã hủy CẢ BUỔI, completedSessions là số Workout đã HELD của chính con ngựa đó.
+     * hoạch, cancelledSessions là số buổi đã hủy CẢ BUỔI, completedSessions là số Workout đã RAN của chính con ngựa đó.
      * trainerId = null nghĩa là mọi Trainer; horseId = null nghĩa là mọi ngựa. Kế hoạch mới nhất lên đầu.
      * (Plan list per horse with horse name, course name and the three progress counters. totalSessions is the plan's own number of
-     * Sessions, cancelledSessions the Sessions cancelled as a whole, completedSessions the horse's own HELD Workouts.)
+     * Sessions, cancelledSessions the Sessions cancelled as a whole, completedSessions the horse's own Workouts that Ran.)
      */
     @Query("""
            SELECT new com.rtms.backend.training.dto.PlanSummaryResponse(
                       p.id, w.horseId, h.name, p.courseId, c.name, p.startDate, p.endDate, p.status,
                       (SELECT COUNT(a) FROM TrainingSession a WHERE a.groupPlanId = p.id),
-                      COUNT(CASE WHEN w.status = com.rtms.backend.training.enums.WorkoutStatus.HELD THEN 1 END),
+                      COUNT(CASE WHEN w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN THEN 1 END),
                       (SELECT COUNT(b) FROM TrainingSession b
                        WHERE b.groupPlanId = p.id AND b.status = com.rtms.backend.training.enums.SessionStatus.CANCELLED))
            FROM TrainingWorkout w
@@ -125,7 +133,7 @@ public interface GroupPlanRepository extends JpaRepository<GroupPlan, Long> {
            SELECT new com.rtms.backend.training.dto.DashboardPlanRow(
                       p.id, w.horseId, p.status, p.startDate, p.endDate, c.name,
                       CAST((SELECT COUNT(a) FROM TrainingSession a WHERE a.groupPlanId = p.id) AS integer),
-                      COUNT(CASE WHEN w.status = com.rtms.backend.training.enums.WorkoutStatus.HELD THEN 1 END),
+                      COUNT(CASE WHEN w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN THEN 1 END),
                       (SELECT COUNT(b) FROM TrainingSession b
                        WHERE b.groupPlanId = p.id AND b.status = com.rtms.backend.training.enums.SessionStatus.CANCELLED))
            FROM TrainingWorkout w

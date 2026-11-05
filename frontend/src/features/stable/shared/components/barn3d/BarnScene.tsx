@@ -83,6 +83,8 @@ interface ContentsProps extends BarnSceneProps {
   setPinnedGroomId: Dispatch<SetStateAction<number | null>>;
 }
 
+const ignoreHover = () => {};
+
 function BarnContents(props: ContentsProps) {
   const { area, layout, groomBadges, horseByStallId, selectedStallId, ownStallIds, colors, onMoveHorse, onHint } = props;
   const { hoveredGroomId, setHoveredGroomId, pinnedGroomId, setPinnedGroomId } = props;
@@ -93,6 +95,7 @@ function BarnContents(props: ContentsProps) {
   const slotById = useMemo(() => new Map(layout.slots.map((slot) => [slot.stall.id, slot])), [layout]);
 
   const [hoveredStallId, setHoveredStallId] = useState<number | null>(null);
+  const [hoveredTrainer, setHoveredTrainer] = useState(false);
 
   // Frame the selected stall; "Reset view" frames the whole barn until the next selection.
   const [framing, setFraming] = useState({ stallId: selectedStallId, reset: props.resetSignal });
@@ -175,6 +178,8 @@ function BarnContents(props: ContentsProps) {
       return {
         kind: 'stall',
         key: `stall-${slot.stall.id}`,
+        // Names stay out of the way until the viewer points at a stall: then its groom's whole group shows.
+        revealed: selected || hovered || (highlightedGroomId != null && slot.stall.groomId === highlightedGroomId),
         // Over the middle of the stall, above the horse's head.
         position: [x, 2.1, z],
         // Selected and hovered first, then the focused groom's horses, then other horses, then empty stalls.
@@ -196,6 +201,7 @@ function BarnContents(props: ContentsProps) {
       return {
         kind: 'staff',
         key: `block-${block.blockNumber}`,
+        revealed: highlighted,
         position: [x, 2.2, z],
         priority: highlighted ? 95 : 60,
         name: block.mixed ? 'Mixed grooms' : badge?.name ?? 'No groom',
@@ -212,6 +218,7 @@ function BarnContents(props: ContentsProps) {
     return [...stallLabels, ...groomLabels, {
       kind: 'staff',
       key: 'trainer',
+      revealed: hoveredTrainer,
       position: [ENTRANCE_X(layout.columns), 2.3, 0],
       priority: 50,
       name: area.trainerId == null ? 'No trainer' : trainerName ?? 'Trainer',
@@ -223,7 +230,7 @@ function BarnContents(props: ContentsProps) {
       faded: focusGroomId != null,
     }];
   }, [layout, horseByStallId, selectedStallId, hoveredStallId, ownStallIds, focusGroomId, personName, groomBadges,
-    currentUserId, highlightedGroomId, area, colors.primary, toneColors, isLocked, visibleBlocks]);
+    currentUserId, highlightedGroomId, hoveredTrainer, area, colors.primary, toneColors, isLocked, visibleBlocks]);
   useEffect(() => { onLabels(labels); }, [labels, onLabels]);
 
   // Lines from the highlighted groom to each horse they look after.
@@ -333,6 +340,8 @@ function BarnContents(props: ContentsProps) {
               dimmed={(ownStallIds ? !ownStallIds.has(slot.stall.id) : false) || (focusGroomId != null && groomId !== focusGroomId)}
               draggable={!!onMoveHorse}
               onPointerDown={onMoveHorse ? startDrag(horse, slot) : undefined}
+              stallId={slot.stall.id}
+              onHover={isLocked(slot.stall.id) ? ignoreHover : setHoveredStallId}
             />
           );
         })}
@@ -373,7 +382,10 @@ function BarnContents(props: ContentsProps) {
           faded={focusGroomId != null}
           colors={colors}
           onClick={props.onTrainerClick}
-          onHover={props.onTrainerClick ? (active) => props.setCursor(active ? 'pointer' : '') : undefined}
+          onHover={(active) => {
+            setHoveredTrainer(active);
+            if (props.onTrainerClick) props.setCursor(active ? 'pointer' : '');
+          }}
         />
       )}
 
@@ -395,7 +407,7 @@ class SceneErrorBoundary extends Component<{ children: ReactNode; onError: () =>
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch(error: unknown) {
-    console.error('3D barn failed; falling back to the plan.', error);
+    console.error('3D barn failed, falling back to the plan.', error);
     this.props.onError();
   }
   render() { return this.state.failed ? null : this.props.children; }

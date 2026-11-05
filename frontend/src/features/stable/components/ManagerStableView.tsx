@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, ConfirmDialog, EmptyState, IconButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, SegmentedControl, Tabs } from '@/components/ui';
+import { Button, ConfirmDialog, EmptyState, FilterBar, IconButton, LinkButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, SearchInput, SegmentedControl, Tabs } from '@/components/ui';
 import type { Area, AreaType, StableStall } from '../types';
 import type { AssignmentDraft, AssignmentTarget, DragStaff } from '../types/manager';
 import { useManagerStable } from '../hooks/useManagerStable';
 import { areaView, compareAreas, editCount, horseMap, overlayDraft, personName, planAssignment, staffLocations, trainerChangeReason } from '../lib/managerAssignments';
 import { toast } from '@/lib/toast';
+import { ChangeHorseStatusModal } from '@/features/horses/components/ChangeHorseStatusModal';
 import { StallDetailPanel } from '../shared/components/StallDetailPanel';
 import { StableMapView } from '../shared/components/StableMapView';
 import { blockNumberOf } from '../shared/lib/stallLayout';
@@ -28,6 +29,8 @@ function ManagerStableContent() {
     reload, discard, save, addArea, deleteArea, setActionError } = state;
   const [activeTab, setActiveTab] = useState<AreaType>('REGULAR');
   const [attentionOnly, setAttentionOnly] = useState(false);
+  const [confirmAddArea, setConfirmAddArea] = useState<AreaType | null>(null);
+  const [search, setSearch] = useState('');
   const { activeItem: dragging, cancel: cancelDrag } = staffDragDrop.useDragDrop();
   const [selectedStaff, setSelectedStaff] = useState<DragStaff | null>(null);
   const [picker, setPicker] = useState<AssignmentTarget | null>(null);
@@ -35,6 +38,7 @@ function ManagerStableContent() {
   const [pendingAction, setPendingAction] = useState<{ run: () => void } | null>(null);
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Area | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
   // Cards hold the drag-and-drop staffing; the map shows the same (draft) state as a plan or 3D barn.
   const [layout, setLayout] = useState<'cards' | 'map'>('cards');
   const count = data && draft ? editCount(data, draft) : 0;
@@ -95,13 +99,73 @@ function ManagerStableContent() {
   if (data && draft && dragging?.source) {
     try { planAssignment(data, draft, dragging.source, null); canReturn = true; } catch { /* A staffed occupied block can only be swapped. */ }
   }
-  const displayed = attentionOnly ? views.filter(v => v.attention > 0) : views;
+  const highlightedStallIds = useMemo(() => {
+    const ids = new Set<number>();
+    const q = search.trim().toLowerCase();
+    if (!q || !data) return ids;
+    data.stalls.forEach(stall => {
+      const horse = horses.get(stall.id);
+      if (stall.stallCode.toLowerCase().includes(q)) {
+        ids.add(stall.id);
+      } else if (horse && (horse.name.toLowerCase().includes(q) || (horse.breed && horse.breed.toLowerCase().includes(q)) || (horse.registrationNumber && horse.registrationNumber.toLowerCase().includes(q)))) {
+        ids.add(stall.id);
+      }
+    });
+    return ids;
+  }, [search, data, horses]);
+
+  const displayed = useMemo(() => {
+    let list = attentionOnly ? views.filter(v => v.attention > 0) : views;
+    const q = search.trim().toLowerCase();
+    if (!q || !data) return list;
+    return list.filter(v => {
+      if (v.area.code.toLowerCase().includes(q) || v.area.name.toLowerCase().includes(q)) return true;
+      const trainer = draft?.trainers[v.area.id] != null ? personName(data, 'trainer', draft.trainers[v.area.id]) : '';
+      if (trainer.toLowerCase().includes(q)) return true;
+      return v.stalls.some(stall => {
+        if (stall.stallCode.toLowerCase().includes(q)) return true;
+        const groomId = draft?.grooms[stall.id];
+        if (groomId != null && personName(data, 'groom', groomId).toLowerCase().includes(q)) return true;
+        const horse = horses.get(stall.id);
+        if (horse && (horse.name.toLowerCase().includes(q) || (horse.breed && horse.breed.toLowerCase().includes(q)) || (horse.registrationNumber && horse.registrationNumber.toLowerCase().includes(q)))) {
+          return true;
+        }
+        return false;
+      });
+    });
+  }, [views, attentionOnly, search, data, draft, horses]);
   const attention = views.reduce((n, v) => n + v.attention, 0);
   const occupied = views.reduce((n, v) => n + v.occupied, 0);
   const totalStalls = views.reduce((n, v) => n + v.stalls.length, 0);
   const projected = data && draft ? overlayDraft(data, draft) : null;
   const selected = projected?.stalls.find(s => s.id === selectedStall?.id) ?? null;
   const mapAreas = projected ? projected.areas.filter(a => a.type === activeTab) : [];
+
+  const selectedHorse = selected ? horses.get(selected.id) : undefined;
+  const selectedArea = selected ? projected?.areas.find((a) => a.id === selected.areaId) : undefined;
+  const canChangeStatus = selectedHorse?.currentStatus === 'ELIGIBLE' || selectedHorse?.currentStatus === 'INACTIVE';
+  const stallDetail = selected && projected ? (
+    <StallDetailPanel
+      onClose={layout === 'map' ? () => setSelectedStall(null) : undefined}
+      stall={selected}
+      area={selectedArea}
+      horse={selectedHorse}
+      groomName={personName(projected, 'groom', selected.groomId)}
+      groomId={selected.groomId}
+      trainerName={selectedArea?.type === 'REGULAR' ? personName(projected, 'trainer', draft?.trainers[selected.areaId] ?? null) : undefined}
+      trainerId={selectedArea?.type === 'REGULAR' ? (draft?.trainers[selected.areaId] ?? selectedArea.trainerId ?? null) : null}
+      hint=""
+      actions={selectedHorse ? <>
+        <LinkButton href={`/manager/horses/${selectedHorse.id}`} variant="secondary" icon="external-link">Horse details</LinkButton>
+        {canChangeStatus && <Button variant={selectedHorse.currentStatus === 'INACTIVE' ? 'primary' : 'warning'}
+          icon={selectedHorse.currentStatus === 'INACTIVE' ? 'check' : 'alert-triangle'} disabled={busy}
+          // A status change reloads the stable, so unsaved staffing changes are confirmed first.
+          onClick={() => guard(() => setStatusOpen(true))}>
+          {selectedHorse.currentStatus === 'INACTIVE' ? 'Restore to Active' : 'Change status'}
+        </Button>}
+      </> : undefined}
+    />
+  ) : null;
 
   return (
     <ScreenLayout variant="dashboard">
@@ -111,7 +175,7 @@ function ManagerStableContent() {
         <Button size="sm" variant="secondary" icon="refresh" disabled={busy} loading={loading && !!data}
           onClick={() => guard(() => { void reload(); })}>Refresh</Button>
         <Button size="sm" variant="primary" icon="plus" disabled={busy || needsReload || !data} loading={creating}
-          onClick={() => guard(() => { void addArea(activeTab); })}>Add area</Button>
+          onClick={() => guard(() => { setConfirmAddArea(activeTab); })}>Add area</Button>
       </div>} />
       {loadError && <Notice tone="error">{loadError} <Button variant="link" size="sm" disabled={busy}
         onClick={() => guard(() => { void reload(); })}>Retry refresh</Button></Notice>}
@@ -124,17 +188,33 @@ function ManagerStableContent() {
         ]} active={activeTab} onChange={id => {
           setActiveTab(id as AreaType); setAttentionOnly(false); setSelectedStaff(null); cancelDrag();
         }} />
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <div className="flex flex-wrap items-center gap-3 text-[var(--color-text-secondary)]">
-            <span><strong className="font-semibold text-[var(--color-text-primary)]">{views.length}</strong> areas</span>
-            <span aria-hidden="true" className="text-[var(--color-border-strong)]">/</span>
-            <span><strong className="font-semibold text-[var(--color-text-primary)]">{totalStalls}</strong> stalls</span>
-            <span aria-hidden="true" className="text-[var(--color-border-strong)]">/</span>
-            <span><strong className="font-semibold text-[var(--color-text-primary)]">{occupied}</strong> occupied</span>
+        <FilterBar className="p-3 gap-3 items-center justify-between" onSubmit={(e) => e.preventDefault()}>
+          <div className="flex flex-1 items-center gap-3 min-w-[220px] max-w-md">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search horse, stall (e.g. A04), or staff..."
+              className="w-full text-sm"
+            />
           </div>
-          <Button variant={attentionOnly ? 'secondary' : 'tertiary'} size="sm" aria-pressed={attentionOnly}
-            onClick={() => setAttentionOnly(v => !v)}>Needs attention{attention > 0 ? ` (${attention})` : ''}</Button>
-        </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <div className="hidden sm:flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+              <span><strong className="font-semibold text-[var(--color-text-primary)]">{views.length}</strong> areas</span>
+              <span aria-hidden="true" className="text-[var(--color-border-strong)]">/</span>
+              <span><strong className="font-semibold text-[var(--color-text-primary)]">{totalStalls}</strong> stalls</span>
+              <span aria-hidden="true" className="text-[var(--color-border-strong)]">/</span>
+              <span><strong className="font-semibold text-[var(--color-text-primary)]">{occupied}</strong> occupied</span>
+            </div>
+            <Button
+              variant={attentionOnly ? 'secondary' : 'tertiary'}
+              size="sm"
+              aria-pressed={attentionOnly}
+              onClick={() => setAttentionOnly(v => !v)}
+            >
+              Needs attention{attention > 0 ? ` (${attention})` : ''}
+            </Button>
+          </div>
+        </FilterBar>
         {selectedStaff && <div className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--color-primary-soft)] px-3 py-2 text-sm text-[var(--color-primary)]" role="status">
           <span>
             {personName(data, selectedStaff.kind, selectedStaff.personId)} · Choose {selectedStaff.kind === 'trainer' ? 'an area' : 'a block'}
@@ -178,6 +258,7 @@ function ManagerStableContent() {
               else setPicker({ kind: 'trainer', areaId: area.id });
             }}
             personName={(kind, id) => personName(projected, kind, id)}
+            detail={stallDetail}
             legendNote={dirty ? 'Unsaved staffing changes are shown on the map.' : undefined}
             emptyTitle="No areas yet"
             cellFooter={(stall) => (
@@ -194,7 +275,7 @@ function ManagerStableContent() {
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_15rem]">
           <div className="min-w-0">
             {displayed.length ? <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              {displayed.map(view => <AreaCard key={view.area.id} view={view} data={data} draft={draft} horses={horses}
+              {displayed.map(view => <AreaCard key={view.area.id} view={view} data={data} draft={draft} horses={horses} highlightedStallIds={highlightedStallIds}
                 disabled={editDisabled} onPick={pick}
                 onDelete={() => guard(() => { cancelDrag(); setSelectedStaff(null); setActionError(null); setDeleteTarget(view.area); })}
                 onAssign={assign} onRemove={target => propose(target, null)} onSelectStall={setSelectedStall} />)}
@@ -216,6 +297,25 @@ function ManagerStableContent() {
       </>}
       {picker && data && draft && <StaffAssignmentPicker key={`${picker.kind}:${picker.areaId}:${picker.kind === 'groom' ? picker.blockNumber : ''}`}
         data={data} draft={draft} target={picker} onClose={() => setPicker(null)} onAssign={assign} />}
+            <ConfirmDialog
+        open={confirmAddArea != null}
+        title={`Add new ${confirmAddArea === 'REGULAR' ? 'Regular' : 'Quarantine'} Area?`}
+        tone="primary"
+        confirmLabel="Add area"
+        loading={creating}
+        onCancel={() => setConfirmAddArea(null)}
+        onConfirm={async () => {
+          if (!confirmAddArea) return;
+          const targetType = confirmAddArea;
+          await addArea(targetType);
+          setConfirmAddArea(null);
+        }}
+        description={
+          <p>
+            A new {confirmAddArea === 'REGULAR' ? 'Regular' : 'Quarantine'} Area with 12 stalls (4 blocks) will be created and added to the stable.
+          </p>
+        }
+      />
       {deleteTarget && <DeleteAreaDialog key={deleteTarget.id} area={deleteTarget} deleting={deleting} actionError={actionError}
         onClose={() => setDeleteTarget(null)} onDelete={async () => {
           const deleted = await deleteArea(deleteTarget.id);
@@ -233,32 +333,16 @@ function ManagerStableContent() {
         confirmLabel="Discard and continue" onCancel={() => setPendingAction(null)} onConfirm={() => {
           const action = pendingAction; discard(); setSelectedStaff(null); setPendingAction(null); action?.run();
         }} />
-      <Modal open={selected != null} title="Stall details" onClose={() => setSelectedStall(null)}>
-        {selected && projected && <StallDetailPanel stall={selected} area={projected.areas.find(a => a.id === selected.areaId)}
-          horse={horses.get(selected.id)} hint=""
-          actions={<>
-            {projected.areas.find(a => a.id === selected.areaId)?.type === 'REGULAR' && (
-              <Button variant="secondary" icon="user" disabled={editDisabled}
-                onClick={() => { setSelectedStall(null); setPicker({ kind: 'trainer', areaId: selected.areaId }); }}>
-                Change trainer
-              </Button>
-            )}
-            <Button variant="secondary" icon="users" disabled={editDisabled}
-              onClick={() => {
-                setSelectedStall(null);
-                setPicker({ kind: 'groom', areaId: selected.areaId, blockNumber: blockNumberOf(selected.stallNumber) });
-              }}>
-              Change groom
-            </Button>
-          </>}>
-          <dl className="space-y-2 text-sm"><div className="flex justify-between gap-3"><dt className="text-[var(--color-text-secondary)]">Groom</dt>
-            <dd className="text-right">{personName(projected, 'groom', selected.groomId)}</dd></div>
-            {projected.areas.find(a => a.id === selected.areaId)?.type === 'REGULAR' && <div className="flex justify-between gap-3">
-              <dt className="text-[var(--color-text-secondary)]">Trainer</dt><dd className="text-right">{personName(projected, 'trainer', draft?.trainers[selected.areaId] ?? null)}</dd>
-            </div>}
-          </dl>
-        </StallDetailPanel>}
+      {/* The map shows the stall in its side column; the cards open it here. */}
+      <Modal open={layout === 'cards' && selected != null} title="Stall details" onClose={() => setSelectedStall(null)}>
+        {layout === 'cards' && stallDetail}
       </Modal>
+      <ChangeHorseStatusModal
+        horse={statusOpen ? selectedHorse ?? null : null}
+        open={statusOpen && selectedHorse != null}
+        onClose={() => setStatusOpen(false)}
+        onSuccess={() => { setStatusOpen(false); void reload(); }}
+      />
     </ScreenLayout>
   );
 }

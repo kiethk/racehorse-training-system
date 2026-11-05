@@ -1,5 +1,5 @@
 import { apiGet, apiUpload } from '@/services/api';
-import type { AdmissionSummaryResponse, AdmissionStatus } from '../types';
+import type { AdmissionSummaryResponse, AdmissionStatus, TrainingDecision } from '../types';
 import type { CreateOwnerAdmissionRequest, AdmissionDocumentUpload } from '../types/owner';
 import type { HorseSex } from '@/types/horse';
 
@@ -19,10 +19,34 @@ export type AdmissionDocument = {
 };
 
 export type OwnerAdmissionDetail = {
-  admissionId: number; status: AdmissionStatus; submittedAt: string;
-  candidate: CandidateForm; documents: AdmissionDocument[];
-  groomFeedback: string | null; vetFeedback: string | null;
-  trainerFeedback: string | null; managerFeedback: string | null;
+  admissionId: number;
+  status: AdmissionStatus;
+  submittedAt: string;
+  candidate: CandidateForm;
+  documents: AdmissionDocument[];
+
+  // Groom review milestone
+  groomDecision?: 'APPROVED' | 'REJECTED' | null;
+  groomReviewedAt?: string | null;
+  groomFeedback?: string | null;
+
+  // Arrival milestone
+  arrivedAt?: string | null;
+  arrivalDeadlineAt?: string | null;
+
+  // Vet review milestone
+  vetTrainingDecision?: TrainingDecision | null;
+  vetReviewedAt?: string | null;
+  vetFeedback?: string | null;
+
+  // Trainer review milestone
+  trainerReviewedAt?: string | null;
+  trainerFeedback?: string | null;
+
+  // Manager review milestone
+  managerDecision?: 'APPROVED' | 'REJECTED' | null;
+  managerReviewedAt?: string | null;
+  managerFeedback?: string | null;
 };
 
 export interface OcrExtractionData {

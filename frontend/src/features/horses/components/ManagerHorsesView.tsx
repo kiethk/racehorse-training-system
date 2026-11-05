@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 import { Button, LinkButton } from '@/components/ui';
@@ -10,6 +11,7 @@ import { HorseListLayout } from '../shared/components/HorseListLayout';
 import { HorseTable } from '../shared/components/HorseTable';
 
 export function ManagerHorsesView() {
+  const router = useRouter();
   const [draftSearch, setDraftSearch] = useState('');
   const [draftStatus, setDraftStatus] = useState<HorseStatus | ''>('');
 
@@ -89,6 +91,7 @@ export function ManagerHorsesView() {
         searchable={false}
         resetPageKey={resetPageKey}
         showSpecialty
+        onRowClick={(horse) => router.push(`/manager/horses/${horse.id}`)}
         renderAction={(horse) => (
           <LinkButton
             href={`/manager/horses/${horse.id}`}

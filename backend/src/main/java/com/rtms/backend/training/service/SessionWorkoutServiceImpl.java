@@ -46,7 +46,7 @@ public class SessionWorkoutServiceImpl implements SessionWorkoutService {
     public WorkoutResultPreviewResponse previewResult(Long workoutId, AuthenticatedUser currentUser) {
         settlement.settle();
         TrainingWorkout workout = findOwnWorkout(workoutId, currentUser);
-        assertHeld(workout);
+        assertTookPlace(workout);
         TrainingSession session = findSession(workout);
         Subject subject = subjectRepository.findById(session.getSubjectId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "SUBJECT_NOT_FOUND", "Subject of this workout not found!"));
@@ -58,13 +58,14 @@ public class SessionWorkoutServiceImpl implements SessionWorkoutService {
     public SessionWorkoutResponse recordResult(Long workoutId, CompleteWorkoutRequest request, AuthenticatedUser currentUser) {
         settlement.settle();
         TrainingWorkout workout = findOwnWorkout(workoutId, currentUser);
-        assertHeld(workout);
-        if (hasResult(workout)) {
+        assertTookPlace(workout);
+        if (workout.getStatus() == WorkoutStatus.RAN) {
             throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_ALREADY_RECORDED",
                     "Results were already recorded for this workout. Edit them instead!");
         }
         WorkoutResults.validate(request);
         WorkoutResults.apply(workout, request);
+        workout.setStatus(WorkoutStatus.RAN);
         return SessionWorkoutResponse.of(workoutRepository.saveAndFlush(workout));
     }
 
@@ -73,8 +74,8 @@ public class SessionWorkoutServiceImpl implements SessionWorkoutService {
     public SessionWorkoutResponse updateResult(Long workoutId, CompleteWorkoutRequest request, AuthenticatedUser currentUser) {
         settlement.settle();
         TrainingWorkout workout = findOwnWorkout(workoutId, currentUser);
-        assertHeld(workout);
-        if (!hasResult(workout)) {
+        assertTookPlace(workout);
+        if (workout.getStatus() != WorkoutStatus.RAN) {
             throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_NOT_RECORDED",
                     "No results were recorded for this workout yet!");
         }
@@ -88,8 +89,8 @@ public class SessionWorkoutServiceImpl implements SessionWorkoutService {
     public SessionWorkoutResponse markDidNotRun(Long workoutId, AuthenticatedUser currentUser) {
         settlement.settle();
         TrainingWorkout workout = findOwnWorkout(workoutId, currentUser);
-        assertHeld(workout);
-        if (hasResult(workout)) {
+        assertTookPlace(workout);
+        if (workout.getStatus() == WorkoutStatus.RAN) {
             throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_ALREADY_RECORDED",
                     "Results were already recorded, so this horse cannot be marked as not running!");
         }
@@ -118,18 +119,15 @@ public class SessionWorkoutServiceImpl implements SessionWorkoutService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "WORKOUT_NOT_FOUND", "Workout not found!"));
     }
 
-    private void assertHeld(TrainingWorkout workout) {
+    /** Workout của buổi đã diễn ra và chưa bị hủy: HELD hoặc RAN. (A Workout of a Session that took place and was not cancelled: HELD or RAN.) */
+    private void assertTookPlace(TrainingWorkout workout) {
         if (workout.getStatus() == WorkoutStatus.CANCELLED) {
             throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_CANCELLED",
                     "This workout was cancelled, so results cannot be recorded!");
         }
-        if (workout.getStatus() != WorkoutStatus.HELD) {
+        if (workout.getStatus() == WorkoutStatus.SCHEDULED) {
             throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_NOT_ENDED",
                     "Results can be recorded only after the session has ended!");
         }
-    }
-
-    private boolean hasResult(TrainingWorkout workout) {
-        return workout.getActualDistanceMeters() != null;
     }
 }

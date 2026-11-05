@@ -1,5 +1,6 @@
 import type { Horse } from '@/features/stable/types';
 import type { IncidentReport, IncidentSeverity, IncidentStatus } from '../types';
+import { formatDateTime } from '@/lib/display';
 
 export const INCIDENT_STATUS_MAP: Record<
   IncidentStatus,
@@ -8,16 +9,16 @@ export const INCIDENT_STATUS_MAP: Record<
   REPORTED: { tone: 'warning', label: 'Reported - Awaiting Veterinary Review' },
   IN_REVIEW: { tone: 'info', label: 'Under Veterinary Review' },
   RESOLVED: { tone: 'success', label: 'Resolved' },
-  DISMISSED: { tone: 'neutral', label: 'No Issue' },
+  DISMISSED: { tone: 'neutral', label: 'Closed' },
 };
 
 export const INCIDENT_SEVERITY_MAP: Record<
   IncidentSeverity,
   { tone: 'neutral' | 'info' | 'warning' | 'danger'; label: string }
 > = {
-  LOW: { tone: 'neutral', label: 'Minor' },
-  MEDIUM: { tone: 'info', label: 'Moderate' },
-  HIGH: { tone: 'warning', label: 'Major' },
+  LOW: { tone: 'neutral', label: 'Low' },
+  MEDIUM: { tone: 'info', label: 'Medium' },
+  HIGH: { tone: 'warning', label: 'High' },
   CRITICAL: { tone: 'danger', label: 'Critical' },
 };
 
@@ -30,5 +31,5 @@ export function incidentHorseName(report: IncidentReport, horse: Horse | undefin
 }
 
 export function formatIncidentReportedAt(reportedAt: string | null | undefined): string {
-  return reportedAt ? new Date(reportedAt).toLocaleString('en-US') : '—';
+  return formatDateTime(reportedAt);
 }

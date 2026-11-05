@@ -10,6 +10,7 @@ import com.rtms.backend.training.dto.GroomWorkoutRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
 import com.rtms.backend.training.dto.PerformanceSessionRow;
+import com.rtms.backend.training.dto.PastWorkoutRow;
 import com.rtms.backend.training.dto.PlanSummaryResponse;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
 import com.rtms.backend.training.dto.SessionHorseNameRow;
@@ -43,6 +44,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -128,7 +130,7 @@ class TrainingSessionQueriesIntegrationTest {
     // ------------------------------------------------------------- performance
 
     @Test
-    void fitnessTrendListsOnlyHeldWorkoutsThatHaveResults() {
+    void fitnessTrendListsOnlyWorkoutsThatRan() {
         List<HorseFitnessTrendItemResponse> trend = workouts.findFitnessTrend(thunder.getId(), today.minusDays(30), today);
 
         assertEquals(1, trend.size());
@@ -204,10 +206,19 @@ class TrainingSessionQueriesIntegrationTest {
         assertFalse(workouts.findByIdAndTrainerId(any.getId(), other.getId()).isPresent());
     }
 
+    @Test
+    void pastWorkoutsListOnlySessionsThatTookPlaceNewestFirstWithTheirGroup() {
+        List<PastWorkoutRow> past = workouts.findPastWorkouts(thunder.getId(), today);
+
+        assertEquals(List.of(today.minusDays(2), today.minusDays(3)), past.stream().map(PastWorkoutRow::sessionDate).toList());
+        assertEquals(List.of(WorkoutStatus.HELD, WorkoutStatus.RAN), past.stream().map(row -> row.workout().getStatus()).toList());
+        assertNotNull(past.get(0).subjectName());
+    }
+
     // ------------------------------------------------------------- plan summaries
 
     @Test
-    void planSummariesCountEachHorsesOwnHeldWorkoutsAndTheWholeCancelledSessions() {
+    void planSummariesCountEachHorsesOwnWorkoutsThatRanAndTheWholeCancelledSessions() {
         List<PlanSummaryResponse> summaries = plans.findPlanSummaries(trainer.getId(), null);
 
         assertEquals(2, summaries.size());
@@ -215,7 +226,7 @@ class TrainingSessionQueriesIntegrationTest {
         assertEquals("Thunder", mine.getHorseName());
         assertEquals("Sprint Base", mine.getCourseName());
         assertEquals(4, mine.getTotalSessions());
-        assertEquals(2, mine.getCompletedSessions());
+        assertEquals(1, mine.getCompletedSessions());     // the Held Workout without a result does not count
         assertEquals(1, mine.getCancelledSessions());
     }
 
@@ -232,7 +243,7 @@ class TrainingSessionQueriesIntegrationTest {
         List<DashboardPlanRow> rows = plans.findDashboardPlans(List.of(thunder.getId(), blaze.getId()));
 
         assertEquals(2, rows.size());
-        assertTrue(rows.stream().allMatch(row -> row.totalSessions() == 4 && row.completedSessions() == 2 && row.cancelledSessions() == 1));
+        assertTrue(rows.stream().allMatch(row -> row.totalSessions() == 4 && row.completedSessions() == 1 && row.cancelledSessions() == 1));
     }
 
     @Test
@@ -330,6 +341,7 @@ class TrainingSessionQueriesIntegrationTest {
         workout.setMaxHeartRate(200);
         workout.setRecoveryHeartRate(80);
         workout.setPerformanceRating(rating);
+        workout.setStatus(WorkoutStatus.RAN);
         return workouts.saveAndFlush(workout);
     }
 }

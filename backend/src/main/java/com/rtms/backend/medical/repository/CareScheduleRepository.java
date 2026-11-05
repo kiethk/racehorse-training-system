@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -89,8 +90,73 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
 
     boolean existsByHorseIdAndStatus(Long horseId, CareScheduleStatus status);
 
+    List<CareSchedule> findByVeterinarianIdAndStatusIn(Long veterinarianId,
+            Collection<CareScheduleStatus> statuses);
+
+    boolean existsByHorseIdAndStatusIn(Long horseId, Collection<CareScheduleStatus> statuses);
+
+    /**
+     * AD-022 / AD-026: Ca SCHEDULED quá 30 phút mà Vet CHƯA BẤM VÀO KHÁM chuyển sang OVERDUE (Lỗi Vet).
+     * URGENT không bao giờ bị chuyển OVERDUE theo chỉ đạo nghiệp vụ.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE CareSchedule cs SET cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.OVERDUE, "
+            + "cs.updatedAt = :now "
+            + "WHERE cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.SCHEDULED "
+            + "AND cs.careType <> com.rtms.backend.medical.enums.CareType.URGENT "
+            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt < :deadline")
+    int markOverdueAfterSlotPassed(@Param("now") LocalDateTime now, @Param("deadline") LocalDateTime deadline);
+
+    /**
+     * AD-026: Ca IN_PROGRESS đang khám nhưng lố giờ chuyển sang DELAYED (Đang khám kéo dài).
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE CareSchedule cs SET cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.DELAYED, "
+            + "cs.updatedAt = :now "
+            + "WHERE cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.IN_PROGRESS "
+            + "AND cs.careType <> com.rtms.backend.medical.enums.CareType.URGENT "
+            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt < :deadline")
+    int markDelayedAfterSlotPassed(@Param("now") LocalDateTime now, @Param("deadline") LocalDateTime deadline);
+
+    /**
+     * AD-025 rule 5: xóa cứng lịch chưa diễn ra, chỉ khi không bản ghi y tế nào tham chiếu.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM CareSchedule cs WHERE cs.horseId = :horseId "
+            + "AND cs.status IN :statuses AND cs.completedAt IS NULL "
+            + "AND NOT EXISTS (SELECT hr.id FROM HealthRecord hr WHERE hr.careScheduleId = cs.id) "
+            + "AND NOT EXISTS (SELECT ir.id FROM HorseIncidentReport ir WHERE ir.careScheduleId = cs.id)")
+    int deleteOpenSchedulesIfUnreferenced(@Param("horseId") Long horseId,
+            @Param("statuses") java.util.Collection<CareScheduleStatus> statuses);
+
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.horseId = :horseId AND cs.status = :status AND cs.scheduledAt IS NOT NULL")
     List<CareSchedule> findScheduledForHorse(@Param("horseId") Long horseId, @Param("status") CareScheduleStatus status);
+
+    /** D1 auto-activate: mọi ca SCHEDULED đã đến giờ (job chạy trong 08:00–17:00). */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE CareSchedule cs SET cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.IN_PROGRESS, "
+            + "cs.updatedAt = :now "
+            + "WHERE cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.SCHEDULED "
+            + "AND cs.careType IN (com.rtms.backend.medical.enums.CareType.INITIAL, "
+            + "com.rtms.backend.medical.enums.CareType.ROUTINE, "
+            + "com.rtms.backend.medical.enums.CareType.URGENT) "
+            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now")
+    int autoActivateDueSchedules(@Param("now") LocalDateTime now);
+
+    /** D1 EOD rollover: INITIAL/ROUTINE chưa hoàn tất còn nằm ở giờ đã qua. */
+    @Query("SELECT cs FROM CareSchedule cs WHERE cs.status IN :statuses "
+            + "AND cs.careType IN (com.rtms.backend.medical.enums.CareType.INITIAL, "
+            + "com.rtms.backend.medical.enums.CareType.ROUTINE) "
+            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now")
+    List<CareSchedule> findRollableEodCandidates(@Param("statuses") Collection<CareScheduleStatus> statuses,
+            @Param("now") LocalDateTime now);
+
+    /** D1 escalate: URGENT vẫn mở quá giờ hẹn (không bao giờ rollover). */
+    @Query("SELECT cs FROM CareSchedule cs WHERE cs.status IN :statuses "
+            + "AND cs.careType = com.rtms.backend.medical.enums.CareType.URGENT "
+            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now")
+    List<CareSchedule> findStaleUrgentForEscalation(@Param("statuses") Collection<CareScheduleStatus> statuses,
+            @Param("now") LocalDateTime now);
 
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.veterinarianId = :vetId AND cs.status = :status AND cs.scheduledAt IS NOT NULL")
     List<CareSchedule> findScheduledForVet(@Param("vetId") Long vetId, @Param("status") CareScheduleStatus status);
@@ -134,7 +200,6 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
         SELECT cs FROM CareSchedule cs
         WHERE cs.admissionId IS NOT NULL
           AND cs.veterinarianId = :vetId
-          AND cs.status != 'CANCELLED'
         ORDER BY
           CASE cs.careType WHEN 'URGENT' THEN 0 WHEN 'INITIAL' THEN 1 ELSE 2 END,
           cs.scheduledAt ASC, cs.id DESC
@@ -143,8 +208,10 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
 
     /**
      * Hàng đợi khám của bác sĩ thú y. Mặc định (scheduleStatus = null) ẩn các ca
-     * COMPLETED và CANCELLED; khi người dùng chọn một trạng thái cụ thể thì bộ lọc
+     * COMPLETED; khi người dùng chọn một trạng thái cụ thể thì bộ lọc
      * đó được ưu tiên, nên ca đã hoàn thành vẫn xem được qua bộ lọc Completed.
+     * Khi chọn một stage admission cụ thể (admissionStatus != null) thì ca COMPLETED
+     * được hiện lại, vì khám xong là điều kiện cần để admission chuyển stage.
      * Bộ lọc pill (Awaiting / In exam) chỉ mô tả ca đang chờ nên bị bỏ qua khi
      * đã chọn trạng thái cụ thể.
      */
@@ -153,41 +220,125 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
         WHERE cs.admissionId = a.id AND c.admissionId = a.id
           AND cs.veterinarianId = :vetId
           AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
-               OR (:scheduleStatus IS NULL AND cs.status NOT IN ('COMPLETED','CANCELLED')))
+               OR (:scheduleStatus IS NULL
+                   AND (:admissionStatus IS NOT NULL OR :pill = 'APPROVED' OR cs.status <> 'COMPLETED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
           AND (:admissionStatus IS NULL OR a.status = :admissionStatus)
           AND (:careType IS NULL OR cs.careType = :careType)
           AND (:scheduleStatus IS NOT NULL
-               OR :pill = '' OR :pill = 'ALL'
-               OR (:pill = 'ACTIVE' AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
-               OR (:pill = 'AWAITING' AND cs.status IN ('REQUESTED','SCHEDULED') AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
-               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS' AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
-               OR (:pill = 'APPROVED' AND a.status = com.rtms.backend.admission.enums.AdmissionStatus.APPROVED))
+               OR ((:pill = '' OR :pill = 'ALL')
+                   AND (:admissionStatus IS NOT NULL
+                        OR a.status NOT IN (
+                            com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW,
+                            com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
+                            com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
+                            com.rtms.backend.admission.enums.AdmissionStatus.REJECTED)))
+               OR (:pill = 'ACTIVE'
+                   AND a.status NOT IN (
+                       com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
+                       com.rtms.backend.admission.enums.AdmissionStatus.REJECTED))
+               OR (:pill = 'AWAITING'
+                   AND cs.status IN ('REQUESTED','SCHEDULED','OVERDUE')
+                   AND a.status NOT IN (
+                       com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
+                       com.rtms.backend.admission.enums.AdmissionStatus.REJECTED))
+               OR (:pill = 'IN_PROGRESS'
+                   AND cs.status IN ('IN_PROGRESS','DELAYED','PAUSED')
+                   AND a.status NOT IN (
+                       com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
+                       com.rtms.backend.admission.enums.AdmissionStatus.REJECTED))
+               OR (:pill = 'APPROVED'
+                   AND ((cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED
+                         AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.REJECTED
+                         AND (cs.careType = com.rtms.backend.medical.enums.CareType.INITIAL
+                              OR NOT EXISTS (
+                                  SELECT initCs.id FROM CareSchedule initCs
+                                  WHERE initCs.admissionId = a.id
+                                    AND initCs.careType = com.rtms.backend.medical.enums.CareType.INITIAL
+                              )))
+                        OR (a.status = com.rtms.backend.admission.enums.AdmissionStatus.APPROVED
+                            AND NOT EXISTS (
+                                SELECT initCs.id FROM CareSchedule initCs
+                                WHERE initCs.admissionId = a.id
+                                  AND initCs.careType = com.rtms.backend.medical.enums.CareType.INITIAL
+                            )))))
           AND (:priority = ''
                OR (:priority = 'URGENT' AND cs.careType = 'URGENT')
                OR (:priority = 'NORMAL' AND cs.careType <> 'URGENT'))
-        ORDER BY CASE cs.careType WHEN 'URGENT' THEN 0 WHEN 'INITIAL' THEN 1 ELSE 2 END,
-                 COALESCE(cs.scheduledAt, cs.createdAt) ASC, cs.id ASC
+        ORDER BY CASE WHEN a.status IN (
+                          com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW,
+                          com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW) THEN 0
+                      ELSE 1 END ASC,
+                 CASE cs.careType WHEN 'URGENT' THEN 0 WHEN 'INITIAL' THEN 1 ELSE 2 END,
+                 CASE WHEN cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED THEN 0 ELSE 1 END ASC,
+                 CASE WHEN cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED
+                      THEN COALESCE(cs.completedAt, cs.scheduledAt, cs.createdAt) END DESC,
+                 COALESCE(cs.scheduledAt, cs.createdAt) ASC,
+                 cs.id DESC
         """,
         countQuery = """
         SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a, CandidateHorseProfile c
         WHERE cs.admissionId = a.id AND c.admissionId = a.id
           AND cs.veterinarianId = :vetId
           AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
-               OR (:scheduleStatus IS NULL AND cs.status NOT IN ('COMPLETED','CANCELLED')))
+               OR (:scheduleStatus IS NULL
+                   AND (:admissionStatus IS NOT NULL OR :pill = 'APPROVED' OR cs.status <> 'COMPLETED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
           AND (:admissionStatus IS NULL OR a.status = :admissionStatus)
           AND (:careType IS NULL OR cs.careType = :careType)
           AND (:scheduleStatus IS NOT NULL
-               OR :pill = '' OR :pill = 'ALL'
-               OR (:pill = 'ACTIVE' AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
-               OR (:pill = 'AWAITING' AND cs.status IN ('REQUESTED','SCHEDULED') AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
-               OR (:pill = 'IN_PROGRESS' AND cs.status = 'IN_PROGRESS' AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED)
-               OR (:pill = 'APPROVED' AND a.status = com.rtms.backend.admission.enums.AdmissionStatus.APPROVED))
+               OR ((:pill = '' OR :pill = 'ALL')
+                   AND (:admissionStatus IS NOT NULL
+                        OR a.status NOT IN (
+                            com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW,
+                            com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
+                            com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
+                            com.rtms.backend.admission.enums.AdmissionStatus.REJECTED)))
+               OR (:pill = 'ACTIVE'
+                   AND a.status NOT IN (
+                       com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
+                       com.rtms.backend.admission.enums.AdmissionStatus.REJECTED))
+               OR (:pill = 'AWAITING'
+                   AND cs.status IN ('REQUESTED','SCHEDULED','OVERDUE')
+                   AND a.status NOT IN (
+                       com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
+                       com.rtms.backend.admission.enums.AdmissionStatus.REJECTED))
+               OR (:pill = 'IN_PROGRESS'
+                   AND cs.status IN ('IN_PROGRESS','DELAYED','PAUSED')
+                   AND a.status NOT IN (
+                       com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
+                       com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
+                       com.rtms.backend.admission.enums.AdmissionStatus.REJECTED))
+               OR (:pill = 'APPROVED'
+                   AND ((cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED
+                         AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.REJECTED
+                         AND (cs.careType = com.rtms.backend.medical.enums.CareType.INITIAL
+                              OR NOT EXISTS (
+                                  SELECT initCs.id FROM CareSchedule initCs
+                                  WHERE initCs.admissionId = a.id
+                                    AND initCs.careType = com.rtms.backend.medical.enums.CareType.INITIAL
+                              )))
+                        OR (a.status = com.rtms.backend.admission.enums.AdmissionStatus.APPROVED
+                            AND NOT EXISTS (
+                                SELECT initCs.id FROM CareSchedule initCs
+                                WHERE initCs.admissionId = a.id
+                                  AND initCs.careType = com.rtms.backend.medical.enums.CareType.INITIAL
+                            )))))
           AND (:priority = ''
                OR (:priority = 'URGENT' AND cs.careType = 'URGENT')
                OR (:priority = 'NORMAL' AND cs.careType <> 'URGENT'))
@@ -206,15 +357,32 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
         SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a
         WHERE cs.admissionId = a.id AND cs.veterinarianId = :vetId
           AND cs.status IN :statuses
-          AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.APPROVED
+          AND a.status NOT IN (
+              com.rtms.backend.admission.enums.AdmissionStatus.TRAINER_REVIEW,
+              com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
+              com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
+              com.rtms.backend.admission.enums.AdmissionStatus.REJECTED)
     """)
     long countActiveVetQueueItems(@Param("vetId") Long vetId, @Param("statuses") Collection<CareScheduleStatus> statuses);
 
     @Query("""
         SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a
         WHERE cs.admissionId = a.id AND cs.veterinarianId = :vetId
-          AND cs.status IN :statuses
-          AND a.status = com.rtms.backend.admission.enums.AdmissionStatus.APPROVED
+          AND ((cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED
+                AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.REJECTED
+                AND (cs.careType = com.rtms.backend.medical.enums.CareType.INITIAL
+                     OR NOT EXISTS (
+                         SELECT initCs.id FROM CareSchedule initCs
+                         WHERE initCs.admissionId = a.id
+                           AND initCs.careType = com.rtms.backend.medical.enums.CareType.INITIAL
+                     )))
+               OR (cs.status IN :statuses
+                   AND a.status = com.rtms.backend.admission.enums.AdmissionStatus.APPROVED
+                   AND NOT EXISTS (
+                       SELECT initCs.id FROM CareSchedule initCs
+                       WHERE initCs.admissionId = a.id
+                         AND initCs.careType = com.rtms.backend.medical.enums.CareType.INITIAL
+                   )))
     """)
     long countApprovedVetQueueItems(@Param("vetId") Long vetId, @Param("statuses") Collection<CareScheduleStatus> statuses);
 
@@ -231,7 +399,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     /**
      * Lần khám sắp tới của ngựa (đã xếp giờ thì lấy giờ xếp, chưa thì lấy giờ
      * yêu cầu). Ngựa đang tạm nghỉ thì đây chính là mốc "tạm nghỉ đến".
-     * Mốc tiêm phòng không tính: nó không phải lần tái khám để mở khóa tập.
+     * Mốc tiêm phòng và ca ROUTINE từ báo cáo không tính: chúng không phải lần tái khám để mở khóa tập.
      * null nếu không còn lần khám nào đang chờ.
      */
     @Query("""
@@ -239,6 +407,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             FROM CareSchedule cs
             WHERE cs.horseId = :horseId AND cs.status IN :statuses
               AND cs.purpose = com.rtms.backend.medical.enums.CareSchedulePurpose.FOLLOW_UP
+              AND NOT (cs.careType = com.rtms.backend.medical.enums.CareType.ROUTINE AND cs.sourceIncidentId IS NOT NULL)
             """)
     LocalDateTime findNextExamTime(@Param("horseId") Long horseId,
                                    @Param("statuses") Collection<CareScheduleStatus> statuses);

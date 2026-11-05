@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, DataTable, EmptyState, HorseAvatar, LinkButton, ListSkeleton, Notice, Pill } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui/DataTable';
@@ -57,6 +58,7 @@ function changeSummary(request: HorseEditRequest): string {
 
 /** Change requests for horses in the groom's stalls; same layout as the groom admission list. */
 export function GroomHorseEditRequestsView() {
+  const router = useRouter();
   const [draft, setDraft] = useState<Filters>(initialFilters);
   const [applied, setApplied] = useState<Filters>(initialFilters);
   const [items, setItems] = useState<HorseEditRequest[] | null>(null);
@@ -161,6 +163,7 @@ export function GroomHorseEditRequestsView() {
         rows={rows}
         columns={columns}
         getRowKey={(item) => item.id}
+        onRowClick={(item) => router.push(`/groom/horse-edit-requests/${item.id}`)}
         ariaLabel="Horse change requests"
         loading={loading}
         pageSize={10}

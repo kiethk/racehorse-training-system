@@ -2,9 +2,13 @@ package com.rtms.backend.admission.service;
 import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.admission.dto.VetAdmissionQueueItemResponse;
 import com.rtms.backend.admission.dto.VetReviewRequest;
+import com.rtms.backend.admission.dto.VetReviewResponse;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
 import com.rtms.backend.admission.enums.AdmissionStatus;
+import com.rtms.backend.admission.enums.ReviewDecision;
+import com.rtms.backend.admission.service.AdmissionGroomReviewService;
+import com.rtms.backend.admission.service.AdmissionNotificationService;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
@@ -14,10 +18,15 @@ import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
+import com.rtms.backend.stable.entity.StableStall;
+import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
+import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
+import com.rtms.backend.medical.dto.InjuryMarkerRequest;
+import com.rtms.backend.medical.enums.HydrationStatus;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
@@ -51,6 +60,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -97,6 +107,10 @@ class AdmissionVetReviewWorkflowTest {
     private AdmissionDocumentRepository admissionDocumentRepository;
     @Mock
     private FileStorageService fileStorage;
+    @Mock
+    private AdmissionNotificationService admissionNotificationService;
+    @Mock
+    private AdmissionGroomReviewService admissionGroomReviewService;
 
     private CareScheduleService careScheduleService;
     private AdmissionQueryService admissionQueryService;
@@ -120,7 +134,9 @@ class AdmissionVetReviewWorkflowTest {
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class)
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                new com.fasterxml.jackson.databind.ObjectMapper()
         );
 
         admissionQueryService = new AdmissionQueryService(
@@ -140,7 +156,9 @@ class AdmissionVetReviewWorkflowTest {
                 horseRepository,
                 stallRepository,
                 careScheduleService,
-                healthRecordRepository
+                healthRecordRepository,
+                admissionNotificationService,
+                admissionGroomReviewService
         );
     }
 
@@ -197,6 +215,8 @@ class AdmissionVetReviewWorkflowTest {
         req.setDiagnosis("Tendon strain");
         req.setTrainingDecision(TrainingDecision.BLOCKED);
         req.setRestrictionDetails("Box rest 10 days");
+        req.setMetrics(List.of(fullMetric()));
+        req.setInjuryMarkers(List.of(injuryMarker()));
         CreateNextScheduleRequest next = new CreateNextScheduleRequest();
         next.setCareType(CareType.ROUTINE);
         next.setDescription("Recheck tendon");
@@ -250,6 +270,7 @@ class AdmissionVetReviewWorkflowTest {
         req.setFindings("Initial exam clear");
         req.setDiagnosis("Good condition");
         req.setTrainingDecision(TrainingDecision.ALLOWED);
+        req.setMetrics(List.of(fullMetric()));
 
         CreateNextScheduleRequest next = new CreateNextScheduleRequest();
         next.setCareType(CareType.ROUTINE);
@@ -329,18 +350,17 @@ class AdmissionVetReviewWorkflowTest {
     @DisplayName("getVetQueueSummary counts active, awaiting, inProgress, and approved")
     void getVetQueueSummary_countsAllBuckets() {
         Long vetId = 15L;
-        List<CareScheduleStatus> activeStatuses = List.of(
-                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+        List<CareScheduleStatus> activeStatuses = CareScheduleStatus.OPEN;
 
         when(careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(vetId, activeStatuses))
                 .thenReturn(5L);
         when(careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses))
                 .thenReturn(3L);
         when(careScheduleRepository.countActiveVetQueueItems(
-                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED)))
+                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.OVERDUE)))
                 .thenReturn(2L);
         when(careScheduleRepository.countActiveVetQueueItems(
-                vetId, List.of(CareScheduleStatus.IN_PROGRESS)))
+                vetId, List.of(CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.DELAYED, CareScheduleStatus.PAUSED)))
                 .thenReturn(1L);
         when(careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses))
                 .thenReturn(2L);
@@ -370,5 +390,430 @@ class AdmissionVetReviewWorkflowTest {
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
         assertEquals("FORBIDDEN", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("Vet REJECT: đơn REJECTED, hủy lịch, trả chuồng, thông báo Owner+Manager, không tạo HealthRecord")
+    void reviewByVet_reject_cleansUpAndNotifies() {
+        Long vetId = 15L;
+        Long horseId = 20L;
+        Long admissionId = 1L;
+        Long scheduleId = 100L;
+        Long quarantineStallId = 99L;
+
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(admissionId);
+        admission.setHorseId(horseId);
+        admission.setOwnerId(5L);
+        admission.setQuarantineStallId(quarantineStallId);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setHorseId(horseId);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setVeterinarianId(vetId);
+
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setName("Desert Star");
+        horse.setCurrentStatus(HorseStatus.CANDIDATE);
+        horse.setCurrentStallId(quarantineStallId);
+
+        StableStall stall = new StableStall();
+        stall.setId(quarantineStallId);
+        stall.setStallCode("Q-1");
+
+        when(admissionRepository.findById(admissionId)).thenReturn(Optional.of(admission));
+        when(careScheduleRepository.findFirstByAdmissionIdAndStatusOrderByCreatedAtDesc(
+                admissionId, CareScheduleStatus.IN_PROGRESS)).thenReturn(Optional.of(schedule));
+        when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse));
+        when(stallRepository.findById(quarantineStallId)).thenReturn(Optional.of(stall));
+
+        VetReviewRequest req = new VetReviewRequest();
+        req.setDecision(ReviewDecision.REJECT);
+        req.setRejectReason("Chronic lameness not suitable for racing");
+
+        VetReviewResponse res = admissionReviewService.reviewByVet(admissionId, req, vetId);
+
+        assertEquals(AdmissionStatus.REJECTED, res.status());
+        assertEquals(AdmissionStatus.REJECTED, admission.getStatus());
+        assertEquals("Chronic lameness not suitable for racing", admission.getVetFeedback());
+        assertNull(admission.getVetTrainingDecision());
+        // AD-025 rule 6: lịch mở của ngựa bị xóa cứng khi vet reject, không CANCELLED.
+        verify(careScheduleRepository).deleteOpenSchedulesIfUnreferenced(horseId, CareScheduleStatus.OPEN);
+        assertEquals(HorseStatus.REJECTED, horse.getCurrentStatus());
+        assertNull(horse.getCurrentStallId());
+        assertEquals(StallStatus.AVAILABLE, stall.getStatus());
+        verify(admissionNotificationService).notifyOwnerRejected(
+                admission, "Desert Star", "Veterinary Clinical Review", "Chronic lameness not suitable for racing");
+        verify(admissionNotificationService).notifyManagersOfAdmissionRejection(
+                admission, "Desert Star", "Veterinary Clinical Review", "Chronic lameness not suitable for racing");
+        verify(admissionGroomReviewService).allocateWaitingAdmissions();
+        verify(healthRecordRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Vet REJECT thiếu lý do -> 400 VALIDATION_ERROR")
+    void reviewByVet_reject_missingReason_throws400() {
+        Long vetId = 15L;
+        Long admissionId = 1L;
+        Long scheduleId = 100L;
+
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(admissionId);
+        admission.setHorseId(20L);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setHorseId(20L);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setVeterinarianId(vetId);
+
+        when(admissionRepository.findById(admissionId)).thenReturn(Optional.of(admission));
+        when(careScheduleRepository.findFirstByAdmissionIdAndStatusOrderByCreatedAtDesc(
+                admissionId, CareScheduleStatus.IN_PROGRESS)).thenReturn(Optional.of(schedule));
+
+        VetReviewRequest req = new VetReviewRequest();
+        req.setDecision(ReviewDecision.REJECT);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> admissionReviewService.reviewByVet(admissionId, req, vetId));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("VALIDATION_ERROR", ex.getErrorCode());
+        verify(careScheduleRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("Vet REJECT bởi Thú y không được giao -> 403 FORBIDDEN")
+    void reviewByVet_reject_otherVet_throws403() {
+        Long assignedVetId = 15L;
+        Long otherVetId = 99L;
+        Long admissionId = 1L;
+        Long scheduleId = 100L;
+
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(admissionId);
+        admission.setHorseId(20L);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setHorseId(20L);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setVeterinarianId(assignedVetId);
+
+        when(admissionRepository.findById(admissionId)).thenReturn(Optional.of(admission));
+        when(careScheduleRepository.findFirstByAdmissionIdAndStatusOrderByCreatedAtDesc(
+                admissionId, CareScheduleStatus.IN_PROGRESS)).thenReturn(Optional.of(schedule));
+
+        VetReviewRequest req = new VetReviewRequest();
+        req.setDecision(ReviewDecision.REJECT);
+        req.setRejectReason("Reason");
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> admissionReviewService.reviewByVet(admissionId, req, otherVetId));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+        assertEquals("FORBIDDEN", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("INITIAL thiếu chỉ số sinh hiệu thứ 6 -> 400 VALIDATION_ERROR")
+    void completeCareSchedule_initialMissingVitals_throws400() {
+        Long scheduleId = 100L;
+        Long vetId = 15L;
+        Long horseId = 20L;
+        Long admissionId = 1L;
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setHorseId(horseId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setVeterinarianId(vetId);
+
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setCurrentStatus(HorseStatus.CANDIDATE);
+
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(admissionId);
+        admission.setHorseId(horseId);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+
+        when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
+        when(admissionRepository.findByIdForUpdate(admissionId)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+
+        CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
+        req.setFindings("Findings");
+        req.setDiagnosis("Diagnosis");
+        req.setTrainingDecision(TrainingDecision.ALLOWED);
+        HorseHealthMetricRequest m = fullMetric();
+        m.setBodyConditionScore(null); // missing 6th vital
+        req.setMetrics(List.of(m));
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> careScheduleService.completeCareSchedule(scheduleId, req, vetId));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("VALIDATION_ERROR", ex.getErrorCode());
+        verify(healthRecordRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("INITIAL chỉ số ngoài range -> 400 VALIDATION_ERROR")
+    void completeCareSchedule_initialBadVitalRange_throws400() {
+        Long scheduleId = 100L;
+        Long vetId = 15L;
+        Long horseId = 20L;
+        Long admissionId = 1L;
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setHorseId(horseId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setVeterinarianId(vetId);
+
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setCurrentStatus(HorseStatus.CANDIDATE);
+
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(admissionId);
+        admission.setHorseId(horseId);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+
+        when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
+        when(admissionRepository.findByIdForUpdate(admissionId)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+
+        CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
+        req.setFindings("Findings");
+        req.setDiagnosis("Diagnosis");
+        req.setTrainingDecision(TrainingDecision.ALLOWED);
+        HorseHealthMetricRequest m = fullMetric();
+        m.setTemperature(BigDecimal.valueOf(50)); // out of range
+        req.setMetrics(List.of(m));
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> careScheduleService.completeCareSchedule(scheduleId, req, vetId));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("VALIDATION_ERROR", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("URGENT chỉ gửi 2 chỉ số -> vẫn hoàn tất thành công")
+    void completeCareSchedule_urgentWithPartialVitals_succeeds() {
+        Long scheduleId = 100L;
+        Long vetId = 20L;
+        Long horseId = 10L;
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setHorseId(horseId);
+        schedule.setVeterinarianId(vetId);
+        schedule.setCareType(CareType.URGENT);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setName("Thunder");
+        horse.setCurrentStatus(HorseStatus.ELIGIBLE);
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+
+        when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
+        when(horseRepository.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+        when(healthRecordRepository.save(any(HealthRecord.class))).thenAnswer(i -> {
+            HealthRecord hr = i.getArgument(0);
+            hr.setId(999L);
+            return hr;
+        });
+        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+        when(careScheduleRepository.saveAndFlush(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+
+        CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
+        req.setFindings("Examined");
+        req.setDiagnosis("Diagnosis");
+        req.setTrainingDecision(TrainingDecision.ALLOWED);
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setScheduledDate(java.time.LocalDate.now().plusDays(3).toString());
+        next.setDescription("Recheck urgent case");
+        req.setNextSchedule(next);
+        HorseHealthMetricRequest m = new HorseHealthMetricRequest();
+        m.setHeartRate(BigDecimal.valueOf(52));
+        m.setTemperature(BigDecimal.valueOf(38.5));
+        req.setMetrics(List.of(m));
+
+        CareScheduleResponse res = careScheduleService.completeCareSchedule(scheduleId, req, vetId);
+
+        assertEquals(CareScheduleStatus.COMPLETED, res.status());
+        verify(healthRecordRepository).save(any(HealthRecord.class));
+    }
+
+    @Test
+    @DisplayName("INITIAL + BLOCKED thiếu injury marker -> 400 VALIDATION_ERROR")
+    void completeCareSchedule_initialBlockedWithoutMarkers_throws400() {
+        Long scheduleId = 100L;
+        Long vetId = 15L;
+        Long horseId = 20L;
+        Long admissionId = 1L;
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setHorseId(horseId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setVeterinarianId(vetId);
+
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setCurrentStatus(HorseStatus.CANDIDATE);
+
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(admissionId);
+        admission.setHorseId(horseId);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+
+        when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
+        when(admissionRepository.findByIdForUpdate(admissionId)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+
+        CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
+        req.setFindings("Findings");
+        req.setDiagnosis("Diagnosis");
+        req.setTrainingDecision(TrainingDecision.BLOCKED);
+        req.setRestrictionDetails("Box rest");
+        req.setMetrics(List.of(fullMetric()));
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setDescription("Recheck");
+        next.setScheduledDate(LocalDate.now().plusDays(3).toString());
+        req.setNextSchedule(next);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> careScheduleService.completeCareSchedule(scheduleId, req, vetId));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("VALIDATION_ERROR", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("INITIAL + BLOCKED có injury marker -> lưu HealthCondition")
+    void completeCareSchedule_initialBlockedWithMarkers_persistsInjury() {
+        Long scheduleId = 100L;
+        Long vetId = 15L;
+        Long horseId = 20L;
+        Long admissionId = 1L;
+
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(scheduleId);
+        schedule.setHorseId(horseId);
+        schedule.setAdmissionId(admissionId);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setStatus(CareScheduleStatus.IN_PROGRESS);
+        schedule.setVeterinarianId(vetId);
+
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setCurrentStatus(HorseStatus.CANDIDATE);
+
+        AdmissionApplication admission = new AdmissionApplication();
+        admission.setId(admissionId);
+        admission.setHorseId(horseId);
+        admission.setStatus(AdmissionStatus.VET_REVIEW);
+
+        com.rtms.backend.medical.repository.InjuryRecordRepository injuryRepo =
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class);
+        when(injuryRepo.save(any(com.rtms.backend.medical.entity.InjuryRecord.class))).thenAnswer(i -> i.getArgument(0));
+
+        CareScheduleService serviceWithInjuryRepo = new CareScheduleService(
+                careScheduleRepository,
+                horseRepository,
+                healthRecordRepository,
+                metricRepository,
+                admissionRepository,
+                stallRepository,
+                userRepository,
+                incidentRepository,
+                vetProfileRepository,
+                auditLogRepository,
+                eventPublisher,
+                entityManager,
+                notificationService,
+                new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
+                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
+                injuryRepo,
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                new com.fasterxml.jackson.databind.ObjectMapper()
+        );
+
+        when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(careScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
+        when(admissionRepository.findByIdForUpdate(admissionId)).thenReturn(Optional.of(admission));
+        when(admissionRepository.findById(admissionId)).thenReturn(Optional.of(admission));
+        when(horseRepository.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+        when(healthRecordRepository.save(any(HealthRecord.class))).thenAnswer(i -> {
+            HealthRecord hr = i.getArgument(0);
+            hr.setId(200L);
+            return hr;
+        });
+        when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+        when(careScheduleRepository.saveAndFlush(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
+
+        CompleteCareScheduleRequest req = new CompleteCareScheduleRequest();
+        req.setFindings("Findings");
+        req.setDiagnosis("Diagnosis");
+        req.setTrainingDecision(TrainingDecision.BLOCKED);
+        req.setRestrictionDetails("Box rest");
+        req.setMetrics(List.of(fullMetric()));
+        req.setInjuryMarkers(List.of(injuryMarker()));
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setDescription("Recheck");
+        next.setScheduledDate(LocalDate.now().plusDays(3).toString());
+        req.setNextSchedule(next);
+
+        serviceWithInjuryRepo.completeCareSchedule(scheduleId, req, vetId);
+
+        verify(injuryRepo).save(argThat(ir ->
+                ir.getHorseId().equals(horseId)
+                        && "Tendon strain".equals(ir.getInjuryType())
+                        && "MODERATE".equals(ir.getSeverity())));
+    }
+
+    private HorseHealthMetricRequest fullMetric() {
+        HorseHealthMetricRequest m = new HorseHealthMetricRequest();
+        m.setHeartRate(BigDecimal.valueOf(36));
+        m.setTemperature(BigDecimal.valueOf(37.8));
+        m.setWeight(BigDecimal.valueOf(450));
+        m.setRespiratoryRate(BigDecimal.valueOf(12));
+        m.setHydrationStatus(HydrationStatus.NORMAL);
+        m.setBodyConditionScore(BigDecimal.valueOf(5.5));
+        return m;
+    }
+
+    private InjuryMarkerRequest injuryMarker() {
+        InjuryMarkerRequest marker = new InjuryMarkerRequest();
+        marker.setInjuryType("Tendon strain");
+        marker.setBodyRegionId(1L);
+        marker.setSeverity("MODERATE");
+        marker.setDescription("Superficial digital flexor tendon, right fore");
+        marker.setDiagnosedAt(LocalDateTime.now());
+        return marker;
     }
 }

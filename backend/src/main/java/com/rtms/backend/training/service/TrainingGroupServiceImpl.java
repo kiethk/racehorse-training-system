@@ -28,6 +28,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -58,6 +61,8 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     private final UserRepository userRepository;
     private final TrainingDecisionService trainingDecisionService;
     private final GroupWorkoutSyncService groupSync;
+    private final GroupPlanService planService;
+    private final Clock clock;
 
     public TrainingGroupServiceImpl(TrainingGroupRepository groupRepository,
                                     TrainingGroupMemberRepository memberRepository,
@@ -66,7 +71,9 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
                                     HorseRepository horseRepository,
                                     UserRepository userRepository,
                                     TrainingDecisionService trainingDecisionService,
-                                    GroupWorkoutSyncService groupSync) {
+                                    GroupWorkoutSyncService groupSync,
+                                    GroupPlanService planService,
+                                    Clock clock) {
         this.groupRepository = groupRepository;
         this.memberRepository = memberRepository;
         this.planRepository = planRepository;
@@ -75,6 +82,8 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         this.userRepository = userRepository;
         this.trainingDecisionService = trainingDecisionService;
         this.groupSync = groupSync;
+        this.planService = planService;
+        this.clock = clock;
     }
 
     // =================================================================
@@ -85,17 +94,29 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     @Transactional(readOnly = true)
     public List<TrainingGroupResponse> getGroups(AuthenticatedUser currentUser) {
         List<TrainingGroup> found = "HEAD_TRAINER".equals(currentUser.getRole())
-                ? groupRepository.findByTrainerIdOrderByNameAsc(currentUser.getUserId())
-                : groupRepository.findAll().stream()
-                        .sorted(Comparator.comparing(TrainingGroup::getName, String.CASE_INSENSITIVE_ORDER)).toList();
+                ? groupRepository.findByTrainerIdAndDisbandedAtIsNullOrderByCreatedAtDesc(currentUser.getUserId())
+                : groupRepository.findByDisbandedAtIsNullOrderByCreatedAtDesc();
         return toResponses(found);
     }
 
     @Override
     @Transactional(readOnly = true)
+    public List<TrainingGroupResponse> getDisbandedGroups(AuthenticatedUser currentUser) {
+        List<TrainingGroup> found = "HEAD_TRAINER".equals(currentUser.getRole())
+                ? groupRepository.findByTrainerIdAndDisbandedAtIsNotNullOrderByCreatedAtDesc(currentUser.getUserId())
+                : groupRepository.findByDisbandedAtIsNotNullOrderByCreatedAtDesc();
+        return toResponses(found);
+    }
+
+    private List<TrainingGroup> sortedByName(List<TrainingGroup> groups) {
+        return groups.stream().sorted(Comparator.comparing(TrainingGroup::getName, String.CASE_INSENSITIVE_ORDER)).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<GroupCandidateResponse> getCandidates(Long groupId, AuthenticatedUser currentUser) {
-        TrainingGroup group = findOwnGroup(groupId, currentUser);
-        List<TrainingGroupMember> groupMembers = memberRepository.findByGroupIdOrderByJoinedAtAsc(group.getId());
+        TrainingGroup group = findLiveOwnGroup(groupId, currentUser);
+        List<TrainingGroupMember> groupMembers = memberRepository.findByGroupIdAndLeftAtIsNullOrderByJoinedAtAsc(group.getId());
         Set<Long> memberHorseIds = groupMembers.stream().map(TrainingGroupMember::getHorseId).collect(Collectors.toSet());
 
         List<Long> candidateIds = memberRepository.findHorseIdsInAreasOf(currentUser.getUserId()).stream()
@@ -103,7 +124,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         Map<Long, Horse> horsesById = horseRepository.findAllById(candidateIds).stream()
                 .collect(Collectors.toMap(Horse::getId, Function.identity()));
         Map<Long, HorseStallInfo> stallByHorse = stallInfo(candidateIds);
-        Map<Long, TrainingGroupMember> membershipByHorse = memberRepository.findByHorseIdIn(candidateIds).stream()
+        Map<Long, TrainingGroupMember> membershipByHorse = memberRepository.findByHorseIdInAndLeftAtIsNull(candidateIds).stream()
                 .collect(Collectors.toMap(TrainingGroupMember::getHorseId, Function.identity()));
         Map<Long, String> horseNamesInGroup = horseNames(memberHorseIds);
         Map<Long, String> groomNames = userNames(
@@ -148,7 +169,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     @Override
     @Transactional
     public TrainingGroupResponse renameGroup(Long groupId, RenameTrainingGroupRequest request, AuthenticatedUser currentUser) {
-        TrainingGroup group = findOwnGroup(groupId, currentUser);
+        TrainingGroup group = findLiveOwnGroup(groupId, currentUser);
         String name = normalizeName(request.name());
         if (!name.equalsIgnoreCase(group.getName())) {
             assertNameFree(currentUser.getUserId(), name);
@@ -159,22 +180,38 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
 
     @Override
     @Transactional
-    public void deleteGroup(Long groupId, AuthenticatedUser currentUser) {
-        TrainingGroup group = findOwnGroup(groupId, currentUser);
-        if (planRepository.existsByGroupIdAndStatusIn(group.getId(), UNFINISHED)) {
-            throw new ApiException(HttpStatus.CONFLICT, "GROUP_HAS_UNFINISHED_PLAN",
-                    "Group '" + group.getName() + "' still has a course that has not finished. Cancel it first!");
+    public void disbandGroup(Long groupId, AuthenticatedUser currentUser) {
+        findLiveOwnGroup(groupId, currentUser);
+        for (GroupPlan plan : planRepository.findByGroupIdAndStatusIn(groupId, UNFINISHED)) {
+            planService.cancelPlan(plan.getId(), currentUser);
         }
-        memberRepository.deleteAll(memberRepository.findByGroupIdOrderByJoinedAtAsc(group.getId()));
+        // Cancelling plans runs bulk updates that clear the persistence context, so the rows are read again.
+        List<Long> leavingIds = new ArrayList<>();
+        for (TrainingGroupMember member : memberRepository.findByGroupIdAndLeftAtIsNullOrderByJoinedAtAsc(groupId)) {
+            groupSync.exitGroup(member);
+            leavingIds.add(member.getId());
+        }
         memberRepository.flush();
-        groupRepository.delete(group);
-        groupRepository.flush();
+        TrainingGroup group = groupRepository.findById(groupId).orElseThrow();
+        if (planRepository.existsByGroupId(groupId)) {
+            // The horses that leave now share the group's disband time, which is how its roster is told apart from earlier leavers.
+            LocalDateTime disbandedAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
+            List<TrainingGroupMember> leaving = memberRepository.findAllById(leavingIds);
+            leaving.forEach(member -> member.setLeftAt(disbandedAt));
+            memberRepository.saveAllAndFlush(leaving);
+            group.setDisbandedAt(disbandedAt);
+            groupRepository.saveAndFlush(group);
+        } else {
+            memberRepository.deleteByGroupId(groupId);
+            groupRepository.delete(group);
+            groupRepository.flush();
+        }
     }
 
     @Override
     @Transactional
     public TrainingGroupResponse addHorse(Long groupId, Long horseId, AuthenticatedUser currentUser) {
-        TrainingGroup group = findOwnGroup(groupId, currentUser);
+        TrainingGroup group = findLiveOwnGroup(groupId, currentUser);
         join(group, horseId, currentUser);
         return toResponse(group);
     }
@@ -182,8 +219,8 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     @Override
     @Transactional
     public TrainingGroupResponse removeHorse(Long groupId, Long horseId, AuthenticatedUser currentUser) {
-        TrainingGroup group = findOwnGroup(groupId, currentUser);
-        TrainingGroupMember member = memberRepository.findByHorseId(horseId)
+        TrainingGroup group = findLiveOwnGroup(groupId, currentUser);
+        TrainingGroupMember member = memberRepository.findByHorseIdAndLeftAtIsNull(horseId)
                 .filter(m -> m.getGroupId().equals(group.getId()))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_IN_GROUP",
                         "That horse is not in group '" + group.getName() + "'!"));
@@ -194,8 +231,8 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     @Override
     @Transactional
     public TrainingGroupResponse moveHorse(Long targetGroupId, Long horseId, AuthenticatedUser currentUser) {
-        TrainingGroup target = findOwnGroup(targetGroupId, currentUser);
-        Optional<TrainingGroupMember> current = memberRepository.findByHorseId(horseId);
+        TrainingGroup target = findLiveOwnGroup(targetGroupId, currentUser);
+        Optional<TrainingGroupMember> current = memberRepository.findByHorseIdAndLeftAtIsNull(horseId);
         if (current.isPresent()) {
             TrainingGroup source = findOwnGroup(current.get().getGroupId(), currentUser);
             if (source.getId().equals(target.getId())) {
@@ -231,7 +268,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
                     stall.stallCode(), horse.getName()));
         }
 
-        Optional<TrainingGroupMember> existing = memberRepository.findByHorseId(horseId);
+        Optional<TrainingGroupMember> existing = memberRepository.findByHorseIdAndLeftAtIsNull(horseId);
         if (existing.isPresent()) {
             boolean sameGroup = existing.get().getGroupId().equals(group.getId());
             throw new ApiException(HttpStatus.CONFLICT, sameGroup ? "HORSE_ALREADY_IN_GROUP" : "HORSE_IN_OTHER_GROUP",
@@ -239,7 +276,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
                             : "Horse '" + horse.getName() + "' is already in another group. Move it instead!");
         }
 
-        List<TrainingGroupMember> groupMembers = memberRepository.findByGroupIdOrderByJoinedAtAsc(group.getId());
+        List<TrainingGroupMember> groupMembers = memberRepository.findByGroupIdAndLeftAtIsNullOrderByJoinedAtAsc(group.getId());
         if (groupMembers.size() >= TrainingLimits.MAX_HORSES_PER_GROUP) {
             throw new ApiException(HttpStatus.CONFLICT, "GROUP_FULL", "Group '" + group.getName() + "' is full ("
                     + TrainingLimits.MAX_HORSES_PER_GROUP + " horses)!");
@@ -312,6 +349,14 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     // =================================================================
 
     /** Nhóm của chính Trainer này; nhóm của người khác báo "không tìm thấy" để không lộ nó tồn tại. */
+    private TrainingGroup findLiveOwnGroup(Long groupId, AuthenticatedUser currentUser) {
+        TrainingGroup group = findOwnGroup(groupId, currentUser);
+        if (group.isDisbanded()) {
+            throw new ApiException(HttpStatus.CONFLICT, "GROUP_DISBANDED", "Group '" + group.getName() + "' is disbanded!");
+        }
+        return group;
+    }
+
     private TrainingGroup findOwnGroup(Long groupId, AuthenticatedUser currentUser) {
         return groupRepository.findById(groupId)
                 .filter(g -> g.getTrainerId().equals(currentUser.getUserId()))
@@ -331,7 +376,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     }
 
     private void assertNameFree(Long trainerId, String name) {
-        if (groupRepository.existsByTrainerIdAndNameIgnoreCase(trainerId, name)) {
+        if (groupRepository.existsByTrainerIdAndNameIgnoreCaseAndDisbandedAtIsNull(trainerId, name)) {
             throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_GROUP_NAME",
                     "You already have a group named '" + name + "'!");
         }
@@ -365,11 +410,10 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
             return List.of();
         }
         List<Long> groupIds = groups.stream().map(TrainingGroup::getId).toList();
-        List<TrainingGroupMember> allMembers = memberRepository.findByGroupIdIn(groupIds);
+        List<TrainingGroupMember> allMembers = memberRepository.findRostersOfGroups(groupIds);
         Map<Long, String> horseNames = horseNames(allMembers.stream().map(TrainingGroupMember::getHorseId).toList());
         Map<Long, String> groomNames = userNames(allMembers.stream().map(TrainingGroupMember::getGroomId).toList());
         Map<Long, List<TrainingGroupMember>> membersByGroup = allMembers.stream()
-                .sorted(Comparator.comparing(TrainingGroupMember::getJoinedAt).thenComparing(TrainingGroupMember::getId))
                 .collect(Collectors.groupingBy(TrainingGroupMember::getGroupId));
 
         Map<Long, GroupPlan> currentPlanByGroup = currentPlans(groupIds);
@@ -387,7 +431,8 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
             result.add(new TrainingGroupResponse(group.getId(), group.getName(), group.getTrainerId(), memberResponses,
                     plan == null ? null : courseNames.get(plan.getCourseId()),
                     plan == null ? null : plan.getStatus().name(),
-                    plan == null ? null : plan.getEndDate()));
+                    plan == null ? null : plan.getStartDate(),
+                    plan == null ? null : plan.getEndDate(), group.isDisbanded()));
         }
         return result;
     }

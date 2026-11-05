@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { BackLink, Spinner } from '@/components/ui';
@@ -16,7 +16,13 @@ import { SchedulePatientHeader } from '@/features/care/components/SchedulePatien
 export default function ScheduleDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const scheduleId = Number(params?.scheduleId);
+  // Opened from the admission queue? Return there instead of the timeline.
+  const fromAdmissions = searchParams.get('back') === 'admissions';
+  const backHref = fromAdmissions ? '/veterinarian/admissions' : '/veterinarian/schedule';
+  const successHref = fromAdmissions ? '/veterinarian/admissions?tab=APPROVED' : '/veterinarian/schedule';
+  const backLabel = fromAdmissions ? 'Back to Admissions' : 'Back to Schedule';
   const [detail, setDetail] = useState<CareScheduleDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,14 +70,17 @@ export default function ScheduleDetailPage() {
   // Completed schedules share the unified View Record screen (Routine/Health/Schedule).
   useEffect(() => {
     if (isCompleted && !Number.isNaN(scheduleId)) {
-      router.replace(`/veterinarian/records?scheduleId=${scheduleId}&back=schedule`);
+      router.replace(`/veterinarian/records?scheduleId=${scheduleId}&back=${fromAdmissions ? 'admissions' : 'schedule'}`);
     }
-  }, [isCompleted, scheduleId, router]);
+  }, [isCompleted, scheduleId, router, fromAdmissions]);
 
   // The timeline card already asked to start the exam; entering this page auto-starts it once.
   const autoStartRef = useRef(false);
   useEffect(() => {
-    if (detail?.schedule?.status === 'SCHEDULED' && !autoStartRef.current) {
+    if (
+      (detail?.schedule?.status === 'SCHEDULED' || detail?.schedule?.status === 'OVERDUE') &&
+      !autoStartRef.current
+    ) {
       autoStartRef.current = true;
       handleStartExam().catch(() => {
         // The form stays gated; the vet can still use the manual Start Examination button.
@@ -83,7 +92,7 @@ export default function ScheduleDetailPage() {
     <RoleGuard allowedRoles={['VETERINARIAN']}>
       <PageContainer>
         <div className="mb-4">
-          <BackLink onClick={() => router.push('/veterinarian/schedule')}>Back to Schedule</BackLink>
+          <BackLink onClick={() => router.push(backHref)}>{backLabel}</BackLink>
         </div>
 
         {loading ? (
@@ -112,6 +121,7 @@ export default function ScheduleDetailPage() {
                 scheduledAt={detail.schedule.scheduledAt ?? detail.schedule.scheduledDate}
                 horseName={detail.horse?.name}
                 horseBreed={detail.horse?.breed}
+                horseId={detail.horse?.id}
                 veterinarianName={detail.veterinarian?.fullName}
               />
               {error && (
@@ -126,7 +136,7 @@ export default function ScheduleDetailPage() {
                 candidateName={detail.horse?.name}
                 horseId={detail.schedule.horseId ?? undefined}
                 onStartExam={handleStartExam}
-                onSuccess={() => router.push('/veterinarian/schedule')}
+                onSuccess={() => router.push(successHref)}
               />
             </div>
           )

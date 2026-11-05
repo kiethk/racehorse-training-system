@@ -18,13 +18,13 @@ public class HorsePedigreeController {
     }
 
     @GetMapping("/{horseId}/pedigree")
-    @PreAuthorize("hasAuthority('HORSE_PEDIGREE_VIEW')")
+    @PreAuthorize("hasAnyAuthority('HORSE_PEDIGREE_VIEW', 'HORSE_VIEW')")
     public ApiResponse<HorsePedigreeResponse> getPedigree(@PathVariable Long horseId) {
         return ApiResponse.success(horsePedigreeService.getByHorseId(horseId));
     }
 
     @PostMapping("/{horseId}/pedigree")
-    @PreAuthorize("hasAuthority('HORSE_PEDIGREE_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('HORSE_PEDIGREE_MANAGE', 'HORSE_CREATE') or hasRole('CLUB_MANAGER')")
     public ApiResponse<HorsePedigreeResponse> createOrUpdatePedigree(
             @PathVariable Long horseId,
             @Valid @RequestBody CreateHorsePedigreeRequest request

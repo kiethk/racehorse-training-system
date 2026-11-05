@@ -19,6 +19,8 @@ import type {
   GroupPlanPreview,
   GroupPlanSummary,
   GroupPlanDetail,
+  PlanHorse,
+  SessionHorseOutcomeItem,
   ScheduleSession,
   SessionDetail,
   SessionWorkoutResult,
@@ -81,13 +83,16 @@ export const trainingService = {
   getGroups: async (): Promise<TrainingGroup[]> =>
     (await apiGet<ApiResponse<TrainingGroup[]>>('/api/training-groups')).data,
 
+  getDisbandedGroups: async (): Promise<TrainingGroup[]> =>
+    (await apiGet<ApiResponse<TrainingGroup[]>>('/api/training-groups?disbanded=true')).data,
+
   createGroup: async (data: CreateTrainingGroupRequest): Promise<TrainingGroup> =>
     (await apiPost<ApiResponse<TrainingGroup>>('/api/training-groups', data)).data,
 
   renameGroup: async (id: number, name: string): Promise<TrainingGroup> =>
     (await apiPatch<ApiResponse<TrainingGroup>>(`/api/training-groups/${id}`, { name })).data,
 
-  deleteGroup: async (id: number): Promise<void> => {
+  disbandGroup: async (id: number): Promise<void> => {
     await apiDelete<ApiResponse<null>>(`/api/training-groups/${id}`);
   },
 
@@ -110,11 +115,22 @@ export const trainingService = {
   createGroupPlan: async (request: GroupPlanRequest): Promise<GroupPlanDetail> =>
     (await apiPost<ApiResponse<GroupPlanDetail>>('/api/group-plans', request)).data,
 
-  getGroupPlans: async (groupId?: number): Promise<GroupPlanSummary[]> =>
-    (await apiGet<ApiResponse<GroupPlanSummary[]>>(`/api/group-plans${groupId ? `?groupId=${groupId}` : ''}`)).data,
+  getGroupPlans: async (filter?: { groupId?: number; horseId?: number }): Promise<GroupPlanSummary[]> => {
+    const query = new URLSearchParams();
+    if (filter?.groupId) query.set('groupId', String(filter.groupId));
+    if (filter?.horseId) query.set('horseId', String(filter.horseId));
+    const suffix = query.size > 0 ? `?${query}` : '';
+    return (await apiGet<ApiResponse<GroupPlanSummary[]>>(`/api/group-plans${suffix}`)).data;
+  },
 
   getGroupPlan: async (id: number): Promise<GroupPlanDetail> =>
     (await apiGet<ApiResponse<GroupPlanDetail>>(`/api/group-plans/${id}`)).data,
+
+  getPlanHorses: async (planId: number): Promise<PlanHorse[]> =>
+    (await apiGet<ApiResponse<PlanHorse[]>>(`/api/group-plans/${planId}/horses`)).data,
+
+  getPlanSessionHorses: async (planId: number, sessionId: number): Promise<SessionHorseOutcomeItem[]> =>
+    (await apiGet<ApiResponse<SessionHorseOutcomeItem[]>>(`/api/group-plans/${planId}/sessions/${sessionId}/horses`)).data,
 
   cancelGroupPlan: async (id: number): Promise<GroupPlanDetail> =>
     (await apiPost<ApiResponse<GroupPlanDetail>>(`/api/group-plans/${id}/cancel`, {})).data,

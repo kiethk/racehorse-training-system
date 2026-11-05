@@ -1,5 +1,6 @@
 export type PlanStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
-export type WorkoutStatus = 'SCHEDULED' | 'HELD' | 'CANCELLED';
+/** HELD: the Session took place but the Workout is not yet confirmed; RAN: results recorded, so the horse took part. */
+export type WorkoutStatus = 'SCHEDULED' | 'HELD' | 'RAN' | 'CANCELLED';
 export type SurfaceType = 'TURF' | 'DIRT' | 'SYNTHETIC';
 export type IntensityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -80,11 +81,10 @@ export interface CompleteWorkoutRequest {
   averageHeartRate: number;
   maxHeartRate: number;
   recoveryHeartRate: number;
-  performanceRating: number; // 1-10
   trainerFeedback?: string | null;
 }
 
-/** A fresh, non-persistent measurement set returned when the result form is opened. */
+/** A simulated measurement set returned only when the Trainer presses "Generate sample data"; never saved by itself. */
 export interface WorkoutResultPreviewResponse {
   actualDistanceMeters: number;
   actualDurationMinutes: number;
@@ -93,7 +93,6 @@ export interface WorkoutResultPreviewResponse {
   averageHeartRate: number;
   maxHeartRate: number;
   recoveryHeartRate: number;
-  performanceRating?: number;
 }
 
 /** One session of a horse in its schedule. The session and the horse's own workout can each be cancelled. */
@@ -145,6 +144,8 @@ export interface TrainingRules {
   maxHorsesPerPlan: number;
   /** A maximum heart rate above this raises an alert. */
   maxHeartRateLimit: number;
+  /** An average heart rate above this raises an alert. */
+  averageHeartRateLimit?: number;
   /** A recovery heart rate above this raises an alert. */
   recoveryHeartRateLimit: number;
 }
@@ -169,7 +170,9 @@ export interface TrainingGroup {
   members: GroupMember[];
   currentCourseName: string | null;
   currentPlanStatus: PlanStatus | null;
-  currentPlanEndDate: string | null;
+  currentPlanStartDate?: string | null;
+  currentPlanEndDate?: string | null;
+  disbanded: boolean;
 }
 
 export interface GroupCandidate {
@@ -230,6 +233,7 @@ export interface GroupPlanSummary {
   id: number;
   groupId: number | null;
   groupName: string | null;
+  groupDisbanded: boolean;
   courseId: number;
   courseName: string;
   startDate: string;
@@ -250,6 +254,24 @@ export interface PlanSessionItem {
   horseCount: number;
 }
 
+export type SessionHorseOutcome = 'TO_RUN' | 'NEEDS_RESULT' | 'RAN' | 'CANCELLED' | 'DID_NOT_RUN';
+
+/** A horse of a plan with its Attendance (attended of total Sessions). */
+export interface PlanHorse {
+  horseId: number;
+  horseName: string;
+  attended: number;
+  total: number;
+}
+
+/** A horse in one Session of a plan with what became of it. */
+export interface SessionHorseOutcomeItem {
+  workoutId: number;
+  horseId: number;
+  horseName: string;
+  outcome: SessionHorseOutcome;
+}
+
 export interface GroupPlanDetail {
   plan: GroupPlanSummary;
   trainingDays: TrainingDay[];
@@ -265,6 +287,7 @@ export interface ScheduleSession {
   planId: number;
   groupId: number | null;
   groupName: string | null;
+  groupDisbanded: boolean;
   courseName: string;
   subjectName: string;
   date: string;
@@ -281,9 +304,10 @@ export interface SessionHorse {
   horseId: number;
   horseName: string;
   groomName: string | null;
-  status: 'SCHEDULED' | 'HELD' | 'CANCELLED';
-  hasResult: boolean;
+  status: WorkoutStatus;
   performanceRating: number | null;
+  /** The stored result, null until one is recorded; the edit form is pre-filled from it. */
+  result: SessionWorkoutResult | null;
 }
 
 export interface SessionDetail {
@@ -295,8 +319,7 @@ export interface SessionWorkoutResult {
   id: number;
   sessionId: number;
   horseId: number;
-  status: 'SCHEDULED' | 'HELD' | 'CANCELLED';
-  hasResult: boolean;
+  status: WorkoutStatus;
   actualDistanceMeters: number | null;
   actualDurationMinutes: number | null;
   topSpeedKmh: number | null;
@@ -311,6 +334,7 @@ export interface SessionWorkoutResult {
 export interface HorseAttendance {
   planId: number;
   groupName: string | null;
+  groupDisbanded: boolean;
   courseName: string;
   planStatus: PlanStatus;
   startDate: string;

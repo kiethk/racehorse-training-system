@@ -21,6 +21,52 @@ export interface DataTablePagination {
   disabled?: boolean;
 }
 
+function extractSortScore(item: unknown): number | null {
+  if (!item || typeof item !== 'object') return null;
+  const obj = item as Record<string, unknown>;
+
+  // Check candidate date/time fields first
+  const dateCandidates = [
+    obj.submittedAt,
+    obj.createdAt,
+    obj.created_at,
+    obj.reportedAt,
+    obj.workoutDate,
+    obj.recordedAt,
+    obj.updatedAt,
+    obj.updated_at,
+    obj.timestamp,
+    obj.date,
+  ];
+  for (const d of dateCandidates) {
+    if (typeof d === 'string' && d.trim()) {
+      const parsed = new Date(d).getTime();
+      if (!Number.isNaN(parsed)) return parsed;
+    } else if (d instanceof Date && !Number.isNaN(d.getTime())) {
+      return d.getTime();
+    }
+  }
+
+  // Fallback to auto-incrementing ID fields
+  const idCandidates = [obj.admissionId, obj.userId, obj.horseId, obj.id];
+  for (const id of idCandidates) {
+    if (typeof id === 'number') {
+      return id;
+    }
+  }
+
+  return null;
+}
+
+function autoNewestFirst<R>(left: R, right: R): number {
+  const scoreA = extractSortScore(left);
+  const scoreB = extractSortScore(right);
+  if (scoreA != null && scoreB != null) {
+    return scoreB - scoreA;
+  }
+  return 0;
+}
+
 export function DataTable<Row>({
   rows,
   columns,
@@ -76,7 +122,13 @@ export function DataTable<Row>({
   }, [activeSearch, getSearchText, rows]);
 
   const sorted = useMemo(() => {
-    if (!sort) return defaultOrder ? [...filtered].sort(defaultOrder) : filtered;
+    if (!sort) {
+      if (defaultOrder) return [...filtered].sort(defaultOrder);
+      if (filtered.length > 1 && extractSortScore(filtered[0]) != null) {
+        return [...filtered].sort(autoNewestFirst);
+      }
+      return filtered;
+    }
     const column = columns.find((item) => item.id === sort.id);
     if (!column?.sortValue) return filtered;
     const direction = sort.direction === 'asc' ? 1 : -1;
@@ -96,7 +148,8 @@ export function DataTable<Row>({
 
   const activePage = pagination?.page ?? localPage;
   const activePageSize = pagination?.pageSize ?? pageSize;
-  const visibleRows = activePageSize && !pagination
+  const shouldSlice = activePageSize !== undefined && (!pagination || rows.length > activePageSize);
+  const visibleRows = shouldSlice && activePageSize !== undefined
     ? sorted.slice(activePage * activePageSize, (activePage + 1) * activePageSize)
     : sorted;
   const pageChange = pagination?.onPageChange ?? setLocalPage;
@@ -173,9 +226,19 @@ export function DataTable<Row>({
                   <tr
                     key={getRowKey(row)}
                     tabIndex={onRowClick ? 0 : undefined}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    onClick={onRowClick ? (event) => {
+                      const target = event.target as HTMLElement | null;
+                      if (target?.closest('a, button, input, select, textarea, [role="button"], [data-prevent-row-click]')) {
+                        return;
+                      }
+                      onRowClick(row);
+                    } : undefined}
                     onKeyDown={onRowClick ? (event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
+                        const target = event.target as HTMLElement | null;
+                        if (target?.closest('a, button, input, select, textarea, [role="button"], [data-prevent-row-click]')) {
+                          return;
+                        }
                         event.preventDefault();
                         onRowClick(row);
                       }

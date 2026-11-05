@@ -8,6 +8,7 @@ import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -41,6 +42,9 @@ public class SessionSettlementServiceImpl implements SessionSettlementService {
     @Override
     @Transactional
     public void settle() {
+        if (TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+            return;     // a read-only caller (the AI tools) cannot write; the scheduler keeps statuses within minutes of the clock
+        }
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDate today = now.toLocalDate();
 

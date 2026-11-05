@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Service
 public class EmailService {
@@ -35,7 +36,7 @@ public class EmailService {
      */
     @Async
     public void sendStaffWelcomeEmail(String toEmail, String fullName, String role, String tempPassword) {
-        String subject = "Welcome to Riverside Training Club - Your Account Details";
+        String subject = "Welcome to Riverside Training Club, " + fullName;
         String loginUrl = frontendUrl + "/login";
 
         String htmlContent = buildStaffWelcomeHtml(fullName, role, toEmail, tempPassword, loginUrl);
@@ -57,7 +58,7 @@ public class EmailService {
      */
     @Async
     public void sendOwnerWelcomeEmail(String toEmail, String fullName) {
-        String subject = "Welcome to Riverside Training Club - Registration Confirmed";
+        String subject = "Welcome to Riverside Training Club, " + fullName;
         String loginUrl = frontendUrl + "/login";
 
         String htmlContent = buildOwnerWelcomeHtml(fullName, toEmail, loginUrl);
@@ -87,7 +88,7 @@ public class EmailService {
             String feedback,
             String admissionUrl) {
 
-        String subject = "Admission Accepted — Quarantine Stall Reserved for " + horseName;
+        String subject = "Quarantine Stall Reserved for " + horseName;
         String deadlineStr = arrivalDeadline != null ? arrivalDeadline.toString() : "Within 14 days";
 
         String htmlContent = buildWaitingForArrivalHtml(fullName, horseName, stallCode, deadlineStr, feedback, admissionUrl);
@@ -198,6 +199,11 @@ public class EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED, StandardCharsets.UTF_8.name());
+
+            // Prevent email clients (such as Gmail) from collapsing distinct transactional emails into threads
+            String messageId = String.format("<%s.%d@riversidertms.com>", UUID.randomUUID(), System.currentTimeMillis());
+            message.setHeader("Message-ID", messageId);
+            message.setHeader("X-Entity-Ref-ID", UUID.randomUUID().toString());
 
             helper.setTo(toEmail);
             helper.setFrom(fromEmail);

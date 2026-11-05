@@ -111,7 +111,7 @@ class TrainingGroupSchemaIntegrationTest {
             addMember(group, horse(), user("GROOM", "groom"));
         }
 
-        assertEquals(6, members.countByGroupId(group.getId()));
+        assertEquals(6, members.countByGroupIdAndLeftAtIsNull(group.getId()));
         assertThrows(DataIntegrityViolationException.class,
                 () -> addMember(group, horse(), user("GROOM", "groom")));
     }
@@ -275,7 +275,7 @@ class TrainingGroupSchemaIntegrationTest {
     }
 
     @Test
-    void aHeldWorkoutHoldsAFullResultOrNone() {
+    void aWorkoutThatIsNotRanHoldsNoResult() {
         GroupPlan plan = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
         TrainingSession session = session(plan, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
 
@@ -287,6 +287,16 @@ class TrainingGroupSchemaIntegrationTest {
         partial.setStatus(WorkoutStatus.HELD);
         partial.setActualDistanceMeters(BigDecimal.valueOf(800));
         assertThrows(DataIntegrityViolationException.class, () -> workouts.saveAndFlush(partial));
+    }
+
+    @Test
+    void aRanWorkoutMustHoldAResult() {
+        GroupPlan plan = plan(group, LocalDate.now().plusDays(10), LocalDate.now().plusDays(20), TrainingPlanStatus.UPCOMING);
+        TrainingSession session = session(plan, LocalDate.now().plusDays(10), LocalTime.of(6, 0), LocalTime.of(7, 0), SessionStatus.SCHEDULED);
+
+        TrainingWorkout ranWithoutResult = sessionWorkout(session, horse());
+        ranWithoutResult.setStatus(WorkoutStatus.RAN);
+        assertThrows(DataIntegrityViolationException.class, () -> workouts.saveAndFlush(ranWithoutResult));
     }
 
     // ------------------------------------------------------------- authorities

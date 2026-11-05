@@ -14,10 +14,11 @@ import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class ClinicalRetrievalServiceTest {
 
@@ -44,6 +45,7 @@ class ClinicalRetrievalServiceTest {
 
     @Test
     @DisplayName("Truy xuất RAG thành công: mở rộng triệu chứng, sinh vector và trả danh sách chunk")
+    @SuppressWarnings("unchecked")
     void testRetrieveSimilarClinicalRecords_Success() {
         String query = "Ngựa bị khập khiễng chân sau";
         when(symptomExpander.expand(query)).thenReturn("Ngựa bị khập khiễng [Lameness] chân sau");
@@ -91,5 +93,27 @@ class ClinicalRetrievalServiceTest {
 
         assertNotNull(results);
         assertTrue(results.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Reindex toàn bộ embeddings thành công theo batch")
+    void testReindexAllEmbeddings_Success() {
+        List<Map<String, Object>> mockRows = List.of(
+                Map.of("id", 1L, "content", "Nội dung bệnh án 1"),
+                Map.of("id", 2L, "content", "Nội dung bệnh án 2")
+        );
+
+        when(jdbcTemplate.queryForList(anyString())).thenReturn(mockRows);
+
+        float[] v1 = new float[1536];
+        float[] v2 = new float[1536];
+        v1[0] = 0.1f;
+        v2[0] = 0.2f;
+        when(embeddingService.embedBatch(anyList())).thenReturn(List.of(v1, v2));
+
+        int updatedCount = retrievalService.reindexAllEmbeddings();
+
+        assertEquals(2, updatedCount);
+        verify(jdbcTemplate, times(2)).update(anyString(), anyString(), anyLong());
     }
 }

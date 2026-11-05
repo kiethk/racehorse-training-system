@@ -61,6 +61,7 @@ class GroupMidCourseIntegrationTest {
     @Autowired private SessionSettlementService settlement;
     @Autowired private HorseAttendanceService attendanceService;
     @Autowired private TrainingDecisionService decisionService;
+    @Autowired private GroupWorkoutSyncService groupSync;
     @Autowired private TrainingFixtures fixtures;
     @Autowired private MutableClock clock;
     @Autowired private HorseRepository horses;
@@ -162,7 +163,7 @@ class GroupMidCourseIntegrationTest {
                 workoutsOf(thunder).subList(1, 3).stream().map(TrainingWorkout::getStatus).toList());
         assertTrue(workoutsOf(blaze).stream().noneMatch(workout -> workout.getStatus() == WorkoutStatus.CANCELLED));
         assertEquals(TrainingPlanStatus.ACTIVE, plans.findById(plan.plan().id()).orElseThrow().getStatus());
-        assertTrue(members.findByHorseId(thunder.getId()).isEmpty());
+        assertTrue(members.findByHorseIdAndLeftAtIsNull(thunder.getId()).isEmpty());
     }
 
     @Test
@@ -208,7 +209,7 @@ class GroupMidCourseIntegrationTest {
         assertEquals(1, mine.stream().filter(workout -> workout.getStatus() == WorkoutStatus.HELD).count());
         assertEquals(2, mine.stream().filter(workout -> workout.getStatus() == WorkoutStatus.CANCELLED).count());
         assertEquals(2, mine.stream().filter(workout -> workout.getStatus() == WorkoutStatus.SCHEDULED).count());
-        assertEquals(other.id(), members.findByHorseId(thunder.getId()).orElseThrow().getGroupId());
+        assertEquals(other.id(), members.findByHorseIdAndLeftAtIsNull(thunder.getId()).orElseThrow().getGroupId());
         assertEquals(TrainingPlanStatus.ACTIVE, plans.findById(secondPlan.plan().id()).orElseThrow().getStatus());
     }
 
@@ -218,10 +219,10 @@ class GroupMidCourseIntegrationTest {
     void aHorseBlockedByTheVetLeavesItsGroupAndTheOthersKeepTraining() {
         decisionService.block(horses.findById(thunder.getId()).orElseThrow(), "Tendon strain");
 
-        assertTrue(members.findByHorseId(thunder.getId()).isEmpty());
+        assertTrue(members.findByHorseIdAndLeftAtIsNull(thunder.getId()).isEmpty());
         assertTrue(workoutsOf(thunder).stream().allMatch(workout -> workout.getStatus() == WorkoutStatus.CANCELLED));
         assertTrue(workoutsOf(blaze).stream().allMatch(workout -> workout.getStatus() == WorkoutStatus.SCHEDULED));
-        assertEquals(1, members.countByGroupId(group.id()));
+        assertEquals(1, members.countByGroupIdAndLeftAtIsNull(group.id()));
     }
 
     @Test
@@ -231,15 +232,38 @@ class GroupMidCourseIntegrationTest {
 
         groupService.addHorse(group.id(), thunder.getId(), trainer);
 
-        assertEquals(2, members.countByGroupId(group.id()));
+        assertEquals(2, members.countByGroupIdAndLeftAtIsNull(group.id()));
+    }
+
+    @Test
+    void aHorseThatAlreadyMovedOnceCanStillBeBlocked() {
+        TrainingGroupResponse other = groupService.createGroup(new CreateTrainingGroupRequest("Nhom 2", List.of()), trainer);
+        groupService.moveHorse(other.id(), thunder.getId(), trainer);
+
+        decisionService.block(horses.findById(thunder.getId()).orElseThrow(), "Tendon strain");
+
+        assertTrue(members.findByHorseIdAndLeftAtIsNull(thunder.getId()).isEmpty());
+        assertEquals(0, members.countByGroupIdAndLeftAtIsNull(other.id()));
+    }
+
+    @Test
+    void aHorseThatLeftDoesNotBlockItsGroomFromTakingAnotherHorseInTheGroup() {
+        Long thunderGroom = group.members().stream()
+                .filter(member -> member.horseId().equals(thunder.getId())).findFirst().orElseThrow().groomId();
+        groupService.removeHorse(group.id(), thunder.getId(), trainer);
+
+        groupSync.reassignFutureWorkoutsToGroom(blaze.getId(), thunderGroom);
+
+        assertEquals(thunderGroom, members.findByHorseIdAndLeftAtIsNull(blaze.getId()).orElseThrow().getGroomId());
     }
 
     // -------------------------------------------------------------- attendance
 
     @Test
-    void attendanceCountsHeldWorkoutsOverTheSessionsThatWereNotCancelled() {
+    void attendanceCountsWorkoutsThatRanOverTheSessionsThatWereNotCancelled() {
         clock.set(monday.plusDays(2).atTime(12, 0));       // two Sessions are over, the third is ahead
         settlement.settle();
+        fixtures.recordHeldResults(thunder);
 
         HorseAttendanceResponse line = attendanceService.getHistory(thunder.getId(), trainer).get(0);
 
@@ -257,6 +281,7 @@ class GroupMidCourseIntegrationTest {
         groupService.addHorse(group.id(), flame.getId(), trainer);
         clock.set(monday.plusDays(4).atTime(12, 0));        // everything is over
         settlement.settle();
+        fixtures.recordHeldResults(flame);
 
         HorseAttendanceResponse line = attendanceService.getHistory(flame.getId(), trainer).get(0);
 
@@ -276,6 +301,7 @@ class GroupMidCourseIntegrationTest {
         groupService.moveHorse(other.id(), thunder.getId(), trainer);
         clock.set(monday.plusDays(4).atTime(12, 0));
         settlement.settle();
+        fixtures.recordHeldResults(thunder);
 
         List<HorseAttendanceResponse> history = attendanceService.getHistory(thunder.getId(), trainer);
 
@@ -297,6 +323,7 @@ class GroupMidCourseIntegrationTest {
         workouts.cancelWorkoutsOfCancelledSessions();
         clock.set(monday.plusDays(4).atTime(12, 0));
         settlement.settle();
+        fixtures.recordHeldResults(thunder);
 
         HorseAttendanceResponse line = attendanceService.getHistory(thunder.getId(), trainer).get(0);
 

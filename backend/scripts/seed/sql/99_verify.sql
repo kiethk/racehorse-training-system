@@ -127,8 +127,12 @@ INSERT INTO seed_check VALUES
      WHERE (i.status IN ('REPORTED', 'IN_REVIEW') AND c.status NOT IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS'))
         OR (i.status = 'RESOLVED' AND (c.status <> 'COMPLETED' OR i.handled_by_id IS DISTINCT FROM c.veterinarian_id))
         OR i.care_schedule_id IS NULL $q$),
-('Cancelled schedule without a reason',
- $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' AND (cancel_reason IS NULL OR btrim(cancel_reason) = '') $q$),
+('PAUSED schedule without a paused_from timestamp',
+ $q$ SELECT id FROM care_schedule WHERE status = 'PAUSED' AND paused_from IS NULL $q$),
+('Cancelled care schedule exists (AD-022 forbids CANCELLED in care_schedule)',
+ $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' $q$),
+('Care schedule with status outside the 6-status enum (AD-022)',
+ $q$ SELECT id FROM care_schedule WHERE status NOT IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS', 'PAUSED', 'DELAYED', 'OVERDUE', 'COMPLETED') $q$),
 ('Health metric hydration status outside the HydrationStatus enum',
  $q$ SELECT id FROM horse_health_metrics
      WHERE hydration_status NOT IN ('NORMAL', 'MILD_DEHYDRATION', 'MODERATE_DEHYDRATION', 'SEVERE_DEHYDRATION', 'ABNORMAL_CRT') $q$),
@@ -142,19 +146,30 @@ INSERT INTO seed_check VALUES
  $q$ SELECT id FROM horse_health_metrics
      WHERE temperature NOT BETWEEN 35.5 AND 41.5 OR heart_rate NOT BETWEEN 24 AND 90 OR respiratory_rate NOT BETWEEN 8 AND 60
         OR body_condition_score NOT BETWEEN 1 AND 9 OR weight NOT BETWEEN 250 AND 800 OR recorded_at > pg_temp.clock() $q$),
+('INITIAL or ROUTINE-FOLLOW_UP completed exam missing full 6-field vitals',
+ $q$ SELECT c.id FROM care_schedule c
+     JOIN health_records h ON h.care_schedule_id = c.id
+     WHERE c.status = 'COMPLETED'
+       AND (c.care_type = 'INITIAL' OR (c.care_type = 'ROUTINE' AND c.purpose = 'FOLLOW_UP'))
+       AND NOT EXISTS (
+         SELECT 1 FROM horse_health_metrics m
+         WHERE m.health_record_id = h.id
+           AND m.heart_rate IS NOT NULL AND m.temperature IS NOT NULL AND m.weight IS NOT NULL
+           AND m.respiratory_rate IS NOT NULL AND m.hydration_status IS NOT NULL AND m.body_condition_score IS NOT NULL
+       ) $q$),
 ('Prescription or treatment plan ending before it starts',
  $q$ SELECT id FROM prescriptions WHERE end_date < start_date UNION ALL SELECT id FROM treatment_plans WHERE end_date < start_date $q$),
 -- ---------------- Huấn luyện (Training)
 ('Group member outside the trainer areas, resting, or not admitted',
  $q$ SELECT m.id FROM training_group_members m JOIN training_groups g ON g.id = m.group_id JOIN horses h ON h.id = m.horse_id
      JOIN stable_stalls s ON s.id = h.current_stall_id JOIN areas a ON a.id = s.area_id
-     WHERE a.trainer_id <> g.trainer_id OR h.training_decision = 'BLOCKED' OR h.current_status <> 'ELIGIBLE' $q$),
+     WHERE (a.trainer_id <> g.trainer_id OR h.training_decision = 'BLOCKED' OR h.current_status <> 'ELIGIBLE') AND m.left_at IS NULL $q$),
 ('Group member groom is not the stall groom',
  $q$ SELECT m.id FROM training_group_members m JOIN horses h ON h.id = m.horse_id JOIN stable_stalls s ON s.id = h.current_stall_id
-     WHERE m.groom_id IS DISTINCT FROM s.groom_id $q$),
+     WHERE m.groom_id IS DISTINCT FROM s.groom_id AND m.left_at IS NULL $q$),
 ('Group with more than 6 horses or a groom twice (BR-10, BR-09)',
- $q$ SELECT group_id FROM training_group_members GROUP BY group_id HAVING count(*) > 6
-     UNION ALL SELECT group_id FROM training_group_members WHERE groom_id IS NOT NULL GROUP BY group_id, groom_id HAVING count(*) > 1 $q$),
+ $q$ SELECT group_id FROM training_group_members WHERE left_at IS NULL GROUP BY group_id HAVING count(*) > 6
+     UNION ALL SELECT group_id FROM training_group_members WHERE groom_id IS NOT NULL AND left_at IS NULL GROUP BY group_id, groom_id HAVING count(*) > 1 $q$),
 ('Plan does not have exactly total_sessions sessions',
  $q$ SELECT p.id FROM group_plans p JOIN courses c ON c.id = p.course_id
      WHERE (SELECT count(*) FROM training_sessions s WHERE s.group_plan_id = p.id) <> c.total_sessions $q$),
@@ -175,7 +190,7 @@ INSERT INTO seed_check VALUES
 ('Workout status does not match its session',
  $q$ SELECT w.id FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id
      WHERE (s.status = 'CANCELLED' AND w.status <> 'CANCELLED')
-        OR (s.status = 'SCHEDULED' AND w.status = 'HELD')
+        OR (s.status = 'SCHEDULED' AND w.status IN ('HELD', 'RAN'))
         OR (s.status = 'HELD' AND w.status = 'SCHEDULED') $q$),
 ('Scheduled session with no effective workout',
  $q$ SELECT s.id FROM training_sessions s
@@ -189,21 +204,33 @@ INSERT INTO seed_check VALUES
      WHERE w.status <> 'CANCELLED' AND pg_temp.blocked_at(w.horse_id, s.session_date + s.start_time) $q$),
 ('BLOCKED horse in a group or with a Workout still to come',
  $q$ SELECT h.id FROM horses h WHERE h.training_decision = 'BLOCKED'
-       AND (EXISTS (SELECT 1 FROM training_group_members m WHERE m.horse_id = h.id)
+       AND (EXISTS (SELECT 1 FROM training_group_members m WHERE m.horse_id = h.id AND m.left_at IS NULL)
             OR EXISTS (SELECT 1 FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id
                         WHERE w.horse_id = h.id AND w.status = 'SCHEDULED' AND s.session_date + s.start_time > pg_temp.clock())) $q$),
 ('Recorded rating differs from the app formula',
- $q$ SELECT id FROM training_workouts WHERE status = 'HELD' AND actual_distance_meters IS NOT NULL
+ $q$ SELECT id FROM training_workouts WHERE status = 'RAN'
        AND performance_rating <> pg_temp.rating(actual_distance_meters, actual_duration_minutes, top_speed_kmh, average_speed_kmh,
                                                 average_heart_rate, max_heart_rate, recovery_heart_rate) $q$),
 ('Result recorded before the session ended or in the future',
  $q$ SELECT w.id FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id
-     WHERE w.status = 'HELD' AND w.actual_distance_meters IS NOT NULL
+     WHERE w.status = 'RAN'
        AND (w.updated_at < s.session_date + s.end_time OR w.updated_at > pg_temp.clock()) $q$),
 ('Unfinished plans of one group overlap',
  $q$ SELECT a.id FROM group_plans a JOIN group_plans b ON b.group_id = a.group_id AND b.id < a.id
      WHERE a.status IN ('UPCOMING', 'ACTIVE') AND b.status IN ('UPCOMING', 'ACTIVE')
        AND a.start_date <= b.end_date AND b.start_date <= a.end_date $q$),
+('Disbanded group with members or an unfinished plan',
+ $q$ SELECT g.id FROM training_groups g WHERE g.disbanded_at IS NOT NULL
+       AND (EXISTS (SELECT 1 FROM training_group_members m WHERE m.group_id = g.id AND m.left_at IS NULL)
+            OR EXISTS (SELECT 1 FROM group_plans p WHERE p.group_id = g.id AND p.status IN ('UPCOMING', 'ACTIVE'))) $q$),
+('Disbanded group dated before it was created or in the future',
+ $q$ SELECT id FROM training_groups WHERE disbanded_at IS NOT NULL AND (disbanded_at < created_at OR disbanded_at > pg_temp.clock()) $q$),
+('Plan or session of a disbanded group dated after the group was disbanded and not cancelled',
+ $q$ SELECT p.id FROM group_plans p JOIN training_groups g ON g.id = p.group_id
+     WHERE g.disbanded_at IS NOT NULL AND (p.created_at > g.disbanded_at
+        OR EXISTS (SELECT 1 FROM training_sessions s WHERE s.group_plan_id = p.id AND s.status <> 'CANCELLED' AND s.session_date + s.start_time > g.disbanded_at)) $q$),
+('Two live groups of one trainer with the same name',
+ $q$ SELECT min(id) FROM training_groups WHERE disbanded_at IS NULL GROUP BY trainer_id, name HAVING count(*) > 1 $q$),
 ('Course uses a subject of another trainer',
  $q$ SELECT cs.id FROM course_subjects cs JOIN courses c ON c.id = cs.course_id JOIN subjects s ON s.id = cs.subject_id
      WHERE s.trainer_id <> c.trainer_id $q$),
@@ -239,7 +266,19 @@ INSERT INTO seed_check VALUES
  $q$ SELECT r.id FROM race_registrations r JOIN horses h ON h.id = r.horse_id JOIN stable_stalls s ON s.id = h.current_stall_id
      JOIN areas a ON a.id = s.area_id
      WHERE a.trainer_id <> r.trainer_id OR r.event_date < r.created_at::DATE OR r.nomination_deadline > r.event_date
-        OR (r.status = 'PENDING') <> (r.reviewed_at IS NULL) $q$);
+        OR (r.status = 'PENDING') <> (r.reviewed_at IS NULL) $q$),
+-- ---------------- Dược lâm sàng (Track 0: catalog + đơn thuốc + severity D4)
+('Health condition severity outside the MILD/MODERATE/SEVERE/CRITICAL vocabulary',
+ $q$ SELECT id FROM health_conditions
+     WHERE UPPER(severity) NOT IN ('MILD', 'MODERATE', 'SEVERE', 'CRITICAL') $q$),
+('Prescription with invalid status or administered_by_role',
+ $q$ SELECT id FROM prescriptions
+     WHERE status NOT IN ('ACTIVE', 'COMPLETED', 'DISCONTINUED')
+        OR administered_by_role NOT IN ('GROOM', 'VETERINARIAN') $q$),
+('Injectable prescription (IV/IM) not assigned to the veterinarian (B5)',
+ $q$ SELECT id FROM prescriptions
+     WHERE UPPER(COALESCE(route, '')) IN ('IV', 'IM', 'INJECTION_IV', 'INJECTION_IM')
+       AND administered_by_role <> 'VETERINARIAN' $q$);
 
 DO $$
 DECLARE

@@ -34,6 +34,10 @@ describe('sessionState', () => {
     assert.equal(sessionState(item({ sessionDate: '2026-11-05', sessionStatus: 'HELD' }), now), 'HELD');
   });
 
+  it('is held when the workout ran', () => {
+    assert.equal(sessionState(item({ sessionDate: '2026-11-05', workoutStatus: 'RAN' }), now), 'HELD');
+  });
+
   it('is cancelled when either the session or this horse workout is cancelled, whatever the time', () => {
     assert.equal(sessionState(item({ sessionStatus: 'CANCELLED' }), now), 'CANCELLED');
     assert.equal(sessionState(item({ workoutStatus: 'CANCELLED', sessionDate: '2026-10-01' }), now), 'CANCELLED');

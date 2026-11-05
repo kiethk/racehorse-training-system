@@ -56,7 +56,7 @@ public class HealthRecordService {
         record.setHorseId(request.getHorseId());
         record.setVeterinarianId(currentUser.getUserId());
         record.setExaminedAt(request.getExaminedAt());
-        record.setSymptoms(request.getSymptoms());
+
         record.setFindings(request.getFindings());
         record.setDiagnosis(request.getDiagnosis());
         record.setNotes(request.getNotes());
@@ -70,7 +70,7 @@ public class HealthRecordService {
                 savedRecord.getId(),
                 horse.getId(),
                 horse.getRegistrationNumber(),
-                savedRecord.getSymptoms(),
+                savedRecord.getFindings(),
                 savedRecord.getDiagnosis(),
                 List.of("VETERINARIAN", "HEAD_TRAINER", "CLUB_MANAGER")
         ));

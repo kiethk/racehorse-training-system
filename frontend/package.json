@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-transform-types --test src/features/admissions/components/__tests__/*.test.ts src/features/ai/__tests__/*.test.ts src/features/groom/__tests__/*.test.ts src/features/horses/__tests__/*.test.ts src/features/notifications/__tests__/*.test.ts src/features/racing/__tests__/*.test.ts src/features/training/__tests__/*.test.ts src/features/stable/__tests__/*.test.ts src/features/staff/__tests__/*.test.ts src/features/vet/__tests__/*.test.ts src/features/vet/lib/__tests__/*.test.ts src/services/__tests__/*.test.ts"
+"test": "node --experimental-transform-types --test src/features/admissions/components/__tests__/*.test.ts src/features/admissions/components/vet-review/__tests__/*.test.ts src/features/ai/__tests__/*.test.ts src/features/analytics/**/__tests__/*.test.ts src/features/audit-log/lib/__tests__/*.test.ts src/features/care/lib/__tests__/*.test.ts src/features/groom/__tests__/*.test.ts src/features/horses/__tests__/*.test.ts src/features/medical/**/__tests__/*.test.ts src/features/notifications/__tests__/*.test.ts src/features/racing/__tests__/*.test.ts src/features/schedule/utils/__tests__/*.test.ts src/features/training/__tests__/*.test.ts src/features/stable/__tests__/*.test.ts src/features/staff/__tests__/*.test.ts src/features/vet/__tests__/*.test.ts src/features/vet/lib/__tests__/*.test.ts src/services/__tests__/*.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.2.0",

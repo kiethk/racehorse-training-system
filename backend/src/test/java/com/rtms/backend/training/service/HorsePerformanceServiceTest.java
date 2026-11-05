@@ -76,8 +76,12 @@ class HorsePerformanceServiceTest {
         return horse;
     }
 
+    private RecentWorkoutRow workout(Long horseId, LocalDate date, Integer maxHr, Integer avgHr, Integer recoveryHr, Integer rating) {
+        return new RecentWorkoutRow(horseId, date, null, maxHr, avgHr, recoveryHr, rating);
+    }
+
     private RecentWorkoutRow workout(Long horseId, LocalDate date, Integer maxHr, Integer recoveryHr, Integer rating) {
-        return new RecentWorkoutRow(horseId, date, null, maxHr, recoveryHr, rating);
+        return new RecentWorkoutRow(horseId, date, null, maxHr, null, recoveryHr, rating);
     }
 
     // =================================================================
@@ -218,18 +222,18 @@ class HorsePerformanceServiceTest {
     // =================================================================
 
     @Test
-    @DisplayName("7.2: raises alerts for max heart rate > 220, recovery > 100, and falling performance")
+    @DisplayName("7.2: raises alerts for max heart rate > 220, recovery > 100, and elevated average heart rate > 180")
     void testGetHorseAlerts_MultipleRulesTriggered() {
         Long horseId = 2L;
         LocalDate today = LocalDate.now();
         when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse(horseId, 5L)));
 
-        // Newest first: max HR 225 (>220), recovery 110 (>100), rating falling 8 -> 6 -> 4
+        // Newest first: max HR 225 (>220), recovery 110 (>100), avg HR 185 (>180)
         when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(horseId)), any(LocalDate.class)))
                 .thenReturn(List.of(
-                        workout(horseId, today.minusDays(1), 225, 110, 4),
-                        workout(horseId, today.minusDays(3), 200, 90, 6),
-                        workout(horseId, today.minusDays(5), 195, 85, 8)));
+                        workout(horseId, today.minusDays(1), 225, 185, 110, 4),
+                        workout(horseId, today.minusDays(3), 200, 160, 90, 6),
+                        workout(horseId, today.minusDays(5), 195, 150, 85, 8)));
 
         List<HorseAlertResponse> alerts = service.getHorseAlerts(horseId, manager);
 
@@ -238,8 +242,8 @@ class HorsePerformanceServiceTest {
                 "Max heart rate alert expected");
         assertTrue(alerts.stream().anyMatch(a -> "POOR_RECOVERY_HEART_RATE".equals(a.getRuleCode())),
                 "Poor recovery alert expected");
-        assertTrue(alerts.stream().anyMatch(a -> "CONSECUTIVE_PERFORMANCE_DROP".equals(a.getRuleCode())),
-                "Consecutive performance drop alert expected");
+        assertTrue(alerts.stream().anyMatch(a -> "AVERAGE_HEART_RATE_EXCEEDED".equals(a.getRuleCode())),
+                "Average heart rate alert expected");
     }
 
     @Test
@@ -249,26 +253,29 @@ class HorsePerformanceServiceTest {
         when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse(horseId, 5L)));
         when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(horseId)), any(LocalDate.class)))
                 .thenReturn(List.of(
-                        workout(horseId, LocalDate.now().minusDays(1), 200, 90, 8),
-                        workout(horseId, LocalDate.now().minusDays(3), 205, 95, 7),
-                        workout(horseId, LocalDate.now().minusDays(5), 198, 88, 7)));
+                        workout(horseId, LocalDate.now().minusDays(1), 200, 175, 90, 8),
+                        workout(horseId, LocalDate.now().minusDays(3), 205, 170, 95, 7),
+                        workout(horseId, LocalDate.now().minusDays(5), 198, 165, 88, 7)));
 
         assertTrue(service.getHorseAlerts(horseId, manager).isEmpty());
     }
 
     @Test
-    @DisplayName("The performance-drop alert needs 3 rated workouts that fall strictly")
-    void testGetHorseAlerts_PerformanceDropNeedsThreeFallingRatings() {
+    @DisplayName("Average heart rate alert triggers only when > 180 bpm")
+    void testGetHorseAlerts_AverageHeartRateThreshold() {
         Long horseId = 2L;
         when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse(horseId, 5L)));
-        // 6 -> 6 -> 8 is not strictly falling; only two ratings in the second case
         when(workoutRepository.findRecentCompletedWorkouts(eq(List.of(horseId)), any(LocalDate.class)))
                 .thenReturn(List.of(
-                        workout(horseId, LocalDate.now().minusDays(1), 150, 60, 6),
-                        workout(horseId, LocalDate.now().minusDays(2), 150, 60, 6),
-                        workout(horseId, LocalDate.now().minusDays(3), 150, 60, 8)));
+                        workout(horseId, LocalDate.now().minusDays(1), 200, 181, 90, 8)));
 
-        assertTrue(service.getHorseAlerts(horseId, manager).isEmpty());
+        List<HorseAlertResponse> alerts = service.getHorseAlerts(horseId, manager);
+        assertEquals(1, alerts.size());
+        HorseAlertResponse alert = alerts.get(0);
+        assertEquals("AVERAGE_HEART_RATE_EXCEEDED", alert.getRuleCode());
+        assertEquals("WARNING", alert.getSeverity());
+        assertEquals(181.0, alert.getMetricValue());
+        assertEquals(180.0, alert.getThresholdValue());
     }
 
     // =================================================================

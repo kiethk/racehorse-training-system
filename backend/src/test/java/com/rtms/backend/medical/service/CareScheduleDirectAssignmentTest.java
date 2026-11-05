@@ -1,6 +1,7 @@
 package com.rtms.backend.medical.service;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.audit.repository.AuditLogRepository;
+import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -33,6 +34,8 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -76,7 +79,9 @@ class CareScheduleDirectAssignmentTest {
                 mock(NotificationService.class),
                 new TrainingDecisionService(horses, schedules, workoutService),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class));
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                new com.fasterxml.jackson.databind.ObjectMapper());
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(schedules.findScheduledForHorse(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
         when(schedules.findScheduledForVet(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
@@ -183,6 +188,72 @@ class CareScheduleDirectAssignmentTest {
                 "A stale overdue in-progress exam must not disqualify the vet from an emergency");
     }
 
+    @Test
+    void initialExamPrefersSlotsOutsideTheRoutineWindow() {
+        LocalDate day = LocalDate.now().plusDays(1);
+        CareSchedule requested = initialRequest(99L, day.atTime(8, 0));
+        User vet = eligibleVet(1L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+        lockEligible(vet);
+
+        service.assignRequestedSchedule(requested);
+
+        assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
+        assertEquals(day.atTime(8, 0), requested.getScheduledAt(),
+                "Admission exams must fill the working day outside 13:30-15:30 before touching the routine window");
+    }
+
+    @Test
+    void initialExamFallsBackIntoTheRoutineWindowOnlyWhenTheRestOfTheDayIsFull() {
+        LocalDate day = LocalDate.now().plusDays(1);
+        CareSchedule requested = initialRequest(99L, day.atTime(8, 0));
+        User vet = eligibleVet(1L);
+        when(users.findActiveVeterinarians()).thenReturn(List.of(vet));
+        lockEligible(vet);
+        // Occupy every 08:00-17:00 slot outside the routine window; the window stays free.
+        List<CareSchedule> blockers = new ArrayList<>();
+        for (int hour = 8; hour <= 17; hour++) {
+            for (int minute : List.of(0, 30)) {
+                LocalTime time = LocalTime.of(hour, minute);
+                if (!time.isBefore(FarmSchedulePolicy.VET_WINDOW_START)
+                        && time.isBefore(FarmSchedulePolicy.VET_WINDOW_END)) {
+                    continue;
+                }
+                CareSchedule block = new CareSchedule();
+                block.setId((long) hour * 60 + minute);
+                block.setVeterinarianId(1L);
+                block.setHorseId(50L + hour);
+                block.setCareType(CareType.ROUTINE);
+                block.setStatus(CareScheduleStatus.SCHEDULED);
+                block.setDurationMinutes(30);
+                block.setScheduledAt(day.atTime(time));
+                blockers.add(block);
+            }
+        }
+        when(schedules.findScheduledForVet(1L, CareScheduleStatus.SCHEDULED)).thenReturn(blockers);
+
+        service.assignRequestedSchedule(requested);
+
+        assertEquals(CareScheduleStatus.SCHEDULED, requested.getStatus());
+        assertEquals(day.atTime(13, 30), requested.getScheduledAt(),
+                "When the hours outside the window are full, the exam takes a free slot inside it");
+    }
+
+    private CareSchedule initialRequest(Long horseId, LocalDateTime requestedAt) {
+        Horse horse = new Horse();
+        horse.setId(horseId);
+        horse.setName("Horse " + horseId);
+        when(horses.findByIdForUpdate(horseId)).thenReturn(Optional.of(horse));
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(600L);
+        schedule.setHorseId(horseId);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setDurationMinutes(30);
+        schedule.setRequestedAt(requestedAt);
+        return schedule;
+    }
+
     private CareSchedule urgentSchedule(Long horseId, Long incidentId) {
         Horse horse = new Horse();
         horse.setId(horseId);
@@ -262,12 +333,12 @@ class CareScheduleDirectAssignmentTest {
         assertEquals(IncidentStatus.IN_REVIEW, incident.getStatus());
         assertEquals(2L, incident.getHandledById());
         assertNotNull(incident.getHandledAt());
-        verify(incidents).save(incident);
+        verify(incidents).saveAll(List.of(incident));
         verify(events).publishEvent(any(com.rtms.backend.event.UrgentAssignmentCommittedEvent.class));
     }
 
     @Test
-    void creatingUrgentScheduleBlocksHorseAndKeepsItRequestedWithoutVet() {
+    void creatingUrgentScheduleKeepsItRequestedWithoutVetAndLeavesTrainingAlone() {
         Horse horse = new Horse();
         horse.setId(99L);
         horse.setName("Rocket");
@@ -282,10 +353,9 @@ class CareScheduleDirectAssignmentTest {
 
         service.createSchedule(99L, CareType.URGENT, "Acute lameness", null, 700L);
 
-        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
-        // Chặn tập luôn kéo theo hủy buổi tập tương lai.
-        verify(workoutService).exitAnyGroup(99L);
-        verify(horses).save(horse);
+        // Báo cáo sự cố quyết định việc chặn tập, không phải lịch khám.
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
+        verify(workoutService, never()).exitAnyGroup(99L);
         verify(schedules, atLeastOnce()).save(argThat(schedule ->
                 schedule.getCareType() == CareType.URGENT
                         && schedule.getStatus() == CareScheduleStatus.REQUESTED

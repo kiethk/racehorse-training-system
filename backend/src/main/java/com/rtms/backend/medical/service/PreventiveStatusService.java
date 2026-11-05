@@ -48,8 +48,7 @@ public class PreventiveStatusService {
     /** Mục đến hạn trong cửa sổ này được gom vào cùng một ca. */
     static final int OPPORTUNITY_WINDOW_DAYS = 7;
     static final LocalTime MILESTONE_TIME = LocalTime.of(14, 0);
-    private static final List<CareScheduleStatus> ACTIVE_STATUSES = List.of(
-            CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+    private static final List<CareScheduleStatus> ACTIVE_STATUSES = CareScheduleStatus.OPEN;
     private static final DateTimeFormatter DAY_MONTH = DateTimeFormatter.ofPattern("dd/MM");
     private static final DateTimeFormatter FULL_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -144,11 +143,18 @@ public class PreventiveStatusService {
         LocalDateTime requestedAt = (target.isAfter(today) ? target : today.plusDays(1)).atTime(MILESTONE_TIME);
         String description = describe(dueByProtocol, requestedAt.toLocalDate());
 
+        // AD-025 rule 3: dấu vết mốc bị mũi tiêm sớm thay thế, ghi lên mốc mới sinh ra.
+        Long supersededScheduleId = null;
         if (existing.isPresent()) {
             CareSchedule milestone = existing.get();
             switch (milestone.getStatus()) {
                 case IN_PROGRESS:
+                case DELAYED:
+                case OVERDUE:
+                case PAUSED:
                     // Vet đang khám chính ca này; kết quả ca khám sẽ quyết định mốc kế tiếp.
+                    // AD-022: ACTIVE_STATUSES nay gồm cả OVERDUE/PAUSED. Thiếu hai nhánh này,
+                    // ca rơi xuống default và mốc mới sinh sẽ đụng unique index.
                     return existing;
                 case REQUESTED:
                     milestone.setRequestedAt(requestedAt);
@@ -165,11 +171,13 @@ public class PreventiveStatusService {
                         milestone.setDescription(remaining);
                         return Optional.of(schedules.save(milestone));
                     }
-                    milestone.setStatus(CareScheduleStatus.CANCELLED);
-                    milestone.setCancelReason("Vaccinated early in a combined visit on " + today.format(DAY_MONTH));
-                    // Flush trước khi tạo mốc mới: Hibernate chạy INSERT trước UPDATE,
-                    // mốc cũ còn active sẽ đụng uq_care_schedule_one_active_preventive_per_horse.
-                    schedules.saveAndFlush(milestone);
+                    // AD-025: mũi tiêm sớm đã thay thế mốc này — mốc không bị "hủy" mà bị
+                    // xóa cứng. Xóa rồi flush: mốc cũ còn nằm ở đây sẽ đụng
+                    // uq_care_schedule_one_active_preventive_per_horse khi INSERT mốc mới.
+                    // An toàn: mốc SCHEDULED chưa khám nên không có health_record nào trỏ vào.
+                    supersededScheduleId = milestone.getId();
+                    schedules.delete(milestone);
+                    schedules.flush();
                     break;
                 default:
                     break;
@@ -191,6 +199,12 @@ public class PreventiveStatusService {
         milestone.setRequestedById(actorId);
         milestone.setIdempotencyKey(operationKey);
         milestone.setDescription(description);
+        if (supersededScheduleId != null) {
+            // AD-025 rule 3: dấu vết của mốc đã xóa nằm ở đây thay vì cancel_reason.
+            milestone.setRescheduleReason(RescheduleReason.OTHER);
+            milestone.setRescheduleNote("Superseded by early vaccination on " + today.format(DAY_MONTH)
+                    + " — replaced schedule #" + supersededScheduleId + " (vaccinated in a combined visit)");
+        }
         return Optional.of(schedules.save(milestone));
     }
 

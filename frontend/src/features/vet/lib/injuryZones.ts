@@ -295,3 +295,39 @@ export function zoneForPoint(p: { x: number; y: number; z: number }): string {
 export function zoneById(id: string): BodyZone | undefined {
   return BODY_ZONES.find((z) => z.id === id);
 }
+
+
+/**
+ * Maps a 3D hit point and zone to the canonical model_node_key of horse_body_regions:
+ * - Differentiates left vs right forelegs and hindlegs (+X is left, -X is right)
+ * - Differentiates upper trunk (back) vs lower trunk (abdomen)
+ */
+export function resolveBodyRegionKey(zoneId: string, p: { x: number; y: number; z: number }): string {
+  const isLeft = p.x >= 0;
+  if (zoneId === 'foreleg') {
+    return isLeft ? 'foreleg_left' : 'foreleg_right';
+  }
+  if (zoneId === 'hindleg') {
+    return isLeft ? 'hindleg_left' : 'hindleg_right';
+  }
+  if (zoneId === 'trunk' || zoneId === 'hindquarters') {
+    const n = normalizePoint(p);
+    return n.y > 0.48 ? 'back' : 'abdomen';
+  }
+  return zoneId;
+}
+
+export function matchBodyRegion<T extends { id: number; code: string; modelNodeKey?: string | null; displayName?: string }>(
+  bodyRegions: T[],
+  zoneId: string,
+  p?: { x: number; y: number; z: number },
+): T | undefined {
+  if (!bodyRegions.length) return undefined;
+  const key = p ? resolveBodyRegionKey(zoneId, p) : zoneId;
+  return (
+    bodyRegions.find((r) => r.modelNodeKey === key) ||
+    bodyRegions.find((r) => r.code.toLowerCase() === key.toLowerCase()) ||
+    bodyRegions.find((r) => r.modelNodeKey === zoneId) ||
+    bodyRegions[0]
+  );
+}

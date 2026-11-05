@@ -6,19 +6,21 @@ export function Pagination({
   total,
   onPageChange,
   disabled = false,
+  className = '',
 }: {
   page: number;
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
   disabled?: boolean;
+  className?: string;
 }) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const firstItem = total === 0 ? 0 : page * pageSize + 1;
   const lastItem = Math.min((page + 1) * pageSize, total);
 
   return (
-    <nav aria-label="Pagination" className="flex flex-col gap-3 border-t border-[var(--color-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+    <nav aria-label="Pagination" className={`flex flex-col gap-3 border-t border-[var(--color-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 ${className}`}>
       <p className="text-xs text-[var(--color-text-secondary)]" aria-live="polite">
         Showing <span className="font-medium text-[var(--color-text-primary)]">{firstItem}</span> to{' '}
         <span className="font-medium text-[var(--color-text-primary)]">{lastItem}</span> of{' '}

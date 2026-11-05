@@ -42,18 +42,18 @@ DO $$
 BEGIN
     PERFORM pg_temp.nominate('H001', -40, 'Greenfield Autumn Sprint', 'Group 3 Sprint', 'Greenfield Racecourse', -20, TIME '15:30',
         'Greenfield Jockey Club', 'https://greenfield-racing.example/autumn-sprint', -27, 1200, 'TURF', 'Winner 120,000,000 VND',
-        'Best 1,200 m trial times in the barn; ratings 7-8 in the last block.', 'Book a jockey who knows the turf course.', 'APPROVED',
+        'Best 1,200 m trial times in the barn, ratings 7-8 in the last block.', 'Book a jockey who knows the turf course.', 'APPROVED',
         'Approved. Entry fee paid from the racing budget.');
     PERFORM pg_temp.nominate('H016', -35, 'Arabian Breeders Cup Juvenile', 'Arabian 3YO', 'Saigon Equestrian Park', -14, TIME '16:00',
         'Arabian Breeders Association', 'https://arabian-breeders.example/cup', -21, 1400, 'DIRT', 'Winner 80,000,000 VND',
-        'Young filly improving quickly on dirt; good gate manners.', NULL, 'APPROVED', 'Approved. Ship two days early.');
+        'Young filly improving quickly on dirt, good gate manners.', NULL, 'APPROVED', 'Approved. Ship two days early.');
     PERFORM pg_temp.nominate('H011', -30, 'City Mile Handicap', 'Handicap', 'Greenfield Racecourse', -10, TIME '14:45',
         'Greenfield Jockey Club', 'https://greenfield-racing.example/city-mile', -16, 1600, 'TURF', 'Winner 60,000,000 VND',
-        'Steady stayer; the mile suits him.', NULL, 'REJECTED',
-        'Rejected: he has a heavy block running that week; aim for the December meeting instead.');
+        'Steady stayer, the mile suits him.', NULL, 'REJECTED',
+        'Rejected: he has a heavy block running that week, aim for the December meeting instead.');
     PERFORM pg_temp.nominate('H010', -6, 'Winter Classic Trial', 'Listed', 'Greenfield Racecourse', 21, TIME '15:00',
         'Greenfield Jockey Club', 'https://greenfield-racing.example/winter-classic', 12, 2000, 'TURF', 'Winner 200,000,000 VND',
-        'Recovered fully from the cut; endurance ratings around 7-8 in this block.', 'Needs one more long gallop before the race.',
+        'Recovered fully from the cut, endurance ratings around 7-8 in this block.', 'Needs one more long gallop before the race.',
         'PENDING');
     PERFORM pg_temp.nominate('H008', -3, 'Ladies Arabian Stakes', 'Fillies and Mares', 'Saigon Equestrian Park', 28, TIME '16:30',
         'Arabian Breeders Association', 'https://arabian-breeders.example/ladies-stakes', 18, 1800, 'DIRT', 'Winner 90,000,000 VND',
@@ -63,5 +63,5 @@ BEGIN
         'First run to gain race experience.', NULL, 'APPROVED', 'Approved, but watch her recovery heart rate after the fatigue alerts.');
     PERFORM pg_temp.nominate('H019', -5, 'Highland Endurance 40', 'Endurance', 'Da Lat Highland Trail', 30, TIME '06:30',
         'Vietnam Endurance Riders', 'https://endurance-vn.example/highland-40', 20, 40000, 'DIRT', 'Trophy and 25,000,000 VND',
-        'Best stamina scores in the C area; calm in company.', NULL, 'PENDING');
+        'Best stamina scores in the C area, calm in company.', NULL, 'PENDING');
 END $$;

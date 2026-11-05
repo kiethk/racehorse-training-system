@@ -59,6 +59,8 @@ class AdmissionReviewServiceTest {
     @Mock HealthRecordRepository healthRecordRepository;
     @Mock HorseRepository horses;
     @Mock StableStallRepository stalls;
+    @Mock AdmissionNotificationService admissionNotificationService;
+    @Mock AdmissionGroomReviewService admissionGroomReviewService;
 
     AdmissionReviewService service;
     AdmissionApplication admission;
@@ -69,7 +71,8 @@ class AdmissionReviewServiceTest {
     @BeforeEach
     void setUp() {
         service = new AdmissionReviewService(admissions, careSchedules, horses, stalls,
-                careScheduleService, healthRecordRepository);
+                careScheduleService, healthRecordRepository, admissionNotificationService,
+                admissionGroomReviewService);
         admission = new AdmissionApplication();
         admission.setId(1L);
         admission.setHorseId(10L);

@@ -22,6 +22,24 @@ export function formatTime(value: string | null | undefined): string {
   return value ? value.slice(0, 5) : '—';
 }
 
+/** Formats a clock label (minutes since midnight, Date, ISO timestamp, or HH:mm string) to "HH:mm". */
+export function formatClockLabel(value: string | Date | number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'number') {
+    const hours = Math.floor(value / 60).toString().padStart(2, '0');
+    const mins = Math.floor(value % 60).toString().padStart(2, '0');
+    return `${hours}:${mins}`;
+  }
+  if (typeof value === 'string' && !value.includes('T') && value.includes(':')) {
+    return value.slice(0, 5);
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(date);
+  }
+  return '—';
+}
+
 /** Turns a backend enum such as `HEAD_TRAINER` into "Head trainer". */
 export function formatEnumLabel(value: string | null | undefined): string {
   if (!value) return '—';

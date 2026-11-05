@@ -280,13 +280,13 @@ class GroupPlanServiceIntegrationTest {
         User other = user("HEAD_TRAINER", "other");
         AuthenticatedUser otherPrincipal = new AuthenticatedUser(other.getId(), other.getEmail(), "HEAD_TRAINER");
 
-        List<GroupPlanSummaryResponse> own = service.getPlans(group.id(), trainerPrincipal);
+        List<GroupPlanSummaryResponse> own = service.getPlans(group.id(), null, trainerPrincipal);
 
         assertEquals(1, own.size());
         assertEquals("Nhom 1", own.get(0).groupName());
         assertEquals("Sprint", own.get(0).courseName());
         assertEquals(3, own.get(0).sessionsTotal());
-        assertTrue(service.getPlans(null, otherPrincipal).isEmpty());
+        assertTrue(service.getPlans(null, null, otherPrincipal).isEmpty());
         ApiException error = assertThrows(ApiException.class, () -> service.getPlan(created.plan().id(), otherPrincipal));
         assertEquals("GROUP_PLAN_NOT_FOUND", error.getErrorCode());
     }

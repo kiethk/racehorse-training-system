@@ -120,7 +120,7 @@ function CompleteVaccinationForm({
         })),
       });
       toast.success(`Vaccination recorded for ${horse.horseName}`,
-        `${chosen.length} protocol${chosen.length === 1 ? '' : 's'} completed; the next due date is updated.`);
+        `${chosen.length} protocol${chosen.length === 1 ? '' : 's'} completed. The next due date is updated.`);
       onRecorded();
       onClose();
     } catch (cause) {

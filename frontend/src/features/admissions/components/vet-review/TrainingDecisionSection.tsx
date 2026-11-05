@@ -1,13 +1,12 @@
 'use client';
 
-import { ChoiceInput, Select, Textarea } from '@/components/ui/Input';
+import { ChoiceInput, Textarea } from '@/components/ui/Input';
 import { Pill } from '@/components/ui/StatusBadge';
-import { trainingDecisions, restrictionOptions } from './constants';
+import { trainingDecisions } from './constants';
 import type { TrainingDecision as TD } from '../../types';
 import type { Dispatch, SetStateAction } from 'react';
 
 export interface TrainingDecisionSectionProps {
-  isUrgent: boolean;
   isFormDisabled: boolean;
   trainingDecision: TD;
   setTrainingDecision: Dispatch<SetStateAction<TD>>;
@@ -22,7 +21,7 @@ export interface TrainingDecisionSectionProps {
 
 export function TrainingDecisionSection(props: TrainingDecisionSectionProps) {
   const {
-    isUrgent, isFormDisabled, trainingDecision, setTrainingDecision,
+    isFormDisabled, trainingDecision, setTrainingDecision,
     restrictionDetails, setRestrictionDetails, fieldErrors, setFieldErrors,
     followUpDate, setFollowUpDate, businessDateFromToday,
   } = props;
@@ -73,36 +72,20 @@ export function TrainingDecisionSection(props: TrainingDecisionSectionProps) {
       {trainingDecision === 'BLOCKED' && (
         <div className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 space-y-1.5 animate-in fade-in duration-200">
           <label htmlFor="field-restriction-details" className="block text-xs font-bold text-[var(--color-warning)]">
-            Mandatory Restriction Protocol <span className="text-[var(--color-danger)]">*</span>
+            Assessment note <span className="text-[var(--color-danger)]">*</span>
           </label>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            Shown to the Head Trainer when planning. The horse rests until the follow-up exam below.
-          </p>
-          {isUrgent ? (
-            <Textarea
-              id="field-restriction-details"
-              rows={2}
-              value={restrictionDetails}
-              onChange={(e) => setRestrictionDetails(e.target.value)}
-              placeholder="Describe restriction rules..."
-            />
-          ) : (
-            <Select
-              id="field-restriction-details"
-              value={restrictionDetails}
-              onChange={(e) => {
-                setRestrictionDetails(e.target.value);
-                if (fieldErrors.restrictionDetails) {
-                  setFieldErrors((errs) => ({ ...errs, restrictionDetails: '' }));
-                }
-              }}
-            >
-              <option value="">Select restriction protocol</option>
-              {restrictionOptions.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </Select>
-          )}
+          <Textarea
+            id="field-restriction-details"
+            rows={3}
+            value={restrictionDetails}
+            onChange={(e) => {
+              setRestrictionDetails(e.target.value);
+              if (fieldErrors.restrictionDetails) {
+                setFieldErrors((errs) => ({ ...errs, restrictionDetails: '' }));
+              }
+            }}
+            placeholder="e.g. Tendon strain: box rest with hand-walking twice daily, recheck before trotting…"
+          />
           {fieldErrors.restrictionDetails && (
             <p className="text-xs font-medium text-[var(--color-danger)]">{fieldErrors.restrictionDetails}</p>
           )}

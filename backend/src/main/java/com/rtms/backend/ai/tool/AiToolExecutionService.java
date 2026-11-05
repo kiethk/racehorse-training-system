@@ -13,6 +13,7 @@ import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.ai.dto.ClinicalChunkResponseDto;
 import com.rtms.backend.ai.rag.service.ClinicalRetrievalService;
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -40,6 +41,8 @@ import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.dto.SessionHorseNameRow;
 import com.rtms.backend.training.dto.PlanSummaryResponse;
+import com.rtms.backend.training.dto.HorseAttendanceResponse;
+import com.rtms.backend.training.dto.PastWorkoutRow;
 import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
 import com.rtms.backend.training.dto.SessionRow;
 import com.rtms.backend.training.entity.Course;
@@ -57,6 +60,14 @@ import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseSpecialtyService;
+import com.rtms.backend.training.service.HorseAttendanceService;
+import com.rtms.backend.training.service.SessionScheduleService;
+import com.rtms.backend.training.service.TrainingGroupService;
+import com.rtms.backend.training.dto.ScheduleSessionResponse;
+import com.rtms.backend.training.dto.SessionHorseResponse;
+import com.rtms.backend.training.dto.TrainingGroupResponse;
+import com.rtms.backend.training.dto.GroupMemberResponse;
+import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.racing.entity.RaceRegistration;
 import com.rtms.backend.racing.repository.RaceRegistrationRepository;
 import com.rtms.backend.training.entity.Subject;
@@ -84,6 +95,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -102,6 +114,12 @@ import java.util.stream.Collectors;
 public class AiToolExecutionService {
 
     private static final Logger log = LoggerFactory.getLogger(AiToolExecutionService.class);
+
+    /** Số buổi đã diễn ra gần nhất mà getWorkoutHistory trả về. (How many recent past Workouts getWorkoutHistory returns.) */
+    private static final int WORKOUT_HISTORY_LIMIT = 20;
+
+    /** Khoảng nhìn lại của bộ lọc "Needs result", như tab trên trang Schedule. (How far back "Needs result" looks, as on the Schedule page.) */
+    private static final int NEEDS_RESULT_LOOKBACK_DAYS = 90;
 
     private final DynamicToolRegistryService toolRegistryService;
     private final ClinicalRetrievalService clinicalRetrievalService;
@@ -129,6 +147,9 @@ public class AiToolExecutionService {
     private final HorsePedigreeRepository horsePedigreeRepository;
     private final HorseIncidentReportRepository horseIncidentReportRepository;
     private final GroomTaskCompletionRepository groomTaskCompletionRepository;
+    private final HorseAttendanceService horseAttendanceService;
+    private final TrainingGroupService trainingGroupService;
+    private final SessionScheduleService sessionScheduleService;
 
     @Autowired
     public AiToolExecutionService(DynamicToolRegistryService toolRegistryService,
@@ -156,7 +177,10 @@ public class AiToolExecutionService {
                                   @Autowired(required = false) HorseHealthMetricRepository horseHealthMetricRepository,
                                   @Autowired(required = false) HorsePedigreeRepository horsePedigreeRepository,
                                   @Autowired(required = false) HorseIncidentReportRepository horseIncidentReportRepository,
-                                  @Autowired(required = false) GroomTaskCompletionRepository groomTaskCompletionRepository) {
+                                  @Autowired(required = false) GroomTaskCompletionRepository groomTaskCompletionRepository,
+                                  HorseAttendanceService horseAttendanceService,
+                                  TrainingGroupService trainingGroupService,
+                                  SessionScheduleService sessionScheduleService) {
         this.toolRegistryService = toolRegistryService;
         this.clinicalRetrievalService = clinicalRetrievalService;
         this.horseRepository = horseRepository;
@@ -183,112 +207,9 @@ public class AiToolExecutionService {
         this.horsePedigreeRepository = horsePedigreeRepository;
         this.horseIncidentReportRepository = horseIncidentReportRepository;
         this.groomTaskCompletionRepository = groomTaskCompletionRepository;
-    }
-
-    public AiToolExecutionService(DynamicToolRegistryService toolRegistryService,
-                                  ClinicalRetrievalService clinicalRetrievalService,
-                                  HorseRepository horseRepository,
-                                  TrainingWorkoutRepository trainingWorkoutRepository,
-                                  HealthRecordRepository healthRecordRepository,
-                                  CareScheduleRepository careScheduleRepository,
-                                  StableStallRepository stableStallRepository,
-                                  GroomDailyTaskRepository groomDailyTaskRepository,
-                                  GroomDailyTaskService groomDailyTaskService,
-                                  AdmissionApplicationRepository admissionApplicationRepository,
-                                  TrainingSessionRepository trainingSessionRepository,
-                                  GroupPlanRepository groupPlanRepository,
-                                  HorseSpecialtyService horseSpecialtyService,
-                                  HorsePerformanceService horsePerformanceService,
-                                  RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
-                                  AreaRepository areaRepository,
-                                  UserRepository userRepository,
-                                  CourseRepository courseRepository) {
-        this(toolRegistryService, clinicalRetrievalService, horseRepository, trainingWorkoutRepository,
-                healthRecordRepository, careScheduleRepository, stableStallRepository, groomDailyTaskRepository,
-                groomDailyTaskService, admissionApplicationRepository, trainingSessionRepository,
-                groupPlanRepository, horseSpecialtyService, horsePerformanceService,
-                racingReadinessAssessmentRepository, areaRepository,
-                userRepository, courseRepository, null, null, null, null, null, null, null, null);
-    }
-
-    public AiToolExecutionService(DynamicToolRegistryService toolRegistryService,
-                                  ClinicalRetrievalService clinicalRetrievalService,
-                                  HorseRepository horseRepository,
-                                  TrainingWorkoutRepository trainingWorkoutRepository,
-                                  HealthRecordRepository healthRecordRepository,
-                                  CareScheduleRepository careScheduleRepository,
-                                  StableStallRepository stableStallRepository,
-                                  GroomDailyTaskRepository groomDailyTaskRepository,
-                                  GroomDailyTaskService groomDailyTaskService,
-                                  AdmissionApplicationRepository admissionApplicationRepository,
-                                  TrainingSessionRepository trainingSessionRepository,
-                                  GroupPlanRepository groupPlanRepository,
-                                  HorseSpecialtyService horseSpecialtyService,
-                                  HorsePerformanceService horsePerformanceService,
-                                  RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
-                                  AreaRepository areaRepository,
-                                  UserRepository userRepository,
-                                  CourseRepository courseRepository,
-                                  AuditLogRepository auditLogRepository) {
-        this(toolRegistryService, clinicalRetrievalService, horseRepository, trainingWorkoutRepository,
-                healthRecordRepository, careScheduleRepository, stableStallRepository, groomDailyTaskRepository,
-                groomDailyTaskService, admissionApplicationRepository, trainingSessionRepository,
-                groupPlanRepository, horseSpecialtyService, horsePerformanceService,
-                racingReadinessAssessmentRepository, areaRepository,
-                userRepository, courseRepository, auditLogRepository, null, null, null, null, null, null, null);
-    }
-
-    public AiToolExecutionService(DynamicToolRegistryService toolRegistryService,
-                                  ClinicalRetrievalService clinicalRetrievalService,
-                                  HorseRepository horseRepository,
-                                  TrainingWorkoutRepository trainingWorkoutRepository,
-                                  HealthRecordRepository healthRecordRepository,
-                                  CareScheduleRepository careScheduleRepository,
-                                  StableStallRepository stableStallRepository,
-                                  GroomDailyTaskRepository groomDailyTaskRepository,
-                                  GroomDailyTaskService groomDailyTaskService,
-                                  AdmissionApplicationRepository admissionApplicationRepository,
-                                  TrainingSessionRepository trainingSessionRepository,
-                                  GroupPlanRepository groupPlanRepository,
-                                  HorseSpecialtyService horseSpecialtyService,
-                                  HorsePerformanceService horsePerformanceService,
-                                  RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
-                                  AreaRepository areaRepository,
-                                  UserRepository userRepository,
-                                  CourseRepository courseRepository,
-                                  AuditLogRepository auditLogRepository,
-                                  CandidateHorseProfileRepository candidateHorseProfileRepository) {
-        this(toolRegistryService, clinicalRetrievalService, horseRepository, trainingWorkoutRepository,
-                healthRecordRepository, careScheduleRepository, stableStallRepository, groomDailyTaskRepository,
-                groomDailyTaskService, admissionApplicationRepository, trainingSessionRepository,
-                groupPlanRepository, horseSpecialtyService, horsePerformanceService,
-                racingReadinessAssessmentRepository, areaRepository,
-                userRepository, courseRepository, auditLogRepository, candidateHorseProfileRepository,
-                null, null, null, null, null, null);
-    }
-
-    public AiToolExecutionService(DynamicToolRegistryService toolRegistryService,
-                                  ClinicalRetrievalService clinicalRetrievalService,
-                                  HorseRepository horseRepository,
-                                  TrainingWorkoutRepository trainingWorkoutRepository,
-                                  HealthRecordRepository healthRecordRepository,
-                                  CareScheduleRepository careScheduleRepository,
-                                  StableStallRepository stableStallRepository,
-                                  GroomDailyTaskRepository groomDailyTaskRepository,
-                                  GroomDailyTaskService groomDailyTaskService,
-                                  AdmissionApplicationRepository admissionApplicationRepository,
-                                  TrainingSessionRepository trainingSessionRepository,
-                                  GroupPlanRepository groupPlanRepository,
-                                  HorseSpecialtyService horseSpecialtyService,
-                                  HorsePerformanceService horsePerformanceService,
-                                  RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
-                                  AreaRepository areaRepository) {
-        this(toolRegistryService, clinicalRetrievalService, horseRepository, trainingWorkoutRepository,
-                healthRecordRepository, careScheduleRepository, stableStallRepository, groomDailyTaskRepository,
-                groomDailyTaskService, admissionApplicationRepository, trainingSessionRepository,
-                groupPlanRepository, horseSpecialtyService, horsePerformanceService,
-                racingReadinessAssessmentRepository, areaRepository,
-                null, null, null, null, null, null, null, null, null, null);
+        this.horseAttendanceService = horseAttendanceService;
+        this.trainingGroupService = trainingGroupService;
+        this.sessionScheduleService = sessionScheduleService;
     }
 
     /**
@@ -325,6 +246,7 @@ public class AiToolExecutionService {
 
             // HEAD_TRAINER Tools
             case "getTrainerHorses" -> handleGetTrainerHorses(currentUser);
+            case "getTrainerGroups" -> handleGetTrainerGroups(currentUser);
             case "getWorkoutHistory" -> handleGetWorkoutHistory(args);
             case "getHorseFitnessTrend" -> handleGetHorseFitnessTrend(args);
             case "getTrainerSchedule" -> handleGetTrainerSchedule(args, currentUser);
@@ -332,7 +254,7 @@ public class AiToolExecutionService {
             case "getHorseSpecialtyAnalysis" -> handleGetHorseSpecialtyAnalysis(args, currentUser);
             case "getTrainerRiskAlerts" -> handleGetTrainerRiskAlerts(args, currentUser);
             case "getRacingReadinessAssessment" -> handleGetRacingReadinessAssessment(args);
-            case "checkGroomConflictForLot" -> handleCheckGroomConflictForLot(args);
+            case "checkGroomConflict" -> handleCheckGroomConflict(args);
             case "getTrainerAssignedGrooms" -> handleGetTrainerAssignedGrooms(currentUser);
             case "getMyHorseRaceRegistrations" -> handleGetMyHorseRaceRegistrations(args, currentUser);
             case "getAssignedAdmissionReviews" -> handleGetAssignedAdmissionReviews(currentUser);
@@ -366,7 +288,7 @@ public class AiToolExecutionService {
             case "getHorseStallLocation" -> handleGetHorseStallLocation(args);
             case "getMyReportedIncidents" -> handleGetMyReportedIncidents(currentUser);
             case "getGroomTaskCompletionRate" -> handleGetGroomTaskCompletionRate(args, currentUser);
-            case "detectHorseBehavioralAnomaly" -> handleDetectHorseBehavioralAnomaly(args);
+            case "detectHorseBehavioralAnomaly" -> handleDetectHorseBehavioralAnomaly(args, currentUser);
             case "recommendDailyCarePriorityOrder" -> handleRecommendDailyCarePriorityOrder(currentUser);
 
             // CLUB_MANAGER Tools
@@ -449,7 +371,7 @@ public class AiToolExecutionService {
         }
 
         List<CareSchedule> activeSchedules = careScheduleRepository.findByHorseIdAndStatusIn(
-                horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+                horse.getId(), CareScheduleStatus.BOOKED_OR_ACTIVE);
         List<Map<String, Object>> careList = activeSchedules.stream().map(cs -> Map.<String, Object>of(
                 "loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám tổng quát", "scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A", "purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A"
         )).toList();
@@ -465,23 +387,48 @@ public class AiToolExecutionService {
         }
         verifyHorseOwnershipIfOwner(horse.getId(), currentUser);
 
-        List<PlanSummaryResponse> summaries = groupPlanRepository.findPlanSummaries(null, horse.getId());
-        if (summaries == null || summaries.isEmpty()) {
+        // Cùng nguồn với lịch sử huấn luyện trên giao diện. (The same source as the training history screen.)
+        List<HorseAttendanceResponse> history = horseAttendanceService.getHistory(horse.getId(), currentUser);
+        if (history.isEmpty()) {
             return Map.of("message", "Chiến mã " + horse.getName() + " hiện chưa có kế hoạch huấn luyện nào.");
         }
+        return history.stream().map(line -> attendanceItem(horse.getName(), line)).toList();
+    }
 
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (PlanSummaryResponse p : summaries) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("planName", p.getCourseName() != null ? p.getCourseName() : "Khóa huấn luyện");
-            item.put("horseName", horse.getName());
-            item.put("status", p.getStatus() != null ? p.getStatus().name() : "N/A");
-            item.put("progress", p.getCompletedSessions() + "/" + p.getTotalSessions() + " buổi");
-            item.put("startDate", p.getStartDate() != null ? p.getStartDate().toString() : "N/A");
-            item.put("endDate", p.getEndDate() != null ? p.getEndDate().toString() : "N/A");
-            result.add(item);
+    /** Một dòng Attendance cho AI: khóa, nhóm, trạng thái phần của con ngựa và X/Y buổi. (One Attendance line for the AI.) */
+    private Map<String, Object> attendanceItem(String horseName, HorseAttendanceResponse line) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("planName", line.courseName() != null ? line.courseName() : "Khóa huấn luyện");
+        item.put("horseName", horseName);
+        item.put("groupName", groupLabel(line.groupName(), line.groupDisbanded()));
+        item.put("status", planStatusLabel(line.planStatus()));
+        item.put("progress", line.attended() + "/" + line.total() + " buổi đã chạy");
+        item.put("completedSessions", line.attended());
+        item.put("totalSessions", line.total());
+        item.put("joinedOn", line.joinedOn() != null ? line.joinedOn().toString() : "N/A");
+        item.put("startDate", line.startDate() != null ? line.startDate().toString() : "N/A");
+        item.put("endDate", line.endDate() != null ? line.endDate().toString() : "N/A");
+        return item;
+    }
+
+    private static String groupLabel(String groupName, boolean disbanded) {
+        if (groupName == null) {
+            return "Nhóm đã xóa";
         }
-        return result;
+        return disbanded ? groupName + " (Disbanded)" : groupName;
+    }
+
+    private static String planStatusLabel(String status) {
+        if (status == null) {
+            return "N/A";
+        }
+        return switch (status) {
+            case "ACTIVE" -> "Đang diễn ra (ACTIVE)";
+            case "UPCOMING" -> "Sắp diễn ra (UPCOMING)";
+            case "COMPLETED" -> "Đã hoàn thành (COMPLETED)";
+            case "CANCELLED" -> "Đã hủy (CANCELLED)";
+            default -> status;
+        };
     }
 
     private Object handleGetMyHorseUpcomingSchedule(Map<String, Object> args, AuthenticatedUser currentUser) {
@@ -491,7 +438,10 @@ public class AiToolExecutionService {
 
         List<SessionRow> sessionRows = trainingSessionRepository.findOwnerSessionRows(ownerId, from, to);
         if (sessionRows.isEmpty()) {
-            return Collections.emptyList();
+            Map<String, Object> emptyResp = new LinkedHashMap<>();
+            emptyResp.put("totalUpcomingWorkouts", 0);
+            emptyResp.put("workoutScheduleList", Collections.emptyList());
+            return emptyResp;
         }
 
         List<Long> sessionIds = sessionRows.stream().map(SessionRow::sessionId).toList();
@@ -561,16 +511,16 @@ public class AiToolExecutionService {
         }
         verifyHorseOwnershipIfOwner(horse.getId(), currentUser);
 
-        List<TrainingWorkout> workouts = trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(horse.getId());
-        int totalSessions = workouts.size();
-        long completedSessions = workouts.stream().filter(w -> w.getStatus() == WorkoutStatus.HELD && w.getActualDistanceMeters() != null).count();
+        List<HorseAttendanceResponse> history = horseAttendanceService.getHistory(horse.getId(), currentUser);
+        int totalSessions = history.stream().mapToInt(HorseAttendanceResponse::total).sum();
+        int completedSessions = history.stream().mapToInt(HorseAttendanceResponse::attended).sum();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("horseName", horse.getName());
         result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
         result.put("trainingDecision", horse.getTrainingDecision() != null ? horse.getTrainingDecision().name() : "N/A");
         result.put("decisionReason", horse.getTrainingDecisionReason() != null ? horse.getTrainingDecisionReason() : "Bình thường");
-        result.put("totalWorkouts", totalSessions);
+        result.put("totalSessions", totalSessions);
         result.put("completedSessions", completedSessions);
         return result;
     }
@@ -648,15 +598,12 @@ public class AiToolExecutionService {
         }
         verifyHorseOwnershipIfOwner(horse.getId(), currentUser);
 
-        List<TrainingWorkout> workouts = (trainingWorkoutRepository != null)
-                ? trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(horse.getId())
-                : Collections.emptyList();
+        List<TrainingWorkout> workouts = ranWorkouts(horse.getId());
 
         int tongSoBuoiTapDatYeuCau = 0;
         BigDecimal maxSpeed = BigDecimal.ZERO;
         for (TrainingWorkout w : workouts) {
-            if (w.getStatus() == WorkoutStatus.HELD && w.getActualDistanceMeters() != null
-                    && (w.getPerformanceRating() == null || w.getPerformanceRating() >= 6)) {
+            if (w.getPerformanceRating() != null && w.getPerformanceRating() >= 6) {
                 tongSoBuoiTapDatYeuCau++;
             }
             if (w.getTopSpeedKmh() != null && w.getTopSpeedKmh().compareTo(maxSpeed) > 0) {
@@ -772,20 +719,62 @@ public class AiToolExecutionService {
         if (horse == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
         }
-        List<TrainingWorkout> workouts = trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(horse.getId());
         List<Map<String, Object>> list = new ArrayList<>();
-        for (TrainingWorkout w : workouts) {
+        for (PastWorkoutRow row : pastWorkouts(horse.getId()).stream().limit(WORKOUT_HISTORY_LIMIT).toList()) {
+            TrainingWorkout w = row.workout();
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("horseName", horse.getName());
-            item.put("status", w.getStatus());
-            item.put("actualDistanceMeters", w.getActualDistanceMeters());
-            item.put("topSpeedKmh", w.getTopSpeedKmh());
-            item.put("avgHeartRate", w.getAverageHeartRate());
-            item.put("evaluationScore", w.getPerformanceRating());
-            item.put("trainerNotes", w.getTrainerFeedback());
+            item.put("workoutDate", row.sessionDate().toString());
+            item.put("sessionTime", formatCaTap(row.startTime(), row.endTime()));
+            item.put("groupName", groupLabel(row.groupName(), row.groupDisbanded()));
+            item.put("subjectName", row.subjectName());
+            item.put("outcome", outcome(row));
+            if (w.getStatus() == WorkoutStatus.RAN) {
+                item.put("actualDistanceMeters", w.getActualDistanceMeters());
+                item.put("topSpeedKmh", w.getTopSpeedKmh());
+                item.put("avgHeartRate", w.getAverageHeartRate());
+                item.put("maxHeartRate", w.getMaxHeartRate());
+                item.put("recoveryHeartRate", w.getRecoveryHeartRate());
+                item.put("evaluationScore", w.getPerformanceRating());
+                item.put("trainerNotes", w.getTrainerFeedback());
+            }
             list.add(item);
         }
         return list;
+    }
+
+    /** Workout trong các buổi đến hôm nay đã diễn ra hoặc đã hủy, mới nhất trước. (Workouts in Sessions up to today, newest first.) */
+    private List<PastWorkoutRow> pastWorkouts(Long horseId) {
+        return trainingWorkoutRepository.findPastWorkouts(horseId, LocalDate.now());
+    }
+
+    /** Workout đã chạy (có kết quả), mới nhất trước: nguồn của mọi phân tích thể lực. (Workouts that Ran, newest first.) */
+    private List<TrainingWorkout> ranWorkouts(Long horseId) {
+        return pastWorkouts(horseId).stream().map(PastWorkoutRow::workout)
+                .filter(w -> w.getStatus() == WorkoutStatus.RAN).toList();
+    }
+
+    /** Tỷ lệ của ngưỡng nhịp tim tính là cường độ cao. (Share of a heart-rate limit counted as high intensity.) */
+    private static final double HIGH_INTENSITY_SHARE = 0.9;
+
+    /**
+     * Có chỉ số nhịp tim nào vượt share × ngưỡng an toàn của hệ thống (ngưỡng cảnh báo trên giao diện) không.
+     * (Whether any heart-rate reading passes share × the app's safe limit, the same limits the UI alerts on.)
+     */
+    private static boolean overLimit(int maxHr, int avgHr, int recoveryHr, double share) {
+        return maxHr > share * HorsePerformanceService.MAX_HEART_RATE_LIMIT
+                || avgHr > share * HorsePerformanceService.AVERAGE_HEART_RATE_LIMIT
+                || recoveryHr > share * HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT;
+    }
+
+    /** Kết cục của một Workout, đúng nhãn trên giao diện. (A Workout's outcome, with the labels the UI uses.) */
+    private static String outcome(PastWorkoutRow row) {
+        return switch (row.workout().getStatus()) {
+            case RAN -> "Ran";
+            case HELD -> "Needs result";
+            case CANCELLED -> row.sessionStatus() == SessionStatus.HELD ? "Did not run" : "Cancelled";
+            case SCHEDULED -> "Scheduled";
+        };
     }
 
     private Object handleGetHorseFitnessTrend(Map<String, Object> args) {
@@ -800,7 +789,73 @@ public class AiToolExecutionService {
         );
     }
 
+    /**
+     * Các buổi trong 90 ngày qua còn Workout chưa xác nhận (HELD), cùng tên những con chưa có kết quả: danh sách việc cần điểm danh.
+     * (Sessions of the last 90 days with an unconfirmed (HELD) Workout, naming the horses without results: the roll call still to do.)
+     */
+    private Object sessionsNeedingResult(AuthenticatedUser currentUser) {
+        LocalDate today = LocalDate.now();
+        List<ScheduleSessionResponse> sessions = sessionScheduleService.getSessions(
+                today.minusDays(NEEDS_RESULT_LOOKBACK_DAYS), today, null, true, currentUser);
+        List<Map<String, Object>> list = new ArrayList<>();
+        int waiting = 0;
+        for (ScheduleSessionResponse session : sessions) {
+            List<String> horses = sessionScheduleService.getSession(session.id(), currentUser).horses().stream()
+                    .filter(horse -> "HELD".equals(horse.status()))
+                    .map(SessionHorseResponse::horseName)
+                    .toList();
+            waiting += horses.size();
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("workoutDate", session.date().toString());
+            item.put("sessionTime", formatCaTap(session.startTime(), session.endTime()));
+            item.put("groupName", groupLabel(session.groupName(), session.groupDisbanded()));
+            item.put("subjectName", session.subjectName());
+            item.put("needsResultCount", horses.size());
+            item.put("horseList", horses);
+            list.add(item);
+        }
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("totalSessions", list.size());
+        response.put("totalWorkoutsNeedingResult", waiting);
+        response.put("sessionList", list);
+        response.put("actionUrl", "/trainer/schedule");
+        return response;
+    }
+
+    /** Nhóm đang hoạt động và nhóm Disbanded của Trainer. (The Trainer's live and Disbanded groups.) */
+    private Object handleGetTrainerGroups(AuthenticatedUser currentUser) {
+        List<Map<String, Object>> live = trainingGroupService.getGroups(currentUser).stream().map(this::groupItem).toList();
+        List<Map<String, Object>> disbanded = trainingGroupService.getDisbandedGroups(currentUser).stream().map(this::groupItem).toList();
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("totalGroups", live.size());
+        response.put("groupList", live);
+        response.put("disbandedGroupCount", disbanded.size());
+        response.put("disbandedGroupList", disbanded);
+        response.put("actionUrl", "/trainer/groups");
+        return response;
+    }
+
+    private Map<String, Object> groupItem(TrainingGroupResponse group) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("groupName", groupLabel(group.name(), group.disbanded()));
+        item.put("horseCount", group.members().size() + "/" + TrainingLimits.MAX_HORSES_PER_GROUP);
+        item.put("horseList", group.members().stream()
+                .map(member -> member.horseName() + " (Groom: " + (member.groomName() != null ? member.groomName() : "chưa có") + ")")
+                .toList());
+        if (group.currentPlanStatus() != null) {
+            item.put("currentCourse", group.currentCourseName());
+            item.put("currentPlanStatus", planStatusLabel(group.currentPlanStatus()));
+            item.put("currentPlanPeriod", group.currentPlanStartDate() + " → " + group.currentPlanEndDate());
+        } else {
+            item.put("currentCourse", group.disbanded() ? "Đã giải tán" : "Đang rảnh (chưa giao khóa)");
+        }
+        return item;
+    }
+
     private Object handleGetTrainerSchedule(Map<String, Object> args, AuthenticatedUser currentUser) {
+        if (Boolean.parseBoolean(String.valueOf(args.get("needsResultOnly")))) {
+            return sessionsNeedingResult(currentUser);
+        }
         Long trainerId = currentUser.getUserId();
         LocalDate from;
         LocalDate to;
@@ -852,17 +907,19 @@ public class AiToolExecutionService {
         String status = args.get("status") != null ? args.get("status").toString().trim() : null;
 
         List<PlanSummaryResponse> summaries = groupPlanRepository.findPlanSummaries(trainerId, horseId);
-        if (status != null && !status.isBlank()) {
-            summaries = summaries.stream()
-                    .filter(p -> p.getStatus() != null && p.getStatus().name().equalsIgnoreCase(status))
-                    .toList();
-        }
-        if (summaries == null || summaries.isEmpty()) {
-            return Collections.emptyList();
+        // Số buổi và trạng thái lấy từ Attendance, như màn hình lịch sử. (Counts and status come from Attendance, as on screen.)
+        Map<Long, Map<Long, HorseAttendanceResponse>> historyByHorse = new HashMap<>();
+        for (Long id : summaries.stream().map(PlanSummaryResponse::getHorseId).distinct().toList()) {
+            historyByHorse.put(id, horseAttendanceService.getHistory(id, currentUser).stream()
+                    .collect(Collectors.toMap(HorseAttendanceResponse::planId, Function.identity(), (a, b) -> a)));
         }
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (PlanSummaryResponse p : summaries) {
+            HorseAttendanceResponse line = historyByHorse.getOrDefault(p.getHorseId(), Map.of()).get(p.getPlanId());
+            if (line == null || (status != null && !status.isBlank() && !status.equalsIgnoreCase(line.planStatus()))) {
+                continue;
+            }
             String targetGoal = "Nâng cao thể lực, sức bền và kỹ năng thi đấu";
             if (courseRepository != null && p.getCourseId() != null) {
                 targetGoal = courseRepository.findById(p.getCourseId())
@@ -870,30 +927,8 @@ public class AiToolExecutionService {
                         .filter(g -> g != null && !g.isBlank())
                         .orElse(targetGoal);
             }
-            String trangThai;
-            if (p.getStatus() != null) {
-                trangThai = switch (p.getStatus()) {
-                    case ACTIVE -> "Đang diễn ra (ACTIVE)";
-                    case UPCOMING -> "Sắp diễn ra (UPCOMING)";
-                    case COMPLETED -> "Đã hoàn thành (COMPLETED)";
-                    case CANCELLED -> "Đã hủy (CANCELLED)";
-                    default -> p.getStatus().name();
-                };
-            } else {
-                trangThai = "N/A";
-            }
-
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("planName", p.getCourseName() != null ? p.getCourseName() : "Kế hoạch huấn luyện");
-            item.put("horseName", p.getHorseName() != null ? p.getHorseName() : "Ngựa thi đấu");
+            Map<String, Object> item = attendanceItem(p.getHorseName() != null ? p.getHorseName() : "Ngựa thi đấu", line);
             item.put("targetGoal", targetGoal);
-            item.put("status", trangThai);
-            item.put("progress", (p.getCompletedSessions() != null ? p.getCompletedSessions() : 0) + "/"
-                    + (p.getTotalSessions() != null ? p.getTotalSessions() : 0) + " buổi hoàn thành");
-            item.put("completedSessions", p.getCompletedSessions());
-            item.put("totalSessions", p.getTotalSessions());
-            item.put("startDate", p.getStartDate() != null ? p.getStartDate().toString() : "N/A");
-            item.put("endDate", p.getEndDate() != null ? p.getEndDate().toString() : "N/A");
             result.add(item);
         }
         return result;
@@ -1246,7 +1281,7 @@ public class AiToolExecutionService {
         return result;
     }
 
-    private Object handleCheckGroomConflictForLot(Map<String, Object> args) {
+    private Object handleCheckGroomConflict(Map<String, Object> args) {
         Horse horse = resolveHorse(args);
         Long horseId = horse != null ? horse.getId() : parseLong(args.get("horseId"));
         Long groomId = parseLong(args.get("groomId"));
@@ -1447,17 +1482,11 @@ public class AiToolExecutionService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
         }
 
-        List<TrainingWorkout> workouts = (trainingWorkoutRepository != null)
-                ? trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(horse.getId())
-                : Collections.emptyList();
-
-        LocalDateTime fourteenDaysAgo = LocalDateTime.now().minusDays(14);
-        List<TrainingWorkout> recentWorkouts = workouts.stream()
-                .filter(w -> w.getCreatedAt() == null || !w.getCreatedAt().isBefore(fourteenDaysAgo))
+        LocalDate fourteenDaysAgo = LocalDate.now().minusDays(14);
+        List<TrainingWorkout> recentWorkouts = pastWorkouts(horse.getId()).stream()
+                .filter(row -> row.workout().getStatus() == WorkoutStatus.RAN && !row.sessionDate().isBefore(fourteenDaysAgo))
+                .map(PastWorkoutRow::workout)
                 .toList();
-        if (recentWorkouts.isEmpty() && !workouts.isEmpty()) {
-            recentWorkouts = workouts;
-        }
 
         double totalDistanceMeters = 0.0;
         int highIntensityCount = 0;
@@ -1483,12 +1512,13 @@ public class AiToolExecutionService {
             if (rHr != null && rHr > maxRecoveryHr) {
                 maxRecoveryHr = rHr;
             }
-            if ((mHr != null && mHr >= 120) || (w.getTopSpeedKmh() != null && w.getTopSpeedKmh().doubleValue() >= 55.0)) {
+            if ((mHr != null && mHr >= HIGH_INTENSITY_SHARE * HorsePerformanceService.MAX_HEART_RATE_LIMIT)
+                    || (w.getTopSpeedKmh() != null && w.getTopSpeedKmh().doubleValue() >= 55.0)) {
                 highIntensityCount++;
             }
         }
 
-        int avgHeartRate = hrCount > 0 ? (int) Math.round((double) sumHr / hrCount) : (maxHr > 0 ? maxHr - 15 : 95);
+        int avgHeartRate = hrCount > 0 ? (int) Math.round((double) sumHr / hrCount) : 0;
         String tongCuLy14Ngay = totalDistanceMeters >= 1000.0
                 ? String.format(Locale.US, "%.1f km", totalDistanceMeters / 1000.0)
                 : String.format(Locale.US, "%.0f m", totalDistanceMeters);
@@ -1500,10 +1530,10 @@ public class AiToolExecutionService {
         if (isBlocked) {
             danhGiaNguyCo = "Cao";
             khuyenNghiHuanLuyen = "Chiến mã đang trong diện cách ly y tế hoặc có quyết định hạn chế tập luyện (BLOCKED). Tuyệt đối ngưng mọi bài tập vận động nặng, tuân thủ phác đồ điều trị và theo dõi hồi phục tại chuồng.";
-        } else if (maxHr >= 130 || avgHeartRate > 115 || maxRecoveryHr > 105 || highIntensityCount >= 5) {
+        } else if (overLimit(maxHr, avgHeartRate, maxRecoveryHr, 1.0) || highIntensityCount >= 5) {
             danhGiaNguyCo = "Cao";
             khuyenNghiHuanLuyen = "Khối lượng vận động 14 ngày qua chạm ngưỡng quá tải. Khuyến nghị giảm 30-50% cự ly bài tập kế tiếp, tăng cường đi bộ hồi phục trên sân cỏ và đo nhịp tim trước ca tập.";
-        } else if (maxHr >= 115 || avgHeartRate > 100 || highIntensityCount >= 3) {
+        } else if (overLimit(maxHr, avgHeartRate, maxRecoveryHr, HIGH_INTENSITY_SHARE) || highIntensityCount >= 3) {
             danhGiaNguyCo = "Trung bình";
             khuyenNghiHuanLuyen = "Cường độ tập luyện ở mức trung bình ổn định. Khuyến nghị duy trì lịch tập xen kẽ ngày nghỉ hồi phục và theo dõi sát bước đi sau khi hoàn thành cự ly dài.";
         } else {
@@ -1516,8 +1546,8 @@ public class AiToolExecutionService {
         result.put("registrationNumber", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
         result.put("totalDistance14Days", tongCuLy14Ngay);
         result.put("workoutCount", recentWorkouts.size());
-        result.put("avgHeartRate", avgHeartRate + " bpm");
-        result.put("maxHeartRate", (maxHr > 0 ? maxHr : 110) + " bpm");
+        result.put("avgHeartRate", avgHeartRate > 0 ? avgHeartRate + " bpm" : "N/A");
+        result.put("maxHeartRate", maxHr > 0 ? maxHr + " bpm" : "N/A");
         result.put("highIntensitySessions", highIntensityCount);
         result.put("riskAssessment", danhGiaNguyCo);
         result.put("trainingRecommendations", khuyenNghiHuanLuyen);
@@ -1536,9 +1566,7 @@ public class AiToolExecutionService {
                 : Collections.emptyMap();
         HorseSpecialtyResponse resp = specialties.get(horse.getId());
 
-        List<TrainingWorkout> workouts = (trainingWorkoutRepository != null)
-                ? trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(horse.getId())
-                : Collections.emptyList();
+        List<TrainingWorkout> workouts = ranWorkouts(horse.getId());
 
         String cuLyDeXuat;
         if (resp != null && resp.strongDistances() != null && !resp.strongDistances().isEmpty()) {
@@ -1588,9 +1616,7 @@ public class AiToolExecutionService {
 
         boolean isBlocked = isHorseInQuarantineOrBlocked(horse);
 
-        List<TrainingWorkout> workouts = (trainingWorkoutRepository != null)
-                ? trainingWorkoutRepository.findByHorseIdOrderByCreatedAtDesc(horse.getId())
-                : Collections.emptyList();
+        List<TrainingWorkout> workouts = ranWorkouts(horse.getId());
         TrainingWorkout latest = workouts.isEmpty() ? null : workouts.get(0);
 
         String buoiTapGanNhat;
@@ -1604,16 +1630,17 @@ public class AiToolExecutionService {
             baiTapKeTiepDeXuat = "Nghỉ ngơi hoàn toàn tại chuồng (Resting in Stall), tạm hoãn xếp ca tập cho đến khi bác sĩ thú y gỡ bỏ giới hạn y tế.";
             lyDoDieuChinh = "Tuân thủ tuyệt đối quy định an toàn sinh học và bảo vệ sức khỏe đàn ngựa (BR-Medical-Block).";
         } else if (latest != null) {
-            boolean highHeartRate = (latest.getMaxHeartRate() != null && latest.getMaxHeartRate() > 110)
-                    || (latest.getAverageHeartRate() != null && latest.getAverageHeartRate() > 110)
-                    || (latest.getRecoveryHeartRate() != null && latest.getRecoveryHeartRate() > 100);
-            boolean notCompleted = latest.getStatus() != null
-                    && !(latest.getStatus() == WorkoutStatus.HELD && latest.getActualDistanceMeters() != null);
+            boolean highHeartRate = overLimit(
+                    latest.getMaxHeartRate() != null ? latest.getMaxHeartRate() : 0,
+                    latest.getAverageHeartRate() != null ? latest.getAverageHeartRate() : 0,
+                    latest.getRecoveryHeartRate() != null ? latest.getRecoveryHeartRate() : 0, 1.0);
 
-            if (highHeartRate || notCompleted) {
+            if (highHeartRate) {
                 buoiTapGanNhat = "Cự ly " + (latest.getActualDistanceMeters() != null ? latest.getActualDistanceMeters() + "m" : "tiêu chuẩn")
-                        + ", nhịp tim ghi nhận " + (latest.getMaxHeartRate() != null ? latest.getMaxHeartRate() : (latest.getAverageHeartRate() != null ? latest.getAverageHeartRate() : 115)) + " bpm";
-                nhanXetTheLuc = "Nhịp tim sau bài tập vượt ngưỡng an toàn (>110 bpm) hoặc trạng thái buổi tập chưa đạt chuẩn toàn diện.";
+                        + ", nhịp tim tối đa " + latest.getMaxHeartRate() + " bpm, hồi phục " + latest.getRecoveryHeartRate() + " bpm";
+                nhanXetTheLuc = "Nhịp tim vượt ngưỡng an toàn của hệ thống (tối đa " + HorsePerformanceService.MAX_HEART_RATE_LIMIT
+                        + ", trung bình " + HorsePerformanceService.AVERAGE_HEART_RATE_LIMIT + ", hồi phục "
+                        + HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT + " bpm).";
                 baiTapKeTiepDeXuat = "Giảm tải 30% cự ly, chuyển sang bài tập đi bộ phục hồi nhẹ nhàng trên sân cỏ tự nhiên (Turf Walking).";
                 lyDoDieuChinh = "Tạo thời gian cho cơ tim và cơ bắp giải phóng acid lactic, tránh nguy cơ căng cơ hoặc chấn thương gân.";
             } else {
@@ -1715,7 +1742,6 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("horseName", horse.getName());
             item.put("examDate", hr.getExaminedAt());
-            item.put("symptoms", hr.getSymptoms());
             item.put("clinicalObservations", hr.getFindings());
             item.put("diagnosis", hr.getDiagnosis());
             item.put("treatmentPlan", hr.getTreatment());
@@ -1732,7 +1758,7 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
         }
         List<CareSchedule> active = careScheduleRepository.findByHorseIdAndStatusIn(
-                horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
+                horse.getId(), CareScheduleStatus.BOOKED_OR_ACTIVE
         ).stream()
                 .filter(cs -> cs.getVeterinarianId() == null || cs.getVeterinarianId().equals(currentUser.getUserId()))
                 .toList();
@@ -1925,8 +1951,7 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
         List<CareSchedule> all = careScheduleRepository.findByVeterinarianId(currentUser.getUserId());
         List<CareSchedule> urgent = all.stream()
                 .filter(cs -> cs.getCareType() == CareType.URGENT
-                        && cs.getStatus() != CareScheduleStatus.COMPLETED
-                        && cs.getStatus() != CareScheduleStatus.CANCELLED)
+                        && cs.getStatus() != CareScheduleStatus.COMPLETED)
                 .toList();
 
         Map<Long, Horse> horses = horseRepository.findAll().stream()
@@ -2047,8 +2072,8 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         for (HealthRecord hr : records) {
             if (hr.getDiagnosis() != null && !hr.getDiagnosis().isBlank()) {
                 conditions.add(hr.getDiagnosis().trim());
-            } else if (hr.getSymptoms() != null && !hr.getSymptoms().isBlank()) {
-                conditions.add(hr.getSymptoms().trim());
+            } else if (hr.getFindings() != null && !hr.getFindings().isBlank()) {
+                conditions.add(hr.getFindings().trim());
             }
         }
         for (HorseIncidentReport ir : incidents) {
@@ -2106,7 +2131,7 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         }
 
         String phacDoCanThiepDeXuat = "Bước 1 (Xử trí ban đầu): Ngay lập tức cách ly tại chuồng bệnh, đặt đường truyền tĩnh mạch bù nước & điện giải, tạm ngưng thức ăn thô. "
-                + "Bước 2 (Can thiệp chuyên sâu): Sử dụng thuốc kháng viêm không steroid (NSAID Flunixin Meglumine 1.1 mg/kg IV) và thuốc bảo vệ niêm mạc; theo dõi nhu động ruột mỗi 2 giờ.";
+                + "Bước 2 (Can thiệp chuyên sâu): Sử dụng thuốc kháng viêm không steroid (NSAID Flunixin Meglumine 1.1 mg/kg IV) và thuốc bảo vệ niêm mạc, theo dõi nhu động ruột mỗi 2 giờ.";
 
         String xetNghiemCanLam = "Tổng phân tích tế bào máu (CBC), đo nồng độ Lactate huyết tương, sinh hóa máu đánh giá chức năng gan/thận và chụp X-quang/siêu âm ổ bụng hoặc chi dưới.";
         String thoiGianTheoDoiToiThieu = "24 - 48 giờ liên tục dưới sự giám sát trực tiếp của Bác sĩ thú y trực ban.";
@@ -2181,7 +2206,11 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         Long groomId = currentUser.getUserId();
         List<StableStall> stalls = stableStallRepository.findByGroomId(groomId);
         if (stalls.isEmpty()) {
-            return Map.of("message", "Hiện tại bạn chưa được phân công phụ trách chuồng nào.", "stallAndHorseList", Collections.emptyList()
+            return Map.of(
+                    "message", "Hiện tại bạn chưa được phân công phụ trách chuồng nào.",
+                    "assignedStallsCount", 0,
+                    "stallsWithHorsesCount", 0,
+                    "stallAndHorseList", Collections.emptyList()
             );
         }
 
@@ -2249,7 +2278,7 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         }
 
         List<CareSchedule> activeSchedules = careScheduleRepository.findByHorseIdAndStatusIn(
-                horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
+                horse.getId(), CareScheduleStatus.BOOKED_OR_ACTIVE
         );
         List<Map<String, Object>> careList = activeSchedules.stream().map(cs -> Map.<String, Object>of(
                 "loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám thú y", "scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A", "purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A"
@@ -2337,14 +2366,17 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         return result;
     }
 
-    private Object handleDetectHorseBehavioralAnomaly(Map<String, Object> args) {
+    private Object handleDetectHorseBehavioralAnomaly(Map<String, Object> args, AuthenticatedUser currentUser) {
         Horse horse = resolveHorse(args);
         if (horse == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
         }
 
+        // Groom chỉ xem báo cáo do chính mình gửi, kể cả qua công cụ AI.
         List<HorseIncidentReport> incidents = (horseIncidentReportRepository != null)
-                ? horseIncidentReportRepository.findByHorseId(horse.getId())
+                ? horseIncidentReportRepository.findByHorseId(horse.getId()).stream()
+                        .filter(r -> currentUser.getUserId().equals(r.getReportedById()))
+                        .toList()
                 : Collections.emptyList();
         List<HorseHealthMetric> metrics = (horseHealthMetricRepository != null)
                 ? horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(horse.getId())
@@ -2380,11 +2412,11 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         String hanhDongCanLamNgay;
 
         if (colicSuspected) {
-            dauHieuBatThuong = !detectedAnomalies.isEmpty() ? String.join("; ", detectedAnomalies) : "Phát hiện dấu hiệu cào đất, bỏ ăn và nhịp tim nghỉ tăng cao";
+            dauHieuBatThuong = !detectedAnomalies.isEmpty() ? String.join(", ", detectedAnomalies) : "Phát hiện dấu hiệu cào đất, bỏ ăn và nhịp tim nghỉ tăng cao";
             mucDoCanhBao = "Khẩn cấp";
             hanhDongCanLamNgay = "Cảnh báo nguy cơ đau bụng Colic cấp tính! Báo ngay cho Bác sĩ thú y trực ban, tạm ngưng toàn bộ thức ăn thô và tinh, không để ngựa nằm lăn tròn trong chuồng, dắt đi bộ nhẹ nhàng.";
         } else if (mildAnomaly) {
-            dauHieuBatThuong = !detectedAnomalies.isEmpty() ? String.join("; ", detectedAnomalies) : "Dấu hiệu uể oải nhẹ, giảm lượng ăn";
+            dauHieuBatThuong = !detectedAnomalies.isEmpty() ? String.join(", ", detectedAnomalies) : "Dấu hiệu uể oải nhẹ, giảm lượng ăn";
             mucDoCanhBao = "Trung bình";
             hanhDongCanLamNgay = "Theo dõi sát lượng nước uống và thức ăn trong 4 giờ tới, kiểm tra phân và đo lại thân nhiệt định kỳ.";
         } else {
@@ -2845,7 +2877,11 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
 
     private Object handleGetRecentAuditLogs(Map<String, Object> args) {
         if (auditLogRepository == null) {
-            return Collections.emptyList();
+            Map<String, Object> emptyResp = new LinkedHashMap<>();
+            emptyResp.put("totalAuditLogs", 0);
+            emptyResp.put("auditLogList", Collections.emptyList());
+            emptyResp.put("actionUrl", "/manager/audit-log");
+            return emptyResp;
         }
         int limit = parseInteger(args.get("limit"), 10);
         if (limit <= 0) limit = 10;

@@ -9,6 +9,7 @@ import java.time.LocalDate;
  */
 public record HorseAttendanceResponse(Long planId,
                                       String groupName,
+                                      boolean groupDisbanded,
                                       String courseName,
                                       String planStatus,
                                       LocalDate startDate,

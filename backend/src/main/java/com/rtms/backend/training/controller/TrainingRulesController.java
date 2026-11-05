@@ -34,6 +34,7 @@ public class TrainingRulesController {
                 SubjectService.MIN_DURATION_MINUTES,
                 SubjectService.MAX_DURATION_MINUTES,
                 HorsePerformanceService.MAX_HEART_RATE_LIMIT,
+                HorsePerformanceService.AVERAGE_HEART_RATE_LIMIT,
                 HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT));
     }
 }

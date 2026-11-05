@@ -33,7 +33,7 @@ SELECT r.horse_id, r.at,
        pg_temp.rndi('b' || r.horse_id, 9, 13) / 2.0,
        CASE r.kind WHEN 'sick' THEN 'Daily check during the rest period.'
                    WHEN 'fatigue' THEN 'Rechecked after a tiring session: heart rate still up in the afternoon.'
-                   WHEN 'fever' THEN 'Slightly warm on the round; recheck tomorrow.'
+                   WHEN 'fever' THEN 'Slightly warm on the round, recheck tomorrow.'
                    WHEN 'high_hr' THEN 'Heart rate up on the round, settled after 15 minutes.'
                    ELSE 'Stable round.' END,
        r.at
@@ -57,7 +57,7 @@ SELECT r.horse_id, r.at,
         -- Sau buổi tập mệt. (After a tiring session.)
         SELECT DISTINCT w.horse_id, s.session_date + TIME '15:00', 'fatigue'
           FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id
-         WHERE w.status = 'HELD' AND w.recovery_heart_rate >= 118 AND s.session_date >= pg_temp.today() - 34
+         WHERE w.status = 'RAN' AND w.recovery_heart_rate >= 118 AND s.session_date >= pg_temp.today() - 34
        ) r
  WHERE r.at <= pg_temp.clock()
  ORDER BY r.at, r.horse_id;

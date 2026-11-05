@@ -21,6 +21,8 @@ import { displayError } from '@/lib/display';
 export interface HorseProfileContext {
   horse: Horse;
   specialty: HorseSpecialty | null;
+  /** Re-reads the horse in place, keeping the open tab. */
+  refreshHorse: () => void;
 }
 
 type ProfileContent = ReactNode | ((profile: HorseProfileContext) => ReactNode);
@@ -43,6 +45,8 @@ export interface HorseProfileViewProps {
   extraTabs?: readonly HorseDetailTab[] | ((profile: HorseProfileContext) => readonly HorseDetailTab[]);
   /** Additional actor context below the common Overview cards. */
   overviewContent?: ProfileContent;
+  /** Whether to show the Racing profile / specialty section in the Overview tab. Defaults to true. */
+  showSpecialty?: boolean;
 }
 
 function HorseProfileContent({
@@ -53,6 +57,7 @@ function HorseProfileContent({
   sidebar,
   extraTabs = [],
   overviewContent,
+  showSpecialty = true,
 }: HorseProfileViewProps) {
   const [horse, setHorse] = useState<Horse | null>(null);
   const [specialty, setSpecialty] = useState<HorseSpecialty | null>(null);
@@ -64,6 +69,11 @@ function HorseProfileContent({
   const reload = useCallback(() => {
     setReloadKey((k) => k + 1);
   }, []);
+
+  // Keeps the open tab: reload() clears the horse, which remounts every tab.
+  const refreshHorse = useCallback(() => {
+    void horseService.getById(horseId).then(setHorse).catch(() => undefined);
+  }, [horseId]);
 
   useEffect(() => {
     let active = true;
@@ -150,11 +160,11 @@ function HorseProfileContent({
     );
   }
 
-  const profile: HorseProfileContext = { horse, specialty };
+  const profile: HorseProfileContext = { horse, specialty, refreshHorse };
   const actorTabs = typeof extraTabs === 'function' ? extraTabs(profile) : extraTabs;
   const overview = typeof overviewContent === 'function' ? overviewContent(profile) : overviewContent;
   const tabs: HorseDetailTab[] = [
-    { id: 'overview', label: 'Overview', content: <HorseOverview horse={horse} specialty={specialty}>{overview}</HorseOverview> },
+    { id: 'overview', label: 'Overview', content: <HorseOverview horse={horse} specialty={specialty} showSpecialty={showSpecialty}>{overview}</HorseOverview> },
     ...actorTabs.filter((tab) => tab.id !== 'overview'),
   ];
 
@@ -189,6 +199,7 @@ export function HorseProfileView({
   sidebar,
   extraTabs = [],
   overviewContent,
+  showSpecialty,
 }: HorseProfileViewProps) {
   return (
     <HorseProfileContent
@@ -200,6 +211,7 @@ export function HorseProfileView({
       sidebar={sidebar}
       extraTabs={extraTabs}
       overviewContent={overviewContent}
+      showSpecialty={showSpecialty}
     />
   );
 }

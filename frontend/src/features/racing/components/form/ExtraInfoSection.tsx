@@ -28,7 +28,7 @@ export function ExtraInfoSection({
         <FormField label="Prize structure (optional)" className="md:col-span-2">
           <Textarea
             rows={2}
-            placeholder="e.g. 1st: VND 50 million; 2nd: VND 25 million; 3rd: VND 10 million"
+            placeholder="e.g. 1st: VND 50 million, 2nd: VND 25 million, 3rd: VND 10 million"
             value={values.prizeDetails}
             onChange={(e) => onChange('prizeDetails', e.target.value)}
           />

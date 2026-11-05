@@ -24,6 +24,7 @@ class TrainingRulesControllerTest {
         assertEquals(15, rules.minSubjectDurationMinutes());
         assertEquals(240, rules.maxSubjectDurationMinutes());
         assertEquals(220, rules.maxHeartRateLimit());
+        assertEquals(180, rules.averageHeartRateLimit());
         assertEquals(100, rules.recoveryHeartRateLimit());
     }
 }

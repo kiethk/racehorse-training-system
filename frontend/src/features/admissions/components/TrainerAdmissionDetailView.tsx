@@ -166,7 +166,7 @@ export function TrainerAdmissionDetailView({ admissionId, returnTo }: TrainerAdm
                 {hr.trainingDecision && <div className="font-semibold">Training Decision: {hr.trainingDecision}</div>}
                 {hr.restrictionDetails && <div>Medical Restrictions: {hr.restrictionDetails}</div>}
                 {hr.diagnosis && <div>Diagnosis: {hr.diagnosis}</div>}
-                {hr.symptoms && <div className="text-[var(--color-text-secondary)]">Symptoms: {hr.symptoms}</div>}
+                {hr.findings && <div className="text-[var(--color-text-secondary)]">Findings: {hr.findings}</div>}
                 {hr.treatment && <div className="text-[var(--color-text-secondary)]">Treatment: {hr.treatment}</div>}
                 {hr.notes && <div className="text-[var(--color-text-secondary)] italic">Notes: {hr.notes}</div>}
               </li>

@@ -9,7 +9,9 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
+import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
 import com.rtms.backend.medical.dto.VaccinationRequest;
+import com.rtms.backend.medical.enums.HydrationStatus;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.PreventiveProtocol;
@@ -21,6 +23,8 @@ import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.notification.service.NotificationService;
+import org.junit.jupiter.api.DisplayName;
+
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
@@ -37,6 +41,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -76,7 +81,9 @@ class CareSchedulePreventiveIntegrationTest {
         service = new CareScheduleService(schedules, horses, healthRecords, metrics, admissions, stalls, users,
                 incidents, profiles, audits, events, entityManager, notifications,
                 new TrainingDecisionService(horses, schedules, workouts), vaccinations,
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class));
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
+                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
+                new com.fasterxml.jackson.databind.ObjectMapper());
 
         horse = new Horse();
         horse.setId(10L);
@@ -244,36 +251,16 @@ class CareSchedulePreventiveIntegrationTest {
     // ---- LAST_FOLLOW_UP ----
 
     @Test
+    @DisplayName("AD-022: cancelCareSchedule abolished — care schedules are moved via reschedule instead")
     void blockedHorseCannotLoseItsLastFollowUpEvenIfAPreventiveMilestoneExists() {
-        horse.setTrainingDecision(TrainingDecision.BLOCKED);
-        exam.setStatus(CareScheduleStatus.SCHEDULED);
-        when(users.findById(1L)).thenReturn(Optional.of(manager()));
-        when(horses.findById(10L)).thenReturn(Optional.of(horse));
-        // Chỉ còn mốc tiêm phòng: query lọc FOLLOW_UP trả false.
-        when(schedules.existsByHorseIdAndPurposeAndStatusInAndIdNot(
-                eq(10L), eq(CareSchedulePurpose.FOLLOW_UP), anyList(), eq(100L))).thenReturn(false);
-
-        var cancel = new com.rtms.backend.medical.dto.CancelCareScheduleRequest();
-        cancel.setReason("Vet on leave");
-        ApiException error = assertThrows(ApiException.class, () -> service.cancelCareSchedule(100L, cancel, 1L));
-
-        assertEquals("LAST_FOLLOW_UP", error.getErrorCode());
+        // Under AD-022, cancelCareSchedule is removed. Blocked horses retain their follow-ups.
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
     }
 
     @Test
+    @DisplayName("AD-022: preventive milestone cancellation abolished")
     void preventiveMilestoneOfABlockedHorseCanBeCancelled() {
-        horse.setTrainingDecision(TrainingDecision.BLOCKED);
-        exam.setStatus(CareScheduleStatus.SCHEDULED);
-        exam.setPurpose(CareSchedulePurpose.PREVENTIVE);
-        when(users.findById(1L)).thenReturn(Optional.of(manager()));
-        when(horses.findById(10L)).thenReturn(Optional.of(horse));
-
-        var cancel = new com.rtms.backend.medical.dto.CancelCareScheduleRequest();
-        cancel.setReason("Gộp vào ca khác");
-        service.cancelCareSchedule(100L, cancel, 1L);
-
-        assertEquals(CareScheduleStatus.CANCELLED, exam.getStatus());
-        verify(schedules, never()).existsByHorseIdAndPurposeAndStatusInAndIdNot(any(), any(), any(), any());
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
     }
 
     // ---- helpers ----
@@ -283,6 +270,14 @@ class CareSchedulePreventiveIntegrationTest {
         request.setFindings("Normal");
         request.setDiagnosis("Healthy");
         request.setTrainingDecision(TrainingDecision.ALLOWED);
+        HorseHealthMetricRequest m = new HorseHealthMetricRequest();
+        m.setHeartRate(BigDecimal.valueOf(36));
+        m.setTemperature(BigDecimal.valueOf(37.8));
+        m.setWeight(BigDecimal.valueOf(450));
+        m.setRespiratoryRate(BigDecimal.valueOf(12));
+        m.setHydrationStatus(HydrationStatus.NORMAL);
+        m.setBodyConditionScore(BigDecimal.valueOf(5.5));
+        request.setMetrics(List.of(m));
         return request;
     }
 

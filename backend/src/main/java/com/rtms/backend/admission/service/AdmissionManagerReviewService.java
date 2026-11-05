@@ -2,6 +2,8 @@ package com.rtms.backend.admission.service;
 
 import com.rtms.backend.admission.dto.ManagerReviewRequest;
 import com.rtms.backend.admission.entity.AdmissionApplication;
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.stable.entity.StableStall;
@@ -16,6 +18,7 @@ import com.rtms.backend.medical.service.PreventiveStatusService;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.identity.repository.GroomProfileRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class AdmissionManagerReviewService {
@@ -36,6 +40,29 @@ public class AdmissionManagerReviewService {
     private final PreventiveStatusService preventiveStatusService;
     private final GroomProfileRepository groomProfileRepository;
     private final AdmissionNotificationService admissionNotificationService;
+    private final AuditLogService auditLogService;
+
+    @Autowired
+    public AdmissionManagerReviewService(
+            AdmissionApplicationRepository admissionApplicationRepository,
+            StableStallRepository stableStallRepository,
+            HorseRepository horseRepository,
+            CareScheduleRepository careScheduleRepository,
+            AdmissionGroomReviewService admissionGroomReviewService,
+            PreventiveStatusService preventiveStatusService,
+            GroomProfileRepository groomProfileRepository,
+            AdmissionNotificationService admissionNotificationService,
+            AuditLogService auditLogService) {
+        this.admissionApplicationRepository = admissionApplicationRepository;
+        this.stableStallRepository = stableStallRepository;
+        this.horseRepository = horseRepository;
+        this.careScheduleRepository = careScheduleRepository;
+        this.admissionGroomReviewService = admissionGroomReviewService;
+        this.preventiveStatusService = preventiveStatusService;
+        this.groomProfileRepository = groomProfileRepository;
+        this.admissionNotificationService = admissionNotificationService;
+        this.auditLogService = auditLogService;
+    }
 
     public AdmissionManagerReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
@@ -46,14 +73,9 @@ public class AdmissionManagerReviewService {
             PreventiveStatusService preventiveStatusService,
             GroomProfileRepository groomProfileRepository,
             AdmissionNotificationService admissionNotificationService) {
-        this.admissionApplicationRepository = admissionApplicationRepository;
-        this.stableStallRepository = stableStallRepository;
-        this.horseRepository = horseRepository;
-        this.careScheduleRepository = careScheduleRepository;
-        this.admissionGroomReviewService = admissionGroomReviewService;
-        this.preventiveStatusService = preventiveStatusService;
-        this.groomProfileRepository = groomProfileRepository;
-        this.admissionNotificationService = admissionNotificationService;
+        this(admissionApplicationRepository, stableStallRepository, horseRepository,
+             careScheduleRepository, admissionGroomReviewService, preventiveStatusService,
+             groomProfileRepository, admissionNotificationService, null);
     }
 
     @Transactional
@@ -162,6 +184,30 @@ public class AdmissionManagerReviewService {
                 horse.getName() + " was approved and moved to stall " + regularStall.getStallCode() + ", which you look after.");
         admissionNotificationService.notifyOwnerApproved(admission, horse, regularStall);
         admissionGroomReviewService.allocateWaitingAdmissions();
+
+        if (auditLogService != null) {
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .userId(managerId)
+                    .action("MANAGER_ADMISSION_APPROVAL")
+                    .entityName("AdmissionApplication")
+                    .entityId(admission.getId())
+                    .module("ADMISSIONS")
+                    .summary("Club Manager approved admission application and allocated stall " + regularStall.getStallCode())
+                    .reason(admission.getManagerFeedback())
+                    .targetUrl("/manager/admissions/" + admission.getId())
+                    .before(Map.of(
+                            "admissionStatus", "MANAGER_REVIEW",
+                            "horseStatus", "CANDIDATE",
+                            "regularStall", "None"
+                    ))
+                    .after(Map.of(
+                            "admissionStatus", "APPROVED",
+                            "horseStatus", "ELIGIBLE",
+                            "regularStall", regularStall.getStallCode()
+                    ))
+                    .build());
+        }
+
         return admission;
     }
 
@@ -194,23 +240,22 @@ public class AdmissionManagerReviewService {
         horse.setCurrentStallId(null);
         horseRepository.save(horse);
 
-        // Cancel active CareSchedule records for this horse
+        // AD-022/AD-025 rule 6: lịch chưa diễn ra của ngựa rớt tuyển bị xóa cứng, không CANCELLED.
         if (careScheduleRepository != null) {
+            // AD-022: OVERDUE thay thế IN_PROGRESS trong danh sách chặn — ca đã bắt đầu khám
+            // thì vẫn phải chặn reject như trước, không được âm thầm xóa mất.
             List<CareSchedule> nonCancellableSchedules =
-                    careScheduleRepository.findByHorseIdAndStatusIn(
-                            horse.getId(), List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS));
+                    careScheduleRepository.findByHorseIdAndStatusIn(horse.getId(),
+                            List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS,
+                                    CareScheduleStatus.DELAYED, CareScheduleStatus.OVERDUE, CareScheduleStatus.PAUSED));
             if (!nonCancellableSchedules.isEmpty()) {
                 throw new IllegalStateException(
-                        "Admission cannot be rejected while veterinary care is REQUESTED or IN_PROGRESS");
+                        "Admission cannot be rejected while veterinary care is REQUESTED, IN_PROGRESS,"
+                                + " DELAYED, OVERDUE or PAUSED");
             }
-            List<CareSchedule> careSchedulesToCancel =
-                    careScheduleRepository.findByHorseIdAndStatusIn(
-                            horse.getId(), List.of(CareScheduleStatus.SCHEDULED));
-            for (CareSchedule cs : careSchedulesToCancel) {
-                cs.setStatus(CareScheduleStatus.CANCELLED);
-                cs.setCancelReason("Admission rejected by manager");
-            }
-            careScheduleRepository.saveAll(careSchedulesToCancel);
+            // Chỉ lịch chưa diễn ra (SCHEDULED) bị xóa cứng.
+            careScheduleRepository.deleteOpenSchedulesIfUnreferenced(
+                    horse.getId(), List.of(CareScheduleStatus.SCHEDULED));
         }
 
         admission.setManagerId(managerId);
@@ -223,6 +268,28 @@ public class AdmissionManagerReviewService {
         admissionNotificationService.notifyOwnerRejected(
                 admission, horse.getName(), "Club Manager Final Review", feedback);
         admissionGroomReviewService.allocateWaitingAdmissions();
+
+        if (auditLogService != null) {
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .userId(managerId)
+                    .action("MANAGER_ADMISSION_REJECTION")
+                    .entityName("AdmissionApplication")
+                    .entityId(admission.getId())
+                    .module("ADMISSIONS")
+                    .summary("Club Manager rejected admission application #" + admission.getId())
+                    .reason(feedback)
+                    .targetUrl("/manager/admissions/" + admission.getId())
+                    .before(Map.of(
+                            "admissionStatus", "MANAGER_REVIEW",
+                            "horseStatus", "CANDIDATE"
+                    ))
+                    .after(Map.of(
+                            "admissionStatus", "REJECTED",
+                            "horseStatus", "REJECTED"
+                    ))
+                    .build());
+        }
+
         return admission;
     }
 }

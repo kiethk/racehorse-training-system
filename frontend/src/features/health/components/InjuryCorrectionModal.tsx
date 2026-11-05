@@ -193,9 +193,9 @@ function InjuryCorrectionModalContent({
                 </span>
                 <Pill
                   tone={
-                    injury.severity === 'CRITICAL'
+                    injury.severity === 'CRITICAL' || injury.severity === 'SEVERE'
                       ? 'danger'
-                      : injury.severity === 'HIGH'
+                      : injury.severity === 'MODERATE'
                         ? 'warning'
                         : 'neutral'
                   }
@@ -360,9 +360,9 @@ function InjuryCorrectionModalContent({
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Severity">
                 <Select value={severity} onChange={(e) => setSeverity(e.target.value)}>
-                  <option value="LOW">LOW</option>
-                  <option value="MEDIUM">MEDIUM</option>
-                  <option value="HIGH">HIGH</option>
+                  <option value="MILD">MILD</option>
+                  <option value="MODERATE">MODERATE</option>
+                  <option value="SEVERE">SEVERE</option>
                   <option value="CRITICAL">CRITICAL</option>
                 </Select>
               </FormField>

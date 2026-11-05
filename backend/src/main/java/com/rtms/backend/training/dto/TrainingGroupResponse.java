@@ -14,5 +14,7 @@ public record TrainingGroupResponse(Long id,
                                     List<GroupMemberResponse> members,
                                     String currentCourseName,
                                     String currentPlanStatus,
-                                    LocalDate currentPlanEndDate) {
+                                    LocalDate currentPlanStartDate,
+                                    LocalDate currentPlanEndDate,
+                                    boolean disbanded) {
 }

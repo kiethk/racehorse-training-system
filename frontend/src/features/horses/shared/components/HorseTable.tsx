@@ -20,6 +20,7 @@ export interface HorseTableProps {
   searchable?: boolean;
   /** When true, shows the Specialty column between Breed and Status. */
   showSpecialty?: boolean;
+  onRowClick?: (horse: Horse) => void;
 }
 
 /**
@@ -63,6 +64,7 @@ export function HorseTable({
   filters,
   searchable = true,
   showSpecialty = false,
+  onRowClick,
 }: HorseTableProps) {
   const [internalSearch, setInternalSearch] = useState('');
   const activeSearch = searchValue !== undefined ? searchValue : internalSearch;
@@ -161,6 +163,7 @@ export function HorseTable({
       defaultOrder={newestHorseFirst}
       columns={columns}
       getRowKey={(h) => h.id}
+      onRowClick={onRowClick}
       loading={loading}
       error={error}
       pageSize={10}

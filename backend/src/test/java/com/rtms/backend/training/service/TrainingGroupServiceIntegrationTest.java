@@ -46,9 +46,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Quản lý Training Group qua service trên PostgreSQL thật: luật thành viên (BR-09, BR-10, khu của Trainer, được phép
- * tập), đổi tên, chuyển ngựa, xóa nhóm và truy vấn ứng viên. Mọi dữ liệu nằm trong một transaction rồi rollback.
+ * tập), đổi tên, chuyển ngựa và truy vấn ứng viên. Mọi dữ liệu nằm trong một transaction rồi rollback.
  * (Training Group management through the service on a real PostgreSQL: membership rules (BR-09, BR-10, the Trainer's
- * area, allowed to train), rename, move, delete and the candidate query. All data lives in one transaction that rolls back.)
+ * area, allowed to train), rename, move, candidate query (disband is in GroupDisbandIntegrationTest). All data lives in one transaction that rolls back.)
  */
 @SpringBootTest
 @Transactional
@@ -233,33 +233,7 @@ class TrainingGroupServiceIntegrationTest {
         TrainingGroupResponse moved = service.moveHorse(to.id(), thunder.getId(), trainerPrincipal);
 
         assertEquals(1, moved.members().size());
-        assertEquals(0, members.countByGroupId(from.id()));
-    }
-
-    // ------------------------------------------------------------------ delete
-
-    @Test
-    void aGroupWithAnUnfinishedPlanCannotBeDeleted() {
-        TrainingGroupResponse group = service.createGroup(new CreateTrainingGroupRequest("Nhom 1", List.of()), trainerPrincipal);
-        plan(group.id(), TrainingPlanStatus.UPCOMING);
-
-        ApiException error = assertThrows(ApiException.class, () -> service.deleteGroup(group.id(), trainerPrincipal));
-        assertEquals("GROUP_HAS_UNFINISHED_PLAN", error.getErrorCode());
-    }
-
-    @Test
-    void deletingAFreeGroupReleasesItsHorses() {
-        Horse thunder = horse("Thunder", groom("An"));
-        TrainingGroupResponse group = service.createGroup(
-                new CreateTrainingGroupRequest("Nhom 1", List.of(thunder.getId())), trainerPrincipal);
-        plan(group.id(), TrainingPlanStatus.COMPLETED);
-
-        service.deleteGroup(group.id(), trainerPrincipal);
-        entityManager.flush();
-        entityManager.clear();
-
-        assertFalse(groups.existsById(group.id()));
-        assertTrue(members.findByHorseId(thunder.getId()).isEmpty());
+        assertEquals(0, members.countByGroupIdAndLeftAtIsNull(from.id()));
     }
 
     // -------------------------------------------------------------- visibility

@@ -9,6 +9,7 @@ import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.ScheduleSessionResponse;
 import com.rtms.backend.training.dto.SessionDetailResponse;
 import com.rtms.backend.training.dto.SessionHorseResponse;
+import com.rtms.backend.training.dto.SessionWorkoutResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.GroupPlan;
 import com.rtms.backend.training.entity.Subject;
@@ -136,7 +137,8 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
                 .map(workout -> new SessionHorseResponse(workout.getId(), workout.getHorseId(),
                         horseNames.get(workout.getHorseId()),
                         workout.getAssignedToId() == null ? null : groomNames.get(workout.getAssignedToId()),
-                        workout.getStatus().name(), workout.getActualDistanceMeters() != null, workout.getPerformanceRating()))
+                        workout.getStatus().name(), workout.getPerformanceRating(),
+                        workout.getStatus() == WorkoutStatus.RAN ? SessionWorkoutResponse.of(workout) : null))
                 .toList();
         return new SessionDetailResponse(toSummary(session, workouts, visible, lookups), horses);
     }
@@ -175,7 +177,7 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
     // DỰNG PHẢN HỒI (Building responses)
     // =================================================================
 
-    private record Lookups(Map<Long, GroupPlan> plans, Map<Long, String> groupNames, Map<Long, String> courseNames,
+    private record Lookups(Map<Long, GroupPlan> plans, Map<Long, TrainingGroup> groups, Map<Long, String> courseNames,
                            Map<Long, String> subjectNames) {
     }
 
@@ -183,16 +185,16 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
         Map<Long, GroupPlan> plans = planRepository
                 .findAllById(sessions.stream().map(TrainingSession::getGroupPlanId).collect(Collectors.toSet())).stream()
                 .collect(Collectors.toMap(GroupPlan::getId, Function.identity()));
-        Map<Long, String> groupNames = groupRepository
+        Map<Long, TrainingGroup> groups = groupRepository
                 .findAllById(plans.values().stream().map(GroupPlan::getGroupId).filter(Objects::nonNull).collect(Collectors.toSet()))
-                .stream().collect(Collectors.toMap(TrainingGroup::getId, TrainingGroup::getName));
+                .stream().collect(Collectors.toMap(TrainingGroup::getId, Function.identity()));
         Map<Long, String> courseNames = courseRepository
                 .findAllById(plans.values().stream().map(GroupPlan::getCourseId).collect(Collectors.toSet())).stream()
                 .collect(Collectors.toMap(Course::getId, Course::getName));
         Map<Long, String> subjectNames = subjectRepository
                 .findAllById(sessions.stream().map(TrainingSession::getSubjectId).collect(Collectors.toSet())).stream()
                 .collect(Collectors.toMap(Subject::getId, Subject::getName));
-        return new Lookups(plans, groupNames, courseNames, subjectNames);
+        return new Lookups(plans, groups, courseNames, subjectNames);
     }
 
     private ScheduleSessionResponse toSummary(TrainingSession session, List<TrainingWorkout> workouts,
@@ -201,9 +203,10 @@ public class SessionScheduleServiceImpl implements SessionScheduleService {
         List<TrainingWorkout> mine = workouts.stream().filter(visible).toList();
         int horseCount = (int) mine.stream().filter(workout -> workout.getStatus() != WorkoutStatus.CANCELLED).count();
         int needsResult = (int) mine.stream()
-                .filter(workout -> workout.getStatus() == WorkoutStatus.HELD && workout.getActualDistanceMeters() == null).count();
+                .filter(workout -> workout.getStatus() == WorkoutStatus.HELD).count();
         return new ScheduleSessionResponse(session.getId(), plan.getId(), plan.getGroupId(),
-                plan.getGroupId() == null ? null : lookups.groupNames().get(plan.getGroupId()),
+                plan.getGroupId() == null ? null : lookups.groups().get(plan.getGroupId()).getName(),
+                plan.getGroupId() != null && lookups.groups().get(plan.getGroupId()).isDisbanded(),
                 lookups.courseNames().get(plan.getCourseId()), lookups.subjectNames().get(session.getSubjectId()),
                 session.getSessionDate(), session.getStartTime(), session.getEndTime(), session.getStatus().name(),
                 horseCount, needsResult);

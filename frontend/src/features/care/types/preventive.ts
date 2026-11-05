@@ -4,7 +4,7 @@ export type ProtocolCategory = 'VACCINE' | 'DEWORMING';
 export type PreventiveDueStatus = 'OK' | 'DUE_SOON' | 'OVERDUE' | 'MISSING' | 'NONE';
 export type VaccinationSource = 'ADMINISTERED' | 'HISTORICAL';
 export type CareSchedulePurpose = 'FOLLOW_UP' | 'PREVENTIVE';
-export type RescheduleReason = 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'OTHER';
+export type RescheduleReason = 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'EOD_ROLLOVER' | 'OTHER';
 export type HorseStatus = 'CANDIDATE' | 'ELIGIBLE' | 'REJECTED' | 'INACTIVE';
 
 export interface PreventiveProtocol {
@@ -73,7 +73,7 @@ export interface PreventiveMilestone {
   id: number;
   horseId: number;
   veterinarianId: number | null;
-  status: 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  status: 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'PAUSED' | 'DELAYED' | 'OVERDUE' | 'COMPLETED';
   scheduledAt: string | null;
   requestedAt: string | null;
   description: string | null;

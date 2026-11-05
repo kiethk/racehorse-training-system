@@ -97,6 +97,7 @@ export function TrainerHorsesView() {
         searchable={false}
         resetPageKey={resetPageKey}
         showSpecialty
+        onRowClick={(horse) => router.push(`/trainer/horses/${horse.id}`)}
         renderAction={(horse) => (
           <LinkButton
             href={`/trainer/horses/${horse.id}`}

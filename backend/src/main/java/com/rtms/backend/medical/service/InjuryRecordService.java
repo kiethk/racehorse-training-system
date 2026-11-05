@@ -74,6 +74,10 @@ public class InjuryRecordService {
 
     @Transactional
     public InjuryRecord createInjuryRecord(Long horseId, CreateInjuryRecordRequest req) {
+        if (!InjuryRecord.isValidSeverity(req.severity())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Severity must be one of " + InjuryRecord.SEVERITY_VALUES);
+        }
         InjuryRecord r = new InjuryRecord();
         r.setHorseId(horseId);
         r.setHealthRecordId(req.healthRecordId());
@@ -134,7 +138,7 @@ public class InjuryRecordService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found with id: " + horseId));
 
         boolean hasUrgent = careScheduleRepository.existsByHorseIdAndCareTypeAndStatusIn(
-                horseId, CareType.URGENT, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+                horseId, CareType.URGENT, CareScheduleStatus.OPEN);
 
         List<InjuryRecord> injuries = injuryRecordRepository.findByHorseIdOrderByDiagnosedAtDesc(horseId);
         int activeInjuries = (int) injuries.stream().filter(i -> "ACTIVE".equalsIgnoreCase(i.getStatus())).count();
@@ -146,7 +150,7 @@ public class InjuryRecordService {
         // The pending urgent case of this horse (if any): its schedule id and who
         // reported the incident behind it — this is what the Health list shows.
         CareSchedule pendingUrgent = careScheduleRepository
-                .findByHorseIdAndStatusIn(horseId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS))
+                .findByHorseIdAndStatusIn(horseId, CareScheduleStatus.OPEN)
                 .stream()
                 .filter(s -> s.getCareType() == CareType.URGENT)
                 .min(java.util.Comparator.comparing(CareSchedule::getId))
@@ -208,6 +212,11 @@ public class InjuryRecordService {
 
         if (existing.getStatus() != null && "SUPERSEDED".equalsIgnoreCase(existing.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "INJURY_ALREADY_SUPERSEDED", "Cannot correct an injury record that has already been superseded");
+        }
+
+        if (req.severity() != null && !InjuryRecord.isValidSeverity(req.severity())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Severity must be one of " + InjuryRecord.SEVERITY_VALUES);
         }
 
         // Tạo bản mới hiệu chỉnh

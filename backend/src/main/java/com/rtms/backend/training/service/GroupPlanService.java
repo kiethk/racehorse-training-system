@@ -5,6 +5,8 @@ import com.rtms.backend.training.dto.GroupPlanDetailResponse;
 import com.rtms.backend.training.dto.GroupPlanPreviewResponse;
 import com.rtms.backend.training.dto.GroupPlanRequest;
 import com.rtms.backend.training.dto.GroupPlanSummaryResponse;
+import com.rtms.backend.training.dto.PlanHorseResponse;
+import com.rtms.backend.training.dto.SessionHorseOutcomeResponse;
 
 import java.util.List;
 
@@ -23,9 +25,21 @@ public interface GroupPlanService {
     GroupPlanDetailResponse createPlan(GroupPlanRequest request, AuthenticatedUser currentUser);
 
     /** Danh sách kế hoạch; Trainer thấy của mình, vai khác được xem thấy tất cả. (Plan list: a Trainer sees own, other viewing roles all.) */
-    List<GroupPlanSummaryResponse> getPlans(Long groupId, AuthenticatedUser currentUser);
+    List<GroupPlanSummaryResponse> getPlans(Long groupId, Long horseId, AuthenticatedUser currentUser);
 
     GroupPlanDetailResponse getPlan(Long planId, AuthenticatedUser currentUser);
+
+    /**
+     * Mọi chiến mã từng có Workout trong kế hoạch, kèm Attendance; không phụ thuộc thành viên hiện tại của nhóm.
+     * (Every horse that ever had a Workout in the plan, with Attendance; independent of the group's current members.)
+     */
+    List<PlanHorseResponse> getPlanHorses(Long planId, AuthenticatedUser currentUser);
+
+    /**
+     * Các chiến mã của một buổi và kết cục của từng con, suy từ Workout của buổi đó.
+     * (The horses of one Session and each one's outcome, derived from that Session's Workouts.)
+     */
+    List<SessionHorseOutcomeResponse> getSessionHorses(Long planId, Long sessionId, AuthenticatedUser currentUser);
 
     /**
      * Bỏ khóa: mọi buổi CHƯA bắt đầu bị hủy và kế hoạch thành CANCELLED ngay, kể cả khi một buổi đang chạy. Buổi đang chạy vẫn chạy

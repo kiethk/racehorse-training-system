@@ -22,14 +22,22 @@ public class HorseResponse {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private final HorseSpecialtyResponse specialty;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private final String ownerName;
+
     public HorseResponse(Horse horse, String imageUrl) {
-        this(horse, imageUrl, null);
+        this(horse, imageUrl, null, null);
     }
 
     public HorseResponse(Horse horse, String imageUrl, HorseSpecialtyResponse specialty) {
+        this(horse, imageUrl, specialty, null);
+    }
+
+    public HorseResponse(Horse horse, String imageUrl, HorseSpecialtyResponse specialty, String ownerName) {
         this.horse = horse;
         this.imageUrl = imageUrl;
         this.specialty = specialty;
+        this.ownerName = ownerName;
     }
 
     /** The underlying Horse entity (fields merged into root JSON object). */
@@ -45,5 +53,10 @@ public class HorseResponse {
     /** Nullable: populated when includeSpecialty=true is queried. */
     public HorseSpecialtyResponse getSpecialty() {
         return specialty;
+    }
+
+    /** Nullable: owner's full name. */
+    public String getOwnerName() {
+        return ownerName;
     }
 }

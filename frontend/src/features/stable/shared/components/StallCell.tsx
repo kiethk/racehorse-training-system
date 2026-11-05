@@ -11,6 +11,8 @@ interface StallCellProps {
   dimmed?: boolean;
   /** Outside the viewer's scope and not theirs to see: drawn as an empty, unclickable frame. */
   locked?: boolean;
+  /** Matches active search query — visually highlighted */
+  highlighted?: boolean;
   /** One line under the horse name, supplied by the screen's lens (task progress, groom name…). */
   footer?: ReactNode;
   onSelect: (stall: StableStall) => void;
@@ -58,7 +60,18 @@ export function stallState(stall: StableStall, horse: Horse | undefined) {
 }
 
 /** One stall on the floor plan. Role-neutral: what a role adds goes through `footer`. */
-export function StallCell({ stall, horse, selected, dimmed = false, locked = false, footer, onSelect, style, compact = false }: StallCellProps) {
+export function StallCell({
+  stall,
+  horse,
+  selected,
+  dimmed = false,
+  locked = false,
+  highlighted = false,
+  footer,
+  onSelect,
+  style,
+  compact = false,
+}: StallCellProps) {
   const state = stallState(stall, horse);
 
   if (locked) {
@@ -86,11 +99,17 @@ export function StallCell({ stall, horse, selected, dimmed = false, locked = fal
       onClick={() => onSelect(stall)}
       aria-label={`Stall ${stall.stallCode}, ${horse ? horse.name : 'no horse'}, ${state.label}`}
       title={compact ? `Stall ${stall.stallCode}${horse ? ` · ${horse.name} (Occupied)` : ` · ${state.label}`}` : undefined}
-      className={cn('flex flex-col', compact ? [
-        'h-11 items-center justify-center px-1.5 py-1 text-center',
-        horse && 'border-[var(--color-success)]/30 bg-[var(--color-success-soft)] font-semibold text-[#165a38]',
-        !horse && stall.status === 'RESERVED' && 'border-[var(--color-info)]/30 bg-[var(--color-info-soft)] text-[var(--color-info)]',
-      ] : 'min-h-24 animate-in fade-in zoom-in-95 fill-mode-backwards duration-300')}
+      className={cn(
+        'flex flex-col',
+        compact
+          ? [
+              'h-11 items-center justify-center px-1.5 py-1 text-center',
+              horse && 'border-[var(--color-success)]/30 bg-[var(--color-success-soft)] font-semibold text-[#165a38]',
+              !horse && stall.status === 'RESERVED' && 'border-[var(--color-info)]/30 bg-[var(--color-info-soft)] text-[var(--color-info)]',
+            ]
+          : 'min-h-24 animate-in fade-in zoom-in-95 fill-mode-backwards duration-300',
+        highlighted && 'ring-2 ring-[var(--color-primary)] ring-offset-1 font-bold z-10 scale-[1.03] transition-transform'
+      )}
       style={style}
     >
       <span className={cn('flex items-center gap-1', compact ? 'w-full justify-center' : 'justify-between')}>

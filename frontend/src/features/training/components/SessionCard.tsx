@@ -19,7 +19,10 @@ export function SessionCard({ session, onOpen }: { session: ScheduleSession; onO
         </span>
         <StatusPill status={SESSION_STATUS[session.status]} />
       </div>
-      <p className="mt-1 truncate text-sm text-[var(--color-text-primary)]">{session.groupName ?? 'Deleted group'}</p>
+      <div className="mt-1 flex items-center gap-1.5 min-w-0">
+        <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{session.groupName}</p>
+        {session.groupDisbanded && <Pill tone="neutral" size="sm">Disbanded</Pill>}
+      </div>
       <p className="truncate text-xs text-[var(--color-text-secondary)]">{session.subjectName}</p>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-muted)]">
         <span className="flex items-center gap-1">
