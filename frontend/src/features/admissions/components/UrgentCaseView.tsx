@@ -14,7 +14,7 @@ import { admissionsApi } from '../services/api';
 import { healthApi } from '@/features/health/services/healthApi';
 import { displayError, formatDateTime } from '@/lib/display';
 import { ClinicalExamForm, type ClinicalExamFormHandle } from './vet-review/ClinicalExamForm';
-import { IncidentCaseReports } from './IncidentCaseReports';
+import { INCIDENT_SEVERITY_MAP } from '@/features/groom/lib/incidentDisplay';
 import { ApiError } from '@/services/api';
 import type { HorseHealthMetric } from '@/features/horses/types';
 import type {
@@ -29,6 +29,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const autoStartRef = useRef(false);
   const formRef = useRef<ClinicalExamFormHandle>(null);
   const [reports, setReports] = useState<UrgentCaseReport[]>([]);
+  const [showAdditional, setShowAdditional] = useState(false);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
@@ -298,12 +299,80 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             </div>
           </div>
         </div>
-      </Panel>
 
-      <IncidentCaseReports
-        title={`Additional reports merged into this case (${additionalReports.length})`}
-        reports={additionalReports}
-      />
+        {additionalReports.length > 0 && (
+          <div className="border-t border-[var(--color-border)] pt-2.5">
+            <button
+              type="button"
+              onClick={() => setShowAdditional((prev) => !prev)}
+              className="flex w-full items-center justify-between rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] px-3 py-2 text-xs font-semibold text-[var(--color-text-primary)] transition-all hover:bg-[var(--color-surface)] hover:text-[var(--color-primary)] active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2">
+                <Icon
+                  name={showAdditional ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  className="text-[var(--color-primary)]"
+                />
+                <span>Additional merged reports ({additionalReports.length})</span>
+              </div>
+              <span className="text-[11px] font-normal text-[var(--color-text-muted)]">
+                {showAdditional ? 'Hide' : 'View'}
+              </span>
+            </button>
+
+            {showAdditional && (
+              <div className="mt-3 space-y-3">
+                {additionalReports.map((report) => {
+                  const severity = INCIDENT_SEVERITY_MAP[report.severity];
+                  return (
+                    <div
+                      key={report.id}
+                      className="flex flex-col sm:flex-row items-start gap-3.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"
+                    >
+                      {report.imageUrl && (
+                        <div className="group relative h-20 w-20 sm:h-22 sm:w-22 shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
+                          <ProtectedImage
+                            src={report.imageUrl}
+                            alt={`Report: ${report.title}`}
+                            openOnClick
+                            className="h-20 w-20 sm:h-22 sm:w-22 object-cover transition-transform duration-200 group-hover:scale-105"
+                          />
+                          <div className="pointer-events-none absolute bottom-1 right-1 flex items-center gap-0.5 rounded bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white shadow-xs backdrop-blur-xs">
+                            <Icon name="search" size={9} />
+                            <span>Zoom</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <strong className="text-xs font-bold text-[var(--color-text-primary)]">
+                            {report.title}
+                          </strong>
+                          <Pill tone={severity.tone} size="sm">
+                            {severity.label}
+                          </Pill>
+                        </div>
+                        <p className="whitespace-pre-wrap break-words text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                          {report.description}
+                        </p>
+                        <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
+                          <span>
+                            {[report.reportedByRole, report.reportedByName].filter(Boolean).join(' ') ||
+                              `#${report.reportedById}`}
+                          </span>
+                          <span>·</span>
+                          <span>{formatDateTime(report.reportedAt)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </Panel>
 
       {/* Main Workspace Area */}
       {(urgentCase.status === 'SCHEDULED' || urgentCase.status === 'PAUSED') && (
