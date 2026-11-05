@@ -11,6 +11,8 @@ public class TreatmentPlanResponse {
     private LocalDate startDate;
     private LocalDate endDate;
     private String status;
+    private String diagnosis;
+    private String veterinarianName;
 
     private List<PrescriptionResponse> prescriptions;
 
@@ -87,5 +89,21 @@ public class TreatmentPlanResponse {
 
     public void setPrescriptions(List<PrescriptionResponse> prescriptions) {
         this.prescriptions = prescriptions;
+    }
+
+    public String getDiagnosis() {
+        return diagnosis;
+    }
+
+    public void setDiagnosis(String diagnosis) {
+        this.diagnosis = diagnosis;
+    }
+
+    public String getVeterinarianName() {
+        return veterinarianName;
+    }
+
+    public void setVeterinarianName(String veterinarianName) {
+        this.veterinarianName = veterinarianName;
     }
 }
