@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/lib/toast';
+import { formatDate, formatNumber } from '@/lib/display';
 import { auditLogApi } from '../services/api';
 import type { AuditArchiveStatus } from '../types';
 
@@ -217,18 +218,18 @@ export function AuditLogArchiveModal({
               <div className="grid grid-cols-3 gap-2 p-2.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)]">
                 <div>
                   <div className="text-[11px] text-[var(--color-text-muted)]">Total Records</div>
-                  <div className="font-semibold text-sm">{status.totalCount.toLocaleString()}</div>
+                  <div className="font-semibold text-sm">{formatNumber(status.totalCount)}</div>
                 </div>
                 <div>
                   <div className="text-[11px] text-[var(--color-text-muted)]">Logs &gt; 30 Days</div>
                   <div className="font-semibold text-sm">
-                    {status.agedCount.toLocaleString()}
+                    {formatNumber(status.agedCount)}
                   </div>
                 </div>
                 <div>
                   <div className="text-[11px] text-[var(--color-text-muted)]">Oldest Record</div>
                   <div className="font-semibold text-sm">
-                    {status.oldestLogDate ? new Date(status.oldestLogDate).toLocaleDateString('en-GB') : 'None'}
+                    {status.oldestLogDate ? formatDate(status.oldestLogDate) : 'None'}
                   </div>
                 </div>
               </div>
