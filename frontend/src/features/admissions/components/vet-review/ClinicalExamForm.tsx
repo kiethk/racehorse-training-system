@@ -184,7 +184,10 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const defaultFollowUpDescription =
       variant === 'URGENT' ? 'Follow-up after the urgent examination' : 'Routine follow-up examination';
     const [followUpDate, setFollowUpDate] = useState(defaultFollowUpDate);
-    const [followUpDescription, setFollowUpDescription] = useState(defaultFollowUpDescription);
+    // The follow-up reason is not asked: a blocked horse reuses the Assessment note so the next Vet sees why,
+    // every other case gets the standard wording the backend requires.
+    const followUpDescription =
+      trainingDecision === 'BLOCKED' && restrictionDetails.trim() ? restrictionDetails.trim() : defaultFollowUpDescription;
     const [followUpIdempotencyKey, setFollowUpIdempotencyKey] = useState(newIdempotencyKey);
 
     const [markers, setMarkers] = useState<InjuryMarker[]>([]);
@@ -233,7 +236,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       restrictionDetails?: string;
       scheduleFollowUp?: boolean;
       followUpDate?: string;
-      followUpDescription?: string;
       followUpIdempotencyKey?: string;
       markers?: InjuryMarker[];
       resolvedConditionIds?: number[];
@@ -398,8 +400,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       if (availableDraft.scheduleFollowUp !== undefined)
         setScheduleFollowUp(availableDraft.scheduleFollowUp);
       if (availableDraft.followUpDate !== undefined) setFollowUpDate(availableDraft.followUpDate);
-      if (availableDraft.followUpDescription !== undefined)
-        setFollowUpDescription(availableDraft.followUpDescription);
       if (availableDraft.followUpIdempotencyKey)
         setFollowUpIdempotencyKey(availableDraft.followUpIdempotencyKey);
       if (availableDraft.markers && Array.isArray(availableDraft.markers)) {
@@ -445,7 +445,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           restrictionDetails,
           scheduleFollowUp,
           followUpDate,
-          followUpDescription,
           followUpIdempotencyKey,
           markers,
           resolvedConditionIds,
@@ -475,7 +474,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       restrictionDetails,
       scheduleFollowUp,
       followUpDate,
-      followUpDescription,
       followUpIdempotencyKey,
       markers,
       resolvedConditionIds,
@@ -500,7 +498,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       setRestrictionDetails('');
       setScheduleFollowUp(false);
       setFollowUpDate(defaultFollowUpDate);
-      setFollowUpDescription(defaultFollowUpDescription);
       setMarkers([]);
       setResolvedConditionIds([]);
       setVerdict('ACCEPT');
@@ -633,7 +630,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           effectiveDiagnosis: z.string().min(1, config.diagnosisRequiredMessage),
           restrictionDetails: z.string(),
           followUpDate: z.string(),
-          followUpDescription: z.string(),
         })
         .superRefine((data, ctx) => {
           if (config.section2Mode === 'structured' && !physicalExamConfirmed) {
@@ -677,15 +673,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
                   config.followUpDateMinMessage ?? 'Follow-up date must be at least one day in the future.',
               });
             }
-            if (!data.followUpDescription.trim()) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['followUpDescription'],
-                message:
-                  config.followUpDescriptionRequiredMessage ??
-                  'Follow-up care description is required.',
-              });
-            }
           }
         });
 
@@ -695,7 +682,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         effectiveDiagnosis,
         restrictionDetails,
         followUpDate,
-        followUpDescription,
       });
       if (!parsed.success) {
         for (const issue of parsed.error.issues) {
@@ -1231,8 +1217,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           setScheduleFollowUp={setScheduleFollowUp}
           followUpDate={followUpDate}
           setFollowUpDate={setFollowUpDate}
-          followUpDescription={followUpDescription}
-          setFollowUpDescription={setFollowUpDescription}
           fieldErrors={fieldErrors}
           setFieldErrors={setFieldErrors}
           businessDateFromToday={businessDateFromToday}
@@ -1626,7 +1610,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
                     <FollowUpMergeNotice chosenDate={followUpDate} waitingAt={waitingFollowUpAt} />
                   ) : (
                     <div className="rounded-[var(--radius-sm)] bg-[var(--color-warning-soft)] p-2 text-xs font-medium text-[var(--color-warning)]">
-                      Follow-up scheduled for <strong>{followUpDate}</strong>: {followUpDescription}.
+                      Follow-up scheduled for <strong>{followUpDate}</strong>.
                     </div>
                   ))}
                   <p className="text-xs text-[var(--color-text-secondary)]">

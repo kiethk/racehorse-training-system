@@ -133,6 +133,7 @@ export default function RoutineDetailPage() {
                 scheduledAt={detail.schedule.scheduledAt ?? detail.schedule.scheduledDate}
                 horseName={detail.horse?.name}
                 horseBreed={detail.horse?.breed}
+                horseId={detail.horse?.id}
                 veterinarianName={detail.veterinarian?.fullName}
               />
               {error && (

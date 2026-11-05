@@ -37,7 +37,6 @@ export interface ExamVariantConfig {
   restrictionZodMessage: string;
   followUpDateRequiredMessage?: string;
   followUpDateMinMessage?: string;
-  followUpDescriptionRequiredMessage?: string;
   findingsRequiredMessage: string;
   diagnosisRequiredMessage: string;
   abnormalFindingsRequiredMessage?: string;
@@ -74,7 +73,6 @@ export const EXAM_VARIANT_CONFIG: Record<ExamVariant, ExamVariantConfig> = {
     restrictionZodMessage: 'An assessment note is required when training is blocked.',
     followUpDateRequiredMessage: 'Follow-up date is required when scheduling follow-up care.',
     followUpDateMinMessage: 'Follow-up date must be at least one day in the future.',
-    followUpDescriptionRequiredMessage: 'Follow-up care description is required.',
     findingsRequiredMessage: 'Clinical examination findings are required.',
     diagnosisRequiredMessage: 'Clinical diagnosis is required.',
     abnormalFindingsRequiredMessage: 'Describe the abnormal examination findings.',
@@ -107,7 +105,6 @@ export const EXAM_VARIANT_CONFIG: Record<ExamVariant, ExamVariantConfig> = {
     restrictionZodMessage: 'An assessment note is required when training is blocked.',
     followUpDateRequiredMessage: 'Follow-up date is required when scheduling follow-up care.',
     followUpDateMinMessage: 'Follow-up date must be at least one day in the future.',
-    followUpDescriptionRequiredMessage: 'Follow-up care description is required.',
     findingsRequiredMessage: 'Clinical examination findings are required.',
     diagnosisRequiredMessage: 'Clinical diagnosis is required.',
     decisionPanelTitle: 'Veterinary Decision Panel',

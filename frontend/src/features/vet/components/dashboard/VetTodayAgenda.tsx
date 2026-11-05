@@ -8,6 +8,7 @@ import { EmptyState, ListSkeleton } from "@/components/ui/states";
 import type { CareSchedule } from "@/features/admissions/types";
 import type { Horse } from "@/features/stable/types";
 import { getCareTypeTone } from "@/features/schedule/utils/timelineUtils";
+import { getScheduleExamAction, getScheduleStatusDisplay } from "@/features/care/lib/scheduleStatusDisplay";
 
 function formatAppointmentTime(scheduledAt?: string | null): string {
   if (!scheduledAt) return "--:--";
@@ -53,7 +54,6 @@ export function VetTodayAgenda({
           <EmptyState
             icon="calendar"
             title="No clinical appointments today"
-            description="No clinical appointments scheduled for today's working day (08:00 – 17:00)."
             action={
               <Button variant="secondary" size="sm" icon="plus" onClick={onBookRoutine}>
                 Book Routine Check
@@ -75,6 +75,8 @@ export function VetTodayAgenda({
               const timeStr = formatAppointmentTime(schedule.scheduledAt);
               const duration = schedule.durationMinutes ?? 30;
               const tone = getCareTypeTone(schedule.careType, schedule.purpose, schedule.sourceIncidentId);
+              const status = getScheduleStatusDisplay(schedule.status);
+              const action = getScheduleExamAction(schedule.status);
               // Whole-row click mirrors the status button, so compute the action once for mouse + keyboard.
               const openRow = () =>
                 schedule.status === "COMPLETED"
@@ -139,63 +141,21 @@ export function VetTodayAgenda({
                       {tone.label}
                     </Pill>
 
-                    {schedule.status === "PAUSED" && (
-                      <Pill tone="warning" size="sm">
-                        Paused
-                      </Pill>
-                    )}
+                    <Pill tone={status.tone} icon={status.icon} size="sm">
+                      {status.label}
+                    </Pill>
 
-                    {schedule.overdue && (
-                      <Pill tone="warning" icon="clock" size="sm">
-                        Overdue
-                      </Pill>
-                    )}
-
-                    {schedule.status === "PAUSED" ? (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onStartExam(schedule);
-                        }}
-                      >
-                        Continue (Paused)
-                      </Button>
-                    ) : schedule.status === "IN_PROGRESS" || schedule.status === "DELAYED" ? (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onStartExam(schedule);
-                        }}
-                      >
-                        Resume Exam
-                      </Button>
-                    ) : schedule.status === "COMPLETED" ? (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onViewFindings(schedule);
-                        }}
-                      >
-                        View Findings
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onStartExam(schedule);
-                        }}
-                      >
-                        Start Exam
-                      </Button>
-                    )}
+                    <Button
+                      variant={schedule.status === "COMPLETED" ? "secondary" : "primary"}
+                      size="sm"
+                      icon={action.icon}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openRow();
+                      }}
+                    >
+                      {action.label}
+                    </Button>
                   </div>
                 </div>
               );

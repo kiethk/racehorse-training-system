@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
+import { getScheduleExamAction, getScheduleStatusDisplay } from '@/features/care/lib/scheduleStatusDisplay';
 import { Icon } from '@/components/ui/Icon';
 import { FilterChips, Select, Input, PageHeader, Notice, Tabs } from '@/components/ui';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
@@ -395,6 +396,8 @@ export function VetScheduleTimeline() {
                 const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
                 const timeStr = cs.scheduledAt ? clockLabel(cs.scheduledAt) : 'Unscheduled';
                 const isCompleted = cs.status === 'COMPLETED';
+                const statusDisplay = getScheduleStatusDisplay(cs.status);
+                const examAction = getScheduleExamAction(cs.status);
 
                 return (
                   <Panel
@@ -415,35 +418,8 @@ export function VetScheduleTimeline() {
                             <Pill tone={tone.pillTone} icon={tone.icon} size="sm">
                               {tone.label}
                             </Pill>
-                            <Pill
-                              tone={
-                                cs.status === 'COMPLETED'
-                                  ? 'success'
-                                  : cs.status === 'OVERDUE'
-                                  ? 'danger'
-                                  : cs.status === 'DELAYED'
-                                  ? 'warning'
-                                  : cs.status === 'PAUSED'
-                                  ? 'warning'
-                                  : cs.status === 'IN_PROGRESS'
-                                  ? 'primary'
-                                  : 'neutral'
-                              }
-                              size="sm"
-                            >
-                              {cs.status === 'SCHEDULED'
-                                ? 'Scheduled'
-                                : cs.status === 'PAUSED'
-                                ? 'Paused'
-                                : cs.status === 'IN_PROGRESS'
-                                ? 'In Progress'
-                                : cs.status === 'DELAYED'
-                                ? 'Delayed'
-                                : cs.status === 'OVERDUE'
-                                ? 'Overdue'
-                                : cs.status === 'REQUESTED'
-                                ? 'Requested'
-                                : 'Completed'}
+                            <Pill tone={statusDisplay.tone} icon={statusDisplay.icon} size="sm">
+                              {statusDisplay.label}
                             </Pill>
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
@@ -465,30 +441,14 @@ export function VetScheduleTimeline() {
                         <Button
                           variant={isCompleted ? 'secondary' : 'primary'}
                           size="sm"
-                          icon={
-                            isCompleted
-                              ? 'file-text'
-                              : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
-                              ? 'activity'
-                              : cs.status === 'OVERDUE'
-                              ? 'alert-triangle'
-                              : 'chevron-right'
-                          }
+                          icon={examAction.icon}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenSchedule(cs);
                           }}
                           className="transition-all active:scale-[0.97]"
                         >
-                          {isCompleted
-                            ? 'View Record'
-                            : cs.status === 'PAUSED'
-                            ? 'Continue (Paused)'
-                            : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
-                            ? 'Continue Exam'
-                            : cs.status === 'OVERDUE'
-                            ? 'Start Exam'
-                            : 'Start Exam'}
+                          {examAction.label}
                         </Button>
                       </div>
                     </div>

@@ -6,7 +6,6 @@ import { CreatableCombobox, type CreatableComboboxOption } from '@/components/ui
 import { FormField } from '@/components/ui/FormField';
 import { Input, Select, Textarea } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
-import { Notice } from '@/components/ui/Notice';
 import type { MedicationRoute, PrescriptionFormItem, PrescriptionSectionProps } from '../types';
 import medicationsCatalog from '../data/medications.json';
 
@@ -110,9 +109,6 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
             <Icon name="pill" size={16} className="text-[var(--color-accent)]" />
             4. Prescriptions & Medication Orders (Optional)
           </h3>
-          <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-            Prescribed medications create an ACTIVE Treatment Plan for Grooms and Trainers per WF-04.
-          </p>
         </div>
         <Button
           type="button"
@@ -126,11 +122,7 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
         </Button>
       </div>
 
-      {prescriptions.length === 0 ? (
-        <Notice tone="info" className="py-2.5">
-          No medications prescribed for this examination. Click <strong>Add Medication</strong> if pharmacological treatment, pain management, or other medications are required.
-        </Notice>
-      ) : (
+      {prescriptions.length > 0 && (
         <div className="space-y-4">
           {prescriptions.map((rx, index) => {
             const isVetRoute = rx.route === 'INJECTION_IV' || rx.route === 'INJECTION_IM';

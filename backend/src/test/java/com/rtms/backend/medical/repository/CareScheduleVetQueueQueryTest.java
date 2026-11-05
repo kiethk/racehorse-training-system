@@ -199,16 +199,68 @@ class CareScheduleVetQueueQueryTest {
                 requestedFollowUp.getId(), overdueExam.getId()),
                 idsOf(activePage));
 
-        // APPROVED pill should only return exams for approved admissions
+        // APPROVED pill returns exams for approved admissions AND exams completed by the vet
         Page<CareSchedule> approvedPage = queue(null, "APPROVED");
-        assertEquals(1L, approvedPage.getTotalElements());
-        assertEquals(Set.of(routineOnApproved.getId()), idsOf(approvedPage));
+        assertEquals(2L, approvedPage.getTotalElements());
+        assertEquals(Set.of(routineOnApproved.getId(), completedExam.getId()), idsOf(approvedPage));
 
         // Summary counts
         List<CareScheduleStatus> activeStatuses = List.of(
                 CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
         assertEquals(3L, careSchedules.countActiveVetQueueItems(vetId, activeStatuses));
-        assertEquals(1L, careSchedules.countApprovedVetQueueItems(vetId, activeStatuses));
+        assertEquals(2L, careSchedules.countApprovedVetQueueItems(vetId, activeStatuses));
+    }
+
+    @Test
+    void trainerAndManagerReviewAdmissionsWithFollowUpsMoveToApprovedOnly() {
+        AdmissionApplication trainerReviewAdm = new AdmissionApplication();
+        trainerReviewAdm.setOwnerId(users.findByEmail("owner@rtms.com").orElseThrow().getId());
+        trainerReviewAdm.setStatus(AdmissionStatus.GROOM_REVIEW);
+        trainerReviewAdm.setSubmittedAt(LocalDateTime.now());
+        Long trAdmId = admissions.saveAndFlush(trainerReviewAdm).getId();
+
+        CandidateHorseProfile trProfile = new CandidateHorseProfile();
+        trProfile.setAdmissionId(trAdmId);
+        trProfile.setName("Futura Test Horse");
+        trProfile.setBreed("Thoroughbred");
+        candidates.saveAndFlush(trProfile);
+
+        trainerReviewAdm.setStatus(AdmissionStatus.TRAINER_REVIEW);
+        trainerReviewAdm.setHorseId(horseId);
+        trainerReviewAdm.setQuarantineStallId(stableStalls.findAll().stream().findFirst().orElseThrow().getId());
+        admissions.saveAndFlush(trainerReviewAdm);
+
+        CareSchedule trInitialCompleted = new CareSchedule();
+        trInitialCompleted.setHorseId(horseId);
+        trInitialCompleted.setVeterinarianId(vetId);
+        trInitialCompleted.setAdmissionId(trAdmId);
+        trInitialCompleted.setCareType(CareType.INITIAL);
+        trInitialCompleted.setStatus(CareScheduleStatus.COMPLETED);
+        trInitialCompleted.setScheduledAt(LocalDateTime.now().minusHours(2));
+        trInitialCompleted.setCompletedAt(LocalDateTime.now().minusHours(1));
+        trInitialCompleted = careSchedules.saveAndFlush(trInitialCompleted);
+
+        CareSchedule trRoutineFollowUp = new CareSchedule();
+        trRoutineFollowUp.setHorseId(horseId);
+        trRoutineFollowUp.setVeterinarianId(vetId);
+        trRoutineFollowUp.setAdmissionId(trAdmId);
+        trRoutineFollowUp.setCareType(CareType.ROUTINE);
+        trRoutineFollowUp.setStatus(CareScheduleStatus.IN_PROGRESS);
+        trRoutineFollowUp.setScheduledAt(LocalDateTime.now().plusDays(7));
+        careSchedules.saveAndFlush(trRoutineFollowUp);
+
+        // Neither the completed INITIAL nor the follow-up ROUTINE on TRAINER_REVIEW may appear in ACTIVE or IN_PROGRESS
+        Page<CareSchedule> activePage = queue(null, "ACTIVE");
+        assertEquals(Set.of(scheduledInitial.getId(), scheduledFollowUp.getId(),
+                requestedFollowUp.getId(), overdueExam.getId()), idsOf(activePage));
+
+        Page<CareSchedule> inProgressPage = queue(null, "IN_PROGRESS");
+        assertEquals(0L, inProgressPage.getTotalElements());
+
+        // Only the completed INITIAL admission exam appears in APPROVED (not the ROUTINE follow-up)
+        Page<CareSchedule> approvedPage = queue(null, "APPROVED");
+        assertEquals(Set.of(completedExam.getId(), trInitialCompleted.getId()), idsOf(approvedPage));
+        assertEquals(trInitialCompleted.getId(), approvedPage.getContent().get(0).getId());
     }
 
     private Page<CareSchedule> queue(CareScheduleStatus scheduleStatus, String pill) {

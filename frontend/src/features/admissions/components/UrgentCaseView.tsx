@@ -8,7 +8,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
-import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { SchedulePatientHeader } from '@/features/care/components/SchedulePatientHeader';
 import { HorseVitalsPanel } from '@/features/health/components/HorseVitalsPanel';
 import { admissionsApi } from '../services/api';
 import { healthApi } from '@/features/health/services/healthApi';
@@ -219,33 +219,6 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           </div>
         </dl>
       </Panel>
-
-      <Panel padded className="space-y-2.5 bg-[var(--color-surface-subtle)]">
-        <div className="flex items-center gap-2 border-b border-[var(--color-border)] pb-2">
-          <Icon name="clipboard" size={14} className="text-[var(--color-text-muted)]" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Emergency Protocol Checklist
-          </h3>
-        </div>
-        <ul className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
-          <li className="flex items-start gap-1.5">
-            <Icon name="check" size={12} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
-            <span>Verify horse is securely haltered and handler positioned safely.</span>
-          </li>
-          <li className="flex items-start gap-1.5">
-            <Icon name="check" size={12} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
-            <span>Record baseline vitals before administering any sedation or NSAIDs.</span>
-          </li>
-          <li className="flex items-start gap-1.5">
-            <Icon name="check" size={12} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
-            <span>Palpate distal extremities for heat, digital pulse, or focal swelling.</span>
-          </li>
-          <li className="flex items-start gap-1.5">
-            <Icon name="check" size={12} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
-            <span>If blocking training, establish a mandatory follow-up reassessment.</span>
-          </li>
-        </ul>
-      </Panel>
     </div>
   );
 
@@ -262,83 +235,28 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       </div>
 
       {/* Case Header */}
-      <Panel className="overflow-hidden border border-[var(--color-border)] border-l-4 border-l-[var(--color-medical)] bg-[var(--color-surface)] p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-4">
-            <HorseAvatar
-              name={urgentCase.horseName}
-              image={urgentCase.horseId ? `/api/horses/${urgentCase.horseId}/photo` : null}
-              size={56}
-              rounded="md"
-            />
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xl font-bold text-[var(--color-text-primary)]">
-                  {urgentCase.horseName}
-                </span>
-                <span className="rounded-[var(--radius-xs)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 font-mono text-xs text-[var(--color-text-muted)]">
-                  #{urgentCase.horseId}
-                </span>
-                <Pill tone={urgentCase.severity === 'CRITICAL' ? 'danger' : 'warning'}>
-                  {urgentCase.severity}
-                </Pill>
-                <Pill
-                  tone={
-                    urgentCase.status === 'COMPLETED'
-                      ? 'success'
-                      : urgentCase.status === 'IN_PROGRESS'
-                        ? 'info'
-                        : 'warning'
-                  }
-                >
-                  {urgentCase.status === 'SCHEDULED'
-                    ? 'Pending Intake'
-                    : urgentCase.status === 'IN_PROGRESS'
-                      ? 'In Progress'
-                      : 'Completed'}
-                </Pill>
-              </div>
-
-              <h1 className="mt-1 text-base font-semibold text-[var(--color-text-primary)]">
-                {urgentCase.title}
-              </h1>
-
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)]">
-                {urgentCase.stallCode && (
-                  <span className="flex items-center gap-1 font-medium text-[var(--color-text-secondary)]">
-                    <Icon name="building" size={12} />
-                    <span>Stall {urgentCase.stallCode}</span>
-                    {urgentCase.stableLocation && (
-                      <span className="text-[var(--color-text-muted)]">
-                        ({urgentCase.stableLocation})
-                      </span>
-                    )}
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <Icon name="clock" size={12} />
-                  <span>Reported: {formatDateTime(urgentCase.reportedAt)}</span>
-                </span>
-                <span className="font-mono text-[11px]">Case #{urgentCase.scheduleId}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-start sm:self-center">
-            {(urgentCase.status === 'SCHEDULED' || urgentCase.status === 'PAUSED' || urgentCase.status === 'OVERDUE') && (
-              <Button
-                variant="destructive"
-                icon="activity"
-                loading={starting}
-                onClick={startExam}
-                className="transition-all active:scale-[0.97]"
-              >
-                Start Examination
-              </Button>
-            )}
-          </div>
-        </div>
-      </Panel>
+      <SchedulePatientHeader
+        scheduleId={urgentCase.scheduleId}
+        status={urgentCase.status}
+        careType="URGENT"
+        scheduledAt={urgentCase.reportedAt}
+        horseName={urgentCase.horseName}
+        horseId={urgentCase.horseId}
+        severity={urgentCase.severity}
+        action={
+          (urgentCase.status === 'SCHEDULED' || urgentCase.status === 'PAUSED' || urgentCase.status === 'OVERDUE') && (
+            <Button
+              variant="destructive"
+              icon="activity"
+              loading={starting}
+              onClick={startExam}
+              className="transition-all active:scale-[0.97]"
+            >
+              Start Examination
+            </Button>
+          )
+        }
+      />
 
       {/* Reported Incident & Observations from Groom */}
       <Panel padded className="space-y-4">
