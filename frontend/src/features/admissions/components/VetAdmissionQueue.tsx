@@ -618,7 +618,9 @@ export function VetAdmissionQueue() {
       <InfoRow label="Schedule" value={currentActiveSchedule ? getScheduleStatusDisplay(currentActiveSchedule.status).label : 'Not scheduled'} />
       <InfoRow label="Quarantine stall" value={detail.quarantineStallCode || 'Not assigned'} />
       <InfoRow label="Trainer" value={detail.trainerName || (detail.trainerId ? `Trainer #${detail.trainerId}` : 'Pending assignment')} />
-      {currentActiveSchedule?.scheduledAt && <InfoRow label="Scheduled" value={formatDateTime(currentActiveSchedule.scheduledAt)} />}
+      {(currentActiveSchedule?.scheduledDate || currentActiveSchedule?.scheduledAt) && (
+        <InfoRow label="Scheduled" value={formatDate((currentActiveSchedule.scheduledDate || currentActiveSchedule.scheduledAt)!)} />
+      )}
       {canStartExam && (
         <Button type="button" className="w-full transition-all active:scale-[0.97]" variant="primary" loading={startingExam} onClick={handleStartExam} icon="activity">
           Start examination
@@ -758,25 +760,17 @@ export function VetAdmissionQueue() {
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                           <span className="inline-flex items-center gap-1 shrink-0">
                             <Icon name="building" size={12} />
-                            <span>{isApproved ? 'Stall:' : 'Quarantine Stall:'} <strong>{stallCode}</strong></span>
+                            <span>{isApproved ? 'Stall' : 'Quarantine Stall'} <strong>{stallCode}</strong></span>
                           </span>
                           <span>·</span>
                           <span className="inline-flex items-center gap-1 shrink-0">
                             <Icon name="calendar" size={12} className="text-[var(--color-primary)]" />
-                            {row.careSchedule?.scheduledAt ? (
-                              <strong>{formatDateTime(row.careSchedule.scheduledAt)}</strong>
-                            ) : row.careSchedule?.scheduledDate ? (
-                              <span>Target: <strong>{formatDate(row.careSchedule.scheduledDate)}</strong></span>
+                            {row.careSchedule?.scheduledDate || row.careSchedule?.scheduledAt ? (
+                              <strong>{formatDate((row.careSchedule.scheduledDate || row.careSchedule.scheduledAt)!)}</strong>
                             ) : (
                               <span className="italic text-[var(--color-text-muted)]">Awaiting slot</span>
                             )}
                           </span>
-                          {isAssignedToMe && (
-                            <>
-                              <span>·</span>
-                              <span className="font-semibold text-[var(--color-primary)]">Assigned to you</span>
-                            </>
-                          )}
                         </div>
                       </div>
                     </div>

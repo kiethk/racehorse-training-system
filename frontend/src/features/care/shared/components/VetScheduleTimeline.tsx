@@ -17,18 +17,10 @@ import { formatDate, formatLocalDateIso } from '@/lib/display';
 import type { CareSchedule, CareType, CareScheduleStatus } from '@/features/admissions/types';
 import type { Horse, StableStall } from '@/features/stable/types';
 import {
-  formatClockLabel,
   getCareTypeTone,
   getMondayOf,
   getWeekDates,
 } from '@/features/schedule/utils/timelineUtils';
-
-/** "14:00" from a backend LocalDateTime string, on the 24-hour clock. */
-function clockLabel(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : formatClockLabel(d.getHours() * 60 + d.getMinutes());
-}
 
 export function VetScheduleTimeline() {
   const router = useRouter();
@@ -312,7 +304,6 @@ export function VetScheduleTimeline() {
                 const horseName = horse?.name || `Horse #${cs.horseId}`;
                 const stallCode = horse?.currentStallId ? stallMap.get(horse.currentStallId) : 'Unassigned';
                 const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
-                const timeStr = cs.scheduledAt ? clockLabel(cs.scheduledAt) : 'Unscheduled';
                 const isCompleted = cs.status === 'COMPLETED';
                 const statusDisplay = getScheduleStatusDisplay(cs.status);
                 const examAction = getScheduleExamAction(cs.status);
@@ -360,12 +351,12 @@ export function VetScheduleTimeline() {
                               <Icon name="building" size={12} className="text-[var(--color-primary)]" />
                               <span>Stall <strong>{stallCode}</strong></span>
                             </span>
-                            {cs.careType === 'INITIAL' && cs.scheduledAt && (
+                            {cs.careType === 'INITIAL' && (
                               <>
                                 <span>·</span>
                                 <span className="inline-flex items-center gap-1">
-                                  <Icon name="clock" size={12} className="text-[var(--color-text-muted)]" />
-                                  <span>{clockLabel(cs.scheduledAt)}</span>
+                                  <Icon name="calendar" size={12} className="text-[var(--color-text-muted)]" />
+                                  <span>Daytime Intake</span>
                                 </span>
                               </>
                             )}
@@ -462,9 +453,9 @@ export function VetScheduleTimeline() {
                         daySchedules.map((cs) => {
                           const horse = horseMap.get(cs.horseId);
                           const horseName = horse?.name || `Horse #${cs.horseId}`;
-                          const timeStr = cs.careType === 'INITIAL' && cs.scheduledAt
-                            ? clockLabel(cs.scheduledAt)
-                            : (cs.status === 'COMPLETED' ? 'Completed' : 'Routine');
+                          const timeStr = cs.status === 'COMPLETED'
+                            ? 'Completed'
+                            : (cs.careType === 'INITIAL' ? 'Admission' : 'Routine');
                           const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
 
                           return (
