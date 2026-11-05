@@ -92,4 +92,35 @@ class UserDirectoryControllerTest {
         assertTrue(response.isSuccess());
         assertEquals(1, response.getData().size());
     }
+
+    @Test
+    @DisplayName("getUserById: trả thông tin user khi tồn tại")
+    void testGetUserById_Found() {
+        Role role = new Role();
+        role.setName("HORSE_OWNER");
+
+        User u = new User();
+        u.setId(10L);
+        u.setFullName("Owner John");
+        u.setEmail("owner@rtms.com");
+        u.setRole(role);
+
+        when(userRepository.findById(10L)).thenReturn(java.util.Optional.of(u));
+
+        ApiResponse<UserSummaryResponse> response = controller.getUserById(10L);
+
+        assertTrue(response.isSuccess());
+        assertEquals(10L, response.getData().getId());
+        assertEquals("Owner John", response.getData().getFullName());
+        assertEquals("HORSE_OWNER", response.getData().getRole());
+    }
+
+    @Test
+    @DisplayName("getUserById: ném 404 khi không tìm thấy user")
+    void testGetUserById_NotFound() {
+        when(userRepository.findById(999L)).thenReturn(java.util.Optional.empty());
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> controller.getUserById(999L));
+    }
 }

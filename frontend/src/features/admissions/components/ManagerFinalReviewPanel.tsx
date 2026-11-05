@@ -5,6 +5,7 @@ import { ApiError } from '@/services/api';
 import { admissionsApi } from '../services/api';
 import type { AdmissionDetailResponse } from '../types';
 import { Button, Checkbox, ConfirmDialog, FormField, Notice, Select, Textarea } from '@/components/ui';
+import { toast } from '@/lib/toast';
 
 interface Props {
   detailData: AdmissionDetailResponse;
@@ -50,6 +51,10 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
       setStallId(null);
       setStallMode('auto');
       setActionMode('INITIAL');
+      toast.success(confirmDecision === 'APPROVED' ? 'Admission approved' : 'Admission rejected',
+        confirmDecision === 'APPROVED'
+          ? 'The horse is now eligible and has moved to its regular stall.'
+          : 'The owner can see your reason on the application.');
       onSuccess();
     } catch (err: unknown) {
       const msg = err instanceof ApiError
@@ -58,6 +63,7 @@ export function ManagerFinalReviewPanel({ detailData, onSuccess }: Props) {
           ? err.message
           : 'Failed to submit review';
       setError(msg);
+      toast.error('Review not saved', msg);
       setConfirmDecision(null);
     } finally {
       setSubmitting(false);

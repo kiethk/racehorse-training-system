@@ -6,13 +6,13 @@ import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.dto.TodayTaskItemResponse;
 import com.rtms.backend.stable.enums.TaskSource;
 import com.rtms.backend.training.entity.Subject;
-import com.rtms.backend.training.entity.TrainingLot;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
 
 
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.stable.entity.GroomDailyTask;
+import com.rtms.backend.stable.entity.GroomTaskCompletion;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.GroomTaskType;
@@ -21,7 +21,6 @@ import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.repository.SubjectRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,7 +62,10 @@ class GroomDailyTaskServiceTest {
     private CareScheduleRepository careScheduleRepository;
 
     @Mock
-    private SubjectRepository subjectRepository;
+    private com.rtms.backend.common.storage.FileStorageService fileStorage;
+
+    @Mock
+    private com.rtms.backend.stable.repository.GroomTaskCompletionRepository completionRepository;
 
     private GroomDailyTaskService taskService;
 
@@ -76,7 +78,8 @@ class GroomDailyTaskServiceTest {
                 stableStallRepository,
                 workoutRepository,
                 careScheduleRepository,
-                subjectRepository
+                fileStorage,
+                completionRepository
         );
     }
 
@@ -121,7 +124,7 @@ class GroomDailyTaskServiceTest {
                     "Sai loại việc ở mốc " + slot.name());
             assertEquals(targetDate.atTime(slot.getTime()), task.getScheduledTime(),
                     "Sai giờ ở mốc " + slot.name());
-            assertEquals(slot.getNote(), task.getNotes());
+            assertNull(task.getNotes(), "routine tasks carry no description");
             assertEquals(Boolean.FALSE, task.getIsCompleted(),
                     "Task mới sinh phải ở trạng thái chưa hoàn thành");
         }
@@ -227,20 +230,12 @@ class GroomDailyTaskServiceTest {
         when(taskRepository.findByGroomIdAndScheduledTimeBetween(eq(4L), any(), any()))
                 .thenReturn(List.of(sopTask));
 
-        // Nguồn 2: Workout JOIN Lot lúc 06:00
-        com.rtms.backend.training.entity.TrainingWorkout workout = new com.rtms.backend.training.entity.TrainingWorkout();
-        workout.setId(201L);
-        workout.setHorseId(1L);
-        workout.setStatus(com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED);
+        // Source 2: a workout joined with its session at 06:00 (horse and subject names come in the same row)
+        com.rtms.backend.training.dto.GroomWorkoutRow workoutRow = new com.rtms.backend.training.dto.GroomWorkoutRow(
+                201L, 1L, "Silver Moon", com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED,
+                java.time.LocalTime.of(6, 0), java.time.LocalTime.of(7, 30), "Steady 1200m run");
 
-        com.rtms.backend.training.entity.TrainingLot lot = new com.rtms.backend.training.entity.TrainingLot();
-        lot.setId(10L);
-        lot.setSubjectId(50L);
-        lot.setStartTime(java.time.LocalTime.of(6, 0));
-        lot.setEndTime(java.time.LocalTime.of(7, 30));
-
-        when(workoutRepository.findGroomWorkoutsWithLot(4L, targetDate))
-                .thenReturn(List.<Object[]>of(new Object[]{workout, lot}));
+        when(workoutRepository.findGroomWorkoutRows(4L, targetDate)).thenReturn(List.of(workoutRow));
 
         // Nguồn 3: Stall + Thú y lúc 13:30 (VET_WINDOW_START)
         StableStall stall = new StableStall();
@@ -265,11 +260,6 @@ class GroomDailyTaskServiceTest {
         when(careScheduleRepository.findByHorseIdInAndScheduledAtBetweenAndStatusIn(eq(List.of(1L)), any(), any(), any()))
                 .thenReturn(List.of(schedule));
 
-        com.rtms.backend.training.entity.Subject subject = new com.rtms.backend.training.entity.Subject();
-        subject.setId(50L);
-        subject.setName("Chạy bền 1200m");
-        when(subjectRepository.findAllById(any())).thenReturn(List.of(subject));
-
         // Act
         List<com.rtms.backend.stable.dto.TodayTaskItemResponse> items =
                 taskService.getTodayAggregatedTasks(null, targetDate, groomUser);
@@ -287,7 +277,7 @@ class GroomDailyTaskServiceTest {
         assertEquals(com.rtms.backend.stable.enums.TaskSource.WORKOUT, items.get(1).getSource());
         assertEquals(java.time.LocalTime.of(6, 0), items.get(1).getStartTime());
         assertEquals(java.time.LocalTime.of(7, 30), items.get(1).getEndTime());
-        assertTrue(items.get(1).getTitle().contains("Chạy bền 1200m"));
+        assertTrue(items.get(1).getTitle().contains("Steady 1200m run"));
         assertFalse(items.get(1).isActionable());
 
         // Item 3: PREVENTIVE_CARE 13:30
@@ -348,5 +338,116 @@ class GroomDailyTaskServiceTest {
 
         assertThrows(RuntimeException.class, () -> taskService.completeTask(taskId, groom));
     }
-}
 
+    @Test
+    @DisplayName("9. Complete a block with a note and two photos: one completion shared by every task")
+    void testCompleteTasks_BlockWithNoteAndPhotos() {
+        GroomDailyTask first = task(20L, 4L);
+        GroomDailyTask second = task(21L, 4L);
+        when(taskRepository.findAllById(List.of(20L, 21L))).thenReturn(List.of(first, second));
+        when(completionRepository.save(any(GroomTaskCompletion.class))).thenAnswer(inv -> {
+            GroomTaskCompletion completion = inv.getArgument(0);
+            completion.setId(7L);
+            return completion;
+        });
+        var photoA = new org.springframework.mock.web.MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
+        var photoB = new org.springframework.mock.web.MockMultipartFile("files", "b.png", "image/png", new byte[]{2});
+        when(fileStorage.store(photoA, "rtms/task-completions/7")).thenReturn("local:a.jpg");
+        when(fileStorage.store(photoB, "rtms/task-completions/7")).thenReturn("local:b.png");
+
+        GroomTaskCompletion result = taskService.completeTasks(List.of(20L, 21L), "  All ate well  ",
+                List.of(photoA, photoB), groom());
+
+        assertEquals("All ate well", result.getNote());
+        assertEquals(List.of("local:a.jpg", "local:b.png"), result.getPhotoKeys());
+        for (GroomDailyTask t : List.of(first, second)) {
+            assertTrue(t.getIsCompleted());
+            assertNotNull(t.getCompletedAt());
+            assertEquals(7L, t.getCompletionId());
+        }
+        verify(taskRepository).saveAll(List.of(first, second));
+    }
+
+    @Test
+    @DisplayName("10. Complete a block without note or photos still works and stores no file")
+    void testCompleteTasks_WithoutEvidence() {
+        GroomDailyTask only = task(22L, 4L);
+        when(taskRepository.findAllById(List.of(22L))).thenReturn(List.of(only));
+        when(completionRepository.save(any(GroomTaskCompletion.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        GroomTaskCompletion result = taskService.completeTasks(List.of(22L), "   ", null, groom());
+
+        assertNull(result.getNote());
+        assertTrue(result.getPhotoKeys().isEmpty());
+        assertTrue(only.getIsCompleted());
+        verify(fileStorage, never()).store(any(), any());
+    }
+
+    @Test
+    @DisplayName("11. A block is refused when it holds another groom's task, a finished task, 6 photos or a non-image")
+    void testCompleteTasks_Refusals() {
+        GroomDailyTask mine = task(23L, 4L);
+        GroomDailyTask other = task(24L, 9L);
+        when(taskRepository.findAllById(List.of(23L, 24L))).thenReturn(List.of(mine, other));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> taskService.completeTasks(List.of(23L, 24L), null, null, groom()));
+
+        when(taskRepository.findAllById(List.of(23L))).thenReturn(List.of(mine));
+        var pdf = new org.springframework.mock.web.MockMultipartFile("files", "a.pdf", "application/pdf", new byte[]{1});
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> taskService.completeTasks(List.of(23L), null, List.of(pdf), groom()));
+
+        var photo = new org.springframework.mock.web.MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> taskService.completeTasks(List.of(23L), null, List.of(photo, photo, photo, photo, photo, photo), groom()));
+
+        mine.setIsCompleted(true);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> taskService.completeTasks(List.of(23L), "again", null, groom()));
+
+        verify(fileStorage, never()).store(any(), any());
+        verify(completionRepository, never()).save(any());
+        verify(taskRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("12. Photos already stored are removed when saving the tasks fails")
+    void testCompleteTasks_CleansUpStoredPhotosOnFailure() {
+        GroomDailyTask only = task(25L, 4L);
+        when(taskRepository.findAllById(List.of(25L))).thenReturn(List.of(only));
+        when(completionRepository.save(any(GroomTaskCompletion.class))).thenAnswer(inv -> {
+            GroomTaskCompletion completion = inv.getArgument(0);
+            completion.setId(8L);
+            return completion;
+        });
+        var photo = new org.springframework.mock.web.MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1});
+        when(fileStorage.store(photo, "rtms/task-completions/8")).thenReturn("local:a.jpg");
+        when(taskRepository.saveAll(any())).thenThrow(new RuntimeException("database down"));
+
+        assertThrows(RuntimeException.class, () -> taskService.completeTasks(List.of(25L), null, List.of(photo), groom()));
+        verify(fileStorage).delete("local:a.jpg");
+    }
+
+    @Test
+    @DisplayName("13. A groom cannot open the completion photo of another groom")
+    void testCompletionPhoto_OtherGroomRefused() {
+        GroomTaskCompletion completion = new GroomTaskCompletion(4L, null, LocalDateTime.now());
+        completion.setId(9L);
+        completion.getPhotoKeys().add("local:a.jpg");
+        when(completionRepository.findById(9L)).thenReturn(Optional.of(completion));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> taskService.loadCompletionPhoto(9L, 0, new AuthenticatedUser(9L, "other@example.com", "GROOM")));
+        verify(fileStorage, never()).load(any());
+    }
+
+    private static GroomDailyTask task(Long id, Long groomId) {
+        GroomDailyTask task = new GroomDailyTask(groomId, 5L, GroomTaskType.FEEDING, LocalDateTime.now(), null);
+        task.setId(id);
+        return task;
+    }
+
+    private static AuthenticatedUser groom() {
+        return new AuthenticatedUser(4L, "groom@example.com", "GROOM");
+    }
+}

@@ -1,30 +1,36 @@
 'use client';
 
+import { ChoiceInput, FileInput, Input, Select, Textarea } from '@/components/ui/Input';
+import { FormField } from '@/components/ui/FormField';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/Button';
+import { BackLink } from '@/components/ui/BackLink';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Panel } from '@/components/ui/Panel';
 import { Icon } from '@/components/ui/Icon';
+import { ImageLightbox } from '@/components/ui/ImageLightbox';
 import { incidentApi } from '../services/incidentService';
 import { stableApi } from '@/features/stable/services/stableService';
 import type { Horse, StableStall } from '@/features/stable/types';
 import type { IncidentReport, IncidentSeverity } from '../types';
 
 const SEVERITY_OPTIONS: { value: IncidentSeverity; label: string; hint: string; tone: string }[] = [
-  { value: 'LOW', label: 'Minor', hint: 'Monitor the horse; no urgent intervention is required.', tone: 'text-gray-600' },
-  { value: 'MEDIUM', label: 'Moderate', hint: 'Veterinary review is needed today.', tone: 'text-blue-600' },
-  { value: 'HIGH', label: 'Major', hint: 'Request veterinary attention as soon as possible.', tone: 'text-amber-600' },
-  { value: 'CRITICAL', label: 'Critical', hint: 'A health emergency requiring an immediate call.', tone: 'text-red-600 font-semibold' },
+  { value: 'LOW', label: 'Minor', hint: 'Monitor the horse; no urgent intervention is required.', tone: 'text-[var(--color-text-secondary)]' },
+  { value: 'MEDIUM', label: 'Moderate', hint: 'Veterinary review is needed today.', tone: 'text-[var(--color-info)]' },
+  { value: 'HIGH', label: 'Major', hint: 'Request veterinary attention as soon as possible.', tone: 'text-[var(--color-warning)]' },
+  { value: 'CRITICAL', label: 'Critical', hint: 'A health emergency requiring an immediate call.', tone: 'text-[var(--color-danger)] font-semibold' },
 ];
 
-export function IncidentForm() {
+export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {}) {
   const router = useRouter();
   const { user } = useAuth();
 
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [horses, setHorses] = useState<Horse[]>([]);
+  const [myHorses, setMyHorses] = useState<Horse[]>([]);
+  const [otherHorses, setOtherHorses] = useState<Horse[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
 
   const [horseId, setHorseId] = useState<number | ''>('');
@@ -33,9 +39,14 @@ export function IncidentForm() {
   const [severity, setSeverity] = useState<IncidentSeverity>('MEDIUM');
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [viewingPreview, setViewingPreview] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   useEffect(() => {
     async function loadData() {
@@ -48,18 +59,26 @@ export function IncidentForm() {
 
         setStalls(stallList);
 
-        // Keep only horses assigned to stalls managed by the current groom.
+        // Ưu tiên ngựa thuộc chuồng do Groom quản lý lên đầu; vẫn cho phép chọn các ngựa khác trong trại khi cấp cứu
         const myStallIds = stallList
           .filter((s) => s.groomId === user?.userId)
           .map((s) => s.id);
 
-        const myHorses = horseList.filter(
+        const assignedHorses = horseList.filter(
           (h) => h.currentStallId && myStallIds.includes(h.currentStallId)
         );
+        const unassignedOrOther = horseList.filter(
+          (h) => !h.currentStallId || !myStallIds.includes(h.currentStallId)
+        );
 
-        setHorses(myHorses);
-        if (myHorses.length > 0) {
-          setHorseId(myHorses[0].id);
+        setMyHorses(assignedHorses);
+        setOtherHorses(unassignedOrOther);
+        const allHorses = [...assignedHorses, ...unassignedOrOther];
+        setHorses(allHorses);
+
+        if (allHorses.length > 0) {
+          const preselected = allHorses.find((h) => h.id === initialHorseId);
+          setHorseId((preselected ?? assignedHorses[0] ?? unassignedOrOther[0]).id);
         }
       } catch (err) {
         console.error('Unable to load horse and stall data:', err);
@@ -72,7 +91,7 @@ export function IncidentForm() {
     if (user?.userId) {
       loadData();
     }
-  }, [user?.userId]);
+  }, [user?.userId, initialHorseId]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
@@ -81,10 +100,12 @@ export function IncidentForm() {
         setError('The image must not exceed 10 MB.');
         return;
       }
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setFile(f);
       const url = URL.createObjectURL(f);
       setPreviewUrl(url);
     } else {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setFile(null);
       setPreviewUrl(null);
     }
@@ -160,26 +181,16 @@ export function IncidentForm() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-            Incident Report
-          </h1>
-          <p className="text-[12px] text-[var(--color-text-secondary)]">
-            Report unusual symptoms or injuries to the veterinary team.
-          </p>
-        </div>
-        <Link
-          href="/groom/incidents"
-          className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-        >
-          <Icon name="arrow-left" size={14} /> Back to reports
-        </Link>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <BackLink href="/groom/incidents">Back to reports</BackLink>
+        <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
+          Incident Report
+        </h1>
       </div>
 
       {error && (
-        <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">
           {error}
         </div>
       )}
@@ -187,7 +198,7 @@ export function IncidentForm() {
       {horses.length === 0 ? (
         <Panel padded>
           <div className="py-8 text-center text-sm text-[var(--color-text-secondary)]">
-            You are not currently assigned to any stalls or horses.
+            Không tìm thấy ngựa nào trong hệ thống.
             <div className="mt-4">
               <Link href="/groom/incidents">
                 <Button variant="secondary">Back</Button>
@@ -200,35 +211,51 @@ export function IncidentForm() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Horse selection */}
             <div>
-              <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                Horse involved in the incident <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={horseId}
-                onChange={(e) => setHorseId(Number(e.target.value))}
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                required
-              >
-                {horses.map((h) => {
-                  const stallLabel = h.currentStallId
-                    ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
-                    : 'No stall assigned';
-                  return (
-                    <option key={h.id} value={h.id}>
-                      {h.name} (#{h.id}) — {stallLabel}
-                    </option>
-                  );
-                })}
-              </select>
-              <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                Only horses in your assigned stalls are shown.
+              <FormField label="Horse involved in the incident" required>
+                <Select
+                  value={horseId}
+                  onChange={(e) => setHorseId(Number(e.target.value))}
+                  required
+                >
+                  {myHorses.length > 0 && (
+                    <optgroup label="Horses in your assigned stalls">
+                      {myHorses.map((h) => {
+                        const stallLabel = h.currentStallId
+                          ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
+                          : 'No stall assigned';
+                        return (
+                          <option key={h.id} value={h.id}>
+                            {h.name} (#{h.id}) — {stallLabel}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+                  {otherHorses.length > 0 && (
+                    <optgroup label="Other horses in facility (Paddocks / Wash bays / Training)">
+                      {otherHorses.map((h) => {
+                        const stallLabel = h.currentStallId
+                          ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
+                          : 'No stall assigned';
+                        return (
+                          <option key={h.id} value={h.id}>
+                            {h.name} (#{h.id}) — {stallLabel}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+                </Select>
+              </FormField>
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                Horses in your assigned stalls are prioritized. You can also select any horse in the facility if an incident occurs outside stalls.
               </p>
             </div>
 
             {/* Severity */}
             <div>
               <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                Severity <span className="text-red-500">*</span>
+                Severity <span className="text-[var(--color-danger)]">*</span>
               </label>
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {SEVERITY_OPTIONS.map((opt) => (
@@ -237,62 +264,61 @@ export function IncidentForm() {
                     className={`flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-md)] border p-2.5 transition-colors ${
                       severity === opt.value
                         ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
-                        : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-gray-300'
+                        : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border)]'
                     }`}
                   >
-                    <input
+                    <ChoiceInput
                       type="radio"
                       name="severity"
                       value={opt.value}
                       checked={severity === opt.value}
                       onChange={() => setSeverity(opt.value)}
-                      className="mt-0.5 text-[var(--color-primary)]"
                     />
                     <div>
                       <div className={`text-xs ${opt.tone}`}>{opt.label}</div>
-                      <div className="text-[11px] text-[var(--color-text-muted)]">{opt.hint}</div>
+                      <div className="text-xs text-[var(--color-text-muted)]">{opt.hint}</div>
                     </div>
                   </label>
                 ))}
               </div>
 
               {severity === 'CRITICAL' && (
-                <div className="mt-2.5 rounded-[var(--radius-md)] border border-red-300 bg-red-50 p-2.5 text-xs text-red-800">
-                  <div className="font-semibold">Emergency warning:</div>
-                  The system does not send instant notifications. For a <strong>Critical</strong> incident,{' '}
-                  <strong>call the veterinary team directly</strong> or notify a manager immediately after submitting this report.
+                <div className="mt-2.5 rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-xs text-[var(--color-danger)]">
+                  <div className="font-semibold flex items-center gap-1.5">
+                    <Icon name="alert-triangle" size={14} />
+                    Emergency Urgent Care Alert:
+                  </div>
+                  <p className="mt-1 font-medium leading-relaxed">
+                    The system immediately pauses training clearance (BLOCKED) and triggers a real-time urgent alert directly to the on-duty veterinarian.
+                  </p>
                 </div>
               )}
             </div>
 
             {/* Title */}
             <div>
-              <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                Incident title <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Example: Swollen right front knee, missed breakfast..."
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                required
-              />
+              <FormField label="Incident title" required>
+                <Input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Example: Swollen right front knee, missed breakfast..."
+                  required
+                />
+              </FormField>
             </div>
 
             {/* Detailed description */}
             <div>
-              <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                Detailed description <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                rows={4}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the symptoms, time discovered, horse behavior, and pain or injury location..."
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                required
-              />
+              <FormField label="Detailed description" required>
+                <Textarea
+                  rows={4}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Describe the symptoms, time discovered, horse behavior, and pain or injury location..."
+                  required
+                />
+              </FormField>
             </div>
 
             {/* Optional image attachment */}
@@ -301,32 +327,45 @@ export function IncidentForm() {
                 Scene or injury image (optional)
               </label>
               <div className="mt-1.5 flex flex-col gap-2">
-                <input
-                  type="file"
+                <FileInput
                   accept="image/jpeg,image/png,image/webp"
                   onChange={handleFileChange}
-                  className="text-xs text-[var(--color-text-secondary)] file:mr-3 file:rounded-[var(--radius-sm)] file:border-0 file:bg-[var(--color-surface-subtle)] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--color-text-primary)] hover:file:bg-[var(--color-border)]"
                 />
-                <p className="text-[11px] text-[var(--color-text-muted)]">
+                <p className="text-xs text-[var(--color-text-muted)]">
                   JPEG, PNG, and WebP only. Maximum size: 10 MB.
                 </p>
 
                 {previewUrl && (
                   <div className="relative mt-2 inline-block max-w-xs">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={previewUrl}
-                      alt="Image preview"
-                      className="max-h-48 rounded-[var(--radius-md)] border border-[var(--color-border)] object-cover"
-                    />
                     <button
                       type="button"
-                      onClick={handleRemoveFile}
-                      className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
-                      title="Remove image"
+                      onClick={() => setViewingPreview(true)}
+                      aria-label="Preview full size image"
+                      className="group block cursor-zoom-in overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
                     >
-                      <Icon name="x" size={14} />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={previewUrl}
+                        alt="Image preview"
+                        className="max-h-48 object-cover transition-transform group-hover:scale-105"
+                      />
                     </button>
+                    <IconButton
+                      icon="x"
+                      size="sm"
+                      variant="secondary"
+                      label="Remove image"
+                      className="absolute right-2 top-2 rounded-full shadow-sm"
+                      onClick={handleRemoveFile}
+                    />
+                    {viewingPreview && (
+                      <ImageLightbox
+                        images={[{ src: previewUrl, alt: 'Incident preview' }]}
+                        index={0}
+                        onIndexChange={() => undefined}
+                        onClose={() => setViewingPreview(false)}
+                      />
+                    )}
                   </div>
                 )}
               </div>

@@ -10,10 +10,13 @@
  *   - ApiResponse<T> is the common wrapper for every backend response
  */
 
+export type HorseSex = 'MALE' | 'FEMALE';
+
 export interface Horse {
   id: number;
   name: string;
   breed: string | null;
+  sex: HorseSex | null;
   dateOfBirth: string | null;
   pedigreeInfo: string | null;
   currentStatus: string;

@@ -7,18 +7,24 @@ interface ApiResponse<T> {
   message?: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export const incidentApi = {
-  list: async (status?: string): Promise<IncidentReport[]> => {
-    const url = status
-      ? `/api/groom-incident-reports?status=${status}`
-      : '/api/groom-incident-reports';
+  list: async (params?: { horseId?: number; status?: string } | string): Promise<IncidentReport[]> => {
+    let url = '/api/incidents';
+    if (typeof params === 'string') {
+      url += `?status=${encodeURIComponent(params)}`;
+    } else if (params) {
+      const q = new URLSearchParams();
+      if (params.horseId) q.append('horseId', String(params.horseId));
+      if (params.status) q.append('status', params.status);
+      const qs = q.toString();
+      if (qs) url += `?${qs}`;
+    }
     return (await apiGet<ApiResponse<IncidentReport[]>>(url)).data;
   },
 
   create: async (body: CreateIncidentRequest): Promise<IncidentReport> =>
-    (await apiPost<ApiResponse<IncidentReport>>('/api/groom-incident-reports', body)).data,
+    (await apiPost<ApiResponse<IncidentReport>>('/api/incidents', body)).data,
 
   /**
    * Attach an image after create returns the report id.
@@ -29,20 +35,21 @@ export const incidentApi = {
     const body = new FormData();
     body.append('file', file);
     const res = await apiUpload<ApiResponse<IncidentReport>>(
-      `/api/groom-incident-reports/${reportId}/image`,
+      `/api/incidents/${reportId}/image`,
       body,
     );
     return res.data;
   },
 
   /**
-   * Resolve the image URL for display.
-   * A "local:" imageUrl points to the system endpoint; external URLs are used as-is.
+   * API path of the report's image, or null when it has none. The endpoint checks the viewer,
+   * so render it with <ProtectedImage>, never a plain <img>.
    */
   imageSrc: (report: IncidentReport): string | null => {
     if (!report.imageUrl) return null;
-    return report.imageUrl.startsWith('local:')
-      ? `${API_URL}/api/groom-incident-reports/${report.id}/image`
-      : report.imageUrl;
+    if (report.imageUrl.startsWith('http://') || report.imageUrl.startsWith('https://')) {
+      return report.imageUrl;
+    }
+    return `/api/incidents/${report.id}/image`;
   },
 };

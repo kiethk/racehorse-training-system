@@ -1,24 +1,30 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { HorseFitnessTrendView } from '@/features/training/components/HorseFitnessTrendView';
+import { TrainerHorseDetailView } from '@/features/training/components/TrainerHorseDetailView';
 
 export const metadata: Metadata = {
-  title: 'Horse fitness and progress | Trainer | RTMS',
+  title: 'Horse Profile | Trainer | RTMS',
 };
 
-export default async function HorseFitnessDetailPage({
+export default async function TrainerHorseDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const resolvedParams = await params;
-  const horseId = Number(resolvedParams.id);
+  const { id } = await params;
+  const horseId = Number(id);
+
+  if (!Number.isInteger(horseId) || horseId <= 0) {
+    notFound();
+  }
 
   return (
     <RoleGuard allowedRoles={['HEAD_TRAINER']}>
       <PageContainer>
-        <HorseFitnessTrendView horseId={horseId} />
+        <TrainerHorseDetailView horseId={horseId} />
       </PageContainer>
     </RoleGuard>
   );

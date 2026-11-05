@@ -9,7 +9,6 @@ import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
-import com.rtms.backend.training.entity.RacingReadinessAssessment;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -17,6 +16,7 @@ import com.rtms.backend.training.repository.RacingReadinessAssessmentRepository;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.admission.service.AdmissionQueryService;
 import com.rtms.backend.admission.service.AdmissionTrainerReviewService;
+import com.rtms.backend.admission.service.HeadTrainerWorkloadService;
 import com.rtms.backend.config.ApiException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,6 +36,7 @@ public class AdmissionTrainerReviewController {
     private final RacingReadinessAssessmentRepository assessmentRepository;
     private final HealthRecordRepository healthRecordRepository;
     private final HorseHealthMetricRepository horseHealthMetricRepository;
+    private final HeadTrainerWorkloadService workloadService;
 
     public AdmissionTrainerReviewController(
             AdmissionTrainerReviewService trainerReviewService,
@@ -43,13 +44,15 @@ public class AdmissionTrainerReviewController {
             HorseRepository horseRepository,
             RacingReadinessAssessmentRepository assessmentRepository,
             HealthRecordRepository healthRecordRepository,
-            HorseHealthMetricRepository horseHealthMetricRepository) {
+            HorseHealthMetricRepository horseHealthMetricRepository,
+            HeadTrainerWorkloadService workloadService) {
         this.trainerReviewService = trainerReviewService;
         this.queryService = queryService;
         this.horseRepository = horseRepository;
         this.assessmentRepository = assessmentRepository;
         this.healthRecordRepository = healthRecordRepository;
         this.horseHealthMetricRepository = horseHealthMetricRepository;
+        this.workloadService = workloadService;
     }
 
     /**
@@ -60,14 +63,15 @@ public class AdmissionTrainerReviewController {
      *
      * Đường dẫn "/trainer/queue" có 3 đoạn nên không đụng "/{id}" (2 đoạn);
      * với "/{id}/documents" thì Spring ưu tiên đoạn chữ "trainer" trước biến
-     * "{id}", đúng như "/horses/{horseId}/readiness-history" bên dưới vẫn
-     * sống chung với "/{id}/trainer-review" từ trước tới nay.
+     * "{id}".
      */
     @GetMapping("/trainer/queue")
     @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_VIEW')")
     public ApiResponse<TrainerAdmissionQueueResponse> getTrainerQueue(
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(queryService.getTrainerQueue(currentUser.getUserId()));
+        Long trainerId = currentUser.getUserId();
+        return ApiResponse.success(queryService.getTrainerQueue(trainerId)
+                .withCapacity(workloadService.getWorkload(trainerId), HeadTrainerWorkloadService.MAX_ACTIVE_HORSES));
     }
 
     /**
@@ -120,17 +124,5 @@ public class AdmissionTrainerReviewController {
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(
                 trainerReviewService.completeAssessment(id, request, currentUser.getUserId()));
-    }
-
-    /** Lịch sử đánh giá của một chiến mã — dùng cho biểu đồ tiến bộ sau này. */
-    @GetMapping("/horses/{horseId}/readiness-history")
-    @PreAuthorize("hasAuthority('RACING_READINESS_ASSESSMENT_VIEW')")
-    public ApiResponse<List<RacingReadinessAssessment>> getHistory(
-            @PathVariable Long horseId,
-            @RequestParam(required = false, defaultValue = "false") boolean includeAdmission) {
-        return ApiResponse.success(includeAdmission
-                ? assessmentRepository.findByHorseIdOrderByAssessmentDateDesc(horseId)
-                : assessmentRepository
-                        .findByHorseIdAndAdmissionIdIsNullOrderByAssessmentDateAsc(horseId));
     }
 }

@@ -1,8 +1,10 @@
 package com.rtms.backend.admission.dto;
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.enums.HorseSex;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -13,14 +15,15 @@ public record CreateOwnerAdmissionRequest(
         @NotBlank @Size(max = 255) String name,
         @Size(max = 255) String breed,
         @PastOrPresent LocalDate dateOfBirth,
-        @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9]{15}$", message = "UELN must be 15 alphanumeric characters")
+        @NotNull(message = "Sex is required (MALE or FEMALE)") HorseSex sex,
+        @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "UELN must be 15 alphanumeric characters (e.g. 704001000000001 or VNM001000000001)")
         String registrationNumber,
         @Size(max = 255) String registryName,
         @Size(max = 255) String sireName,
-        @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9]{15}$", message = "Sire UELN must be 15 alphanumeric characters")
+        @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "Sire UELN must be 15 alphanumeric characters (e.g. 704001000000001 or VNM001000000001)")
         String sireRegistrationNumber,
         @Size(max = 255) String damName,
-        @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9]{15}$", message = "Dam UELN must be 15 alphanumeric characters")
+        @Pattern(regexp = "^\\s*$|^[a-zA-Z0-9\\s\\-_\\.]{15,20}$", message = "Dam UELN must be 15 alphanumeric characters (e.g. 704001000000001 or VNM001000000001)")
         String damRegistrationNumber,
         @Size(max = 2000) String pedigreeNotes) {
 

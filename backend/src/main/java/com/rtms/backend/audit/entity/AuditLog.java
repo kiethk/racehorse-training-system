@@ -34,6 +34,9 @@ public class AuditLog {
     @Column(name = "status_code")
     private Integer statusCode;
 
+    @Column(name = "details", columnDefinition = "TEXT")
+    private String details;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -109,7 +112,19 @@ public class AuditLog {
         this.statusCode = statusCode;
     }
 
+    public String getDetails() {
+        return details;
+    }
+
+    public void setDetails(String details) {
+        this.details = details;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

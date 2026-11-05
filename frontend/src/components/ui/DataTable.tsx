@@ -21,6 +21,52 @@ export interface DataTablePagination {
   disabled?: boolean;
 }
 
+function extractSortScore(item: unknown): number | null {
+  if (!item || typeof item !== 'object') return null;
+  const obj = item as Record<string, unknown>;
+
+  // Check candidate date/time fields first
+  const dateCandidates = [
+    obj.submittedAt,
+    obj.createdAt,
+    obj.created_at,
+    obj.reportedAt,
+    obj.workoutDate,
+    obj.recordedAt,
+    obj.updatedAt,
+    obj.updated_at,
+    obj.timestamp,
+    obj.date,
+  ];
+  for (const d of dateCandidates) {
+    if (typeof d === 'string' && d.trim()) {
+      const parsed = new Date(d).getTime();
+      if (!Number.isNaN(parsed)) return parsed;
+    } else if (d instanceof Date && !Number.isNaN(d.getTime())) {
+      return d.getTime();
+    }
+  }
+
+  // Fallback to auto-incrementing ID fields
+  const idCandidates = [obj.admissionId, obj.userId, obj.horseId, obj.id];
+  for (const id of idCandidates) {
+    if (typeof id === 'number') {
+      return id;
+    }
+  }
+
+  return null;
+}
+
+function autoNewestFirst<R>(left: R, right: R): number {
+  const scoreA = extractSortScore(left);
+  const scoreB = extractSortScore(right);
+  if (scoreA != null && scoreB != null) {
+    return scoreB - scoreA;
+  }
+  return 0;
+}
+
 export function DataTable<Row>({
   rows,
   columns,
@@ -38,6 +84,8 @@ export function DataTable<Row>({
   onFilterValueChange,
   getSearchText,
   searchPlaceholder = 'Search records…',
+  toolbarExtras,
+  defaultOrder,
   className = '',
 }: {
   rows: Row[];
@@ -56,6 +104,9 @@ export function DataTable<Row>({
   onFilterValueChange?: (value: string) => void;
   getSearchText?: (row: Row) => string;
   searchPlaceholder?: string;
+  toolbarExtras?: ReactNode;
+  /** Order of the rows until the user sorts by a column (e.g. newest first). Without it rows keep the order they arrive in. */
+  defaultOrder?: (left: Row, right: Row) => number;
   className?: string;
 }) {
   const [sort, setSort] = useState<{ id: string; direction: 'asc' | 'desc' } | null>(null);
@@ -71,7 +122,13 @@ export function DataTable<Row>({
   }, [activeSearch, getSearchText, rows]);
 
   const sorted = useMemo(() => {
-    if (!sort) return filtered;
+    if (!sort) {
+      if (defaultOrder) return [...filtered].sort(defaultOrder);
+      if (filtered.length > 1 && extractSortScore(filtered[0]) != null) {
+        return [...filtered].sort(autoNewestFirst);
+      }
+      return filtered;
+    }
     const column = columns.find((item) => item.id === sort.id);
     if (!column?.sortValue) return filtered;
     const direction = sort.direction === 'asc' ? 1 : -1;
@@ -87,11 +144,12 @@ export function DataTable<Row>({
           : String(a).localeCompare(String(b), 'en-GB', { numeric: true, sensitivity: 'base' });
       return result * direction;
     });
-  }, [columns, filtered, sort]);
+  }, [columns, defaultOrder, filtered, sort]);
 
   const activePage = pagination?.page ?? localPage;
   const activePageSize = pagination?.pageSize ?? pageSize;
-  const visibleRows = activePageSize && !pagination
+  const shouldSlice = activePageSize !== undefined && (!pagination || rows.length > activePageSize);
+  const visibleRows = shouldSlice && activePageSize !== undefined
     ? sorted.slice(activePage * activePageSize, (activePage + 1) * activePageSize)
     : sorted;
   const pageChange = pagination?.onPageChange ?? setLocalPage;
@@ -102,24 +160,31 @@ export function DataTable<Row>({
         <div role="alert" className="p-5 text-sm text-[var(--color-danger)]">{error}</div>
       ) : (
         <>
-          {getSearchText && (
-            <div className="border-b border-[var(--color-border)] p-3">
-              <label className="sr-only" htmlFor={searchId}>Search records</label>
-              <input
-                id={searchId}
-                type="search"
-                value={activeSearch}
-                onChange={(event) => {
-                  if (onFilterValueChange) onFilterValueChange(event.target.value);
-                  else setSearchQuery(event.target.value);
-                  setLocalPage(0);
-                }}
-                placeholder={searchPlaceholder}
-                className="min-h-10 w-full max-w-sm rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-              />
+          {(getSearchText || toolbarExtras) && (
+            <div className={toolbarExtras ? 'flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] p-3' : 'border-b border-[var(--color-border)] p-3'}>
+              {getSearchText && (
+                <>
+                  <label className="sr-only" htmlFor={searchId}>Search records</label>
+                  <input
+                    id={searchId}
+                    type="search"
+                    value={activeSearch}
+                    onChange={(event) => {
+                      if (onFilterValueChange) onFilterValueChange(event.target.value);
+                      else setSearchQuery(event.target.value);
+                      setLocalPage(0);
+                    }}
+                    placeholder={searchPlaceholder}
+                    className="min-h-10 w-full max-w-sm rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                  />
+                </>
+              )}
+              {toolbarExtras}
             </div>
           )}
-          <div className="overflow-x-auto">
+          {/* relative: an absolutely positioned cell child (an sr-only header) is then clipped by this scroller
+              instead of widening the whole page. */}
+          <div className="relative overflow-x-auto">
             <table aria-label={ariaLabel} aria-busy={loading} className="w-full min-w-[36rem] text-left text-sm">
               <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-muted)] text-xs font-semibold text-[var(--color-text-secondary)]">
                 <tr>
@@ -161,9 +226,19 @@ export function DataTable<Row>({
                   <tr
                     key={getRowKey(row)}
                     tabIndex={onRowClick ? 0 : undefined}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    onClick={onRowClick ? (event) => {
+                      const target = event.target as HTMLElement | null;
+                      if (target?.closest('a, button, input, select, textarea, [role="button"], [data-prevent-row-click]')) {
+                        return;
+                      }
+                      onRowClick(row);
+                    } : undefined}
                     onKeyDown={onRowClick ? (event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
+                        const target = event.target as HTMLElement | null;
+                        if (target?.closest('a, button, input, select, textarea, [role="button"], [data-prevent-row-click]')) {
+                          return;
+                        }
                         event.preventDefault();
                         onRowClick(row);
                       }

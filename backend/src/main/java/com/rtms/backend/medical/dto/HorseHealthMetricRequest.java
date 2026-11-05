@@ -1,5 +1,6 @@
 package com.rtms.backend.medical.dto;
 
+import com.rtms.backend.medical.enums.HydrationStatus;
 import java.math.BigDecimal;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Size;
@@ -13,8 +14,7 @@ public class HorseHealthMetricRequest {
     private BigDecimal weight;
     @Digits(integer = 4, fraction = 2)
     private BigDecimal respiratoryRate;
-    @Size(max = 50)
-    private String hydrationStatus;
+    private HydrationStatus hydrationStatus;
     @Digits(integer = 2, fraction = 1)
     private BigDecimal bodyConditionScore;
     @Size(max = 2000)
@@ -28,8 +28,8 @@ public class HorseHealthMetricRequest {
     public void setWeight(BigDecimal weight) { this.weight = weight; }
     public BigDecimal getRespiratoryRate() { return respiratoryRate; }
     public void setRespiratoryRate(BigDecimal respiratoryRate) { this.respiratoryRate = respiratoryRate; }
-    public String getHydrationStatus() { return hydrationStatus; }
-    public void setHydrationStatus(String hydrationStatus) { this.hydrationStatus = hydrationStatus; }
+    public HydrationStatus getHydrationStatus() { return hydrationStatus; }
+    public void setHydrationStatus(HydrationStatus hydrationStatus) { this.hydrationStatus = hydrationStatus; }
     public BigDecimal getBodyConditionScore() { return bodyConditionScore; }
     public void setBodyConditionScore(BigDecimal bodyConditionScore) { this.bodyConditionScore = bodyConditionScore; }
     public String getNotes() { return notes; }

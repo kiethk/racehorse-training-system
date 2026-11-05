@@ -2,6 +2,8 @@ package com.rtms.backend.admission.service;
 
 import com.rtms.backend.admission.dto.ManagerReviewRequest;
 import com.rtms.backend.admission.entity.AdmissionApplication;
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.stable.entity.StableStall;
@@ -12,13 +14,20 @@ import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.medical.service.PreventiveStatusService;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
+import com.rtms.backend.identity.repository.GroomProfileRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class AdmissionManagerReviewService {
@@ -28,18 +37,45 @@ public class AdmissionManagerReviewService {
     private final HorseRepository horseRepository;
     private final CareScheduleRepository careScheduleRepository;
     private final AdmissionGroomReviewService admissionGroomReviewService;
+    private final PreventiveStatusService preventiveStatusService;
+    private final GroomProfileRepository groomProfileRepository;
+    private final AdmissionNotificationService admissionNotificationService;
+    private final AuditLogService auditLogService;
+
+    @Autowired
+    public AdmissionManagerReviewService(
+            AdmissionApplicationRepository admissionApplicationRepository,
+            StableStallRepository stableStallRepository,
+            HorseRepository horseRepository,
+            CareScheduleRepository careScheduleRepository,
+            AdmissionGroomReviewService admissionGroomReviewService,
+            PreventiveStatusService preventiveStatusService,
+            GroomProfileRepository groomProfileRepository,
+            AdmissionNotificationService admissionNotificationService,
+            AuditLogService auditLogService) {
+        this.admissionApplicationRepository = admissionApplicationRepository;
+        this.stableStallRepository = stableStallRepository;
+        this.horseRepository = horseRepository;
+        this.careScheduleRepository = careScheduleRepository;
+        this.admissionGroomReviewService = admissionGroomReviewService;
+        this.preventiveStatusService = preventiveStatusService;
+        this.groomProfileRepository = groomProfileRepository;
+        this.admissionNotificationService = admissionNotificationService;
+        this.auditLogService = auditLogService;
+    }
 
     public AdmissionManagerReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
             StableStallRepository stableStallRepository,
             HorseRepository horseRepository,
             CareScheduleRepository careScheduleRepository,
-            AdmissionGroomReviewService admissionGroomReviewService) {
-        this.admissionApplicationRepository = admissionApplicationRepository;
-        this.stableStallRepository = stableStallRepository;
-        this.horseRepository = horseRepository;
-        this.careScheduleRepository = careScheduleRepository;
-        this.admissionGroomReviewService = admissionGroomReviewService;
+            AdmissionGroomReviewService admissionGroomReviewService,
+            PreventiveStatusService preventiveStatusService,
+            GroomProfileRepository groomProfileRepository,
+            AdmissionNotificationService admissionNotificationService) {
+        this(admissionApplicationRepository, stableStallRepository, horseRepository,
+             careScheduleRepository, admissionGroomReviewService, preventiveStatusService,
+             groomProfileRepository, admissionNotificationService, null);
     }
 
     @Transactional
@@ -89,19 +125,21 @@ public class AdmissionManagerReviewService {
             Long managerId,
             ManagerReviewRequest request) {
 
-        // 1. Lock REGULAR stall
+        // 1. Lock REGULAR stall. Every allocation first takes the same stall-row locks, so two
+        //    approvals cannot both read the same groom loads and pick the same "least loaded" groom.
+        stableStallRepository.lockAdmissionCapacityStallsForUpdate();
         StableStall regularStall;
 
         if (request.getStallId() != null) {
             regularStall = stableStallRepository
                     .findAvailableRegularStallByIdForUpdate(request.getStallId())
-                    .orElseThrow(() -> new IllegalStateException(
-                            "Selected regular stall is no longer available"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Selected regular stall is no longer available or has no assigned groom"));
         } else {
             regularStall = stableStallRepository
-                    .findFirstAvailableRegularStallForUpdate()
-                    .orElseThrow(() -> new IllegalStateException(
-                            "No available regular stall"));
+                    .findFairAvailableStallForUpdate("REGULAR")
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                            "No available regular stall with an assigned groom"));
         }
 
         // 2. Update existing Horse
@@ -114,11 +152,12 @@ public class AdmissionManagerReviewService {
         // 3. Mark regular stall occupied
         regularStall.setStatus(StallStatus.OCCUPIED);
         stableStallRepository.save(regularStall);
+        groomProfileRepository.touchLastHorseAssignedAt(regularStall.getGroomId(), LocalDateTime.now());
 
         // 4. Update Admission
         admission.setManagerId(managerId);
         admission.setManagerDecision(ReviewDecision.APPROVED);
-        admission.setManagerFeedback(request.getFeedback());
+        admission.setManagerFeedback(AdmissionGroomReviewService.normalizeFeedback(request.getFeedback()));
         admission.setManagerReviewedAt(LocalDateTime.now());
         admission.setStatus(AdmissionStatus.APPROVED);
 
@@ -136,7 +175,39 @@ public class AdmissionManagerReviewService {
         }
 
         admission = admissionApplicationRepository.save(admission);
-        processNextWaitingAdmission();
+
+        // 6. Phác đồ bắt buộc mà khám nhập trại chưa tiêm, cũng chưa có sổ cũ: hẹn tiêm ngay hôm sau.
+        preventiveStatusService.upsertMilestone(horse.getId(), "preventive:approval:" + admission.getId(),
+                managerId, LocalDate.now().plusDays(1));
+
+        admissionGroomReviewService.notifyGroomAssigned(admission, regularStall,
+                horse.getName() + " was approved and moved to stall " + regularStall.getStallCode() + ", which you look after.");
+        admissionNotificationService.notifyOwnerApproved(admission, horse, regularStall);
+        admissionGroomReviewService.allocateWaitingAdmissions();
+
+        if (auditLogService != null) {
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .userId(managerId)
+                    .action("MANAGER_ADMISSION_APPROVAL")
+                    .entityName("AdmissionApplication")
+                    .entityId(admission.getId())
+                    .module("ADMISSIONS")
+                    .summary("Club Manager approved admission application and allocated stall " + regularStall.getStallCode())
+                    .reason(admission.getManagerFeedback())
+                    .targetUrl("/manager/admissions/" + admission.getId())
+                    .before(Map.of(
+                            "admissionStatus", "MANAGER_REVIEW",
+                            "horseStatus", "CANDIDATE",
+                            "regularStall", "None"
+                    ))
+                    .after(Map.of(
+                            "admissionStatus", "APPROVED",
+                            "horseStatus", "ELIGIBLE",
+                            "regularStall", regularStall.getStallCode()
+                    ))
+                    .build());
+        }
+
         return admission;
     }
 
@@ -146,8 +217,8 @@ public class AdmissionManagerReviewService {
             Long managerId,
             ManagerReviewRequest request) {
 
-        if (request.getFeedback() == null
-                || request.getFeedback().isBlank()) {
+        String feedback = AdmissionGroomReviewService.normalizeFeedback(request.getFeedback());
+        if (feedback == null) {
             throw new IllegalArgumentException(
                     "Feedback is required when rejecting an admission");
         }
@@ -190,19 +261,36 @@ public class AdmissionManagerReviewService {
 
         admission.setManagerId(managerId);
         admission.setManagerDecision(ReviewDecision.REJECTED);
-        admission.setManagerFeedback(request.getFeedback());
+        admission.setManagerFeedback(feedback);
         admission.setManagerReviewedAt(LocalDateTime.now());
         admission.setStatus(AdmissionStatus.REJECTED);
 
         admission = admissionApplicationRepository.save(admission);
-        processNextWaitingAdmission();
-        return admission;
-    }
+        admissionNotificationService.notifyOwnerRejected(
+                admission, horse.getName(), "Club Manager Final Review", feedback);
+        admissionGroomReviewService.allocateWaitingAdmissions();
 
-    private void processNextWaitingAdmission() {
-        admissionApplicationRepository.findFirstByStatusOrderBySubmittedAtAscIdAsc(AdmissionStatus.WAITING_FOR_STALL)
-                .ifPresent(waitingAdmission -> {
-                    admissionGroomReviewService.processWaitingForStall(waitingAdmission.getId());
-                });
+        if (auditLogService != null) {
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .userId(managerId)
+                    .action("MANAGER_ADMISSION_REJECTION")
+                    .entityName("AdmissionApplication")
+                    .entityId(admission.getId())
+                    .module("ADMISSIONS")
+                    .summary("Club Manager rejected admission application #" + admission.getId())
+                    .reason(feedback)
+                    .targetUrl("/manager/admissions/" + admission.getId())
+                    .before(Map.of(
+                            "admissionStatus", "MANAGER_REVIEW",
+                            "horseStatus", "CANDIDATE"
+                    ))
+                    .after(Map.of(
+                            "admissionStatus", "REJECTED",
+                            "horseStatus", "REJECTED"
+                    ))
+                    .build());
+        }
+
+        return admission;
     }
 }

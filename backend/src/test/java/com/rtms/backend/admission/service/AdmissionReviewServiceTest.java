@@ -7,6 +7,7 @@ import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
 import com.rtms.backend.admission.dto.VetReviewRequest;
+import com.rtms.backend.admission.dto.VetReviewResponse;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
@@ -36,6 +37,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -57,6 +59,8 @@ class AdmissionReviewServiceTest {
     @Mock HealthRecordRepository healthRecordRepository;
     @Mock HorseRepository horses;
     @Mock StableStallRepository stalls;
+    @Mock AdmissionNotificationService admissionNotificationService;
+    @Mock AdmissionGroomReviewService admissionGroomReviewService;
 
     AdmissionReviewService service;
     AdmissionApplication admission;
@@ -67,7 +71,8 @@ class AdmissionReviewServiceTest {
     @BeforeEach
     void setUp() {
         service = new AdmissionReviewService(admissions, careSchedules, horses, stalls,
-                careScheduleService, healthRecordRepository);
+                careScheduleService, healthRecordRepository, admissionNotificationService,
+                admissionGroomReviewService);
         admission = new AdmissionApplication();
         admission.setId(1L);
         admission.setHorseId(10L);
@@ -156,6 +161,8 @@ class AdmissionReviewServiceTest {
         request.setFindings("Splint inflammation; horse blocked from training but admitted");
         request.setRestrictionDetails("No track work for 30 days");
         request.setNextSchedule(next);
+        var vaccinations = java.util.List.of(new com.rtms.backend.medical.dto.VaccinationRequest());
+        request.setVaccinations(vaccinations);
 
         var response = service.reviewByVet(1L, request, 5L);
 
@@ -170,6 +177,7 @@ class AdmissionReviewServiceTest {
         assertEquals(TrainingDecision.BLOCKED, completion.getValue().getTrainingDecision());
         assertEquals("No track work for 30 days", completion.getValue().getRestrictionDetails());
         assertSame(next, completion.getValue().getNextSchedule());
+        assertSame(vaccinations, completion.getValue().getVaccinations());
     }
 
     @Test
@@ -226,9 +234,30 @@ class AdmissionReviewServiceTest {
     }
 
     @Test
-    void requestedExaminationCannotBypassAutomaticAssignment() {
+    void requestedExaminationAutoAssignsAndStartsForReviewingVet() {
         schedule.setStatus(CareScheduleStatus.REQUESTED);
         schedule.setVeterinarianId(null);
+        when(admissions.findById(1L)).thenReturn(Optional.of(admission));
+        when(careSchedules.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
+                .thenReturn(Optional.of(schedule));
+        when(horses.findById(10L)).thenReturn(Optional.of(horse));
+        when(careScheduleService.completeCareSchedule(eq(20L), any(), eq(5L)))
+                .thenReturn(CareScheduleResponse.from(schedule));
+
+        VetReviewResponse response = service.reviewByVet(1L, request(TrainingDecision.ALLOWED), 5L);
+
+        assertNotNull(response);
+        assertEquals(5L, schedule.getVeterinarianId());
+        assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus());
+        verify(careSchedules).save(schedule);
+        verify(careScheduleService).startCareSchedule(20L, 5L);
+        verify(careScheduleService).completeCareSchedule(eq(20L), any(), eq(5L));
+    }
+
+    @Test
+    void requestedExaminationRejectsDifferentVet() {
+        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setVeterinarianId(99L);
         when(admissions.findById(1L)).thenReturn(Optional.of(admission));
         when(careSchedules.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
                 .thenReturn(Optional.of(schedule));
@@ -236,11 +265,9 @@ class AdmissionReviewServiceTest {
         ApiException error = assertThrows(ApiException.class,
                 () -> service.reviewByVet(1L, request(TrainingDecision.ALLOWED), 5L));
 
-        assertEquals(HttpStatus.CONFLICT, error.getStatus());
-        assertNull(schedule.getVeterinarianId());
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatus());
+        assertEquals("FORBIDDEN", error.getErrorCode());
         verify(careScheduleService, never()).startCareSchedule(anyLong(), anyLong());
-        verify(careScheduleService, never()).completeCareSchedule(anyLong(), any(), anyLong());
-        verify(careSchedules, never()).save(any());
     }
 
     @Test

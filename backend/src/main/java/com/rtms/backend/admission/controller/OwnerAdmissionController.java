@@ -2,6 +2,7 @@ package com.rtms.backend.admission.controller;
 import com.rtms.backend.admission.dto.AdmissionDocumentMetadataRequest;
 import com.rtms.backend.admission.dto.AdmissionDocumentResponse;
 import com.rtms.backend.admission.dto.AdmissionSummaryResponse;
+import com.rtms.backend.admission.dto.AdmissionUelnAvailabilityResponse;
 import com.rtms.backend.admission.dto.CreateOwnerAdmissionRequest;
 import com.rtms.backend.admission.dto.OwnerAdmissionDetailResponse;
 import com.rtms.backend.admission.enums.AdmissionDocumentType;
@@ -10,6 +11,7 @@ import com.rtms.backend.common.dto.ApiResponse;
 
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.admission.service.OwnerAdmissionService;
+import com.rtms.backend.admission.service.AdmissionUelnPolicy;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,16 +20,23 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
-import java.time.LocalDate;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/owner/admissions")
 public class OwnerAdmissionController {
     private final OwnerAdmissionService service;
+    private final AdmissionUelnPolicy uelnPolicy;
 
-    public OwnerAdmissionController(OwnerAdmissionService service) {
+    public OwnerAdmissionController(OwnerAdmissionService service, AdmissionUelnPolicy uelnPolicy) {
         this.service = service;
+        this.uelnPolicy = uelnPolicy;
+    }
+
+    @GetMapping("/ueln-availability")
+    @PreAuthorize("hasAuthority('ADMISSION_APPLICATION_CREATE') and principal.role == 'HORSE_OWNER'")
+    public ApiResponse<AdmissionUelnAvailabilityResponse> uelnAvailability(@RequestParam String ueln) {
+        return ApiResponse.success(uelnPolicy.checkAvailability(ueln));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -75,17 +84,22 @@ public class OwnerAdmissionController {
         return ApiResponse.success(service.getMyDocuments(owner.getUserId(), id));
     }
 
-    @PostMapping(value = "/{id}/documents", consumes = "multipart/form-data")
-    @PreAuthorize("hasAuthority('ADMISSION_DOCUMENT_CREATE') and principal.role == 'HORSE_OWNER'")
-    public ResponseEntity<ApiResponse<AdmissionDocumentResponse>> upload(
+    /**
+     * Edit the candidate details and replace or add documents while no groom has reviewed the
+     * application yet; 409 once the review has started.
+     */
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(
+            "hasAuthority('ADMISSION_APPLICATION_CREATE')"
+            + " and hasAuthority('ADMISSION_DOCUMENT_CREATE')"
+            + " and principal.role == 'HORSE_OWNER'"
+    )
+    public ApiResponse<OwnerAdmissionDetailResponse> update(
             @PathVariable Long id,
             @AuthenticationPrincipal AuthenticatedUser owner,
-            @RequestParam AdmissionDocumentType documentType,
-            @RequestParam(required = false) LocalDate recordDate,
-            @RequestParam(required = false) String note,
-            @RequestPart("file") MultipartFile file) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(service.upload(owner.getUserId(), id, documentType,
-                        recordDate, note, file)));
+            @Valid @RequestPart("candidate") CreateOwnerAdmissionRequest request,
+            @RequestPart(value = "documentTypes", required = false) List<AdmissionDocumentType> documentTypes,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        return ApiResponse.success(service.updateBeforeGroomReview(owner.getUserId(), id, request, documentTypes, files));
     }
 }

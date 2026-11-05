@@ -1,3 +1,5 @@
+import type { PrescriptionItemRequest } from '@/features/care/types';
+import type { VaccinationRequest } from '@/features/care/types/preventive';
 export type AdmissionStatus =
   | 'GROOM_REVIEW'
   | 'WAITING_FOR_STALL'
@@ -42,7 +44,7 @@ export interface HealthRecord {
   horseId: number;
   veterinarianId: number;
   examinedAt: string;
-  symptoms: string | null;
+  symptoms?: string | null;
   findings: string | null;
   diagnosis: string | null;
   treatment: string | null;
@@ -66,6 +68,8 @@ export interface AdmissionDetailResponse {
   admissionId: number;
   ownerId: number;
   ownerName: string | null;
+  ownerEmail?: string | null;
+  ownerPhone?: string | null;
   status: AdmissionStatus;
   quarantineStallId: number | null;
   quarantineStallCode: string | null;
@@ -76,22 +80,27 @@ export interface AdmissionDetailResponse {
     id: number;
     name: string;
     breed: string;
+    sex: import('@/types/horse').HorseSex | null;
     dateOfBirth: string;
     registrationNumber: string | null;
     registryName: string | null;
     sireName: string | null;
+    sireRegistrationNumber?: string | null;
     damName: string | null;
+    damRegistrationNumber?: string | null;
     pedigreeNotes: string | null;
   } | null;
 
   documents: AdmissionDocument[];
 
   groomId: number | null;
+  groomName?: string | null;
   groomDecision: string | null;
   groomFeedback: string | null;
   groomReviewedAt: string | null;
 
   veterinarianId: number | null;
+  veterinarianName?: string | null;
   /** Outcome of the admission exam. The vet does not approve or reject the admission. */
   vetTrainingDecision: TrainingDecision | null;
   vetFeedback: string | null;
@@ -104,6 +113,7 @@ export interface AdmissionDetailResponse {
   trainerReviewedAt: string | null;
 
   managerId: number | null;
+  managerName?: string | null;
   managerDecision: string | null;
   managerFeedback: string | null;
   managerReviewedAt: string | null;
@@ -121,6 +131,13 @@ export interface AdmissionDetailResponse {
     scheduledDate: string | null;
     scheduledAt: string | null;
   } | null;
+
+  /**
+   * Typed view of the initial vet exam for this admission.
+   * null when the vet has not yet completed the examination.
+   */
+  initialVetExam: InitialVetExamResponse | null;
+
   capacity: {
     availableQuarantineStalls: number;
     availableRegularStalls: number;
@@ -130,11 +147,44 @@ export interface AdmissionDetailResponse {
   };
 }
 
+/** Vital-sign measurement recorded during a health exam session. */
+export interface InitialVetExamMetric {
+  id: number;
+  horseId: number;
+  healthRecordId: number;
+  recordedAt: string;
+  heartRate: number | null;
+  temperature: number | null;
+  weight: number | null;
+  respiratoryRate: number | null;
+  hydrationStatus: string | null;
+  bodyConditionScore: number | null;
+  notes: string | null;
+}
+
+/** Read-only view of the initial admission vet exam. */
+export interface InitialVetExamResponse {
+  healthRecordId: number;
+  veterinarianId: number | null;
+  veterinarianName: string | null;
+  examinedAt: string;
+  trainingDecision: TrainingDecision | null;
+  restrictionDetails: string | null;
+  symptoms?: string | null;
+  findings: string | null;
+  diagnosis: string | null;
+  treatment: string | null;
+  notes: string | null;
+  metrics: InitialVetExamMetric[];
+}
+
+
 // Care Schedule Types
 export type CareScheduleStatus =
   | 'REQUESTED'
   | 'SCHEDULED'
   | 'IN_PROGRESS'
+  | 'PAUSED'
   | 'COMPLETED'
   | 'CANCELLED';
 
@@ -159,15 +209,30 @@ export interface UrgentAssignmentAlert {
   stallCode: string | null;
   reportedById: number;
   reportedByName: string | null;
+  reportedByRole?: string | null;
   reportedAt: string;
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   title: string;
   description: string;
   imageUrl: string | null;
   trainingDecision: TrainingDecision;
+  previousTrainingDecision: TrainingDecision | null;
+  previousTrainingDecisionReason: string | null;
   status: CareScheduleStatus;
   scheduledAt: string | null;
   assignedAt: string;
+}
+
+export interface UrgentCaseReport {
+  id: number;
+  reportedById: number;
+  reportedByName: string | null;
+  reportedByRole: string | null;
+  reportedAt: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  title: string;
+  description: string;
+  imageUrl: string | null;
 }
 
 export interface CareSchedule {
@@ -181,10 +246,19 @@ export interface CareSchedule {
   assignedVetId?: number | null;
   scheduledDate?: string | null;
   scheduledAt?: string | null;
+  completedAt?: string | null;
+  durationMinutes?: number | null;
   notes?: string | null;
   description?: string | null;
   createdAt?: string;
+  purpose?: 'FOLLOW_UP' | 'PREVENTIVE';
+  requestedAt?: string | null;
+  /** D1 cờ dẫn xuất từ BE: ca IN_PROGRESS quá 30' so với giờ hẹn (không phải trạng thái DB). */
+  overdue?: boolean;
+  pausedFrom?: string | null;
 }
+
+export type CareScheduleResponse = CareSchedule;
 
 export interface CareScheduleDetail {
   schedule: CareSchedule;
@@ -207,6 +281,7 @@ export interface CareScheduleFilters {
   admissionId?: number;
   vetId?: number;
   veterinarianId?: number;
+  date?: string;
   page?: number;
   size?: number;
 }
@@ -232,6 +307,38 @@ export interface CompleteCareScheduleRequest {
   notes?: string;
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
+  /** Multiple follow-up rechecks (rotating vets on consecutive days). */
+  nextSchedules?: CreateNextScheduleRequest[];
+  vaccinations?: VaccinationRequest[];
+  /** 7–10 days; only on a preventive visit without vaccinations. */
+  deferVaccinationDays?: number;
+  /** Marker chấn thương ghi nhận cùng ca khám (T4). */
+  injuryMarkers?: CreateInjuryMarkerRequest[];
+  /** Don thuoc ke tu danh muc chuan (Track 2a/3a). */
+  prescriptions?: PrescriptionItemRequest[];
+  /** Huong dan cham soc chung cho toan dot dieu tri (WF-04 §3.4). */
+  generalCareInstructions?: string;
+  /** Active condition IDs marked resolved by the vet during this exam (Track 3b). */
+  resolvedConditionIds?: number[];
+}
+
+export interface CreateInjuryMarkerRequest {
+  injuryType: string;
+  bodyRegionId: number;
+  severity: string;
+  description?: string;
+  diagnosedAt: string;
+  positionX?: number | null;
+  positionY?: number | null;
+  positionZ?: number | null;
+  zoneId?: string | null;
+  localX?: number | null;
+  localY?: number | null;
+  localZ?: number | null;
+  normalX?: number | null;
+  normalY?: number | null;
+  normalZ?: number | null;
+  meshName?: string | null;
 }
 
 export interface VetAdmissionQueueItem {
@@ -254,15 +361,17 @@ export interface VetAdmissionQueueItem {
 
 export interface VetQueueSummary {
   total: number;
+  active?: number;
   awaiting: number;
   inProgress: number;
+  approved?: number;
 }
 
 export type VetQueueSummaryResponse = VetQueueSummary;
 
 export interface VetQueueFilters {
   search?: string;
-  pill?: 'ALL' | 'AWAITING' | 'IN_PROGRESS';
+  pill?: 'ALL' | 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'PAUSED' | 'APPROVED';
   admissionStatus?: AdmissionStatus | 'ALL';
   scheduleStatus?: CareScheduleStatus | 'ALL';
   careType?: CareType | 'ALL';
@@ -302,19 +411,31 @@ export interface HorseHealthMetricResponse extends HorseHealthMetricRequest {
   recordedAt: string;
 }
 
+export type VetReviewDecision = 'ACCEPT' | 'REJECT';
+
 export interface VetReviewRequest {
   careScheduleId?: number;
-  trainingDecision: TrainingDecision;
+  decision?: VetReviewDecision;
+  rejectReason?: string;
+  trainingDecision?: TrainingDecision;
   restrictionDetails?: string;
   feedback?: string;
-  physicalExamConfirmed: boolean;
+  physicalExamConfirmed?: boolean;
   symptoms?: string;
-  findings: string;
+  findings?: string;
   diagnosis?: string;
   treatment?: string;
   notes?: string;
   metrics?: HorseHealthMetricRequest[];
   nextSchedule?: CreateNextScheduleRequest | null;
+  vaccinations?: VaccinationRequest[];
+  injuryMarkers?: CreateInjuryMarkerRequest[];
+  /** Don thuoc ke tu danh muc chuan (Track 2a/3a). */
+  prescriptions?: PrescriptionItemRequest[];
+  /** Huong dan cham soc chung cho toan dot dieu tri (WF-04 §3.4). */
+  generalCareInstructions?: string;
+  /** Active condition IDs marked resolved by the vet during this exam (Track 3b). */
+  resolvedConditionIds?: number[];
 }
 
 export interface VetReviewResponse {
@@ -353,7 +474,8 @@ export interface GroomQueueResponse {
 
 export interface GroomReviewRequest {
   decision: 'APPROVED' | 'REJECTED';
-  feedback: string;
+  /** Optional when approving; required (non-blank) when rejecting. */
+  feedback?: string;
 }
 
 export interface ManagerReviewRequest {

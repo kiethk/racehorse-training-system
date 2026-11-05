@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/features/notifications/context/NotificationContext';
@@ -9,12 +9,17 @@ import type { NotificationItem } from '@/features/notifications/types';
 import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { cn } from '@/lib/cn';
+import { formatDateTime } from '@/lib/display';
 
 export function NotificationBell() {
   const { user } = useAuth();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, refreshNotifications, markAsRead, markAllAsRead } = useNotifications();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (open) void refreshNotifications();
+  }, [open, refreshNotifications]);
 
   // Marking as read is best-effort here; the next poll reconciles the list.
   const markReadQuietly = async (id: number) => {
@@ -142,12 +147,5 @@ export function NotificationBell() {
 }
 
 function formatNotificationTime(isoString: string): string {
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatDateTime(isoString);
 }

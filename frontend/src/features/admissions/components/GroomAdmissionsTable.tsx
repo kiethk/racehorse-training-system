@@ -87,12 +87,12 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
   };
 
   if (loading && !result) {
-    return <AdmissionListLayout title="Admissions" description="Review applications, quarantine capacity and horse arrivals."><ListSkeleton rows={8} /></AdmissionListLayout>;
+    return <AdmissionListLayout title="Admissions"><ListSkeleton rows={8} /></AdmissionListLayout>;
   }
 
   if (error && !result) {
     return (
-      <AdmissionListLayout title="Admissions" description="Review applications, quarantine capacity and horse arrivals.">
+      <AdmissionListLayout title="Admissions">
         <EmptyState
           title="Unable to load applications"
           description={error}
@@ -103,7 +103,7 @@ export function GroomAdmissionsTable({ initialFilters }: { initialFilters: Groom
   }
 
   return (
-    <AdmissionListLayout title="Admissions" description="Review applications, quarantine capacity and horse arrivals.">
+    <AdmissionListLayout title="Admissions">
       <AdmissionFilterBar
         search={draft.candidateName}
         onSearchChange={(candidateName) => setDraft({ ...draft, candidateName })}

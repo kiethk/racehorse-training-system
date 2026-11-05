@@ -2,11 +2,14 @@ package com.rtms.backend.stable.entity;
 
 import com.rtms.backend.stable.enums.AreaType;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "areas")
+@SQLRestriction("deleted_at IS NULL")
 public class Area {
 
     @Id
@@ -32,6 +35,10 @@ public class Area {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "deleted_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private LocalDateTime deletedAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -46,6 +53,10 @@ public class Area {
     public Long getId() {
         return id;
     }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 
     public void setId(Long id) {
         this.id = id;

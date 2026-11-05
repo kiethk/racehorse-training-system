@@ -1,24 +1,10 @@
-import { apiGet, apiPost } from '@/services/api';
+import { apiGet, apiPost, apiUpload } from '@/services/api';
 import type { TodayTaskItem } from '../types';
 
 interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-async function patchWithMessage<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'PATCH',
-    credentials: 'include',
-  });
-  const payload = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(payload?.message || `API error: ${res.status}`);
-  }
-  return payload?.data !== undefined ? payload.data : (payload as T);
 }
 
 export const groomApi = {
@@ -31,8 +17,16 @@ export const groomApi = {
     return (await apiGet<ApiResponse<TodayTaskItem[]>>(url)).data;
   },
 
-  completeTask: async (id: number): Promise<void> => {
-    await patchWithMessage(`/api/groom-daily-tasks/${id}/complete`);
+  /**
+   * Completes a block of routine tasks in one action, with an optional note and up to five optional photos
+   * shared by every task in it. Sent as multipart through the shared client, which adds the access token.
+   */
+  completeTasks: async (taskIds: number[], evidence?: { note?: string; photos?: File[] }): Promise<void> => {
+    const body = new FormData();
+    taskIds.forEach((id) => body.append('taskIds', String(id)));
+    if (evidence?.note?.trim()) body.append('note', evidence.note.trim());
+    evidence?.photos?.forEach((photo) => body.append('files', photo));
+    await apiUpload<ApiResponse<unknown>>('/api/groom-daily-tasks/complete', body);
   },
 
   generateRoutine: async (date?: string): Promise<void> => {

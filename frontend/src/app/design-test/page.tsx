@@ -7,12 +7,15 @@ import {
   Avatar,
   Button,
   Checkbox,
+  BackLink,
   ConfirmDialog,
   EmptyState,
   FieldLabel,
   FilterChips,
   FormField,
   IconButton,
+  ImageLightbox,
+  ImageThumbnail,
   Input,
   LinkButton,
   ListSkeleton,
@@ -20,10 +23,14 @@ import {
   Modal,
   Notice,
   Panel,
+  PeriodBarChart,
   Pill,
+  ProgressBar,
+  ScoreScale,
   SearchInput,
   SectionTitle,
   SegmentedControl,
+  SelectableCard,
   Select,
   Skeleton,
   Spinner,
@@ -40,8 +47,14 @@ import { getNavigationForRole } from '@/config/navigation';
 import { ROLE_LABELS } from '@/lib/roleRoute';
 import { toast } from '@/lib/toast';
 import type { Role } from '@/types/auth';
+import { DragDropExample } from './DragDropExample';
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[];
+const SAMPLE_IMAGES = [
+  { src: '/logo.png', alt: 'RTMS logo' },
+  { src: '/globe.svg', alt: 'Globe' },
+  { src: '/window.svg', alt: 'Window' },
+];
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -55,12 +68,15 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 /** Living reference for every shared primitive. Add new primitives here. */
 export default function DesignTestPage() {
   const [role, setRole] = useState<Role>('HEAD_TRAINER');
+  const [selectedCard, setSelectedCard] = useState<'a' | 'b'>('a');
   const [collapsed, setCollapsed] = useState(false);
   const [view, setView] = useState<'week' | 'month'>('week');
+  const [score, setScore] = useState<number | null>(7);
   const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'DONE'>('ALL');
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   return (
     <div className="mx-auto max-w-5xl space-y-10 p-8">
@@ -101,6 +117,7 @@ export default function DesignTestPage() {
           <LinkButton href="/design-test" variant="secondary" iconRight="chevron-right">LinkButton</LinkButton>
           <IconButton icon="refresh" label="Refresh" />
           <IconButton icon="x" label="Close" size="sm" />
+          <BackLink href="/design-test">Back to list</BackLink>
         </div>
       </Section>
 
@@ -128,6 +145,12 @@ export default function DesignTestPage() {
           <Checkbox label="Isolate on arrival" description="Keeps the horse out of shared paddocks." />
           <Checkbox type="radio" name="demo" label="Radio option" />
         </Panel>
+      </Section>
+
+      <Section title="Score scale">
+        <div className="max-w-md">
+          <ScoreScale label="Temperament" value={score} onChange={setScore} required />
+        </div>
       </Section>
 
       <Section title="Segmented control and filter chips">
@@ -169,9 +192,67 @@ export default function DesignTestPage() {
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Lifts on hover.</p>
           </Panel>
           <MetricCard label="Horses in training" value={42} icon="horse" />
+          <SelectableCard selected={selectedCard === 'a'} onClick={() => setSelectedCard('a')}>
+            <FieldLabel>SelectableCard</FieldLabel>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Picked from a set; click to select.</p>
+          </SelectableCard>
+          <SelectableCard dimmed empty selected={selectedCard === 'b'} onClick={() => setSelectedCard('b')}>
+            <FieldLabel>Dimmed, empty</FieldLabel>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Outside the viewer&apos;s scope.</p>
+          </SelectableCard>
           <MetricCard label="Avg fitness" value="7.8" unit="/10" tone="success" icon="activity" />
           <MetricCard label="Open incidents" value={3} tone="danger" icon="alert-triangle" hint="2 need a vet" />
         </div>
+      </Section>
+
+      <Section title="Progress bar">
+        <Panel padded className="space-y-4">
+          <div className="space-y-1.5">
+            <FieldLabel>Single value</FieldLabel>
+            <ProgressBar label="Course progress" value={7} max={12} />
+            <ProgressBar label="Course progress, small" value={9} max={12} size="sm" tone="success" />
+          </div>
+          <div className="space-y-1.5">
+            <FieldLabel>Stacked distribution</FieldLabel>
+            <ProgressBar
+              label="Team performance distribution"
+              max={10}
+              segments={[
+                { value: 4, tone: 'success', label: 'Excellent: 4' },
+                { value: 3, tone: 'info', label: 'On target: 3' },
+                { value: 2, tone: 'warning', label: 'Needs improvement: 2' },
+                { value: 1, tone: 'neutral', label: 'No data: 1' },
+              ]}
+            />
+          </div>
+        </Panel>
+      </Section>
+
+      <Section title="Period bar chart">
+        <Panel padded>
+          <PeriodBarChart
+            fromDate="2026-08-03"
+            toDate="2026-10-26"
+            bucketDays={7}
+            labelEvery={2}
+            items={[
+              { date: '2026-08-17', value: 7.5 },
+              { date: '2026-08-24', value: 8 },
+              { date: '2026-09-07', value: 6 },
+              { date: '2026-09-28', value: 9 },
+              { date: '2026-10-12', value: 8.5 },
+              { date: '2026-10-19', value: 5 },
+            ]}
+            getDate={(item) => item.date}
+            getValue={(item) => item.value}
+            renderTooltip={(item) => <span>Week of {item.date}: {item.value}/10</span>}
+            min={0}
+            max={10}
+            ticks={[0, 2, 4, 6, 8, 10]}
+            axisLabel="Rating"
+            ariaLabel="Example rating per week"
+          />
+        </Panel>
       </Section>
 
       <Section title="Badges, avatars, tooltips">
@@ -194,11 +275,11 @@ export default function DesignTestPage() {
         <div className="space-y-2">
           <Notice tone="success">Admission approved.</Notice>
           <Notice tone="error" title="Could not save">The server rejected the request.</Notice>
-          <Notice tone="warning">This plan overlaps another lot.</Notice>
+          <Notice tone="warning">This plan overlaps another course.</Notice>
           <Notice tone="info" onDismiss={() => undefined}>Dismissible notice.</Notice>
           <div className="flex flex-wrap gap-2 pt-1">
             <Button onClick={() => toast.success('Status updated')}>Success toast</Button>
-            <Button onClick={() => toast.error('Unable to cancel this lot', 'Try again in a moment.')}>
+            <Button onClick={() => toast.error('Unable to cancel this session', 'Try again in a moment.')}>
               Error toast
             </Button>
           </div>
@@ -214,7 +295,7 @@ export default function DesignTestPage() {
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           title="Reschedule workout"
-          description="Pick a new time slot for this lot."
+          description="Pick a new time slot for this session."
           footer={
             <>
               <Button onClick={() => setModalOpen(false)}>Cancel</Button>
@@ -228,14 +309,34 @@ export default function DesignTestPage() {
         </Modal>
         <ConfirmDialog
           open={confirmOpen}
-          title="Cancel this lot?"
+          title="Cancel this session?"
           description="Riders will be notified. This cannot be undone."
           tone="danger"
-          confirmLabel="Cancel lot"
+          confirmLabel="Cancel session"
           cancelLabel="Keep"
           onConfirm={() => setConfirmOpen(false)}
           onCancel={() => setConfirmOpen(false)}
         />
+      </Section>
+
+      <Section title="Image thumbnails and lightbox">
+        <ul className="grid max-w-md grid-cols-3 gap-2" aria-label="Sample images">
+          {SAMPLE_IMAGES.map((image, index) => (
+            <li key={image.src}>
+              <ImageThumbnail src={image.src} alt={image.alt} onClick={() => setLightboxIndex(index)} />
+            </li>
+          ))}
+        </ul>
+        <ImageLightbox
+          images={SAMPLE_IMAGES}
+          index={lightboxIndex}
+          onIndexChange={setLightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      </Section>
+
+      <Section title="Drag and drop">
+        <DragDropExample />
       </Section>
 
       <Section title="Table">

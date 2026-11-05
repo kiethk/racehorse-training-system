@@ -16,6 +16,8 @@ public class AdmissionDetailResponse {
     private Long admissionId;
     private Long ownerId;
     private String ownerName;
+    private String ownerEmail;
+    private String ownerPhone;
     private AdmissionStatus status;
     private Long quarantineStallId;
     private String quarantineStallCode;
@@ -25,6 +27,7 @@ public class AdmissionDetailResponse {
     private AdmissionCapacitySummary capacity;
 
     private Long groomId;
+    private String groomName;
     private ReviewDecision groomDecision;
     private String groomFeedback;
     private LocalDateTime groomReviewedAt;
@@ -32,6 +35,7 @@ public class AdmissionDetailResponse {
     private LocalDateTime arrivedAt;
 
     private Long veterinarianId;
+    private String veterinarianName;
     private TrainingDecision vetTrainingDecision;
     private String vetFeedback;
     private LocalDateTime vetReviewedAt;
@@ -42,6 +46,7 @@ public class AdmissionDetailResponse {
     private LocalDateTime trainerReviewedAt;
 
     private Long managerId;
+    private String managerName;
     private ReviewDecision managerDecision;
     private String managerFeedback;
     private LocalDateTime managerReviewedAt;
@@ -56,8 +61,17 @@ public class AdmissionDetailResponse {
     private List<HealthRecord> healthRecords;
     private InitialExamScheduleResponse initialExamSchedule;
 
+    /**
+     * Structured, read-only view of the first INITIAL-type exam for this admission.
+     * null when the vet has not yet completed the examination.
+     */
+    private InitialVetExamResponse initialVetExam;
+
     public InitialExamScheduleResponse getInitialExamSchedule() { return initialExamSchedule; }
     public void setInitialExamSchedule(InitialExamScheduleResponse initialExamSchedule) { this.initialExamSchedule = initialExamSchedule; }
+
+    public InitialVetExamResponse getInitialVetExam() { return initialVetExam; }
+    public void setInitialVetExam(InitialVetExamResponse initialVetExam) { this.initialVetExam = initialVetExam; }
 
     public Long getAdmissionId() {
         return admissionId;
@@ -78,6 +92,14 @@ public class AdmissionDetailResponse {
     public String getOwnerName() { return ownerName; }
 
     public void setOwnerName(String ownerName) { this.ownerName = ownerName; }
+
+    public String getOwnerEmail() { return ownerEmail; }
+
+    public void setOwnerEmail(String ownerEmail) { this.ownerEmail = ownerEmail; }
+
+    public String getOwnerPhone() { return ownerPhone; }
+
+    public void setOwnerPhone(String ownerPhone) { this.ownerPhone = ownerPhone; }
 
     public AdmissionStatus getStatus() {
         return status;
@@ -131,6 +153,10 @@ public class AdmissionDetailResponse {
         this.groomId = groomId;
     }
 
+    public String getGroomName() { return groomName; }
+
+    public void setGroomName(String groomName) { this.groomName = groomName; }
+
     public ReviewDecision getGroomDecision() {
         return groomDecision;
     }
@@ -170,6 +196,10 @@ public class AdmissionDetailResponse {
     public void setVeterinarianId(Long veterinarianId) {
         this.veterinarianId = veterinarianId;
     }
+
+    public String getVeterinarianName() { return veterinarianName; }
+
+    public void setVeterinarianName(String veterinarianName) { this.veterinarianName = veterinarianName; }
 
     public TrainingDecision getVetTrainingDecision() {
         return vetTrainingDecision;
@@ -230,6 +260,10 @@ public class AdmissionDetailResponse {
     public void setManagerId(Long managerId) {
         this.managerId = managerId;
     }
+
+    public String getManagerName() { return managerName; }
+
+    public void setManagerName(String managerName) { this.managerName = managerName; }
 
     public ReviewDecision getManagerDecision() {
         return managerDecision;

@@ -15,6 +15,7 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.horse.enums.HorseSex;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.stable.enums.StallStatus;
@@ -22,6 +23,8 @@ import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
 import com.rtms.backend.horse.repository.HorsePedigreeRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.horse.service.PedigreeBirthDateValidator;
+import com.rtms.backend.identity.repository.GroomProfileRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +37,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -69,6 +73,12 @@ class AdmissionGroomReviewServiceTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private GroomProfileRepository groomProfileRepository;
+
+    @Mock
+    private AdmissionNotificationService admissionNotificationService;
+
     private AdmissionGroomReviewService service;
 
     @BeforeEach
@@ -81,7 +91,10 @@ class AdmissionGroomReviewServiceTest {
                 horsePedigreeRepository,
                 careScheduleRepository,
                 careScheduleService,
-                notificationService);
+                notificationService,
+                new PedigreeBirthDateValidator(horseRepository),
+                groomProfileRepository,
+                admissionNotificationService);
         lenient().when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
     }
 
@@ -90,6 +103,7 @@ class AdmissionGroomReviewServiceTest {
     void review_reject_success() {
         AdmissionApplication admission = admission();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.REJECTED, "Missing documents"));
@@ -100,8 +114,9 @@ class AdmissionGroomReviewServiceTest {
         assertEquals("Missing documents", result.getGroomFeedback());
         assertNotNull(result.getGroomReviewedAt());
         assertNull(result.getHorseId());
-        verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
-                careScheduleRepository, stableStallRepository, notificationService);
+        verify(stableStallRepository, never()).lockAdmissionCapacityStallsForUpdate();
+        verify(admissionNotificationService).notifyOwnerRejected(eq(admission), anyString(), eq("Quarantine Groom Review"), eq("Missing documents"));
+        verifyNoInteractions(horseRepository, horsePedigreeRepository, careScheduleRepository, notificationService);
     }
 
     @Test
@@ -109,6 +124,7 @@ class AdmissionGroomReviewServiceTest {
     void review_approveWithoutCapacity_waitingForStall() {
         AdmissionApplication admission = admission();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
         when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(0L);
         when(stableStallRepository.countAvailableRegularStalls()).thenReturn(10L);
         when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(1L);
@@ -120,6 +136,7 @@ class AdmissionGroomReviewServiceTest {
         assertEquals(ReviewDecision.APPROVED, result.getGroomDecision());
         assertNull(result.getHorseId());
         verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
+        verify(admissionApplicationRepository, never()).findNextWaitingForStallForUpdate();
         verifyNoInteractions(candidateHorseProfileRepository, horseRepository, horsePedigreeRepository,
                 careScheduleRepository, notificationService);
     }
@@ -129,6 +146,7 @@ class AdmissionGroomReviewServiceTest {
     void review_approveWithoutRegularReserve_waitingForStall() {
         AdmissionApplication admission = admission();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
         when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(2L);
         when(stableStallRepository.countAvailableRegularStalls()).thenReturn(1L);
         when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(1L);
@@ -144,20 +162,61 @@ class AdmissionGroomReviewServiceTest {
     }
 
     @Test
-    @DisplayName("Groom review rejects blank feedback for both decisions")
-    void review_blankFeedback_isRejected() {
-        for (ReviewDecision decision : List.of(ReviewDecision.APPROVED, ReviewDecision.REJECTED)) {
-            AdmissionApplication admission = admission();
-            when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+    @DisplayName("BR-02: approve without feedback is allowed and stores no feedback")
+    void review_approveWithoutFeedback_isAllowed() {
+        AdmissionApplication admission = admission();
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
+        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(0L);
+        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-                    () -> service.review(1L, 7L, request(decision, "  \t ")));
+        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "  \t "));
 
-            assertEquals(400, exception.getStatusCode().value());
-        }
+        assertEquals(AdmissionStatus.WAITING_FOR_STALL, result.getStatus());
+        assertNull(result.getGroomFeedback());
+    }
+
+    @Test
+    @DisplayName("BR-02: reject requires non-blank feedback even when the client skips its own check")
+    void review_rejectWithBlankFeedback_isRejected() {
+        AdmissionApplication admission = admission();
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.review(1L, 7L, request(ReviewDecision.REJECTED, "  \t ")));
+
+        assertEquals(400, exception.getStatusCode().value());
         verify(admissionApplicationRepository, never()).save(any());
-        verifyNoInteractions(stableStallRepository, candidateHorseProfileRepository, horseRepository,
-                horsePedigreeRepository, careScheduleRepository, notificationService);
+        assertEquals(AdmissionStatus.GROOM_REVIEW, admission.getStatus());
+    }
+
+    @Test
+    @DisplayName("BR-02: feedback longer than 2000 characters is rejected")
+    void review_tooLongFeedback_isRejected() {
+        AdmissionApplication admission = admission();
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.review(1L, 7L, request(ReviewDecision.REJECTED, "x".repeat(2001))));
+
+        assertEquals(400, exception.getStatusCode().value());
+        verify(admissionApplicationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("BR-03: only quarantine grooms may review new admissions")
+    void review_byNonQuarantineGroom_isForbidden() {
+        AdmissionApplication admission = admission();
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.isQuarantineGroom(8L)).thenReturn(false);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.review(1L, 8L, request(ReviewDecision.APPROVED, null)));
+
+        assertEquals(403, exception.getStatusCode().value());
+        verify(admissionApplicationRepository, never()).save(any());
     }
 
     @Test
@@ -165,6 +224,7 @@ class AdmissionGroomReviewServiceTest {
     void review_trimsFeedback() {
         AdmissionApplication admission = admission();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.review(1L, 7L,
@@ -174,203 +234,358 @@ class AdmissionGroomReviewServiceTest {
     }
 
     @Test
-    @DisplayName("Groom approve đủ capacity: tạo Horse CANDIDATE, chiếm Q stall, tạo INITIAL CareSchedule, gán Vet, gán Trainer và gửi notifications")
-    void review_approveWithCapacity_createsCandidateHorseAndAssignsVetAndTrainer() {
+    void reviewApprovalJoinsQueueAndReservesFairStallWithoutCreatingHorse() {
         AdmissionApplication admission = admission();
-        CandidateHorseProfile candidate = candidate();
         StableStall qStall = stall(99L);
-
+        qStall.setGroomId(12L);
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        mockCapacityAvailable();
-        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(candidate));
-        when(stableStallRepository.findFirstAvailableQuarantineStallForUpdate()).thenReturn(Optional.of(qStall));
-        when(horseRepository.findByRegistrationNumber("FR1234567890123")).thenReturn(List.of());
-        when(horseRepository.save(any(Horse.class))).thenAnswer(inv -> {
-            Horse horse = inv.getArgument(0);
-            horse.setId(20L);
-            return horse;
-        });
-        when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.empty());
-
-        // Initial CareSchedule creation
-        CareSchedule createdSchedule = new CareSchedule();
-        createdSchedule.setId(100L);
-        createdSchedule.setHorseId(20L);
-        createdSchedule.setAdmissionId(1L);
-        createdSchedule.setCareType(CareType.INITIAL);
-        createdSchedule.setStatus(CareScheduleStatus.SCHEDULED);
-        createdSchedule.setVeterinarianId(15L); // Vet 15 assigned
-
-        when(careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(createdSchedule));
-        when(careScheduleRepository.save(any(CareSchedule.class))).thenReturn(createdSchedule);
-
+        when(stableStallRepository.isQuarantineGroom(7L)).thenReturn(true);
+        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(1L, 0L);
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(2L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(1L);
+        when(admissionApplicationRepository.findNextWaitingForStallForUpdate()).thenReturn(Optional.of(admission));
+        when(stableStallRepository.findFairAvailableStallForUpdate("QUARANTINE")).thenReturn(Optional.of(qStall));
         when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "Ready"));
 
-        // 1. Trạng thái Admission
-        assertEquals(AdmissionStatus.VET_REVIEW, result.getStatus());
-        assertEquals(20L, result.getHorseId());
+        assertEquals(AdmissionStatus.WAITING_FOR_ARRIVAL, result.getStatus());
+        assertEquals(StallStatus.RESERVED, qStall.getStatus());
         assertEquals(99L, result.getQuarantineStallId());
-        assertEquals(StallStatus.OCCUPIED, qStall.getStatus());
-
-        // 3. Horse CANDIDATE
-        ArgumentCaptor<Horse> horseCaptor = ArgumentCaptor.forClass(Horse.class);
-        verify(horseRepository).save(horseCaptor.capture());
-        Horse savedHorse = horseCaptor.getValue();
-        assertEquals("QABALAH MERCURY", savedHorse.getName());
-        assertEquals("Arabian", savedHorse.getBreed());
-        assertEquals(HorseStatus.CANDIDATE, savedHorse.getCurrentStatus());
-        // Ngựa CANDIDATE: không cần cờ khóa, canTrain() đã false vì chưa ELIGIBLE.
-        assertEquals(TrainingDecision.ALLOWED, savedHorse.getTrainingDecision());
-        assertNull(savedHorse.getTrainingDecisionReason());
-        assertFalse(savedHorse.canTrain());
-        assertEquals(99L, savedHorse.getCurrentStallId());
-        assertEquals(5L, savedHorse.getOwnerId());
-        assertEquals("FR1234567890123", savedHorse.getRegistrationNumber());
-
-        // 4. CareSchedule INITIAL & gán Vet
-        verify(careScheduleService).assignRequestedSchedules();
-
-        // 5. Notifications cho Vet (Groom review chỉ gửi Vet notification)
-        verify(notificationService).sendAssignmentNotification(
-                eq(15L), eq(1L), eq(20L), eq(NotificationTypes.ADMISSION_VET_ASSIGNED), anyString(), anyString());
+        assertNotNull(result.getArrivalDeadlineAt());
+        assertNull(result.getHorseId());
+        verify(groomProfileRepository).touchLastHorseAssignedAt(eq(12L), any());
+        verify(notificationService).createNotification(eq(12L), anyString(), anyString(),
+                eq(NotificationTypes.ADMISSION_GROOM_ASSIGNED), eq(NotificationTypes.REFERENCE_ADMISSION), eq(1L),
+                eq("12:ADMISSION_1:ADMISSION_GROOM_ASSIGNED:stall:99"));
+        verify(admissionNotificationService).notifyOwnerWaitingForArrival(eq(admission), anyString(), eq(qStall));
+        verifyNoInteractions(horseRepository, horsePedigreeRepository, careScheduleRepository);
     }
 
     @Test
-    @DisplayName("Retry Groom confirm không tạo trùng CareSchedule, không duplicate notification")
-    void review_retry_idempotent_preservesAssignments() {
-        AdmissionApplication admission = admission();
-        CandidateHorseProfile candidate = candidate();
-        StableStall qStall = stall(99L);
+    @DisplayName("BR-01: allocation serves the queue oldest first and stops without error when capacity runs out")
+    void allocateWaitingAdmissionsServesQueueUntilCapacityRunsOut() {
+        AdmissionApplication oldest = admission();
+        oldest.setStatus(AdmissionStatus.WAITING_FOR_STALL);
+        AdmissionApplication next = admission();
+        next.setId(2L);
+        next.setStatus(AdmissionStatus.WAITING_FOR_STALL);
+        StableStall first = stall(98L);
+        first.setGroomId(12L);
+        StableStall second = stall(99L);
+        second.setGroomId(13L);
+        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(2L, 1L, 0L);
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(10L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(0L, 1L);
+        when(admissionApplicationRepository.findNextWaitingForStallForUpdate())
+                .thenReturn(Optional.of(oldest), Optional.of(next));
+        when(stableStallRepository.findFairAvailableStallForUpdate("QUARANTINE"))
+                .thenReturn(Optional.of(first), Optional.of(second));
 
-        CareSchedule existingSchedule = new CareSchedule();
-        existingSchedule.setId(100L);
-        existingSchedule.setHorseId(20L);
-        existingSchedule.setAdmissionId(1L);
-        existingSchedule.setCareType(CareType.INITIAL);
-        existingSchedule.setStatus(CareScheduleStatus.SCHEDULED);
-        existingSchedule.setVeterinarianId(15L);
+        int allocated = service.allocateWaitingAdmissions();
 
+        assertEquals(2, allocated);
+        assertEquals(98L, oldest.getQuarantineStallId());
+        assertEquals(99L, next.getQuarantineStallId());
+        assertEquals(AdmissionStatus.WAITING_FOR_ARRIVAL, oldest.getStatus());
+        assertEquals(AdmissionStatus.WAITING_FOR_ARRIVAL, next.getStatus());
+        var order = inOrder(admissionApplicationRepository, stableStallRepository);
+        order.verify(admissionApplicationRepository).flush();
+        order.verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
+    }
+
+    @Test
+    @DisplayName("BR-01: an empty queue or a missing groom stall ends allocation quietly")
+    void allocateWaitingAdmissionsWithoutWorkReturnsZero() {
+        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(3L);
+        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(10L);
+        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(0L);
+        when(admissionApplicationRepository.findNextWaitingForStallForUpdate()).thenReturn(Optional.empty());
+
+        assertEquals(0, service.allocateWaitingAdmissions());
+
+        AdmissionApplication waiting = admission();
+        waiting.setStatus(AdmissionStatus.WAITING_FOR_STALL);
+        when(admissionApplicationRepository.findNextWaitingForStallForUpdate()).thenReturn(Optional.of(waiting));
+        when(stableStallRepository.findFairAvailableStallForUpdate("QUARANTINE")).thenReturn(Optional.empty());
+
+        assertEquals(0, service.allocateWaitingAdmissions());
+        assertEquals(AdmissionStatus.WAITING_FOR_STALL, waiting.getStatus());
+        verifyNoInteractions(notificationService, groomProfileRepository);
+    }
+
+    @Test
+    @DisplayName("BR-01: expiring a reservation hands the freed stall to the queue")
+    void expiringReservationTriggersAllocation() {
+        AdmissionApplication overdue = awaitingArrival();
+        overdue.setArrivalDeadlineAt(LocalDateTime.now().minusMinutes(1));
+        when(admissionApplicationRepository.findByStatusAndArrivalDeadlineAtLessThanEqualOrderByArrivalDeadlineAtAscIdAsc(
+                eq(AdmissionStatus.WAITING_FOR_ARRIVAL), any())).thenReturn(List.of(overdue));
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(overdue));
+        StableStall reserved = stall(99L);
+        reserved.setStatus(StallStatus.RESERVED);
+        when(stableStallRepository.findQuarantineStallByIdForUpdate(99L)).thenReturn(Optional.of(reserved));
+        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(0L);
+
+        service.expireOverdueArrivalReservations();
+
+        assertEquals(AdmissionStatus.ARRIVAL_EXPIRED, overdue.getStatus());
+        assertEquals(StallStatus.AVAILABLE, reserved.getStatus());
+        verify(stableStallRepository).lockAdmissionCapacityStallsForUpdate();
+    }
+
+    @Test
+    @DisplayName("BR-03: only the groom of the reserved quarantine stall confirms arrival")
+    void confirmArrivalByAnotherGroomIsForbidden() {
+        AdmissionApplication admission = awaitingArrival();
         when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        mockCapacityAvailable();
-        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(candidate));
-        when(stableStallRepository.findFirstAvailableQuarantineStallForUpdate()).thenReturn(Optional.of(qStall));
-        when(horseRepository.findByRegistrationNumber("FR1234567890123")).thenReturn(List.of());
+        StableStall reserved = stall(99L);
+        reserved.setStatus(StallStatus.RESERVED);
+        reserved.setGroomId(7L);
+        when(stableStallRepository.findQuarantineStallByIdForUpdate(99L)).thenReturn(Optional.of(reserved));
+
+        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 8L));
+
+        assertEquals(403, error.getStatusCode().value());
+        verify(horseRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmArrivalCreatesHorseAndInitialExamForThisAdmission() {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
         when(horseRepository.save(any(Horse.class))).thenAnswer(inv -> {
             Horse horse = inv.getArgument(0);
             horse.setId(20L);
             return horse;
         });
-        when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.empty());
-
-        // Existing schedule found -> not recreated
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(100L);
+        schedule.setHorseId(20L);
+        schedule.setAdmissionId(1L);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setVeterinarianId(15L);
         when(careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
-                .thenReturn(Optional.of(existingSchedule));
+                .thenReturn(Optional.empty(), Optional.of(schedule));
+        when(careScheduleRepository.save(any(CareSchedule.class))).thenReturn(schedule);
 
-        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        AdmissionApplication result = service.confirmArrival(1L, 7L);
 
-        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "Retry approve"));
-
-        // Không tạo mới schedule
-        verify(careScheduleRepository, never()).save(any(CareSchedule.class));
-
-        // Notifications được gọi qua dedup service cho Vet
-        verify(notificationService).sendAssignmentNotification(
-                eq(15L), eq(1L), eq(20L), eq(NotificationTypes.ADMISSION_VET_ASSIGNED), anyString(), anyString());
+        assertEquals(AdmissionStatus.VET_REVIEW, result.getStatus());
+        assertEquals(20L, result.getHorseId());
+        var horse = ArgumentCaptor.forClass(Horse.class);
+        verify(horseRepository).save(horse.capture());
+        assertEquals(5L, horse.getValue().getOwnerId());
+        assertEquals("999999TST000001", horse.getValue().getRegistrationNumber());
+        assertEquals(HorseSex.FEMALE, horse.getValue().getSex());
+        assertEquals(HorseStatus.CANDIDATE, horse.getValue().getCurrentStatus());
+        assertFalse(horse.getValue().canTrain());
+        var initial = ArgumentCaptor.forClass(CareSchedule.class);
+        verify(careScheduleRepository).save(initial.capture());
+        assertEquals(1L, initial.getValue().getAdmissionId());
+        assertEquals(20L, initial.getValue().getHorseId());
+        verify(careScheduleService).assignRequestedSchedule(schedule);
+        verify(careScheduleService, never()).assignRequestedSchedules();
+        verify(notificationService).sendAssignmentNotification(eq(15L), eq(1L), eq(20L),
+                eq(NotificationTypes.ADMISSION_VET_ASSIGNED), anyString(), anyString());
     }
 
     @Test
-    @DisplayName("WAITING_FOR_STALL retry: chuyển sang VET_REVIEW khi capacity đủ")
-    void processWaitingForStall_success() {
-        AdmissionApplication admission = admission();
-        admission.setStatus(AdmissionStatus.WAITING_FOR_STALL);
-        admission.setGroomId(7L);
-        admission.setGroomDecision(ReviewDecision.APPROVED);
-        CandidateHorseProfile candidate = candidate();
-        StableStall qStall = stall(99L);
-
-        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        mockCapacityAvailable();
-        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(candidate));
-        when(stableStallRepository.findFirstAvailableQuarantineStallForUpdate()).thenReturn(Optional.of(qStall));
-        when(horseRepository.findByRegistrationNumber("FR1234567890123")).thenReturn(List.of());
+    void confirmArrivalPreservesExistingExamAssignmentAndRejectsRepeatConfirmation() {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
         when(horseRepository.save(any(Horse.class))).thenAnswer(inv -> {
             Horse horse = inv.getArgument(0);
             horse.setId(20L);
             return horse;
         });
-        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        AdmissionApplication result = service.processWaitingForStall(1L);
-
-        assertEquals(AdmissionStatus.VET_REVIEW, result.getStatus());
-        assertEquals(7L, result.getGroomId());
-        assertEquals(ReviewDecision.APPROVED, result.getGroomDecision());
-        assertEquals(20L, result.getHorseId());
-    }
-
-    @Test
-    @DisplayName("Reuse Horse REJECTED cùng owner theo UELN")
-    void review_reusesRejectedHorseSameOwner() {
-        AdmissionApplication admission = admission();
-        CandidateHorseProfile candidate = candidate();
-        StableStall qStall = stall(99L);
-        Horse existingHorse = new Horse();
-        existingHorse.setId(20L);
-        existingHorse.setOwnerId(5L);
-        existingHorse.setCurrentStatus(HorseStatus.REJECTED);
-
-        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        mockCapacityAvailable();
-        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(candidate));
-        when(stableStallRepository.findFirstAvailableQuarantineStallForUpdate()).thenReturn(Optional.of(qStall));
-        when(horseRepository.findByRegistrationNumber("FR1234567890123")).thenReturn(List.of(existingHorse));
-        when(horseRepository.save(existingHorse)).thenReturn(existingHorse);
-        when(horsePedigreeRepository.findByHorseId(20L)).thenReturn(Optional.of(new HorsePedigree()));
+        CareSchedule schedule = new CareSchedule();
+        schedule.setId(100L);
+        schedule.setHorseId(20L);
+        schedule.setAdmissionId(1L);
+        schedule.setCareType(CareType.INITIAL);
+        schedule.setVeterinarianId(15L);
         when(careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
-                .thenReturn(Optional.empty());
-        when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+                .thenReturn(Optional.of(schedule));
 
-        AdmissionApplication result = service.review(1L, 7L, request(ReviewDecision.APPROVED, "Verified"));
+        service.confirmArrival(1L, 7L);
+        ResponseStatusException repeated = assertThrows(ResponseStatusException.class,
+                () -> service.confirmArrival(1L, 7L));
 
-        assertEquals(AdmissionStatus.VET_REVIEW, result.getStatus());
-        assertEquals(20L, result.getHorseId());
-        assertEquals(HorseStatus.CANDIDATE, existingHorse.getCurrentStatus());
-        assertFalse(existingHorse.canTrain());
-        assertEquals(99L, existingHorse.getCurrentStallId());
+        assertEquals(409, repeated.getStatusCode().value());
+        verify(careScheduleRepository, never()).save(any());
+        verify(horseRepository, times(1)).save(any());
+        verify(notificationService).sendAssignmentNotification(eq(15L), eq(1L), eq(20L),
+                eq(NotificationTypes.ADMISSION_VET_ASSIGNED), anyString(), anyString());
     }
 
     @Test
-    @DisplayName("Active Horse cùng UELN: không tạo duplicate")
-    void review_existingActiveHorseSameUeln_throws() {
-        AdmissionApplication admission = admission();
-        CandidateHorseProfile candidate = candidate();
-        StableStall qStall = stall(99L);
+    void confirmArrivalReusesRejectedHorseWithSameOwner() {
+        assertReadmissionUpdatesCurrentHorseOnly(5L);
+    }
+
+    @Test
+    void confirmArrivalReusesRejectedHorseWithNewOwner() {
+        assertReadmissionUpdatesCurrentHorseOnly(42L);
+    }
+
+    @Test
+    void confirmArrivalRechecksParentBirthDateBeforeUpdatingHorseOrStall() {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
+        Horse sire = new Horse();
+        sire.setDateOfBirth(LocalDate.of(2022, 1, 1));
+        when(horseRepository.findByRegistrationNumber("999999SIR000001")).thenReturn(List.of(sire));
+
+        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L));
+
+        assertEquals(400, error.getStatusCode().value());
+        assertTrue(error.getReason().contains("sire"));
+        verify(stableStallRepository, never()).save(any());
+        verify(horseRepository, never()).save(any());
+        verify(admissionApplicationRepository, never()).save(any());
+        verifyNoInteractions(horsePedigreeRepository, careScheduleRepository, notificationService);
+    }
+
+    @Test
+    void confirmArrivalStillRejectsAnActiveHorseWithSameUeln() {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
         Horse existingHorse = new Horse();
         existingHorse.setId(20L);
-        existingHorse.setOwnerId(5L);
-        existingHorse.setCurrentStatus(HorseStatus.CANDIDATE);
+        existingHorse.setOwnerId(42L);
+        existingHorse.setCurrentStatus(HorseStatus.ELIGIBLE);
+        when(horseRepository.findByRegistrationNumberForUpdate("999999TST000001"))
+                .thenReturn(List.of(existingHorse));
 
-        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
-        mockCapacityAvailable();
-        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(candidate));
-        when(stableStallRepository.findFirstAvailableQuarantineStallForUpdate()).thenReturn(Optional.of(qStall));
-        when(horseRepository.findByRegistrationNumber("FR1234567890123")).thenReturn(List.of(existingHorse));
-
-        assertThrows(ResponseStatusException.class,
-                () -> service.review(1L, 7L, request(ReviewDecision.APPROVED, "Verified")));
-
+        assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L));
+        assertEquals(42L, existingHorse.getOwnerId());
         verify(horseRepository, never()).save(any());
         verify(admissionApplicationRepository, never()).save(any());
     }
 
-    private void mockCapacityAvailable() {
-        when(stableStallRepository.countAvailableQuarantineStalls()).thenReturn(1L);
-        when(stableStallRepository.countAvailableRegularStalls()).thenReturn(2L);
-        when(stableStallRepository.countOccupiedQuarantineStalls()).thenReturn(1L);
+    @Test
+    void legacyAdmissionDoesNotEraseKnownSexOnReadmission() {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
+        CandidateHorseProfile legacy = candidate();
+        legacy.setSex(null);
+        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(legacy));
+        Horse existing = new Horse();
+        existing.setId(20L);
+        existing.setCurrentStatus(HorseStatus.REJECTED);
+        existing.setSex(HorseSex.FEMALE);
+        when(horseRepository.findByRegistrationNumberForUpdate("999999TST000001")).thenReturn(List.of(existing));
+        when(horseRepository.save(existing)).thenReturn(existing);
+
+        service.confirmArrival(1L, 7L);
+
+        assertEquals(HorseSex.FEMALE, existing.getSex());
+        assertNull(legacy.getSex());
+        verify(candidateHorseProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void legacyAdmissionCanCreateHorseWithUnknownSex() {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
+        CandidateHorseProfile legacy = candidate();
+        legacy.setSex(null);
+        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(legacy));
+        when(horseRepository.save(any(Horse.class))).thenAnswer(inv -> {
+            Horse horse = inv.getArgument(0);
+            horse.setId(20L);
+            return horse;
+        });
+
+        service.confirmArrival(1L, 7L);
+
+        var saved = ArgumentCaptor.forClass(Horse.class);
+        verify(horseRepository).save(saved.capture());
+        assertNull(saved.getValue().getSex());
+    }
+
+    @Test
+    void confirmArrivalRejectsQuarantineStallStillLinkedToAnotherHorse() {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
+        Horse squatter = new Horse();
+        squatter.setId(77L);
+        when(horseRepository.findByCurrentStallId(99L)).thenReturn(Optional.of(squatter));
+
+        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L));
+
+        assertEquals(409, error.getStatusCode().value());
+        verify(stableStallRepository, never()).save(any());
+        verify(horseRepository, never()).save(any());
+        verifyNoInteractions(careScheduleRepository, notificationService);
+    }
+
+    @Test
+    void confirmArrivalRejectsReadmittedHorseWithAnotherActiveAdmission() {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
+        Horse rejected = new Horse();
+        rejected.setId(20L);
+        rejected.setCurrentStatus(HorseStatus.REJECTED);
+        when(horseRepository.findByRegistrationNumberForUpdate("999999TST000001")).thenReturn(List.of(rejected));
+        when(admissionApplicationRepository.existsByHorseIdAndIdNotAndStatusNotIn(eq(20L), eq(1L), any()))
+                .thenReturn(true);
+
+        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L));
+
+        assertEquals(409, error.getStatusCode().value());
+        verify(horseRepository, never()).save(any());
+        verifyNoInteractions(careScheduleRepository, notificationService);
+    }
+
+    private void assertReadmissionUpdatesCurrentHorseOnly(Long previousOwnerId) {
+        AdmissionApplication admission = awaitingArrival();
+        mockArrival(admission);
+        Horse existingHorse = new Horse();
+        existingHorse.setId(20L);
+        existingHorse.setOwnerId(previousOwnerId);
+        existingHorse.setCurrentStatus(HorseStatus.REJECTED);
+        existingHorse.setRegistrationNumber("999999TST000001");
+        when(horseRepository.findByRegistrationNumberForUpdate("999999TST000001"))
+                .thenReturn(List.of(existingHorse));
+        when(horseRepository.save(existingHorse)).thenReturn(existingHorse);
+
+        AdmissionApplication result = service.confirmArrival(1L, 7L);
+
+        assertEquals(20L, result.getHorseId());
+        assertEquals(5L, existingHorse.getOwnerId());
+        assertEquals(HorseSex.FEMALE, existingHorse.getSex());
+        assertEquals("999999TST000001", existingHorse.getRegistrationNumber());
+        assertEquals(HorseStatus.CANDIDATE, existingHorse.getCurrentStatus());
+        assertEquals(99L, existingHorse.getCurrentStallId());
+        assertFalse(existingHorse.canTrain());
+        verify(horseRepository).save(same(existingHorse));
+        verify(admissionApplicationRepository).findByIdForUpdate(1L);
+        verify(admissionApplicationRepository).save(same(admission));
+        verify(admissionApplicationRepository).existsByHorseIdAndIdNotAndStatusNotIn(eq(20L), eq(1L), any());
+        verifyNoMoreInteractions(admissionApplicationRepository);
+        verify(candidateHorseProfileRepository).findByAdmissionId(1L);
+        verifyNoMoreInteractions(candidateHorseProfileRepository);
+    }
+
+    private AdmissionApplication awaitingArrival() {
+        AdmissionApplication admission = admission();
+        admission.setStatus(AdmissionStatus.WAITING_FOR_ARRIVAL);
+        admission.setGroomId(7L);
+        admission.setQuarantineStallId(99L);
+        admission.setArrivalDeadlineAt(LocalDateTime.now().plusDays(1));
+        return admission;
+    }
+
+    private void mockArrival(AdmissionApplication admission) {
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        when(candidateHorseProfileRepository.findByAdmissionId(1L)).thenReturn(Optional.of(candidate()));
+        StableStall reserved = stall(99L);
+        reserved.setStatus(StallStatus.RESERVED);
+        reserved.setGroomId(7L);
+        when(stableStallRepository.findQuarantineStallByIdForUpdate(99L)).thenReturn(Optional.of(reserved));
+        lenient().when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
     }
 
     private AdmissionApplication admission() {
@@ -387,13 +602,14 @@ class AdmissionGroomReviewServiceTest {
         candidate.setAdmissionId(1L);
         candidate.setName("QABALAH MERCURY");
         candidate.setBreed("Arabian");
+        candidate.setSex(HorseSex.FEMALE);
         candidate.setDateOfBirth(LocalDate.of(2021, 3, 4));
-        candidate.setRegistrationNumber("FR1234567890123");
+        candidate.setRegistrationNumber("999999TST000001");
         candidate.setRegistryName("SIRE");
         candidate.setSireName("Mercury Sire");
-        candidate.setSireRegistrationNumber("FR1234567890001");
+        candidate.setSireRegistrationNumber("999999SIR000001");
         candidate.setDamName("Mercury Dam");
-        candidate.setDamRegistrationNumber("FR1234567890002");
+        candidate.setDamRegistrationNumber("999999DAM000001");
         candidate.setPedigreeNotes("Clean pedigree snapshot");
         return candidate;
     }

@@ -2,8 +2,15 @@ package com.rtms.backend.config;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import jakarta.persistence.PersistenceException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -12,9 +19,12 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiResponse<Object>> handleApiException(ApiException ex) {
@@ -44,10 +54,27 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(message, "VALIDATION_ERROR"));
     }
 
+    @ExceptionHandler({
+            HttpMediaTypeNotSupportedException.class,
+            HttpMediaTypeNotAcceptableException.class,
+            MissingServletRequestPartException.class,
+            MissingServletRequestParameterException.class
+    })
+    public ResponseEntity<ApiResponse<Object>> handleMediaTypeAndParameterExceptions(Exception ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage(), "VALIDATION_ERROR"));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Object>> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ApiResponse.error("The file is too large. The limit is 10 MB per file.", "VALIDATION_ERROR"));
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiResponse<Object>> handleStatus(ResponseStatusException ex) {
         return ResponseEntity.status(ex.getStatusCode())
-                .body(ApiResponse.error(ex.getStatusCode().is5xxServerError() ? "Unexpected server error" :
+                .body(ApiResponse.error(ex.getStatusCode().is5xxServerError() && !isStorageFailure(ex) ? "Unexpected server error" :
                         ex.getReason() == null ? "Request failed" : ex.getReason(),
                         ex.getStatusCode().value() == 404 ? "RESOURCE_NOT_FOUND" :
                         ex.getStatusCode().value() == 409 ? "INVALID_REVIEW_STATE" :
@@ -56,9 +83,20 @@ public class GlobalExceptionHandler {
                         ex.getStatusCode().is5xxServerError() ? "INTERNAL_ERROR" : "VALIDATION_ERROR"));
     }
 
+    /** A cloud-storage failure carries a message written for the user, unlike other 5xx errors. */
+    private static boolean isStorageFailure(ResponseStatusException ex) {
+        return ex.getStatusCode().value() == HttpStatus.BAD_GATEWAY.value() && ex.getReason() != null;
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Object>> handleMalformedRequest(HttpMessageNotReadableException ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.error("Invalid admission request body or unsupported field", "VALIDATION_ERROR"));
+        return ResponseEntity.badRequest().body(ApiResponse.error("Invalid request body or unsupported field", "VALIDATION_ERROR"));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleNoResourceFound(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error("Resource not found: " + ex.getResourcePath(), "RESOURCE_NOT_FOUND"));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -68,6 +106,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({DataAccessException.class, PersistenceException.class})
     public ResponseEntity<ApiResponse<Object>> handlePersistenceException(RuntimeException ex) {
+        // The client only sees a generic message, so the cause (constraint name, SQLState) must reach the log.
+        log.error("Unhandled persistence error", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Unexpected server error", "INTERNAL_ERROR"));
     }
@@ -80,6 +120,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
+        log.error("Unhandled server error", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Unexpected server error", "INTERNAL_ERROR"));
     }

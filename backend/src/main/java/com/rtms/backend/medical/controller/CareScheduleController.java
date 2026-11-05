@@ -5,6 +5,7 @@ import com.rtms.backend.medical.dto.CareScheduleDetailResponse;
 import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
+import com.rtms.backend.medical.dto.UrgentCaseReportResponse;
 import com.rtms.backend.notification.dto.UrgentAssignmentAlert;
 
 import com.rtms.backend.medical.enums.CareScheduleStatus;
@@ -51,6 +52,14 @@ public class CareScheduleController {
         return ApiResponse.success(careScheduleService.getUrgentCase(scheduleId, currentUser.getUserId()));
     }
 
+    @GetMapping("/urgent-alerts/{scheduleId}/reports")
+    @PreAuthorize("principal.role == 'VETERINARIAN'")
+    public ApiResponse<List<UrgentCaseReportResponse>> urgentCaseReports(
+            @PathVariable Long scheduleId,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(careScheduleService.getUrgentCaseReports(scheduleId, currentUser.getUserId()));
+    }
+
     @GetMapping(value = "/urgent-alerts/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize("principal.role == 'VETERINARIAN'")
     public SseEmitter streamUrgentAlerts(@AuthenticationPrincipal AuthenticatedUser currentUser) {
@@ -65,16 +74,23 @@ public class CareScheduleController {
             @RequestParam(required = false) Long horseId,
             @RequestParam(required = false) Long veterinarianId,
             @RequestParam(required = false) Long admissionId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
             Pageable pageable,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        Long requestedById = null;
         if ("VETERINARIAN".equals(currentUser.getRole())) {
-            veterinarianId = currentUser.getUserId();
+            if (status == CareScheduleStatus.REQUESTED) {
+                // REQUESTED schedules have no veterinarian assigned yet; show the ones this vet created
+                requestedById = currentUser.getUserId();
+            } else {
+                veterinarianId = currentUser.getUserId();
+            }
         }
         if ("GROOM".equals(currentUser.getRole())) {
             return ApiResponse.success(careScheduleService.listSchedulesForAdmissionAssignee(status, careType,
                     horseId, veterinarianId, admissionId, currentUser.getUserId(), currentUser.getRole(), pageable));
         }
-        return ApiResponse.success(careScheduleService.listSchedules(status, careType, horseId, veterinarianId, admissionId, pageable));
+        return ApiResponse.success(careScheduleService.listSchedules(status, careType, horseId, veterinarianId, requestedById, admissionId, date, pageable));
     }
 
     @GetMapping("/{id}")

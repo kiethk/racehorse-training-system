@@ -5,24 +5,76 @@
 
 ---
 
-## Checklist setup ban đầu
+## Checklist setup ban đầu (PostgreSQL Local)
 
 Trước khi chạy dự án lần đầu, cần:
 
-- [ ] Cài **Docker Desktop** (để chạy PostgreSQL qua `docker-compose.yml`)
+- [ ] Cài **PostgreSQL 16, 17 hoặc 18** trên Windows (chạy cổng mặc định `5432`).
+- [ ] Cài đặt extension **pgvector** cho PostgreSQL (xem hướng dẫn bên dưới - bắt buộc cho module AI RAG).
+- [ ] Tạo database `rtms_db` trên PostgreSQL local.
 - [ ] Cài **JDK 21**
 - [ ] Cài **Node.js 18+**
+- [ ] Copy `backend/src/main/resources/application-local.properties.example` → `application-local.properties` và điền mật khẩu PostgreSQL của bạn.
 - [ ] Copy `frontend/.env.local.example` → `frontend/.env.local`
 
 ```bash
-# Khởi động PostgreSQL
-docker-compose up -d
+# 1. Cài pgvector (Mở PowerShell với Run as Administrator):
+.\scripts\setup-pgvector-windows.ps1
 
-# Chạy backend (port 8080)
+# 2. Chạy backend (port 8080 - Flyway sẽ tự động tạo bảng và nạp dữ liệu):
 cd backend && ./mvnw spring-boot:run
 
-# Chạy frontend (port 3000)
+# 3. Chạy frontend (port 3000):
 cd frontend && npm install && npm run dev
+```
+
+---
+
+## Hướng dẫn cài đặt PostgreSQL Local & pgvector chi tiết
+
+### 1. Tại sao bắt buộc phải có `pgvector`?
+Hệ thống RTMS tích hợp phân hệ AI Assistant & RAG Knowledge Base (`V202610200000__init_ai_rag_schema.sql`). Schema này sử dụng kiểu dữ liệu `vector(1536)` và chỉ mục HNSW cosine distance. Nếu thiếu extension này, Spring Boot sẽ dừng ngay khi khởi động vì lỗi:
+`ERROR: extension "vector" is not available`.
+
+### 2. Cách cài đặt `pgvector` cho PostgreSQL trên Windows
+
+#### Cách 1: Chạy script tự động (Khuyên dùng)
+Nhóm đã chuẩn bị sẵn script tự động tải binary tương ứng với phiên bản PostgreSQL (16, 17 hoặc 18) và cài vào máy:
+1. Mở PowerShell với quyền **Run as Administrator**.
+2. Đứng tại thư mục gốc của repository, chạy:
+   ```powershell
+   .\scripts\setup-pgvector-windows.ps1
+   ```
+3. Script sẽ tự động:
+   - Phát hiện phiên bản PostgreSQL đang cài trên máy.
+   - Tải gói binary chính xác từ GitHub (`andreiramani/pgvector_pgsql_windows`).
+   - Copy `vector.dll` vào `C:\Program Files\PostgreSQL\<version>\lib`.
+   - Copy `vector.control` và các file SQL vào `C:\Program Files\PostgreSQL\<version>\share\extension`.
+   - Tự động restart dịch vụ PostgreSQL.
+
+#### Cách 2: Cài đặt thủ công
+1. Vào trang GitHub Releases: [andreiramani/pgvector_pgsql_windows/releases](https://github.com/andreiramani/pgvector_pgsql_windows/releases)
+2. Tải file `.zip` tương ứng phiên bản PostgreSQL của bạn (ví dụ: `vector.v0.8.7-pg16.zip`, `vector.v0.8.7-pg17.zip` hoặc `vector.v0.8.7-pg18.zip`).
+3. Giải nén file zip:
+   - Copy file `lib/vector.dll` vào `C:\Program Files\PostgreSQL\<version>\lib\`
+   - Copy toàn bộ nội dung trong `share/extension/` vào `C:\Program Files\PostgreSQL\<version>\share\extension\`
+4. Mở `services.msc`, tìm dịch vụ `postgresql-x64-<version>` và chọn **Restart**.
+
+### 3. Khởi tạo Database `rtms_db`
+Mở **pgAdmin 4** (hoặc mở Command Prompt gõ `psql -U postgres`):
+```sql
+CREATE DATABASE rtms_db;
+\c rtms_db
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+Kiểm tra nếu lệnh `CREATE EXTENSION IF NOT EXISTS vector;` chạy thành công (trả về `CREATE EXTENSION` hoặc `NOTICE: extension "vector" already exists`) là đã sẵn sàng 100%!
+
+### 4. Cấu hình kết nối Spring Boot
+Tạo file `backend/src/main/resources/application-local.properties` (nếu chưa có):
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5432/rtms_db
+spring.datasource.username=postgres
+spring.datasource.password=<mat_khau_postgres_cua_ban>
 ```
 
 ---

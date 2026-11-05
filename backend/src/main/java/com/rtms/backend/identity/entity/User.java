@@ -27,6 +27,9 @@ public class User {
     private String phone;
     private String address;
 
+    @Column(name = "avatar_url", length = 1000)
+    private String avatarUrl;
+
     @Column(name = "is_active")
     private boolean isActive = true;
 
@@ -102,6 +105,16 @@ public class User {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    /** Storage key; expose an authenticated API URL through DTOs, not this value. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
     }
 
     public boolean isActive() {

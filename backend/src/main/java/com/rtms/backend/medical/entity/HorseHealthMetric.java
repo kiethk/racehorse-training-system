@@ -1,5 +1,6 @@
 package com.rtms.backend.medical.entity;
 
+import com.rtms.backend.medical.enums.HydrationStatus;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,7 +24,8 @@ public class HorseHealthMetric {
     @Column(name = "respiratory_rate")
     private BigDecimal respiratoryRate;
     @Column(name = "hydration_status", length = 50)
-    private String hydrationStatus;
+    @Enumerated(EnumType.STRING)
+    private HydrationStatus hydrationStatus;
     @Column(name = "body_condition_score")
     private BigDecimal bodyConditionScore;
     @Column(length = 2000)
@@ -49,8 +51,8 @@ public class HorseHealthMetric {
     public void setWeight(BigDecimal weight) { this.weight = weight; }
     public BigDecimal getRespiratoryRate() { return respiratoryRate; }
     public void setRespiratoryRate(BigDecimal respiratoryRate) { this.respiratoryRate = respiratoryRate; }
-    public String getHydrationStatus() { return hydrationStatus; }
-    public void setHydrationStatus(String hydrationStatus) { this.hydrationStatus = hydrationStatus; }
+    public HydrationStatus getHydrationStatus() { return hydrationStatus; }
+    public void setHydrationStatus(HydrationStatus hydrationStatus) { this.hydrationStatus = hydrationStatus; }
     public BigDecimal getBodyConditionScore() { return bodyConditionScore; }
     public void setBodyConditionScore(BigDecimal bodyConditionScore) { this.bodyConditionScore = bodyConditionScore; }
     public String getNotes() { return notes; }

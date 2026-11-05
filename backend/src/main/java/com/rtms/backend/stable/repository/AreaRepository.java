@@ -13,12 +13,19 @@ import java.util.Optional;
 @Repository
 public interface AreaRepository extends JpaRepository<Area, Long> {
 
+    @Query(value = "SELECT * FROM areas WHERE deleted_at IS NULL ORDER BY id FOR UPDATE", nativeQuery = true)
+    List<Area> findAllForAssignmentUpdate();
+
+    @Query(value = "SELECT code FROM areas WHERE type=:type", nativeQuery = true)
+    List<String> findCodesIncludingDeleted(@Param("type") String type);
+
     Optional<Area> findByCode(String code);
 
     List<Area> findByType(AreaType type);
 
-    /** REGULAR areas not yet assigned to any trainer, ordered by code ascending (deterministic). */
-    @Query("SELECT a FROM Area a WHERE a.type = 'REGULAR' AND a.trainerId IS NULL ORDER BY a.code ASC")
+    /** Unassigned REGULAR areas in generated order: A..Z, AA.., excluding soft-deleted rows. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Area a WHERE a.type = 'REGULAR' AND a.trainerId IS NULL ORDER BY LENGTH(a.code), a.code ASC")
     List<Area> findUnassignedRegularAreasOrdered();
 
     /** REGULAR areas already assigned to the given trainer. */

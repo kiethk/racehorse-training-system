@@ -1,5 +1,6 @@
 'use client';
 
+import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/Table';
 import { useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -10,9 +11,10 @@ import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
-import { DetailSkeleton, EmptyState } from '@/components/ui/states';
+import { DetailSkeleton, EmptyState, ListSkeleton } from '@/components/ui/states';
 import { FilterBar } from '@/components/ui/FilterBar';
-import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
+import { Panel } from '@/components/ui/Panel';
+import { Pagination } from '@/components/ui/Pagination';
 import { FormField } from '@/components/ui/FormField';
 import { SearchInput, Select } from '@/components/ui/Input';
 import { Notice } from '@/components/ui/Notice';
@@ -23,10 +25,16 @@ import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeade
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
 import { AdmissionStatusBadge } from '../shared/components/AdmissionStatusBadge';
+import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
+import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSection';
+import { CareRecordDetailModal } from '@/features/care/components/CareRecordDetailModal';
+import { getCareTypeTone } from '@/features/schedule/utils/timelineUtils';
+import { formatDate, formatDateTime } from '@/lib/display';
 import { admissionsApi } from '../services/api';
 import type {
   AdmissionDetailResponse,
   AdmissionDocument,
+  AdmissionStatus,
   CareSchedule,
   CareScheduleStatus,
   CareType,
@@ -37,7 +45,7 @@ import type {
 } from '../types';
 import { VetReviewForm } from './VetReviewForm';
 
-type QueuePillFilter = 'ALL' | 'AWAITING' | 'IN_PROGRESS';
+type QueuePillFilter = 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'APPROVED';
 
 const examStatusOptions: Array<{ value: CareScheduleStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'All Exam States' },
@@ -65,15 +73,6 @@ function formatLabel(value: string) {
   return value.replaceAll('_', ' ').toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
 }
 
-function formatDate(value: string | null | undefined, includeTime = false) {
-  if (!value) return 'Not scheduled';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, includeTime
-    ? { dateStyle: 'medium', timeStyle: 'short' }
-    : { dateStyle: 'medium' }).format(date);
-}
-
 function calculateAge(dateOfBirth: string | null | undefined): string {
   if (!dateOfBirth) return 'Age unavailable';
   const dob = new Date(dateOfBirth);
@@ -94,6 +93,7 @@ function calculateAge(dateOfBirth: string | null | undefined): string {
 function examTone(status: CareScheduleStatus | undefined) {
   if (status === 'COMPLETED') return 'success' as const;
   if (status === 'IN_PROGRESS') return 'primary' as const;
+  if (status === 'PAUSED') return 'warning' as const;
   if (status === 'SCHEDULED') return 'info' as const;
   if (status === 'REQUESTED') return 'warning' as const;
   return 'neutral' as const;
@@ -102,19 +102,15 @@ function examTone(status: CareScheduleStatus | undefined) {
 function examIcon(status: CareScheduleStatus | undefined) {
   if (status === 'COMPLETED') return 'check' as const;
   if (status === 'IN_PROGRESS') return 'activity' as const;
+  if (status === 'PAUSED') return 'clock' as const;
   if (status === 'SCHEDULED') return 'calendar' as const;
   if (status === 'REQUESTED') return 'clock' as const;
   return 'circle' as const;
 }
 
-function getPriorityBadge(careType: CareType | undefined) {
-  if (careType === 'URGENT') {
-    return { label: 'P1 · Urgent', tone: 'danger' as const, icon: 'alert-triangle' as const };
-  }
-  if (careType === 'INITIAL') {
-    return { label: 'P2 · Initial', tone: 'info' as const, icon: 'stethoscope' as const };
-  }
-  return { label: 'P4 · Routine', tone: 'neutral' as const, icon: 'clock' as const };
+function getPriorityBadge(careType: CareType | undefined, purpose?: string | null) {
+  const tone = getCareTypeTone(careType ?? 'ROUTINE', purpose);
+  return { label: tone.label, tone: tone.pillTone, icon: tone.icon };
 }
 
 function MedicalNoteBlock({
@@ -171,8 +167,8 @@ export function VetAdmissionQueue() {
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('');
-  const [queuePillFilter, setQueuePillFilter] = useState<QueuePillFilter>('ALL');
-  const [admissionFilter, setAdmissionFilter] = useState<'ALL' | 'VET_REVIEW'>('ALL');
+  const [queuePillFilter, setQueuePillFilter] = useState<QueuePillFilter>('ACTIVE');
+  const [admissionFilter, setAdmissionFilter] = useState<'ALL' | AdmissionStatus>('ALL');
   const [examStatusFilter, setExamStatusFilter] = useState<CareScheduleStatus | 'ALL'>('ALL');
   const [examTypeFilter, setExamTypeFilter] = useState<CareType | 'ALL'>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'URGENT' | 'NORMAL'>('ALL');
@@ -214,7 +210,7 @@ export function VetAdmissionQueue() {
             }
             setDeepLinkedSchedule(schedule);
             setSelectedId(schedule.admissionId);
-            setActiveTab('exam');
+            setActiveTab(schedule.status === 'COMPLETED' ? 'history' : 'exam');
           })
           .catch((cause) => {
             if (active) setDetailError(errorText(cause));
@@ -241,7 +237,7 @@ export function VetAdmissionQueue() {
   }, [searchParams]);
 
 
-  // Server-side filtered queue loading
+  // Server-side filtered queue loading with legacy backend fallback
   useEffect(() => {
     let active = true;
     Promise.resolve().then(() => {
@@ -250,24 +246,77 @@ export function VetAdmissionQueue() {
       setError('');
     });
 
-    Promise.all([
-      admissionsApi.getVetQueue({
-        search: searchQuery.trim() || undefined,
-        pill: queuePillFilter,
-        admissionStatus: admissionFilter !== 'ALL' ? admissionFilter : undefined,
-        scheduleStatus: examStatusFilter !== 'ALL' ? examStatusFilter : undefined,
-        careType: examTypeFilter !== 'ALL' ? examTypeFilter : undefined,
-        priority: priorityFilter !== 'ALL' ? priorityFilter : undefined,
-        page,
-        size: pageSize,
-      }),
-      admissionsApi.getVetQueueSummary(),
-    ])
-      .then(([queuePage, summaryData]) => {
+    admissionsApi
+      .getVetQueueSummary()
+      .then(async (summaryData) => {
         if (!active) return;
-        setItems(queuePage.content);
-        setTotalElements(queuePage.totalElements);
-        setSummary(summaryData);
+
+        // If backend hasn't been restarted, summaryData.approved will be undefined or missing.
+        const isLegacyBackend = summaryData.approved == null;
+
+        if (isLegacyBackend) {
+          // Fetch unfiltered queue without pill so client can inspect admissions
+          const fullPage = await admissionsApi.getVetQueue({
+            search: searchQuery.trim() || undefined,
+            admissionStatus: admissionFilter !== 'ALL' ? admissionFilter : undefined,
+            scheduleStatus: examStatusFilter !== 'ALL' ? examStatusFilter : undefined,
+            careType: examTypeFilter !== 'ALL' ? examTypeFilter : undefined,
+            priority: priorityFilter !== 'ALL' ? priorityFilter : undefined,
+            page: 0,
+            size: 100,
+          });
+          if (!active) return;
+
+          const allContent = fullPage.content;
+          const approvedCount = allContent.filter((r) => r.admissionStatus === 'APPROVED').length;
+          const activeRows = allContent.filter((r) => r.admissionStatus !== 'APPROVED');
+          const awaitingCount = activeRows.filter(
+            (r) => r.careSchedule?.status === 'REQUESTED' || r.careSchedule?.status === 'SCHEDULED'
+          ).length;
+          const inProgressCount = activeRows.filter(
+            (r) => r.careSchedule?.status === 'IN_PROGRESS'
+          ).length;
+
+          setSummary({
+            total: allContent.length,
+            active: activeRows.length,
+            awaiting: awaitingCount,
+            inProgress: inProgressCount,
+            approved: approvedCount,
+          });
+
+          let filtered = allContent;
+          if (queuePillFilter === 'APPROVED') {
+            filtered = allContent.filter((r) => r.admissionStatus === 'APPROVED');
+          } else if (queuePillFilter === 'ACTIVE') {
+            filtered = activeRows;
+          } else if (queuePillFilter === 'AWAITING') {
+            filtered = activeRows.filter(
+              (r) => r.careSchedule?.status === 'REQUESTED' || r.careSchedule?.status === 'SCHEDULED'
+            );
+          } else if (queuePillFilter === 'IN_PROGRESS') {
+            filtered = activeRows.filter((r) => r.careSchedule?.status === 'IN_PROGRESS');
+          }
+
+          setTotalElements(filtered.length);
+          const startIndex = page * pageSize;
+          setItems(filtered.slice(startIndex, startIndex + pageSize));
+        } else {
+          setSummary(summaryData);
+          const queuePage = await admissionsApi.getVetQueue({
+            search: searchQuery.trim() || undefined,
+            pill: queuePillFilter,
+            admissionStatus: admissionFilter !== 'ALL' ? admissionFilter : undefined,
+            scheduleStatus: examStatusFilter !== 'ALL' ? examStatusFilter : undefined,
+            careType: examTypeFilter !== 'ALL' ? examTypeFilter : undefined,
+            priority: priorityFilter !== 'ALL' ? priorityFilter : undefined,
+            page,
+            size: pageSize,
+          });
+          if (!active) return;
+          setItems(queuePage.content);
+          setTotalElements(queuePage.totalElements);
+        }
       })
       .catch((cause) => {
         if (active) setError(errorText(cause));
@@ -291,9 +340,40 @@ export function VetAdmissionQueue() {
     reload,
   ]);
 
+  const displayedItems = useMemo(() => {
+    return items.filter((row) => {
+      if (queuePillFilter === 'ACTIVE' || queuePillFilter === 'AWAITING' || queuePillFilter === 'IN_PROGRESS') {
+        return row.admissionStatus !== 'APPROVED';
+      }
+      if (queuePillFilter === 'APPROVED') {
+        return row.admissionStatus === 'APPROVED';
+      }
+      return true;
+    });
+  }, [items, queuePillFilter]);
+
+  // The summary counts describe the unfiltered queue; once any filter narrows
+  // the list, the server's filtered totalElements is the only correct total.
+  const filtersNarrowList =
+    searchQuery.trim() !== '' ||
+    admissionFilter !== 'ALL' ||
+    examStatusFilter !== 'ALL' ||
+    examTypeFilter !== 'ALL' ||
+    priorityFilter !== 'ALL';
+
+  const effectiveTotal = useMemo(() => {
+    if (!filtersNarrowList) {
+      if (queuePillFilter === 'ACTIVE' && summary.active != null) return summary.active;
+      if (queuePillFilter === 'AWAITING' && summary.awaiting != null) return summary.awaiting;
+      if (queuePillFilter === 'IN_PROGRESS' && summary.inProgress != null) return summary.inProgress;
+      if (queuePillFilter === 'APPROVED' && summary.approved != null) return summary.approved;
+    }
+    return totalElements;
+  }, [queuePillFilter, summary, totalElements, filtersNarrowList]);
+
   const hasActiveFilters =
     searchQuery !== '' ||
-    queuePillFilter !== 'ALL' ||
+    queuePillFilter !== 'ACTIVE' ||
     admissionFilter !== 'ALL' ||
     examStatusFilter !== 'ALL' ||
     examTypeFilter !== 'ALL' ||
@@ -301,7 +381,7 @@ export function VetAdmissionQueue() {
 
   const resetFilters = () => {
     setSearchQuery('');
-    setQueuePillFilter('ALL');
+    setQueuePillFilter('ACTIVE');
     setAdmissionFilter('ALL');
     setExamStatusFilter('ALL');
     setExamTypeFilter('ALL');
@@ -335,6 +415,9 @@ export function VetAdmissionQueue() {
         setDetail(detailData);
         setDocuments(docs);
         setCareSchedules(schedulesPage.content);
+        if (detailData.status === 'APPROVED') {
+          setActiveTab((prev) => (prev === 'exam' ? 'history' : prev));
+        }
         if (detailData.quarantineStallCode) {
           setStallCodes((prev) => ({
             ...prev,
@@ -406,19 +489,25 @@ export function VetAdmissionQueue() {
   );
   const displayedTrainingDecision =
     currentScheduleRecord?.trainingDecision ??
-    (currentActiveSchedule?.careType === 'INITIAL' ? detail?.vetTrainingDecision : null);
+    (currentActiveSchedule?.careType === 'INITIAL' ? detail?.vetTrainingDecision : null) ??
+    detail?.vetTrainingDecision;
 
   const assignedVetId = currentActiveSchedule?.veterinarianId ?? currentActiveSchedule?.assignedVetId ?? null;
   const assignedElsewhere = Boolean(assignedVetId && assignedVetId !== user?.userId);
 
+  const isApprovedAdmission = detail?.status === 'APPROVED' || selectedRow?.admissionStatus === 'APPROVED';
+
   // Requirement: Disable Start for REQUESTED schedules; only allow starting when SCHEDULED
+  // If admission is already APPROVED, examining is disabled (read-only record viewing only).
   const canStartExam = Boolean(
+    !isApprovedAdmission &&
     currentActiveSchedule &&
       currentActiveSchedule.status === 'SCHEDULED' &&
       assignedVetId === user?.userId,
   );
 
   const canCompleteExam = Boolean(
+    !isApprovedAdmission &&
     currentActiveSchedule &&
       ['SCHEDULED', 'IN_PROGRESS'].includes(currentActiveSchedule.status) &&
       assignedVetId === user?.userId,
@@ -454,11 +543,14 @@ export function VetAdmissionQueue() {
     return list.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
   }, [careSchedules, selectedId, detail]);
 
-  const handleOpenAdmission = (id: number, schedule: CareSchedule | null) => {
+  const handleOpenAdmission = (id: number, schedule: CareSchedule | null, forceViewRecord = false) => {
     setTargetScheduleId(schedule?.id ?? null);
     setDeepLinkedSchedule(null);
     setSelectedId(id);
-    setActiveTab('exam');
+    const row = items.find((r) => r.admissionId === id);
+    const isApproved = forceViewRecord || row?.admissionStatus === 'APPROVED' || queuePillFilter === 'APPROVED';
+    // When approved, user only views records; a completed exam has no review form to fill either.
+    setActiveTab(isApproved || schedule?.status === 'COMPLETED' ? 'history' : 'exam');
     setScheduleWarning('');
     setIsDrawerDirty(false);
     setDrawerOpen(true);
@@ -526,131 +618,42 @@ export function VetAdmissionQueue() {
   }
 
   const workspaceTabs: TabItem[] = [
-    { id: 'exam', label: 'Clinical Examination', icon: 'stethoscope' },
-    {
-      id: 'history',
-      label: 'Medical Records',
-      icon: 'clipboard',
-      count: (detail?.healthRecords?.length ?? 0) > 0 ? detail?.healthRecords?.length : undefined,
-    },
-    {
-      id: 'vitals',
-      label: 'Vitals History',
-      icon: 'heart-pulse',
-      count: metrics.length > 0 ? metrics.length : undefined,
-    },
     {
       id: 'documents',
-      label: 'Intake & Pedigree',
+      label: 'Documents',
       icon: 'file-text',
       count: documents.length > 0 ? documents.length : undefined,
     },
+    { id: 'exam', label: 'Clinical Examination', icon: 'stethoscope' },
   ];
 
-  const queueColumns: DataTableColumn<(typeof items)[number]>[] = [
-    {
-      id: 'horse',
-      header: 'Horse',
-      render: (row) => (
-        <div className="flex min-w-0 items-center gap-3">
-          <HorseAvatar name={row.candidateName} image={row.imageUrl} size={32} rounded="md" />
-          <div className="min-w-0">
-            <span className="block truncate font-semibold">{row.candidateName}</span>
-            <span className="block truncate text-xs text-[var(--color-text-muted)]">
-              #{row.admissionId} · {row.breed || 'Breed not provided'} · {calculateAge(row.dateOfBirth)}
-            </span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 'priority',
-      header: 'Priority',
-      render: (row) => {
-        const priority = getPriorityBadge(row.careSchedule?.careType);
-        return <Pill tone={priority.tone} size="sm" icon={priority.icon}>{priority.label}</Pill>;
-      },
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      render: (row) => <AdmissionStatusBadge status={row.admissionStatus} size="sm" />,
-    },
-    {
-      id: 'exam',
-      header: 'Exam',
-      render: (row) => row.careSchedule ? (
-        <Pill tone={examTone(row.careSchedule.status)} size="sm" icon={examIcon(row.careSchedule.status)}>
-          {formatLabel(row.careSchedule.status)}
-        </Pill>
-      ) : (
-        <Pill tone="neutral" size="sm">No schedule</Pill>
-      ),
-    },
-    {
-      id: 'stall',
-      header: 'Stall',
-      render: (row) => stallCodes[row.admissionId] || row.quarantineStallCode || (row.quarantineStallId ? `Q-Stall #${row.quarantineStallId}` : 'Quarantine'),
-    },
-    {
-      id: 'scheduled',
-      header: 'Scheduled',
-      className: 'whitespace-nowrap',
-      render: (row) => row.careSchedule?.scheduledAt ? (
-        <span className="font-metric">{formatDate(row.careSchedule.scheduledAt, true)}</span>
-      ) : row.careSchedule?.scheduledDate ? (
-        <span className="font-metric text-[var(--color-text-muted)]">Target: {formatDate(row.careSchedule.scheduledDate)}</span>
-      ) : (
-        <span className="italic text-[var(--color-text-muted)]">Awaiting slot</span>
-      ),
-    },
-    {
-      id: 'vet',
-      header: 'Veterinarian',
-      className: 'whitespace-nowrap',
-      render: (row) => {
-        const rowVetId = row.careSchedule?.veterinarianId ?? row.careSchedule?.assignedVetId ?? null;
-        if (rowVetId && user?.userId && rowVetId === user.userId) {
-          return <span className="font-semibold text-[var(--color-primary)]">Assigned to you</span>;
-        }
-        return rowVetId ? `Vet #${rowVetId}` : <span className="text-[var(--color-text-muted)]">Unassigned</span>;
-      },
-    },
-    {
-      id: 'action',
-      header: 'Action',
-      align: 'right',
-      render: (row) => {
-        const status = row.careSchedule?.status;
-        const action =
-          status === 'IN_PROGRESS' ? ({ label: 'Continue', icon: 'activity', primary: true } as const)
-          : status === 'SCHEDULED' ? ({ label: 'Examine', icon: 'stethoscope', primary: true } as const)
-          : status === 'COMPLETED' ? ({ label: 'View results', icon: 'check', primary: false } as const)
-          : ({ label: 'Details', icon: 'chevron-right', primary: false } as const);
-        return (
-          <Button
-            size="sm"
-            variant={action.primary ? 'primary' : 'secondary'}
-            icon={action.icon}
-            className="min-w-[6.5rem]"
-            onClick={() => handleOpenAdmission(row.admissionId, row.careSchedule)}
-          >
-            {action.label}
-          </Button>
-        );
-      },
-    },
-  ];
+  // Opening a row must do exactly what that row's action button does.
+  const handleRowAction = (row: (typeof items)[number]) => {
+    const isApproved = row.admissionStatus === 'APPROVED' || queuePillFilter === 'APPROVED';
+    if (isApproved) {
+      handleOpenAdmission(row.admissionId, row.careSchedule, true);
+      return;
+    }
+    // Examine = go straight to the examination workspace (it auto-starts the
+    // SCHEDULED exam). Continue/View results/Details keep opening the drawer.
+    if (row.careSchedule?.status === 'SCHEDULED' && row.careSchedule.id) {
+      router.push(`/veterinarian/schedule/${row.careSchedule.id}?back=admissions`);
+      return;
+    }
+    handleOpenAdmission(row.admissionId, row.careSchedule);
+  };
+
+
 
   const examDetailsCard = detail ? (
     <AdmissionSideCard title="Examination details">
-      <InfoRow label="Priority" value={selectedRow ? getPriorityBadge(selectedRow.careSchedule?.careType).label : 'Standard'} />
+      <InfoRow label="Priority" value={selectedRow ? getPriorityBadge(selectedRow.careSchedule?.careType, selectedRow.careSchedule?.purpose).label : 'Standard'} />
       <InfoRow label="Schedule" value={currentActiveSchedule ? formatLabel(currentActiveSchedule.status) : 'Not scheduled'} />
       <InfoRow label="Quarantine stall" value={detail.quarantineStallCode || 'Not assigned'} />
       <InfoRow label="Trainer" value={detail.trainerName || (detail.trainerId ? `Trainer #${detail.trainerId}` : 'Pending assignment')} />
-      {currentActiveSchedule?.scheduledAt && <InfoRow label="Scheduled" value={formatDate(currentActiveSchedule.scheduledAt, true)} />}
+      {currentActiveSchedule?.scheduledAt && <InfoRow label="Scheduled" value={formatDateTime(currentActiveSchedule.scheduledAt)} />}
       {canStartExam && (
-        <Button type="button" className="w-full" variant="primary" loading={startingExam} onClick={handleStartExam} icon="activity">
+        <Button type="button" className="w-full transition-all active:scale-[0.97]" variant="primary" loading={startingExam} onClick={handleStartExam} icon="activity">
           Start examination
         </Button>
       )}
@@ -670,16 +673,17 @@ export function VetAdmissionQueue() {
           label="Queue"
           value={queuePillFilter}
           onChange={(value) => {
-            setQueuePillFilter(value);
+            setQueuePillFilter(value as QueuePillFilter);
             setPage(0);
           }}
           options={[
-            { value: 'ALL', label: 'Active', count: summary.total },
+            { value: 'ACTIVE', label: 'Active', count: summary.active ?? summary.total },
             { value: 'AWAITING', label: 'Awaiting', count: summary.awaiting },
             { value: 'IN_PROGRESS', label: 'In exam', count: summary.inProgress },
+            { value: 'APPROVED', label: 'Approved', count: summary.approved ?? 0 },
           ]}
         />
-        <Button type="button" onClick={handleRefresh} disabled={loading} icon="refresh" variant="secondary" size="sm">
+        <Button type="button" onClick={handleRefresh} disabled={loading} icon="refresh" variant="secondary" size="sm" className="transition-all active:scale-[0.98]">
           Refresh
         </Button>
       </div>
@@ -705,7 +709,11 @@ export function VetAdmissionQueue() {
             }}
           >
             <option value="ALL">All stages</option>
-            <option value="VET_REVIEW">Initial review</option>
+            <option value="VET_REVIEW">Vet review</option>
+            <option value="TRAINER_REVIEW">Trainer review</option>
+            <option value="MANAGER_REVIEW">Manager review</option>
+            <option value="APPROVED">Approved</option>
+            <option value="REJECTED">Rejected</option>
           </Select>
         </FormField>
         <FormField label="Exam status" className="min-w-[9rem] flex-1">
@@ -743,8 +751,8 @@ export function VetAdmissionQueue() {
             }}
           >
             <option value="ALL">All priorities</option>
-            <option value="URGENT">Urgent (P1)</option>
-            <option value="NORMAL">Standard (P2-P4)</option>
+            <option value="URGENT">Urgent</option>
+            <option value="NORMAL">Standard</option>
           </Select>
         </FormField>
         <Button type="button" variant="secondary" onClick={resetFilters} disabled={!hasActiveFilters}>
@@ -752,17 +760,134 @@ export function VetAdmissionQueue() {
         </Button>
       </FilterBar>
 
-      <DataTable
-        rows={items}
-        columns={queueColumns}
-        getRowKey={(row) => (row.careSchedule?.id ? `schedule-${row.careSchedule.id}` : `admission-${row.admissionId}`)}
-        ariaLabel="Veterinary admission queue"
-        loading={loading}
-        emptyTitle="No matching admissions found"
-        emptyDescription="No candidates match your current search query or active filter settings."
-        emptyAction={<Button size="sm" variant="secondary" onClick={resetFilters}>Clear filters</Button>}
-        pagination={{ page, pageSize, total: totalElements, onPageChange: setPage, disabled: loading }}
-      />
+      {loading ? (
+        <Panel padded>
+          <ListSkeleton rows={4} />
+        </Panel>
+      ) : displayedItems.length === 0 ? (
+        <Panel padded>
+          <EmptyState
+            icon="clipboard"
+            title="No matching admissions found"
+            description="No candidates match your current search query or active filter settings."
+            action={<Button size="sm" variant="secondary" onClick={resetFilters}>Clear filters</Button>}
+          />
+        </Panel>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {displayedItems.map((row) => {
+              const priority = getPriorityBadge(row.careSchedule?.careType, row.careSchedule?.purpose);
+              const stallCode =
+                stallCodes[row.admissionId] ||
+                row.quarantineStallCode ||
+                (row.quarantineStallId ? `Q-Stall #${row.quarantineStallId}` : 'Quarantine');
+              const isApproved = row.admissionStatus === 'APPROVED' || queuePillFilter === 'APPROVED';
+              const status = row.careSchedule?.status;
+              const action = isApproved
+                ? ({ label: 'View Record', icon: 'clipboard' as const, primary: false })
+                : status === 'PAUSED'
+                ? ({ label: 'Continue (Paused)', icon: 'activity' as const, primary: true })
+                : status === 'IN_PROGRESS'
+                ? ({ label: 'Continue', icon: 'activity' as const, primary: true })
+                : status === 'SCHEDULED'
+                ? ({ label: 'Examine', icon: 'stethoscope' as const, primary: true })
+                : status === 'COMPLETED'
+                ? ({ label: 'View results', icon: 'check' as const, primary: false })
+                : ({ label: 'Details', icon: 'chevron-right' as const, primary: false });
+
+              const rowVetId = row.careSchedule?.veterinarianId ?? row.careSchedule?.assignedVetId ?? null;
+              const isAssignedToMe = Boolean(rowVetId && user?.userId && rowVetId === user.userId);
+
+              return (
+                <Panel
+                  key={row.careSchedule?.id ? `schedule-${row.careSchedule.id}` : `admission-${row.admissionId}`}
+                  padded
+                  onClick={() => handleRowAction(row)}
+                  className="cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    {/* Left: Avatar + Details */}
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <HorseAvatar name={row.candidateName} image={row.imageUrl} size={42} rounded="md" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                            {row.candidateName}
+                          </span>
+                          <Pill tone={priority.tone} size="sm" icon={priority.icon}>
+                            {priority.label}
+                          </Pill>
+                          <AdmissionStatusBadge status={row.admissionStatus} size="sm" />
+                          {row.careSchedule && (
+                            <Pill
+                              tone={examTone(row.careSchedule.status)}
+                              size="sm"
+                              icon={examIcon(row.careSchedule.status)}
+                            >
+                              {formatLabel(row.careSchedule.status)}
+                            </Pill>
+                          )}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                          <span className="inline-flex items-center gap-1 shrink-0">
+                            <Icon name="building" size={12} />
+                            <span>Stall: <strong>{stallCode}</strong></span>
+                          </span>
+                          <span>·</span>
+                          <span className="inline-flex items-center gap-1 shrink-0">
+                            <Icon name="calendar" size={12} className="text-[var(--color-primary)]" />
+                            {row.careSchedule?.scheduledAt ? (
+                              <strong>{formatDateTime(row.careSchedule.scheduledAt)}</strong>
+                            ) : row.careSchedule?.scheduledDate ? (
+                              <span>Target: <strong>{formatDate(row.careSchedule.scheduledDate)}</strong></span>
+                            ) : (
+                              <span className="italic text-[var(--color-text-muted)]">Awaiting slot</span>
+                            )}
+                          </span>
+                          {isAssignedToMe && (
+                            <>
+                              <span>·</span>
+                              <span className="font-semibold text-[var(--color-primary)]">Assigned to you</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Action Button */}
+                    <div className="shrink-0">
+                      <Button
+                        size="sm"
+                        variant={action.primary ? 'primary' : 'secondary'}
+                        icon={action.icon}
+                        className="min-w-[6.5rem] transition-all active:scale-[0.97]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRowAction(row);
+                        }}
+                      >
+                        {action.label}
+                      </Button>
+                    </div>
+                  </div>
+                </Panel>
+              );
+            })}
+          </div>
+
+          <Panel className="overflow-hidden">
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={effectiveTotal}
+              onPageChange={setPage}
+              disabled={loading}
+              className="border-t-0"
+            />
+          </Panel>
+        </div>
+      )}
         </>
       )}
 
@@ -804,7 +929,76 @@ export function VetAdmissionQueue() {
                   {/* Tab 1: Clinical Examination & VetReviewForm */}
                   {/* Tab 1: Clinical Examination & VetReviewForm (kept mounted to preserve state across tab switches) */}
                   <div className={activeTab === 'exam' ? 'block' : 'hidden'}>
-                    {canCompleteExam ? (
+                    {isApprovedAdmission ? (
+                      <div className="space-y-5">
+                        <div className="rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-5">
+                          <div className="flex items-center gap-2.5">
+                            <Icon name="check" size={24} className="text-[var(--color-success)] shrink-0" />
+                            <div>
+                              <h3 className="text-base font-bold text-[var(--color-success)]">
+                                Admission Approved
+                              </h3>
+                              <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
+                                This admission has been finalized and approved by management. Clinical examination records are locked for editing.
+                              </p>
+                            </div>
+                          </div>
+                          {displayedTrainingDecision && (
+                            <div className="mt-3">
+                              <Pill
+                                tone={displayedTrainingDecision === 'ALLOWED' ? 'success' : 'danger'}
+                              >
+                                Training Decision: {formatLabel(displayedTrainingDecision)}
+                              </Pill>
+                            </div>
+                          )}
+                        </div>
+
+                        {detail.initialVetExam ? (
+                          <MedicalFindingsSection exam={detail.initialVetExam} />
+                        ) : detail.healthRecords && detail.healthRecords.length > 0 ? (
+                          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+                            <h4 className="text-sm font-bold text-[var(--color-text-primary)] mb-3">
+                              Recorded Health Findings
+                            </h4>
+                            <div className="space-y-3">
+                              {detail.healthRecords.map((record) => (
+                                <div
+                                  key={record.id}
+                                  className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-sm"
+                                >
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="font-semibold text-[var(--color-text-primary)]">
+                                      {formatLabel(record.recordType)} Examination
+                                    </span>
+                                    <span className="text-xs text-[var(--color-text-muted)]">
+                                      {formatDateTime(record.examinedAt)}
+                                    </span>
+                                  </div>
+                                  {record.trainingDecision && (
+                                    <div className="mb-2">
+                                      <Pill tone={record.trainingDecision === 'ALLOWED' ? 'success' : 'danger'}>
+                                        {record.trainingDecision === 'ALLOWED' ? 'Allowed to Train' : 'Blocked'}
+                                      </Pill>
+                                    </div>
+                                  )}
+                                  <div className="grid gap-2 sm:grid-cols-2">
+
+                                    {record.findings && <div><span className="text-xs text-[var(--color-text-muted)] block">Findings</span>{record.findings}</div>}
+                                    {record.diagnosis && <div><span className="text-xs text-[var(--color-text-muted)] block">Diagnosis</span>{record.diagnosis}</div>}
+                                    {record.treatment && <div><span className="text-xs text-[var(--color-text-muted)] block">Treatment</span>{record.treatment}</div>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center text-sm text-[var(--color-text-muted)]">
+                            No additional examination records found for this admission.
+                          </div>
+                        )}
+                      </div>
+                    ) : canCompleteExam ? (
                       <VetReviewForm
                         key={`${detail.admissionId}-${currentActiveSchedule?.id}`}
                         admissionId={detail.admissionId}
@@ -814,6 +1008,7 @@ export function VetAdmissionQueue() {
                         careScheduleId={currentActiveSchedule?.id}
                         careType={currentActiveSchedule?.careType}
                         scheduleStatus={currentActiveSchedule?.status}
+                        schedulePurpose={currentActiveSchedule?.purpose}
                         onStartExam={handleStartExam}
                         asideTop={examDetailsCard}
                         onSuccess={handleReviewSuccess}
@@ -857,260 +1052,21 @@ export function VetAdmissionQueue() {
                     )}
                   </div>
 
-                  {/* Tab 2: Medical Records History */}
-                  {activeTab === 'history' && (
-                    <div className="space-y-5">
-                      <div>
-                        <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
-                          Completed Health Records
-                        </h3>
-                        {detail.healthRecords && detail.healthRecords.length > 0 ? (
-                          <ul className="mt-3 space-y-3">
-                            {detail.healthRecords.map((record) => (
-                              <li
-                                key={record.id}
-                                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-                              >
-                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-bold text-[var(--color-text-primary)]">
-                                      {formatLabel(record.recordType)} Exam
-                                    </span>
-                                    <span className="font-metric text-xs text-[var(--color-text-muted)]">
-                                      Record #{record.id}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-metric text-xs text-[var(--color-text-secondary)]">
-                                      {formatDate(record.examinedAt, true)}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                                  <MedicalNoteBlock label="Symptoms" value={record.symptoms} />
-                                  <MedicalNoteBlock label="Findings" value={record.findings} />
-                                  <MedicalNoteBlock label="Diagnosis" value={record.diagnosis} />
-                                  <MedicalNoteBlock label="Treatment Plan" value={record.treatment} />
-                                  <MedicalNoteBlock label="Notes & Context" value={record.notes} />
-                                </div>
-
-                                {record.trainingDecision && (
-                                  <div className="mt-2.5 flex items-center gap-2">
-                                    <span
-                                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
-                                        record.trainingDecision === 'ALLOWED'
-                                          ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]'
-                                          : 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
-                                      }`}
-                                    >
-                                      Training Decision: {record.trainingDecision}
-                                    </span>
-                                  </div>
-                                )}
-
-                                {record.restrictionDetails && (
-                                  <div className="mt-2 rounded bg-[var(--color-warning-soft)] p-2 text-xs text-[var(--color-warning)]">
-                                    <strong>Restriction Protocol:</strong> {record.restrictionDetails}
-                                  </div>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-2 text-xs text-[var(--color-text-muted)] italic">
-                            No health records filed for this candidate yet.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="border-t border-[var(--color-border)] pt-4">
-                        <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
-                          Examination Schedule Log
-                        </h3>
-                        {selectedHistory.length > 0 ? (
-                          <ol className="mt-3 space-y-2.5">
-                            {selectedHistory.map((item, idx) => (
-                              <li
-                                key={`${item.id}-${idx}`}
-                                className="flex items-start gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-xs"
-                              >
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary-soft)] text-xs font-bold text-[var(--color-primary)]">
-                                  {idx + 1}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <span className="font-bold text-[var(--color-text-primary)]">
-                                      {item.label}
-                                    </span>
-                                    <Pill tone={examTone(item.status)} size="sm">
-                                      {formatLabel(item.status)}
-                                    </Pill>
-                                  </div>
-                                  <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-                                    {item.description}
-                                  </p>
-                                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-muted)]">
-                                    <span>Scheduled: {item.scheduledAt ? formatDate(item.scheduledAt, true) : 'Pending'}</span>
-                                    <span>·</span>
-                                    <span>Assigned Vet: {item.assignedVetId ? `#${item.assignedVetId}` : 'Unassigned'}</span>
-                                  </div>
-                                </div>
-                              </li>
-                            ))}
-                          </ol>
-                        ) : (
-                          <p className="mt-2 text-xs text-[var(--color-text-muted)] italic">
-                            No care schedule logs recorded.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tab 3: Vitals & Health Metrics History */}
-                  {activeTab === 'vitals' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
-                          Recorded Vitals &amp; Telemetry
-                        </h3>
-                        <span className="text-xs text-[var(--color-text-muted)]">
-                          {metrics.length} readings on record
-                        </span>
-                      </div>
-
-                      {metrics.length > 0 ? (
-                        <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-border)]">
-                          <table className="w-full text-left text-xs">
-                            <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-                              <tr>
-                                <th className="px-3 py-2">Recorded At</th>
-                                <th className="px-3 py-2">Temp</th>
-                                <th className="px-3 py-2">Heart Rate</th>
-                                <th className="px-3 py-2">Resp Rate</th>
-                                <th className="px-3 py-2">Weight</th>
-                                <th className="px-3 py-2">BCS</th>
-                                <th className="px-3 py-2">Hydration</th>
-                                <th className="px-3 py-2">Notes</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[var(--color-border)] font-metric">
-                              {metrics.map((m) => (
-                                <tr key={m.id} className="hover:bg-[var(--color-surface-subtle)]">
-                                  <td className="px-3 py-2 text-[var(--color-text-primary)]">
-                                    {formatDate(m.recordedAt, true)}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    {m.temperature != null ? `${m.temperature} °C` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    {m.heartRate != null ? `${m.heartRate} bpm` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    {m.respiratoryRate != null ? `${m.respiratoryRate} rpm` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    {m.weight != null ? `${m.weight} kg` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    {m.bodyConditionScore != null ? `${m.bodyConditionScore} / 9` : '—'}
-                                  </td>
-                                  <td className="px-3 py-2 font-sans">
-                                    {m.hydrationStatus || '—'}
-                                  </td>
-                                  <td className="px-3 py-2 font-sans text-[var(--color-text-secondary)] max-w-xs truncate">
-                                    {m.notes || '—'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] p-6 text-center text-[var(--color-text-muted)]">
-                          <Icon name="heart-pulse" size={24} className="mx-auto mb-1.5 opacity-50" />
-                          <p className="text-xs font-medium text-[var(--color-text-secondary)]">
-                            No telemetry metrics recorded yet
-                          </p>
-                        </div>
-                      )}
-
-                      {latestMetrics && (
-                        <div className="rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] p-3 border border-[var(--color-border)]">
-                          <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
-                            Latest Telemetry Baseline ({formatDate(latestMetrics.recordedAt, true)})
-                          </span>
-                          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6 font-metric text-xs">
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">TEMP</span>
-                              <strong>{latestMetrics.temperature ?? '—'} °C</strong>
-                            </div>
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">PULSE</span>
-                              <strong>{latestMetrics.heartRate ?? '—'} bpm</strong>
-                            </div>
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">RESP</span>
-                              <strong>{latestMetrics.respiratoryRate ?? '—'} rpm</strong>
-                            </div>
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">WEIGHT</span>
-                              <strong>{latestMetrics.weight ?? '—'} kg</strong>
-                            </div>
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">BCS</span>
-                              <strong>{latestMetrics.bodyConditionScore ?? '—'} / 9</strong>
-                            </div>
-                            <div>
-                              <span className="text-xs text-[var(--color-text-muted)] block font-sans">HYDRATION</span>
-                              <strong className="font-sans text-xs">{latestMetrics.hydrationStatus ?? 'Normal'}</strong>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                  {/* View Record (common form) */}
+                  {activeTab === 'record' && (
+                    <CareRecordDetailModal
+                      scheduleId={currentActiveSchedule?.id ?? null}
+                      open={true}
+                      onClose={() => setActiveTab('exam')}
+                      onScheduleUpdated={() => {}}
+                    />
                   )}
 
                   {/* Tab 4: Intake Documents & Pedigree */}
                   {activeTab === 'documents' && (
                     <div className="grid gap-5 xl:grid-cols-2">
                       <div>
-                        <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
-                          Attached Admission Documents
-                        </h3>
-                        {documents.length > 0 ? (
-                          <ul className="mt-3 space-y-2">
-                            {documents.map((doc) => (
-                              <li
-                                key={doc.id}
-                                className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-xs"
-                              >
-                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
-                                  <Icon name="file-text" size={14} />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <a
-                                    href={doc.fileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-semibold text-[var(--color-primary)] hover:underline truncate block"
-                                  >
-                                    {formatLabel(doc.documentType)}
-                                  </a>
-                                  <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--color-text-muted)] font-metric">
-                                    {doc.recordDate && <span>Dated: {formatDate(doc.recordDate)}</span>}
-                                    <span>Uploaded: {formatDate(doc.uploadedAt)}</span>
-                                  </div>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-2 text-xs text-[var(--color-text-muted)] italic">
-                            No documents attached.
-                          </p>
-                        )}
+                        <AdmissionDocumentsSection documents={documents} assetUrl={admissionsApi.assetUrl} />
                       </div>
 
                       <div className="space-y-4">
@@ -1149,7 +1105,7 @@ export function VetAdmissionQueue() {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-[var(--color-text-muted)]">Reviewed At:</span>
-                              <span className="font-metric">{formatDate(detail.groomReviewedAt, true)}</span>
+                              <span className="font-metric">{formatDateTime(detail.groomReviewedAt)}</span>
                             </div>
                           </dl>
                           {detail.groomFeedback && (
@@ -1197,7 +1153,7 @@ export function VetAdmissionQueue() {
 function QueueShell({ showHeader, children }: { showHeader: boolean; children: ReactNode }) {
   if (!showHeader) return <div className="w-full min-w-0 space-y-5">{children}</div>;
   return (
-    <AdmissionListLayout title="Veterinary admissions" description="Review initial veterinary examinations for horse admissions.">
+    <AdmissionListLayout title="Veterinary admissions">
       {children}
     </AdmissionListLayout>
   );

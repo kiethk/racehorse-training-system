@@ -1,6 +1,6 @@
 package com.rtms.backend.notification.dto;
 
-import com.rtms.backend.stable.enums.IncidentSeverity;
+import com.rtms.backend.incident.enums.IncidentSeverity;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.training.enums.TrainingDecision;
 
@@ -17,6 +17,7 @@ public record UrgentAssignmentAlert(
         String stallCode,
         Long reportedById,
         String reportedByName,
+        String reportedByRole,
         LocalDateTime reportedAt,
         IncidentSeverity severity,
         String title,
@@ -25,5 +26,55 @@ public record UrgentAssignmentAlert(
         TrainingDecision trainingDecision,
         CareScheduleStatus status,
         LocalDateTime scheduledAt,
-        LocalDateTime assignedAt
-) {}
+        LocalDateTime assignedAt,
+        TrainingDecision previousTrainingDecision,
+        String previousTrainingDecisionReason
+) {
+    /** Backward compatibility constructor without reportedByRole and the pre-incident state. */
+    public UrgentAssignmentAlert(
+            Long eventId,
+            Long scheduleId,
+            Long incidentId,
+            Long veterinarianId,
+            Long horseId,
+            String horseName,
+            String stableLocation,
+            String stallCode,
+            Long reportedById,
+            String reportedByName,
+            LocalDateTime reportedAt,
+            IncidentSeverity severity,
+            String title,
+            String description,
+            String imageUrl,
+            TrainingDecision trainingDecision,
+            CareScheduleStatus status,
+            LocalDateTime scheduledAt,
+            LocalDateTime assignedAt
+    ) {
+        this(
+                eventId,
+                scheduleId,
+                incidentId,
+                veterinarianId,
+                horseId,
+                horseName,
+                stableLocation,
+                stallCode,
+                reportedById,
+                reportedByName,
+                null,
+                reportedAt,
+                severity,
+                title,
+                description,
+                imageUrl,
+                trainingDecision,
+                status,
+                scheduledAt,
+                assignedAt,
+                null,
+                null
+        );
+    }
+}

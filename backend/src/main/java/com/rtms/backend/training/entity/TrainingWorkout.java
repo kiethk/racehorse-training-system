@@ -13,16 +13,9 @@ public class TrainingWorkout {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "plan_id", nullable = false)
-    private Long planId;
-
-    /**
-     * Lot mà chiến mã này tham gia.
-     * Ngày, giờ bắt đầu/kết thúc và bài tập đều lấy từ lot — workout không
-     * còn giữ bản sao nào của chúng nữa.
-     */
-    @Column(name = "lot_id", nullable = false)
-    private Long lotId;
+    /** Buổi của nhóm mà chiến mã này tham gia; ngày, giờ và bài tập đều lấy từ buổi. (The group Session this horse takes part in; the date, time and Subject all come from it.) */
+    @Column(name = "session_id", nullable = false)
+    private Long sessionId;
 
     @Column(name = "horse_id", nullable = false)
     private Long horseId;
@@ -85,11 +78,8 @@ public class TrainingWorkout {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public Long getPlanId() { return planId; }
-    public void setPlanId(Long planId) { this.planId = planId; }
-
-    public Long getLotId() { return lotId; }
-    public void setLotId(Long lotId) { this.lotId = lotId; }
+    public Long getSessionId() { return sessionId; }
+    public void setSessionId(Long sessionId) { this.sessionId = sessionId; }
 
     public Long getHorseId() { return horseId; }
     public void setHorseId(Long horseId) { this.horseId = horseId; }

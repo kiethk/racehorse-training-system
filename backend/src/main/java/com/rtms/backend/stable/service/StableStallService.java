@@ -1,102 +1,64 @@
 package com.rtms.backend.stable.service;
-import com.rtms.backend.horse.service.HorseService;
-import com.rtms.backend.training.service.HorseTrainingPlanService;
 
-
-import com.rtms.backend.config.FarmSchedulePolicy;
+import com.rtms.backend.stable.dto.BlockGroomAssignmentDto;
+import com.rtms.backend.stable.dto.BatchStableAssignmentRequest;
 import com.rtms.backend.stable.entity.StableStall;
-import com.rtms.backend.identity.entity.User;
-import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.identity.repository.UserRepository;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class StableStallService {
+    private final StableStallRepository stalls;
+    private final StableAssignmentService assignments;
 
-    private final StableStallRepository stableStallRepository;
-    private final UserRepository userRepository;
-    private final HorseRepository horseRepository;
-    private final HorseTrainingPlanService planService;
+    public StableStallService(StableStallRepository stalls, StableAssignmentService assignments) {
+        this.stalls = stalls;
+        this.assignments = assignments;
+    }
 
-    /**
-     * @param planService dùng để đồng bộ Groom cho các buổi tập tương lai.
-     *                    Đánh @Lazy phòng xa, theo đúng cách HorseService đang
-     *                    tiêm lớp này — HorseTrainingPlanService có nhiều quan
-     *                    hệ, thêm quan hệ mới về sau sẽ không làm Spring chết
-     *                    lúc khởi động vì vòng phụ thuộc.
-     */
-    public StableStallService(StableStallRepository stableStallRepository,
-                              UserRepository userRepository,
-                              HorseRepository horseRepository,
-                              @Lazy HorseTrainingPlanService planService) {
-        this.stableStallRepository = stableStallRepository;
-        this.userRepository = userRepository;
-        this.horseRepository = horseRepository;
-        this.planService = planService;
+    /** Legacy stall address, but an explicit baseline and whole-block policy are always required. */
+    @Transactional
+    public StableStall assignGroom(Long stallId, BlockGroomAssignmentDto request) {
+        StableStall stall = stalls.findById(stallId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Stall not found"));
+        request.setAreaId(stall.getAreaId());
+        request.setBlockNumber((stall.getStallNumber() - 1) / StableAssignmentService.STALLS_PER_BLOCK + 1);
+        assignments.applyAssignments(new BatchStableAssignmentRequest(null, List.of(request)));
+        return stalls.findById(stallId).orElseThrow();
     }
 
     /**
-     * BR-06 — Mỗi Groom tối đa 3 chuồng.
-     *
-     * Căn cứ thực tế: nhân viên chuồng trại ở lò đua thường chăm 2–3 con mỗi
-     * ngày. Con số này cũng ăn khớp với số lot mỗi sáng (2–3 lot trong khung
-     * 06:00–10:00): nếu cả 3 con cùng tập một ngày, chúng vừa đủ xếp vào 3 lot
-     * khác nhau mà không vi phạm BR-09 (một Groom không dắt 2 ngựa cùng lot).
+     * Những gì một Groom được thấy: chỉ các khu có chuồng của mình; chuồng của người khác trong cùng khu vẫn trả về
+     * để vẽ khung barn nhưng bị xoá groomId. Trả bản sao, không sửa entity đang được quản lý.
+     * (What a groom may see: only the areas holding one of their stalls; other grooms' stalls in those areas are
+     * still returned so the barn can be drawn, but without groomId. Copies are returned; managed entities are not
+     * modified.)
      */
-    @Transactional
-    public StableStall assignGroom(Long stallId, Long groomId) {
-        StableStall stall = stableStallRepository.findById(stallId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuồng #" + stallId));
+    public static List<StableStall> scopeForGroom(List<StableStall> all, List<StableStall> ownStalls, Long groomId) {
+        // Khu được suy từ chuồng thật của Groom, không từ danh sách đã lọc (ví dụ ?status=AVAILABLE).
+        // (Areas come from the groom's actual stalls, not from the possibly filtered list, e.g. ?status=AVAILABLE.)
+        Set<Long> ownAreaIds = ownStalls.stream()
+                .map(StableStall::getAreaId)
+                .collect(Collectors.toSet());
+        return all.stream()
+                .filter(stall -> ownAreaIds.contains(stall.getAreaId()))
+                .map(stall -> groomId.equals(stall.getGroomId()) ? stall : withoutGroom(stall))
+                .toList();
+    }
 
-        // TH1: gỡ Groom khỏi chuồng -> không cần kiểm tra BR-06/BR-09,
-        // nhưng vẫn phải đồng bộ buổi tập: chúng thành "chưa phân công" để
-        // Trainer thấy mà xử lý, thay vì treo ở người không còn chăm con ngựa.
-        if (groomId == null) {
-            horseRepository.findByCurrentStallId(stallId)
-                    .ifPresent(h -> planService.reassignFutureWorkoutsToGroom(h.getId(), null));
-
-            stall.setGroomId(null);
-            return stableStallRepository.save(stall);
-        }
-
-        // TH2: gán lại ĐÚNG Groom đang giữ chuồng này -> không tính thêm 1
-        if (groomId.equals(stall.getGroomId())) {
-            return stall;
-        }
-
-        // TH3: kiểm tra người được gán đúng là GROOM
-        User user = userRepository.findById(groomId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng #" + groomId));
-
-        if (user.getRole() == null || !"GROOM".equalsIgnoreCase(user.getRole().getName())) {
-            throw new IllegalArgumentException(String.format(
-                    "Người dùng '%s' có vai trò %s, không phải GROOM — không thể gán vào chuồng!",
-                    user.getFullName(),
-                    user.getRole() != null ? user.getRole().getName() : "KHÔNG XÁC ĐỊNH"));
-        }
-
-        // TH4: BR-06
-        long assignedCount = stableStallRepository.countByGroomId(groomId);
-        if (assignedCount >= FarmSchedulePolicy.MAX_STALLS_PER_GROOM) {
-            throw new IllegalStateException(String.format(
-                    "Groom '%s' đã phụ trách %d chuồng. Mỗi Groom chỉ được nhận tối đa %d chuồng "
-                  + "để đảm bảo chất lượng chăm sóc và phúc lợi chiến mã!",
-                    user.getFullName(), assignedCount, FarmSchedulePolicy.MAX_STALLS_PER_GROOM));
-        }
-
-        // TH5: đồng bộ buổi tập tương lai của con ngựa đang ở chuồng này.
-        //
-        // PHẢI gọi TRƯỚC stall.setGroomId(). Nếu vướng BR-09 thì hàm này ném
-        // lỗi, @Transactional rollback, và chuồng giữ nguyên Groom cũ. Ghi
-        // trước rồi kiểm sau sẽ để lại trạng thái nửa vời nếu ai đó lỡ bỏ
-        // @Transactional khỏi phương thức này.
-        horseRepository.findByCurrentStallId(stallId)
-                .ifPresent(h -> planService.reassignFutureWorkoutsToGroom(h.getId(), groomId));
-
-        stall.setGroomId(groomId);
-        return stableStallRepository.save(stall);
+    private static StableStall withoutGroom(StableStall stall) {
+        StableStall copy = new StableStall();
+        copy.setId(stall.getId());
+        copy.setAreaId(stall.getAreaId());
+        copy.setStallNumber(stall.getStallNumber());
+        copy.setStallCode(stall.getStallCode());
+        copy.setStatus(stall.getStatus());
+        return copy;
     }
 }

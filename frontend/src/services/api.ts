@@ -29,13 +29,71 @@ async function responseError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, msg, payload?.errorCode);
 }
 
+async function parseJsonResponse<T>(res: Response): Promise<T> {
+  if (res.status === 204) {
+    return undefined as unknown as T;
+  }
+  const text = await res.text();
+  if (!text || !text.trim()) {
+    return undefined as unknown as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return undefined as unknown as T;
+  }
+}
+
 let refreshPromise: Promise<boolean> | null = null;
 
-export function createAuthenticatedEventSource(path: string): EventSource {
-  return new EventSource(getApiUrl(path), { withCredentials: true });
+export interface AuthenticatedEventStreamOptions {
+  signal?: AbortSignal;
+  onEvent: (event: string, data: string) => void;
+}
+
+/**
+ * Reads a server-sent-events response with normal Bearer authentication.
+ * EventSource cannot send an Authorization header, so the urgent alert stream
+ * must be read with fetch instead of EventSource.
+ */
+export async function openAuthenticatedEventStream(
+  path: string,
+  { signal, onEvent }: AuthenticatedEventStreamOptions,
+): Promise<void> {
+  const res = await doFetch(path, { credentials: 'include', signal });
+  if (!res.ok) {
+    throw await responseError(res);
+  }
+  if (!res.body) {
+    throw new Error('The server did not return an event stream.');
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, '\n');
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary >= 0) {
+      const frame = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      let event = 'message';
+      const data: string[] = [];
+      for (const line of frame.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
+      }
+      if (data.length > 0) onEvent(event, data.join('\n'));
+      boundary = buffer.indexOf('\n\n');
+    }
+  }
 }
 
 let accessToken: string | null = null;
+
+export const AUTH_UNAUTHORIZED_EVENT = 'rtms:auth-unauthorized';
 
 export function getAccessToken(): string | null {
   return accessToken;
@@ -64,9 +122,15 @@ export async function refreshAccessToken(): Promise<boolean> {
         }
       }
       setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT));
+      }
       return false;
     } catch {
       setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT));
+      }
       return false;
     } finally {
       refreshPromise = null;
@@ -115,7 +179,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   if (!res.ok) {
     throw await responseError(res);
   }
-  return res.json();
+  return parseJsonResponse<T>(res);
 }
 
 /** Binary files use Bearer authentication and the same refresh flow as JSON. */
@@ -134,17 +198,19 @@ export async function apiGetBlob(path: string, signal?: AbortSignal): Promise<Bl
   return res.blob();
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+/** `signal` lets a caller cancel a request whose answer is no longer wanted, such as a superseded preview. */
+export async function apiPost<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await doFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) {
     throw await responseError(res);
   }
-  return res.json();
+  return parseJsonResponse<T>(res);
 }
 
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
@@ -157,13 +223,20 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   if (!res.ok) {
     throw await responseError(res);
   }
-  return res.json();
+  return parseJsonResponse<T>(res);
+}
+
+/** JSON DELETE uses the same authentication, token refresh and error mapping. */
+export async function apiDelete<T>(path: string): Promise<T> {
+  const res = await doFetch(path, { method: 'DELETE', credentials: 'include' });
+  if (!res.ok) throw await responseError(res);
+  return parseJsonResponse<T>(res);
 }
 
 /** Multipart upload uses the same Bearer API client as JSON requests. */
-export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
+export async function apiUpload<T>(path: string, body: FormData, method: "POST" | "PUT" = "POST"): Promise<T> {
   const res = await doFetch(path, {
-    method: "POST",
+    method,
     credentials: "include",
     body,
   });
@@ -185,5 +258,5 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   if (!res.ok) {
     throw await responseError(res);
   }
-  return res.json();
+  return parseJsonResponse<T>(res);
 }

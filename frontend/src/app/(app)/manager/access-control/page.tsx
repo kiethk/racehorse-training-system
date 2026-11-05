@@ -12,7 +12,7 @@ export default function ManagerAccessControlPage() {
     <RoleGuard allowedRoles={['CLUB_MANAGER']}>
       <PageContainer>
         <div>
-          <h1 className="text-[20px] font-semibold tracking-tight text-[var(--color-text-primary)] mb-4">
+          <h1 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)] mb-4">
             Access Control
           </h1>
           <AccessControlView />

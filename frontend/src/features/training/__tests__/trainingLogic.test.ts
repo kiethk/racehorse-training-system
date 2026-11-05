@@ -1,0 +1,133 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { cancelledLabel, planProgress } from '../lib/planProgress.ts';
+import { ratingDistribution, ratingTier, ratingTone } from '../lib/rating.ts';
+import { PLAN_STATUS } from '../lib/status.ts';
+import { clockOf, minutesOf, sessionStartOptions } from '../lib/timeline.ts';
+import { rangeForPreset, rangeLabel, shiftIsoDate, toIsoDate, tomorrowIso } from '../lib/dateRange.ts';
+
+describe('planProgress', () => {
+  it('removes cancelled sessions from the denominator so the plan can reach 100%', () => {
+    const progress = planProgress(11, 12, 1, 'COMPLETED');
+    assert.equal(progress.total, 11);
+    assert.equal(progress.percent, 100);
+  });
+
+  it('never divides by zero for an empty plan or one whose sessions are all cancelled', () => {
+    assert.deepEqual(planProgress(0, 0, 0, 'COMPLETED'), { completed: 0, total: 0, cancelled: 0, percent: 0, allCancelled: false });
+    assert.equal(planProgress(0, 4, 4, 'COMPLETED').percent, 0);
+  });
+
+  it('flags a plan whose sessions are all cancelled', () => {
+    assert.equal(planProgress(0, 6, 6, 'COMPLETED').allCancelled, true);
+    assert.equal(planProgress(1, 6, 5, 'COMPLETED').allCancelled, false);
+  });
+
+  it('labels the cancelled count in the singular and plural', () => {
+    assert.equal(cancelledLabel(1), '1 session cancelled');
+    assert.equal(cancelledLabel(3), '3 sessions cancelled');
+  });
+
+  it('keeps cancelled sessions in the count of a cancelled plan', () => {
+    const progress = planProgress(3, 6, 3, 'CANCELLED');
+    assert.equal(progress.total, 6);
+    assert.equal(progress.percent, 50);
+    assert.equal(progress.allCancelled, false);
+    assert.equal(planProgress(0, 6, 6, 'CANCELLED').allCancelled, true);
+  });
+
+  it('caps the percentage at 100', () => {
+    assert.equal(planProgress(5, 3, 0, 'COMPLETED').percent, 100);
+  });
+});
+
+describe('rating tiers', () => {
+  it('puts the boundaries into the higher tier', () => {
+    assert.equal(ratingTier(8), 'excellent');
+    assert.equal(ratingTier(7.9), 'good');
+    assert.equal(ratingTier(6), 'good');
+    assert.equal(ratingTier(5.9), 'needsImprovement');
+  });
+
+  it('maps each tier to one tone', () => {
+    assert.equal(ratingTone(9), 'success');
+    assert.equal(ratingTone(7), 'info');
+    assert.equal(ratingTone(3), 'warning');
+  });
+
+  it('counts a missing rating as no data', () => {
+    assert.deepEqual(ratingDistribution([9, 8, 7, 4, null, undefined]), {
+      excellent: 2,
+      good: 1,
+      needsImprovement: 1,
+      noData: 2,
+    });
+  });
+});
+
+describe('status maps', () => {
+  it('covers every plan status the dashboard can return, including NONE', () => {
+    assert.deepEqual(Object.keys(PLAN_STATUS).sort(), ['ACTIVE', 'CANCELLED', 'COMPLETED', 'NONE', 'UPCOMING']);
+  });
+
+});
+
+describe('date ranges', () => {
+  const today = new Date(2026, 9, 11); // 11 Oct 2026, local time
+
+  it('formats a date in the local time zone, not UTC', () => {
+    assert.equal(toIsoDate(new Date(2026, 0, 5, 0, 30)), '2026-01-05');
+  });
+
+  it('counts a preset back from today', () => {
+    assert.deepEqual(rangeForPreset('7D', today), { from: '2026-10-04', to: '2026-10-11' });
+    assert.deepEqual(rangeForPreset('30D', today), { from: '2026-09-11', to: '2026-10-11' });
+  });
+
+  it('has no bounds for all time and uses the typed dates for a custom range', () => {
+    assert.deepEqual(rangeForPreset('ALL', today), {});
+    assert.deepEqual(rangeForPreset('CUSTOM', today, { from: '2026-01-01', to: '' }), { from: '2026-01-01', to: undefined });
+  });
+
+  it('suggests tomorrow as the first training day, across a month end', () => {
+    assert.equal(tomorrowIso(new Date(2026, 9, 31)), '2026-11-01');
+  });
+});
+
+describe('schedule timeline', () => {
+  it('reads backend times with or without seconds', () => {
+    assert.equal(minutesOf('06:30'), 390);
+    assert.equal(minutesOf('06:30:00'), 390);
+  });
+
+  it('offers only quarter-hour starts that keep the session inside the window', () => {
+    const options = sessionStartOptions('06:00:00', '10:00:00', 60, 15);
+    assert.equal(options[0], '06:00');
+    assert.equal(options[1], '06:15');
+    assert.equal(options.at(-1), '09:00');
+    assert.equal(clockOf(405), '06:45');
+  });
+});
+
+describe('shiftIsoDate', () => {
+  it('crosses month and year ends', () => {
+    assert.equal(shiftIsoDate('2026-10-31', 1), '2026-11-01');
+    assert.equal(shiftIsoDate('2027-01-01', -1), '2026-12-31');
+  });
+});
+
+describe('range label', () => {
+  const format = (date: string) => `<${date}>`;
+
+  it('names a preset', () => {
+    assert.equal(rangeLabel('30D', {}, format), 'Last 30 days');
+    assert.equal(rangeLabel('ALL', {}, format), 'All time');
+  });
+
+  it('spells out a custom range, open ended on one side', () => {
+    assert.equal(rangeLabel('CUSTOM', { from: '2026-01-01', to: '2026-02-01' }, format), '<2026-01-01> – <2026-02-01>');
+    assert.equal(rangeLabel('CUSTOM', { from: '2026-01-01' }, format), 'From <2026-01-01>');
+    assert.equal(rangeLabel('CUSTOM', { to: '2026-02-01' }, format), 'Until <2026-02-01>');
+    assert.equal(rangeLabel('CUSTOM', {}, format), 'All time');
+  });
+});

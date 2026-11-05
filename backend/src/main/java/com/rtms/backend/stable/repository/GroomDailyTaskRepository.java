@@ -25,4 +25,6 @@ public interface GroomDailyTaskRepository extends JpaRepository<GroomDailyTask, 
             LocalDateTime start,
             LocalDateTime end
     );
+
+    List<GroomDailyTask> findByHorseIdAndIsCompletedFalse(Long horseId);
 }

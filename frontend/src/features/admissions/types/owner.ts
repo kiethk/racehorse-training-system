@@ -1,4 +1,5 @@
 import type { AdmissionStatus } from './index';
+import type { HorseSex } from '@/types/horse';
 
 export interface ApiResult<T> {
   success: boolean;
@@ -8,6 +9,7 @@ export interface ApiResult<T> {
 
 export interface CreateOwnerAdmissionRequest {
   name: string;
+  sex: HorseSex;
   breed?: string;
   dateOfBirth?: string;
   registrationNumber?: string;
@@ -50,11 +52,16 @@ export interface AdmissionSummaryResponse {
   quarantineStallId: number | null;
 }
 
+/** Stored legacy snapshots may not have sex, unlike a new submission. */
+export type OwnerCandidateSnapshot = Omit<CreateOwnerAdmissionRequest, 'sex'> & {
+  sex: HorseSex | null;
+};
+
 export interface OwnerAdmissionDetail {
   admissionId: number;
   status: AdmissionStatus;
   submittedAt: string;
-  candidate: CreateOwnerAdmissionRequest;
+  candidate: OwnerCandidateSnapshot;
   documents: AdmissionDocument[];
   groomFeedback: string | null;
   vetFeedback: string | null;

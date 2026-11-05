@@ -1,5 +1,4 @@
 package com.rtms.backend.interceptor;
-import com.rtms.backend.identity.controller.AuthController;
 
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.audit.service.AuditLogService;
@@ -11,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.util.List;
 import java.util.Set;
 
 public class HttpAuditInterceptor implements HandlerInterceptor {
@@ -20,15 +20,23 @@ public class HttpAuditInterceptor implements HandlerInterceptor {
     private static final Set<String> WRITE_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
     /**
-     * Auth endpoints that handle credentials — excluded from audit to avoid noise
-     * and accidental future handling of sensitive data.
-     * Based on actual routes in AuthController (@RequestMapping("/api/auth")).
+     * Endpoints excluded from audit logging to avoid noise, transient processing, and personal UI state:
+     * - Authentication credential handshakes (/api/auth/...)
+     * - Personal notification reading (/api/notifications/...)
+     * - AI conversation streaming and chat state (/api/v1/ai/chat/..., /api/v1/ai/conversations/...)
+     * - Transient multipart OCR scanning (/api/owner/admissions/ocr-scan)
+     * - Plan preview simulation (/api/group-plans/preview)
      */
-    private static final Set<String> EXCLUDED_PATHS = Set.of(
+    private static final List<String> EXCLUDED_PREFIXES = List.of(
             "/api/auth/login",
             "/api/auth/refresh",
             "/api/auth/logout",
-            "/api/auth/register"
+            "/api/auth/register",
+            "/api/notifications",
+            "/api/v1/ai/chat",
+            "/api/v1/ai/conversations",
+            "/api/owner/admissions/ocr-scan",
+            "/api/group-plans/preview"
     );
 
     private final AuditLogService auditLogService;
@@ -46,7 +54,12 @@ public class HttpAuditInterceptor implements HandlerInterceptor {
         }
 
         String path = request.getRequestURI();
-        if (EXCLUDED_PATHS.contains(path)) {
+        if (isExcluded(path)) {
+            return;
+        }
+
+        // Tier-1 deduplication: skip HTTP interceptor logging if a Tier-2 domain audit was recorded
+        if (Boolean.TRUE.equals(request.getAttribute("DOMAIN_AUDIT_LOGGED"))) {
             return;
         }
 
@@ -63,6 +76,18 @@ public class HttpAuditInterceptor implements HandlerInterceptor {
 
     private boolean isWriteMethod(String method) {
         return WRITE_METHODS.contains(method);
+    }
+
+    private boolean isExcluded(String path) {
+        if (path == null) {
+            return true;
+        }
+        for (String prefix : EXCLUDED_PREFIXES) {
+            if (path.equals(prefix) || path.startsWith(prefix + "/") || path.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Long resolveUserId() {

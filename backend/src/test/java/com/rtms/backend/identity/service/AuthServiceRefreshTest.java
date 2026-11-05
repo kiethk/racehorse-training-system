@@ -126,6 +126,43 @@ class AuthServiceRefreshTest {
     }
 
     @Test
+    void testRefresh_WithinGracePeriod_Success() {
+        User user = new User();
+        user.setId(1L);
+        user.setEmail("test@test.com");
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("CLUB_MANAGER");
+        user.setRole(role);
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setExpiresAt(LocalDateTime.now().plusDays(1));
+        LocalDateTime initialRevokedAt = LocalDateTime.now().minusSeconds(10);
+        refreshToken.setRevokedAt(initialRevokedAt);
+
+        when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(refreshToken));
+        when(jwtUtil.generateToken(1L, "test@test.com", "CLUB_MANAGER")).thenReturn("new_access_token");
+
+        AuthService.RefreshResult result = authService.refresh("some_raw_token");
+        assertEquals("new_access_token", result.accessToken());
+        assertNotNull(result.refreshToken());
+        assertEquals(initialRevokedAt, refreshToken.getRevokedAt());
+    }
+
+    @Test
+    void testRefresh_BeyondGracePeriod_RevokedTokenRejected() {
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setRevokedAt(LocalDateTime.now().minusSeconds(35)); // Beyond 30s grace period
+        refreshToken.setExpiresAt(LocalDateTime.now().plusDays(1));
+
+        when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(refreshToken));
+
+        ApiException ex = assertThrows(ApiException.class, () -> authService.refresh("revoked_token"));
+        assertTrue(ex.getMessage().contains("revoked"));
+    }
+
+    @Test
     void testRefresh_RevokedTokenRejected() {
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setRevokedAt(LocalDateTime.now().minusDays(1)); // Revoked

@@ -4,6 +4,7 @@ type IconName =
   | 'search'
   | 'plus'
   | 'chevron-down'
+  | 'chevron-up'
   | 'chevron-right'
   | 'chevron-left'
   | 'bell'
@@ -12,7 +13,9 @@ type IconName =
   | 'grid'
   | 'list'
   | 'x'
+  | 'injury-dot'
   | 'download'
+  | 'upload'
   | 'check'
   | 'alert-triangle'
   | 'heart-pulse'
@@ -50,9 +53,55 @@ type IconName =
   | 'home'
   | 'log-out'
   | 'panel-left'
-  | 'layers';
+  | 'layers'
+  | 'sparkles'
+  | 'bot'
+  | 'send'
+  | 'maximize'
+  | 'minimize'
+  | 'pencil'
+  | 'archive'
+  | 'trash'
+  | 'eye'
+  | 'eye-off';
 
 const paths: Record<IconName, ReactElement> = {
+  archive: (
+    <>
+      <rect width="20" height="5" x="2" y="3" rx="1" />
+      <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+      <path d="M10 12h4" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+      <line x1="10" x2="10" y1="11" y2="17" />
+      <line x1="14" x2="14" y1="11" y2="17" />
+    </>
+  ),
+  pencil: (
+    <>
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  'eye-off': (
+    <>
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+      <line x1="2" x2="22" y1="2" y2="22" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="7" />
@@ -61,6 +110,7 @@ const paths: Record<IconName, ReactElement> = {
   ),
   plus: <path d="M12 5v14M5 12h14" />,
   'chevron-down': <path d="m6 9 6 6 6-6" />,
+  'chevron-up': <path d="m18 15-6-6-6 6" />,
   'chevron-right': <path d="m9 6 6 6-6 6" />,
   'chevron-left': <path d="m15 6-6 6 6 6" />,
   bell: (
@@ -97,7 +147,9 @@ const paths: Record<IconName, ReactElement> = {
     </>
   ),
   x: <path d="M18 6 6 18M6 6l12 12" />,
+  'injury-dot': <></>,
   download: <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />,
+  upload: <path d="M12 15V3m0 0 4 4m-4-4-4 4M5 21h14" />,
   check: <path d="m5 12 5 5L20 7" />,
   'alert-triangle': (
     <>
@@ -222,6 +274,8 @@ const paths: Record<IconName, ReactElement> = {
     </>
   ),
   minus: <path d="M5 12h14" />,
+  maximize: <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />,
+  minimize: <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7" />,
   utensils: (
     <>
       <path d="M4 3v7a2 2 0 0 0 4 0V3M6 10v11" />
@@ -229,11 +283,11 @@ const paths: Record<IconName, ReactElement> = {
     </>
   ),
   horse: (
-    <>
-      <path d="M4 16c1-3 1.5-7 5-8 2.5-.7 5 1 6.5 3 1.2 1.6 2.8 2.2 4.5 1.5" />
-      <path d="M8 9 6 5l3 1 2-2 1.5 3M7 15l-1 5M15 15l1 5M18 13l3 2" />
-      <path d="M10 12h.01" />
-    </>
+    <path
+      fill="currentColor"
+      stroke="none"
+      d="M23 4c-2.043 0-3.305 1.207-4 2.156V5C3.184 5 3 27.77 3 28h4s-.016-4.875 1.531-9.688c.774-2.406 1.95-4.785 3.625-6.5S15.973 9 19 9h.625l.281-.563S20.793 6.954 22 6.313V9.25l4.094 8.188l.093.156l.125.125c.403.379.555.738.625.968c.055.168.032.165.032.188c-.028.098-.07.309-.25.594c-.219.347-.414.531-.719.531s-.5-.184-.719-.531s-.312-.719-.312-.719l-.219-.844l-.875.094s-.832.098-1.75-.156s-1.785-.703-2.156-2.094l-.344-1.281l-1.125.656c-1.293.758-2.043 1.914-2.188 3.094c-.144 1.18.204 2.316.625 3.437C17.777 23.898 19 26.184 19 28h2c0-2.621-1.465-5.055-2.219-7.063c-.375-1.003-.547-1.851-.468-2.468a1.8 1.8 0 0 1 .468-1c.762 1.191 1.805 2.035 2.813 2.312c.93.258 1.308.176 1.75.157c.09.234.062.292.25.593C24 21.184 24.804 22 26 22c1.195 0 2-.816 2.406-1.469c.407-.652.563-1.281.563-1.281l.031-.094v-.093s.008-.481-.156-1c-.137-.438-.496-.97-.969-1.5h.031L24 8.75V4zm-4.531 3.031c-.004.008-.028.024-.032.032c-.406.019-.8.039-1.187.093c-.313.043-.61.121-.906.188a10 10 0 0 1 .906-.188c.39-.066.8-.105 1.219-.125M22 12c-.55 0-1 .45-1 1s.45 1 1 1s1-.45 1-1s-.45-1-1-1"
+    />
   ),
   camera: (
     <>
@@ -290,6 +344,25 @@ const paths: Record<IconName, ReactElement> = {
       <path d="m3 13 9 5 9-5" />
     </>
   ),
+  sparkles: (
+    <>
+      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z" />
+      <path d="M5 3v4M3 5h4M19 17v4M17 19h4" />
+    </>
+  ),
+  bot: (
+    <>
+      <path d="M12 8V4H8" />
+      <rect width="16" height="12" x="4" y="8" rx="2" />
+      <path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
+    </>
+  ),
+  send: (
+    <>
+      <path d="m22 2-7 20-4-9-9-4Z" />
+      <path d="M22 2 11 13" />
+    </>
+  ),
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
@@ -297,12 +370,13 @@ interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
   size?: number;
 }
 
-export function Icon({ name, size = 16, ...props }: IconProps) {
+export function Icon({ name, size = 16, viewBox, ...props }: IconProps) {
+  const defaultViewBox = name === 'horse' ? '0 0 32 32' : '0 0 24 24';
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox={viewBox ?? defaultViewBox}
       fill="none"
       stroke="currentColor"
       strokeWidth="1.75"

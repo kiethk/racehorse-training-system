@@ -1,9 +1,11 @@
 import { apiGet, apiUpload } from '@/services/api';
-import type { AdmissionSummaryResponse, AdmissionStatus } from '../types';
+import type { AdmissionSummaryResponse, AdmissionStatus, TrainingDecision } from '../types';
 import type { CreateOwnerAdmissionRequest, AdmissionDocumentUpload } from '../types/owner';
+import type { HorseSex } from '@/types/horse';
 
 export type CandidateForm = {
   name: string; breed: string; dateOfBirth: string | null;
+  sex: HorseSex | null;
   registrationNumber: string | null; registryName: string | null;
   sireName: string | null; sireRegistrationNumber: string | null;
   damName: string | null; damRegistrationNumber: string | null;
@@ -17,16 +19,72 @@ export type AdmissionDocument = {
 };
 
 export type OwnerAdmissionDetail = {
-  admissionId: number; status: AdmissionStatus; submittedAt: string;
-  candidate: CandidateForm; documents: AdmissionDocument[];
-  groomFeedback: string | null; vetFeedback: string | null;
-  trainerFeedback: string | null; managerFeedback: string | null;
+  admissionId: number;
+  status: AdmissionStatus;
+  submittedAt: string;
+  candidate: CandidateForm;
+  documents: AdmissionDocument[];
+
+  // Groom review milestone
+  groomDecision?: 'APPROVED' | 'REJECTED' | null;
+  groomReviewedAt?: string | null;
+  groomFeedback?: string | null;
+
+  // Arrival milestone
+  arrivedAt?: string | null;
+  arrivalDeadlineAt?: string | null;
+
+  // Vet review milestone
+  vetTrainingDecision?: TrainingDecision | null;
+  vetReviewedAt?: string | null;
+  vetFeedback?: string | null;
+
+  // Trainer review milestone
+  trainerReviewedAt?: string | null;
+  trainerFeedback?: string | null;
+
+  // Manager review milestone
+  managerDecision?: 'APPROVED' | 'REJECTED' | null;
+  managerReviewedAt?: string | null;
+  managerFeedback?: string | null;
 };
 
+export interface OcrExtractionData {
+  name?: string | null;
+  sex?: HorseSex | null;
+  rawSexText?: string | null;
+  breed?: string | null;
+  dateOfBirth?: string | null;
+  registrationNumber?: string | null;
+  registryName?: string | null;
+  sireName?: string | null;
+  sireRegistrationNumber?: string | null;
+  damName?: string | null;
+  damRegistrationNumber?: string | null;
+  fileReference?: {
+    tempFileId: string;
+    fileUrl: string;
+    originalFilename: string;
+  } | null;
+  confidenceScore?: number | null;
+  hasConflict?: boolean;
+  conflictMessage?: string | null;
+}
+
+export interface OcrExtractionResponse {
+  success: boolean;
+  message: string;
+  data: OcrExtractionData;
+  extractedFieldsCount: number;
+}
+
 type ApiResponse<T> = { success: boolean; data: T; message: string };
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export const ownerAdmissionApi = {
+  checkUeln: async (ueln: string) =>
+    (await apiGet<ApiResponse<{ available: boolean; message: string | null }>>(
+      `/api/owner/admissions/ueln-availability?${new URLSearchParams({ ueln })}`,
+    )).data,
   list: async () => (await apiGet<ApiResponse<AdmissionSummaryResponse[]>>('/api/owner/admissions')).data,
   detail: async (id: number) =>
     (await apiGet<ApiResponse<OwnerAdmissionDetail>>(`/api/owner/admissions/${id}`)).data,
@@ -44,19 +102,24 @@ export const ownerAdmissionApi = {
     if (!result?.success) throw new Error(result?.message || 'Unable to submit admission.');
     return result.data;
   },
-  upload: async (id: number, file: File, documentType: string, recordDate?: string, note?: string) => {
+  /** Edit details and replace/add documents while no groom has reviewed the application (409 afterwards). */
+  update: async (id: number, candidate: CreateOwnerAdmissionRequest, uploads: { documentType: string; file: File }[]) => {
+    const body = new FormData();
+    body.append('candidate', new Blob([JSON.stringify(candidate)], { type: 'application/json' }));
+    if (uploads.length > 0) {
+      body.append('documentTypes', new Blob([JSON.stringify(uploads.map(u => u.documentType))], { type: 'application/json' }));
+      uploads.forEach(upload => body.append('files', upload.file));
+    }
+    const result = await apiUpload<ApiResponse<OwnerAdmissionDetail>>(`/api/owner/admissions/${id}`, body, 'PUT');
+    if (!result?.success) throw new Error(result?.message || 'Unable to update the application.');
+    return result.data;
+  },
+  scanOcr: async (file: File, documentType: string) => {
     const body = new FormData();
     body.append('file', file);
     body.append('documentType', documentType);
-    if (recordDate) body.append('recordDate', recordDate);
-    if (note) body.append('note', note);
-    const response = await fetch(`${API_URL}/api/owner/admissions/${id}/documents`, {
-      method: 'POST', credentials: 'include', body,
-    });
-    const json: ApiResponse<AdmissionDocument> = await response.json();
-    if (!response.ok || !json.success) throw new Error(json.message || 'Document upload failed');
+    const json = await apiUpload<ApiResponse<OcrExtractionResponse>>('/api/owner/admissions/ocr-scan', body);
+    if (!json?.success) throw new Error(json?.message || 'OCR extraction failed');
     return json.data;
   },
 };
-
-

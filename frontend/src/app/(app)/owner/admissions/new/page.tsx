@@ -17,7 +17,7 @@ export default function NewOwnerAdmissionPage() {
           </div>
           <PageHeader
             title="New horse admission"
-            description={<>Enter your horse&apos;s information and select supporting documents before submitting.</>}
+            description={<>Start quickly by uploading registration documents for AI smart auto-fill, or complete the form manually.</>}
           />
           <OwnerAdmissionForm />
         </ScreenLayout>

@@ -9,6 +9,7 @@ import com.rtms.backend.identity.dto.StaffSummaryResponse;
 import com.rtms.backend.identity.dto.StaffUpdateRequest;
 import com.rtms.backend.identity.service.StaffManagementService;
 import org.springframework.http.HttpStatus;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,7 +48,7 @@ public class StaffManagementController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('USER_MANAGE')")
-    public ApiResponse<StaffCreationResponse> createStaff(@RequestBody StaffCreationRequest request) {
+    public ApiResponse<StaffCreationResponse> createStaff(@Valid @RequestBody StaffCreationRequest request) {
         return ApiResponse.success(staffManagementService.createStaff(request));
     }
 

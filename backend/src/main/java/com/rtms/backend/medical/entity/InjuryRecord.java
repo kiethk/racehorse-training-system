@@ -6,8 +6,16 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "injury_records")
+@Table(name = "health_conditions")
 public class InjuryRecord {
+
+    /** D4 (WF-02 §3.3): một bộ từ vựng severity duy nhất cho bệnh lý/chấn thương. */
+    public static final java.util.Set<String> SEVERITY_VALUES =
+            java.util.Set.of("MILD", "MODERATE", "SEVERE", "CRITICAL");
+
+    public static boolean isValidSeverity(String severity) {
+        return severity != null && SEVERITY_VALUES.contains(severity.trim().toUpperCase());
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,10 +27,13 @@ public class InjuryRecord {
     @Column(name = "health_record_id", nullable = false)
     private Long healthRecordId;
 
-    @Column(name = "injury_type", nullable = false)
+    @Column(name = "category", nullable = false, length = 20)
+    private String category = "INJURY";
+
+    @Column(name = "condition_type", nullable = false)
     private String injuryType;
 
-    @Column(name = "body_region_id", nullable = false)
+    @Column(name = "body_region_id")
     private Long bodyRegionId;
 
     @Column(name = "severity", nullable = false, length = 50)
@@ -31,7 +42,8 @@ public class InjuryRecord {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "diagnosed_at", nullable = false)
+    /** Ngày chẩn đoán ≈ thời điểm ghi nhận condition (health_conditions không còn diagnosed_at sau V202610311800). Read-only mapping onto created_at. */
+    @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime diagnosedAt;
 
     @Column(name = "expected_recovery_date")
@@ -51,6 +63,30 @@ public class InjuryRecord {
 
     @Column(name = "position_z", precision = 10, scale = 4)
     private BigDecimal positionZ;
+
+    @Column(name = "zone_id", length = 64)
+    private String zoneId;
+
+    @Column(name = "local_x", precision = 10, scale = 4)
+    private BigDecimal localX;
+
+    @Column(name = "local_y", precision = 10, scale = 4)
+    private BigDecimal localY;
+
+    @Column(name = "local_z", precision = 10, scale = 4)
+    private BigDecimal localZ;
+
+    @Column(name = "normal_x", precision = 10, scale = 4)
+    private BigDecimal normalX;
+
+    @Column(name = "normal_y", precision = 10, scale = 4)
+    private BigDecimal normalY;
+
+    @Column(name = "normal_z", precision = 10, scale = 4)
+    private BigDecimal normalZ;
+
+    @Transient
+    private String meshName;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -182,11 +218,44 @@ public class InjuryRecord {
         this.positionZ = positionZ;
     }
 
+    public String getZoneId() { return zoneId; }
+    public void setZoneId(String zoneId) { this.zoneId = zoneId; }
+    public BigDecimal getLocalX() { return localX; }
+    public void setLocalX(BigDecimal v) { this.localX = v; }
+    public BigDecimal getLocalY() { return localY; }
+    public void setLocalY(BigDecimal v) { this.localY = v; }
+    public BigDecimal getLocalZ() { return localZ; }
+    public void setLocalZ(BigDecimal v) { this.localZ = v; }
+    public BigDecimal getNormalX() { return normalX; }
+    public void setNormalX(BigDecimal v) { this.normalX = v; }
+    public BigDecimal getNormalY() { return normalY; }
+    public void setNormalY(BigDecimal v) { this.normalY = v; }
+    public BigDecimal getNormalZ() { return normalZ; }
+    public void setNormalZ(BigDecimal v) { this.normalZ = v; }
+    public String getMeshName() { return meshName; }
+    public void setMeshName(String meshName) { this.meshName = meshName; }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public String getCategory() {
+        return category != null ? category : "INJURY";
+    }
+
+    public void setCategory(String category) {
+        this.category = category != null ? category : "INJURY";
+    }
+
+    public String getConditionType() {
+        return injuryType;
+    }
+
+    public void setConditionType(String conditionType) {
+        this.injuryType = conditionType;
     }
 }

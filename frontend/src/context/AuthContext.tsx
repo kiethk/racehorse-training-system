@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import * as authService from '@/services/auth';
-import { refreshAccessToken } from '@/services/api';
+import { refreshAccessToken, setAccessToken, AUTH_UNAUTHORIZED_EVENT } from '@/services/api';
 import type { AuthUser } from '@/types/auth';
 
 interface AuthContextValue {
@@ -20,6 +20,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateUser: (updated: AuthUser) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -27,6 +28,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const updateUser = useCallback((updated: AuthUser) => {
+    setUser(current => current?.userId === updated.userId ? updated : current);
+  }, []);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -36,6 +41,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 401 or backend unavailable — treat as unauthenticated
       setUser(null);
     }
+  }, []);
+
+  // Listen to unauthorized event dispatched on failed refresh
+  useEffect(() => {
+    function handleUnauthorized() {
+      setUser(null);
+      setAccessToken(null);
+    }
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
   }, []);
 
   // On mount: restore session from cookie by fetching a new access token
@@ -73,6 +88,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!meRes.success) {
       throw new Error(meRes.message || 'Failed to load user profile');
     }
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('vet:urgent:snoozed');
+        sessionStorage.removeItem('vet:urgent:p1:dismissed');
+        localStorage.removeItem('vet:urgent:p1:snoozed');
+      } catch {
+        // ignore storage errors
+      }
+    }
     setUser(meRes.data);
   }, []);
 
@@ -82,13 +106,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Even if the backend call fails, clear local state
     } finally {
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem('vet:urgent:snoozed');
+          sessionStorage.removeItem('vet:urgent:p1:dismissed');
+          localStorage.removeItem('vet:urgent:p1:snoozed');
+        } catch {
+          // ignore storage errors
+        }
+      }
       setUser(null);
     }
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, isAuthenticated: user !== null, login, logout, refreshUser }),
-    [user, loading, login, logout, refreshUser]
+    () => ({ user, loading, isAuthenticated: user !== null, login, logout, refreshUser, updateUser }),
+    [user, loading, login, logout, refreshUser, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -14,8 +14,6 @@ public class Course {
     @Column(nullable = false)
     private String name;
 
-    private String description;
-
     @Column(name = "target_goal")
     private String targetGoal;
 
@@ -24,6 +22,9 @@ public class Course {
 
     @Column(name = "created_by_id")
     private Long createdById;
+
+    @Column(name = "trainer_id")
+    private Long trainerId;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -49,9 +50,6 @@ public class Course {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-
     public String getTargetGoal() { return targetGoal; }
     public void setTargetGoal(String targetGoal) { this.targetGoal = targetGoal; }
 
@@ -60,6 +58,9 @@ public class Course {
 
     public Long getCreatedById() { return createdById; }
     public void setCreatedById(Long createdById) { this.createdById = createdById; }
+
+    public Long getTrainerId() { return trainerId; }
+    public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
 
 
     public LocalDateTime getCreatedAt() { return createdAt; }

@@ -17,4 +17,10 @@ public class AdmissionArrivalScheduler {
     public void expireOverdueArrivalReservations() {
         admissionGroomReviewService.expireOverdueArrivalReservations();
     }
+
+    /** Safety net: every capacity change already triggers allocation, this catches anything skipped (e.g. SKIP LOCKED). */
+    @Scheduled(fixedRate = 60000, initialDelay = 30000)
+    public void allocateWaitingAdmissions() {
+        admissionGroomReviewService.allocateWaitingAdmissions();
+    }
 }

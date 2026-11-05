@@ -36,15 +36,15 @@ export function getNavigationForRole(role: Role): NavSection[] {
           label: 'Operations',
           items: [
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/manager/admissions' },
-            { id: 'horses', label: 'Horses', icon: 'horse' },
-            { id: 'stable', label: 'Stable', icon: 'building' },
+            { id: 'horses', label: 'Horses', icon: 'horse', href: '/manager/horses' },
+            { id: 'stable', label: 'Stable', icon: 'building', href: '/manager/stable' },
           ],
         },
         {
           id: 'administration',
           label: 'Administration',
           items: [
-            { id: 'staff', label: 'Staff', icon: 'users', href: '/manager/staff' },
+            { id: 'accounts', label: 'Accounts', icon: 'users', href: '/manager/accounts' },
             { id: 'access-control', label: 'Access Control', icon: 'shield', href: '/manager/access-control' },
             { id: 'audit-log', label: 'Audit Log', icon: 'file-text', href: '/manager/audit-log' },
             { id: 'reports', label: 'Reports', icon: 'trending-up' },
@@ -59,6 +59,7 @@ export function getNavigationForRole(role: Role): NavSection[] {
           label: 'Training',
           items: [
             { id: 'training', label: 'Training', icon: 'target', href: '/trainer/courses' },
+            { id: 'groups', label: 'Groups', icon: 'users', href: '/trainer/groups' },
             { id: 'plans', label: 'Plans', icon: 'layers', href: '/trainer/plans' },
             { id: 'schedule', label: 'Schedule', icon: 'calendar', href: '/trainer/schedule' },
           ],
@@ -74,16 +75,19 @@ export function getNavigationForRole(role: Role): NavSection[] {
           ],
         },
       ];
-    case 'VETERINARIAN':
+        case 'VETERINARIAN':
       return [
         { id: 'overview', items: [dashboard] },
         {
           id: 'clinical',
           label: 'Clinical',
           items: [
+            { id: 'urgent', label: 'Urgent Cases', icon: 'alert-triangle', href: '/veterinarian/urgent' },
+            { id: 'schedule', label: 'Schedule', icon: 'calendar', href: '/veterinarian/schedule' },
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/veterinarian/admissions' },
-            { id: 'health', label: 'Health', icon: 'heart-pulse' },
-            { id: 'preventive-care', label: 'Preventive Care', icon: 'pill' },
+            { id: 'health', label: 'Health', icon: 'heart-pulse', href: '/veterinarian/health' },
+            { id: 'routine', label: 'Routine Checks', icon: 'stethoscope', href: '/veterinarian/routine' },
+            { id: 'preventive-care', label: 'Preventive Care', icon: 'pill', href: '/veterinarian/preventive-care' },
           ],
         },
       ];
@@ -95,9 +99,11 @@ export function getNavigationForRole(role: Role): NavSection[] {
           label: 'Care',
           items: [
             { id: 'care-tasks', label: 'Daily Tasks', icon: 'list', href: '/groom/tasks' },
+            { id: 'groom-schedule', label: 'Schedule', icon: 'calendar', href: '/groom/schedule' },
             { id: 'incidents', label: 'Incidents', icon: 'alert-triangle', href: '/groom/incidents' },
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/groom/admissions' },
-            { id: 'stable', label: 'Stable', icon: 'building' },
+            { id: 'horse-edit-requests', label: 'Change Requests', icon: 'file-text', href: '/groom/horse-edit-requests' },
+            { id: 'stable', label: 'Stable', icon: 'building', href: '/groom/stable' },
           ],
         },
       ];
@@ -108,7 +114,8 @@ export function getNavigationForRole(role: Role): NavSection[] {
           id: 'my-stable',
           label: 'My stable',
           items: [
-            { id: 'my-horses', label: 'My Horses', icon: 'horse' },
+            { id: 'my-horses', label: 'My Horses', icon: 'horse', href: '/owner/horses' },
+            { id: 'owner-schedule', label: 'Schedule', icon: 'calendar', href: '/owner/schedule' },
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/owner/admissions' },
             { id: 'racing', label: 'Racing', icon: 'flag' },
           ],

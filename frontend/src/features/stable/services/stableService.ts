@@ -1,5 +1,6 @@
-import { apiGet, apiPut } from '@/services/api';
-import type { Area, Horse, StableStall, UserSummary, HorseStatus } from '../types';
+import { apiDelete, apiGet, apiPost, apiPut } from '@/services/api';
+import type { Area, AreaType, Horse, StableStall, UserSummary, HorseStatus } from '../types';
+import type { AreaDeletionCheck, AreaDeletionResult, AreaTrainerChangeCheck, AssignmentBatch, AssignmentResponse } from '../types/manager';
 
 interface ApiResponse<T> { success: boolean; data: T; message?: string; }
 
@@ -17,13 +18,32 @@ interface ApiResponse<T> { success: boolean; data: T; message?: string; }
  * @RequestBody, so Spring ignores the body.
  */
 export const stableApi = {
-  getAreas: async (): Promise<Area[]> =>
-    (await apiGet<ApiResponse<Area[]>>('/api/areas')).data,
+  getTrainerAssignmentChecks: async (): Promise<AreaTrainerChangeCheck[]> =>
+    (await apiGet<ApiResponse<AreaTrainerChangeCheck[]>>('/api/areas/trainer-assignment-checks')).data,
+
+  getDeletionCheck: async (areaId: number): Promise<AreaDeletionCheck> =>
+    (await apiGet<ApiResponse<AreaDeletionCheck>>(`/api/areas/${areaId}/deletion-check`)).data,
+
+  deleteArea: async (areaId: number): Promise<AreaDeletionResult> =>
+    (await apiDelete<ApiResponse<AreaDeletionResult>>(`/api/areas/${areaId}`)).data,
+
+  saveAssignments: async (request: AssignmentBatch): Promise<AssignmentResponse> =>
+    (await apiPut<ApiResponse<AssignmentResponse>>('/api/areas/assignments', request)).data,
+  getAreas: async (type?: AreaType): Promise<Area[]> => {
+    const url = type ? `/api/areas?type=${type}` : '/api/areas';
+    return (await apiGet<ApiResponse<Area[]>>(url)).data;
+  },
+
+  createArea: async (type: AreaType): Promise<Area> =>
+    (await apiPost<ApiResponse<Area>>('/api/areas', { type })).data,
 
   getStalls: async (areaCode?: string): Promise<StableStall[]> => {
     const url = areaCode ? `/api/stalls?areaCode=${areaCode}` : '/api/stalls';
     return (await apiGet<ApiResponse<StableStall[]>>(url)).data;
   },
+
+  getAvailableRegularStalls: async (): Promise<StableStall[]> =>
+    (await apiGet<ApiResponse<StableStall[]>>('/api/stalls?areaType=REGULAR&status=AVAILABLE')).data,
 
   /** mine=true -> only horses in the block the Trainer is responsible for (BE-2.1). */
   /**
@@ -37,17 +57,22 @@ export const stableApi = {
     mine?: boolean;
     unassigned?: boolean;
     status?: HorseStatus;
+    includeSpecialty?: boolean;
   }): Promise<Horse[]> => {
     const params = new URLSearchParams();
     if (opts?.mine) params.set('mine', 'true');
     if (opts?.unassigned) params.set('unassigned', 'true');
     if (opts?.status) params.set('status', opts.status);
+    if (opts?.includeSpecialty) params.set('includeSpecialty', 'true');
     const qs = params.toString();
     return (await apiGet<ApiResponse<Horse[]>>(`/api/horses${qs ? `?${qs}` : ''}`)).data;
   },
 
   getGrooms: async (): Promise<UserSummary[]> =>
     (await apiGet<ApiResponse<UserSummary[]>>('/api/users?role=GROOM')).data,
+
+  getTrainers: async (): Promise<UserSummary[]> =>
+    (await apiGet<ApiResponse<UserSummary[]>>('/api/users?role=HEAD_TRAINER')).data,
 
   /** NOTE: the backend takes @RequestParam, NOT a body. */
   assignHorseToStall: async (horseId: number, stallId: number): Promise<void> => {

@@ -1,9 +1,8 @@
 package com.rtms.backend.admission.service;
+
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.training.entity.Course;
-import com.rtms.backend.training.entity.HorseTrainingPlan;
 import com.rtms.backend.training.entity.TrainingWorkout;
-
 
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.admission.dto.TrainerAdmissionReviewRequest;
@@ -30,7 +29,7 @@ import java.time.LocalDateTime;
  * MANAGER_REVIEW, Manager mới quyết định cuối cùng.
  *
  * Bước này KHÔNG đụng tới Horse.currentStatus (vẫn CANDIDATE), chuồng cách ly,
- * hay Course / HorseTrainingPlan / TrainingWorkout.
+ * hay Course / GroupPlan / TrainingWorkout.
  */
 @Service
 public class AdmissionTrainerReviewService {
@@ -38,22 +37,24 @@ public class AdmissionTrainerReviewService {
     private static final BigDecimal MIN_SCORE = BigDecimal.ZERO;
     private static final BigDecimal MAX_SCORE = BigDecimal.TEN;
     private static final int MAX_MONTHS = 60;
+    private static final int MAX_REMARKS_LENGTH = 3000;
 
     private final AdmissionApplicationRepository admissionRepository;
     private final RacingReadinessAssessmentRepository assessmentRepository;
 
     public AdmissionTrainerReviewService(AdmissionApplicationRepository admissionRepository,
-                                         RacingReadinessAssessmentRepository assessmentRepository) {
+            RacingReadinessAssessmentRepository assessmentRepository) {
         this.admissionRepository = admissionRepository;
         this.assessmentRepository = assessmentRepository;
     }
 
     @Transactional
     public AdmissionApplication completeAssessment(Long admissionId,
-                                                    TrainerAdmissionReviewRequest request,
-                                                    Long trainerId) {
+            TrainerAdmissionReviewRequest request,
+            Long trainerId) {
 
-        // Khóa đơn: hai lần bấm nộp gần như cùng lúc thì lần sau thấy MANAGER_REVIEW và dừng.
+        // Khóa đơn: hai lần bấm nộp gần như cùng lúc thì lần sau thấy MANAGER_REVIEW và
+        // dừng.
         AdmissionApplication admission = admissionRepository.findByIdForUpdate(admissionId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND",
                         "Không tìm thấy đơn nhập học #" + admissionId));
@@ -80,7 +81,7 @@ public class AdmissionTrainerReviewService {
 
         RacingReadinessAssessment assessment = new RacingReadinessAssessment();
         assessment.setHorseId(admission.getHorseId());
-        assessment.setAdmissionId(admission.getId());   // NOT NULL -> loại "nhập học"
+        assessment.setAdmissionId(admission.getId()); // NOT NULL -> loại "nhập học"
         assessment.setTrainerId(trainerId);
         assessment.setReadinessStatus(request.getReadinessStatus());
         assessment.setConformationScore(request.getConformationScore());
@@ -89,7 +90,6 @@ public class AdmissionTrainerReviewService {
         assessment.setEstimatedMonthsToRace(request.getEstimatedMonthsToRace());
         assessment.setAssessmentDate(LocalDate.now());
         assessment.setRemarks(request.getRemarks());
-        // fitnessScore, validUntil: để NULL — ngựa đang cách ly, chỉ đánh giá định kỳ mới có
         assessmentRepository.save(assessment);
 
         admission.setTrainerFeedback(request.getRemarks());
@@ -103,13 +103,26 @@ public class AdmissionTrainerReviewService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
                     "Phải chọn mức độ sẵn sàng thi đấu (READY / NEEDS_MORE_TRAINING / UNSUITABLE)!");
         }
+        if (request.getConformationScore() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Điểm dáng vóc là bắt buộc!");
+        }
         validateScore(request.getConformationScore(), "Điểm dáng vóc");
+        if (request.getTemperamentScore() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Điểm tính nết là bắt buộc!");
+        }
         validateScore(request.getTemperamentScore(), "Điểm tính nết");
+        if (request.getGaitQualityScore() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Điểm bước đi là bắt buộc!");
+        }
         validateScore(request.getGaitQualityScore(), "Điểm bước đi");
         if (request.getEstimatedMonthsToRace() != null
                 && (request.getEstimatedMonthsToRace() < 0 || request.getEstimatedMonthsToRace() > MAX_MONTHS)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
                     "Ước tính thời gian phải từ 0 đến " + MAX_MONTHS + " tháng!");
+        }
+        if (request.getRemarks() != null && request.getRemarks().length() > MAX_REMARKS_LENGTH) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                    "Nhận xét chuyên môn không được vượt quá " + MAX_REMARKS_LENGTH + " ký tự!");
         }
     }
 

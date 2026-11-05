@@ -1,3 +1,4 @@
+import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { DataTable, type DataTableColumn, type DataTablePagination } from '@/components/ui/DataTable';
 import { LinkButton } from '@/components/ui/Button';
@@ -34,6 +35,11 @@ interface AdmissionTableProps<Row extends AdmissionRow> {
   pagination?: DataTablePagination;
 }
 
+/** Newest submission first; the same submission time falls back to the newest application. */
+function newestSubmissionFirst(left: AdmissionRow, right: AdmissionRow): number {
+  return new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime() || right.admissionId - left.admissionId;
+}
+
 /** The one admission list table. Every role renders this so rows look identical. */
 export function AdmissionTable<Row extends AdmissionRow>({
   admissions,
@@ -49,6 +55,7 @@ export function AdmissionTable<Row extends AdmissionRow>({
   loading,
   pagination,
 }: AdmissionTableProps<Row>) {
+  const router = useRouter();
   const columns: DataTableColumn<Row>[] = [
     {
       id: 'horse',
@@ -104,6 +111,7 @@ export function AdmissionTable<Row extends AdmissionRow>({
       rows={admissions}
       columns={columns}
       getRowKey={(admission) => admission.admissionId}
+      onRowClick={(admission) => router.push(detailHref(admission.admissionId))}
       ariaLabel="Admission records"
       loading={loading}
       emptyTitle={emptyTitle ?? 'No admissions found'}
@@ -111,6 +119,7 @@ export function AdmissionTable<Row extends AdmissionRow>({
       emptyAction={emptyAction}
       pageSize={pagination ? undefined : 10}
       pagination={pagination}
+      defaultOrder={newestSubmissionFirst}
       getSearchText={searchable ? (admission) => `${admission.candidateName} ${admission.breed ?? ''} ${admission.status}` : undefined}
       searchPlaceholder="Search horse, breed, or status…"
     />

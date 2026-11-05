@@ -1,18 +1,15 @@
 package com.rtms.backend.horse.service;
 import com.rtms.backend.config.GlobalExceptionHandler;
-import com.rtms.backend.training.service.HorseTrainingPlanService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 
 
 import com.rtms.backend.horse.dto.CreateHorseRequest;
-import com.rtms.backend.notification.dto.HorseAlertResponse;
-import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import java.time.LocalDate;
 import com.rtms.backend.security.AuthenticatedUser;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -20,6 +17,23 @@ import org.springframework.transaction.annotation.Transactional;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.repository.AreaRepository;
 
+import com.rtms.backend.audit.dto.DomainAuditEvent;
+import com.rtms.backend.audit.service.AuditLogService;
+import com.rtms.backend.config.ApiException;
+import com.rtms.backend.horse.dto.HorseStatusChangeRequest;
+import com.rtms.backend.medical.entity.CareSchedule;
+import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.repository.CareScheduleRepository;
+import com.rtms.backend.notification.service.NotificationService;
+import com.rtms.backend.stable.entity.GroomDailyTask;
+import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
+import com.rtms.backend.training.enums.TrainingDecision;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -27,19 +41,53 @@ import java.util.stream.Collectors;
 @Service
 public class HorseService {
 
+    private static final String GROOM_ROLE = "GROOM";
+
     private final HorseRepository horseRepository;
     private final StableStallRepository stableStallRepository;
-    private final HorseTrainingPlanService trainingPlanService;
+    private final GroupWorkoutSyncService workoutService;
     private final AreaRepository areaRepository;
+    private final CareScheduleRepository careScheduleRepository;
+    private final GroomDailyTaskRepository groomDailyTaskRepository;
+    private final NotificationService notificationService;
+    private final AuditLogService auditLogService;
 
     public HorseService(HorseRepository horseRepository,
                         StableStallRepository stableStallRepository,
-                        @org.springframework.context.annotation.Lazy HorseTrainingPlanService trainingPlanService,
+                        GroupWorkoutSyncService workoutService,
                         AreaRepository areaRepository) {
+        this(horseRepository, stableStallRepository, workoutService, areaRepository,
+                null, null, null, null);
+    }
+
+    public HorseService(HorseRepository horseRepository,
+                        StableStallRepository stableStallRepository,
+                        GroupWorkoutSyncService workoutService,
+                        AreaRepository areaRepository,
+                        CareScheduleRepository careScheduleRepository,
+                        GroomDailyTaskRepository groomDailyTaskRepository,
+                        NotificationService notificationService) {
+        this(horseRepository, stableStallRepository, workoutService, areaRepository,
+                careScheduleRepository, groomDailyTaskRepository, notificationService, null);
+    }
+
+    @Autowired
+    public HorseService(HorseRepository horseRepository,
+                        StableStallRepository stableStallRepository,
+                        GroupWorkoutSyncService workoutService,
+                        AreaRepository areaRepository,
+                        CareScheduleRepository careScheduleRepository,
+                        GroomDailyTaskRepository groomDailyTaskRepository,
+                        NotificationService notificationService,
+                        AuditLogService auditLogService) {
         this.horseRepository = horseRepository;
         this.stableStallRepository = stableStallRepository;
-        this.trainingPlanService = trainingPlanService;
+        this.workoutService = workoutService;
         this.areaRepository = areaRepository;
+        this.careScheduleRepository = careScheduleRepository;
+        this.groomDailyTaskRepository = groomDailyTaskRepository;
+        this.notificationService = notificationService;
+        this.auditLogService = auditLogService;
     }
 
     /** Giữ chữ ký 3 tham số cho các lời gọi đã có. */
@@ -78,6 +126,23 @@ public class HorseService {
                 ? horseRepository.findByOwnerId(currentUser.getUserId())
                 : horseRepository.findAll();
 
+        if (horses != null && !horses.isEmpty()) {
+            horses = horses.stream()
+                    .sorted(Comparator.comparing(Horse::getId, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .collect(Collectors.toList());
+        }
+
+        // Groom chỉ thấy ngựa đang ở trong chuồng mình chăm, áp dụng trước mọi bộ lọc khác.
+        // (A groom sees only horses in the stalls they look after, before any other filter.)
+        if (GROOM_ROLE.equals(currentUser.getRole())) {
+            Set<Long> ownStallIds = stableStallRepository.findByGroomId(currentUser.getUserId()).stream()
+                    .map(StableStall::getId)
+                    .collect(Collectors.toSet());
+            horses = horses.stream()
+                    .filter(h -> h.getCurrentStallId() != null && ownStallIds.contains(h.getCurrentStallId()))
+                    .toList();
+        }
+
         if (Boolean.TRUE.equals(unassigned)) {
             horses = horses.stream()
                     .filter(h -> h.getCurrentStallId() == null)
@@ -110,7 +175,12 @@ public class HorseService {
                     .toList();
         }
 
-        return horses;
+        return horses.stream()
+                .sorted(Comparator.comparing(
+                        Horse::getCreatedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ).reversed().thenComparing(Comparator.comparing(Horse::getId).reversed()))
+                .toList();
     }
 
     public List<Horse> getAllHorses(AuthenticatedUser currentUser) {
@@ -118,9 +188,14 @@ public class HorseService {
     }
 
     public Horse createHorse(CreateHorseRequest request) {
+        if (request.getSex() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Sex is required (MALE or FEMALE)");
+        }
         Horse horse = new Horse();
         horse.setName(request.getName());
         horse.setBreed(request.getBreed());
+        horse.setSex(request.getSex());
         horse.setDateOfBirth(request.getDateOfBirth());
         horse.setStableLocation(request.getStableLocation());
         horse.setOwnerId(request.getOwnerId());
@@ -136,6 +211,11 @@ public class HorseService {
             if (!currentUser.getUserId().equals(horse.getOwnerId())) {
                 throw new AccessDeniedException("You can only view horses you own");
             }
+        }
+        if (GROOM_ROLE.equals(currentUser.getRole())
+                && (horse.getCurrentStallId() == null
+                    || !stableStallRepository.existsByIdAndGroomId(horse.getCurrentStallId(), currentUser.getUserId()))) {
+            throw new AccessDeniedException("You can only view horses in the stalls you look after");
         }
         return horse;
     }
@@ -163,7 +243,7 @@ public class HorseService {
 
             // Buổi tập tương lai thành "chưa phân công". Không có người phụ
             // trách thì không thể vướng BR-09, nên hàm này không ném lỗi.
-            trainingPlanService.reassignFutureWorkoutsToGroom(horseId, null);
+            workoutService.reassignFutureWorkoutsToGroom(horseId, null);
 
             stableStallRepository.findById(horse.getCurrentStallId()).ifPresent(oldStall -> {
                 oldStall.setStatus(StallStatus.AVAILABLE);
@@ -174,7 +254,7 @@ public class HorseService {
             return horseRepository.save(horse);
         }
 
-        StableStall newStall = stableStallRepository.findById(stallId)
+        StableStall newStall = stableStallRepository.findActiveByIdForUpdate(stallId)
                 .orElseThrow(() -> new RuntimeException("Stable stall not found with id: " + stallId));
 
         // ---- BR-07: một chuồng chỉ chứa một chiến mã ----
@@ -197,7 +277,7 @@ public class HorseService {
         // vẫn treo ở Groom của chuồng CŨ.
         // Gọi TRƯỚC khi ghi, để vướng BR-09 thì rollback toàn bộ.
         if (!stallId.equals(horse.getCurrentStallId())) {
-            trainingPlanService.reassignFutureWorkoutsToGroom(horseId, newStall.getGroomId());
+            workoutService.reassignFutureWorkoutsToGroom(horseId, newStall.getGroomId());
         }
 
         // Nếu ngựa trước đó đã ở chuồng khác thì giải phóng chuồng cũ về AVAILABLE
@@ -215,11 +295,162 @@ public class HorseService {
         return horseRepository.save(horse);
     }
 
-    public List<HorseFitnessTrendItemResponse> getFitnessTrend(Long horseId, LocalDate from, LocalDate to) {
-        return trainingPlanService.getFitnessTrend(horseId, from, to);
-    }
+    /**
+     * Updates a horse's lifecycle status (ELIGIBLE <-> INACTIVE) with full cascade safety.
+     * - Admin (CLUB_MANAGER) has full authority.
+     * - Groom (GROOM) can only report ELIGIBLE -> INACTIVE for horses currently assigned to their stall.
+     */
+    @Transactional
+    public Horse changeHorseStatus(Long horseId, HorseStatusChangeRequest request, AuthenticatedUser currentUser) {
+        Horse horse = horseRepository.findById(horseId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found with id: " + horseId));
 
-    public List<HorseAlertResponse> getHorseAlerts(Long horseId) {
-        return trainingPlanService.getHorseAlerts(horseId);
+        HorseStatus currentStatus = horse.getCurrentStatus();
+        HorseStatus targetStatus = request.status();
+
+        if (currentStatus == targetStatus) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NO_STATUS_CHANGE", "Horse already has status " + targetStatus);
+        }
+
+        // 1. Role & Permission checks
+        String role = currentUser.getRole();
+        if ("CLUB_MANAGER".equals(role)) {
+            // Manager has full authority over permitted transitions
+        } else if ("GROOM".equals(role)) {
+            // Groom can only report ELIGIBLE -> INACTIVE for horses in their stall
+            if (currentStatus != HorseStatus.ELIGIBLE || targetStatus != HorseStatus.INACTIVE) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
+                        "Grooms are only permitted to report a horse as INACTIVE.");
+            }
+            if (horse.getCurrentStallId() == null ||
+                    !stableStallRepository.existsByIdAndGroomId(horse.getCurrentStallId(), currentUser.getUserId())) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
+                        "You are only permitted to update horses assigned to your stalls.");
+            }
+        } else {
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "You do not have permission to change horse status.");
+        }
+
+        // 2. Status Transition validation: only ELIGIBLE <-> INACTIVE
+        if ((currentStatus != HorseStatus.ELIGIBLE && currentStatus != HorseStatus.INACTIVE) ||
+                (targetStatus != HorseStatus.ELIGIBLE && targetStatus != HorseStatus.INACTIVE)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_STATUS_TRANSITION",
+                    "Manual status changes are only permitted between ELIGIBLE and INACTIVE. Candidate and Rejected horses must follow the admission process.");
+        }
+
+        String effectiveReason = request.resolveEffectiveReason();
+        String reasonCode = request.resolveReasonCode();
+        if (effectiveReason.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "REASON_REQUIRED", "Reason is required when changing horse status.");
+        }
+
+        // 3. Cascade operations when transitioning to INACTIVE
+        if (targetStatus == HorseStatus.INACTIVE) {
+            // 3.1. Vacate stall & set to AVAILABLE
+            if (horse.getCurrentStallId() != null) {
+                stableStallRepository.findById(horse.getCurrentStallId()).ifPresent(stall -> {
+                    stall.setStatus(StallStatus.AVAILABLE);
+                    stableStallRepository.save(stall);
+                });
+                horse.setCurrentStallId(null);
+            }
+
+            // 3.2. Leave the training group: not-yet-started Workouts are cancelled, the group carries on without it.
+            workoutService.exitAnyGroup(horseId);
+
+            // 3.4. Cancel pending and scheduled medical appointments
+            if (careScheduleRepository != null) {
+                List<CareSchedule> pendingCares = careScheduleRepository.findByHorseIdAndStatusIn(
+                        horseId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));
+                if (!pendingCares.isEmpty()) {
+                    for (CareSchedule cs : pendingCares) {
+                        cs.setStatus(CareScheduleStatus.CANCELLED);
+                        cs.setCancelReason("Horse marked INACTIVE: " + effectiveReason);
+                    }
+                    careScheduleRepository.saveAll(pendingCares);
+                }
+            }
+
+            // 3.5. Block training
+            horse.setTrainingDecision(TrainingDecision.BLOCKED);
+            horse.setTrainingDecisionReason(effectiveReason);
+
+            // 3.6. Clean uncompleted groom daily tasks
+            if (groomDailyTaskRepository != null) {
+                List<GroomDailyTask> uncompletedTasks = groomDailyTaskRepository.findByHorseIdAndIsCompletedFalse(horseId);
+                if (!uncompletedTasks.isEmpty()) {
+                    groomDailyTaskRepository.deleteAll(uncompletedTasks);
+                }
+            }
+
+            // 3.7. Notify horse owner
+            if (notificationService != null && horse.getOwnerId() != null) {
+                notificationService.createNotification(
+                        horse.getOwnerId(),
+                        "Horse Status Updated: " + horse.getName(),
+                        String.format("Your horse %s has been marked as INACTIVE. Reason: %s", horse.getName(), effectiveReason),
+                        "HORSE_STATUS_CHANGE",
+                        "HORSE",
+                        horse.getId(),
+                        null
+                );
+            }
+        } else if (targetStatus == HorseStatus.ELIGIBLE) {
+            // Restore to ELIGIBLE: assign to a regular stall. Take the shared stall-row locks first so the
+            // fair pick cannot race another allocation for the same "least loaded" groom.
+            stableStallRepository.lockAdmissionCapacityStallsForUpdate();
+            StableStall regularStall;
+            if (request.stallId() != null) {
+                regularStall = stableStallRepository
+                        .findAvailableRegularStallByIdForUpdate(request.stallId())
+                        .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "STALL_UNAVAILABLE",
+                                "The selected regular stall is no longer available."));
+            } else {
+                regularStall = stableStallRepository
+                        .findFairAvailableStallForUpdate("REGULAR")
+                        .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "NO_AVAILABLE_STALL",
+                                "Cannot restore horse: No regular stalls are currently available. Please free a stall before restoring this horse."));
+            }
+
+            regularStall.setStatus(StallStatus.OCCUPIED);
+            stableStallRepository.save(regularStall);
+
+            horse.setCurrentStallId(regularStall.getId());
+
+            // Reassign future workouts to the new stall's groom
+            if (workoutService != null && regularStall.getGroomId() != null) {
+                workoutService.reassignFutureWorkoutsToGroom(horseId, regularStall.getGroomId());
+            }
+
+            horse.setTrainingDecision(TrainingDecision.ALLOWED);
+            horse.setTrainingDecisionReason(null);
+        }
+
+        // 4. Update status, statusReason, and statusReasonCode
+        horse.setCurrentStatus(targetStatus);
+        horse.setStatusReason(effectiveReason);
+        horse.setStatusReasonCode(reasonCode);
+        Horse saved = horseRepository.save(horse);
+
+        if (auditLogService != null) {
+            auditLogService.recordDomainEvent(DomainAuditEvent.builder()
+                    .userId(currentUser.getUserId())
+                    .action("HORSE_STATUS_CHANGE")
+                    .entityName("Horse")
+                    .entityId(horse.getId())
+                    .module("HORSES")
+                    .summary("Horse " + horse.getName() + " lifecycle status updated to " + targetStatus)
+                    .reason(effectiveReason)
+                    .targetUrl("/manager/horses/" + horse.getId())
+                    .before(Map.of(
+                            "status", currentStatus != null ? currentStatus.name() : "None"
+                    ))
+                    .after(Map.of(
+                            "status", targetStatus.name()
+                    ))
+                    .build());
+        }
+
+        return saved;
     }
 }

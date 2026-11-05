@@ -1,6 +1,7 @@
 package com.rtms.backend.admission.entity;
 
 import jakarta.persistence.*;
+import com.rtms.backend.horse.enums.HorseSex;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -20,6 +21,10 @@ public class CandidateHorseProfile {
     private String name;
 
     private String breed;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sex", length = 10)
+    private HorseSex sex;
 
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
@@ -94,6 +99,10 @@ public class CandidateHorseProfile {
     public void setBreed(String breed) {
         this.breed = breed;
     }
+
+    public HorseSex getSex() { return sex; }
+
+    public void setSex(HorseSex sex) { this.sex = sex; }
 
     public LocalDate getDateOfBirth() {
         return dateOfBirth;

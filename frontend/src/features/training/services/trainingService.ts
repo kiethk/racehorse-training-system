@@ -1,79 +1,60 @@
-import { apiGet, apiPost } from '@/services/api';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/services/api';
+import type { ApiResponse } from '@/types/horse';
 import type {
   Subject,
   CreateSubjectRequest,
-  SubjectCategory,
   Course,
   CourseDetailResponse,
   CreateCourseRequest,
-  CourseSubjectItem,
-  CourseSubjectResponse,
-  JoinableCohortResponse,
-  CreateHorseTrainingPlanRequest,
-  HorseTrainingPlanDetailResponse,
-  PlanSummaryResponse,
   CompleteWorkoutRequest,
-  TrainingLotResponse,
-  RescheduleLotRequest,
+  WorkoutResultPreviewResponse,
   HorseFitnessTrendItem,
+  HorseScheduleItem,
   HorseAlert,
-  TrainerDashboardHorse,
-  ReadinessAssessment,
+  TrainingRules,
+  TrainingGroup,
+  GroupCandidate,
+  CreateTrainingGroupRequest,
+  GroupPlanRequest,
+  GroupPlanPreview,
+  GroupPlanSummary,
+  GroupPlanDetail,
+  PlanHorse,
+  SessionHorseOutcomeItem,
+  ScheduleSession,
+  SessionDetail,
+  SessionWorkoutResult,
+  HorseAttendance,
 } from '../types';
 
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
 /**
- * Keeps the backend's detailed error message (e.g. the golden-hour-full notice with the exact minutes)
+ * Every call goes through services/api.ts, so it carries the Bearer token, refreshes it once on a 401, and keeps
+ * the backend's detailed error message (for example the notice that a session is full with the exact minutes).
  */
-async function postWithMessage<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  });
-  const payload = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(payload?.message || `API error: ${res.status}`);
-  }
-  return payload?.data !== undefined ? payload.data : (payload as T);
-}
+export const trainingService = {
+  // Rules the backend enforces, so the UI never hard-codes them
+  getRules: async (): Promise<TrainingRules> =>
+    (await apiGet<ApiResponse<TrainingRules>>('/api/training-rules')).data,
 
-async function patchWithMessage<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  const payload = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(payload?.message || `API error: ${res.status}`);
-  }
-  return payload?.data !== undefined ? payload.data : (payload as T);
-}
-
-export const trainingApi = {
   // Subjects
-  getSubjects: async (): Promise<Subject[]> =>
-    (await apiGet<ApiResponse<Subject[]>>('/api/subjects')).data,
+  getSubjects: async (params?: { trainerId?: number; category?: string }): Promise<Subject[]> => {
+    const searchParams = new URLSearchParams();
+    if (params?.trainerId) searchParams.set('trainerId', String(params.trainerId));
+    if (params?.category) searchParams.set('category', params.category);
+    const qs = searchParams.toString();
+    return (await apiGet<ApiResponse<Subject[]>>(`/api/subjects${qs ? `?${qs}` : ''}`)).data;
+  },
 
   createSubject: async (data: CreateSubjectRequest): Promise<Subject> =>
     (await apiPost<ApiResponse<Subject>>('/api/subjects', data)).data,
 
-  getCategories: async (): Promise<SubjectCategory[]> =>
-    (await apiGet<ApiResponse<SubjectCategory[]>>('/api/subject-categories')).data,
-
   // Courses
-  getCourses: async (): Promise<Course[]> =>
-    (await apiGet<ApiResponse<Course[]>>('/api/courses')).data,
+  getCourses: async (params?: { trainerId?: number }): Promise<Course[]> => {
+    const searchParams = new URLSearchParams();
+    if (params?.trainerId) searchParams.set('trainerId', String(params.trainerId));
+    const qs = searchParams.toString();
+    return (await apiGet<ApiResponse<Course[]>>(`/api/courses${qs ? `?${qs}` : ''}`)).data;
+  },
 
   getCourse: async (id: number): Promise<CourseDetailResponse> =>
     (await apiGet<ApiResponse<CourseDetailResponse>>(`/api/courses/${id}`)).data,
@@ -81,85 +62,115 @@ export const trainingApi = {
   createCourse: async (data: CreateCourseRequest): Promise<Course> =>
     (await apiPost<ApiResponse<Course>>('/api/courses', data)).data,
 
-  addSubjectToCourse: async (
-    courseId: number,
-    data: CourseSubjectItem,
-  ): Promise<CourseSubjectResponse> =>
-    (await apiPost<ApiResponse<CourseSubjectResponse>>(`/api/courses/${courseId}/subjects`, data)).data,
+  /** One horse's sessions from a date to a date, cancelled ones included. */
+  getHorseSchedule: async (horseId: number, from: string, to: string): Promise<HorseScheduleItem[]> =>
+    (await apiGet<ApiResponse<HorseScheduleItem[]>>(`/api/horses/${horseId}/schedule?from=${from}&to=${to}`)).data,
 
-  // Training plans
-  getJoinableCohorts: async (courseId: number): Promise<JoinableCohortResponse[]> =>
-    (await apiGet<ApiResponse<JoinableCohortResponse[]>>(
-      `/api/training-plans/joinable-cohorts?courseId=${courseId}`,
-    )).data,
-
-  createPlan: async (
-    data: CreateHorseTrainingPlanRequest,
-  ): Promise<HorseTrainingPlanDetailResponse[]> =>
-    await postWithMessage<HorseTrainingPlanDetailResponse[]>('/api/training-plans', data),
-
-  getPlanById: async (id: number): Promise<HorseTrainingPlanDetailResponse> =>
-    (await apiGet<ApiResponse<HorseTrainingPlanDetailResponse>>(`/api/training-plans/${id}`)).data,
-
-  /** Plans with horse name, course name and progress. */
-  getPlans: async (horseId?: number): Promise<PlanSummaryResponse[]> => {
-    const url = horseId ? `/api/training-plans?horseId=${horseId}` : '/api/training-plans';
-    return (await apiGet<ApiResponse<PlanSummaryResponse[]>>(url)).data;
-  },
-
-  // Training lots
-  getLots: async (from: string, to: string, includeCancelled: boolean = false): Promise<TrainingLotResponse[]> =>
-    (await apiGet<ApiResponse<TrainingLotResponse[]>>(
-      `/api/lots?from=${from}&to=${to}&includeCancelled=${includeCancelled}`,
-    )).data,
-
-  getLotById: async (id: number): Promise<TrainingLotResponse> =>
-    (await apiGet<ApiResponse<TrainingLotResponse>>(`/api/lots/${id}`)).data,
-
-  rescheduleLot: async (id: number, data: RescheduleLotRequest): Promise<TrainingLotResponse> =>
-    await patchWithMessage<TrainingLotResponse>(`/api/lots/${id}/reschedule`, data),
-
-  cancelLot: async (id: number): Promise<TrainingLotResponse> =>
-    await patchWithMessage<TrainingLotResponse>(`/api/lots/${id}/cancel`),
-
-  // Workouts
-  completeWorkout: async (workoutId: number, data: CompleteWorkoutRequest): Promise<void> => {
-    await patchWithMessage(`/api/workouts/${workoutId}/complete`, data);
-  },
-
-  // Phase 7: dashboard, fitness & alerts
-  getDashboard: async (): Promise<TrainerDashboardHorse[]> => {
-    const res = await apiGet<ApiResponse<TrainerDashboardHorse[]>>('/api/training-plans/dashboard');
-    return res.data;
-  },
-
+  // Fitness and alerts
   getFitnessTrend: async (horseId: number, from?: string, to?: string): Promise<HorseFitnessTrendItem[]> => {
     const params = new URLSearchParams();
     if (from) params.append('from', from);
     if (to) params.append('to', to);
     const qs = params.toString() ? `?${params.toString()}` : '';
-    const res = await apiGet<ApiResponse<HorseFitnessTrendItem[]>>(`/api/horses/${horseId}/fitness-trend${qs}`);
-    return res.data;
+    return (await apiGet<ApiResponse<HorseFitnessTrendItem[]>>(`/api/horses/${horseId}/fitness-trend${qs}`)).data;
   },
 
-  getHorseAlerts: async (horseId: number): Promise<HorseAlert[]> => {
-    const res = await apiGet<ApiResponse<HorseAlert[]>>(`/api/horses/${horseId}/alerts`);
-    return res.data;
+  getHorseAlerts: async (horseId: number): Promise<HorseAlert[]> =>
+    (await apiGet<ApiResponse<HorseAlert[]>>(`/api/horses/${horseId}/alerts`)).data,
+
+
+  // Training groups
+  getGroups: async (): Promise<TrainingGroup[]> =>
+    (await apiGet<ApiResponse<TrainingGroup[]>>('/api/training-groups')).data,
+
+  getDisbandedGroups: async (): Promise<TrainingGroup[]> =>
+    (await apiGet<ApiResponse<TrainingGroup[]>>('/api/training-groups?disbanded=true')).data,
+
+  createGroup: async (data: CreateTrainingGroupRequest): Promise<TrainingGroup> =>
+    (await apiPost<ApiResponse<TrainingGroup>>('/api/training-groups', data)).data,
+
+  renameGroup: async (id: number, name: string): Promise<TrainingGroup> =>
+    (await apiPatch<ApiResponse<TrainingGroup>>(`/api/training-groups/${id}`, { name })).data,
+
+  disbandGroup: async (id: number): Promise<void> => {
+    await apiDelete<ApiResponse<null>>(`/api/training-groups/${id}`);
   },
 
-  getReadinessHistory: async (horseId: number, includeAdmission = false): Promise<ReadinessAssessment[]> => {
-    const res = await apiGet<ApiResponse<ReadinessAssessment[]>>(
-      `/api/admissions/horses/${horseId}/readiness-history?includeAdmission=${includeAdmission}`
-    );
-    return res.data;
+  getGroupCandidates: async (id: number): Promise<GroupCandidate[]> =>
+    (await apiGet<ApiResponse<GroupCandidate[]>>(`/api/training-groups/${id}/candidates`)).data,
+
+  addGroupHorse: async (id: number, horseId: number): Promise<TrainingGroup> =>
+    (await apiPost<ApiResponse<TrainingGroup>>(`/api/training-groups/${id}/horses`, { horseId })).data,
+
+  removeGroupHorse: async (id: number, horseId: number): Promise<TrainingGroup> =>
+    (await apiDelete<ApiResponse<TrainingGroup>>(`/api/training-groups/${id}/horses/${horseId}`)).data,
+
+  moveGroupHorse: async (targetGroupId: number, horseId: number): Promise<TrainingGroup> =>
+    (await apiPost<ApiResponse<TrainingGroup>>(`/api/training-groups/${targetGroupId}/horses/move`, { horseId })).data,
+
+  // Group plans
+  previewGroupPlan: async (request: GroupPlanRequest, signal?: AbortSignal): Promise<GroupPlanPreview> =>
+    (await apiPost<ApiResponse<GroupPlanPreview>>('/api/group-plans/preview', request, signal)).data,
+
+  createGroupPlan: async (request: GroupPlanRequest): Promise<GroupPlanDetail> =>
+    (await apiPost<ApiResponse<GroupPlanDetail>>('/api/group-plans', request)).data,
+
+  getGroupPlans: async (filter?: { groupId?: number; horseId?: number }): Promise<GroupPlanSummary[]> => {
+    const query = new URLSearchParams();
+    if (filter?.groupId) query.set('groupId', String(filter.groupId));
+    if (filter?.horseId) query.set('horseId', String(filter.horseId));
+    const suffix = query.size > 0 ? `?${query}` : '';
+    return (await apiGet<ApiResponse<GroupPlanSummary[]>>(`/api/group-plans${suffix}`)).data;
   },
 
-  getHorseById: async (horseId: number): Promise<{ id: number; name: string; ueln: string; status: string }> => {
-    const res = await apiGet<ApiResponse<{ id: number; name: string; ueln: string; status: string }>>(`/api/horses/${horseId}`);
-    return res.data;
+  getGroupPlan: async (id: number): Promise<GroupPlanDetail> =>
+    (await apiGet<ApiResponse<GroupPlanDetail>>(`/api/group-plans/${id}`)).data,
+
+  getPlanHorses: async (planId: number): Promise<PlanHorse[]> =>
+    (await apiGet<ApiResponse<PlanHorse[]>>(`/api/group-plans/${planId}/horses`)).data,
+
+  getPlanSessionHorses: async (planId: number, sessionId: number): Promise<SessionHorseOutcomeItem[]> =>
+    (await apiGet<ApiResponse<SessionHorseOutcomeItem[]>>(`/api/group-plans/${planId}/sessions/${sessionId}/horses`)).data,
+
+  cancelGroupPlan: async (id: number): Promise<GroupPlanDetail> =>
+    (await apiPost<ApiResponse<GroupPlanDetail>>(`/api/group-plans/${id}/cancel`, {})).data,
+
+  // Group sessions
+  getSessions: async (params: { from: string; to: string; groupId?: number; needsResult?: boolean }): Promise<ScheduleSession[]> => {
+    const query = new URLSearchParams({ from: params.from, to: params.to });
+    if (params.groupId) query.set('groupId', String(params.groupId));
+    if (params.needsResult) query.set('needsResult', 'true');
+    return (await apiGet<ApiResponse<ScheduleSession[]>>(`/api/training-sessions?${query}`)).data;
   },
+
+  getSession: async (id: number): Promise<SessionDetail> =>
+    (await apiGet<ApiResponse<SessionDetail>>(`/api/training-sessions/${id}`)).data,
+
+  rescheduleSession: async (id: number, newStartTime: string): Promise<void> => {
+    await apiPatch<ApiResponse<unknown>>(`/api/training-sessions/${id}/reschedule`, { newStartTime });
+  },
+
+  cancelSession: async (id: number): Promise<void> => {
+    await apiPost<ApiResponse<unknown>>(`/api/training-sessions/${id}/cancel`, {});
+  },
+
+  cancelSessionWorkout: async (id: number): Promise<void> => {
+    await apiPost<ApiResponse<unknown>>(`/api/session-workouts/${id}/cancel`, {});
+  },
+
+  previewSessionResult: async (id: number): Promise<WorkoutResultPreviewResponse> =>
+    (await apiGet<ApiResponse<WorkoutResultPreviewResponse>>(`/api/session-workouts/${id}/result-preview`)).data,
+
+  recordSessionResult: async (id: number, data: CompleteWorkoutRequest): Promise<SessionWorkoutResult> =>
+    (await apiPatch<ApiResponse<SessionWorkoutResult>>(`/api/session-workouts/${id}/result`, data)).data,
+
+  updateSessionResult: async (id: number, data: CompleteWorkoutRequest): Promise<SessionWorkoutResult> =>
+    (await apiPut<ApiResponse<SessionWorkoutResult>>(`/api/session-workouts/${id}/result`, data)).data,
+
+  markDidNotRun: async (id: number): Promise<void> => {
+    await apiPost<ApiResponse<unknown>>(`/api/session-workouts/${id}/did-not-run`, {});
+  },
+
+  getHorseAttendance: async (horseId: number): Promise<HorseAttendance[]> =>
+    (await apiGet<ApiResponse<HorseAttendance[]>>(`/api/horses/${horseId}/group-plan-history`)).data,
 };
-
-export const trainingService = trainingApi;
-
-

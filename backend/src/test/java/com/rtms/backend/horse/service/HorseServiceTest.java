@@ -1,9 +1,12 @@
 package com.rtms.backend.horse.service;
 import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.horse.enums.HorseSex;
+import com.rtms.backend.horse.dto.CreateHorseRequest;
+import org.springframework.web.server.ResponseStatusException;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.repository.AreaRepository;
-import com.rtms.backend.training.service.HorseTrainingPlanService;
+import com.rtms.backend.training.service.GroupWorkoutSyncService;
 
 
 import com.rtms.backend.horse.entity.Horse;
@@ -35,7 +38,7 @@ class HorseServiceTest {
     private StableStallRepository stableStallRepository;
 
     @Mock
-    private HorseTrainingPlanService trainingPlanService;
+    private GroupWorkoutSyncService workoutService;
 
     @Mock
     private com.rtms.backend.stable.repository.AreaRepository areaRepository;
@@ -44,7 +47,29 @@ class HorseServiceTest {
 
     @BeforeEach
     void setUp() {
-        horseService = new HorseService(horseRepository, stableStallRepository, trainingPlanService, areaRepository);
+        horseService = new HorseService(horseRepository, stableStallRepository, workoutService, areaRepository);
+    }
+
+    @Test
+    void directCreationPersistsSexAndPreservesExistingDefaults() {
+        CreateHorseRequest request = new CreateHorseRequest();
+        request.setName("Pegasus");
+        request.setSex(HorseSex.FEMALE);
+        when(horseRepository.save(any(Horse.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Horse created = horseService.createHorse(request);
+
+        assertEquals(HorseSex.FEMALE, created.getSex());
+        assertEquals(HorseStatus.ELIGIBLE, created.getCurrentStatus());
+        assertTrue(created.canTrain());
+    }
+
+    @Test
+    void directCreationWithoutSexDoesNotWriteToDatabase() {
+        var error = assertThrows(ResponseStatusException.class,
+                () -> horseService.createHorse(new CreateHorseRequest()));
+        assertEquals(400, error.getStatusCode().value());
+        verifyNoInteractions(horseRepository, stableStallRepository, workoutService, areaRepository);
     }
 
     @Test
@@ -60,7 +85,7 @@ class HorseServiceTest {
         stall.setStatus(StallStatus.AVAILABLE);
 
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(6L)).thenReturn(Optional.of(stall));
+        when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(stall));
         when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
 
         Horse updated = horseService.assignStall(1L, 6L);
@@ -88,7 +113,7 @@ class HorseServiceTest {
         newStall.setStatus(StallStatus.AVAILABLE);
 
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(6L)).thenReturn(Optional.of(newStall));
+        when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(newStall));
         when(stableStallRepository.findById(5L)).thenReturn(Optional.of(oldStall));
         when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -108,7 +133,7 @@ class HorseServiceTest {
         horse.setId(1L);
 
         when(horseRepository.findById(1L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(999L)).thenReturn(Optional.empty());
+        when(stableStallRepository.findActiveByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> horseService.assignStall(1L, 999L));
         verify(horseRepository, never()).save(any());
@@ -216,7 +241,7 @@ class HorseServiceTest {
 
         assertNull(result.getCurrentStallId());
         assertEquals(StallStatus.AVAILABLE, oldStall.getStatus());
-        verify(trainingPlanService).reassignFutureWorkoutsToGroom(eq(15L), isNull());
+        verify(workoutService).reassignFutureWorkoutsToGroom(eq(15L), isNull());
     }
 
     @Test
@@ -232,7 +257,7 @@ class HorseServiceTest {
 
         assertNull(result.getCurrentStallId());
         verify(horseRepository, never()).save(any());
-        verify(trainingPlanService, never()).reassignFutureWorkoutsToGroom(any(), any());
+        verify(workoutService, never()).reassignFutureWorkoutsToGroom(any(), any());
     }
 
     // =================================================================
@@ -258,7 +283,7 @@ class HorseServiceTest {
         target.setStatus(StallStatus.OCCUPIED);
 
         when(horseRepository.findById(9L)).thenReturn(Optional.of(moving));
-        when(stableStallRepository.findById(6L)).thenReturn(Optional.of(target));
+        when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(target));
         when(horseRepository.findByCurrentStallId(6L)).thenReturn(Optional.of(occupant));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
@@ -267,7 +292,7 @@ class HorseServiceTest {
         assertTrue(ex.getMessage().contains("A1"));
         assertTrue(ex.getMessage().contains("BOOSTER WINNER"));
         verify(horseRepository, never()).save(any());
-        verify(trainingPlanService, never()).reassignFutureWorkoutsToGroom(any(), any());
+        verify(workoutService, never()).reassignFutureWorkoutsToGroom(any(), any());
     }
 
     @Test
@@ -284,7 +309,7 @@ class HorseServiceTest {
         stall.setStatus(StallStatus.OCCUPIED);
 
         when(horseRepository.findById(5L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(6L)).thenReturn(Optional.of(stall));
+        when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(stall));
         when(horseRepository.findByCurrentStallId(6L)).thenReturn(Optional.of(horse));
         when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -292,7 +317,7 @@ class HorseServiceTest {
 
         assertEquals(6L, result.getCurrentStallId());
         // Cùng chuồng -> không cần đồng bộ Groom
-        verify(trainingPlanService, never()).reassignFutureWorkoutsToGroom(any(), any());
+        verify(workoutService, never()).reassignFutureWorkoutsToGroom(any(), any());
     }
 
     @Test
@@ -314,14 +339,14 @@ class HorseServiceTest {
         newStall.setStatus(StallStatus.AVAILABLE);
 
         when(horseRepository.findById(9L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(22L)).thenReturn(Optional.of(newStall));
+        when(stableStallRepository.findActiveByIdForUpdate(22L)).thenReturn(Optional.of(newStall));
         when(stableStallRepository.findById(18L)).thenReturn(Optional.of(oldStall));
         when(horseRepository.findByCurrentStallId(22L)).thenReturn(Optional.empty());
         when(horseRepository.save(any(Horse.class))).thenAnswer(i -> i.getArgument(0));
 
         horseService.assignStall(9L, 22L);
 
-        verify(trainingPlanService).reassignFutureWorkoutsToGroom(9L, 7L);
+        verify(workoutService).reassignFutureWorkoutsToGroom(9L, 7L);
         assertEquals(StallStatus.AVAILABLE, oldStall.getStatus());
         assertEquals(StallStatus.OCCUPIED, newStall.getStatus());
     }
@@ -339,14 +364,63 @@ class HorseServiceTest {
         newStall.setGroomId(4L);
 
         when(horseRepository.findById(9L)).thenReturn(Optional.of(horse));
-        when(stableStallRepository.findById(6L)).thenReturn(Optional.of(newStall));
+        when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(newStall));
         when(horseRepository.findByCurrentStallId(6L)).thenReturn(Optional.empty());
         doThrow(new IllegalStateException("Groom này đang dắt 'BOOSTER WINNER'"))
-                .when(trainingPlanService).reassignFutureWorkoutsToGroom(9L, 4L);
+                .when(workoutService).reassignFutureWorkoutsToGroom(9L, 4L);
 
         assertThrows(IllegalStateException.class, () -> horseService.assignStall(9L, 6L));
 
         verify(horseRepository, never()).save(any());
         assertEquals(18L, horse.getCurrentStallId());
     }
-}
+
+    private static Horse horseIn(long id, Long stallId) {
+        Horse horse = new Horse();
+        horse.setId(id);
+        horse.setCurrentStallId(stallId);
+        return horse;
+    }
+
+    @Test
+    @DisplayName("Groom chỉ thấy ngựa trong chuồng mình chăm")
+    void groomListsOnlyHorsesInTheirStalls() {
+        AuthenticatedUser groom = new AuthenticatedUser(44L, "groom@test.com", "GROOM");
+        StableStall ownStall = new StableStall();
+        ownStall.setId(101L);
+        when(stableStallRepository.findByGroomId(44L)).thenReturn(List.of(ownStall));
+        when(horseRepository.findAll()).thenReturn(List.of(horseIn(1, 101L), horseIn(2, 102L), horseIn(3, null)));
+
+        List<Horse> result = horseService.getAllHorses(groom, null, null, null);
+
+        assertEquals(List.of(1L), result.stream().map(Horse::getId).toList());
+        assertTrue(horseService.getAllHorses(groom, null, true, null).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Groom xem ngựa của người khác bị từ chối, ngựa của mình thì được")
+    void groomMayOpenOnlyTheirOwnHorse() {
+        AuthenticatedUser groom = new AuthenticatedUser(44L, "groom@test.com", "GROOM");
+        when(horseRepository.findById(1L)).thenReturn(Optional.of(horseIn(1, 101L)));
+        when(horseRepository.findById(2L)).thenReturn(Optional.of(horseIn(2, 102L)));
+        when(horseRepository.findById(3L)).thenReturn(Optional.of(horseIn(3, null)));
+        when(stableStallRepository.existsByIdAndGroomId(101L, 44L)).thenReturn(true);
+        when(stableStallRepository.existsByIdAndGroomId(102L, 44L)).thenReturn(false);
+
+        assertEquals(1L, horseService.getHorseById(1L, groom).getId());
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> horseService.getHorseById(2L, groom));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> horseService.getHorseById(3L, groom));
+    }
+
+    @Test
+    @DisplayName("Các vai khác Groom không bị giới hạn theo chuồng")
+    void otherRolesAreNotScopedByStall() {
+        AuthenticatedUser manager = new AuthenticatedUser(1L, "m@test.com", "CLUB_MANAGER");
+        when(horseRepository.findAll()).thenReturn(List.of(horseIn(1, 101L), horseIn(2, null)));
+        when(horseRepository.findById(2L)).thenReturn(Optional.of(horseIn(2, null)));
+
+        assertEquals(2, horseService.getAllHorses(manager, null, null, null).size());
+        assertEquals(2L, horseService.getHorseById(2L, manager).getId());
+        verify(stableStallRepository, never()).findByGroomId(any());
+    }
+}

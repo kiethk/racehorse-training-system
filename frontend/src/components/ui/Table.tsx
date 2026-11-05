@@ -5,10 +5,24 @@ import { cn } from '@/lib/cn';
  * Table primitives with the same look as DataTable, for tables that need custom
  * cells or layouts DataTable cannot express. Prefer DataTable when rows are uniform.
  */
-export function Table({ className, children, ...props }: TableHTMLAttributes<HTMLTableElement>) {
+export function Table({
+  className,
+  children,
+  bare = false,
+  ...props
+}: TableHTMLAttributes<HTMLTableElement> & {
+  /** Render without the card surface, for a table that already sits inside a Panel. */
+  bare?: boolean;
+}) {
   return (
-    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-panel)]">
-      <div className="scroll-slim overflow-x-auto">
+    <div
+      className={cn(
+        'overflow-hidden',
+        !bare && 'rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-panel)]',
+      )}
+    >
+      {/* relative keeps absolutely positioned cell content (sr-only labels) inside the scroller, not the page. */}
+      <div className="scroll-slim relative overflow-x-auto">
         <table className={cn('w-full text-left text-sm', className)} {...props}>
           {children}
         </table>

@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.rtms.backend.horse.enums.HorseStatus;
+import com.rtms.backend.horse.enums.HorseSex;
 import com.rtms.backend.training.enums.TrainingDecision;
 
 @Entity
@@ -20,6 +21,10 @@ public class Horse {
     private String name;
 
     private String breed;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sex", length = 10)
+    private HorseSex sex;
 
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
@@ -39,6 +44,12 @@ public class Horse {
     /** Vì sao bị chặn tập. Chỉ có giá trị khi trainingDecision = BLOCKED. */
     @Column(name = "training_decision_reason", columnDefinition = "TEXT")
     private String trainingDecisionReason;
+
+    @Column(name = "status_reason", columnDefinition = "TEXT")
+    private String statusReason;
+
+    @Column(name = "status_reason_code", length = 50)
+    private String statusReasonCode;
 
     @Column(name = "stable_location")
     private String stableLocation;
@@ -85,6 +96,9 @@ public class Horse {
     public String getBreed() { return breed; }
     public void setBreed(String breed) { this.breed = breed; }
 
+    public HorseSex getSex() { return sex; }
+    public void setSex(HorseSex sex) { this.sex = sex; }
+
     public LocalDate getDateOfBirth() { return dateOfBirth; }
     public void setDateOfBirth(LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
 
@@ -96,6 +110,12 @@ public class Horse {
 
     public String getTrainingDecisionReason() { return trainingDecisionReason; }
     public void setTrainingDecisionReason(String trainingDecisionReason) { this.trainingDecisionReason = trainingDecisionReason; }
+
+    public String getStatusReason() { return statusReason; }
+    public void setStatusReason(String statusReason) { this.statusReason = statusReason; }
+
+    public String getStatusReasonCode() { return statusReasonCode; }
+    public void setStatusReasonCode(String statusReasonCode) { this.statusReasonCode = statusReasonCode; }
 
     /**
      * Quy tắc duy nhất: ngựa đã được nhận vào nuôi VÀ không bị chặn tập.

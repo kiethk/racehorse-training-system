@@ -1,6 +1,7 @@
 package com.rtms.backend.notification.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
+import com.rtms.backend.notification.dto.NotificationFeedResponse;
 import com.rtms.backend.notification.dto.NotificationResponse;
 import com.rtms.backend.notification.dto.UnreadCountResponse;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -39,6 +40,25 @@ public class NotificationController {
 
         Page<NotificationResponse> result = notificationService.getNotifications(currentUser.getUserId(), status, pageable);
         return ApiResponse.success(result);
+    }
+
+    @GetMapping("/feed")
+    public ApiResponse<NotificationFeedResponse> getFeed(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+
+        return ApiResponse.success(notificationService.getFeed(currentUser.getUserId(), status, cursor, size));
+    }
+
+    @GetMapping("/since")
+    public ApiResponse<NotificationFeedResponse> getSince(
+            @RequestParam(name = "after") String after,
+            @RequestParam(defaultValue = "50") int limit,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+
+        return ApiResponse.success(notificationService.getSince(currentUser.getUserId(), after, limit));
     }
 
     @GetMapping("/unread-count")

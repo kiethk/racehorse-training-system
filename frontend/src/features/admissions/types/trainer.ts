@@ -16,6 +16,11 @@ export interface TrainerAdmissionQueue {
   pending: AdmissionSummaryResponse[];
   /** Admissions I have evaluated — every later status, including rejected by the Manager. */
   reviewed: AdmissionSummaryResponse[];
+  /** Horses I look after now: horses in my areas plus admissions assigned to me that are not finished. */
+  activeHorseCount: number;
+  /** Load limit; at this count the system assigns me no new admissions. */
+  horseLimit: number;
+  atCapacity: boolean;
 }
 
 /**
@@ -32,18 +37,14 @@ export interface RacingReadinessAssessment {
   id: number;
   horseId: number;
   readinessStatus: RacingReadinessStatus;
-  /** ALWAYS null at intake — the horse is in quarantine, fitness cannot be measured. */
-  fitnessScore: number | null;
   conformationScore: number | null;
   temperamentScore: number | null;
   gaitQualityScore: number | null;
   estimatedMonthsToRace: number | null;
   assessmentDate: string;
-  /** null at intake (CHECK chk_rra_valid_until). */
-  validUntil: string | null;
   remarks: string | null;
   trainerId: number | null;
-  /** NOT NULL = intake evaluation. null = periodic evaluation. */
+  /** The admission this evaluation was made for. */
   admissionId: number | null;
   createdAt: string;
 }
@@ -52,6 +53,7 @@ export interface HorseSummary {
   id: number;
   name: string;
   breed: string | null;
+  sex: import('@/types/horse').HorseSex | null;
   dateOfBirth: string | null;
   currentStatus: string;
   currentStallId: number | null;

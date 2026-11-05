@@ -39,7 +39,9 @@ export function TrainerAdmissionsListView() {
     };
   }, [searchParams]);
 
-  const [queue, setQueue] = useState<TrainerAdmissionQueue>({ pending: [], reviewed: [] });
+  const [queue, setQueue] = useState<TrainerAdmissionQueue>({
+    pending: [], reviewed: [], activeHorseCount: 0, horseLimit: 0, atCapacity: false,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<TrainerQueueFilters>(urlFilters);
@@ -111,6 +113,9 @@ export function TrainerAdmissionsListView() {
     });
   }, [queue, urlFilters]);
 
+  // A page past the end of the filtered list falls back to the first one.
+  const page = tablePage * 10 >= filteredAdmissions.length ? 0 : tablePage;
+
   const updateUrl = (filters: TrainerQueueFilters) => {
     const params = new URLSearchParams();
     if (filters.tab !== 'PENDING') params.set('tab', filters.tab);
@@ -155,7 +160,7 @@ export function TrainerAdmissionsListView() {
     return s ? `?${s}` : '';
   }, [urlFilters]);
 
-  if (loading) return <AdmissionListLayout title="Admissions" description="Assess racing potential and readiness of candidate horses in the quarantine facility."><ListSkeleton rows={6} /></AdmissionListLayout>;
+  if (loading) return <AdmissionListLayout title="Admissions"><ListSkeleton rows={6} /></AdmissionListLayout>;
 
   type Row = TrainerAdmissionQueue['pending'][number];
   const extraColumns: DataTableColumn<Row>[] = [
@@ -176,7 +181,7 @@ export function TrainerAdmissionsListView() {
   ];
 
   return (
-    <AdmissionListLayout title="Admissions" description="Assess racing potential and readiness of candidate horses in the quarantine facility.">
+    <AdmissionListLayout title="Admissions">
       <FilterChips
         label="Application type"
         value={urlFilters.tab}
@@ -205,6 +210,14 @@ export function TrainerAdmissionsListView() {
         <Notice tone="error">{error}</Notice>
       )}
 
+      {queue.atCapacity && (
+        <Notice tone="warning" title="Horse limit reached">
+          You are looking after {queue.activeHorseCount} horses (limit {queue.horseLimit}, counting horses in your
+          areas and admissions still in quarantine or awaiting approval). New admissions will not be assigned to you
+          until a place frees up.
+        </Notice>
+      )}
+
       <AdmissionTable
         admissions={filteredAdmissions}
         detailHref={(id) => `/trainer/admissions/${id}${detailQuery}`}
@@ -215,7 +228,7 @@ export function TrainerAdmissionsListView() {
         emptyTitle="No admission records found"
         emptyDescription="Try adjusting your search filters or switch the application type."
         emptyAction={<Button size="sm" onClick={clearFilters}>Clear filters</Button>}
-        pagination={{ page: tablePage, pageSize: 10, total: filteredAdmissions.length, onPageChange: setTablePage }}
+        pagination={{ page, pageSize: 10, total: filteredAdmissions.length, onPageChange: setTablePage }}
       />
     </AdmissionListLayout>
   );

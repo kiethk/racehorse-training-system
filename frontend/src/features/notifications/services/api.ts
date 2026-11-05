@@ -1,5 +1,6 @@
 import { apiGet, apiPatch } from '@/services/api';
 import type {
+  NotificationFeedResponse,
   NotificationItem,
   NotificationPageResponse,
   UnreadCountResponse,
@@ -18,6 +19,23 @@ export const notificationApi = {
     params.set('page', String(page));
     params.set('size', String(size));
     const response = await apiGet<ApiResponse<NotificationPageResponse>>(`/api/notifications?${params}`);
+    return response.data;
+  },
+
+  getNotificationFeed: async (status?: 'ALL' | 'UNREAD' | 'READ', cursor?: string, size = 20): Promise<NotificationFeedResponse> => {
+    const params = new URLSearchParams();
+    if (status && status !== 'ALL') params.set('status', status);
+    if (cursor) params.set('cursor', cursor);
+    params.set('size', String(size));
+    const response = await apiGet<ApiResponse<NotificationFeedResponse>>(`/api/notifications/feed?${params}`);
+    return response.data;
+  },
+
+  getNotificationsSince: async (after: string, limit = 50): Promise<NotificationFeedResponse> => {
+    const params = new URLSearchParams();
+    params.set('after', after);
+    params.set('limit', String(limit));
+    const response = await apiGet<ApiResponse<NotificationFeedResponse>>(`/api/notifications/since?${params}`);
     return response.data;
   },
 

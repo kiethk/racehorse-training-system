@@ -51,6 +51,8 @@ class AdmissionTrainerReviewServiceTest {
 
         TrainerAdmissionReviewRequest req = request();
         req.setConformationScore(new BigDecimal("8.0"));
+        req.setTemperamentScore(new BigDecimal("7.5"));
+        req.setGaitQualityScore(new BigDecimal("8.0"));
         req.setEstimatedMonthsToRace(6);
         req.setRemarks("Good candidate");
 
@@ -68,6 +70,8 @@ class AdmissionTrainerReviewServiceTest {
         assertEquals(2L, saved.getTrainerId());
         assertEquals(RacingReadinessStatus.READY, saved.getReadinessStatus());
         assertEquals(new BigDecimal("8.0"), saved.getConformationScore());
+        assertEquals(new BigDecimal("7.5"), saved.getTemperamentScore());
+        assertEquals(new BigDecimal("8.0"), saved.getGaitQualityScore());
     }
 
     @Test
@@ -150,6 +154,20 @@ class AdmissionTrainerReviewServiceTest {
     }
 
     @Test
+    @DisplayName("Thiếu điểm đánh giá bắt buộc -> 400")
+    void completeAssessment_missingScore_badRequest() {
+        when(admissionRepository.findByIdForUpdate(10L))
+                .thenReturn(Optional.of(admission(AdmissionStatus.TRAINER_REVIEW, 2L, 7L)));
+
+        TrainerAdmissionReviewRequest req = request();
+        req.setConformationScore(null);
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.completeAssessment(10L, req, 2L));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertTrue(ex.getMessage().contains("Điểm dáng vóc"));
+    }
+
+    @Test
     @DisplayName("Điểm ngoài 0..10 hoặc số tháng ngoài 0..60 -> 400")
     void completeAssessment_outOfRange_badRequest() {
         when(admissionRepository.findByIdForUpdate(10L))
@@ -182,6 +200,9 @@ class AdmissionTrainerReviewServiceTest {
     private TrainerAdmissionReviewRequest request() {
         TrainerAdmissionReviewRequest req = new TrainerAdmissionReviewRequest();
         req.setReadinessStatus(RacingReadinessStatus.READY);
+        req.setConformationScore(new BigDecimal("8.0"));
+        req.setTemperamentScore(new BigDecimal("7.5"));
+        req.setGaitQualityScore(new BigDecimal("8.0"));
         return req;
     }
 }

@@ -1,8 +1,10 @@
 package com.rtms.backend.medical.dto;
 
 import com.rtms.backend.medical.entity.CareSchedule;
+import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
+import com.rtms.backend.medical.enums.RescheduleReason;
 
 import java.time.LocalDateTime;
 
@@ -20,10 +22,21 @@ public record CareScheduleResponse(
         LocalDateTime completedAt,
         String cancelReason,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        CareSchedulePurpose purpose,
+        LocalDateTime requestedAt,
+        RescheduleReason rescheduleReason,
+        String rescheduleNote,
+        /** D1 cờ dẫn xuất: IN_PROGRESS quá 30 phút so với scheduled_at (không phải trạng thái DB). */
+        boolean overdue,
+        /** D2 thời điểm ca khám bị tạm dừng do ưu tiên ca cấp cứu khác. */
+        LocalDateTime pausedFrom
 ) {
     public static CareScheduleResponse from(CareSchedule cs) {
         if (cs == null) return null;
+        boolean overdue = cs.getStatus() == CareScheduleStatus.IN_PROGRESS
+                && cs.getScheduledAt() != null
+                && java.time.LocalDateTime.now().isAfter(cs.getScheduledAt().plusMinutes(30));
         return new CareScheduleResponse(
                 cs.getId(),
                 cs.getHorseId(),
@@ -38,7 +51,13 @@ public record CareScheduleResponse(
                 cs.getCompletedAt(),
                 cs.getCancelReason(),
                 cs.getCreatedAt(),
-                cs.getUpdatedAt()
+                cs.getUpdatedAt(),
+                cs.getPurpose(),
+                cs.getRequestedAt(),
+                cs.getRescheduleReason(),
+                cs.getRescheduleNote(),
+                overdue,
+                cs.getPausedFrom()
         );
     }
 }

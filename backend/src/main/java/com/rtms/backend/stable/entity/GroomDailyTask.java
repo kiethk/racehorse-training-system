@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
+
 @Entity
 @Table(name = "groom_daily_tasks")
 public class GroomDailyTask {
@@ -34,6 +35,10 @@ public class GroomDailyTask {
 
     @Column(columnDefinition = "TEXT")
     private String notes;
+
+    /** The completion action that closed this task, with its note and photos. Null until completed. */
+    @Column(name = "completion_id")
+    private Long completionId;
 
     public GroomDailyTask() {
     }
@@ -109,5 +114,13 @@ public class GroomDailyTask {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public Long getCompletionId() {
+        return completionId;
+    }
+
+    public void setCompletionId(Long completionId) {
+        this.completionId = completionId;
     }
 }

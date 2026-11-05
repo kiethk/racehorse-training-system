@@ -1,32 +1,40 @@
 package com.rtms.backend.identity.dto;
 
 import java.time.LocalDate;
+import jakarta.validation.constraints.*;
 
 public class StaffCreationRequest {
-    private String fullName;
-    private String email;
-    private String password;
-    private String phone;
-    private String address;
-    private String role; // Allowed: GROOM, VETERINARIAN, HEAD_TRAINER
+    @NotBlank(message="Full name is required") @Size(max=255) private String fullName;
+    @NotBlank(message="Email is required") @Email(message="Enter a valid email address") @Size(max=255) private String email;
+    @NotBlank(message="Password is required") @Size(max=72) private String password;
+    @Size(max=20, message="Phone number must be at most 20 characters") private String phone;
+    @Size(max=255) private String address;
+    @NotBlank @Pattern(regexp="GROOM|VETERINARIAN|HEAD_TRAINER",message="Invalid staff role") private String role;
 
     // Veterinarian specific
-    private String licenseNumber;
-    private LocalDate licenseIssuedDate;
-    private String specialization;
+    @Size(max=100) private String licenseNumber;
+    @PastOrPresent(message="License issued date cannot be in the future") private LocalDate licenseIssuedDate;
+    @Size(max=255) private String specialization;
 
     // Head Trainer specific
-    private String certificationNumber;
-    private LocalDate certificationIssuedDate;
+    @Size(max=100) private String certificationNumber;
+    @PastOrPresent(message="Certification issued date cannot be in the future") private LocalDate certificationIssuedDate;
 
     // Groom specific
     private Long trainerId;
+
+    @AssertTrue(message="License number is required for Veterinarian")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isVetLicenseValid() { return !"VETERINARIAN".equals(role) || licenseNumber != null && !licenseNumber.isBlank(); }
+    @AssertTrue(message="Certification number is required for Head Trainer")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isTrainerCertificationValid() { return !"HEAD_TRAINER".equals(role) || certificationNumber != null && !certificationNumber.isBlank(); }
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
 
     public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public void setEmail(String email) { this.email = email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT); }
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }

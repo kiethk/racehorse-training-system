@@ -31,4 +31,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
             + "WHERE u.isActive = true AND u.role.name = 'HEAD_TRAINER' "
             + "AND tp.certificationNumber IS NOT NULL AND TRIM(tp.certificationNumber) <> '' ORDER BY u.id")
     List<User> findActiveHeadTrainers();
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.isActive = true AND u.role.name = 'CLUB_MANAGER'")
+    long countActiveClubManagers();
+
+    @Query("SELECT u FROM User u WHERE u.isActive = true AND u.role.name = 'CLUB_MANAGER'")
+    List<User> findActiveClubManagers();
 }

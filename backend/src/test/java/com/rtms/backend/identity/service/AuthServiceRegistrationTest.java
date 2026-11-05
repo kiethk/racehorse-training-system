@@ -17,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
+import com.rtms.backend.config.ApiException;
 
 import java.util.Optional;
 
@@ -135,11 +136,11 @@ class AuthServiceRegistrationTest {
         when(userRepository.findByEmail("nguyenvana@example.com"))
                 .thenReturn(Optional.of(new User()));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        ApiException ex = assertThrows(ApiException.class,
                 () -> authService.registerOwner(validRequest()));
 
-        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
-        assertTrue(ex.getReason().contains("already exists"));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertTrue(ex.getMessage().contains("already exists"));
         verify(userRepository, never()).save(any());
     }
 
@@ -163,9 +164,9 @@ class AuthServiceRegistrationTest {
         OwnerRegistrationRequest req = validRequest();
         req.setFullName("   ");
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        ApiException ex = assertThrows(ApiException.class,
                 () -> authService.registerOwner(req));
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
     }
 
     @Test
@@ -173,9 +174,19 @@ class AuthServiceRegistrationTest {
         OwnerRegistrationRequest req = validRequest();
         req.setEmail(null);
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        ApiException ex = assertThrows(ApiException.class,
                 () -> authService.registerOwner(req));
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+    }
+
+    @Test
+    void invalidEmailFormat_throwsBadRequest() {
+        OwnerRegistrationRequest req = validRequest();
+        req.setEmail("not-an-email");
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> authService.registerOwner(req));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
     }
 
     @Test
@@ -183,9 +194,29 @@ class AuthServiceRegistrationTest {
         OwnerRegistrationRequest req = validRequest();
         req.setPassword("");
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+        ApiException ex = assertThrows(ApiException.class,
                 () -> authService.registerOwner(req));
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+    }
+
+    @Test
+    void shortPassword_throwsBadRequest() {
+        OwnerRegistrationRequest req = validRequest();
+        req.setPassword("short");
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> authService.registerOwner(req));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+    }
+
+    @Test
+    void invalidPhoneFormat_throwsBadRequest() {
+        OwnerRegistrationRequest req = validRequest();
+        req.setPhone("invalid-phone");
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> authService.registerOwner(req));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
     }
 
     @Test

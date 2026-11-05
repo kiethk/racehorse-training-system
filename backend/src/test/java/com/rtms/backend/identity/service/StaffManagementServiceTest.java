@@ -12,6 +12,8 @@ import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
+import com.rtms.backend.stable.service.AreaTrainerAssignmentPolicy;
+import com.rtms.backend.stable.dto.AreaTrainerChangeCheck;
 
 
 import com.rtms.backend.identity.dto.StaffCreationRequest;
@@ -44,6 +46,9 @@ class StaffManagementServiceTest {
     private AreaRepository areaRepository;
     private StableStallRepository stableStallRepository;
     private StaffManagementService staffService;
+    private AreaTrainerAssignmentPolicy trainerAssignmentPolicy;
+    private jakarta.persistence.EntityManager em;
+    private jakarta.validation.Validator validator;
 
     @BeforeEach
     void setUp() {
@@ -55,11 +60,21 @@ class StaffManagementServiceTest {
         trainerProfileRepository = mock(TrainerProfileRepository.class);
         areaRepository = mock(AreaRepository.class);
         stableStallRepository = mock(StableStallRepository.class);
+        trainerAssignmentPolicy = mock(AreaTrainerAssignmentPolicy.class);
+        em = mock(jakarta.persistence.EntityManager.class);
+        var query = mock(jakarta.persistence.Query.class);
+        when(em.createNativeQuery(anyString())).thenReturn(query);
+        when(query.setParameter(anyString(), any())).thenReturn(query);
+        validator = mock(jakarta.validation.Validator.class);
+        when(trainerAssignmentPolicy.check(anyLong())).thenAnswer(i ->
+                new AreaTrainerChangeCheck(i.getArgument(0), null, true, List.of()));
+        when(stableStallRepository.findBlockForUpdate(anyLong(), eq(1), eq(12))).thenAnswer(i ->
+                java.util.stream.IntStream.rangeClosed(1,12).mapToObj(n -> stall(n,i.getArgument(0),n,null)).toList());
 
         staffService = new StaffManagementService(
                 userRepository, roleRepository, passwordEncoder,
                 groomProfileRepository, vetProfileRepository, trainerProfileRepository,
-                areaRepository, stableStallRepository
+                areaRepository, stableStallRepository, trainerAssignmentPolicy, em, validator
         );
     }
 
@@ -90,7 +105,7 @@ class StaffManagementServiceTest {
     }
 
     private void mockUserSaveWithId(long id) {
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0); u.setId(id); return u;
         });
     }
@@ -201,6 +216,18 @@ class StaffManagementServiceTest {
     }
 
     // ── Groom creation ────────────────────────────────────────────────────────
+
+    @Test void newTrainerSkipsBlockedAreasAndStillFindsTwoEmptyAreas() {
+        mockBasicCreation("HEAD_TRAINER"); mockUserSaveWithId(10L);
+        when(areaRepository.findUnassignedRegularAreasOrdered()).thenReturn(List.of(area(1,"A"),area(2,"B"),area(3,"C")));
+        when(trainerAssignmentPolicy.check(1L)).thenReturn(new AreaTrainerChangeCheck(1L,null,false,List.of("Area has horses.")));
+        when(areaRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        var request = new StaffCreationRequest(); request.setFullName("Tom"); request.setEmail("tom@rtms.com");
+        request.setPassword("pass"); request.setRole("HEAD_TRAINER"); request.setCertificationNumber("CERT-001");
+        var result = staffService.createStaff(request);
+        assertEquals(List.of(2L,3L),result.getAssignedAreaIds());
+        verify(areaRepository,never()).save(argThat(a -> a.getId()==1L));
+    }
 
     @Test
     void testCreateGroom_AutoAssignment_BalancedLoad() {
@@ -399,6 +426,7 @@ class StaffManagementServiceTest {
     void testDuplicateEmailRejected() {
         StaffCreationRequest request = new StaffCreationRequest();
         request.setEmail("dup@rtms.com"); request.setRole("GROOM");
+        request.setFullName("Duplicate"); request.setPassword("pass");
 
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(new User()));
 

@@ -47,4 +47,18 @@ public class UserDirectoryController {
 
         return ApiResponse.success(result);
     }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('USER_VIEW')")
+    public ApiResponse<UserSummaryResponse> getUserById(@PathVariable Long id) {
+        com.rtms.backend.identity.entity.User user = userRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "User not found with id: " + id));
+
+        return ApiResponse.success(new UserSummaryResponse(
+                user.getId(),
+                user.getFullName(),
+                user.getEmail(),
+                user.getRole() != null ? user.getRole().getName() : null));
+    }
 }

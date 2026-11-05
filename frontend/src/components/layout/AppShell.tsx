@@ -1,12 +1,18 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { getNavigationForRole, isNavItemActive } from '@/config/navigation';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { useSidebarState } from './useSidebarState';
+
+const AiChatWidget = dynamic(
+  () => import('@/features/ai').then((mod) => mod.AiChatWidget),
+  { ssr: false }
+);
 
 /** Persistent frame for every signed-in page: left sidebar, top bar, content. */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -28,13 +34,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar sections={sections} role={user.role} collapsed={collapsed} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
-          title={activeItem?.label ?? 'RTMS'}
+          title={pathname === '/profile' ? 'My profile' : activeItem?.label ?? 'RTMS'}
           sidebarCollapsed={collapsed}
           canToggleSidebar={canToggle}
           onToggleSidebar={toggle}
         />
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</main>
       </div>
+      <AiChatWidget />
     </div>
   );
 }

@@ -17,6 +17,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.AccessDeniedException;
 import java.util.List;
 
+/**
+ * @deprecated Thay bằng hub mới (docs/preventive-care-flow.md mục 6): {@link PreventiveCareHubController}
+ * cho trạng thái tiêm / ghi nhận hàng loạt, và {@code POST /api/care-schedules/{id}/complete} kèm
+ * {@code vaccinations[]}. Giữ lại tới khi FE bỏ {@code SchedulePreventiveCareModal} và
+ * {@code HorseHealthSummary} chuyển sang {@code GET /api/horses/{id}/preventive-status}.
+ */
+@Deprecated
 @RestController
 @RequestMapping("/api/preventive-care-schedules")
 public class PreventiveCareController {

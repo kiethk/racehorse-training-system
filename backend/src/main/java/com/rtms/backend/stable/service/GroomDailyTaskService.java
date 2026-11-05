@@ -6,26 +6,32 @@ import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.stable.dto.CreateGroomDailyTaskRequest;
 import com.rtms.backend.stable.dto.TodayTaskItemResponse;
 import com.rtms.backend.stable.entity.GroomDailyTask;
+import com.rtms.backend.stable.entity.GroomTaskCompletion;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.training.entity.Subject;
-import com.rtms.backend.training.entity.TrainingLot;
-import com.rtms.backend.training.entity.TrainingWorkout;
+import com.rtms.backend.training.dto.GroomWorkoutRow;
 import com.rtms.backend.stable.enums.GroomTaskType;
 import com.rtms.backend.stable.enums.SopSlot;
 import com.rtms.backend.stable.enums.TaskSource;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
+import com.rtms.backend.stable.repository.GroomTaskCompletionRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.repository.SubjectRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.security.AuthenticatedUser;
+import com.rtms.backend.common.storage.FileStorageService;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -34,7 +40,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -46,7 +54,12 @@ public class GroomDailyTaskService {
     private final StableStallRepository stableStallRepository;
     private final TrainingWorkoutRepository workoutRepository;
     private final CareScheduleRepository careScheduleRepository;
-    private final SubjectRepository subjectRepository;
+    private final FileStorageService fileStorage;
+    private final GroomTaskCompletionRepository completionRepository;
+
+    private static final int MAX_COMPLETION_NOTE_LENGTH = 1000;
+    private static final int MAX_COMPLETION_PHOTOS = 5;
+    private static final int MAX_TASKS_PER_COMPLETION = 20;
 
     public GroomDailyTaskService(GroomDailyTaskRepository taskRepository,
                                  HorseRepository horseRepository,
@@ -54,14 +67,16 @@ public class GroomDailyTaskService {
                                  StableStallRepository stableStallRepository,
                                  TrainingWorkoutRepository workoutRepository,
                                  CareScheduleRepository careScheduleRepository,
-                                 SubjectRepository subjectRepository) {
+                                 FileStorageService fileStorage,
+                                 GroomTaskCompletionRepository completionRepository) {
+        this.fileStorage = fileStorage;
+        this.completionRepository = completionRepository;
         this.taskRepository = taskRepository;
         this.horseRepository = horseRepository;
         this.userRepository = userRepository;
         this.stableStallRepository = stableStallRepository;
         this.workoutRepository = workoutRepository;
         this.careScheduleRepository = careScheduleRepository;
-        this.subjectRepository = subjectRepository;
     }
 
     @Transactional
@@ -133,6 +148,115 @@ public class GroomDailyTaskService {
         return taskRepository.save(task);
     }
 
+    /**
+     * Completes one task with what the Groom recorded. Kept for callers that complete a single task;
+     * the checklist completes a whole block through {@link #completeTasks}.
+     */
+    @Transactional
+    public GroomDailyTask completeTask(Long taskId, String note, MultipartFile image, AuthenticatedUser currentUser) {
+        completeTasks(List.of(taskId), note, image == null ? List.of() : List.of(image), currentUser);
+        return taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found with id: " + taskId));
+    }
+
+    /**
+     * Completes several routine tasks in one action (the same duty at the same time for several horses) and
+     * records one optional note and up to five optional photos for all of them. A task is completed once;
+     * its evidence cannot be replaced afterwards.
+     */
+    @Transactional
+    public GroomTaskCompletion completeTasks(List<Long> taskIds, String note, List<MultipartFile> photos,
+                                             AuthenticatedUser currentUser) {
+        List<Long> ids = taskIds == null ? List.of()
+                : taskIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty() || ids.size() > MAX_TASKS_PER_COMPLETION) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Select between 1 and " + MAX_TASKS_PER_COMPLETION + " tasks to complete");
+        }
+
+        List<GroomDailyTask> tasks = taskRepository.findAllById(ids);
+        if (tasks.size() != ids.size()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "One or more tasks were not found");
+        }
+        boolean isGroom = "GROOM".equalsIgnoreCase(currentUser.getRole());
+        Long groomId = tasks.get(0).getGroomId();
+        for (GroomDailyTask task : tasks) {
+            if (isGroom && !task.getGroomId().equals(currentUser.getUserId())) {
+                throw new AccessDeniedException("You are not authorized to complete a task assigned to another groom");
+            }
+            if (!task.getGroomId().equals(groomId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Tasks completed together must belong to the same groom");
+            }
+            if (Boolean.TRUE.equals(task.getIsCompleted())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Task #" + task.getId() + " is already completed");
+            }
+        }
+
+        String cleanNote = note == null || note.isBlank() ? null : note.trim();
+        if (cleanNote != null && cleanNote.length() > MAX_COMPLETION_NOTE_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "The note is too long. The limit is " + MAX_COMPLETION_NOTE_LENGTH + " characters.");
+        }
+
+        List<MultipartFile> files = photos == null ? List.of()
+                : photos.stream().filter(file -> file != null && !file.isEmpty()).toList();
+        if (files.size() > MAX_COMPLETION_PHOTOS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Attach at most " + MAX_COMPLETION_PHOTOS + " photos");
+        }
+        for (MultipartFile file : files) {
+            String mediaType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+            if (!mediaType.startsWith("image/")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Task photos must be images (JPEG, PNG, WebP)");
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        GroomTaskCompletion completion = completionRepository.save(new GroomTaskCompletion(groomId, cleanNote, now));
+        List<String> storedKeys = new ArrayList<>();
+        try {
+            for (MultipartFile file : files) {
+                // validates size and real content
+                storedKeys.add(fileStorage.store(file, "rtms/task-completions/" + completion.getId()));
+            }
+            completion.getPhotoKeys().addAll(storedKeys);
+            GroomTaskCompletion saved = completionRepository.save(completion);
+            for (GroomDailyTask task : tasks) {
+                task.setIsCompleted(true);
+                task.setCompletedAt(now);
+                task.setCompletionId(saved.getId());
+            }
+            taskRepository.saveAll(tasks);
+            return saved;
+        } catch (RuntimeException ex) {
+            storedKeys.forEach(fileStorage::delete);   // nothing was saved -> do not leave orphan files
+            throw ex;
+        }
+    }
+
+    /** Storage key of one completion photo. A Groom may only open photos of their own completions. */
+    private String completionPhotoKey(Long completionId, int index, AuthenticatedUser currentUser) {
+        GroomTaskCompletion completion = completionRepository.findById(completionId)
+                .orElseThrow(() -> new RuntimeException("Task completion not found with id: " + completionId));
+        if ("GROOM".equalsIgnoreCase(currentUser.getRole()) && !completion.getGroomId().equals(currentUser.getUserId())) {
+            throw new AccessDeniedException("You can only view photos of your own tasks");
+        }
+        if (index < 0 || index >= completion.getPhotoKeys().size()) {
+            throw new RuntimeException("Photo " + index + " of task completion #" + completionId + " not found");
+        }
+        return completion.getPhotoKeys().get(index);
+    }
+
+    public Resource loadCompletionPhoto(Long completionId, int index, AuthenticatedUser currentUser) {
+        return fileStorage.load(completionPhotoKey(completionId, index, currentUser));
+    }
+
+    public MediaType completionPhotoMediaType(Long completionId, int index, AuthenticatedUser currentUser) {
+        return fileStorage.mediaType(completionPhotoKey(completionId, index, currentUser));
+    }
+
     @Transactional
     public List<GroomDailyTask> generateDailyRoutineTasks(LocalDate date) {
         LocalDate targetDate = (date != null) ? date : LocalDate.now();
@@ -158,7 +282,7 @@ public class GroomDailyTaskService {
                         horse.getId(),
                         slot.getTaskType(),
                         targetDate.atTime(slot.getTime()),
-                        slot.getNote());
+                        null);    // the task type and time say it all; notes are for ad-hoc tasks
             }
         }
 
@@ -205,12 +329,9 @@ public class GroomDailyTaskService {
         List<GroomDailyTask> sopTasks = taskRepository
                 .findByGroomIdAndScheduledTimeBetween(targetGroomId, dayStart, dayEnd);
 
-        // Nguồn 2 — Buổi tập (JOIN sang training_lots vì workout không còn giữ giờ)
-        List<WorkoutWithLot> workouts = workoutRepository
-                .findGroomWorkoutsWithLot(targetGroomId, targetDate)
-                .stream()
-                .map(WorkoutWithLot::of)
-                .toList();
+        // Nguồn 2 — Buổi tập, đã JOIN sẵn giờ session, tên ngựa và tên bài tập trong MỘT câu query
+        // (Source 2 — Workouts, with session times, horse name and subject name already joined in ONE query)
+        List<GroomWorkoutRow> workouts = workoutRepository.findGroomWorkoutRows(targetGroomId, targetDate);
 
         // Nguồn 3 — Lịch thú y của ngựa trong chuồng mình
         List<Long> stallIds = stableStallRepository.findByGroomId(targetGroomId).stream()
@@ -239,10 +360,10 @@ public class GroomDailyTaskService {
         myHorses.forEach(h -> horseNameById.put(h.getId(), h.getName()));
 
         // Chỉ những con CHƯA có tên mới phải tra thêm (ví dụ Trainer nhờ Groom
-        // này dắt hộ một con không thuộc chuồng của họ). Thường là rỗng.
+        // này dắt hộ một con không thuộc chuồng của họ). Thường là rỗng. Buổi tập đã mang sẵn tên ngựa.
+        // (Only horses WITHOUT a name yet need a lookup. Usually empty. Workout rows already carry the horse name.)
         Set<Long> neededHorseIds = new HashSet<>();
         sopTasks.forEach(t -> neededHorseIds.add(t.getHorseId()));
-        workouts.forEach(wl -> neededHorseIds.add(wl.workout().getHorseId()));
         neededHorseIds.removeAll(horseNameById.keySet());
 
         if (!neededHorseIds.isEmpty()) {
@@ -250,21 +371,21 @@ public class GroomDailyTaskService {
                     .forEach(h -> horseNameById.put(h.getId(), h.getName()));
         }
 
-        Set<Long> subjectIds = new HashSet<>();
-        workouts.forEach(wl -> subjectIds.add(wl.lot().getSubjectId()));
-
-        Map<Long, String> subjectNameById = new HashMap<>();
-        if (!subjectIds.isEmpty()) {
-            subjectRepository.findAllById(subjectIds)
-                    .forEach(s -> subjectNameById.put(s.getId(), s.getName()));
-        }
-
         // =============================================================
         // B3 — DỰNG ITEM (không còn query nào nữa)
         // =============================================================
         List<TodayTaskItemResponse> items = new ArrayList<>();
 
+        // Completions of the day's tasks, loaded once: tasks completed together share one.
+        Set<Long> completionIds = new HashSet<>();
+        sopTasks.forEach(t -> { if (t.getCompletionId() != null) completionIds.add(t.getCompletionId()); });
+        Map<Long, GroomTaskCompletion> completionById = new HashMap<>();
+        if (!completionIds.isEmpty()) {
+            completionRepository.findAllById(completionIds).forEach(c -> completionById.put(c.getId(), c));
+        }
+
         for (GroomDailyTask task : sopTasks) {
+            GroomTaskCompletion completion = completionById.get(task.getCompletionId());
             items.add(new TodayTaskItemResponse(
                     TaskSource.SOP,
                     task.getId(),
@@ -275,23 +396,23 @@ public class GroomDailyTaskService {
                     toVietnamese(task.getTaskType()),
                     task.getNotes(),
                     Boolean.TRUE.equals(task.getIsCompleted()) ? "COMPLETED" : "PENDING",
-                    true));                       // chỉ SOP mới tick được
+                    true)                         // chỉ SOP mới tick được
+                    .withCompletion(task.getCompletionId(),
+                            completion == null ? null : completion.getNote(),
+                            completion == null ? List.of() : completionPhotoUrls(completion)));
         }
 
-        for (WorkoutWithLot wl : workouts) {
-            TrainingWorkout w = wl.workout();
-            TrainingLot lot = wl.lot();
-
+        for (GroomWorkoutRow w : workouts) {
             items.add(new TodayTaskItemResponse(
                     TaskSource.WORKOUT,
-                    w.getId(),
-                    lot.getStartTime(),
-                    lot.getEndTime(),
-                    w.getHorseId(),
-                    nameOf(horseNameById, w.getHorseId()),
-                    "Buổi tập · " + nameOf(subjectNameById, lot.getSubjectId()),
-                    "Dắt ngựa ra sân, hỗ trợ Trainer, nhận ngựa về sau buổi tập",
-                    w.getStatus().name(),
+                    w.workoutId(),
+                    w.startTime(),
+                    w.endTime(),
+                    w.horseId(),
+                    w.horseName(),
+                    "Training session · " + w.subjectName(),
+                    "Lead the horse to the track, assist the trainer, and bring the horse back after the session",
+                    w.status().name(),
                     false));                      // Trainer mới là người đóng buổi tập
         }
 
@@ -303,7 +424,7 @@ public class GroomDailyTaskService {
                     s.getScheduledAt().plusMinutes(s.getDurationMinutes()).toLocalTime(),
                     s.getHorseId(),
                     nameOf(horseNameById, s.getHorseId()),
-                    "Thú y · " + s.getCareType(),
+                    "Veterinary · " + s.getCareType(),
                     s.getDescription(),
                     s.getStatus().name(),
                     false));              // Vet mới là người đóng
@@ -317,32 +438,31 @@ public class GroomDailyTaskService {
     }
 
     /** Tra tên từ Map đã nạp sẵn; không khớp thì hiện mã số như cũ. */
+    /** API paths of a completion's photos: the endpoint that checks the viewer, never the storage key. */
+    private static List<String> completionPhotoUrls(GroomTaskCompletion completion) {
+        List<String> urls = new ArrayList<>();
+        for (int index = 0; index < completion.getPhotoKeys().size(); index++) {
+            urls.add("/api/groom-daily-tasks/completions/" + completion.getId() + "/photos/" + index);
+        }
+        return urls;
+    }
+
     private String nameOf(Map<Long, String> nameById, Long id) {
         return nameById.getOrDefault(id, "#" + id);
     }
 
-    /**
-     * Cặp workout + lot trả về từ query JOIN.
-     * Dự án không dùng quan hệ JPA nên query trả Object[]; record này gói lại
-     * để khỏi phải ép kiểu lặp đi lặp lại ở nhiều chỗ.
-     */
-    private record WorkoutWithLot(TrainingWorkout workout, TrainingLot lot) {
-        static WorkoutWithLot of(Object[] row) {
-            return new WorkoutWithLot((TrainingWorkout) row[0], (TrainingLot) row[1]);
-        }
-    }
 
     /** Nhãn tiếng Việt cho loại việc SOP. */
     private String toVietnamese(GroomTaskType type) {
         return switch (type) {
-            case FEEDING        -> "Cho ăn";
-            case MUCKING_OUT    -> "Dọn chuồng";
-            case GROOMING       -> "Tắm rửa & chải lông";
-            case HOOF_CARE      -> "Chăm sóc móng";
-            case HEALTH_CHECK   -> "Kiểm tra sức khoẻ";
-            case WORKOUT_ASSIST -> "Hỗ trợ buổi tập";
-            case VET_ASSIST     -> "Hỗ trợ thú y";
-            case SPECIAL_CARE   -> "Chăm sóc đặc biệt";
+            case FEEDING        -> "Feeding";
+            case MUCKING_OUT    -> "Mucking out";
+            case GROOMING       -> "Washing & grooming";
+            case HOOF_CARE      -> "Hoof care";
+            case HEALTH_CHECK   -> "Health check";
+            case WORKOUT_ASSIST -> "Training assistance";
+            case VET_ASSIST     -> "Veterinary assistance";
+            case SPECIAL_CARE   -> "Special care";
         };
     }
 

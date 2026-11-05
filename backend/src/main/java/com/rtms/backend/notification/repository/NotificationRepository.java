@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,4 +53,58 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.id = :id AND n.recipientId = :recipientId")
     int markReadByIdAndRecipientId(@Param("id") Long id, @Param("recipientId") Long recipientId);
+
+    default List<Notification> feedBefore(
+            Long recipientId,
+            Boolean read,
+            LocalDateTime createdAt,
+            Long id,
+            Pageable pageable
+    ) {
+        if (createdAt == null) {
+            return feedBeforeInitial(recipientId, read, pageable);
+        }
+        return feedBeforeCursor(recipientId, read, createdAt, id, pageable);
+    }
+
+    @Query("""
+            SELECT n FROM Notification n
+            WHERE n.recipientId = :recipientId
+              AND (:read IS NULL OR n.isRead = :read)
+            ORDER BY n.createdAt DESC, n.id DESC
+            """)
+    List<Notification> feedBeforeInitial(
+            @Param("recipientId") Long recipientId,
+            @Param("read") Boolean read,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT n FROM Notification n
+            WHERE n.recipientId = :recipientId
+              AND (:read IS NULL OR n.isRead = :read)
+              AND (n.createdAt < :createdAt
+                   OR (n.createdAt = :createdAt AND (:id IS NULL OR n.id < :id)))
+            ORDER BY n.createdAt DESC, n.id DESC
+            """)
+    List<Notification> feedBeforeCursor(
+            @Param("recipientId") Long recipientId,
+            @Param("read") Boolean read,
+            @Param("createdAt") LocalDateTime createdAt,
+            @Param("id") Long id,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT n FROM Notification n
+            WHERE n.recipientId = :recipientId
+              AND (n.createdAt > :createdAt OR (n.createdAt = :createdAt AND n.id > :id))
+            ORDER BY n.createdAt ASC, n.id ASC
+            """)
+    List<Notification> sinceAfter(
+            @Param("recipientId") Long recipientId,
+            @Param("createdAt") LocalDateTime createdAt,
+            @Param("id") Long id,
+            Pageable pageable
+    );
 }
