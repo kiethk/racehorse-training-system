@@ -181,6 +181,18 @@ export function RoutineChecksWorkspace() {
         />
       </div>
 
+      {/* Policy Strip */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-secondary)]">
+        <div className="flex items-center gap-2">
+          <Icon name="clock" size={14} className="text-[var(--color-primary)] shrink-0" />
+          <span>Routine Examination Window: <strong>13:30 – 15:30</strong></span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Icon name="activity" size={14} className="text-[var(--color-text-muted)] shrink-0" />
+          <span>Daily quota: <strong>Max 4 exams per vet</strong></span>
+        </div>
+      </div>
+
       {/* Error banner */}
       {error && (
         <Notice tone="error">
@@ -335,12 +347,12 @@ export function RoutineChecksWorkspace() {
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                         <span className="inline-flex items-center gap-1">
                           <Icon name="calendar" size={12} className="text-[var(--color-primary)]" />
-                          <strong>{dateStr} (13:30 – 15:30)</strong>
+                          <strong>{dateStr}</strong>
                         </span>
                         <span>·</span>
                         <span className="inline-flex items-center gap-1">
                           <Icon name="building" size={12} />
-                          <span>Stall: <strong>{stallCode}</strong></span>
+                          <span>Stall <strong>{stallCode}</strong></span>
                         </span>
                       </div>
                     </div>

@@ -17,18 +17,10 @@ import { formatDate, formatLocalDateIso } from '@/lib/display';
 import type { CareSchedule, CareType, CareScheduleStatus } from '@/features/admissions/types';
 import type { Horse, StableStall } from '@/features/stable/types';
 import {
-  WORKDAY_START,
-  WORKDAY_LEN,
-  VET_WINDOW_START,
-  VET_WINDOW_END,
-  computeTimelinePosition,
   formatClockLabel,
   getCareTypeTone,
   getMondayOf,
   getWeekDates,
-  isOutsideWorkday,
-  assignTimelineLanes,
-  timelineRulerMarks,
 } from '@/features/schedule/utils/timelineUtils';
 
 /** "14:00" from a backend LocalDateTime string, on the 24-hour clock. */
@@ -122,23 +114,6 @@ export function VetScheduleTimeline() {
 
     return { total: schedules.length, initial, routine };
   }, [schedules]);
-
-  // Overlapping cases get separate lanes so every block stays visible and clickable.
-  const blockLanes = useMemo(
-    () =>
-      assignTimelineLanes(
-        schedules
-          .filter((s) => s.scheduledAt)
-          .map((s) => {
-            const d = new Date(s.scheduledAt as string);
-            const start = d.getHours() * 60 + d.getMinutes();
-            return { id: s.id, start, end: start + (s.durationMinutes || 30) };
-          }),
-      ),
-    [schedules],
-  );
-  const laneHeight = blockLanes.lanes === 1 ? 56 : 44;
-  const trackHeight = 8 + blockLanes.lanes * laneHeight + (blockLanes.lanes - 1) * 4;
 
   const handleOpenSchedule = (item: CareSchedule) => {
     if (item.careType === 'INITIAL') {
@@ -245,98 +220,42 @@ export function VetScheduleTimeline() {
       {/* View: TODAY */}
       {view === 'today' && (
         <div className="space-y-6">
-          {/* Visual Timeline Bar (08:00 - 17:00, routine window highlighted) */}
-          <Panel padded className="space-y-3">
-            {/* Ruler */}
-            <div className="relative h-5 border-b border-[var(--color-border)] text-xs font-mono text-[var(--color-text-muted)]">
-              {timelineRulerMarks().map((mark) => (
-                <span
-                  key={mark.minutes}
-                  className={`absolute ${
-                    mark.percent === 0 ? 'left-0' : mark.percent === 100 ? 'right-0' : '-translate-x-1/2'
-                  }`}
-                  style={mark.percent !== 0 && mark.percent !== 100 ? { left: `${mark.percent}%` } : undefined}
-                >
-                  {mark.label}
-                </span>
-              ))}
-            </div>
-
-            {/* Routine window indicator strip */}
-            <div className="relative h-6" aria-label="Routine examination window">
-              <div
-                className="absolute inset-y-0 flex items-center justify-center gap-1.5 truncate rounded-[var(--radius-xs)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] px-2 text-xs font-semibold text-[var(--color-warning)] shadow-2xs"
-                style={{
-                  left: `${((VET_WINDOW_START - WORKDAY_START) / WORKDAY_LEN) * 100}%`,
-                  width: `${((VET_WINDOW_END - VET_WINDOW_START) / WORKDAY_LEN) * 100}%`,
-                }}
-              >
-                <Icon name="clock" size={12} className="shrink-0" />
-                <span className="truncate">
-                  Routine {formatClockLabel(VET_WINDOW_START)} – {formatClockLabel(VET_WINDOW_END)}
-                </span>
-              </div>
-            </div>
-
-            {/* Timeline track with blocks (no urgent) */}
-            <div
-              className="relative w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] overflow-hidden"
-              style={{ height: `${trackHeight}px` }}
-            >
-              {/* Routine window band */}
-              <div
-                aria-hidden
-                className="absolute inset-y-0 border-x border-[var(--color-warning)]/60 bg-[var(--color-warning-soft)]/30"
-                style={{
-                  left: `${((VET_WINDOW_START - WORKDAY_START) / WORKDAY_LEN) * 100}%`,
-                  width: `${((VET_WINDOW_END - VET_WINDOW_START) / WORKDAY_LEN) * 100}%`,
-                }}
-              />
-              {schedules.map((cs) => {
-                if (!cs.scheduledAt) return null;
-                const { leftPercent, widthPercent } = computeTimelinePosition(
-                  cs.scheduledAt,
-                  cs.durationMinutes || 30
-                );
-                const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
-                const horse = horseMap.get(cs.horseId);
-                const horseName = horse?.name || `Horse #${cs.horseId}`;
-                const offHours = isOutsideWorkday(cs.scheduledAt);
-                const lane = blockLanes.laneOf.get(cs.id) ?? 0;
-                const blockLabel = `#${cs.id} · ${tone.label} - ${horseName} (${clockLabel(cs.scheduledAt)})${offHours ? ' · outside 08:00-17:00' : ''} · Open case`;
-
-                return (
-                  <div
-                    key={cs.id}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={blockLabel}
-                    title={blockLabel}
-                    onClick={() => handleOpenSchedule(cs)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleOpenSchedule(cs);
-                      }
-                    }}
-                    style={{
-                      left: `${leftPercent}%`,
-                      width: `${widthPercent}%`,
-                      top: `${4 + lane * (laneHeight + 4)}px`,
-                      height: `${laneHeight}px`,
-                    }}
-                    className={`absolute flex flex-col justify-center overflow-hidden rounded border px-2 py-0.5 cursor-pointer shadow-sm transition-transform hover:scale-[1.02] hover:ring-1 hover:ring-[var(--color-border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${tone.bg} ${tone.border} ${tone.text}`}
-                  >
-                    <div className="flex items-center gap-1 truncate text-xs font-bold">
-                      <Icon name={offHours ? 'flag' : tone.icon} size={12} className="shrink-0" />
-                      {horseName}
-                    </div>
-                    <div className="truncate text-xs opacity-80">
-                      {clockLabel(cs.scheduledAt)} · {cs.durationMinutes || 30}m
-                    </div>
+          {/* Capacity Overview Bar */}
+          <Panel padded className="border border-[var(--color-border)] bg-[var(--color-surface)]">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-6">
+                <div>
+                  <div className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                    Routine Care Bucket
                   </div>
-                );
-              })}
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-xl font-bold text-[var(--color-text-primary)]">
+                      {stats.routine}/4
+                    </span>
+                    <Pill tone={stats.routine >= 4 ? 'warning' : 'primary'} size="sm">
+                      Window 13:30 – 15:30
+                    </Pill>
+                  </div>
+                </div>
+
+                <div className="hidden sm:block h-8 w-px bg-[var(--color-border)]" />
+
+                <div>
+                  <div className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                    Admission Exams
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-xl font-bold text-[var(--color-text-primary)]">
+                      {stats.initial}/2
+                    </span>
+                    <Pill tone="neutral" size="sm">
+                      Daytime Intake
+                    </Pill>
+                  </div>
+                </div>
+              </div>
+
+  
             </div>
           </Panel>
 
@@ -438,14 +357,18 @@ export function VetScheduleTimeline() {
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                             <span className="inline-flex items-center gap-1">
-                              <Icon name="clock" size={12} className="text-[var(--color-primary)]" />
-                              <strong>{cs.careType === 'ROUTINE' ? '13:30 – 15:30' : timeStr}</strong>
+                              <Icon name="building" size={12} className="text-[var(--color-primary)]" />
+                              <span>Stall <strong>{stallCode}</strong></span>
                             </span>
-                            <span>·</span>
-                            <span className="inline-flex items-center gap-1">
-                              <Icon name="building" size={12} />
-                              <span>Stall: <strong>{stallCode}</strong></span>
-                            </span>
+                            {cs.careType === 'INITIAL' && cs.scheduledAt && (
+                              <>
+                                <span>·</span>
+                                <span className="inline-flex items-center gap-1">
+                                  <Icon name="clock" size={12} className="text-[var(--color-text-muted)]" />
+                                  <span>{clockLabel(cs.scheduledAt)}</span>
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -539,7 +462,9 @@ export function VetScheduleTimeline() {
                         daySchedules.map((cs) => {
                           const horse = horseMap.get(cs.horseId);
                           const horseName = horse?.name || `Horse #${cs.horseId}`;
-                          const timeStr = cs.careType === 'ROUTINE' ? '13:30 – 15:30' : (cs.scheduledAt ? clockLabel(cs.scheduledAt) : '');
+                          const timeStr = cs.careType === 'INITIAL' && cs.scheduledAt
+                            ? clockLabel(cs.scheduledAt)
+                            : (cs.status === 'COMPLETED' ? 'Completed' : 'Routine');
                           const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
 
                           return (
