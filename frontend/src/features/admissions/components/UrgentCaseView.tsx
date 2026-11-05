@@ -273,30 +273,30 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           </span>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-start justify-between">
-          <div className="min-w-0 flex-1">
+        <div className="flex flex-col sm:flex-row gap-4 items-start">
+          {urgentCase.imageUrl && (
+            <div className="group relative h-28 w-28 sm:h-32 sm:w-32 shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
+              <ProtectedImage
+                src={urgentCase.imageUrl}
+                alt="Urgent case report incident photo"
+                openOnClick
+                className="h-28 w-28 sm:h-32 sm:w-32 object-cover transition-transform duration-200 group-hover:scale-105"
+              />
+              <div className="pointer-events-none absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-xs backdrop-blur-xs">
+                <Icon name="search" size={10} />
+                <span>Zoom</span>
+              </div>
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1 space-y-2">
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-secondary)]">
               {urgentCase.description || 'No detailed clinical description provided by reporter.'}
             </p>
-          </div>
-
-          {urgentCase.imageUrl && (
-            <div className="shrink-0 flex flex-col items-center">
-              <div className="group relative h-24 w-24 sm:h-28 sm:w-28 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
-                <ProtectedImage
-                  src={urgentCase.imageUrl}
-                  alt="Urgent case report incident photo"
-                  openOnClick
-                  className="h-24 w-24 sm:h-28 sm:w-28 object-cover transition-transform duration-200 group-hover:scale-105"
-                />
-                <div className="pointer-events-none absolute bottom-1 right-1 flex items-center gap-0.5 rounded bg-black/60 px-1 py-0.5 text-[10px] font-medium text-white shadow-xs backdrop-blur-xs">
-                  <Icon name="search" size={10} />
-                  <span>Zoom</span>
-                </div>
-              </div>
-              <span className="mt-1 text-[11px] text-[var(--color-text-muted)]">Photo evidence</span>
+            <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+              <span>Reported at {formatDateTime(urgentCase.reportedAt)}</span>
             </div>
-          )}
+          </div>
         </div>
       </Panel>
 
