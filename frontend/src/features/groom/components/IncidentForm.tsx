@@ -17,7 +17,7 @@ import type { Horse, StableStall } from '@/features/stable/types';
 import type { IncidentReport, IncidentSeverity } from '../types';
 
 const SEVERITY_OPTIONS: { value: IncidentSeverity; label: string; hint: string; tone: string }[] = [
-  { value: 'LOW', label: 'Minor', hint: 'Monitor the horse; no urgent intervention is required.', tone: 'text-[var(--color-text-secondary)]' },
+  { value: 'LOW', label: 'Minor', hint: 'Monitor the horse. No urgent intervention is required.', tone: 'text-[var(--color-text-secondary)]' },
   { value: 'MEDIUM', label: 'Moderate', hint: 'Veterinary review is needed today.', tone: 'text-[var(--color-info)]' },
   { value: 'HIGH', label: 'Major', hint: 'Request veterinary attention as soon as possible.', tone: 'text-[var(--color-warning)]' },
   { value: 'CRITICAL', label: 'Critical', hint: 'A health emergency requiring an immediate call.', tone: 'text-[var(--color-danger)] font-semibold' },

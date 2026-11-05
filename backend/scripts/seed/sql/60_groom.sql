@@ -53,8 +53,8 @@ BEGIN
               ('H031', 'HEALTH_CHECK', pg_temp.at(0, TIME '18:00'), 'Evening temperature.'),
               ('H038', 'HOOF_CARE', pg_temp.at(-4, TIME '09:30'), 'Change the poultice on the right fore.'),
               ('H010', 'HOOF_CARE', pg_temp.at(-3, TIME '09:00'), 'Pick out and check the shoes before the farrier visit.'),
-              ('H003', 'SPECIAL_CARE', pg_temp.at(-3, TIME '15:00'), 'Antifungal wash on the neck patches; use her own brushes only.'),
-              ('H003', 'SPECIAL_CARE', pg_temp.at(0, TIME '15:00'), 'Antifungal wash on the neck patches; use her own brushes only.')
+              ('H003', 'SPECIAL_CARE', pg_temp.at(-3, TIME '15:00'), 'Antifungal wash on the neck patches, use her own brushes only.'),
+              ('H003', 'SPECIAL_CARE', pg_temp.at(0, TIME '15:00'), 'Antifungal wash on the neck patches, use her own brushes only.')
            ) x(k, task_type, at, notes)
       JOIN horses h ON h.id = pg_temp.hid(x.k) JOIN stable_stalls ss ON ss.id = h.current_stall_id;
 
@@ -76,9 +76,9 @@ BEGIN
                 CASE pg_temp.rndi('note' || g.groom_id || g.scheduled_time, 1, 12)
                     WHEN 1 THEN 'All ate up well.'
                     WHEN 2 THEN 'Water buckets scrubbed and refilled.'
-                    WHEN 3 THEN 'Left fore shoe a bit loose on one horse; told the farrier.'
+                    WHEN 3 THEN 'Left fore shoe a bit loose on one horse, told the farrier.'
                     WHEN 4 THEN 'Fresh shavings in every box.'
-                    WHEN 5 THEN 'One horse left some hay; keep an eye on her appetite.'
+                    WHEN 5 THEN 'One horse left some hay, keep an eye on her appetite.'
                 END,
                 v_done)
         RETURNING id INTO v_completion;

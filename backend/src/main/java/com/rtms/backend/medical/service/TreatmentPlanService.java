@@ -1,5 +1,7 @@
 package com.rtms.backend.medical.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.medical.dto.CreatePrescriptionRequest;
 import com.rtms.backend.medical.dto.CreateTreatmentPlanRequest;
@@ -29,13 +31,23 @@ public class TreatmentPlanService {
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final PrescriptionRepository prescriptionRepository;
     private final com.rtms.backend.identity.repository.UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
     public TreatmentPlanService(
             HealthRecordRepository healthRecordRepository,
             TreatmentPlanRepository treatmentPlanRepository,
             PrescriptionRepository prescriptionRepository)
     {
-        this(healthRecordRepository, treatmentPlanRepository, prescriptionRepository, null);
+        this(healthRecordRepository, treatmentPlanRepository, prescriptionRepository, null, new ObjectMapper());
+    }
+
+    public TreatmentPlanService(
+            HealthRecordRepository healthRecordRepository,
+            TreatmentPlanRepository treatmentPlanRepository,
+            PrescriptionRepository prescriptionRepository,
+            com.rtms.backend.identity.repository.UserRepository userRepository)
+    {
+        this(healthRecordRepository, treatmentPlanRepository, prescriptionRepository, userRepository, new ObjectMapper());
     }
 
     @Autowired
@@ -43,12 +55,14 @@ public class TreatmentPlanService {
             HealthRecordRepository healthRecordRepository,
             TreatmentPlanRepository treatmentPlanRepository,
             PrescriptionRepository prescriptionRepository,
-            com.rtms.backend.identity.repository.UserRepository userRepository)
+            com.rtms.backend.identity.repository.UserRepository userRepository,
+            ObjectMapper objectMapper)
     {
         this.healthRecordRepository = healthRecordRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;
         this.prescriptionRepository = prescriptionRepository;
         this.userRepository = userRepository;
+        this.objectMapper = objectMapper;
     }
 
     private void verifyVetAccess(HealthRecord record, AuthenticatedUser currentUser) {
@@ -84,6 +98,8 @@ public class TreatmentPlanService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HEALTH_RECORD_NOT_FOUND", "Health record not found with id: " + healthRecordId));
 
         verifyVetAccess(record, currentUser);
+
+        validateInstructionRoutes(request.getInstructions());
 
         validateDates(
                 request.getStartDate(),
@@ -122,6 +138,8 @@ public class TreatmentPlanService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HEALTH_RECORD_NOT_FOUND", "Health record not found with id: " + plan.getHealthRecordId()));
 
         verifyVetAccess(record, currentUser);
+
+        rejectInjectionRoute(request.getRoute());
 
         validateDates(request.getStartDate(), request.getEndDate());
 
@@ -237,5 +255,36 @@ public class TreatmentPlanService {
         if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", "Start date cannot be after end date");
         }
+    }
+
+    private void rejectInjectionRoute(String route) {
+        if (!TreatmentRoutes.isAllowedTreatmentRoute(route)) {
+            throw injectionNotAllowed();
+        }
+    }
+
+    private void validateInstructionRoutes(String instructions) {
+        if (instructions == null || instructions.isBlank()) return;
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(instructions);
+        } catch (Exception ignored) {
+            return;
+        }
+        JsonNode items = root.isArray() ? root : root.isObject() ? root.get("items") : null;
+        if (items == null || !items.isArray()) return;
+        for (JsonNode item : items) {
+            if (item != null && item.isObject() && item.has("route")) {
+                JsonNode route = item.get("route");
+                if (route == null || !route.isTextual() || !TreatmentRoutes.isAllowedTreatmentRoute(route.asText())) {
+                    throw injectionNotAllowed();
+                }
+            }
+        }
+    }
+
+    private ApiException injectionNotAllowed() {
+        return new ApiException(HttpStatus.BAD_REQUEST, "INJECTION_NOT_ALLOWED",
+                "Treatment plans cannot contain injections");
     }
 }

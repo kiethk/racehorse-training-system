@@ -119,8 +119,8 @@ export function StableMapView({ personName, currentUserId, onMoveHorse, onMoveGr
   };
 
   const ownNote = !ownStallIds ? null
-    : lockOthers ? `Only ${OWN_LABEL[lens].toLowerCase()} are shown; other stalls are locked.`
-    : `${OWN_LABEL[lens]} are shown at full strength; the rest are faded.`;
+    : lockOthers ? `Only ${OWN_LABEL[lens].toLowerCase()} are shown. Other stalls are locked.`
+    : `${OWN_LABEL[lens]} are shown at full strength. The rest are faded.`;
   const is3d = view === '3d' && !unavailable;
 
   return (

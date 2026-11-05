@@ -989,6 +989,9 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         setShowApproveConfirm(false);
         onSuccess(result, completionKind, request);
       } catch (cause) {
+        if (cause instanceof ApiError) {
+          toast.error(cause.message);
+        }
         if (config.errorMapping === 'formatted' && cause instanceof ApiError) {
           const errorMsg = `${cause.status === 403 ? 'Permission denied' : cause.status === 409 ? 'Review state conflict' : 'Review failed'} (${cause.status}${cause.errorCode ? ` · ${cause.errorCode}` : ''}): ${cause.message}`;
           setFormError(errorMsg);
@@ -999,7 +1002,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           const errorMsg =
             cause instanceof ApiError
               ? cause.message
-              : 'Unable to complete the examination. Your entries have been kept; please try again.';
+              : 'Unable to complete the examination. Your entries have been kept. Please try again.';
           setFormError(errorMsg);
         }
         setShowApproveConfirm(false);

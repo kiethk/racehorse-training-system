@@ -6,12 +6,6 @@ export interface ParsedTreatmentInstructions {
   rawText: string;
 }
 
-const GROOM_ROUTES = new Set<string>(['ORAL', 'FEED_ADDITIVE', 'TOPICAL']);
-
-export function isAdministeredByGroom(route: string): boolean {
-  return GROOM_ROUTES.has(route.toUpperCase());
-}
-
 /**
  * Safely parses the treatment plan's instructions string.
  * If formatted as a JSON array of prescriptions, returns the structured items.

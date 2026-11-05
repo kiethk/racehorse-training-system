@@ -446,7 +446,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
         Integer sessions = course.getTotalSessions();
         if (sessions == null || sessions < TrainingLimits.MIN_COURSE_SESSIONS || sessions > TrainingLimits.MAX_COURSE_SESSIONS) {
             throw new ApiException(HttpStatus.CONFLICT, "COURSE_INVALID_SESSIONS", String.format(
-                    "Course '%s' has %s sessions; a course needs between %d and %d sessions to be assigned.",
+                    "Course '%s' has %s sessions. A course needs between %d and %d sessions to be assigned.",
                     course.getName(), sessions, TrainingLimits.MIN_COURSE_SESSIONS, TrainingLimits.MAX_COURSE_SESSIONS));
         }
     }

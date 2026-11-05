@@ -2,12 +2,13 @@ import { Button, EntityLink, Icon, Pill, ProtectedImage } from '@/components/ui'
 import { entityHref } from '@/lib/entityRoute';
 import { cn } from '@/lib/cn';
 import type { TaskBlock as TaskBlockData } from '../lib/groupTasks';
+import type { TreatmentPlan } from '@/features/care/types';
 
 /**
  * One routine duty at one time for every horse that has it, completed in one action. A block of one horse
  * looks the same, so the checklist stays uniform.
  */
-export function TaskBlock({ block, onComplete }: { block: TaskBlockData; onComplete: (block: TaskBlockData) => void }) {
+export function TaskBlock({ block, onComplete, plans, onViewInstructions }: { block: TaskBlockData; onComplete: (block: TaskBlockData) => void; plans: Map<number, TreatmentPlan>; onViewInstructions: (horseId: number) => void }) {
   const finished = block.pending.length === 0;
 
   return (
@@ -47,6 +48,7 @@ export function TaskBlock({ block, onComplete }: { block: TaskBlockData; onCompl
                   >
                     {done && <Icon name="check" size={12} />}
                     <EntityLink href={entityHref('horse', task.horseId, 'GROOM', { stallCode: task.stallCode })}>{task.horseName}</EntityLink>
+                    {plans.has(task.horseId) && <Button type="button" variant="tertiary" size="sm" icon="pill" aria-label={`View instructions for ${task.horseName}`} onClick={(event) => { event.stopPropagation(); onViewInstructions(task.horseId); }} />}
                   </li>
                 );
               })}

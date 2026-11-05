@@ -196,7 +196,7 @@ export default function DesignTestPage() {
           <MetricCard label="Horses in training" value={42} icon="horse" />
           <SelectableCard selected={selectedCard === 'a'} onClick={() => setSelectedCard('a')}>
             <FieldLabel>SelectableCard</FieldLabel>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Picked from a set; click to select.</p>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Select an option from the set by clicking it.</p>
           </SelectableCard>
           <SelectableCard dimmed empty selected={selectedCard === 'b'} onClick={() => setSelectedCard('b')}>
             <FieldLabel>Dimmed, empty</FieldLabel>

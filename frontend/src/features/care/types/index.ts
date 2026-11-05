@@ -172,7 +172,7 @@ export interface PageResponse<T> {
   number: number;
 }
 
-export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'INJECTION_IV' | 'INJECTION_IM' | 'FEED_ADDITIVE';
+export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'FEED_ADDITIVE';
 
 export interface MedicationCatalogItem {
   id: number;
