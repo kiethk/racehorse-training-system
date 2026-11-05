@@ -53,6 +53,7 @@ import {
 } from './examVariantConfig';
 import { healthApi } from '@/features/health/services/healthApi';
 import type { HorseBodyRegion, InjuryRecord } from '@/features/health/types';
+import { AdmissionDocumentPanel } from '../../shared/components/AdmissionDocumentPanel';
 import {
   InjuryMarkerPanel,
   buildInjuryMarkerRequests,
@@ -68,6 +69,7 @@ import {
 } from '../../shared/components/AdmissionDetailLayout';
 import type {
   CareType,
+  AdmissionDocument,
   CareSchedule,
   CareScheduleStatus,
   CompleteCareScheduleRequest,
@@ -133,6 +135,7 @@ export interface ClinicalExamFormProps {
   onDirtyChange?: (dirty: boolean) => void;
   prefillFindings?: string | null;
   injuryMarkers?: CreateInjuryMarkerRequest[];
+  documents?: AdmissionDocument[];
 }
 
 export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamFormProps>(
@@ -152,6 +155,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       onDirtyChange,
       prefillFindings,
       injuryMarkers,
+      documents = [],
     } = props;
 
     const config = EXAM_VARIANT_CONFIG[variant];
@@ -163,6 +167,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     const showTier1 = tier1VerdictEnabled(variant, careType);
     const [verdict, setVerdict] = useState<VetReviewDecision>('ACCEPT');
+    const [openDocumentId, setOpenDocumentId] = useState<number | null>(null);
     const [rejectReason, setRejectReason] = useState('');
 
     const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>(config.defaultDecision);
@@ -1453,6 +1458,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       return (
         <div>
           <ExamVaccinationSection
+            documents={documents}
+            onViewDocument={setOpenDocumentId}
             horseId={horseId}
             careType={careType}
             purpose={schedulePurpose}
@@ -1597,7 +1604,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         {renderDraftBanner()}
         {renderDraftSaved()}
 
-        <div className={admissionDetailGridClassName}>
+        <div className={openDocumentId == null ? admissionDetailGridClassName : 'grid min-w-0 gap-5'}>
           <div className="min-w-0 space-y-5">
             {show3DTab && (
               <div className="border-b border-[var(--color-border)] pb-3">
@@ -1945,8 +1952,19 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       </form>
     );
 
-    return config.layout === 'split-sticky-decision-panel'
+    const form = config.layout === 'split-sticky-decision-panel'
       ? renderSplitStickyForm()
       : renderStackedForm();
+    return openDocumentId == null ? form : (
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,40%)]">
+        <div className="min-w-0">{form}</div>
+        <AdmissionDocumentPanel
+          documents={documents}
+          documentId={openDocumentId}
+          onSelectDocument={setOpenDocumentId}
+          onClose={() => setOpenDocumentId(null)}
+        />
+      </div>
+    );
   },
 );

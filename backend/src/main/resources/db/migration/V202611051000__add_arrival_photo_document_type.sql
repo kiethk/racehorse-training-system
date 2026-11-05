@@ -1,0 +1,8 @@
+ALTER TABLE admission_documents DROP CONSTRAINT IF EXISTS chk_admission_document_type;
+
+ALTER TABLE admission_documents ADD CONSTRAINT chk_admission_document_type
+    CHECK (document_type IN (
+        'HORSE_PHOTO', 'REGISTRATION_DOCUMENT', 'PEDIGREE_CERTIFICATE',
+        'VACCINATION_RECORD', 'DEWORMING_RECORD', 'HEALTH_CERTIFICATE',
+        'PREVIOUS_MEDICAL_RECORD', 'PREVIOUS_INJURY_RECORD', 'ARRIVAL_PHOTO'
+    ));

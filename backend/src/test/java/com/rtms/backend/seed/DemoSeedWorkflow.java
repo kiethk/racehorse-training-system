@@ -368,7 +368,7 @@ abstract class DemoSeedWorkflow {
                 at(date(p,"expiredDate"),9,0); grooms.expireOverdueArrivalReservations(); return created;
             }
             at(date(p,"arrivedDate"),9,0);
-            grooms.confirmArrival(created,groomId);
+            grooms.confirmArrival(created,groomId, List.of(files.get(0)));
 
             if ("VET_REVIEW".equals(target)) {
                 Long vet1Id = staffIds.get("VT01");

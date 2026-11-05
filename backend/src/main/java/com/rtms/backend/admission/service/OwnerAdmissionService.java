@@ -201,6 +201,9 @@ public class OwnerAdmissionService {
         requireSex(request);
         List<AdmissionDocumentType> types = documentTypes == null ? List.of() : documentTypes;
         List<MultipartFile> uploads = files == null ? List.of() : files;
+        if (types.contains(AdmissionDocumentType.ARRIVAL_PHOTO)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Owners cannot upload arrival photos");
+        }
         if (types.stream().anyMatch(java.util.Objects::isNull) || new java.util.HashSet<>(types).size() != types.size()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Upload at most one file per document type");
         }
@@ -243,7 +246,7 @@ public class OwnerAdmissionService {
             MultipartFile file = uploads.get(i);
             AdmissionDocumentType type = types.get(i);
             List<AdmissionDocument> previous = existing.stream()
-                    .filter(doc -> doc.getDocumentType() == type)
+                    .filter(doc -> doc.getDocumentType() == type && doc.getDocumentType() != AdmissionDocumentType.ARRIVAL_PHOTO)
                     .toList();
             previous.forEach(doc -> replacedKeys.add(doc.getFileUrl()));
             documents.deleteAll(previous);
@@ -464,6 +467,9 @@ public class OwnerAdmissionService {
                         HttpStatus.BAD_REQUEST,
                         "Document type is required"
                 );
+            }
+            if (item.documentType() == AdmissionDocumentType.ARRIVAL_PHOTO) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Owners cannot upload arrival photos");
             }
 
             if (!selectedTypes.add(item.documentType())) {

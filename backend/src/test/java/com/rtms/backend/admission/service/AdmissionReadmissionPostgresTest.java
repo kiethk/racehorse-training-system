@@ -56,6 +56,11 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 @EnabledIfEnvironmentVariable(named = "RTMS_UELN_TEST_DB_URL",
         matches = "jdbc:postgresql://localhost:5433/rtms_ueln_test_[a-zA-Z0-9_]+")
 class AdmissionReadmissionPostgresTest {
+    private static MockMultipartFile arrivalPhoto() {
+        byte[] png = Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4ZkAAAAASUVORK5CYII=");
+        return new MockMultipartFile("files", "arrival.png", "image/png", png);
+    }
     @Autowired private OwnerAdmissionService owners;
     @Autowired private AdmissionGroomReviewService groom;
     @Autowired private AdmissionApplicationRepository admissions;
@@ -196,7 +201,7 @@ class AdmissionReadmissionPostgresTest {
             admissions.saveAndFlush(admission);
         });
 
-        var arrived = groom.confirmArrival(newAdmission.admissionId(), groomId);
+        var arrived = groom.confirmArrival(newAdmission.admissionId(), groomId, List.of(arrivalPhoto()));
         assertEquals(horseId, arrived.getHorseId());
         Horse currentHorse = horses.findById(horseId).orElseThrow();
         assertEquals(newOwner, currentHorse.getOwnerId());
@@ -258,7 +263,7 @@ class AdmissionReadmissionPostgresTest {
             admission.setStatus(AdmissionStatus.WAITING_FOR_ARRIVAL);
             admissions.saveAndFlush(admission);
         });
-        var arrived = groom.confirmArrival(created.admissionId(), groomId);
+        var arrived = groom.confirmArrival(created.admissionId(), groomId, List.of(arrivalPhoto()));
         Horse horse = horses.findById(arrived.getHorseId()).orElseThrow();
         assertEquals(HorseSex.FEMALE, horse.getSex());
         assertEquals(HorseStatus.CANDIDATE, horse.getCurrentStatus());

@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, EmptyState, LinkButton, ListSkeleton, PageHeader, Panel, ScreenLayout, Tabs } from '@/components/ui';
+import { Button, EmptyState, EntityLink, LinkButton, ListSkeleton, PageHeader, Panel, ScreenLayout, Tabs } from '@/components/ui';
+import { entityHref } from '@/lib/entityRoute';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { displayError, formatDate, formatDateTime, formatTime } from '@/lib/display';
 import { RACE_STATUS } from '../lib/status';
@@ -26,7 +27,7 @@ const columns: DataTableColumn<RaceRegistrationResponse>[] = [
     sortValue: (item) => item.raceName,
     render: (item) => (
       <div>
-        <div className="font-semibold">{item.raceName}</div>
+        <EntityLink href={entityHref('race', item.id, 'HEAD_TRAINER')} className="font-semibold">{item.raceName}</EntityLink>
         <div className="text-xs text-[var(--color-text-secondary)]">{item.raceCategory}</div>
       </div>
     ),
@@ -37,7 +38,7 @@ const columns: DataTableColumn<RaceRegistrationResponse>[] = [
     sortValue: (item) => item.horseName,
     render: (item) => (
       <div>
-        <div className="font-medium">{item.horseName || `Horse #${item.horseId}`}</div>
+        <EntityLink href={entityHref('horse', item.horseId, 'HEAD_TRAINER')}>{item.horseName || `Horse #${item.horseId}`}</EntityLink>
         {item.horseRegistrationNumber && (
           <div className="font-metric text-xs text-[var(--color-text-muted)]">{item.horseRegistrationNumber}</div>
         )}

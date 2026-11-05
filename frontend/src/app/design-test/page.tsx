@@ -10,6 +10,7 @@ import {
   BackLink,
   ConfirmDialog,
   EmptyState,
+  EntityLink,
   FieldLabel,
   FilterChips,
   FormField,
@@ -118,6 +119,7 @@ export default function DesignTestPage() {
           <IconButton icon="refresh" label="Refresh" />
           <IconButton icon="x" label="Close" size="sm" />
           <BackLink href="/design-test">Back to list</BackLink>
+          <EntityLink href="/manager/horses/1">Example horse</EntityLink>
         </div>
       </Section>
 

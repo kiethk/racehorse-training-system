@@ -1,5 +1,6 @@
 import type { PrescriptionItemRequest } from '@/features/care/types';
 import type { VaccinationRequest } from '@/features/care/types/preventive';
+import type { AdmissionDocumentType } from './owner';
 export type AdmissionStatus =
   | 'GROOM_REVIEW'
   | 'WAITING_FOR_STALL'
@@ -30,7 +31,7 @@ export interface AdmissionSummaryResponse {
 
 export interface AdmissionDocument {
   id: number;
-  documentType: string;
+  documentType: AdmissionDocumentType;
   fileUrl: string;
   recordDate: string | null;
   note: string | null;
@@ -365,13 +366,14 @@ export interface VetQueueSummary {
   awaiting: number;
   inProgress: number;
   approved?: number;
+  reviewed?: number;
 }
 
 export type VetQueueSummaryResponse = VetQueueSummary;
 
 export interface VetQueueFilters {
   search?: string;
-  pill?: 'ALL' | 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'PAUSED' | 'APPROVED';
+  pill?: 'ALL' | 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'PAUSED' | 'APPROVED' | 'REVIEWED';
   admissionStatus?: AdmissionStatus | 'ALL';
   scheduleStatus?: CareScheduleStatus | 'ALL';
   careType?: CareType | 'ALL';

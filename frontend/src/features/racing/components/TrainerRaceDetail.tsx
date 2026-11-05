@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BackLink, DetailSkeleton, EmptyState, Icon, LinkButton, Notice, PageHeader, Panel, ScreenLayout } from '@/components/ui';
+import { BackLink, DetailSkeleton, EmptyState, EntityLink, Icon, LinkButton, Notice, PageHeader, Panel, ScreenLayout } from '@/components/ui';
+import { entityHref } from '@/lib/entityRoute';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import { horseService } from '@/features/horses/services/horseService';
 import type { HorseSpecialty } from '@/features/horses/types';
@@ -79,7 +80,7 @@ export function TrainerRaceDetail({ id }: { id: number }) {
         <div className="space-y-5">
           <RaceSection title="Nominated horse">
             <RaceField label="Horse">
-              <span className="text-base">{data.horseName || `Horse #${data.horseId}`}</span>
+              <EntityLink href={entityHref('horse', data.horseId, 'HEAD_TRAINER')} className="text-base">{data.horseName || `Horse #${data.horseId}`}</EntityLink>
             </RaceField>
             {data.horseRegistrationNumber && (
               <RaceField label="UELN / registration number">

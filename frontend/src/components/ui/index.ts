@@ -10,6 +10,7 @@ export { Button, IconButton, LinkButton, buttonClassName } from './Button';
 export { ChipButton } from './ChipButton';
 export { ConfirmDialog } from './ConfirmDialog';
 export { DataTable } from './DataTable';
+export { EntityLink } from './EntityLink';
 export { createDragDrop } from './DragDrop';
 export {
   DropdownMenu,

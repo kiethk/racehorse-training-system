@@ -1,4 +1,5 @@
-import { Button, Icon, Pill, ProtectedImage } from '@/components/ui';
+import { Button, EntityLink, Icon, Pill, ProtectedImage } from '@/components/ui';
+import { entityHref } from '@/lib/entityRoute';
 import { cn } from '@/lib/cn';
 import type { TaskBlock as TaskBlockData } from '../lib/groupTasks';
 
@@ -45,7 +46,7 @@ export function TaskBlock({ block, onComplete }: { block: TaskBlockData; onCompl
                     )}
                   >
                     {done && <Icon name="check" size={12} />}
-                    {task.horseName}
+                    <EntityLink href={entityHref('horse', task.horseId, 'GROOM', { stallCode: task.stallCode })}>{task.horseName}</EntityLink>
                   </li>
                 );
               })}
@@ -67,7 +68,13 @@ export function TaskBlock({ block, onComplete }: { block: TaskBlockData; onCompl
           {block.evidence.map((evidence) => (
             <div key={evidence.completionId} className="space-y-2">
               {block.evidence.length > 1 && (
-                <p className="text-xs text-[var(--color-text-muted)]">{evidence.horseNames.join(', ')}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {evidence.horseNames.map((name, index) => {
+                    const matches = block.tasks.filter((task) => task.horseName === name);
+                    const task = matches.length === 1 ? matches[0] : null;
+                    return <span key={`${name}-${index}`}>{index > 0 && ', '}<EntityLink href={task ? entityHref('horse', task.horseId, 'GROOM', { stallCode: task.stallCode }) : null}>{name}</EntityLink></span>;
+                  })}
+                </p>
               )}
               {evidence.note && (
                 <p className="whitespace-pre-wrap break-words text-xs text-[var(--color-text-primary)]">

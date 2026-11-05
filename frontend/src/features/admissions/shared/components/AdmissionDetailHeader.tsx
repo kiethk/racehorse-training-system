@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import { EntityLink } from '@/components/ui/EntityLink';
+import { entityHref } from '@/lib/entityRoute';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
 import { Icon } from '@/components/ui/Icon';
 import { ImageLightbox } from '@/components/ui/ImageLightbox';
@@ -17,6 +19,8 @@ interface HeaderDetail {
   status: AdmissionStatus;
   submittedAt: string;
   ownerId?: number;
+  horseId?: number | null;
+  quarantineStallCode?: string | null;
   ownerName?: string | null;
   candidate: { name: string; breed?: string | null; sex?: HorseSex | null } | null;
 }
@@ -41,6 +45,7 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus 
   simplifiedStatus?: boolean;
 }) {
   const [photoOpen, setPhotoOpen] = useState(false);
+  const { user } = useAuth();
   const candidate = detail.candidate;
 
   const effectivePhoto =
@@ -76,7 +81,7 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus 
 
         <div className="min-w-0 flex-1">
           <h1 className="mb-2.5 flex flex-wrap items-center gap-2.5 text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">
-            <span className="truncate">{candidate.name}</span>
+            <EntityLink href={detail.horseId ? entityHref('horse', detail.horseId, user?.role, { stallCode: detail.quarantineStallCode }) : null} className="truncate">{candidate.name}</EntityLink>
             <AdmissionStatusBadge status={detail.status} simplified={simplifiedStatus} />
           </h1>
           <div className="grid min-w-0 grid-cols-1 gap-x-5 gap-y-2 min-[480px]:grid-cols-2 lg:grid-cols-5">
@@ -85,14 +90,10 @@ export function AdmissionDetailHeader({ detail, horsePhotoUrl, simplifiedStatus 
               label="Owner"
               value={
                 detail.ownerId != null ? (
-                  <Link
-                    href={`/manager/accounts?userId=${detail.ownerId}`}
-                    className="group inline-flex items-center gap-1 font-semibold text-[var(--color-primary)] hover:underline truncate max-w-full"
-                    title="View owner account details"
-                  >
+                  <EntityLink href={entityHref('owner', detail.ownerId, user?.role)} className="group inline-flex items-center gap-1 font-semibold truncate max-w-full">
                     <span className="truncate">{detail.ownerName ? `${detail.ownerName} (#${detail.ownerId})` : `#${detail.ownerId}`}</span>
-                    <Icon name="external-link" size={11} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
-                  </Link>
+                    {user?.role === 'CLUB_MANAGER' && <Icon name="external-link" size={11} className="shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />}
+                  </EntityLink>
                 ) : (
                   detail.ownerName || 'You'
                 )

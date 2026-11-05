@@ -7,6 +7,10 @@ import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.admission.dto.GroomAdmissionReviewRequest;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
+import com.rtms.backend.admission.entity.AdmissionDocument;
+import com.rtms.backend.admission.enums.AdmissionDocumentType;
+import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
+import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.entity.HorsePedigree;
 import com.rtms.backend.medical.entity.CareSchedule;
@@ -35,6 +39,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -78,6 +83,10 @@ class AdmissionGroomReviewServiceTest {
 
     @Mock
     private AdmissionNotificationService admissionNotificationService;
+    @Mock
+    private FileStorageService fileStorageService;
+    @Mock
+    private AdmissionDocumentRepository admissionDocumentRepository;
 
     private AdmissionGroomReviewService service;
 
@@ -94,7 +103,10 @@ class AdmissionGroomReviewServiceTest {
                 notificationService,
                 new PedigreeBirthDateValidator(horseRepository),
                 groomProfileRepository,
-                admissionNotificationService);
+                admissionNotificationService,
+                fileStorageService,
+                admissionDocumentRepository);
+        lenient().when(fileStorageService.store(any(), anyString())).thenReturn("local:arrival.png");
         lenient().when(careScheduleRepository.save(any(CareSchedule.class))).thenAnswer(i -> i.getArgument(0));
     }
 
@@ -344,7 +356,7 @@ class AdmissionGroomReviewServiceTest {
         reserved.setGroomId(7L);
         when(stableStallRepository.findQuarantineStallByIdForUpdate(99L)).thenReturn(Optional.of(reserved));
 
-        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 8L));
+        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 8L, List.of(photo())));
 
         assertEquals(403, error.getStatusCode().value());
         verify(horseRepository, never()).save(any());
@@ -369,7 +381,12 @@ class AdmissionGroomReviewServiceTest {
                 .thenReturn(Optional.empty(), Optional.of(schedule));
         when(careScheduleRepository.save(any(CareSchedule.class))).thenReturn(schedule);
 
-        AdmissionApplication result = service.confirmArrival(1L, 7L);
+        AdmissionApplication result = service.confirmArrival(1L, 7L, List.of(photo()));
+        ArgumentCaptor<AdmissionDocument> savedPhoto = ArgumentCaptor.forClass(AdmissionDocument.class);
+        verify(admissionDocumentRepository).save(savedPhoto.capture());
+        assertEquals(AdmissionDocumentType.ARRIVAL_PHOTO, savedPhoto.getValue().getDocumentType());
+        assertEquals(1L, savedPhoto.getValue().getAdmissionId());
+        assertEquals("local:arrival.png", savedPhoto.getValue().getFileUrl());
 
         assertEquals(AdmissionStatus.VET_REVIEW, result.getStatus());
         assertEquals(20L, result.getHorseId());
@@ -391,6 +408,51 @@ class AdmissionGroomReviewServiceTest {
     }
 
     @Test
+    void arrivalPhotosAreRequired() {
+        mockAuthorizedArrival();
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.confirmArrival(1L, 7L, null));
+        assertEquals(400, error.getStatusCode().value());
+        assertEquals("Attach between 1 and 5 arrival photos", error.getReason());
+        verifyNoInteractions(admissionDocumentRepository);
+    }
+
+    @Test
+    void expiredArrivalDoesNotStorePhotos() {
+        AdmissionApplication admission = awaitingArrival();
+        admission.setArrivalDeadlineAt(LocalDateTime.now().minusMinutes(1));
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(admission));
+        StableStall reserved = stall(99L);
+        reserved.setStatus(StallStatus.RESERVED);
+        when(stableStallRepository.findQuarantineStallByIdForUpdate(99L)).thenReturn(Optional.of(reserved));
+        when(admissionApplicationRepository.save(admission)).thenReturn(admission);
+
+        assertEquals(AdmissionStatus.ARRIVAL_EXPIRED,
+                service.confirmArrival(1L, 7L, List.of(photo())).getStatus());
+        verifyNoInteractions(fileStorageService, admissionDocumentRepository);
+    }
+
+    @Test
+    void arrivalPhotosAreLimitedToFive() {
+        mockAuthorizedArrival();
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.confirmArrival(1L, 7L, List.of(photo(), photo(), photo(), photo(), photo(), photo())));
+        assertEquals(400, error.getStatusCode().value());
+        verifyNoInteractions(admissionDocumentRepository);
+    }
+
+    @Test
+    void arrivalPhotosMustBeImages() {
+        mockAuthorizedArrival();
+        var pdf = new MockMultipartFile("files", "file.pdf", "application/pdf", new byte[] {1});
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.confirmArrival(1L, 7L, List.of(pdf)));
+        assertEquals(400, error.getStatusCode().value());
+        assertEquals("Arrival photos must be images (JPEG, PNG, WebP)", error.getReason());
+        verifyNoInteractions(admissionDocumentRepository);
+    }
+
+    @Test
     void confirmArrivalPreservesExistingExamAssignmentAndRejectsRepeatConfirmation() {
         AdmissionApplication admission = awaitingArrival();
         mockArrival(admission);
@@ -408,9 +470,9 @@ class AdmissionGroomReviewServiceTest {
         when(careScheduleRepository.findFirstByAdmissionIdAndCareTypeOrderByCreatedAtDesc(1L, CareType.INITIAL))
                 .thenReturn(Optional.of(schedule));
 
-        service.confirmArrival(1L, 7L);
+        service.confirmArrival(1L, 7L, List.of(photo()));
         ResponseStatusException repeated = assertThrows(ResponseStatusException.class,
-                () -> service.confirmArrival(1L, 7L));
+                () -> service.confirmArrival(1L, 7L, List.of(photo())));
 
         assertEquals(409, repeated.getStatusCode().value());
         verify(careScheduleRepository, never()).save(any());
@@ -437,7 +499,7 @@ class AdmissionGroomReviewServiceTest {
         sire.setDateOfBirth(LocalDate.of(2022, 1, 1));
         when(horseRepository.findByRegistrationNumber("999999SIR000001")).thenReturn(List.of(sire));
 
-        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L));
+        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L, List.of(photo())));
 
         assertEquals(400, error.getStatusCode().value());
         assertTrue(error.getReason().contains("sire"));
@@ -458,7 +520,7 @@ class AdmissionGroomReviewServiceTest {
         when(horseRepository.findByRegistrationNumberForUpdate("999999TST000001"))
                 .thenReturn(List.of(existingHorse));
 
-        assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L));
+        assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L, List.of(photo())));
         assertEquals(42L, existingHorse.getOwnerId());
         verify(horseRepository, never()).save(any());
         verify(admissionApplicationRepository, never()).save(any());
@@ -478,7 +540,7 @@ class AdmissionGroomReviewServiceTest {
         when(horseRepository.findByRegistrationNumberForUpdate("999999TST000001")).thenReturn(List.of(existing));
         when(horseRepository.save(existing)).thenReturn(existing);
 
-        service.confirmArrival(1L, 7L);
+        service.confirmArrival(1L, 7L, List.of(photo()));
 
         assertEquals(HorseSex.FEMALE, existing.getSex());
         assertNull(legacy.getSex());
@@ -498,7 +560,7 @@ class AdmissionGroomReviewServiceTest {
             return horse;
         });
 
-        service.confirmArrival(1L, 7L);
+        service.confirmArrival(1L, 7L, List.of(photo()));
 
         var saved = ArgumentCaptor.forClass(Horse.class);
         verify(horseRepository).save(saved.capture());
@@ -513,7 +575,7 @@ class AdmissionGroomReviewServiceTest {
         squatter.setId(77L);
         when(horseRepository.findByCurrentStallId(99L)).thenReturn(Optional.of(squatter));
 
-        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L));
+        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L, List.of(photo())));
 
         assertEquals(409, error.getStatusCode().value());
         verify(stableStallRepository, never()).save(any());
@@ -532,7 +594,7 @@ class AdmissionGroomReviewServiceTest {
         when(admissionApplicationRepository.existsByHorseIdAndIdNotAndStatusNotIn(eq(20L), eq(1L), any()))
                 .thenReturn(true);
 
-        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L));
+        var error = assertThrows(ResponseStatusException.class, () -> service.confirmArrival(1L, 7L, List.of(photo())));
 
         assertEquals(409, error.getStatusCode().value());
         verify(horseRepository, never()).save(any());
@@ -551,7 +613,7 @@ class AdmissionGroomReviewServiceTest {
                 .thenReturn(List.of(existingHorse));
         when(horseRepository.save(existingHorse)).thenReturn(existingHorse);
 
-        AdmissionApplication result = service.confirmArrival(1L, 7L);
+        AdmissionApplication result = service.confirmArrival(1L, 7L, List.of(photo()));
 
         assertEquals(20L, result.getHorseId());
         assertEquals(5L, existingHorse.getOwnerId());
@@ -586,6 +648,18 @@ class AdmissionGroomReviewServiceTest {
         reserved.setGroomId(7L);
         when(stableStallRepository.findQuarantineStallByIdForUpdate(99L)).thenReturn(Optional.of(reserved));
         lenient().when(admissionApplicationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    }
+
+    private void mockAuthorizedArrival() {
+        when(admissionApplicationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(awaitingArrival()));
+        StableStall reserved = stall(99L);
+        reserved.setStatus(StallStatus.RESERVED);
+        reserved.setGroomId(7L);
+        when(stableStallRepository.findQuarantineStallByIdForUpdate(99L)).thenReturn(Optional.of(reserved));
+    }
+
+    private static MockMultipartFile photo() {
+        return new MockMultipartFile("files", "arrival.png", "image/png", new byte[] {1, 2, 3});
     }
 
     private AdmissionApplication admission() {

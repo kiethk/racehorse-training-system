@@ -8,6 +8,8 @@ import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { EntityLink } from '@/components/ui/EntityLink';
+import { entityHref } from '@/lib/entityRoute';
 import { Icon } from '@/components/ui/Icon';
 import { Pill } from '@/components/ui/StatusBadge';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
@@ -45,7 +47,7 @@ import type {
 } from '../types';
 import { VetReviewForm } from './VetReviewForm';
 
-type QueuePillFilter = 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'APPROVED';
+type QueuePillFilter = 'ACTIVE' | 'AWAITING' | 'IN_PROGRESS' | 'APPROVED' | 'REVIEWED';
 
 const examStatusOptions: Array<{ value: CareScheduleStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'All Exam States' },
@@ -210,7 +212,7 @@ export function VetAdmissionQueue() {
             }
             setDeepLinkedSchedule(schedule);
             setSelectedId(schedule.admissionId);
-            setActiveTab(schedule.status === 'COMPLETED' ? 'history' : 'exam');
+            setActiveTab('exam');
           })
           .catch((cause) => {
             if (active) setDetailError(errorText(cause));
@@ -283,11 +285,14 @@ export function VetAdmissionQueue() {
             awaiting: awaitingCount,
             inProgress: inProgressCount,
             approved: approvedCount,
+            reviewed: allContent.filter((r) => r.careSchedule?.status === 'COMPLETED').length,
           });
 
           let filtered = allContent;
           if (queuePillFilter === 'APPROVED') {
             filtered = allContent.filter((r) => r.admissionStatus === 'APPROVED');
+          } else if (queuePillFilter === 'REVIEWED') {
+            filtered = allContent.filter((r) => r.careSchedule?.status === 'COMPLETED');
           } else if (queuePillFilter === 'ACTIVE') {
             filtered = activeRows;
           } else if (queuePillFilter === 'AWAITING') {
@@ -367,6 +372,7 @@ export function VetAdmissionQueue() {
       if (queuePillFilter === 'AWAITING' && summary.awaiting != null) return summary.awaiting;
       if (queuePillFilter === 'IN_PROGRESS' && summary.inProgress != null) return summary.inProgress;
       if (queuePillFilter === 'APPROVED' && summary.approved != null) return summary.approved;
+      if (queuePillFilter === 'REVIEWED' && summary.reviewed != null) return summary.reviewed;
     }
     return totalElements;
   }, [queuePillFilter, summary, totalElements, filtersNarrowList]);
@@ -416,7 +422,7 @@ export function VetAdmissionQueue() {
         setDocuments(docs);
         setCareSchedules(schedulesPage.content);
         if (detailData.status === 'APPROVED') {
-          setActiveTab((prev) => (prev === 'exam' ? 'history' : prev));
+          setActiveTab('exam');
         }
         if (detailData.quarantineStallCode) {
           setStallCodes((prev) => ({
@@ -550,7 +556,7 @@ export function VetAdmissionQueue() {
     const row = items.find((r) => r.admissionId === id);
     const isApproved = forceViewRecord || row?.admissionStatus === 'APPROVED' || queuePillFilter === 'APPROVED';
     // When approved, user only views records; a completed exam has no review form to fill either.
-    setActiveTab(isApproved || schedule?.status === 'COMPLETED' ? 'history' : 'exam');
+    setActiveTab('exam');
     setScheduleWarning('');
     setIsDrawerDirty(false);
     setDrawerOpen(true);
@@ -650,7 +656,7 @@ export function VetAdmissionQueue() {
       <InfoRow label="Priority" value={selectedRow ? getPriorityBadge(selectedRow.careSchedule?.careType, selectedRow.careSchedule?.purpose).label : 'Standard'} />
       <InfoRow label="Schedule" value={currentActiveSchedule ? formatLabel(currentActiveSchedule.status) : 'Not scheduled'} />
       <InfoRow label="Quarantine stall" value={detail.quarantineStallCode || 'Not assigned'} />
-      <InfoRow label="Trainer" value={detail.trainerName || (detail.trainerId ? `Trainer #${detail.trainerId}` : 'Pending assignment')} />
+      <InfoRow label="Trainer" value={<EntityLink href={detail.trainerId ? entityHref('user', detail.trainerId, 'VETERINARIAN') : null}>{detail.trainerName || (detail.trainerId ? `Trainer #${detail.trainerId}` : 'Pending assignment')}</EntityLink>} />
       {currentActiveSchedule?.scheduledAt && <InfoRow label="Scheduled" value={formatDateTime(currentActiveSchedule.scheduledAt)} />}
       {canStartExam && (
         <Button type="button" className="w-full transition-all active:scale-[0.97]" variant="primary" loading={startingExam} onClick={handleStartExam} icon="activity">
@@ -681,6 +687,7 @@ export function VetAdmissionQueue() {
             { value: 'AWAITING', label: 'Awaiting', count: summary.awaiting },
             { value: 'IN_PROGRESS', label: 'In exam', count: summary.inProgress },
             { value: 'APPROVED', label: 'Approved', count: summary.approved ?? 0 },
+            { value: 'REVIEWED', label: 'Reviewed', count: summary.reviewed ?? 0 },
           ]}
         />
         <Button type="button" onClick={handleRefresh} disabled={loading} icon="refresh" variant="secondary" size="sm" className="transition-all active:scale-[0.98]">
@@ -812,9 +819,9 @@ export function VetAdmissionQueue() {
                       <HorseAvatar name={row.candidateName} image={row.imageUrl} size={42} rounded="md" />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                          <EntityLink href={row.horseId ? entityHref('horse', row.horseId, 'VETERINARIAN') : null} className="text-base font-bold text-[var(--color-text-primary)] truncate">
                             {row.candidateName}
-                          </span>
+                          </EntityLink>
                           <Pill tone={priority.tone} size="sm" icon={priority.icon}>
                             {priority.label}
                           </Pill>
@@ -904,7 +911,7 @@ export function VetAdmissionQueue() {
             />
           ) : (
             <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm font-semibold text-[var(--color-text-primary)]">
-              {selectedRow?.candidateName ?? 'Loading admission'}
+              <EntityLink href={selectedRow?.horseId ? entityHref('horse', selectedRow.horseId, 'VETERINARIAN') : null}>{selectedRow?.candidateName ?? 'Loading admission'}</EntityLink>
             </div>
           )}
           pipeline={detail ? <AdmissionPipeline detail={detail} /> : <DetailSkeleton />}
@@ -1013,6 +1020,7 @@ export function VetAdmissionQueue() {
                         asideTop={examDetailsCard}
                         onSuccess={handleReviewSuccess}
                         onDirtyChange={handleDirtyChange}
+                        documents={documents}
                       />
                     ) : currentActiveSchedule?.status === 'COMPLETED' ? (
                       <div className="rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] p-5 text-center">
