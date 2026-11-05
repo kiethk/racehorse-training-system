@@ -76,7 +76,7 @@ public class CareSchedule {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
-    @Column(name = "cancel_reason", columnDefinition = "TEXT")
+    @Transient
     private String cancelReason;
 
     @Column(name = "created_at", nullable = false, updatable = false)

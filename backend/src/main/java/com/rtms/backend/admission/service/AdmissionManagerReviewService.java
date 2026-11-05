@@ -240,23 +240,22 @@ public class AdmissionManagerReviewService {
         horse.setCurrentStallId(null);
         horseRepository.save(horse);
 
-        // Cancel active CareSchedule records for this horse
+        // AD-022/AD-025 rule 6: lịch chưa diễn ra của ngựa rớt tuyển bị xóa cứng, không CANCELLED.
         if (careScheduleRepository != null) {
+            // AD-022: OVERDUE thay thế IN_PROGRESS trong danh sách chặn — ca đã bắt đầu khám
+            // thì vẫn phải chặn reject như trước, không được âm thầm xóa mất.
             List<CareSchedule> nonCancellableSchedules =
-                    careScheduleRepository.findByHorseIdAndStatusIn(
-                            horse.getId(), List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS));
+                    careScheduleRepository.findByHorseIdAndStatusIn(horse.getId(),
+                            List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS,
+                                    CareScheduleStatus.DELAYED, CareScheduleStatus.OVERDUE, CareScheduleStatus.PAUSED));
             if (!nonCancellableSchedules.isEmpty()) {
                 throw new IllegalStateException(
-                        "Admission cannot be rejected while veterinary care is REQUESTED or IN_PROGRESS");
+                        "Admission cannot be rejected while veterinary care is REQUESTED, IN_PROGRESS,"
+                                + " DELAYED, OVERDUE or PAUSED");
             }
-            List<CareSchedule> careSchedulesToCancel =
-                    careScheduleRepository.findByHorseIdAndStatusIn(
-                            horse.getId(), List.of(CareScheduleStatus.SCHEDULED));
-            for (CareSchedule cs : careSchedulesToCancel) {
-                cs.setStatus(CareScheduleStatus.CANCELLED);
-                cs.setCancelReason("Admission rejected by manager");
-            }
-            careScheduleRepository.saveAll(careSchedulesToCancel);
+            // Chỉ lịch chưa diễn ra (SCHEDULED) bị xóa cứng.
+            careScheduleRepository.deleteOpenSchedulesIfUnreferenced(
+                    horse.getId(), List.of(CareScheduleStatus.SCHEDULED));
         }
 
         admission.setManagerId(managerId);

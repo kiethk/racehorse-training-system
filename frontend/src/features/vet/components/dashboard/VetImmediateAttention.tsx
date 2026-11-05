@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { ListSkeleton } from "@/components/ui/states";
 import type { CareSchedule } from "@/features/admissions/types";
 import type { Horse } from "@/features/stable/types";
+import { getScheduleStatusDisplay } from "@/features/care/lib/scheduleStatusDisplay";
 
 interface VetImmediateAttentionProps {
   loading: boolean;
@@ -72,10 +73,6 @@ export function VetImmediateAttention({
               horse?.currentStallId != null
                 ? stallMap.get(horse.currentStallId)
                 : null;
-            const excerpt =
-              schedule.description ||
-              schedule.notes ||
-              "Emergency examination requested";
 
             return (
               <div
@@ -111,13 +108,9 @@ export function VetImmediateAttention({
                     </div>
                   </div>
                   <Pill tone="danger" size="sm">
-                    {schedule.status}
+                    {getScheduleStatusDisplay(schedule.status).label}
                   </Pill>
                 </div>
-
-                <p className="mt-2 line-clamp-2 text-xs text-[var(--color-text-secondary)]">
-                  {excerpt}
-                </p>
 
                 <div className="mt-3 flex justify-end">
                   <LinkButton

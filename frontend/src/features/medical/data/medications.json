@@ -1,0 +1,17 @@
+[
+  { "name": "Phenylbutazone", "therapeuticClass": "NSAID", "defaultDosage": "4.4 mg/kg", "defaultFrequency": "BID", "defaultRoute": "ORAL" },
+  { "name": "Flunixin Meglumine", "therapeuticClass": "NSAID", "defaultDosage": "1.1 mg/kg", "defaultFrequency": "BID", "defaultRoute": "INJECTION_IV" },
+  { "name": "Furosemide", "therapeuticClass": "Diuretic", "defaultDosage": "1 mg/kg", "defaultFrequency": "ONCE", "defaultRoute": "INJECTION_IV" },
+  { "name": "Dexamethasone", "therapeuticClass": "Corticosteroid", "defaultDosage": "0.05 mg/kg", "defaultFrequency": "ONCE", "defaultRoute": "INJECTION_IV" },
+  { "name": "Prednisolone", "therapeuticClass": "Corticosteroid", "defaultDosage": "0.5 mg/kg", "defaultFrequency": "SID", "defaultRoute": "ORAL" },
+  { "name": "Omeprazole", "therapeuticClass": "Gastric protectant", "defaultDosage": "4 mg/kg", "defaultFrequency": "SID", "defaultRoute": "ORAL" },
+  { "name": "Aspirin", "therapeuticClass": "NSAID", "defaultDosage": "25 mg/kg", "defaultFrequency": "SID", "defaultRoute": "ORAL" },
+  { "name": "Procaine HCl Penicillin G", "therapeuticClass": "Antibiotic", "defaultDosage": "22000 IU/kg", "defaultFrequency": "SID", "defaultRoute": "INJECTION_IM" },
+  { "name": "Isoxsuprine HCl", "therapeuticClass": "Vasodilator", "defaultDosage": "0.4 mg/kg", "defaultFrequency": "BID", "defaultRoute": "ORAL" },
+  { "name": "Midazolam", "therapeuticClass": "Sedative", "defaultDosage": "0.1 mg/kg", "defaultFrequency": "ONCE", "defaultRoute": "INJECTION_IV" },
+  { "name": "Atropine Sulfate", "therapeuticClass": "Anticholinergic", "defaultDosage": "0.02 mg/kg", "defaultFrequency": "ONCE", "defaultRoute": "INJECTION_IV" },
+  { "name": "Acepromazine", "therapeuticClass": "Sedative", "defaultDosage": "0.05 mg/kg", "defaultFrequency": "ONCE", "defaultRoute": "INJECTION_IM" },
+  { "name": "Magnesium Sulfate", "therapeuticClass": "Sedative adjunct", "defaultDosage": "1 g/100 kg", "defaultFrequency": "ONCE", "defaultRoute": "INJECTION_IV" },
+  { "name": "Trimethoprim-Sulfa", "therapeuticClass": "Antibiotic", "defaultDosage": "30 mg/kg", "defaultFrequency": "BID", "defaultRoute": "ORAL" },
+  { "name": "Diclofenac Gel", "therapeuticClass": "Topical NSAID", "defaultDosage": "10 g topical", "defaultFrequency": "BID", "defaultRoute": "TOPICAL" }
+]

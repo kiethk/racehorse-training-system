@@ -457,7 +457,10 @@ export function TrainerStableView() {
           horseName={selectedHorse.name}
           open={reportOpen}
           onClose={() => setReportOpen(false)}
-          onSuccess={() => setReportOpen(false)}
+          onSuccess={() => {
+            setReportOpen(false);
+            void loadData(true);
+          }}
         />
       )}
     </ScreenLayout>

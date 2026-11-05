@@ -84,7 +84,7 @@ export function TrainingDecisionSection(props: TrainingDecisionSectionProps) {
                 setFieldErrors((errs) => ({ ...errs, restrictionDetails: '' }));
               }
             }}
-            placeholder="e.g. Tendon strain: box rest with hand-walking twice daily; recheck before trotting…"
+            placeholder="e.g. Tendon strain: box rest with hand-walking twice daily, recheck before trotting…"
           />
           {fieldErrors.restrictionDetails && (
             <p className="text-xs font-medium text-[var(--color-danger)]">{fieldErrors.restrictionDetails}</p>

@@ -57,7 +57,7 @@ public class CareScheduleController {
     public ApiResponse<List<UrgentCaseReportResponse>> urgentCaseReports(
             @PathVariable Long scheduleId,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(careScheduleService.getUrgentCaseReports(scheduleId, currentUser.getUserId()));
+        return ApiResponse.success(careScheduleService.getIncidentCaseReports(scheduleId, currentUser.getUserId()));
     }
 
     @GetMapping(value = "/urgent-alerts/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -124,14 +124,11 @@ public class CareScheduleController {
         return ApiResponse.success(careScheduleService.completeCareSchedule(id, request, currentUser.getUserId()));
     }
 
-    @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasRole('CLUB_MANAGER')")
-    public ApiResponse<CareScheduleResponse> cancel(
-            @PathVariable Long id,
-            @Valid @RequestBody CancelCareScheduleRequest request,
-            @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(careScheduleService.cancelCareSchedule(id, request, currentUser.getUserId()));
-    }
+    /**
+     * AD-022 removed POST /{id}/cancel: a care schedule is never cancelled. Use
+     * POST /{id}/reschedule to move it, or let the lifecycle sweep mark it OVERDUE and
+     * roll it to the next working day at 17:00.
+     */
 
     @PostMapping("/create-next")
     @PreAuthorize("hasAuthority('VET_EXAM_MANAGE') or hasAuthority('ROLE_VETERINARIAN') or principal.role == 'VETERINARIAN'")

@@ -41,14 +41,14 @@ BEGIN
         IF (SELECT training_decision FROM horses WHERE id = p_horse) = 'BLOCKED' THEN
             EXIT WHEN c.scheduled_at + INTERVAL '25 minutes' > v_limit;
             PERFORM pg_temp.complete_care(c.id, c.scheduled_at + INTERVAL '25 minutes',
-                p_findings => 'Recheck: the problem noted at the last visit has resolved; gait, temperature and appetite normal.',
-                p_diagnosis => 'Recovered; fit to resume training', p_decision => 'ALLOWED',
+                p_findings => 'Recheck: the problem noted at the last visit has resolved, gait, temperature and appetite normal.',
+                p_diagnosis => 'Recovered, fit to resume training', p_decision => 'ALLOWED',
                 p_notes => 'Cleared to return to normal work.',
                 p_temp => 37.8, p_hr => 36, p_rr => 12, p_weight => round(pg_temp.rnd('rw' || c.id, 400, 470), 1), p_bcs => 5.5);
         ELSE
-            v_assign := c.updated_at + INTERVAL '1 day';
-            EXIT WHEN v_assign > v_limit OR v_assign >= c.scheduled_at;
-            PERFORM pg_temp.cancel_care(c.id, 'Horse recovered at the previous recheck; no further rechecks needed.', v_assign);
+            -- AD-022: ngua da khoi (ALLOWED) -> ket thuc chuoi tai kham dot ngot;
+            -- ca hen ke tiep (c) da duoc xep gio va giu nguyen lam lich dinh ky.
+            EXIT;
         END IF;
     END LOOP;
 END $$ LANGUAGE plpgsql;
@@ -147,9 +147,9 @@ BEGIN
         END IF;
         IF p_defer AND v_visits = 0 THEN
             PERFORM pg_temp.complete_care(m.id, v_done,
-                p_findings => 'Pre-vaccination check: mild serous nasal discharge and a soft cough; lungs clear, temperature 38.4 °C.',
-                p_diagnosis => 'Mild upper airway irritation; vaccination postponed', p_decision => 'ALLOWED',
-                p_treatment => 'Steam the hay for a week; recheck before vaccinating.', p_notes => 'Vaccination deferred by 7 days.',
+                p_findings => 'Pre-vaccination check: mild serous nasal discharge and a soft cough, lungs clear, temperature 38.4 °C.',
+                p_diagnosis => 'Mild upper airway irritation, vaccination postponed', p_decision => 'ALLOWED',
+                p_treatment => 'Steam the hay for a week, recheck before vaccinating.', p_notes => 'Vaccination deferred by 7 days.',
                 p_symptoms => 'Soft cough, clear nasal discharge',
                 p_temp => 38.4, p_hr => 40, p_rr => 16, p_bcs => 5.5, p_defer_days => 7);
         ELSE
@@ -159,8 +159,8 @@ BEGIN
             IF pg_temp.rndi('opt' || m.id, 1, 6) = 1 THEN v_codes := v_codes || 'RABIES'::TEXT; END IF;
             SELECT string_agg(pp.name, ', ') INTO v_names FROM preventive_protocols pp WHERE pp.code = ANY (v_codes);
             PERFORM pg_temp.complete_care(m.id, v_done,
-                p_findings => 'Pre-vaccination check: temperature, heart and lungs normal; no swelling at previous injection sites.',
-                p_diagnosis => 'Healthy; vaccinated per preventive protocol', p_decision => 'ALLOWED',
+                p_findings => 'Pre-vaccination check: temperature, heart and lungs normal, no swelling at previous injection sites.',
+                p_diagnosis => 'Healthy, vaccinated per preventive protocol', p_decision => 'ALLOWED',
                 p_treatment => 'Administered: ' || v_names, p_vaccines => v_codes,
                 p_temp => round(pg_temp.rnd('t' || m.id, 37.4, 38.1), 1), p_hr => pg_temp.rndi('h' || m.id, 30, 40),
                 p_rr => pg_temp.rndi('r' || m.id, 10, 15), p_weight => round(pg_temp.rnd('w' || m.id, 410, 480), 1),
@@ -223,9 +223,9 @@ BEGIN
                SET groom_id = v_groom, groom_decision = a.groom_decision, groom_reviewed_at = v_t, updated_at = v_t,
                    groom_feedback = CASE WHEN a.groom_decision = 'REJECTED'
                        THEN 'The vaccination record is out of date: the last influenza / tetanus dose was given in November 2024. Please resubmit with a current vaccination record.'
-                       ELSE (ARRAY['Identity, UELN and pedigree match the registry; the required documents are complete and legible.',
+                       ELSE (ARRAY['Identity, UELN and pedigree match the registry, the required documents are complete and legible.',
                                    'Dossier complete. Registration and vaccination record checked against the photo and UELN.',
-                                   'All four required documents present; health certificate and deworming record also supplied.'])
+                                   'All four required documents present, health certificate and deworming record also supplied.'])
                             [pg_temp.rndi('gf' || a.k, 1, 3)] END
              WHERE id = v_adm;
             IF a.groom_decision = 'REJECTED' THEN
@@ -306,13 +306,13 @@ BEGIN
                 p_findings => CASE WHEN a.vet_decision = 'BLOCKED'
                      THEN 'Physical examination completed in person. ' || a.restriction
                      ELSE 'Physical examination completed in person. General condition, respiratory, cardiovascular, musculoskeletal and digestive systems within normal limits.' END,
-                p_diagnosis => CASE WHEN a.vet_decision = 'BLOCKED' THEN 'Minor finding after transport; fit for admission after a short rest'
+                p_diagnosis => CASE WHEN a.vet_decision = 'BLOCKED' THEN 'Minor finding after transport, fit for admission after a short rest'
                      ELSE 'Clinically healthy' END,
                 p_decision => a.vet_decision, p_restriction => a.restriction,
                 p_treatment => CASE WHEN a.vet_decision = 'BLOCKED' THEN 'Rest and monitoring until the recheck.'
                      ELSE 'No medical treatment required.' END,
                 p_notes => CASE WHEN a.vet_decision = 'BLOCKED' THEN 'Recheck booked before the horse starts training.'
-                     ELSE 'Calm, alert and responsive after transport; supplied certificates checked.' END,
+                     ELSE 'Calm, alert and responsive after transport, supplied certificates checked.' END,
                 p_symptoms => CASE WHEN a.vet_decision = 'BLOCKED' THEN 'Noted on arrival by the quarantine groom' ELSE 'No symptoms observed' END,
                 p_next_at => CASE WHEN a.vet_decision = 'BLOCKED' THEN date_trunc('day', v_done) + INTERVAL '7 days 14 hours' END,
                 p_next_desc => 'Recheck before training', p_history_codes => v_codes, p_history_dates => v_dates,
@@ -335,14 +335,14 @@ BEGIN
             v_t := pg_temp.ts(a.trainer_at);
             v_remarks := CASE a.readiness
                 WHEN 'READY' THEN (ARRAY[
-                    'Balanced, correct conformation and a calm, workable temperament. Moves straight with good reach; can start a racing preparation straight after admission.',
-                    'Strong, well-muscled and light on the forehand. Settles quickly on the track; ready for race-specific work.'])
+                    'Balanced, correct conformation and a calm, workable temperament. Moves straight with good reach, can start a racing preparation straight after admission.',
+                    'Strong, well-muscled and light on the forehand. Settles quickly on the track, ready for race-specific work.'])
                     [pg_temp.rndi('rm' || a.k, 1, 2)]
                 WHEN 'UNSUITABLE' THEN
                     'Tense and difficult to handle on the track, with an irregular, short stride behind. Not a racing prospect at this stage.'
                 ELSE (ARRAY[
                     'Sound and willing but still building strength through the topline and hindquarters. Needs a conditioning block before any race entry.',
-                    'Good temperament; stride still short and the horse tires in the last furlong. Conditioning first, then speed work.',
+                    'Good temperament, stride still short and the horse tires in the last furlong. Conditioning first, then speed work.',
                     'Correct legs and a kind eye, but green at the gate and on turns. Needs gate schooling and a base fitness block.'])
                     [pg_temp.rndi('rm' || a.k, 1, 3)] END;
             INSERT INTO racing_readiness_assessments (horse_id, readiness_status, assessment_date, remarks, created_at, trainer_id,
@@ -376,9 +376,9 @@ BEGIN
                 UPDATE admission_applications
                    SET manager_id = v_manager, manager_decision = 'APPROVED', manager_reviewed_at = v_t, status = 'APPROVED',
                        updated_at = v_t,
-                       manager_feedback = (ARRAY['Dossier, intake examination and trainer assessment reviewed; admitted to the regular stable.',
-                                                 'Approved. Owner informed; the horse moves to its regular stall today.',
-                                                 'Approved on the trainer''s recommendation; review progress after the first training block.'])
+                       manager_feedback = (ARRAY['Dossier, intake examination and trainer assessment reviewed, admitted to the regular stable.',
+                                                 'Approved. Owner informed, the horse moves to its regular stall today.',
+                                                 'Approved on the trainer''s recommendation, review progress after the first training block.'])
                                           [pg_temp.rndi('mf' || a.k, 1, 3)]
                  WHERE id = v_adm;
                 PERFORM pg_temp.upsert_milestone(v_horse, 'preventive:approval:' || v_adm, v_manager, v_t::DATE + 1, v_t);

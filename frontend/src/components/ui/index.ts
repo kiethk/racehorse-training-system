@@ -9,6 +9,7 @@ export { BrandLogo } from './BrandLogo';
 export { Button, IconButton, LinkButton, buttonClassName } from './Button';
 export { ChipButton } from './ChipButton';
 export { ConfirmDialog } from './ConfirmDialog';
+export { CreatableCombobox, type CreatableComboboxOption } from './CreatableCombobox';
 export { DataTable } from './DataTable';
 export { createDragDrop } from './DragDrop';
 export {

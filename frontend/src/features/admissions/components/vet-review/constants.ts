@@ -62,14 +62,6 @@ export const diagnosisOptions = [
   'Medically unsuitable for admission',
 ];
 
-export const followUpDescriptionOptions = [
-  'Routine follow-up recheck examination',
-  'Post-treatment clinical reassessment',
-  'Lameness and gait reassessment',
-  'Respiratory and infectious disease recheck',
-  'Training restriction clearance examination',
-];
-
 export interface TrainingDecisionOption {
   value: import('../../types').TrainingDecision;
   title: string;

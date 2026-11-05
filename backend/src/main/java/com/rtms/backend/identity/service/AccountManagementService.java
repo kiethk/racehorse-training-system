@@ -529,7 +529,7 @@ public class AccountManagementService {
                 if (careScheduleRepository != null) {
                     boolean hasPendingSchedules = careScheduleRepository.existsByVeterinarianIdAndStatusIn(
                             targetUserId,
-                            List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
+                            CareScheduleStatus.OPEN
                     );
                     if (hasPendingSchedules) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,

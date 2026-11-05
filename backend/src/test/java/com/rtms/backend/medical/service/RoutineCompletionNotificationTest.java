@@ -17,7 +17,6 @@ import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
-import com.rtms.backend.medical.repository.ClinicalMedicationRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
@@ -96,9 +95,8 @@ class RoutineCompletionNotificationTest {
                 trainingDecisionService,
                 mock(PreventiveVaccinationService.class),
                 injuryRecordRepository,
-                mock(ClinicalMedicationRepository.class),
                 treatmentPlanRepository,
-                mock(PrescriptionRepository.class)
+                new com.fasterxml.jackson.databind.ObjectMapper()
         );
 
         horse = new Horse();

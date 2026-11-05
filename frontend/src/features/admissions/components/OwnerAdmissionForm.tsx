@@ -270,7 +270,7 @@ export function OwnerAdmissionForm() {
     } catch {
       setOcrNotice({
         tone: 'warning',
-        message: 'AI OCR service is temporarily unavailable. File has been attached; please review and enter details manually.',
+        message: 'AI OCR service is temporarily unavailable. File has been attached. Please review and enter details manually.',
       });
     } finally {
       setScanningDocType(null);

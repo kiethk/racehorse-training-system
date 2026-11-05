@@ -21,6 +21,8 @@ import { displayError } from '@/lib/display';
 export interface HorseProfileContext {
   horse: Horse;
   specialty: HorseSpecialty | null;
+  /** Re-reads the horse in place, keeping the open tab. */
+  refreshHorse: () => void;
 }
 
 type ProfileContent = ReactNode | ((profile: HorseProfileContext) => ReactNode);
@@ -67,6 +69,11 @@ function HorseProfileContent({
   const reload = useCallback(() => {
     setReloadKey((k) => k + 1);
   }, []);
+
+  // Keeps the open tab: reload() clears the horse, which remounts every tab.
+  const refreshHorse = useCallback(() => {
+    void horseService.getById(horseId).then(setHorse).catch(() => undefined);
+  }, [horseId]);
 
   useEffect(() => {
     let active = true;
@@ -153,7 +160,7 @@ function HorseProfileContent({
     );
   }
 
-  const profile: HorseProfileContext = { horse, specialty };
+  const profile: HorseProfileContext = { horse, specialty, refreshHorse };
   const actorTabs = typeof extraTabs === 'function' ? extraTabs(profile) : extraTabs;
   const overview = typeof overviewContent === 'function' ? overviewContent(profile) : overviewContent;
   const tabs: HorseDetailTab[] = [

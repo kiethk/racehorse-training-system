@@ -1,21 +1,23 @@
 package com.rtms.backend.medical.dto;
 
 import com.rtms.backend.medical.enums.MedicationRoute;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import java.time.LocalDate;
-
-/** Đơn thuốc kê từ danh mục chuẩn tại thời điểm hoàn tất ca khám (WF-04, A3). */
+/**
+ * Đơn thuốc Vet kê tự do (Track 0 — ROADMAP v3.0).
+ * Bỏ medicationId/withdrawalDays/startDate/endDate; thêm medicationName/duration/notes.
+ * BE tự tính startDate = today, endDate = today + duration.
+ * Serialize thành JSON snake_case lưu vào treatment_plans.instructions.
+ */
 public class PrescriptionItemRequest {
 
-    @NotNull(message = "Medication ID is required")
-    private Long medicationId;
+    @NotBlank(message = "Medication name is required")
+    @Size(max = 150, message = "Medication name must not exceed 150 characters")
+    private String medicationName;
 
     @NotBlank(message = "Dosage is required")
     @Size(max = 100, message = "Dosage must not exceed 100 characters")
@@ -25,30 +27,19 @@ public class PrescriptionItemRequest {
     private MedicationRoute route;
 
     @NotBlank(message = "Frequency is required")
+    @Size(max = 50, message = "Frequency must not exceed 50 characters")
     private String frequency;
 
-    @NotNull(message = "Start date is required")
-    private LocalDate startDate;
+    @NotNull(message = "Duration is required")
+    @Min(value = 1, message = "Duration must be at least 1 day")
+    @Max(value = 365, message = "Duration must not exceed 365 days")
+    private Integer duration;
 
-    @NotNull(message = "End date is required")
-    private LocalDate endDate;
+    @Size(max = 1000, message = "Notes must not exceed 1000 characters")
+    private String notes;
 
-    @NotNull(message = "Withdrawal days is required")
-    @Min(value = 0, message = "Withdrawal days cannot be negative")
-    @Max(value = 365, message = "Withdrawal days must be realistic (<= 365)")
-    private Integer withdrawalDays;
-
-    @Size(max = 1000, message = "Instructions must not exceed 1000 characters")
-    private String instructions;
-
-    @JsonIgnore
-    @AssertTrue(message = "End date must be on or after start date")
-    public boolean isDateRangeValid() {
-        return startDate != null && endDate != null && !endDate.isBefore(startDate);
-    }
-
-    public Long getMedicationId() { return medicationId; }
-    public void setMedicationId(Long medicationId) { this.medicationId = medicationId; }
+    public String getMedicationName() { return medicationName; }
+    public void setMedicationName(String medicationName) { this.medicationName = medicationName; }
 
     public String getDosage() { return dosage; }
     public void setDosage(String dosage) { this.dosage = dosage; }
@@ -59,15 +50,9 @@ public class PrescriptionItemRequest {
     public String getFrequency() { return frequency; }
     public void setFrequency(String frequency) { this.frequency = frequency; }
 
-    public LocalDate getStartDate() { return startDate; }
-    public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
+    public Integer getDuration() { return duration; }
+    public void setDuration(Integer duration) { this.duration = duration; }
 
-    public LocalDate getEndDate() { return endDate; }
-    public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
-
-    public Integer getWithdrawalDays() { return withdrawalDays; }
-    public void setWithdrawalDays(Integer withdrawalDays) { this.withdrawalDays = withdrawalDays; }
-
-    public String getInstructions() { return instructions; }
-    public void setInstructions(String instructions) { this.instructions = instructions; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 }

@@ -44,7 +44,7 @@ export function DiagnosisSection(props: DiagnosisSectionProps) {
   return (
     <div>
       <div className="mb-1 block text-xs font-semibold text-[var(--color-text-primary)]">
-        Clinical Assessment &amp; Diagnosis <span className="text-[var(--color-danger)]">*</span>
+        2. Clinical Assessment &amp; Diagnosis <span className="text-[var(--color-danger)]">*</span>
       </div>
       {isUrgent ? (
         <>
@@ -100,7 +100,7 @@ export function DiagnosisSection(props: DiagnosisSectionProps) {
                     setAbnormalFindings(e.target.value);
                     if (fieldErrors.abnormalFindings) setFieldErrors((errs) => ({ ...errs, abnormalFindings: '' }));
                   }}
-                  placeholder="e.g. Mild SDFT strain right fore; heat on palpation; lameness 2/5 at trot…"
+                  placeholder="e.g. Mild SDFT strain right fore, heat on palpation, lameness 2/5 at trot…"
                 />
                 {fieldErrors.abnormalFindings && (
                   <p className="mt-1 text-xs font-medium text-[var(--color-danger)]">{fieldErrors.abnormalFindings}</p>

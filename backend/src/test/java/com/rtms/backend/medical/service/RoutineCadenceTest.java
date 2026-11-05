@@ -95,9 +95,8 @@ class RoutineCadenceTest {
                 incidents, profiles, audits, events, entityManager, notifications,
                 new TrainingDecisionService(horses, schedules, workouts), vaccinations,
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
+                new com.fasterxml.jackson.databind.ObjectMapper());
 
         horse = new Horse();
         horse.setId(10L);
@@ -144,7 +143,7 @@ class RoutineCadenceTest {
         assertEquals(exam.getId(), next.getSourceScheduleId());
         assertEquals(CareType.ROUTINE, next.getCareType());
         assertEquals(CareSchedulePurpose.FOLLOW_UP, next.getPurpose());
-        assertEquals("Routine follow-up recheck examination", next.getDescription());
+        assertEquals("Routine follow-up examination", next.getDescription());
     }
 
     // ---- 2. Double submit ----
@@ -162,7 +161,7 @@ class RoutineCadenceTest {
         existing.setSourceScheduleId(exam.getId());
         existing.setIdempotencyKey("completion:" + exam.getId());
         existing.setRequestedAt(expectedRequestedAt);
-        existing.setDescription("Routine follow-up recheck examination");
+        existing.setDescription("Routine follow-up examination");
         existing.setRequestFingerprint(fingerprint(horse.getId(), null, expectedRequestedAt, existing.getDescription()));
 
         when(schedules.findById(exam.getId())).thenReturn(Optional.of(exam));
@@ -182,6 +181,7 @@ class RoutineCadenceTest {
     @DisplayName("Kết luận BLOCKED mà không có lịch khám lại -> 400 FOLLOW_UP_REQUIRED, không tạo lịch AUTO")
     void blockedWithoutNextScheduleIsStillRejected() {
         CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        stubCompletion(exam);
         CompleteCareScheduleRequest req = request(TrainingDecision.BLOCKED);
         req.setRestrictionDetails("Walk only for 5 days");
 
@@ -222,10 +222,17 @@ class RoutineCadenceTest {
         exam.setCareType(CareType.URGENT);
         stubCompletion(exam);
 
-        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+        CreateNextScheduleRequest next = new CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setScheduledAt(LocalDateTime.now().plusDays(3).withSecond(0).withNano(0));
+        next.setDescription("Recheck urgent case");
+        CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
+        req.setNextSchedule(next);
+
+        service.completeCareSchedule(exam.getId(), req, vet.getId());
 
         assertEquals(CareScheduleStatus.COMPLETED, exam.getStatus());
-        verify(schedules, never()).saveAndFlush(any());
+        verify(schedules, times(1)).saveAndFlush(any());
     }
 
     // ---- 5. MANUAL thắng AUTO ----
@@ -318,6 +325,181 @@ class RoutineCadenceTest {
         } catch (Exception impossible) {
             throw new IllegalStateException(impossible);
         }
+    }
+
+    @Test
+    @DisplayName("Ca ROUTINE từ báo cáo sự cố: ngựa sốt vẫn hoàn tất được và không tự nối lịch 14 ngày")
+    void incidentVisitAcceptsAbnormalVitalsAndDoesNotChain() {
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        exam.setSourceIncidentId(700L);
+        stubCompletion(exam);
+        CompleteCareScheduleRequest fever = request(TrainingDecision.ALLOWED);
+        fever.getMetrics().get(0).setTemperature(BigDecimal.valueOf(39.2));
+
+        service.completeCareSchedule(exam.getId(), fever, vet.getId());
+
+        assertEquals(CareScheduleStatus.COMPLETED, exam.getStatus());
+        verify(schedules, never()).saveAndFlush(any(CareSchedule.class));
+    }
+
+    @Test
+    @DisplayName("Tái khám thường: thân nhiệt 39.2 độ vẫn ghi nhận được, ngoài giới hạn đo mới bị từ chối")
+    void recheckRecordsAFeverButRejectsAnImpossibleReading() {
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        stubCompletion(exam);
+        CompleteCareScheduleRequest impossible = request(TrainingDecision.ALLOWED);
+        impossible.getMetrics().get(0).setTemperature(BigDecimal.valueOf(50));
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.completeCareSchedule(exam.getId(), impossible, vet.getId()));
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
+
+        CompleteCareScheduleRequest fever = request(TrainingDecision.ALLOWED);
+        fever.getMetrics().get(0).setTemperature(BigDecimal.valueOf(39.2));
+        service.completeCareSchedule(exam.getId(), fever, vet.getId());
+        assertEquals(CareScheduleStatus.COMPLETED, exam.getStatus());
+    }
+
+    @Test
+    @DisplayName("Ca nhẹ từ báo cáo không mở lệnh chặn khi ngựa còn lịch khám khác đang chờ")
+    void incidentVisitKeepsABlockOwnedByAnotherExam() {
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        exam.setSourceIncidentId(700L);
+        stubCompletion(exam);
+        when(schedules.existsByHorseIdAndPurposeAndStatusInAndIdNot(
+                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq(CareSchedulePurpose.FOLLOW_UP),
+                any(), org.mockito.ArgumentMatchers.eq(100L))).thenReturn(true);
+
+        horse.setTrainingDecisionReason("Box rest");
+
+        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+
+        assertEquals(TrainingDecision.BLOCKED, horse.getTrainingDecision());
+        org.mockito.ArgumentCaptor<HealthRecord> record = org.mockito.ArgumentCaptor.forClass(HealthRecord.class);
+        verify(healthRecords).save(record.capture());
+        assertEquals(TrainingDecision.BLOCKED, record.getValue().getTrainingDecision());
+        assertEquals("Box rest", record.getValue().getRestrictionDetails());
+    }
+
+    @Test
+    @DisplayName("Ngựa bị chặn không còn lịch nào khác: Vet vẫn mở được qua ca từ báo cáo")
+    void incidentVisitLiftsTheBlockWhenNothingElseIsWaiting() {
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        exam.setSourceIncidentId(700L);
+        stubCompletion(exam);
+
+        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+
+        assertEquals(TrainingDecision.ALLOWED, horse.getTrainingDecision());
+    }
+
+    @Test
+    @DisplayName("Đã có Follow-up đang chờ: không tự sinh lịch 14 ngày")
+    void aWaitingFollowUpStopsTheAutoChain() {
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        stubCompletion(exam);
+        when(schedules.findByHorseIdAndStatusIn(org.mockito.ArgumentMatchers.eq(10L), any()))
+                .thenReturn(java.util.List.of(waitingFollowUp(LocalDateTime.now().plusDays(5))));
+
+        service.completeCareSchedule(exam.getId(), request(TrainingDecision.ALLOWED), vet.getId());
+
+        verify(schedules, never()).saveAndFlush(any(CareSchedule.class));
+    }
+
+    @Test
+    @DisplayName("Vet chọn ngày sớm hơn Follow-up đang chờ: không thêm lịch, dời lịch cũ và ghép mô tả")
+    void anEarlierDateMovesTheWaitingFollowUp() {
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        stubCompletion(exam);
+        CareSchedule waiting = waitingFollowUp(LocalDateTime.now().plusDays(20));
+        when(schedules.findByHorseIdAndStatusIn(org.mockito.ArgumentMatchers.eq(10L), any()))
+                .thenReturn(java.util.List.of(waiting));
+        LocalDateTime earlier = LocalDateTime.now().plusDays(5).withSecond(0).withNano(0);
+        CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
+        req.setNextSchedule(nextAt(earlier));
+
+        service.completeCareSchedule(exam.getId(), req, vet.getId());
+
+        verify(schedules, never()).saveAndFlush(any(CareSchedule.class));
+        assertEquals(earlier, waiting.getRequestedAt());
+        assertEquals("Existing visit. Check the left leg", waiting.getDescription());
+    }
+
+    @Test
+    @DisplayName("Vet chọn ngày muộn hơn Follow-up đang chờ: giữ ngày sớm hơn, vẫn ghi thêm mô tả")
+    void aLaterDateKeepsTheWaitingFollowUpDate() {
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        stubCompletion(exam);
+        LocalDateTime kept = LocalDateTime.now().plusDays(5);
+        CareSchedule waiting = waitingFollowUp(kept);
+        when(schedules.findByHorseIdAndStatusIn(org.mockito.ArgumentMatchers.eq(10L), any()))
+                .thenReturn(java.util.List.of(waiting));
+        CompleteCareScheduleRequest req = request(TrainingDecision.ALLOWED);
+        req.setNextSchedule(nextAt(LocalDateTime.now().plusDays(20)));
+
+        service.completeCareSchedule(exam.getId(), req, vet.getId());
+
+        assertEquals(kept, waiting.getScheduledAt());
+        assertEquals(CareScheduleStatus.SCHEDULED, waiting.getStatus());
+        assertEquals("Existing visit. Check the left leg", waiting.getDescription());
+    }
+
+    @Test
+    @DisplayName("Ngựa bị chặn quay lại từ INACTIVE, không còn lịch khám: tạo một Follow-up")
+    void aBlockedHorseThatReturnsGetsAFollowUp() {
+        horse.setTrainingDecision(TrainingDecision.BLOCKED);
+
+        service.scheduleFollowUpIfBlocked(horse, vet.getId());
+
+        verify(schedules).saveAndFlush(any(CareSchedule.class));
+    }
+
+    @Test
+    @DisplayName("Ngựa được phép tập quay lại từ INACTIVE: không tạo lịch")
+    void anAllowedHorseThatReturnsGetsNoFollowUp() {
+        service.scheduleFollowUpIfBlocked(horse, vet.getId());
+
+        verify(schedules, never()).saveAndFlush(any(CareSchedule.class));
+    }
+
+    @Test
+    @DisplayName("Chi tiết ca cho biết Follow-up đang chờ, ngày hẹn và Vet nhận")
+    void detailShowsTheWaitingFollowUpAndItsVet() {
+        CareSchedule exam = routineExam(CareScheduleStatus.IN_PROGRESS);
+        when(schedules.findById(exam.getId())).thenReturn(Optional.of(exam));
+        LocalDateTime at = LocalDateTime.now().plusDays(5);
+        CareSchedule waiting = waitingFollowUp(at);
+        waiting.setVeterinarianId(vet.getId());
+        when(schedules.findByHorseIdAndStatusIn(org.mockito.ArgumentMatchers.eq(10L), any()))
+                .thenReturn(java.util.List.of(waiting));
+        when(users.findById(vet.getId())).thenReturn(Optional.of(vet));
+
+        var detail = service.getScheduleDetail(exam.getId());
+
+        assertEquals(at, detail.waitingFollowUp().at());
+        assertEquals("Dr. Smith", detail.waitingFollowUp().veterinarianName());
+    }
+
+    private static com.rtms.backend.medical.dto.CreateNextScheduleRequest nextAt(LocalDateTime at) {
+        com.rtms.backend.medical.dto.CreateNextScheduleRequest next = new com.rtms.backend.medical.dto.CreateNextScheduleRequest();
+        next.setCareType(CareType.ROUTINE);
+        next.setScheduledAt(at);
+        next.setDescription("Check the left leg");
+        return next;
+    }
+
+    private CareSchedule waitingFollowUp(LocalDateTime at) {
+        CareSchedule waiting = new CareSchedule();
+        waiting.setId(200L);
+        waiting.setHorseId(10L);
+        waiting.setCareType(CareType.ROUTINE);
+        waiting.setPurpose(CareSchedulePurpose.FOLLOW_UP);
+        waiting.setStatus(CareScheduleStatus.SCHEDULED);
+        waiting.setScheduledAt(at);
+        waiting.setDescription("Existing visit");
+        return waiting;
     }
 
     @Test

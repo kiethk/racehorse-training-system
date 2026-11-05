@@ -135,9 +135,8 @@ class AdmissionVetReviewWorkflowTest {
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
+                new com.fasterxml.jackson.databind.ObjectMapper()
         );
 
         admissionQueryService = new AdmissionQueryService(
@@ -351,18 +350,17 @@ class AdmissionVetReviewWorkflowTest {
     @DisplayName("getVetQueueSummary counts active, awaiting, inProgress, and approved")
     void getVetQueueSummary_countsAllBuckets() {
         Long vetId = 15L;
-        List<CareScheduleStatus> activeStatuses = List.of(
-                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+        List<CareScheduleStatus> activeStatuses = CareScheduleStatus.OPEN;
 
         when(careScheduleRepository.countByVeterinarianIdAndAdmissionIdIsNotNullAndStatusIn(vetId, activeStatuses))
                 .thenReturn(5L);
         when(careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses))
                 .thenReturn(3L);
         when(careScheduleRepository.countActiveVetQueueItems(
-                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED)))
+                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.OVERDUE)))
                 .thenReturn(2L);
         when(careScheduleRepository.countActiveVetQueueItems(
-                vetId, List.of(CareScheduleStatus.IN_PROGRESS)))
+                vetId, List.of(CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.DELAYED, CareScheduleStatus.PAUSED)))
                 .thenReturn(1L);
         when(careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses))
                 .thenReturn(2L);
@@ -433,9 +431,6 @@ class AdmissionVetReviewWorkflowTest {
                 admissionId, CareScheduleStatus.IN_PROGRESS)).thenReturn(Optional.of(schedule));
         when(horseRepository.findById(horseId)).thenReturn(Optional.of(horse));
         when(stallRepository.findById(quarantineStallId)).thenReturn(Optional.of(stall));
-        when(careScheduleRepository.findByHorseIdAndStatusIn(horseId,
-                List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)))
-                .thenReturn(List.of(schedule));
 
         VetReviewRequest req = new VetReviewRequest();
         req.setDecision(ReviewDecision.REJECT);
@@ -447,16 +442,11 @@ class AdmissionVetReviewWorkflowTest {
         assertEquals(AdmissionStatus.REJECTED, admission.getStatus());
         assertEquals("Chronic lameness not suitable for racing", admission.getVetFeedback());
         assertNull(admission.getVetTrainingDecision());
-        assertEquals(CareScheduleStatus.CANCELLED, schedule.getStatus());
-        assertEquals("Admission rejected by veterinarian", schedule.getCancelReason());
+        // AD-025 rule 6: lịch mở của ngựa bị xóa cứng khi vet reject, không CANCELLED.
+        verify(careScheduleRepository).deleteOpenSchedulesIfUnreferenced(horseId, CareScheduleStatus.OPEN);
         assertEquals(HorseStatus.REJECTED, horse.getCurrentStatus());
         assertNull(horse.getCurrentStallId());
         assertEquals(StallStatus.AVAILABLE, stall.getStatus());
-        verify(careScheduleRepository).saveAll(argThat(list -> {
-            int n = 0;
-            for (Object ignored : list) n++;
-            return n == 1;
-        }));
         verify(admissionNotificationService).notifyOwnerRejected(
                 admission, "Desert Star", "Veterinary Clinical Review", "Chronic lameness not suitable for racing");
         verify(admissionNotificationService).notifyManagersOfAdmissionRejection(
@@ -614,7 +604,7 @@ class AdmissionVetReviewWorkflowTest {
         req.setDiagnosis("Diagnosis");
         req.setTrainingDecision(TrainingDecision.ALLOWED);
         HorseHealthMetricRequest m = fullMetric();
-        m.setTemperature(BigDecimal.valueOf(39.0)); // out of range
+        m.setTemperature(BigDecimal.valueOf(50)); // out of range
         req.setMetrics(List.of(m));
 
         ApiException ex = assertThrows(ApiException.class,
@@ -768,9 +758,8 @@ class AdmissionVetReviewWorkflowTest {
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
                 org.mockito.Mockito.mock(PreventiveVaccinationService.class),
                 injuryRepo,
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
+                new com.fasterxml.jackson.databind.ObjectMapper()
         );
 
         when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));

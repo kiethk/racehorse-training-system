@@ -288,7 +288,7 @@ public class AiToolExecutionService {
             case "getHorseStallLocation" -> handleGetHorseStallLocation(args);
             case "getMyReportedIncidents" -> handleGetMyReportedIncidents(currentUser);
             case "getGroomTaskCompletionRate" -> handleGetGroomTaskCompletionRate(args, currentUser);
-            case "detectHorseBehavioralAnomaly" -> handleDetectHorseBehavioralAnomaly(args);
+            case "detectHorseBehavioralAnomaly" -> handleDetectHorseBehavioralAnomaly(args, currentUser);
             case "recommendDailyCarePriorityOrder" -> handleRecommendDailyCarePriorityOrder(currentUser);
 
             // CLUB_MANAGER Tools
@@ -371,7 +371,7 @@ public class AiToolExecutionService {
         }
 
         List<CareSchedule> activeSchedules = careScheduleRepository.findByHorseIdAndStatusIn(
-                horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS));
+                horse.getId(), CareScheduleStatus.BOOKED_OR_ACTIVE);
         List<Map<String, Object>> careList = activeSchedules.stream().map(cs -> Map.<String, Object>of(
                 "loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám tổng quát", "scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A", "purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A"
         )).toList();
@@ -1758,7 +1758,7 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
         }
         List<CareSchedule> active = careScheduleRepository.findByHorseIdAndStatusIn(
-                horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
+                horse.getId(), CareScheduleStatus.BOOKED_OR_ACTIVE
         ).stream()
                 .filter(cs -> cs.getVeterinarianId() == null || cs.getVeterinarianId().equals(currentUser.getUserId()))
                 .toList();
@@ -1951,8 +1951,7 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
         List<CareSchedule> all = careScheduleRepository.findByVeterinarianId(currentUser.getUserId());
         List<CareSchedule> urgent = all.stream()
                 .filter(cs -> cs.getCareType() == CareType.URGENT
-                        && cs.getStatus() != CareScheduleStatus.COMPLETED
-                        && cs.getStatus() != CareScheduleStatus.CANCELLED)
+                        && cs.getStatus() != CareScheduleStatus.COMPLETED)
                 .toList();
 
         Map<Long, Horse> horses = horseRepository.findAll().stream()
@@ -2132,7 +2131,7 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         }
 
         String phacDoCanThiepDeXuat = "Bước 1 (Xử trí ban đầu): Ngay lập tức cách ly tại chuồng bệnh, đặt đường truyền tĩnh mạch bù nước & điện giải, tạm ngưng thức ăn thô. "
-                + "Bước 2 (Can thiệp chuyên sâu): Sử dụng thuốc kháng viêm không steroid (NSAID Flunixin Meglumine 1.1 mg/kg IV) và thuốc bảo vệ niêm mạc; theo dõi nhu động ruột mỗi 2 giờ.";
+                + "Bước 2 (Can thiệp chuyên sâu): Sử dụng thuốc kháng viêm không steroid (NSAID Flunixin Meglumine 1.1 mg/kg IV) và thuốc bảo vệ niêm mạc, theo dõi nhu động ruột mỗi 2 giờ.";
 
         String xetNghiemCanLam = "Tổng phân tích tế bào máu (CBC), đo nồng độ Lactate huyết tương, sinh hóa máu đánh giá chức năng gan/thận và chụp X-quang/siêu âm ổ bụng hoặc chi dưới.";
         String thoiGianTheoDoiToiThieu = "24 - 48 giờ liên tục dưới sự giám sát trực tiếp của Bác sĩ thú y trực ban.";
@@ -2279,7 +2278,7 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         }
 
         List<CareSchedule> activeSchedules = careScheduleRepository.findByHorseIdAndStatusIn(
-                horse.getId(), List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)
+                horse.getId(), CareScheduleStatus.BOOKED_OR_ACTIVE
         );
         List<Map<String, Object>> careList = activeSchedules.stream().map(cs -> Map.<String, Object>of(
                 "loaiChamSoc", cs.getCareType() != null ? cs.getCareType().name() : "Khám thú y", "scheduledAt", cs.getScheduledAt() != null ? cs.getScheduledAt().toString() : "N/A", "purpose", cs.getPurpose() != null ? cs.getPurpose().name() : "N/A"
@@ -2367,14 +2366,17 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         return result;
     }
 
-    private Object handleDetectHorseBehavioralAnomaly(Map<String, Object> args) {
+    private Object handleDetectHorseBehavioralAnomaly(Map<String, Object> args, AuthenticatedUser currentUser) {
         Horse horse = resolveHorse(args);
         if (horse == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Cần cung cấp ID hoặc tên ngựa");
         }
 
+        // Groom chỉ xem báo cáo do chính mình gửi, kể cả qua công cụ AI.
         List<HorseIncidentReport> incidents = (horseIncidentReportRepository != null)
-                ? horseIncidentReportRepository.findByHorseId(horse.getId())
+                ? horseIncidentReportRepository.findByHorseId(horse.getId()).stream()
+                        .filter(r -> currentUser.getUserId().equals(r.getReportedById()))
+                        .toList()
                 : Collections.emptyList();
         List<HorseHealthMetric> metrics = (horseHealthMetricRepository != null)
                 ? horseHealthMetricRepository.findByHorseIdOrderByRecordedAtDesc(horse.getId())
@@ -2410,11 +2412,11 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
         String hanhDongCanLamNgay;
 
         if (colicSuspected) {
-            dauHieuBatThuong = !detectedAnomalies.isEmpty() ? String.join("; ", detectedAnomalies) : "Phát hiện dấu hiệu cào đất, bỏ ăn và nhịp tim nghỉ tăng cao";
+            dauHieuBatThuong = !detectedAnomalies.isEmpty() ? String.join(", ", detectedAnomalies) : "Phát hiện dấu hiệu cào đất, bỏ ăn và nhịp tim nghỉ tăng cao";
             mucDoCanhBao = "Khẩn cấp";
             hanhDongCanLamNgay = "Cảnh báo nguy cơ đau bụng Colic cấp tính! Báo ngay cho Bác sĩ thú y trực ban, tạm ngưng toàn bộ thức ăn thô và tinh, không để ngựa nằm lăn tròn trong chuồng, dắt đi bộ nhẹ nhàng.";
         } else if (mildAnomaly) {
-            dauHieuBatThuong = !detectedAnomalies.isEmpty() ? String.join("; ", detectedAnomalies) : "Dấu hiệu uể oải nhẹ, giảm lượng ăn";
+            dauHieuBatThuong = !detectedAnomalies.isEmpty() ? String.join(", ", detectedAnomalies) : "Dấu hiệu uể oải nhẹ, giảm lượng ăn";
             mucDoCanhBao = "Trung bình";
             hanhDongCanLamNgay = "Theo dõi sát lượng nước uống và thức ăn trong 4 giờ tới, kiểm tra phân và đo lại thân nhiệt định kỳ.";
         } else {
