@@ -137,7 +137,20 @@ export interface TreatmentPlan {
   startDate: string;
   endDate: string;
   status: string;
+  diagnosis?: string;
+  veterinarianName?: string;
   prescriptions?: Prescription[];
+}
+
+export type PrescriptionRoute = 'ORAL' | 'FEED_ADDITIVE' | 'TOPICAL' | 'INJECTION_IV' | 'INJECTION_IM';
+
+export interface PrescriptionJsonItem {
+  medication_name: string;
+  dosage: string;
+  frequency: string;
+  route: PrescriptionRoute;
+  duration: number;
+  notes?: string;
 }
 
 export interface CreateTreatmentPlanRequest {

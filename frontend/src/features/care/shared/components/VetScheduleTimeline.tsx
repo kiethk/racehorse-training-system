@@ -18,7 +18,6 @@ import type { CareSchedule, CareType, CareScheduleStatus } from '@/features/admi
 import type { Horse, StableStall } from '@/features/stable/types';
 import {
   WORKDAY_START,
-  WORKDAY_END,
   WORKDAY_LEN,
   VET_WINDOW_START,
   VET_WINDOW_END,
@@ -481,7 +480,7 @@ export function VetScheduleTimeline() {
                 const isToday = dayIso === formatLocalDateIso();
                 const [year, month, day] = dayIso.split('-').map(Number);
                 const dayDate = new Date(year, month - 1, day);
-                const dayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'short', day: '2-digit', month: 'short' }).format(dayDate);
+                const dayLabel = formatDate(dayDate, { weekday: 'short', day: '2-digit', month: 'short' });
 
                 return (
                   <Panel

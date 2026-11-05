@@ -44,6 +44,16 @@ public class TreatmentPlanController {
         );
     }
 
+    @GetMapping("/horses/{horseId}/active")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<TreatmentPlanResponse> getActiveTreatmentPlanForHorse(
+            @PathVariable Long horseId
+    ) {
+        return ApiResponse.success(
+                treatmentPlanService.getActiveTreatmentPlanByHorseId(horseId)
+        );
+    }
+
     @PatchMapping(value = {"/{planId}/status", "/treatment-plans/{planId}/status"})
     @PreAuthorize("hasAuthority('TREATMENT_PLAN_MANAGE')")
     public ApiResponse<TreatmentPlanResponse> updateTreatmentPlanStatus(

@@ -18,7 +18,6 @@ import {
   DISMISSED_SESSION_KEY,
   getNextSnoozeExpiry,
   getEligibleP1Alerts,
-  selectP1OverlayAlert,
   shouldPlayEmergencySound,
   SNOOZE_STORAGE_KEY,
 } from '../lib/urgentOverlayUtils';
