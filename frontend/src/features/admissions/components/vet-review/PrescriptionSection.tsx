@@ -23,12 +23,14 @@ export interface PrescriptionSectionProps {
 }
 
 const ROUTE_OPTIONS: Array<{ value: MedicationRoute; label: string }> = [
-  { value: 'ORAL', label: 'Oral (Groom Administered)' },
-  { value: 'TOPICAL', label: 'Topical (Groom Administered)' },
-  { value: 'FEED_ADDITIVE', label: 'Feed Additive (Groom Administered)' },
-  { value: 'INJECTION_IV', label: 'Intravenous — IV (Veterinarian Administered)' },
-  { value: 'INJECTION_IM', label: 'Intramuscular — IM (Veterinarian Administered)' },
+  { value: 'ORAL', label: 'Oral' },
+  { value: 'TOPICAL', label: 'Topical' },
+  { value: 'FEED_ADDITIVE', label: 'Feed additive' },
 ];
+
+function isAllowedRoute(route: string): route is MedicationRoute {
+  return route === 'ORAL' || route === 'TOPICAL' || route === 'FEED_ADDITIVE';
+}
 
 export function PrescriptionSection(props: PrescriptionSectionProps) {
   const {
@@ -48,7 +50,7 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
       id: Math.random().toString(36).substring(2, 9),
       medicationId: catalog.length > 0 ? catalog[0].id : null,
       dosage: catalog.length > 0 && catalog[0].defaultDosage ? catalog[0].defaultDosage : '',
-      route: (catalog.length > 0 && (catalog[0].defaultRoute as MedicationRoute)) || 'ORAL',
+      route: catalog.length > 0 && isAllowedRoute(catalog[0].defaultRoute) ? catalog[0].defaultRoute : 'ORAL',
       frequency: catalog.length > 0 && catalog[0].defaultFrequency ? catalog[0].defaultFrequency : 'BID',
       startDate: todayLocalDate,
       endDate: todayLocalDate,
@@ -81,7 +83,7 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
           ...item,
           medicationId: med.id,
           dosage: med.defaultDosage || item.dosage || '',
-          route: (med.defaultRoute as MedicationRoute) || 'ORAL',
+          route: isAllowedRoute(med.defaultRoute) ? med.defaultRoute : 'ORAL',
           frequency: med.defaultFrequency || item.frequency || 'BID',
           withdrawalDays: Math.max(item.withdrawalDays, med.standardWithdrawalDays),
         };
@@ -139,7 +141,6 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
         <div className="space-y-4">
           {prescriptions.map((rx, index) => {
             const selectedMed = catalog.find((m) => m.id === rx.medicationId);
-            const isVetRoute = rx.route === 'INJECTION_IV' || rx.route === 'INJECTION_IM';
             const minWithdrawal = selectedMed ? selectedMed.standardWithdrawalDays : 0;
 
             return (
@@ -259,7 +260,7 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
                       }
                     />
                     <span className="text-[11px] text-[var(--color-text-muted)] mt-1 block">
-                      FEI min: {minWithdrawal} days {isVetRoute ? '(Vet admin)' : '(Groom admin)'}
+                      FEI min: {minWithdrawal} days
                     </span>
                   </FormField>
                 </div>
@@ -270,7 +271,7 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
                 >
                   <Input
                     disabled={isFormDisabled}
-                    placeholder="e.g. Administer with morning grain feed; monitor for colic signs"
+                    placeholder="e.g. Administer with morning grain feed. Monitor for colic signs"
                     value={rx.instructions}
                     onChange={(e) => handleFieldChange(rx.id, 'instructions', e.target.value)}
                   />

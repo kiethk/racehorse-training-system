@@ -75,6 +75,23 @@ class OwnerAdmissionServiceTest {
     }
 
     @Test
+    void ownersCannotSubmitArrivalPhotos() {
+        List<AdmissionDocumentMetadataRequest> metadata = List.of(
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.HORSE_PHOTO, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.REGISTRATION_DOCUMENT, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.PEDIGREE_CERTIFICATE, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.VACCINATION_RECORD, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.ARRIVAL_PHOTO, null, null));
+        List<MultipartFile> uploads = metadata.stream()
+                .map(item -> (MultipartFile) new MockMultipartFile("files", "document.png", "image/png", new byte[] {1}))
+                .toList();
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.submit(7L, request(), metadata, uploads));
+        assertEquals(400, error.getStatusCode().value());
+        verifyNoInteractions(documents, files);
+    }
+
+    @Test
     void createsOneApplicationAndOneSnapshotWithoutCreatingHorse() {
         var result = service.create(7L, request());
         assertEquals(AdmissionStatus.GROOM_REVIEW, result.status());

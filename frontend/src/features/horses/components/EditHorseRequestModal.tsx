@@ -149,9 +149,9 @@ export function EditHorseRequestModal({ open, horse, pedigree, slots, onClose, o
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Pedigree</h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {field('sireName', 'Sire name')}
-              {field('sireRegistrationNumber', 'Sire UELN', '15 letters or digits; the sire must be male if registered here.')}
+              {field('sireRegistrationNumber', 'Sire UELN', 'Enter 15 letters or digits. The sire must be male if registered here.')}
               {field('damName', 'Dam name')}
-              {field('damRegistrationNumber', 'Dam UELN', '15 letters or digits; the dam must be female if registered here.')}
+              {field('damRegistrationNumber', 'Dam UELN', 'Enter 15 letters or digits. The dam must be female if registered here.')}
             </div>
           </section>
 

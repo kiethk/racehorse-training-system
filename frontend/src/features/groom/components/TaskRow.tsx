@@ -1,8 +1,10 @@
-import { Pill } from '@/components/ui';
+import { Button, EntityLink, Pill } from '@/components/ui';
+import { entityHref } from '@/lib/entityRoute';
 import type { TodayTaskItem } from '../types';
+import type { TreatmentPlan } from '@/features/care/types';
 
 /** A workout or vet visit on the checklist. The Groom sees it but someone else closes it. */
-export function TaskRow({ task }: { task: TodayTaskItem }) {
+export function TaskRow({ task, plans, onViewInstructions }: { task: TodayTaskItem; plans: Map<number, TreatmentPlan>; onViewInstructions: (horseId: number) => void }) {
   const isCompleted = task.status === 'COMPLETED';
 
   return (
@@ -18,7 +20,8 @@ export function TaskRow({ task }: { task: TodayTaskItem }) {
             <Pill tone={task.source === 'WORKOUT' ? 'warning' : 'info'} size="sm">{task.source}</Pill>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-            <span>Horse: <strong>{task.horseName}</strong></span>
+            <span>Horse: <EntityLink href={entityHref('horse', task.horseId, 'GROOM', { stallCode: task.stallCode })}>{task.horseName}</EntityLink></span>
+            {plans.has(task.horseId) && <Button type="button" variant="tertiary" size="sm" icon="pill" aria-label={`View instructions for ${task.horseName}`} onClick={(event) => { event.stopPropagation(); onViewInstructions(task.horseId); }} />}
             {task.note && <span>• {task.note}</span>}
           </div>
         </div>

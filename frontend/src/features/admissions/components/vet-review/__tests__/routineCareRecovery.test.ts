@@ -35,7 +35,7 @@ describe('Track 3a & 3b & 3d — Routine Care Prescriptions, Condition Recovery 
         id: 'rx-3',
         medicationId: 105,
         dosage: '10 ml',
-        route: 'INJECTION_IV',
+        route: 'ORAL',
         frequency: 'EOD',
         startDate: '2026-11-03',
         endDate: '2026-11-07',
@@ -60,7 +60,7 @@ describe('Track 3a & 3b & 3d — Routine Care Prescriptions, Condition Recovery 
     assert.deepEqual(requests[1], {
       medicationId: 105,
       dosage: '10 ml',
-      route: 'INJECTION_IV',
+      route: 'ORAL',
       frequency: 'EOD',
       startDate: '2026-11-03',
       endDate: '2026-11-07',

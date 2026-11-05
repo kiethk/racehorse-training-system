@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Button, Icon, Modal, Notice, Pill } from '@/components/ui';
+import { Button, Icon, Modal, Notice } from '@/components/ui';
 import { formatEnumLabel } from '@/lib/display';
-import { isAdministeredByGroom, parseTreatmentInstructions } from '../lib/treatmentInstructions';
+import { parseTreatmentInstructions } from '../lib/treatmentInstructions';
 
 export interface MedicationInstructionModalProps {
   isOpen?: boolean;
@@ -95,16 +95,6 @@ export function MedicationInstructionModal({
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2 text-xs text-[var(--color-text-muted)]">
               <span className="font-medium text-[var(--color-text-primary)]">Prescribed Medications</span>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[var(--color-success)]" />
-                  Groom Administered
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[var(--color-warning)]" />
-                  Vet Administered Only
-                </span>
-              </div>
             </div>
 
             {/* Custom Grid Table using pure CSS and tokens (no raw <table>) */}
@@ -120,7 +110,11 @@ export function MedicationInstructionModal({
               {/* Table Rows */}
               <div className="divide-y divide-[var(--color-border)] bg-[var(--color-surface)]">
                 {parsed.items.map((item, idx) => {
-                  const groomRole = isAdministeredByGroom(item.route);
+                  const routeLabel = item.route === 'INJECTION_IV'
+                    ? 'Intravenous'
+                    : item.route === 'INJECTION_IM'
+                      ? 'Intramuscular'
+                      : formatEnumLabel(item.route);
                   return (
                     <div
                       key={`${item.medication_name}-${idx}`}
@@ -131,17 +125,7 @@ export function MedicationInstructionModal({
                         <p className="font-semibold text-[var(--color-text-primary)]">
                           {item.medication_name}
                         </p>
-                        <div>
-                          {groomRole ? (
-                            <Pill size="sm" tone="success">
-                              Groom: {formatEnumLabel(item.route)}
-                            </Pill>
-                          ) : (
-                            <Pill size="sm" tone="warning">
-                              Vet Only: {formatEnumLabel(item.route)}
-                            </Pill>
-                          )}
-                        </div>
+                        <p className="text-[var(--color-text-secondary)]">{routeLabel}</p>
                       </div>
 
                       {/* Dosage & Frequency */}

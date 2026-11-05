@@ -77,7 +77,7 @@ export const EXAM_VARIANT_CONFIG: Record<ExamVariant, ExamVariantConfig> = {
     confirmDialogCancelLabel: 'Back to Review',
     restrictionLabel: 'Assessment note',
     restrictionPlaceholder:
-      'e.g. Tendon strain: box rest with hand-walking twice daily; recheck before trotting…',
+      'e.g. Tendon strain: box rest with hand-walking twice daily. Recheck before trotting…',
     restrictionZodMessage: 'An assessment note is required when training is blocked.',
     followUpDateRequiredMessage: 'Follow-up date is required when scheduling follow-up care.',
     followUpDateMinMessage: 'Follow-up date must be at least one day in the future.',
@@ -111,7 +111,7 @@ export const EXAM_VARIANT_CONFIG: Record<ExamVariant, ExamVariantConfig> = {
     confirmDialogCancelLabel: 'Back to Review',
     restrictionLabel: 'Assessment note',
     restrictionPlaceholder:
-      'e.g. Tendon strain: box rest with hand-walking twice daily; recheck before trotting…',
+      'e.g. Tendon strain: box rest with hand-walking twice daily. Recheck before trotting…',
     restrictionZodMessage: 'An assessment note is required when training is blocked.',
     followUpDateRequiredMessage: 'Follow-up date is required when scheduling follow-up care.',
     followUpDateMinMessage: 'Follow-up date must be at least one day in the future.',

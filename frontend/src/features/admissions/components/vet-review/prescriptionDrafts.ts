@@ -1,4 +1,4 @@
-export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'INJECTION_IV' | 'INJECTION_IM' | 'FEED_ADDITIVE';
+export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'FEED_ADDITIVE';
 
 export interface PrescriptionItemRequest {
   medicationId: number;

@@ -162,6 +162,16 @@ class CareScheduleVetQueueQueryTest {
         assertEquals(1L, completed.getTotalElements());
     }
 
+    @Test
+    void reviewedPillIncludesCompletedExamAndCountMatchesPage() {
+        Page<CareSchedule> reviewed = careSchedules.findVetQueuePage(vetId, false, "", "REVIEWED",
+                null, null, null, "", PageRequest.of(0, 1));
+
+        assertEquals(1L, reviewed.getTotalElements());
+        assertEquals(Set.of(completedExam.getId()), idsOf(reviewed));
+        assertEquals(reviewed.getTotalElements(), careSchedules.countReviewedVetQueueItems(vetId));
+    }
+
 
     @Test
     void activeAndApprovedPillFiltersSeparateActiveAndApprovedAdmissions() {
@@ -191,6 +201,15 @@ class CareScheduleVetQueueQueryTest {
         routineOnApproved.setScheduledAt(LocalDateTime.now().plusDays(5));
         routineOnApproved = careSchedules.saveAndFlush(routineOnApproved);
 
+        CareSchedule completedOnApproved = new CareSchedule();
+        completedOnApproved.setHorseId(horseId);
+        completedOnApproved.setVeterinarianId(vetId);
+        completedOnApproved.setAdmissionId(approvedAdmissionId);
+        completedOnApproved.setCareType(CareType.INITIAL);
+        completedOnApproved.setStatus(CareScheduleStatus.COMPLETED);
+        completedOnApproved.setScheduledAt(LocalDateTime.now().minusDays(1));
+        completedOnApproved = careSchedules.saveAndFlush(completedOnApproved);
+
         // ACTIVE pill should only return exams for non-approved admissions
         Page<CareSchedule> activePage = queue(null, "ACTIVE");
         assertEquals(3L, activePage.getTotalElements());
@@ -199,14 +218,22 @@ class CareScheduleVetQueueQueryTest {
 
         // APPROVED pill should only return exams for approved admissions
         Page<CareSchedule> approvedPage = queue(null, "APPROVED");
-        assertEquals(1L, approvedPage.getTotalElements());
-        assertEquals(Set.of(routineOnApproved.getId()), idsOf(approvedPage));
+        assertEquals(2L, approvedPage.getTotalElements());
+        assertEquals(Set.of(routineOnApproved.getId(), completedOnApproved.getId()), idsOf(approvedPage));
+        Page<CareSchedule> approvedPaged = careSchedules.findVetQueuePage(vetId, false, "", "APPROVED",
+                null, null, null, "", PageRequest.of(0, 1));
+        assertEquals(2L, approvedPaged.getTotalElements());
+
+        Page<CareSchedule> reviewedPage = queue(null, "REVIEWED");
+        assertEquals(2L, reviewedPage.getTotalElements());
+        assertEquals(Set.of(completedExam.getId(), completedOnApproved.getId()), idsOf(reviewedPage));
 
         // Summary counts
         List<CareScheduleStatus> activeStatuses = List.of(
                 CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
         assertEquals(3L, careSchedules.countActiveVetQueueItems(vetId, activeStatuses));
-        assertEquals(1L, careSchedules.countApprovedVetQueueItems(vetId, activeStatuses));
+        assertEquals(2L, careSchedules.countApprovedVetQueueItems(vetId));
+        assertEquals(2L, careSchedules.countReviewedVetQueueItems(vetId));
     }
 
     private Page<CareSchedule> queue(CareScheduleStatus scheduleStatus, String pill) {

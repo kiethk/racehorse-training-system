@@ -1,4 +1,4 @@
-import { apiGet, apiGetBlob, apiPost } from '@/services/api';
+import { apiGet, apiGetBlob, apiPost, apiUpload } from '@/services/api';
 import {
   AdmissionSummaryResponse,
   AdmissionDetailResponse,
@@ -173,8 +173,10 @@ export const admissionsApi = {
   getDocumentBlob: async (pathOrUrl: string): Promise<Blob> => {
     return apiGetBlob(pathOrUrl);
   },
-  confirmArrival: async (id: number): Promise<AdmissionDetailResponse> => {
-    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/arrival-confirmation`, {});
+  confirmArrival: async (id: number, files: File[]): Promise<AdmissionDetailResponse> => {
+    const body = new FormData();
+    files.forEach(file => body.append('files', file));
+    const response = await apiUpload<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/arrival-confirmation`, body);
     return response.data;
   },
   reopenExpiredArrival: async (id: number): Promise<AdmissionDetailResponse> => {

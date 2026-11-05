@@ -334,7 +334,8 @@ public class GroomDailyTaskService {
         List<GroomWorkoutRow> workouts = workoutRepository.findGroomWorkoutRows(targetGroomId, targetDate);
 
         // Nguồn 3 — Lịch thú y của ngựa trong chuồng mình
-        List<Long> stallIds = stableStallRepository.findByGroomId(targetGroomId).stream()
+        List<StableStall> groomStalls = stableStallRepository.findByGroomId(targetGroomId);
+        List<Long> stallIds = groomStalls.stream()
                 .map(StableStall::getId)
                 .toList();
 
@@ -358,6 +359,10 @@ public class GroomDailyTaskService {
         // Ngựa trong chuồng mình đã có sẵn tên từ B1 -> không cần query lại
         Map<Long, String> horseNameById = new HashMap<>();
         myHorses.forEach(h -> horseNameById.put(h.getId(), h.getName()));
+        Map<Long, String> stallCodeById = new HashMap<>();
+        groomStalls.forEach(stall -> stallCodeById.put(stall.getId(), stall.getStallCode()));
+        Map<Long, String> horseStallCodeById = new HashMap<>();
+        myHorses.forEach(h -> horseStallCodeById.put(h.getId(), stallCodeById.get(h.getCurrentStallId())));
 
         // Chỉ những con CHƯA có tên mới phải tra thêm (ví dụ Trainer nhờ Groom
         // này dắt hộ một con không thuộc chuồng của họ). Thường là rỗng. Buổi tập đã mang sẵn tên ngựa.
@@ -397,6 +402,7 @@ public class GroomDailyTaskService {
                     task.getNotes(),
                     Boolean.TRUE.equals(task.getIsCompleted()) ? "COMPLETED" : "PENDING",
                     true)                         // chỉ SOP mới tick được
+                    .withStallCode(horseStallCodeById.get(task.getHorseId()))
                     .withCompletion(task.getCompletionId(),
                             completion == null ? null : completion.getNote(),
                             completion == null ? List.of() : completionPhotoUrls(completion)));
@@ -413,7 +419,7 @@ public class GroomDailyTaskService {
                     "Training session · " + w.subjectName(),
                     "Lead the horse to the track, assist the trainer, and bring the horse back after the session",
                     w.status().name(),
-                    false));                      // Trainer mới là người đóng buổi tập
+                    false).withStallCode(horseStallCodeById.get(w.horseId())));                      // Trainer mới là người đóng buổi tập
         }
 
         for (CareSchedule s : schedules) {
@@ -427,7 +433,7 @@ public class GroomDailyTaskService {
                     "Veterinary · " + s.getCareType(),
                     s.getDescription(),
                     s.getStatus().name(),
-                    false));              // Vet mới là người đóng
+                    false).withStallCode(horseStallCodeById.get(s.getHorseId())));              // Vet mới là người đóng
         }
 
         // =============================================================

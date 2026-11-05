@@ -318,6 +318,38 @@ class HorseEditRequestServiceTest {
         assertEquals(409, status(() -> service.cancel(OWNER, HORSE, 900L)));
     }
 
+    @Test
+    void groomWithoutStatusReceivesApprovedRequests() {
+        HorseEditRequest approved = pending("Mercury Star");
+        approved.setStatus(HorseEditRequestStatus.APPROVED);
+        when(requests.findVisibleToGroom(GROOM, false, null)).thenReturn(List.of(approved));
+
+        var result = service.listForGroom(GROOM, null);
+
+        assertEquals(1, result.size());
+        assertEquals(HorseEditRequestStatus.APPROVED, result.getFirst().status());
+        verify(requests).findVisibleToGroom(GROOM, false, null);
+    }
+
+    @Test
+    void ownerHistoryIncludesAllStatusesAndChecksOwnership() {
+        HorseEditRequest newest = pending("Mercury Star");
+        newest.setStatus(HorseEditRequestStatus.REJECTED);
+        newest.setReviewFeedback("Check the name");
+        HorseEditRequest older = pending("Mercury II");
+        older.setId(899L);
+        older.setStatus(HorseEditRequestStatus.APPROVED);
+        when(requests.findByHorseIdOrderByCreatedAtDescIdDesc(HORSE)).thenReturn(List.of(newest, older));
+
+        var result = service.listForOwner(OWNER, HORSE);
+
+        assertEquals(List.of(900L, 899L), result.stream().map(r -> r.id()).toList());
+        assertEquals("Check the name", result.getFirst().reviewFeedback());
+        assertEquals("Mercury II", result.get(1).requested().name());
+        assertThrows(AccessDeniedException.class, () -> service.listForOwner(8L, HORSE));
+        verify(requests, times(1)).findByHorseIdOrderByCreatedAtDescIdDesc(HORSE);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static int status(org.junit.jupiter.api.function.Executable call) {

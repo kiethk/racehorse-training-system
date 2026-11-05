@@ -364,8 +364,10 @@ class AdmissionVetReviewWorkflowTest {
         when(careScheduleRepository.countActiveVetQueueItems(
                 vetId, List.of(CareScheduleStatus.IN_PROGRESS)))
                 .thenReturn(1L);
-        when(careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses))
+        when(careScheduleRepository.countApprovedVetQueueItems(vetId))
                 .thenReturn(2L);
+        when(careScheduleRepository.countReviewedVetQueueItems(vetId))
+                .thenReturn(1L);
 
         var summary = admissionQueryService.getVetQueueSummary(vetId);
 
@@ -374,6 +376,7 @@ class AdmissionVetReviewWorkflowTest {
         assertEquals(2L, summary.awaiting());
         assertEquals(1L, summary.inProgress());
         assertEquals(2L, summary.approved());
+        assertEquals(1L, summary.reviewed());
     }
 
     @Test

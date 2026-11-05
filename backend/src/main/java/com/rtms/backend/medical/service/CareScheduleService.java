@@ -741,7 +741,7 @@ public class CareScheduleService {
                 if (!missing.isEmpty() || !outOfRange.isEmpty()) {
                     rowErrors.add("metric[" + index + "]: "
                             + (missing.isEmpty() ? "" : "missing " + String.join(", ", missing)
-                                    + (outOfRange.isEmpty() ? "" : "; "))
+                                    + (outOfRange.isEmpty() ? "" : ", "))
                             + (outOfRange.isEmpty() ? "" : "out of range " + String.join(", ", outOfRange)));
                 }
                 index++;
@@ -776,6 +776,10 @@ public class CareScheduleService {
                     .filter(ClinicalMedication::getActive)
                     .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "MEDICATION_NOT_FOUND",
                             "Medication " + item.getMedicationId() + " is not in the active catalog"));
+            if (item.getRoute() != null && item.getRoute().isInjection()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "INJECTION_NOT_ALLOWED",
+                        "Treatment plans cannot contain injections");
+            }
             if (item.getWithdrawalDays() < med.getStandardWithdrawalDays()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_WITHDRAWAL_DAYS",
                         "Withdrawal days cannot be lower than regulatory standard: "
@@ -844,7 +848,7 @@ public class CareScheduleService {
         boolean isManager = actor != null && actor.getRole() != null && "CLUB_MANAGER".equals(actor.getRole().getName());
 
         if (!isManager) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only club managers can cancel care schedules; veterinarians cannot decline assignments");
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only club managers can cancel care schedules. Veterinarians cannot decline assignments");
         }
 
         // Ngựa đang tạm nghỉ chỉ được mở khóa bởi một lần khám. Hủy nốt lần khám

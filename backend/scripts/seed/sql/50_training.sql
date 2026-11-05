@@ -93,10 +93,10 @@ $$ LANGUAGE sql STABLE;
 
 -- Nhận xét của Trainer theo điểm. (The Trainer's note for a rating.)
 CREATE FUNCTION pg_temp.feedback(p_rating INT) RETURNS TEXT AS $$
-    SELECT CASE WHEN p_rating >= 8 THEN 'Strong, even rhythm; recovered quickly after the final furlong.'
-                WHEN p_rating >= 6 THEN 'Solid session; pace dropped slightly in the second half.'
-                WHEN p_rating >= 4 THEN 'Laboured in the last part; heart rate slow to come down.'
-                ELSE 'Tired early and slow to recover. Rest day advised; ask the vet if it continues.' END
+    SELECT CASE WHEN p_rating >= 8 THEN 'Strong, even rhythm, recovered quickly after the final furlong.'
+                WHEN p_rating >= 6 THEN 'Solid session, pace dropped slightly in the second half.'
+                WHEN p_rating >= 4 THEN 'Laboured in the last part, heart rate slow to come down.'
+                ELSE 'Tired early and slow to recover. Rest day advised, ask the vet if it continues.' END
 $$ LANGUAGE sql IMMUTABLE;
 
 -- Kết quả một buổi tập theo cách WorkoutResultSimulationService sinh số liệu, chỉnh theo "năng lực" của ngựa
@@ -189,7 +189,7 @@ BEGIN
     LOOP
         v_end := v_start + make_interval(mins => p_minutes);
         IF v_end > TIME '10:00' OR v_end < v_start THEN
-            RAISE EXCEPTION 'Schedule full on % for trainer % (too many sessions that day; move a group to other weekdays)',
+            RAISE EXCEPTION 'Schedule full on % for trainer % (too many sessions that day, move a group to other weekdays)',
                 p_date, p_trainer;
         END IF;
         EXIT WHEN NOT EXISTS (SELECT 1 FROM training_sessions o
@@ -516,7 +516,7 @@ BEGIN
     PERFORM pg_temp.subject('TR01', 'Trot Balance Work', 'Balance, stride symmetry and joint mobility at trot.', 'TURF', 1200, 'LOW', 'RECOVERY', 45, 116);
     PERFORM pg_temp.subject('TR01', 'Gate Loading Composure', 'Calm loading into the starting stall and a quiet stand.', 'DIRT', 200, 'LOW', 'GATE_START', 45, 115);
     PERFORM pg_temp.subject('TR01', 'Official Speed Trial', 'Full mock trial with electronic timing.', 'TURF', 1200, 'HIGH', 'SPEED', 60, 115);
-    PERFORM pg_temp.subject('TR01', 'Sand Track Stamina', 'Deep sand work for stamina; not in any course yet.', 'DIRT', 1800, 'MEDIUM', 'ENDURANCE', 60, 20);
+    PERFORM pg_temp.subject('TR01', 'Sand Track Stamina', 'Deep sand work for stamina, not in any course yet.', 'DIRT', 1800, 'MEDIUM', 'ENDURANCE', 60, 20);
     PERFORM pg_temp.course('TR01', 'Gate Confidence Drill', 'Calm, confident loading and stand in the starting gate.', 6,
                            ARRAY['Gate Loading Composure'], 110);
     PERFORM pg_temp.course('TR01', 'Novice Foundation', 'Base fitness and steady rhythm for newly admitted horses.', 10,
@@ -529,7 +529,7 @@ BEGIN
                            ARRAY['Turn and Straight Sprint', 'Furlong Interval Bursts', 'Uphill Power Gallop', 'Gate Breakout Sprint', 'Long Stride Gallop', 'Official Speed Trial'], 100);
     PERFORM pg_temp.course('TR01', 'Recovery Maintenance', 'Light work after a heavy block or a rest period.', 4,
                            ARRAY['Trot Balance Work', 'Walk and Hydro Cooling'], 100);
-    PERFORM pg_temp.course('TR01', 'Winter Base Block', 'Planned for the winter break; no horse enrolled yet.', 20,
+    PERFORM pg_temp.course('TR01', 'Winter Base Block', 'Planned for the winter break, no horse enrolled yet.', 20,
                            ARRAY['Aerobic Base Canter', 'Sand Track Stamina', 'Trot Balance Work'], 10);
     PERFORM pg_temp.subject('TR02', 'Distance Canter', 'Even canter over a long distance.', 'TURF', 2000, 'MEDIUM', 'ENDURANCE', 60, 90);
     PERFORM pg_temp.subject('TR02', 'Hill Repeats', 'Repeated short climbs at a strong canter.', 'DIRT', 1400, 'HIGH', 'ENDURANCE', 60, 90);

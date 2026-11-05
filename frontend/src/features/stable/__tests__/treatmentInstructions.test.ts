@@ -1,9 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  isAdministeredByGroom,
-  parseTreatmentInstructions,
-} from '../../care/lib/treatmentInstructions.ts';
+import { parseTreatmentInstructions } from '../../care/lib/treatmentInstructions.ts';
 
 describe('Treatment Instructions Parser (CP-1)', () => {
   it('correctly parses structured JSON array into prescription items', () => {
@@ -87,19 +84,22 @@ describe('Treatment Instructions Parser (CP-1)', () => {
   });
 });
 
-describe('Route Classification (Groom vs Vet)', () => {
-  it('identifies groom-administered routes as true', () => {
-    assert.equal(isAdministeredByGroom('ORAL'), true);
-    assert.equal(isAdministeredByGroom('oral'), true);
-    assert.equal(isAdministeredByGroom('FEED_ADDITIVE'), true);
-    assert.equal(isAdministeredByGroom('TOPICAL'), true);
-  });
+describe('Legacy treatment routes', () => {
+  it('keeps parsing legacy IV and IM route values', () => {
+    const result = parseTreatmentInstructions(JSON.stringify([
+      { medication_name: 'IV medication', route: 'IV' },
+      { medication_name: 'IM medication', route: 'IM' },
+      { medication_name: 'Intravenous medication', route: 'INJECTION_IV' },
+      { medication_name: 'Intramuscular medication', route: 'INJECTION_IM' },
+    ]));
 
-  it('identifies vet-administered injection routes as false', () => {
-    assert.equal(isAdministeredByGroom('INJECTION_IV'), false);
-    assert.equal(isAdministeredByGroom('INJECTION_IM'), false);
-    assert.equal(isAdministeredByGroom('IV'), false);
-    assert.equal(isAdministeredByGroom('IM'), false);
+    assert.equal(result.isJson, true);
+    assert.deepEqual(result.items.map((item) => item.route), [
+      'INJECTION_IV',
+      'INJECTION_IM',
+      'INJECTION_IV',
+      'INJECTION_IM',
+    ]);
   });
 });
 

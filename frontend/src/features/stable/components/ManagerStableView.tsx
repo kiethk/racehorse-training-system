@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button, ConfirmDialog, EmptyState, FilterBar, IconButton, LinkButton, ListSkeleton, Modal, Notice, PageHeader, Panel, Pill, ScreenLayout, SearchInput, SegmentedControl, Tabs } from '@/components/ui';
 import type { Area, AreaType, StableStall } from '../types';
 import type { AssignmentDraft, AssignmentTarget, DragStaff } from '../types/manager';
@@ -24,6 +25,7 @@ export function ManagerStableView() {
 }
 
 function ManagerStableContent() {
+  const stallCode = useSearchParams().get('stall');
   const state = useManagerStable();
   const { data, draft, setDraft, loading, saving, creating, deleting, loadError, actionError, needsReload,
     reload, discard, save, addArea, deleteArea, setActionError } = state;
@@ -37,10 +39,24 @@ function ManagerStableContent() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pendingAction, setPendingAction] = useState<{ run: () => void } | null>(null);
   const [selectedStall, setSelectedStall] = useState<StableStall | null>(null);
+  const appliedStallCode = useRef<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Area | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   // Cards hold the drag-and-drop staffing; the map shows the same (draft) state as a plan or 3D barn.
   const [layout, setLayout] = useState<'cards' | 'map'>('cards');
+  useEffect(() => {
+    if (!stallCode || !data || appliedStallCode.current === stallCode) return;
+    const stall = data.stalls.find((item) => item.stallCode === stallCode);
+    if (!stall) return;
+    appliedStallCode.current = stallCode;
+    const area = data.areas.find((item) => item.id === stall.areaId);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (area) setActiveTab(area.type);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedStall(stall);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLayout('map');
+  }, [stallCode, data]);
   const count = data && draft ? editCount(data, draft) : 0;
   const dirty = count > 0;
   const busy = loading || saving || creating || deleting;

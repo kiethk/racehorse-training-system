@@ -201,9 +201,9 @@ function HealthRecordsContent() {
       if (pendingUrgentVetId != null && pendingUrgentVetId === user?.userId) {
         router.push(`/veterinarian/urgent/${pendingUrgentScheduleId}`);
       } else if (pendingUrgentVetName) {
-        toast.warning('Urgent case held by another vet', `${pendingUrgentVetName} is examining ${row.horse.name}; no record opens until that case is closed.`);
+        toast.warning('Urgent case held by another vet', `${pendingUrgentVetName} is examining ${row.horse.name}. No record opens until that case is closed.`);
       } else {
-        toast.warning('Urgent case awaiting assignment', `${row.horse.name} has an open urgent case; it is assigned from the Admissions queue.`);
+        toast.warning('Urgent case awaiting assignment', `${row.horse.name} has an open urgent case. It is assigned from the Admissions queue.`);
       }
       return;
     }

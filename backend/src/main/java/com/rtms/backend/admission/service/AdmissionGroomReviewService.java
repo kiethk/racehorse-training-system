@@ -1,10 +1,14 @@
 package com.rtms.backend.admission.service;
 import com.rtms.backend.admission.entity.AdmissionApplication;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
+import com.rtms.backend.admission.entity.AdmissionDocument;
+import com.rtms.backend.admission.enums.AdmissionDocumentType;
 import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.enums.ReviewDecision;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
+import com.rtms.backend.admission.repository.AdmissionDocumentRepository;
+import com.rtms.backend.common.storage.FileStorageService;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.entity.HorsePedigree;
 import com.rtms.backend.horse.enums.HorseStatus;
@@ -30,9 +34,13 @@ import com.rtms.backend.admission.dto.GroomAdmissionReviewRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -52,6 +60,8 @@ public class AdmissionGroomReviewService {
     private final PedigreeBirthDateValidator birthDates;
     private final GroomProfileRepository groomProfileRepository;
     private final AdmissionNotificationService admissionNotificationService;
+    private final FileStorageService fileStorageService;
+    private final AdmissionDocumentRepository admissionDocumentRepository;
 
     public AdmissionGroomReviewService(
             AdmissionApplicationRepository admissionApplicationRepository,
@@ -64,7 +74,9 @@ public class AdmissionGroomReviewService {
             NotificationService notificationService,
             PedigreeBirthDateValidator birthDates,
             GroomProfileRepository groomProfileRepository,
-            AdmissionNotificationService admissionNotificationService) {
+            AdmissionNotificationService admissionNotificationService,
+            FileStorageService fileStorageService,
+            AdmissionDocumentRepository admissionDocumentRepository) {
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
         this.stableStallRepository = stableStallRepository;
@@ -76,6 +88,8 @@ public class AdmissionGroomReviewService {
         this.birthDates = birthDates;
         this.groomProfileRepository = groomProfileRepository;
         this.admissionNotificationService = admissionNotificationService;
+        this.fileStorageService = fileStorageService;
+        this.admissionDocumentRepository = admissionDocumentRepository;
     }
 
     @Transactional
@@ -142,7 +156,7 @@ public class AdmissionGroomReviewService {
     }
 
     @Transactional
-    public AdmissionApplication confirmArrival(Long admissionId, Long groomId) {
+    public AdmissionApplication confirmArrival(Long admissionId, Long groomId, List<MultipartFile> files) {
         AdmissionApplication admission = admissionApplicationRepository.findByIdForUpdate(admissionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission not found"));
         if (admission.getStatus() != AdmissionStatus.WAITING_FOR_ARRIVAL) {
@@ -164,6 +178,15 @@ public class AdmissionGroomReviewService {
         }
         if (quarantineStall.getStatus() != StallStatus.RESERVED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Reserved quarantine stall is no longer available");
+        }
+        if (files == null || files.isEmpty() || files.size() > 5) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attach between 1 and 5 arrival photos");
+        }
+        for (MultipartFile file : files) {
+            if (file == null || file.getContentType() == null || !file.getContentType().startsWith("image/")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Arrival photos must be images (JPEG, PNG, WebP)");
+            }
+            fileStorageService.validate(file);
         }
 
         CandidateHorseProfile candidate = candidateHorseProfileRepository
@@ -188,8 +211,39 @@ public class AdmissionGroomReviewService {
         admission.setStatus(AdmissionStatus.VET_REVIEW);
         CareSchedule initialSchedule = ensureInitialCareSchedule(admissionId, horse.getId());
         admission = admissionApplicationRepository.save(admission);
+        saveArrivalPhotos(admissionId, files, now);
         dispatchAssignmentNotifications(admission, horse, initialSchedule);
         return admission;
+    }
+
+    private void saveArrivalPhotos(Long admissionId, List<MultipartFile> files, LocalDateTime now) {
+        List<String> storedKeys = new ArrayList<>();
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status == STATUS_ROLLED_BACK) storedKeys.forEach(fileStorageService::delete);
+                }
+            });
+        }
+        try {
+            for (MultipartFile file : files) {
+                String key = fileStorageService.store(file, "rtms/admissions/" + admissionId + "/arrival");
+                storedKeys.add(key);
+                AdmissionDocument document = new AdmissionDocument();
+                document.setAdmissionId(admissionId);
+                document.setDocumentType(AdmissionDocumentType.ARRIVAL_PHOTO);
+                document.setFileUrl(key);
+                document.setOriginalFileName(file.getOriginalFilename());
+                document.setRecordDate(now.toLocalDate());
+                document.setUploadedAt(now);
+                admissionDocumentRepository.save(document);
+            }
+        } catch (RuntimeException error) {
+            storedKeys.forEach(fileStorageService::delete);
+            storedKeys.clear();
+            throw error;
+        }
     }
 
     @Transactional

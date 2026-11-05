@@ -9,6 +9,8 @@ import { Panel } from '@/components/ui/Panel';
 import { Pill } from '@/components/ui/StatusBadge';
 import { ProtectedImage } from '@/components/ui/ProtectedImage';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { EntityLink } from '@/components/ui/EntityLink';
+import { entityHref } from '@/lib/entityRoute';
 import { HorseVitalsPanel } from '@/features/health/components/HorseVitalsPanel';
 import { admissionsApi } from '../services/api';
 import { healthApi } from '@/features/health/services/healthApi';
@@ -190,9 +192,9 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
             />
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xl font-bold text-[var(--color-text-primary)]">
+                <EntityLink href={entityHref('horse', urgentCase.horseId, 'VETERINARIAN')} className="text-xl font-bold text-[var(--color-text-primary)]">
                   {urgentCase.horseName}
-                </span>
+                </EntityLink>
                 <span className="rounded-[var(--radius-xs)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 font-mono text-xs text-[var(--color-text-muted)]">
                   #{urgentCase.horseId}
                 </span>
@@ -495,7 +497,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
               <div className="flex items-center justify-between">
                 <dt className="text-[var(--color-text-muted)]">Horse</dt>
                 <dd className="font-bold text-[var(--color-text-primary)]">
-                  {urgentCase.horseName} (#{urgentCase.horseId})
+                  <EntityLink href={entityHref('horse', urgentCase.horseId, 'VETERINARIAN')}>{urgentCase.horseName} (#{urgentCase.horseId})</EntityLink>
                 </dd>
               </div>
               <div className="flex items-center justify-between">

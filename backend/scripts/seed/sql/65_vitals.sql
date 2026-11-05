@@ -33,7 +33,7 @@ SELECT r.horse_id, r.at,
        pg_temp.rndi('b' || r.horse_id, 9, 13) / 2.0,
        CASE r.kind WHEN 'sick' THEN 'Daily check during the rest period.'
                    WHEN 'fatigue' THEN 'Rechecked after a tiring session: heart rate still up in the afternoon.'
-                   WHEN 'fever' THEN 'Slightly warm on the round; recheck tomorrow.'
+                   WHEN 'fever' THEN 'Slightly warm on the round, recheck tomorrow.'
                    WHEN 'high_hr' THEN 'Heart rate up on the round, settled after 15 minutes.'
                    ELSE 'Stable round.' END,
        r.at
