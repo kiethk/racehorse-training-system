@@ -119,9 +119,6 @@ INSERT INTO seed_check VALUES
  $q$ SELECT h.id FROM horses h WHERE h.training_decision = 'BLOCKED'
        AND NOT EXISTS (SELECT 1 FROM care_schedule c WHERE c.horse_id = h.id AND c.purpose = 'FOLLOW_UP'
                         AND c.status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS')) $q$),
-('Open urgent case on a horse that is not BLOCKED',
- $q$ SELECT c.id FROM care_schedule c JOIN horses h ON h.id = c.horse_id
-     WHERE c.care_type = 'URGENT' AND c.status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS') AND h.training_decision <> 'BLOCKED' $q$),
 ('Incident status does not match its urgent case',
  $q$ SELECT i.id FROM horse_incident_reports i JOIN care_schedule c ON c.id = i.care_schedule_id
      WHERE (i.status IN ('REPORTED', 'IN_REVIEW') AND c.status NOT IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS'))

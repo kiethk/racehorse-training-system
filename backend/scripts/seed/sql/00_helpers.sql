@@ -21,7 +21,7 @@ CREATE FUNCTION pg_temp.ref_day() RETURNS DATE AS $$ SELECT DATE '2026-10-25' $$
 -- set rtms.seed_now, e.g. seed-database.ps1 -AsOf '2026-11-02 08:00'.)
 CREATE FUNCTION pg_temp.clock() RETURNS TIMESTAMP AS $$
     SELECT date_trunc('minute', COALESCE(NULLIF(current_setting('rtms.seed_now', TRUE), '')::TIMESTAMP,
-                                         now() AT TIME ZONE 'Asia/Ho_Chi_Minh'))::TIMESTAMP
+                                         TIMESTAMP '2026-11-06 14:00:00'))::TIMESTAMP
 $$ LANGUAGE sql STABLE;
 
 CREATE FUNCTION pg_temp.today() RETURNS DATE AS $$ SELECT pg_temp.clock()::DATE $$ LANGUAGE sql STABLE;
@@ -382,9 +382,7 @@ BEGIN
              WHERE id = m.id;
             RETURN m.id;
         END IF;
-        UPDATE care_schedule SET status = 'CANCELLED', updated_at = p_at,
-                                 cancel_reason = 'Vaccinated early in a combined visit on ' || to_char(v_on, 'DD/MM')
-         WHERE id = m.id;
+        DELETE FROM care_schedule WHERE id = m.id;
     END IF;
     SELECT a.id INTO v_admission FROM admission_applications a
      WHERE a.horse_id = p_horse AND a.status NOT IN ('APPROVED', 'REJECTED') ORDER BY a.submitted_at DESC LIMIT 1;
@@ -550,10 +548,11 @@ CREATE FUNCTION pg_temp.child_of(p_source BIGINT) RETURNS BIGINT AS $$
     SELECT id FROM care_schedule WHERE source_schedule_id = p_source
 $$ LANGUAGE sql STABLE;
 
--- Sự cố do Groom báo (createReport): mở ca khẩn cấp nếu ngựa chưa có, chặn tập, giao Thú y ngay.
--- (An incident reported by a groom: opens an urgent case if none is open, blocks training, assigns a vet at once.)
+-- Sự cố do Groom báo (createReport): mở ca khẩn cấp nếu ngựa chưa có, giao Thú y nếu p_auto_assign=TRUE.
+-- (An incident reported by a groom: opens an urgent case if none is open, assigns a vet if p_auto_assign=TRUE.)
 CREATE FUNCTION pg_temp.report_incident(p_horse BIGINT, p_reporter BIGINT, p_at TIMESTAMP, p_title TEXT, p_desc TEXT,
-                                        p_severity TEXT, p_vet BIGINT, p_image TEXT DEFAULT NULL) RETURNS BIGINT AS $$
+                                        p_severity TEXT, p_vet BIGINT, p_image TEXT DEFAULT NULL,
+                                        p_auto_assign BOOLEAN DEFAULT TRUE) RETURNS BIGINT AS $$
 DECLARE
     v_incident BIGINT;
     v_schedule BIGINT;
@@ -569,17 +568,21 @@ BEGIN
      WHERE horse_id = p_horse AND care_type = 'URGENT' AND status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS');
     IF v_schedule IS NULL THEN
         v_schedule := pg_temp.new_schedule(p_horse, 'URGENT', 'FOLLOW_UP', p_desc, NULL, p_at, NULL, v_incident);
-        PERFORM pg_temp.block(p_horse, 'Urgent veterinary care pending: ' || p_desc, p_at);
-        -- Thú y rảnh lúc này, ưu tiên p_vet. (A vet free right now, preferring p_vet.)
-        SELECT u.id INTO v_vet FROM users u JOIN roles r ON r.id = u.role_id
-         WHERE r.name = 'VETERINARIAN' AND u.is_active AND NOT pg_temp.vet_busy(u.id, p_at, 30, NULL)
-         ORDER BY (u.id = p_vet) DESC, u.id LIMIT 1;
-        PERFORM pg_temp.assign(v_schedule, v_vet, p_at, p_at);
-        UPDATE horse_incident_reports SET status = 'IN_REVIEW', handled_by_id = v_vet, handled_at = p_at WHERE id = v_incident;
+        IF p_auto_assign THEN
+            -- Thú y rảnh lúc này, ưu tiên p_vet. (A vet free right now, preferring p_vet.)
+            SELECT u.id INTO v_vet FROM users u JOIN roles r ON r.id = u.role_id
+             WHERE r.name = 'VETERINARIAN' AND u.is_active AND NOT pg_temp.vet_busy(u.id, p_at, 30, NULL)
+             ORDER BY (u.id = p_vet) DESC, u.id LIMIT 1;
+            IF v_vet IS NOT NULL THEN
+                PERFORM pg_temp.assign(v_schedule, v_vet, p_at, p_at);
+                UPDATE horse_incident_reports SET status = 'IN_REVIEW', handled_by_id = v_vet, handled_at = p_at WHERE id = v_incident;
+            END IF;
+        END IF;
     ELSE
-        PERFORM pg_temp.block(p_horse, 'Urgent veterinary care pending', p_at);
-        UPDATE horse_incident_reports r SET status = 'IN_REVIEW', handled_by_id = c.veterinarian_id, handled_at = p_at
-          FROM care_schedule c WHERE r.id = v_incident AND c.id = v_schedule AND c.veterinarian_id IS NOT NULL;
+        IF p_auto_assign THEN
+            UPDATE horse_incident_reports r SET status = 'IN_REVIEW', handled_by_id = c.veterinarian_id, handled_at = p_at
+              FROM care_schedule c WHERE r.id = v_incident AND c.id = v_schedule AND c.veterinarian_id IS NOT NULL;
+        END IF;
     END IF;
     UPDATE horse_incident_reports SET care_schedule_id = v_schedule WHERE id = v_incident;
     RETURN v_incident;
