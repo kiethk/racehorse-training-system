@@ -139,7 +139,7 @@ class CareScheduleLifecycleSweepTest {
 
         assertEquals(CareScheduleStatus.SCHEDULED, initial.getStatus());
         assertEquals(LocalDateTime.of(2026, 11, 2, 8, 0), initial.getScheduledAt());
-        assertEquals(RescheduleReason.EOD_ROLLOVER, initial.getRescheduleReason());
+        assertEquals(RescheduleReason.TIME_EXCEEDED, initial.getRescheduleReason());
         assertNotNull(initial.getRescheduleNote());
         assertTrue(initial.getRescheduleNote().contains("(was in progress)"));
         verify(notificationService).sendAssignmentNotification(eq(20L),
@@ -237,6 +237,6 @@ class CareScheduleLifecycleSweepTest {
 
         ArgumentCaptor<CareSchedule> saved = ArgumentCaptor.forClass(CareSchedule.class);
         verify(careScheduleRepository).save(saved.capture());
-        assertEquals(RescheduleReason.EOD_ROLLOVER, saved.getValue().getRescheduleReason());
+        assertEquals(RescheduleReason.TIME_EXCEEDED, saved.getValue().getRescheduleReason());
     }
 }

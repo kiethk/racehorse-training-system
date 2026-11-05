@@ -234,10 +234,10 @@ CREATE FUNCTION pg_temp.new_schedule(p_horse BIGINT, p_care_type TEXT, p_purpose
                                      p_source BIGINT DEFAULT NULL, p_requested_by BIGINT DEFAULT NULL,
                                      p_key TEXT DEFAULT NULL, p_fingerprint TEXT DEFAULT NULL) RETURNS BIGINT AS $$
     INSERT INTO care_schedule (horse_id, admission_id, source_incident_id, care_type, status, duration_minutes, description,
-                               created_at, updated_at, requested_at, source_schedule_id, requested_by_id, idempotency_key,
-                               request_fingerprint, purpose)
+                               created_at, updated_at, requested_at, scheduled_date, source_schedule_id, requested_by_id, idempotency_key,
+                               purpose)
     VALUES (p_horse, p_admission, p_incident, p_care_type, 'REQUESTED', 30, p_desc, p_created_at, p_created_at,
-            p_requested_at, p_source, p_requested_by, p_key, p_fingerprint, p_purpose)
+            p_requested_at, CAST(p_requested_at AS DATE), p_source, p_requested_by, p_key, p_purpose)
     RETURNING id
 $$ LANGUAGE sql;
 
@@ -249,7 +249,7 @@ DECLARE
     v_horse TEXT;
     v_type TEXT; v_title TEXT; v_message TEXT;
 BEGIN
-    UPDATE care_schedule SET veterinarian_id = p_vet, scheduled_at = p_slot, status = 'SCHEDULED', updated_at = p_at
+    UPDATE care_schedule SET veterinarian_id = p_vet, scheduled_at = p_slot, scheduled_date = CAST(p_slot AS DATE), status = 'SCHEDULED', updated_at = p_at
      WHERE id = p_schedule RETURNING * INTO c;
     SELECT name INTO v_horse FROM horses WHERE id = c.horse_id;
     IF c.care_type = 'INITIAL' AND c.admission_id IS NOT NULL THEN

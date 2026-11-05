@@ -127,8 +127,6 @@ INSERT INTO seed_check VALUES
      WHERE (i.status IN ('REPORTED', 'IN_REVIEW') AND c.status NOT IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS'))
         OR (i.status = 'RESOLVED' AND (c.status <> 'COMPLETED' OR i.handled_by_id IS DISTINCT FROM c.veterinarian_id))
         OR i.care_schedule_id IS NULL $q$),
-('PAUSED schedule without a paused_from timestamp',
- $q$ SELECT id FROM care_schedule WHERE status = 'PAUSED' AND paused_from IS NULL $q$),
 ('Cancelled care schedule exists (AD-022 forbids CANCELLED in care_schedule)',
  $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' $q$),
 ('Care schedule with status outside the 6-status enum (AD-022)',

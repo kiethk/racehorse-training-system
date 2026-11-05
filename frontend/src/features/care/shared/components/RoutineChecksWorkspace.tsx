@@ -316,11 +316,26 @@ export function RoutineChecksWorkspace() {
                             ? 'Requested'
                             : 'Completed'}
                         </Pill>
+                        {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
+                          <Pill tone="warning" size="sm">
+                            Rolled {cs.rolloverCount}x
+                          </Pill>
+                        )}
+                        {cs.rescheduleReason === 'URGENT_PREEMPTION' && (
+                          <Pill tone="info" size="sm">
+                            Emergency Priority
+                          </Pill>
+                        )}
+                        {cs.rescheduleReason === 'PEER_OFFLOAD' && (
+                          <Pill tone="neutral" size="sm">
+                            Transferred
+                          </Pill>
+                        )}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                         <span className="inline-flex items-center gap-1">
                           <Icon name="calendar" size={12} className="text-[var(--color-primary)]" />
-                          <strong>{dateStr}</strong>
+                          <strong>{dateStr} (13:30 – 15:30)</strong>
                         </span>
                         <span>·</span>
                         <span className="inline-flex items-center gap-1">

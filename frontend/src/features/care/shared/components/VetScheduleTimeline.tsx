@@ -420,11 +420,26 @@ export function VetScheduleTimeline() {
                             <Pill tone={statusDisplay.tone} icon={statusDisplay.icon} size="sm">
                               {statusDisplay.label}
                             </Pill>
+                            {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
+                              <Pill tone="warning" size="sm">
+                                Rolled {cs.rolloverCount}x
+                              </Pill>
+                            )}
+                            {cs.rescheduleReason === 'URGENT_PREEMPTION' && (
+                              <Pill tone="info" size="sm">
+                                Emergency Priority
+                              </Pill>
+                            )}
+                            {cs.rescheduleReason === 'PEER_OFFLOAD' && (
+                              <Pill tone="neutral" size="sm">
+                                Transferred
+                              </Pill>
+                            )}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                             <span className="inline-flex items-center gap-1">
                               <Icon name="clock" size={12} className="text-[var(--color-primary)]" />
-                              <strong>{timeStr}</strong>
+                              <strong>{cs.careType === 'ROUTINE' ? '13:30 – 15:30' : timeStr}</strong>
                             </span>
                             <span>·</span>
                             <span className="inline-flex items-center gap-1">
@@ -466,9 +481,6 @@ export function VetScheduleTimeline() {
             <span className="text-[var(--color-text-primary)]">
               Week of {formatDate(mondayIso)} – {formatDate(weekDays[6])}
             </span>
-            <span className="text-xs text-[var(--color-text-muted)]">
-              Showing non-urgent clinical exams for the week
-            </span>
           </div>
 
           {loading ? (
@@ -476,7 +488,9 @@ export function VetScheduleTimeline() {
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
               {weekDays.map((dayIso) => {
-                const daySchedules = schedules.filter((s) => s.scheduledAt?.startsWith(dayIso));
+                const daySchedules = schedules.filter((s) => (s.scheduledDate ? s.scheduledDate === dayIso : s.scheduledAt?.startsWith(dayIso)));
+                const routineCount = daySchedules.filter((s) => s.careType === 'ROUTINE').length;
+                const admissionCount = daySchedules.filter((s) => s.careType === 'INITIAL').length;
                 const isToday = dayIso === formatLocalDateIso();
                 const [year, month, day] = dayIso.split('-').map(Number);
                 const dayDate = new Date(year, month - 1, day);
@@ -492,20 +506,27 @@ export function VetScheduleTimeline() {
                     }`}
                   >
                     {/* Day Column Header */}
-                    <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2 mb-2">
-                      <div>
-                        <span className="text-xs font-bold text-[var(--color-text-primary)] block">
-                          {dayLabel}
-                        </span>
-                        {isToday && (
-                          <span className="text-[10px] font-semibold text-[var(--color-primary)] uppercase tracking-wide">
-                            Today
+                    <div className="border-b border-[var(--color-border)] pb-2 mb-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-[var(--color-text-primary)] block">
+                            {dayLabel}
                           </span>
-                        )}
+                          {isToday && (
+                            <span className="text-[10px] font-semibold text-[var(--color-primary)] uppercase tracking-wide">
+                              Today
+                            </span>
+                          )}
+                        </div>
+                        <Pill tone={daySchedules.length > 0 ? 'primary' : 'neutral'} size="sm">
+                          {daySchedules.length}
+                        </Pill>
                       </div>
-                      <Pill tone={daySchedules.length > 0 ? 'primary' : 'neutral'} size="sm">
-                        {daySchedules.length}
-                      </Pill>
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-[var(--color-text-muted)] font-medium">
+                        <span>R: {routineCount}/4</span>
+                        <span>·</span>
+                        <span>A: {admissionCount}/2</span>
+                      </div>
                     </div>
 
                     {/* Day Column Body */}
@@ -518,7 +539,7 @@ export function VetScheduleTimeline() {
                         daySchedules.map((cs) => {
                           const horse = horseMap.get(cs.horseId);
                           const horseName = horse?.name || `Horse #${cs.horseId}`;
-                          const timeStr = cs.scheduledAt ? clockLabel(cs.scheduledAt) : '';
+                          const timeStr = cs.careType === 'ROUTINE' ? '13:30 – 15:30' : (cs.scheduledAt ? clockLabel(cs.scheduledAt) : '');
                           const tone = getCareTypeTone(cs.careType, cs.purpose, cs.sourceIncidentId);
 
                           return (
@@ -538,7 +559,14 @@ export function VetScheduleTimeline() {
                             >
                               <div className="flex items-center justify-between text-xs font-bold">
                                 <span>{timeStr}</span>
-                                <span className="text-[10px] uppercase font-semibold">{tone.label}</span>
+                                <div className="flex items-center gap-1">
+                                  {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
+                                    <span className="text-[9px] px-1 rounded bg-[var(--color-warning-subtle)] text-[var(--color-warning-strong)] font-bold">
+                                      Rolled
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] uppercase font-semibold">{tone.label}</span>
+                                </div>
                               </div>
                               <p className="text-xs truncate font-medium mt-1 text-[var(--color-text-primary)]">
                                 {horseName}

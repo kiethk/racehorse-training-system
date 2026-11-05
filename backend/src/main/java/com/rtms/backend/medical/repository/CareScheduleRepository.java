@@ -17,6 +17,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -168,6 +169,18 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     List<CareSchedule> findByVeterinarianIdAndStatus(Long veterinarianId, CareScheduleStatus status);
     List<CareSchedule> findByVeterinarianId(Long veterinarianId);
     boolean existsByVeterinarianIdAndStatusIn(Long veterinarianId, Collection<CareScheduleStatus> statuses);
+
+    boolean existsByVeterinarianIdAndCareTypeAndStatusInAndScheduledDate(
+            Long veterinarianId, CareType careType, Collection<CareScheduleStatus> statuses, LocalDate scheduledDate);
+
+    List<CareSchedule> findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
+            Long veterinarianId, LocalDate scheduledDate, CareType careType, Collection<CareScheduleStatus> statuses);
+
+    List<CareSchedule> findByScheduledDateAndCareTypeAndStatusIn(
+            LocalDate scheduledDate, CareType careType, Collection<CareScheduleStatus> statuses);
+
+    long countByVeterinarianIdAndScheduledDateAndCareTypeAndStatusIn(
+            Long veterinarianId, LocalDate scheduledDate, CareType careType, Collection<CareScheduleStatus> statuses);
 
     @Query("SELECT cs FROM CareSchedule cs WHERE (:status IS NULL OR cs.status = :status) "
             + "AND (:careType IS NULL OR cs.careType = :careType) "

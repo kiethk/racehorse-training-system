@@ -749,6 +749,11 @@ export function VetAdmissionQueue() {
                               {getScheduleStatusDisplay(status).label}
                             </Pill>
                           )}
+                          {Boolean((row.careSchedule?.rolloverCount ?? 0) > 0) && (
+                            <Pill tone="warning" size="sm">
+                              Rolled {row.careSchedule?.rolloverCount}x
+                            </Pill>
+                          )}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                           <span className="inline-flex items-center gap-1 shrink-0">

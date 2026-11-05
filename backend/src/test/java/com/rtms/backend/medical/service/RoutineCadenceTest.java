@@ -162,7 +162,6 @@ class RoutineCadenceTest {
         existing.setIdempotencyKey("completion:" + exam.getId());
         existing.setRequestedAt(expectedRequestedAt);
         existing.setDescription("Routine follow-up examination");
-        existing.setRequestFingerprint(fingerprint(horse.getId(), null, expectedRequestedAt, existing.getDescription()));
 
         when(schedules.findById(exam.getId())).thenReturn(Optional.of(exam));
         when(schedules.findByIdForUpdate(exam.getId())).thenReturn(Optional.of(exam));
@@ -315,16 +314,6 @@ class RoutineCadenceTest {
         m.setBodyConditionScore(BigDecimal.valueOf(5.5));
         req.setMetrics(List.of(m));
         return req;
-    }
-
-    private static String fingerprint(Long horseId, Long admissionId, LocalDateTime requestedAt, String description) {
-        String value = horseId + "|" + admissionId + "|ROUTINE|" + requestedAt + "|" + description;
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(digest);
-        } catch (Exception impossible) {
-            throw new IllegalStateException(impossible);
-        }
     }
 
     @Test

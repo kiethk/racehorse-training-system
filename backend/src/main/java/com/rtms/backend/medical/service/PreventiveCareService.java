@@ -134,11 +134,12 @@ public class PreventiveCareService {
                 admissionId = null;
             }
         }
-        String fingerprint = fingerprint(request.getHorseId(), admissionId, requestedAt, description);
-
         Optional<CareSchedule> existing = schedules.findByRequestedByIdAndIdempotencyKey(user.getUserId(), idempotencyKey);
         if (existing.isPresent()) {
-            if (!Objects.equals(existing.get().getRequestFingerprint(), fingerprint)) {
+            boolean payloadMatches = Objects.equals(existing.get().getHorseId(), request.getHorseId())
+                    && Objects.equals(existing.get().getAdmissionId(), admissionId)
+                    && Objects.equals(existing.get().getDescription(), description);
+            if (!payloadMatches) {
                 throw new ApiException(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT", "Idempotency key was already used with a different payload");
             }
             return existing.get();
@@ -169,7 +170,6 @@ public class PreventiveCareService {
         schedule.setSourceScheduleId(null);
         schedule.setRequestedById(user.getUserId());
         schedule.setIdempotencyKey(idempotencyKey);
-        schedule.setRequestFingerprint(fingerprint);
         schedule.setCareType(CareType.ROUTINE);
         schedule.setPurpose(purpose);
         schedule.setStatus(CareScheduleStatus.REQUESTED);
@@ -180,16 +180,6 @@ public class PreventiveCareService {
         CareSchedule saved = schedules.save(schedule);
         care.assignRequestedSchedule(saved, user.getUserId());
         return saved;
-    }
-
-    private static String fingerprint(Long horseId, Long admissionId, LocalDateTime requestedAt, String description) {
-        String value = horseId + "|" + admissionId + "|ROUTINE|" + requestedAt + "|" + description;
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException(impossible);
-        }
     }
 
     public List<CareSchedule> getSchedulesByHorse(Long horseId, AuthenticatedUser user) {
