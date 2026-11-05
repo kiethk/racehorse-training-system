@@ -29,7 +29,7 @@ import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSect
 import { CareRecordDetailModal } from '@/features/care/components/CareRecordDetailModal';
 import { getCareTypeTone } from '@/features/schedule/utils/timelineUtils';
 import { formatDate, formatDateTime } from '@/lib/display';
-import { getScheduleStatusDisplay } from '@/features/care/lib/scheduleStatusDisplay';
+import { getScheduleExamAction, getScheduleStatusDisplay } from '@/features/care/lib/scheduleStatusDisplay';
 import { admissionsApi } from '../services/api';
 import type {
   AdmissionDetailResponse,
@@ -621,11 +621,6 @@ export function VetAdmissionQueue() {
       {(currentActiveSchedule?.scheduledDate || currentActiveSchedule?.scheduledAt) && (
         <InfoRow label="Scheduled" value={formatDate((currentActiveSchedule.scheduledDate || currentActiveSchedule.scheduledAt)!)} />
       )}
-      {canStartExam && (
-        <Button type="button" className="w-full transition-all active:scale-[0.97]" variant="primary" loading={startingExam} onClick={handleStartExam} icon="activity">
-          Start examination
-        </Button>
-      )}
     </AdmissionSideCard>
   ) : null;
 
@@ -707,17 +702,10 @@ export function VetAdmissionQueue() {
               const status: CareScheduleStatus | undefined = isVetApproved
                 ? 'COMPLETED'
                 : row.careSchedule?.status;
+              const examAction = getScheduleExamAction(status);
               const action = isVetApproved
-                ? ({ label: 'View Record', icon: 'clipboard' as const, primary: false })
-                : status === 'PAUSED'
-                ? ({ label: 'Continue (Paused)', icon: 'activity' as const, primary: true })
-                : status === 'IN_PROGRESS' || status === 'DELAYED'
-                ? ({ label: 'Continue', icon: 'activity' as const, primary: true })
-                : status === 'OVERDUE'
-                ? ({ label: 'Examine (Overdue)', icon: 'stethoscope' as const, primary: true })
-                : status === 'SCHEDULED'
-                ? ({ label: 'Examine', icon: 'stethoscope' as const, primary: true })
-                : ({ label: 'Details', icon: 'chevron-right' as const, primary: false });
+                ? ({ label: 'View Record', icon: 'file-text' as const, primary: false })
+                : ({ label: examAction.label, icon: examAction.icon, primary: examAction.label === 'Examine' });
 
               const rowVetId = row.careSchedule?.veterinarianId ?? row.careSchedule?.assignedVetId ?? null;
               const isAssignedToMe = Boolean(rowVetId && user?.userId && rowVetId === user.userId);

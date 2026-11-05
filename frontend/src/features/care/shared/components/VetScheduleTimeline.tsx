@@ -131,7 +131,6 @@ export function VetScheduleTimeline() {
     <div className="space-y-6">
       {/* Top Header & Navigation */}
       <PageHeader
-        eyebrow="Clinical Schedule"
         title="Veterinary Schedule"
         actions={
           <div className="flex flex-wrap items-center gap-2">

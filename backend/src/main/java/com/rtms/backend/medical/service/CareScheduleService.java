@@ -484,10 +484,12 @@ public class CareScheduleService {
         }
 
         // AD-022/BRD: a late exam is completed from OVERDUE too — the vet never has to
-        // reopen it. ACTIVE_EXAM = {IN_PROGRESS, OVERDUE}.
-        if (!CareScheduleStatus.ACTIVE_EXAM.contains(schedule.getStatus())) {
+        // reopen it. ACTIVE_EXAM = {IN_PROGRESS, OVERDUE}. SCHEDULED is also accepted directly
+        // for routine and admission visits (no start-exam step needed).
+        if (!CareScheduleStatus.ACTIVE_EXAM.contains(schedule.getStatus())
+                && schedule.getStatus() != CareScheduleStatus.SCHEDULED) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS",
-                    "Care schedule must be IN_PROGRESS or OVERDUE to complete");
+                    "Care schedule must be SCHEDULED, IN_PROGRESS or OVERDUE to complete");
         }
         if (!Objects.equals(schedule.getVeterinarianId(), vetId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Only the assigned veterinarian can complete this schedule");

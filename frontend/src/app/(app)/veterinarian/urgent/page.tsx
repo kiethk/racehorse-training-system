@@ -108,7 +108,6 @@ export default function UrgentCasesPage() {
         <div className="space-y-6">
           {/* Header */}
           <PageHeader
-            eyebrow="Clinical Emergency Operations"
             title="Urgent Cases"
             actions={
               <div className="flex items-center gap-2">

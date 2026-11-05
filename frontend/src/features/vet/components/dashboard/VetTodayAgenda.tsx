@@ -26,21 +26,24 @@ interface VetTodayAgendaProps {
   appointments: CareSchedule[];
   horseMap: Map<number, Horse>;
   stallMap: Map<number, string>;
-  onStartExam: (schedule: CareSchedule) => void;
+  onStartExam?: (schedule: CareSchedule) => void;
+  onExamine?: (schedule: CareSchedule) => void;
   onViewFindings: (schedule: CareSchedule) => void;
   onBookRoutine: () => void;
 }
 
-/** Left column of the vet dashboard: today's clinical agenda (08:00 – 17:00). */
+/** Left column of the vet dashboard: today's clinical agenda. */
 export function VetTodayAgenda({
   loading,
   appointments,
   horseMap,
   stallMap,
   onStartExam,
+  onExamine,
   onViewFindings,
   onBookRoutine,
 }: VetTodayAgendaProps) {
+  const handleExamAction = onExamine ?? onStartExam ?? (() => {});
   return (
     <div className="space-y-4 lg:col-span-7">
       <Panel padded>
@@ -72,16 +75,17 @@ export function VetTodayAgenda({
                 horse?.currentStallId != null
                   ? stallMap.get(horse.currentStallId)
                   : null;
-              const timeStr = formatAppointmentTime(schedule.scheduledAt);
-              const duration = schedule.durationMinutes ?? 30;
+              const stallLabel = stallCode
+                ? (schedule.careType === 'INITIAL' ? `Quarantine Stall: ${stallCode}` : `Stall: ${stallCode}`)
+                : "Stall: Unassigned";
               const tone = getCareTypeTone(schedule.careType, schedule.purpose, schedule.sourceIncidentId);
               const status = getScheduleStatusDisplay(schedule.status);
               const action = getScheduleExamAction(schedule.status);
-              // Whole-row click mirrors the status button, so compute the action once for mouse + keyboard.
+              // Whole-row click mirrors the action button, so compute once for mouse + keyboard.
               const openRow = () =>
                 schedule.status === "COMPLETED"
                   ? onViewFindings(schedule)
-                  : onStartExam(schedule);
+                  : handleExamAction(schedule);
 
               return (
                 <div
@@ -118,20 +122,15 @@ export function VetTodayAgenda({
                         )}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                        <span className="font-medium text-[var(--color-text-primary)]">
-                          {timeStr}
-                        </span>
-                        <span className="text-[var(--color-text-muted)]">
-                          ({duration}m)
-                        </span>
-                        <span className="text-[var(--color-border-strong)]">
-                          ·
-                        </span>
-                        <span>
-                          {stallCode
-                            ? `Stall: ${stallCode}`
-                            : "Stall: Unassigned"}
-                        </span>
+                        {schedule.careType === 'URGENT' && schedule.scheduledAt && (
+                          <>
+                            <span className="font-semibold text-[var(--color-danger)]">
+                              {formatAppointmentTime(schedule.scheduledAt)}
+                            </span>
+                            <span className="text-[var(--color-border-strong)]">·</span>
+                          </>
+                        )}
+                        <span>{stallLabel}</span>
                       </div>
                     </div>
                   </div>

@@ -16,6 +16,7 @@ import type { Horse, StableStall } from '@/features/stable/types';
 import { useAuth } from '@/context/AuthContext';
 import { formatDate } from '@/lib/display';
 import { getCareTypeTone } from '@/features/schedule/utils/timelineUtils';
+import { getScheduleExamAction } from '@/features/care/lib/scheduleStatusDisplay';
 import { CreateRoutineModal } from './CreateRoutineModal';
 import { filterRoutineSchedules } from '@/features/routine/utils/routineValidation';
 
@@ -128,7 +129,6 @@ export function RoutineChecksWorkspace() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
-        eyebrow="Clinical Operations"
         title="Routine & Preventive Care"
         actions={
           <div className="flex items-center gap-2">
@@ -363,30 +363,14 @@ export function RoutineChecksWorkspace() {
                     <Button
                       variant={isClosed ? 'secondary' : 'primary'}
                       size="sm"
-                      icon={
-                        isClosed
-                          ? 'file-text'
-                          : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
-                          ? 'activity'
-                          : cs.status === 'OVERDUE'
-                          ? 'alert-triangle'
-                          : 'chevron-right'
-                      }
+                      icon={isClosed ? 'file-text' : getScheduleExamAction(cs.status).icon}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleOpenSchedule(cs);
                       }}
                       className="transition-all active:scale-[0.97]"
                     >
-                      {isClosed
-                        ? 'View Record'
-                        : cs.status === 'PAUSED'
-                        ? 'Continue (Paused)'
-                        : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
-                        ? 'Continue Exam'
-                        : cs.status === 'OVERDUE'
-                        ? 'Start Exam'
-                        : 'Start Exam'}
+                      {isClosed ? 'View Record' : getScheduleExamAction(cs.status).label}
                     </Button>
                   </div>
                 </div>
