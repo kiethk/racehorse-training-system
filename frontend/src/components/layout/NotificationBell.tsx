@@ -9,6 +9,7 @@ import type { NotificationItem } from '@/features/notifications/types';
 import { Icon } from '@/components/ui/Icon';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { cn } from '@/lib/cn';
+import { formatDateTime } from '@/lib/display';
 
 export function NotificationBell() {
   const { user } = useAuth();
@@ -146,12 +147,5 @@ export function NotificationBell() {
 }
 
 function formatNotificationTime(isoString: string): string {
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatDateTime(isoString);
 }

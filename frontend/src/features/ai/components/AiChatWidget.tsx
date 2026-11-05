@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -6,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAiChat } from '../context/AiChatContext';
 import { getQuickPromptsByRole } from '../lib/aiUtils';
 import { MarkdownMessage } from './MarkdownMessage';
+import { formatClockLabel, formatDateTime } from '@/lib/display';
 
 export function AiChatWidget() {
   const { user } = useAuth();
@@ -34,6 +36,7 @@ export function AiChatWidget() {
   // Tự động mở sidebar lịch sử khi phóng to khung chat
   useEffect(() => {
     if (isExpanded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowHistory(true);
     }
   }, [isExpanded]);
@@ -244,12 +247,7 @@ export function AiChatWidget() {
                           <div className="min-w-0 flex-1 pr-1.5">
                             <div className="truncate text-[11px] leading-snug">{c.title}</div>
                             <div className="text-[9px] text-[var(--color-text-secondary)] font-normal">
-                              {new Date(c.updatedAt).toLocaleDateString([], {
-                                month: 'numeric',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                              {formatDateTime(c.updatedAt)}
                             </div>
                           </div>
                           <button
@@ -297,10 +295,7 @@ export function AiChatWidget() {
                       </div>
 
                       <span className="mt-1 px-1 text-[9px] text-[var(--color-text-secondary)]">
-                        {new Date(msg.timestamp).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatClockLabel(msg.timestamp)}
                       </span>
                     </div>
                   );

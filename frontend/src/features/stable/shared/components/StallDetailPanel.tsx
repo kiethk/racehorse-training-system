@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button, EmptyState, HorseAvatar, Icon, IconButton, Panel, Pill } from '@/components/ui';
 import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
 import type { HorseSpecialty } from '@/features/horses/types';
-import { formatDate, formatEnumLabel } from '@/lib/display';
+import { formatDate, formatEnumLabel, formatLocalDateIso } from '@/lib/display';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
 import type { TreatmentPlan } from '@/features/care/types';
 import { MedicationInstructionModal } from '@/features/care/components/MedicationInstructionModal';
@@ -93,7 +93,7 @@ export function StallDetailPanel({
     };
   }, [horseId]);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = formatLocalDateIso();
   const hasActiveTreatment = Boolean(
     activePlan &&
       activePlan.status === 'ACTIVE' &&

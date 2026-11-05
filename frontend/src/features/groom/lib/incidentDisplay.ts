@@ -1,5 +1,6 @@
 import type { Horse } from '@/features/stable/types';
 import type { IncidentReport, IncidentSeverity, IncidentStatus } from '../types';
+import { formatDateTime } from '@/lib/display';
 
 export const INCIDENT_STATUS_MAP: Record<
   IncidentStatus,
@@ -30,5 +31,5 @@ export function incidentHorseName(report: IncidentReport, horse: Horse | undefin
 }
 
 export function formatIncidentReportedAt(reportedAt: string | null | undefined): string {
-  return reportedAt ? new Date(reportedAt).toLocaleString('en-US') : '—';
+  return formatDateTime(reportedAt);
 }
