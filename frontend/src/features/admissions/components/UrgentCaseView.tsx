@@ -49,6 +49,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
   useEffect(() => {
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUrgentCase(null);
     setLoading(true);
     setReports([]);
@@ -259,8 +260,8 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       />
 
       {/* Reported Incident & Observations from Groom */}
-      <Panel padded className="space-y-4">
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
+      <Panel padded className="space-y-3">
+        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
           <div className="flex items-center gap-2">
             <Icon name="file-text" size={16} className="text-[var(--color-medical)]" />
             <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
@@ -272,28 +273,31 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           </span>
         </div>
 
-        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-secondary)]">
-          {urgentCase.description || 'No detailed clinical description provided by reporter.'}
-        </p>
-
-        {urgentCase.imageUrl && (
-          <div className="pt-2">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-              Photo Evidence
-            </label>
-            <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2">
-              <ProtectedImage
-                src={urgentCase.imageUrl}
-                alt="Urgent case report incident photo"
-                openOnClick
-                className="max-h-72 w-full rounded-[var(--radius-sm)] object-contain"
-              />
-              <p className="mt-1.5 text-center text-[11px] text-[var(--color-text-muted)]">
-                Click photo to open full resolution view
-              </p>
-            </div>
+        <div className="flex flex-col sm:flex-row gap-4 items-start justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-secondary)]">
+              {urgentCase.description || 'No detailed clinical description provided by reporter.'}
+            </p>
           </div>
-        )}
+
+          {urgentCase.imageUrl && (
+            <div className="shrink-0 flex flex-col items-center">
+              <div className="group relative h-24 w-24 sm:h-28 sm:w-28 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
+                <ProtectedImage
+                  src={urgentCase.imageUrl}
+                  alt="Urgent case report incident photo"
+                  openOnClick
+                  className="h-24 w-24 sm:h-28 sm:w-28 object-cover transition-transform duration-200 group-hover:scale-105"
+                />
+                <div className="pointer-events-none absolute bottom-1 right-1 flex items-center gap-0.5 rounded bg-black/60 px-1 py-0.5 text-[10px] font-medium text-white shadow-xs backdrop-blur-xs">
+                  <Icon name="search" size={10} />
+                  <span>Zoom</span>
+                </div>
+              </div>
+              <span className="mt-1 text-[11px] text-[var(--color-text-muted)]">Photo evidence</span>
+            </div>
+          )}
+        </div>
       </Panel>
 
       <IncidentCaseReports

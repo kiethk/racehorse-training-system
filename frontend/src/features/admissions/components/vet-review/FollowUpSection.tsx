@@ -67,11 +67,6 @@ export function FollowUpSection(props: FollowUpSectionProps) {
           }}
         />
       </label>
-      {followUpRequired && (
-        <p className="text-xs text-[var(--color-text-secondary)]">
-          A follow-up schedule is required before submitting.
-        </p>
-      )}
       {careType === 'ROUTINE' && !followUpRequired && schedulePurpose !== 'PREVENTIVE' && !fromIncident && (
         <p className="text-xs text-[var(--color-text-secondary)]">
           Without a follow-up date the system books the next visit automatically — routine

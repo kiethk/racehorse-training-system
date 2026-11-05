@@ -42,9 +42,11 @@ export function DiagnosisSection(props: DiagnosisSectionProps) {
   }
 
   return (
-    <div>
-      <div className="mb-1 block text-xs font-semibold text-[var(--color-text-primary)]">
-        2. Clinical Assessment &amp; Diagnosis <span className="text-[var(--color-danger)]">*</span>
+    <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)] space-y-4">
+      <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
+        <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
+          2. Clinical Assessment &amp; Diagnosis <span className="text-[var(--color-danger)]">*</span>
+        </h3>
       </div>
       {isUrgent ? (
         <>
