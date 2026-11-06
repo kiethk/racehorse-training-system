@@ -105,6 +105,17 @@ BEGIN
                                     'The swelling is larger now and she is reluctant to put full weight on the leg.', 'HIGH', NULL,
                                     'admission-packs/h002-eagle-atena/horse-photo.jpg');
 
+    -- 1b. WILD IVANA (A08, groom4): đau bụng (colic) cấp, vừa báo cáo 25 phút trước, chưa gán Thú y (REQUESTED).
+    --     (Acute colic symptoms reported 25 minutes ago, unassigned urgent case waiting for vet intake.)
+    s := pg_temp.report_incident(pg_temp.hid('H008'), pg_temp.uid('GR04'), pg_temp.clock() - INTERVAL '25 minutes',
+                                 'Acute colic signs - sweating and rolling',
+                                 'Sweating profusely, pawing ground and attempting to roll in the stall. Urgent veterinary exam requested.',
+                                 'CRITICAL', NULL, 'admission-packs/h008-wild-ivana/horse-photo.jpg', p_auto_assign => FALSE);
+    UPDATE care_schedule SET status = 'REQUESTED', veterinarian_id = NULL, scheduled_at = NULL, updated_at = pg_temp.clock() - INTERVAL '25 minutes'
+     WHERE id = (SELECT care_schedule_id FROM horse_incident_reports WHERE id = s);
+    UPDATE horse_incident_reports SET status = 'REPORTED', handled_by_id = NULL, handled_at = NULL
+     WHERE id = s;
+
     -- 2. DOUGLAS (A05, groom2): sưng ống chân sau phải, vừa báo, đã giao Thú y (SCHEDULED, chưa bắt đầu khám).
     --    (Swollen right hind cannon, just reported and assigned, not started yet.)
     s := pg_temp.urgent_case('H005', 'GR02', pg_temp.clock() - INTERVAL '25 minutes', 'Swollen right hind cannon',
@@ -278,15 +289,13 @@ BEGIN
                               pg_temp.today() - 6, pg_temp.today() - 5, 'CANCELLED',
                               ARRAY[['Miconazole 2% cream', 'Thin layer', 'Twice daily', 'Topical', 'Stopped after one day.']]);
 
-    -- 11. NAUSICAA BY NIKA (A01, groom1): Thú y vet1 tự hẹn kiểm tra độ chắc chân trước mùa giải (lịch đứng riêng).
-    --     (vet1 books a pre-season soundness check on her own, a standalone follow-up.)
+    -- 11. NAUSICAA BY NIKA (A01, groom1): Thú y vet1 hẹn kiểm tra độ chắc chân trước mùa giải (lịch thường hôm nay).
+    --     (vet1 routine pre-season soundness check scheduled for today at 13:30.)
     SELECT id INTO c FROM care_schedule WHERE horse_id = pg_temp.hid('H001') AND status = 'COMPLETED'
      ORDER BY completed_at DESC LIMIT 1;
     s := pg_temp.new_schedule(pg_temp.hid('H001'), 'ROUTINE', 'FOLLOW_UP', 'Pre-season soundness and flexion check',
-                              pg_temp.at(3, TIME '14:00'), pg_temp.at(-1, TIME '16:00'), NULL, NULL, NULL, pg_temp.uid('VT01'),
-                              'soundness-check-' || pg_temp.hid('H001'),
-                              pg_temp.fingerprint(pg_temp.hid('H001'), NULL, pg_temp.at(3, TIME '14:00'),
-                                                  'Pre-season soundness and flexion check'));
-    PERFORM pg_temp.book(s, pg_temp.uid('VT01'));
+                              pg_temp.at(0, TIME '13:30'), pg_temp.at(-1, TIME '16:00'), NULL, NULL, NULL, pg_temp.uid('VT01'),
+                              'soundness-check-' || pg_temp.hid('H001'), NULL);
+    PERFORM pg_temp.assign(s, pg_temp.uid('VT01'), pg_temp.at(0, TIME '13:30'), pg_temp.at(-1, TIME '16:00'));
 
 END $$;

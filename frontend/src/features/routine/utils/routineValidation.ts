@@ -49,7 +49,12 @@ export function filterRoutineSchedules(
 ): CareSchedule[] {
   const normalizedSearch = searchTerm.trim().toLowerCase();
 
-  return schedules.filter((s) => {
+  const filtered = schedules.filter((s) => {
+    // Exclude preventive care: Routine Checks strictly handles clinical routine & follow-up exams
+    if (s.purpose === 'PREVENTIVE') {
+      return false;
+    }
+
     if (statusFilter !== 'ALL' && s.status !== statusFilter) {
       return false;
     }
@@ -70,5 +75,14 @@ export function filterRoutineSchedules(
       desc.includes(normalizedSearch) ||
       idStr.includes(normalizedSearch)
     );
+  });
+
+  return filtered.sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (timeB !== timeA) {
+      return timeB - timeA;
+    }
+    return (b.id || 0) - (a.id || 0);
   });
 }

@@ -116,15 +116,15 @@ class HorseIncidentReportRoutingTest {
     }
 
     @Test
-    @DisplayName("HIGH tạo ca URGENT và chặn tập, lý do ghi tiêu đề báo cáo")
-    void seriousReportOpensAnUrgentCaseAndBlocksTraining() {
+    @DisplayName("HIGH tạo ca URGENT nhưng không tự tiện chặn tập (quyền thuộc về Vet khi khám lâm sàng)")
+    void seriousReportOpensAnUrgentCaseWithoutBlockingTraining() {
         stubCreatedCase(CareType.URGENT, 100L, VET_ID);
 
         HorseIncidentReport report = service.createReport(request(IncidentSeverity.HIGH), groom);
 
         assertEquals(IncidentStatus.IN_REVIEW, report.getStatus());
         assertEquals(VET_ID, report.getHandledById());
-        verify(trainingDecisions).block(horse, "Urgent veterinary care pending: Lame");
+        verify(trainingDecisions, never()).block(any(), anyString());
     }
 
     @Test
@@ -165,11 +165,11 @@ class HorseIncidentReportRoutingTest {
         assertEquals(200L, report.getCareScheduleId());
         assertEquals(200L, earlier.getCareScheduleId());
         assertEquals(21L, earlier.getHandledById());
-        verify(trainingDecisions).block(eq(horse), anyString());
+        verify(trainingDecisions, never()).block(any(), anyString());
     }
 
     @Test
-    @DisplayName("HIGH khi Vet đang khám ca ROUTINE: gắn vào ca đó và chặn tập ngay")
+    @DisplayName("HIGH khi Vet đang khám ca ROUTINE: gắn vào ca đó và không tự ý chặn tập")
     void seriousReportJoinsARoutineExamInProgress() {
         CareSchedule routine = schedule(100L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS, VET_ID);
         when(careScheduleService.findOpenIncidentCase(HORSE_ID)).thenReturn(Optional.of(routine));
@@ -179,7 +179,7 @@ class HorseIncidentReportRoutingTest {
         assertEquals(100L, report.getCareScheduleId());
         verify(careScheduleService, never()).cancelSupersededCase(any());
         verify(careScheduleService, never()).createSchedule(anyLong(), any(), any(), any(), anyLong());
-        verify(trainingDecisions).block(eq(horse), anyString());
+        verify(trainingDecisions, never()).block(any(), anyString());
     }
 
     @Test

@@ -110,27 +110,11 @@ export function VetDashboardView() {
 
   const admissionClearanceCount = summary?.active ?? summary?.awaiting ?? 0;
 
-  const handleStartExam = async (schedule: CareSchedule) => {
-    try {
-      if (
-        schedule.status === "SCHEDULED" ||
-        schedule.status === "OVERDUE" ||
-        schedule.status === "PAUSED"
-      ) {
-        await admissionsApi.startCareSchedule(schedule.id);
-      }
-    } catch (err: unknown) {
-      console.error("Failed to start care schedule:", err);
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Cannot start examination: veterinarian is currently busy with another in-progress schedule";
-      setError(msg);
-      return;
-    }
-
+  const handleStartExam = (schedule: CareSchedule) => {
     if (schedule.careType === "INITIAL") {
       router.push(`/veterinarian/admissions?scheduleId=${schedule.id}`);
+    } else if (schedule.purpose === "PREVENTIVE") {
+      router.push(`/veterinarian/preventive-care?horseId=${schedule.horseId}`);
     } else if (schedule.careType === "ROUTINE") {
       router.push(`/veterinarian/routine/${schedule.id}`);
     } else if (schedule.careType === "URGENT") {
@@ -156,7 +140,6 @@ export function VetDashboardView() {
     <ScreenLayout variant="dashboard">
       {/* TIER 1: Header & Quick Actions */}
       <PageHeader
-        eyebrow="Clinical Operations"
         title="Veterinary Command Center"
         actions={
           <div className="flex flex-wrap items-center gap-2">

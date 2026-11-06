@@ -24,8 +24,6 @@ export default function RoutineDetailPage() {
   const [reports, setReports] = useState<UrgentCaseReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // The list card already asked to start the exam; entering this page auto-starts it once.
-  const autoStartRef = useRef(false);
 
   const loadDetail = useCallback(async () => {
     if (Number.isNaN(scheduleId)) return;
@@ -87,19 +85,6 @@ export default function RoutineDetailPage() {
       router.replace(`/veterinarian/records?scheduleId=${scheduleId}`);
     }
   }, [isCompleted, scheduleId, router]);
-
-  // Auto-start a SCHEDULED/OVERDUE exam on entry; on failure the gated form keeps the manual button.
-  useEffect(() => {
-    if (
-      (detail?.schedule?.status === 'SCHEDULED' || detail?.schedule?.status === 'OVERDUE') &&
-      !autoStartRef.current
-    ) {
-      autoStartRef.current = true;
-      handleStartExam().catch(() => {
-        // The form stays gated; the vet can still use the manual Start Examination button.
-      });
-    }
-  }, [detail, handleStartExam]);
 
   return (
     <RoleGuard allowedRoles={['VETERINARIAN']}>

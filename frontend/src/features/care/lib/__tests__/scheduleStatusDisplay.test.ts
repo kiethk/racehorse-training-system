@@ -17,11 +17,11 @@ describe('scheduleStatusDisplay', () => {
     assert.equal(getScheduleStatusDisplay(undefined).label, 'Unknown');
   });
 
-  it('uses the same action for started exams and Start Exam for overdue ones', () => {
-    assert.equal(getScheduleExamAction('IN_PROGRESS').label, 'Continue Exam');
-    assert.equal(getScheduleExamAction('DELAYED').label, 'Continue Exam');
-    assert.equal(getScheduleExamAction('OVERDUE').label, 'Start Exam');
-    assert.equal(getScheduleExamAction('SCHEDULED').label, 'Start Exam');
+  it('unifies open exam actions as Examine and completed ones as View Record', () => {
+    assert.equal(getScheduleExamAction('IN_PROGRESS').label, 'Examine');
+    assert.equal(getScheduleExamAction('DELAYED').label, 'Examine');
+    assert.equal(getScheduleExamAction('OVERDUE').label, 'Examine');
+    assert.equal(getScheduleExamAction('SCHEDULED').label, 'Examine');
     assert.equal(getScheduleExamAction('COMPLETED').label, 'View Record');
   });
 });

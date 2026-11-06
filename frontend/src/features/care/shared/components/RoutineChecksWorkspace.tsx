@@ -16,6 +16,7 @@ import type { Horse, StableStall } from '@/features/stable/types';
 import { useAuth } from '@/context/AuthContext';
 import { formatDate } from '@/lib/display';
 import { getCareTypeTone } from '@/features/schedule/utils/timelineUtils';
+import { getScheduleExamAction } from '@/features/care/lib/scheduleStatusDisplay';
 import { CreateRoutineModal } from './CreateRoutineModal';
 import { filterRoutineSchedules } from '@/features/routine/utils/routineValidation';
 
@@ -49,7 +50,10 @@ export function RoutineChecksWorkspace() {
         stableApi.getStalls(),
       ]);
 
-      setSchedules(schedulePage.content || []);
+      // Routine Checks tab strictly manages clinical routine exams and follow-ups.
+      // Preventive care (vaccinations & deworming) is managed in the Preventive Care tab.
+      const routineOnly = (schedulePage.content || []).filter((s) => s.purpose !== 'PREVENTIVE');
+      setSchedules(routineOnly);
       setHorses(horseList || []);
       setStalls(stallList || []);
     } catch (err) {
@@ -128,8 +132,7 @@ export function RoutineChecksWorkspace() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
-        eyebrow="Clinical Operations"
-        title="Routine & Preventive Care"
+        title="Routine Checks"
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -147,7 +150,7 @@ export function RoutineChecksWorkspace() {
               onClick={() => setCreateModalOpen(true)}
               className="transition-all active:scale-[0.98]"
             >
-              Schedule Care
+              Schedule Routine Check
             </Button>
           </div>
         }
@@ -156,7 +159,7 @@ export function RoutineChecksWorkspace() {
       {/* Metric Cards Banner */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <MetricCard
-          label="Total Care Schedules"
+          label="Total Routine Schedules"
           value={stats.total}
           icon="calendar"
           tone={stats.total > 0 ? 'default' : 'neutral'}
@@ -174,11 +177,23 @@ export function RoutineChecksWorkspace() {
           tone={stats.inProgress > 0 ? 'info' : 'neutral'}
         />
         <MetricCard
-          label="Completed Care"
+          label="Completed Checks"
           value={stats.completed}
           icon="check"
           tone={stats.completed > 0 ? 'success' : 'neutral'}
         />
+      </div>
+
+      {/* Policy Strip */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-secondary)]">
+        <div className="flex items-center gap-2">
+          <Icon name="clock" size={14} className="text-[var(--color-primary)] shrink-0" />
+          <span>Routine Examination Window: <strong>13:30 – 15:30</strong></span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Icon name="activity" size={14} className="text-[var(--color-text-muted)] shrink-0" />
+          <span>Daily quota: <strong>Max 3 routine exams per vet</strong></span>
+        </div>
       </div>
 
       {/* Error banner */}
@@ -205,10 +220,6 @@ export function RoutineChecksWorkspace() {
           options={[
             { value: 'ALL', label: 'All', count: schedules.length },
             { value: 'SCHEDULED', label: 'Scheduled', count: stats.scheduled },
-            { value: 'IN_PROGRESS', label: 'In Progress', count: stats.inProgress },
-            ...(stats.delayed > 0 ? [{ value: 'DELAYED' as const, label: 'Delayed', count: stats.delayed }] : []),
-            ...(stats.overdue > 0 ? [{ value: 'OVERDUE' as const, label: 'Overdue', count: stats.overdue }] : []),
-            { value: 'PAUSED', label: 'Paused', count: stats.paused },
             { value: 'COMPLETED', label: 'Completed', count: stats.completed },
           ]}
         />
@@ -247,7 +258,7 @@ export function RoutineChecksWorkspace() {
                 onClick={() => setCreateModalOpen(true)}
                 className="transition-all active:scale-[0.98]"
               >
-                Schedule Care
+                Schedule Routine Check
               </Button>
             }
           />
@@ -279,43 +290,53 @@ export function RoutineChecksWorkspace() {
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <HorseAvatar name={horseName} image={horse?.imageUrl} size={42} rounded="md" />
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
-                          {horseName}
-                        </span>
+                      <div className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                        {horseName}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         <Pill tone={tone.pillTone} icon={tone.icon} size="sm">
                           {tone.label}
                         </Pill>
-                        <Pill
-                          tone={
-                            cs.status === 'COMPLETED'
-                              ? 'success'
-                              : cs.status === 'OVERDUE'
-                              ? 'danger'
-                              : cs.status === 'DELAYED'
-                              ? 'warning'
-                              : cs.status === 'PAUSED'
-                              ? 'warning'
+                        {cs.status !== 'SCHEDULED' && (
+                          <Pill
+                            tone={
+                              cs.status === 'COMPLETED'
+                                ? 'success'
+                                : cs.status === 'OVERDUE'
+                                ? 'danger'
+                                : cs.status === 'DELAYED'
+                                ? 'warning'
+                                : cs.status === 'PAUSED'
+                                ? 'warning'
+                                : cs.status === 'IN_PROGRESS'
+                                ? 'primary'
+                                : 'warning'
+                            }
+                            size="sm"
+                          >
+                            {cs.status === 'PAUSED'
+                              ? 'Paused'
                               : cs.status === 'IN_PROGRESS'
-                              ? 'primary'
-                              : 'warning'
-                          }
-                          size="sm"
-                        >
-                          {cs.status === 'SCHEDULED'
-                            ? 'Scheduled'
-                            : cs.status === 'PAUSED'
-                            ? 'Paused'
-                            : cs.status === 'IN_PROGRESS'
-                            ? 'In Progress'
-                            : cs.status === 'DELAYED'
-                            ? 'Delayed'
-                            : cs.status === 'OVERDUE'
-                            ? 'Overdue'
-                            : cs.status === 'REQUESTED'
-                            ? 'Requested'
-                            : 'Completed'}
-                        </Pill>
+                              ? 'In Progress'
+                              : cs.status === 'DELAYED'
+                              ? 'Delayed'
+                              : cs.status === 'OVERDUE'
+                              ? 'Overdue'
+                              : cs.status === 'REQUESTED'
+                              ? 'Requested'
+                              : 'Completed'}
+                          </Pill>
+                        )}
+                        {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
+                          <Pill tone="warning" size="sm">
+                            Rolled {cs.rolloverCount}x
+                          </Pill>
+                        )}
+                        {cs.rescheduleReason === 'PEER_OFFLOAD' && (
+                          <Pill tone="neutral" size="sm">
+                            Transferred
+                          </Pill>
+                        )}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                         <span className="inline-flex items-center gap-1">
@@ -325,7 +346,7 @@ export function RoutineChecksWorkspace() {
                         <span>·</span>
                         <span className="inline-flex items-center gap-1">
                           <Icon name="building" size={12} />
-                          <span>Stall: <strong>{stallCode}</strong></span>
+                          <span>Stall <strong>{stallCode}</strong></span>
                         </span>
                       </div>
                     </div>
@@ -336,30 +357,14 @@ export function RoutineChecksWorkspace() {
                     <Button
                       variant={isClosed ? 'secondary' : 'primary'}
                       size="sm"
-                      icon={
-                        isClosed
-                          ? 'file-text'
-                          : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
-                          ? 'activity'
-                          : cs.status === 'OVERDUE'
-                          ? 'alert-triangle'
-                          : 'chevron-right'
-                      }
+                      icon={isClosed ? 'file-text' : getScheduleExamAction(cs.status).icon}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleOpenSchedule(cs);
                       }}
                       className="transition-all active:scale-[0.97]"
                     >
-                      {isClosed
-                        ? 'View Record'
-                        : cs.status === 'PAUSED'
-                        ? 'Continue (Paused)'
-                        : cs.status === 'IN_PROGRESS' || cs.status === 'DELAYED'
-                        ? 'Continue Exam'
-                        : cs.status === 'OVERDUE'
-                        ? 'Start Exam'
-                        : 'Start Exam'}
+                      {isClosed ? 'View Record' : getScheduleExamAction(cs.status).label}
                     </Button>
                   </div>
                 </div>

@@ -11,6 +11,7 @@ public record VetAdmissionQueueItemResponse(
         String ownerName,
         String candidateName,
         String breed,
+        String imageUrl,
         LocalDate dateOfBirth,
         AdmissionStatus admissionStatus,
         LocalDateTime submittedAt,

@@ -92,6 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         sessionStorage.removeItem('vet:urgent:snoozed');
         sessionStorage.removeItem('vet:urgent:p1:dismissed');
+        sessionStorage.removeItem('vet:urgent:seen_ids');
+        sessionStorage.removeItem('vet:urgent:initialized');
         localStorage.removeItem('vet:urgent:p1:snoozed');
       } catch {
         // ignore storage errors
@@ -110,6 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           sessionStorage.removeItem('vet:urgent:snoozed');
           sessionStorage.removeItem('vet:urgent:p1:dismissed');
+          sessionStorage.removeItem('vet:urgent:seen_ids');
+          sessionStorage.removeItem('vet:urgent:initialized');
           localStorage.removeItem('vet:urgent:p1:snoozed');
         } catch {
           // ignore storage errors
