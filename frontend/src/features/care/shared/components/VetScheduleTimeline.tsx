@@ -36,7 +36,7 @@ export function VetScheduleTimeline() {
   const [error, setError] = useState<string | null>(null);
 
   // Filters (Urgent excluded by rule)
-  const [careTypeFilter, setCareTypeFilter] = useState<CareType | 'ALL'>('ALL');
+  const [careTypeFilter, setCareTypeFilter] = useState<CareType | 'PREVENTIVE' | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<CareScheduleStatus | 'ALL'>('ALL');
 
   const mondayIso = useMemo(() => getMondayOf(selectedDate), [selectedDate]);
@@ -89,7 +89,13 @@ export function VetScheduleTimeline() {
   // Sorted and filtered schedules for Today view
   const filteredSchedules = useMemo(() => {
     return schedules
-      .filter((s) => (careTypeFilter === 'ALL' ? true : s.careType === careTypeFilter))
+      .filter((s) => {
+        if (careTypeFilter === 'ALL') return true;
+        if (careTypeFilter === 'INITIAL') return s.careType === 'INITIAL';
+        if (careTypeFilter === 'PREVENTIVE') return s.careType === 'ROUTINE' && s.purpose === 'PREVENTIVE';
+        if (careTypeFilter === 'ROUTINE') return s.careType === 'ROUTINE' && s.purpose !== 'PREVENTIVE';
+        return s.careType === careTypeFilter;
+      })
       .filter((s) => (statusFilter === 'ALL' ? true : s.status === statusFilter))
       .sort((a, b) => new Date(a.scheduledAt || 0).getTime() - new Date(b.scheduledAt || 0).getTime());
   }, [schedules, careTypeFilter, statusFilter]);
@@ -277,11 +283,12 @@ export function VetScheduleTimeline() {
             <FilterChips
               label="Care type"
               value={careTypeFilter}
-              onChange={(v) => setCareTypeFilter(v as CareType | 'ALL')}
+              onChange={(v) => setCareTypeFilter(v as CareType | 'PREVENTIVE' | 'ALL')}
               options={[
                 { value: 'ALL', label: 'All', count: schedules.length },
                 { value: 'INITIAL', label: 'Admission', count: stats.initial },
                 { value: 'ROUTINE', label: 'Routine', count: stats.routine },
+                { value: 'PREVENTIVE', label: 'Preventive', count: stats.preventive },
               ]}
             />
 
@@ -348,17 +355,14 @@ export function VetScheduleTimeline() {
                             <Pill tone={tone.pillTone} icon={tone.icon} size="sm">
                               {tone.label}
                             </Pill>
-                            <Pill tone={statusDisplay.tone} icon={statusDisplay.icon} size="sm">
-                              {statusDisplay.label}
-                            </Pill>
+                            {cs.status !== 'SCHEDULED' && (
+                              <Pill tone={statusDisplay.tone} icon={statusDisplay.icon} size="sm">
+                                {statusDisplay.label}
+                              </Pill>
+                            )}
                             {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
                               <Pill tone="warning" size="sm">
                                 Rolled {cs.rolloverCount}x
-                              </Pill>
-                            )}
-                            {cs.rescheduleReason === 'URGENT_PREEMPTION' && (
-                              <Pill tone="info" size="sm">
-                                Emergency Priority
                               </Pill>
                             )}
                             {cs.rescheduleReason === 'PEER_OFFLOAD' && (

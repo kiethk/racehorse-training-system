@@ -140,9 +140,11 @@ export function VetTodayAgenda({
                       {tone.label}
                     </Pill>
 
-                    <Pill tone={status.tone} icon={status.icon} size="sm">
-                      {status.label}
-                    </Pill>
+                    {schedule.status !== "SCHEDULED" && (
+                      <Pill tone={status.tone} icon={status.icon} size="sm">
+                        {status.label}
+                      </Pill>
+                    )}
 
                     <Button
                       variant={schedule.status === "COMPLETED" ? "secondary" : "primary"}

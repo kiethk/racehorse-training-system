@@ -730,7 +730,7 @@ export function VetAdmissionQueue() {
                             {priority.label}
                           </Pill>
                           <AdmissionStatusBadge status={row.admissionStatus} size="sm" />
-                          {status && (
+                          {status && status !== 'SCHEDULED' && (
                             <Pill
                               tone={getScheduleStatusDisplay(status).tone}
                               size="sm"

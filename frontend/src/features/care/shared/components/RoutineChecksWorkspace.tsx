@@ -298,44 +298,39 @@ export function RoutineChecksWorkspace() {
                         <Pill tone={tone.pillTone} icon={tone.icon} size="sm">
                           {tone.label}
                         </Pill>
-                        <Pill
-                          tone={
-                            cs.status === 'COMPLETED'
-                              ? 'success'
-                              : cs.status === 'OVERDUE'
-                              ? 'danger'
-                              : cs.status === 'DELAYED'
-                              ? 'warning'
-                              : cs.status === 'PAUSED'
-                              ? 'warning'
+                        {cs.status !== 'SCHEDULED' && (
+                          <Pill
+                            tone={
+                              cs.status === 'COMPLETED'
+                                ? 'success'
+                                : cs.status === 'OVERDUE'
+                                ? 'danger'
+                                : cs.status === 'DELAYED'
+                                ? 'warning'
+                                : cs.status === 'PAUSED'
+                                ? 'warning'
+                                : cs.status === 'IN_PROGRESS'
+                                ? 'primary'
+                                : 'warning'
+                            }
+                            size="sm"
+                          >
+                            {cs.status === 'PAUSED'
+                              ? 'Paused'
                               : cs.status === 'IN_PROGRESS'
-                              ? 'primary'
-                              : 'warning'
-                          }
-                          size="sm"
-                        >
-                          {cs.status === 'SCHEDULED'
-                            ? 'Scheduled'
-                            : cs.status === 'PAUSED'
-                            ? 'Paused'
-                            : cs.status === 'IN_PROGRESS'
-                            ? 'In Progress'
-                            : cs.status === 'DELAYED'
-                            ? 'Delayed'
-                            : cs.status === 'OVERDUE'
-                            ? 'Overdue'
-                            : cs.status === 'REQUESTED'
-                            ? 'Requested'
-                            : 'Completed'}
-                        </Pill>
+                              ? 'In Progress'
+                              : cs.status === 'DELAYED'
+                              ? 'Delayed'
+                              : cs.status === 'OVERDUE'
+                              ? 'Overdue'
+                              : cs.status === 'REQUESTED'
+                              ? 'Requested'
+                              : 'Completed'}
+                          </Pill>
+                        )}
                         {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (
                           <Pill tone="warning" size="sm">
                             Rolled {cs.rolloverCount}x
-                          </Pill>
-                        )}
-                        {cs.rescheduleReason === 'URGENT_PREEMPTION' && (
-                          <Pill tone="info" size="sm">
-                            Emergency Priority
                           </Pill>
                         )}
                         {cs.rescheduleReason === 'PEER_OFFLOAD' && (
