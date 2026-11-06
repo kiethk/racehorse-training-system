@@ -170,7 +170,7 @@ export function EdaScatterChart({
 
       <div className="w-full h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 10, right: 20, bottom: 25, left: 10 }}>
+          <ScatterChart margin={{ top: 10, right: 20, bottom: 25, left: 30 }}>
             <XAxis
               type="number"
               dataKey="x"
@@ -186,7 +186,14 @@ export function EdaScatterChart({
               name="Recovery HR"
               unit=" bpm"
               domain={[minY, maxY]}
-              label={{ value: yAxisLabel, angle: -90, position: 'left', offset: 0, fontSize: 11, fill: 'var(--color-text-secondary)' }}
+              label={{
+                value: yAxisLabel,
+                angle: -90,
+                position: 'insideLeft',
+                textAnchor: 'middle',
+                style: { textAnchor: 'middle', fill: 'var(--color-text-secondary)', fontSize: 11 },
+                offset: -10,
+              }}
               tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             />
             <ZAxis range={[50, 90]} />
