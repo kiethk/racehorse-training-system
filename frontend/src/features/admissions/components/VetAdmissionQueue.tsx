@@ -722,10 +722,10 @@ export function VetAdmissionQueue() {
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <HorseAvatar name={row.candidateName} image={row.imageUrl} size={42} rounded="md" />
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
-                            {row.candidateName}
-                          </span>
+                        <div className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                          {row.candidateName}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
                           <Pill tone={priority.tone} size="sm" icon={priority.icon}>
                             {priority.label}
                           </Pill>

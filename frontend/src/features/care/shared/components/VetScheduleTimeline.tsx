@@ -319,10 +319,10 @@ export function VetScheduleTimeline() {
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <HorseAvatar name={horseName} image={horse?.imageUrl} size={42} rounded="md" />
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
-                              {horseName}
-                            </span>
+                          <div className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                            {horseName}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             <Pill tone={tone.pillTone} icon={tone.icon} size="sm">
                               {tone.label}
                             </Pill>
