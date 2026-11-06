@@ -28,15 +28,47 @@ import { MarkdownMessage } from './MarkdownMessage';
 import { formatClockLabel, formatDateTime } from '@/lib/display';
 
 const TOOL_LABELS: Record<string, string> = {
-  getHorsesList: 'Tra cứu danh sách chiến mã',
-  getHorseDetails: 'Xem hồ sơ chi tiết ngựa',
-  getTrainingPlans: 'Tra cứu kế hoạch huấn luyện',
-  getMedicalRecords: 'Kiểm tra hồ sơ bệnh án',
-  getUrgentAlerts: 'Quét cảnh báo y tế khẩn cấp',
-  getStallStatus: 'Kiểm tra tình trạng chuồng trại',
-  getStaffSchedule: 'Tra cứu lịch trực & phân công',
-  queryClubMetrics: 'Tổng hợp chỉ số hoạt động CLB',
-  generateChartData: 'Trực quan hóa biểu đồ dữ liệu',
+  getHorsesList: 'Retrieve horses list',
+  getHorseDetails: 'View horse details',
+  getTrainingPlans: 'Check training plans',
+  getMedicalRecords: 'Inspect medical records',
+  getUrgentAlerts: 'Scan urgent medical alerts',
+  getStallStatus: 'Check stable occupancy',
+  getStaffSchedule: 'Look up staff schedule',
+  queryClubMetrics: 'Synthesize club metrics',
+  generateChartData: 'Visualize data chart',
+  getTrainerSchedule: 'Look up trainer schedule',
+  getTrainerPlansSummary: 'Check trainer plans summary',
+  getTrainerHorses: 'Retrieve trainer horses',
+  getTrainerGroups: 'List training groups',
+  getWorkoutHistory: 'Check workout history',
+  getMyAssignedHorses: 'List assigned horses & stalls',
+  getDailyGroomTasks: 'Retrieve daily groom tasks',
+  getTodayAggregatedTasks: 'Check aggregated tasks',
+  getMyReportedIncidents: 'List reported incidents',
+  getHorseStallLocation: 'Locate horse stall',
+  getVetExaminationOverview: 'Inspect veterinary exam overview',
+  getQuarantineStatus: 'Check quarantine status',
+  getHorseVitalSignsTrend: 'Analyze vital signs trend',
+  getActivePrescriptions: 'Check active prescriptions',
+  getPendingAdmissionExams: 'Check pending admission exams',
+  getUrgentCareAlerts: 'Scan urgent care alerts',
+  evaluateTrainingResumptionReadiness: 'Evaluate training resumption readiness',
+  getClubHealthOverview: 'Review club health overview',
+  getStableOccupancyMetrics: 'Check stable occupancy metrics',
+  getSystemStaffOverview: 'Inspect staff overview',
+  getAdmissionRequestsOverview: 'Review admission requests',
+  getRecentAuditLogs: 'Review recent audit logs',
+  getMyHorses: 'Retrieve owned horses',
+  getMyHorseAdmissions: 'Check admission applications',
+  getMyHorseUpcomingSchedule: 'Look up upcoming schedule',
+  getMyHorsePedigreeInfo: 'Inspect horse pedigree',
+  getHorseSpecialtyAnalysis: 'Analyze horse specialties',
+  recommendOptimalRaceDistanceAndTrack: 'Recommend optimal distance & track',
+  recommendNextWorkoutAdjustment: 'Recommend next workout adjustment',
+  recommendTrainerStrategy: 'Recommend training strategy',
+  analyzeStableCapacityAndStallBottlenecks: 'Analyze stable bottlenecks',
+  analyzeIncidentPatternsAndRecurringRisks: 'Analyze recurring risks',
 };
 
 function formatToolName(name: string): string {
@@ -69,7 +101,7 @@ function ToolExecutionSteps({
     return (
       <div className="flex h-7 items-center gap-2 rounded-md text-xs text-[var(--color-text-secondary)]">
         <Loader2 className="size-3.5 animate-spin text-[var(--color-primary)]" />
-        <span>Đang xử lý dữ liệu...</span>
+        <span>Processing data...</span>
       </div>
     );
   }
@@ -79,8 +111,8 @@ function ToolExecutionSteps({
   ).length;
 
   const summary = errorCount > 0
-    ? `Đã dùng ${tools.length} công cụ, ${errorCount} lỗi`
-    : `Đã dùng ${tools.length} công cụ`;
+    ? `Used ${tools.length} tools, ${errorCount} errors`
+    : `Used ${tools.length} tools`;
 
   return (
     <div className="my-1 text-xs">
@@ -107,18 +139,18 @@ function ToolExecutionSteps({
         <div className="overflow-hidden" inert={!expanded}>
           <ul className="ml-[7px] my-1 space-y-2 border-l border-[var(--color-border-strong)] pl-4 py-1">
             {tools.map((tool, idx) => {
-              const toolName = String(tool.tool || tool.name || `Công cụ ${idx + 1}`);
+              const toolName = String(tool.tool || tool.name || `Tool ${idx + 1}`);
               const isError = tool.status === 'ERROR' || Boolean(tool.error);
               const errorMessage = typeof tool.error === 'string' ? tool.error : null;
               const argsSummary = formatToolArgs(tool.arguments || tool.input);
               const resultCount =
                 !isError && Array.isArray(tool.result)
-                  ? `${tool.result.length} bản ghi`
+                  ? `${tool.result.length} records`
                   : null;
               const detailText = isError && errorMessage
-                ? `Lỗi: ${errorMessage}`
+                ? `Error: ${errorMessage}`
                 : resultCount
-                ? `Kết quả: ${resultCount}`
+                ? `Result: ${resultCount}`
                 : argsSummary;
 
               return (
@@ -189,8 +221,8 @@ function MessageActionBar({
         <button
           type="button"
           onClick={handleCopy}
-          aria-label="Sao chép nội dung"
-          title="Sao chép"
+          aria-label="Copy content"
+          title="Copy"
           className="flex size-8 cursor-pointer items-center justify-center rounded-lg hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)] transition-colors"
         >
           {copied ? (
@@ -205,8 +237,8 @@ function MessageActionBar({
         type="button"
         onClick={onRegenerate}
         disabled={isLoading}
-        aria-label="Tạo lại câu trả lời"
-        title="Tạo lại"
+        aria-label="Regenerate response"
+        title="Regenerate"
         className="flex size-8 cursor-pointer items-center justify-center rounded-lg hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)] transition-colors disabled:opacity-40"
       >
         <RotateCw className="size-3.5" />
@@ -214,7 +246,7 @@ function MessageActionBar({
 
       {isStopped && (
         <span className="ml-1 text-[11px] text-[var(--color-text-secondary)] font-medium">
-          Đã dừng giữa chừng
+          Stopped
         </span>
       )}
     </div>
@@ -354,7 +386,7 @@ export function AiChatWidget() {
         <button
           type="button"
           onClick={toggleOpen}
-          aria-label={isOpen ? 'Đóng Trợ lý AI RTMS Copilot' : 'Mở Trợ lý AI RTMS Copilot'}
+          aria-label={isOpen ? 'Close RTMS Copilot' : 'Open RTMS Copilot'}
           className="group relative flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-[var(--color-primary)] text-white shadow-xl shadow-[var(--color-primary)]/25 transition-all duration-300 hover:scale-105 hover:bg-[var(--color-primary-hover)] active:scale-95 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] outline-none"
         >
           {isOpen ? (
@@ -369,7 +401,7 @@ export function AiChatWidget() {
       {isOpen && (
         <div
           role="dialog"
-          aria-label="Cửa sổ Trợ lý AI RTMS Copilot"
+          aria-label="RTMS Copilot Dialog"
           className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl shadow-neutral-900/15 backdrop-blur-md transition-all duration-300 ease-in-out animate-in fade-in slide-in-from-bottom-4 ${
             isExpanded
               ? 'bottom-6 right-6 h-[720px] w-[800px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-48px)]'
@@ -383,7 +415,7 @@ export function AiChatWidget() {
               <button
                 type="button"
                 onClick={() => setShowHistory(!showHistory)}
-                title={showHistory ? 'Đóng lịch sử trò chuyện' : 'Lịch sử trò chuyện'}
+                title={showHistory ? 'Close conversation history' : 'Conversation history'}
                 className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl transition-colors ${
                   showHistory
                     ? 'bg-[var(--color-primary)] text-white'
@@ -398,7 +430,7 @@ export function AiChatWidget() {
                   <span className="text-xs font-semibold text-[var(--color-text-primary)]">
                     RTMS Copilot
                   </span>
-                  <span className="flex h-2 w-2 rounded-full bg-[var(--color-primary)] animate-pulse" title="Sẵn sàng" />
+                  <span className="flex h-2 w-2 rounded-full bg-[var(--color-primary)] animate-pulse" title="Ready" />
                   {isExpanded && (
                     <span className="rounded bg-[var(--color-primary)]/10 px-1.5 py-0.5 text-[9px] font-medium text-[var(--color-primary)]">
                       Mở rộng
@@ -416,7 +448,7 @@ export function AiChatWidget() {
               <button
                 type="button"
                 onClick={createNewChat}
-                title="Tạo cuộc trò chuyện mới"
+                title="New chat"
                 className="flex size-7 cursor-pointer items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
               >
                 <Plus className="size-4" />
@@ -426,7 +458,7 @@ export function AiChatWidget() {
               <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                title={isExpanded ? 'Thu nhỏ cửa sổ' : 'Phóng to cửa sổ'}
+                title={isExpanded ? 'Minimize window' : 'Maximize window'}
                 className="flex size-7 cursor-pointer items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
               >
                 {isExpanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
@@ -436,7 +468,7 @@ export function AiChatWidget() {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                title="Đóng cửa sổ"
+                title="Close window"
                 className="flex size-7 cursor-pointer items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
               >
                 <X className="size-4" />
@@ -459,7 +491,7 @@ export function AiChatWidget() {
               >
                 <div className="flex items-center justify-between border-b border-[var(--color-border)] p-2.5">
                   <span className="text-[11px] font-semibold text-[var(--color-text-primary)]">
-                    Lịch sử hội thoại ({conversations.length})
+                    Conversation History ({conversations.length})
                   </span>
                   <div className="flex items-center gap-1">
                     <button
@@ -471,7 +503,7 @@ export function AiChatWidget() {
                       className="flex cursor-pointer items-center gap-1 rounded-lg bg-[var(--color-primary)] px-2 py-1 text-[10px] font-medium text-white shadow-xs hover:bg-[var(--color-primary-hover)] transition-colors"
                     >
                       <Plus className="size-3" />
-                      <span>Chat mới</span>
+                      <span>New Chat</span>
                     </button>
                     {!isExpanded && (
                       <button
@@ -488,11 +520,11 @@ export function AiChatWidget() {
                 <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
                   {isLoadingConversations && conversations.length === 0 ? (
                     <div className="p-4 text-center text-xs text-[var(--color-text-secondary)]">
-                      Đang tải lịch sử...
+                      Loading history...
                     </div>
                   ) : conversations.length === 0 ? (
                     <div className="p-4 text-center text-xs text-[var(--color-text-secondary)]">
-                      Chưa có cuộc trò chuyện nào được lưu.
+                      No saved conversations yet.
                     </div>
                   ) : (
                     conversations.map((c) => {
@@ -545,7 +577,7 @@ export function AiChatWidget() {
                             {!isEditing && (
                               <button
                                 type="button"
-                                title="Đổi tên"
+                                title="Rename"
                                 onClick={(e) => handleStartRename(c.id, c.title, e)}
                                 className="rounded p-1 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)] transition-colors"
                               >
@@ -554,7 +586,7 @@ export function AiChatWidget() {
                             )}
                             <button
                               type="button"
-                              title="Xóa cuộc trò chuyện này"
+                              title="Delete conversation"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 void deleteChat(c.id);
@@ -580,11 +612,11 @@ export function AiChatWidget() {
                 onScroll={handleScroll}
                 className="flex-1 overflow-y-auto px-4 py-4 space-y-6"
               >
-                {/* Trạng thái rỗng: Cuộc trò chuyện mới ("Thử hỏi") */}
+                {/* Trạng thái rỗng: Cuộc trò chuyện mới ("Suggested Prompts") */}
                 {messages.length === 0 && (
                   <div className="flex flex-col justify-end min-h-[300px] space-y-3 pb-2">
                     <p className="text-xs font-medium text-[var(--color-text-secondary)]">
-                      Thử hỏi
+                      Suggested Prompts
                     </p>
                     <div className="flex flex-col gap-2">
                       {starterPrompts.map((prompt, idx) => (
@@ -637,10 +669,10 @@ export function AiChatWidget() {
                         {msg.status === 'error' ? (
                           <div className="space-y-1.5 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-left">
                             <p className="text-xs sm:text-sm font-medium text-red-600">
-                              Trợ lý chưa trả lời được
+                              Assistant could not respond
                             </p>
                             <p className="text-[11px] text-[var(--color-text-secondary)]">
-                              {msg.errorMessage || 'Máy chủ bận hoặc gặp sự cố kết nối.'}
+                              {msg.errorMessage || 'Server is busy or encountered a connection issue.'}
                             </p>
                             <button
                               type="button"
@@ -648,7 +680,7 @@ export function AiChatWidget() {
                               className="mt-1 inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-surface-muted)] transition-colors"
                             >
                               <RotateCw className="size-3" />
-                              <span>Thử lại</span>
+                              <span>Retry</span>
                             </button>
                           </div>
                         ) : (
@@ -669,7 +701,7 @@ export function AiChatWidget() {
                         {/* Gợi ý hỏi tiếp dưới câu trả lời cuối cùng */}
                         {isLastAssistant && !isLoading && nextPrompts.length > 0 && (
                           <div className="space-y-1.5 pt-2">
-                            <p className="text-xs text-[var(--color-text-secondary)]">Hỏi tiếp</p>
+                            <p className="text-xs text-[var(--color-text-secondary)]">Follow-up suggestions</p>
                             <div className="flex flex-col gap-1.5">
                               {nextPrompts.map((p, idx) => (
                                 <button
@@ -698,7 +730,7 @@ export function AiChatWidget() {
                   <div className="max-w-[65ch] space-y-2 text-left">
                     <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                       <Loader2 className="size-3.5 animate-spin text-[var(--color-primary)]" />
-                      <span>Copilot đang soạn câu trả lời...</span>
+                      <span>Copilot is generating a response...</span>
                       <span className="inline-block h-[1.1em] w-2 rounded-xs bg-[var(--color-text-primary)]/30 align-text-bottom" />
                     </div>
                   </div>
@@ -712,8 +744,8 @@ export function AiChatWidget() {
                 <button
                   type="button"
                   onClick={() => scrollToBottom(true)}
-                  aria-label="Cuộn xuống dưới cùng"
-                  title="Cuộn xuống dưới cùng"
+                  aria-label="Scroll to bottom"
+                  title="Scroll to bottom"
                   className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 flex size-8 cursor-pointer items-center justify-center rounded-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-md hover:bg-[var(--color-surface-muted)] transition-all"
                 >
                   <ArrowDown className="size-4" />
@@ -739,7 +771,7 @@ export function AiChatWidget() {
                     value={input}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
-                    placeholder="Hỏi về lịch tập, sức khỏe, chuồng trại..."
+                    placeholder="Ask about training schedule, horse health, stabling..."
                     className="max-h-36 min-h-[40px] flex-1 resize-none bg-transparent px-3 py-2 text-xs sm:text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] outline-hidden leading-relaxed"
                   />
 
@@ -747,8 +779,8 @@ export function AiChatWidget() {
                     <button
                       type="button"
                       onClick={stopGenerating}
-                      aria-label="Dừng trả lời"
-                      title="Dừng trả lời"
+                      aria-label="Stop generating"
+                      title="Stop generating"
                       className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-2xl bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-all active:scale-95 shadow-xs"
                     >
                       <Square className="size-3.5 fill-current" />
@@ -757,8 +789,8 @@ export function AiChatWidget() {
                     <button
                       type="submit"
                       disabled={!input.trim()}
-                      aria-label="Gửi câu hỏi"
-                      title="Gửi câu hỏi"
+                      aria-label="Send message"
+                      title="Send message"
                       className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-2xl bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 shadow-xs"
                     >
                       <ArrowUp className="size-4" />
