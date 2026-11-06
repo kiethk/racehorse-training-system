@@ -1,9 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
 import { Button, Icon, Modal, Notice } from '@/components/ui';
-import { formatEnumLabel } from '@/lib/display';
-import { parseTreatmentInstructions } from '../lib/treatmentInstructions';
+import { formatDate, formatEnumLabel } from '@/lib/display';
+import type { Prescription } from '../types';
 
 export interface MedicationInstructionModalProps {
   isOpen?: boolean;
@@ -13,7 +12,8 @@ export interface MedicationInstructionModalProps {
   stallCode: string;
   diagnosis?: string;
   veterinarianName?: string;
-  instructions: string;
+  prescriptions: Prescription[];
+  notes: string;
   endDate?: string | null;
 }
 
@@ -25,15 +25,14 @@ export function MedicationInstructionModal({
   stallCode,
   diagnosis,
   veterinarianName,
-  instructions,
+  prescriptions,
+  notes,
   endDate,
 }: MedicationInstructionModalProps) {
   const isVisible = open ?? isOpen ?? false;
 
-  const parsed = useMemo(
-    () => parseTreatmentInstructions(instructions),
-    [instructions],
-  );
+  const activePrescriptions = prescriptions.filter((prescription) => prescription.status === 'ACTIVE');
+  const displayedPrescriptions = activePrescriptions.length > 0 ? activePrescriptions : prescriptions;
 
   if (!isVisible) return null;
 
@@ -90,8 +89,7 @@ export function MedicationInstructionModal({
           )}
         </div>
 
-        {/* Content: Structured JSON Table vs Legacy Plain-Text Notice */}
-        {parsed.isJson && parsed.items.length > 0 ? (
+        {displayedPrescriptions.length > 0 ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2 text-xs text-[var(--color-text-muted)]">
               <span className="font-medium text-[var(--color-text-primary)]">Prescribed Medications</span>
@@ -109,21 +107,23 @@ export function MedicationInstructionModal({
 
               {/* Table Rows */}
               <div className="divide-y divide-[var(--color-border)] bg-[var(--color-surface)]">
-                {parsed.items.map((item, idx) => {
-                  const routeLabel = item.route === 'INJECTION_IV'
-                    ? 'Intravenous'
-                    : item.route === 'INJECTION_IM'
-                      ? 'Intramuscular'
-                      : formatEnumLabel(item.route);
+                {displayedPrescriptions.map((item) => {
+                  const routeLabel = item.route === 'ORAL'
+                    ? 'Oral'
+                    : item.route === 'TOPICAL'
+                      ? 'Topical'
+                      : item.route === 'FEED_ADDITIVE'
+                        ? 'Feed additive'
+                        : formatEnumLabel(item.route);
                   return (
                     <div
-                      key={`${item.medication_name}-${idx}`}
+                      key={item.id}
                       className="grid grid-cols-12 gap-3 px-3.5 py-3 text-xs items-start"
                     >
                       {/* Medication & Route */}
                       <div className="col-span-4 space-y-1">
                         <p className="font-semibold text-[var(--color-text-primary)]">
-                          {item.medication_name}
+                          {item.medicationName}
                         </p>
                         <p className="text-[var(--color-text-secondary)]">{routeLabel}</p>
                       </div>
@@ -140,14 +140,12 @@ export function MedicationInstructionModal({
 
                       {/* Duration */}
                       <div className="col-span-2 font-medium text-[var(--color-text-primary)]">
-                        {item.duration > 0
-                          ? `${item.duration} ${item.duration === 1 ? 'day' : 'days'}`
-                          : '—'}
+                        From {formatDate(item.startDate)} to {formatDate(item.endDate)}
                       </div>
 
                       {/* Special Instructions */}
                       <div className="col-span-3 text-[var(--color-text-secondary)] leading-relaxed italic">
-                        {item.notes || 'No special notes.'}
+                        {item.instructions || '—'}
                       </div>
                     </div>
                   );
@@ -157,9 +155,12 @@ export function MedicationInstructionModal({
           </div>
         ) : (
           <Notice tone="info" title="Clinical Treatment Instructions">
-            {parsed.rawText || 'No specific administration instructions recorded.'}
+            No medications recorded
           </Notice>
         )}
+        <Notice tone="info" title="General Instructions">
+          {notes || '—'}
+        </Notice>
       </div>
     </Modal>
   );

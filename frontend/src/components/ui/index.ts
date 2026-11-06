@@ -46,6 +46,7 @@ export { PeriodBarChart, type PeriodBarChartProps } from './PeriodBarChart';
 export { Pill, StatusBadge } from './StatusBadge';
 export { Table, TBody, Td, Th, THead, Tr } from './Table';
 export { Tabs, type TabItem } from './Tabs';
+export { TurnstileWidget, type TurnstileWidgetHandle } from './TurnstileWidget';
 export { Tooltip } from './Tooltip';
 export { CapacityBar, type CapacityBarProps } from './CapacityBar';
 export { DonutChart, type DonutChartProps, type DonutSegment } from './DonutChart';

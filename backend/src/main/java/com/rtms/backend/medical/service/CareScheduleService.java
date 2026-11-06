@@ -23,7 +23,6 @@ import com.rtms.backend.medical.dto.HorseHealthMetricRequest;
 import com.rtms.backend.medical.dto.PrescriptionItemRequest;
 import com.rtms.backend.medical.dto.UrgentCaseReportResponse;
 import com.rtms.backend.medical.entity.CareSchedule;
-import com.rtms.backend.medical.entity.ClinicalMedication;
 import com.rtms.backend.medical.entity.HealthRecord;
 import com.rtms.backend.medical.entity.InjuryRecord;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
@@ -35,7 +34,6 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.RescheduleReason;
 import com.rtms.backend.medical.event.PrescriptionCreatedEvent;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
-import com.rtms.backend.medical.repository.ClinicalMedicationRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
@@ -107,7 +105,6 @@ public class CareScheduleService {
     private final TrainingDecisionService trainingDecisionService;
     private final PreventiveVaccinationService preventiveVaccinationService;
     private final InjuryRecordRepository injuryRecordRepository;
-    private final ClinicalMedicationRepository clinicalMedicationRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final PrescriptionRepository prescriptionRepository;
 
@@ -128,7 +125,6 @@ public class CareScheduleService {
             TrainingDecisionService trainingDecisionService,
             PreventiveVaccinationService preventiveVaccinationService,
             InjuryRecordRepository injuryRecordRepository,
-            ClinicalMedicationRepository clinicalMedicationRepository,
             TreatmentPlanRepository treatmentPlanRepository,
             PrescriptionRepository prescriptionRepository) {
         this.careScheduleRepository = careScheduleRepository;
@@ -147,7 +143,6 @@ public class CareScheduleService {
         this.trainingDecisionService = trainingDecisionService;
         this.preventiveVaccinationService = preventiveVaccinationService;
         this.injuryRecordRepository = injuryRecordRepository;
-        this.clinicalMedicationRepository = clinicalMedicationRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;
         this.prescriptionRepository = prescriptionRepository;
     }
@@ -331,7 +326,7 @@ public class CareScheduleService {
                 }
             }
         }
-        validatePrescriptionCatalog(request.getPrescriptions());
+        validatePrescriptions(request.getPrescriptions());
 
         CareSchedule schedule = lockClinicalSchedule(scheduleId);
 
@@ -760,30 +755,18 @@ public class CareScheduleService {
         }
     }
 
-    /**
-     * A3: mọi đơn phải khớp danh mục chuẩn — thuốc tồn tại & đang hoạt động,
-     * không trùng trong cùng lần nộp, withdrawal không dưới mốc FEI.
-     */
-    private void validatePrescriptionCatalog(List<PrescriptionItemRequest> prescriptions) {
+    private void validatePrescriptions(List<PrescriptionItemRequest> prescriptions) {
         if (prescriptions == null || prescriptions.isEmpty()) return;
-        Set<Long> seen = new HashSet<>();
+        Set<String> seen = new HashSet<>();
         for (PrescriptionItemRequest item : prescriptions) {
-            if (!seen.add(item.getMedicationId())) {
+            String medicationName = item.getMedicationName().trim();
+            if (!seen.add(medicationName.toLowerCase(Locale.ROOT))) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "DUPLICATE_MEDICATION",
-                        "Medication " + item.getMedicationId() + " is already prescribed in this examination");
+                        "Medication " + medicationName + " is already prescribed in this examination");
             }
-            ClinicalMedication med = clinicalMedicationRepository.findById(item.getMedicationId())
-                    .filter(ClinicalMedication::getActive)
-                    .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "MEDICATION_NOT_FOUND",
-                            "Medication " + item.getMedicationId() + " is not in the active catalog"));
             if (item.getRoute() != null && item.getRoute().isInjection()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INJECTION_NOT_ALLOWED",
                         "Treatment plans cannot contain injections");
-            }
-            if (item.getWithdrawalDays() < med.getStandardWithdrawalDays()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_WITHDRAWAL_DAYS",
-                        "Withdrawal days cannot be lower than regulatory standard: "
-                                + med.getStandardWithdrawalDays());
             }
         }
     }
@@ -810,19 +793,15 @@ public class CareScheduleService {
 
         List<Long> rxIds = new ArrayList<>();
         for (PrescriptionItemRequest item : prescriptions) {
-            ClinicalMedication med = clinicalMedicationRepository.findById(item.getMedicationId())
-                    .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "MEDICATION_NOT_FOUND",
-                            "Medication " + item.getMedicationId() + " disappeared from the catalog"));
             Prescription rx = new Prescription();
             rx.setTreatmentPlanId(savedPlan.getId());
-            rx.setMedicationName(med.getName());
+            rx.setMedicationName(item.getMedicationName().trim());
             rx.setDosage(item.getDosage());
             rx.setFrequency(item.getFrequency());
             rx.setRoute(item.getRoute().name());
             rx.setStartDate(item.getStartDate());
             rx.setEndDate(item.getEndDate());
             rx.setInstructions(item.getInstructions());
-            rx.setWithdrawalDays(item.getWithdrawalDays());
             rx.setStatus("ACTIVE");
             rx.setAdministeredByRole(item.getRoute().requiresVeterinarian() ? "VETERINARIAN" : "GROOM");
             rxIds.add(prescriptionRepository.save(rx).getId());

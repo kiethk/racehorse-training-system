@@ -80,7 +80,6 @@ class CareSchedulePreventiveIntegrationTest {
                 incidents, profiles, audits, events, entityManager, notifications,
                 new TrainingDecisionService(horses, schedules, workouts), vaccinations,
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
                 org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
 

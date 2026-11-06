@@ -7,64 +7,59 @@ import {
 } from '../prescriptionDrafts.ts';
 
 describe('Track 3a & 3b & 3d — Routine Care Prescriptions, Condition Recovery & Recheck Calculation', () => {
-  it('toPrescriptionRequests: converts form items and filters out unselected medications', () => {
+  it('toPrescriptionRequests: converts named prescription items and filters blank names', () => {
     const items: PrescriptionFormItem[] = [
       {
         id: 'rx-1',
-        medicationId: 101,
+        medicationName: '  Phenylbutazone  ',
         dosage: ' 4.4 mg/kg ',
         route: 'ORAL',
         frequency: ' SID ',
         startDate: '2026-11-02',
         endDate: '2026-11-09',
-        withdrawalDays: 7,
         instructions: ' Administer with morning grain feed ',
       },
       {
         id: 'rx-2',
-        medicationId: null, // Draft row not yet chosen
+        medicationName: '   ', // Draft row not yet named
         dosage: '',
         route: 'TOPICAL',
         frequency: 'BID',
         startDate: '2026-11-02',
         endDate: '2026-11-05',
-        withdrawalDays: 0,
         instructions: '',
       },
       {
         id: 'rx-3',
-        medicationId: 105,
+        medicationName: 'Flunixin',
         dosage: '10 ml',
         route: 'ORAL',
         frequency: 'EOD',
         startDate: '2026-11-03',
         endDate: '2026-11-07',
-        withdrawalDays: 14,
         instructions: '',
       },
     ];
 
     const requests = toPrescriptionRequests(items);
 
-    assert.equal(requests.length, 2, 'Must filter out the item with null medicationId');
+    assert.equal(requests.length, 2, 'Must filter out the item with a blank medication name');
     assert.deepEqual(requests[0], {
-      medicationId: 101,
+      medicationName: 'Phenylbutazone',
       dosage: '4.4 mg/kg',
       route: 'ORAL',
       frequency: 'SID',
       startDate: '2026-11-02',
       endDate: '2026-11-09',
-      withdrawalDays: 7,
       instructions: 'Administer with morning grain feed',
     });
     assert.deepEqual(requests[1], {
-      medicationId: 105,
+      medicationName: 'Flunixin',
       dosage: '10 ml',
       route: 'ORAL',
       frequency: 'EOD',
       startDate: '2026-11-03',
       endDate: '2026-11-07',
-      withdrawalDays: 14,
       instructions: undefined,
     });
   });

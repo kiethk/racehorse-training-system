@@ -46,6 +46,7 @@ public class AuthService {
     private final GroomProfileRepository groomProfileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final com.rtms.backend.notification.service.EmailService emailService;
+    private final TurnstileVerifier turnstileVerifier;
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^(0|\\+84)[3|5|7|8|9][0-9]{8}$|^[+]?[0-9]{9,15}$");
@@ -67,7 +68,21 @@ public class AuthService {
             RefreshTokenRepository refreshTokenRepository) {
         this(userRepository, roleRepository, passwordEncoder, jwtUtil,
                 veterinarianProfileRepository, trainerProfileRepository, groomProfileRepository, refreshTokenRepository,
-                null);
+                null, disabledTurnstileVerifier());
+    }
+
+    public AuthService(UserRepository userRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            JwtUtil jwtUtil,
+            VeterinarianProfileRepository veterinarianProfileRepository,
+            TrainerProfileRepository trainerProfileRepository,
+            GroomProfileRepository groomProfileRepository,
+            RefreshTokenRepository refreshTokenRepository,
+            EmailService emailService) {
+        this(userRepository, roleRepository, passwordEncoder, jwtUtil, veterinarianProfileRepository,
+                trainerProfileRepository, groomProfileRepository, refreshTokenRepository, emailService,
+                disabledTurnstileVerifier());
     }
 
     @Autowired
@@ -79,7 +94,8 @@ public class AuthService {
             TrainerProfileRepository trainerProfileRepository,
             GroomProfileRepository groomProfileRepository,
             RefreshTokenRepository refreshTokenRepository,
-            @Autowired(required = false) EmailService emailService) {
+            @Autowired(required = false) EmailService emailService,
+            TurnstileVerifier turnstileVerifier) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -89,6 +105,12 @@ public class AuthService {
         this.groomProfileRepository = groomProfileRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.emailService = emailService;
+        this.turnstileVerifier = turnstileVerifier;
+    }
+
+    private static TurnstileVerifier disabledTurnstileVerifier() {
+        return new TurnstileVerifier(new com.fasterxml.jackson.databind.ObjectMapper(), false, "", "",
+                java.net.http.HttpClient.newHttpClient());
     }
 
     @Transactional
@@ -215,6 +237,15 @@ public class AuthService {
     }
 
     public OwnerRegistrationResponse registerOwner(OwnerRegistrationRequest request) {
+        return registerOwner(request, null);
+    }
+
+    public OwnerRegistrationResponse registerOwner(OwnerRegistrationRequest request, String clientIp) {
+        turnstileVerifier.verify(request == null ? null : request.getCaptchaToken(), clientIp);
+        return registerOwnerAfterVerification(request);
+    }
+
+    private OwnerRegistrationResponse registerOwnerAfterVerification(OwnerRegistrationRequest request) {
         if (request == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Registration details are required");
         }

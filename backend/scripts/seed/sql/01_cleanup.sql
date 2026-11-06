@@ -14,7 +14,6 @@ DECLARE
         'flyway_schema_history',
         'roles', 'permissions', 'role_permissions',
         'horse_body_regions', 'preventive_protocols', 'medical_symptom_mappings',
-        'clinical_medications',
         'rag_knowledge_documents', 'rag_knowledge_embeddings'
     ];
     v_tables TEXT;

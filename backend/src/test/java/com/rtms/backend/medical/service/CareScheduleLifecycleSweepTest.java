@@ -13,7 +13,6 @@ import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.RescheduleReason;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
-import com.rtms.backend.medical.repository.ClinicalMedicationRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
 import com.rtms.backend.medical.repository.InjuryRecordRepository;
@@ -65,7 +64,6 @@ class CareScheduleLifecycleSweepTest {
     @Mock private GroupWorkoutSyncService groupSync;
     @Mock private PreventiveVaccinationService preventiveVaccinationService;
     @Mock private InjuryRecordRepository injuryRecordRepository;
-    @Mock private ClinicalMedicationRepository clinicalMedicationRepository;
     @Mock private TreatmentPlanRepository treatmentPlanRepository;
     @Mock private PrescriptionRepository prescriptionRepository;
 
@@ -82,7 +80,7 @@ class CareScheduleLifecycleSweepTest {
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, groupSync),
                 preventiveVaccinationService, injuryRecordRepository,
-                clinicalMedicationRepository, treatmentPlanRepository, prescriptionRepository);
+                treatmentPlanRepository, prescriptionRepository);
         Horse horse = new Horse();
         horse.setId(10L);
         horse.setName("Test Horse");

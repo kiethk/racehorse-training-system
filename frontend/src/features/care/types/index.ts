@@ -121,6 +121,8 @@ export interface Prescription {
   startDate: string;
   endDate: string;
   instructions: string;
+  status: 'ACTIVE' | 'COMPLETED' | 'DISCONTINUED';
+  administeredByRole: 'GROOM' | 'VETERINARIAN';
 }
 
 export interface CreatePrescriptionRequest {
@@ -174,23 +176,12 @@ export interface PageResponse<T> {
 
 export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'FEED_ADDITIVE';
 
-export interface MedicationCatalogItem {
-  id: number;
-  name: string;
-  therapeuticClass: string;
-  defaultRoute: string;
-  standardWithdrawalDays: number;
-  defaultDosage: string | null;
-  defaultFrequency: string | null;
-}
-
 export interface PrescriptionItemRequest {
-  medicationId: number;
+  medicationName: string;
   dosage: string;
   route: MedicationRoute;
   frequency: string;
   startDate: string;
   endDate: string;
-  withdrawalDays: number;
   instructions?: string;
 }

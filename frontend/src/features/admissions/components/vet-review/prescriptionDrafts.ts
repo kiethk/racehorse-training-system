@@ -1,39 +1,36 @@
 export type MedicationRoute = 'ORAL' | 'TOPICAL' | 'FEED_ADDITIVE';
 
 export interface PrescriptionItemRequest {
-  medicationId: number;
+  medicationName: string;
   dosage: string;
   route: MedicationRoute;
   frequency: string;
   startDate: string;
   endDate: string;
-  withdrawalDays: number;
   instructions?: string;
 }
 
 export interface PrescriptionFormItem {
   id: string;
-  medicationId: number | null;
+  medicationName: string;
   dosage: string;
   route: MedicationRoute;
   frequency: string;
   startDate: string;
   endDate: string;
-  withdrawalDays: number;
   instructions: string;
 }
 
 export function toPrescriptionRequests(items: PrescriptionFormItem[]): PrescriptionItemRequest[] {
   return items
-    .filter((item) => item.medicationId != null)
+    .filter((item) => item.medicationName.trim().length > 0)
     .map((item) => ({
-      medicationId: item.medicationId!,
+      medicationName: item.medicationName.trim(),
       dosage: item.dosage.trim(),
       route: item.route,
       frequency: item.frequency.trim(),
       startDate: item.startDate,
       endDate: item.endDate,
-      withdrawalDays: item.withdrawalDays ?? 0,
       instructions: item.instructions.trim() || undefined,
     }));
 }

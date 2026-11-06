@@ -64,18 +64,7 @@ class TreatmentPlanServiceRouteTest {
     }
 
     @Test
-    void rejectsInjectionRouteInJsonInstructions() {
-        when(healthRecordRepository.findById(7L)).thenReturn(Optional.of(new HealthRecord()));
-        CreateTreatmentPlanRequest request = treatmentPlan("{\"items\":[{\"name\":\"Drug\",\"route\":\"IM\"}]}");
-
-        ApiException ex = assertThrows(ApiException.class, () -> service.createTreatmentPlan(7L, request));
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertEquals("INJECTION_NOT_ALLOWED", ex.getErrorCode());
-        verify(treatmentPlanRepository, never()).save(any());
-    }
-
-    @Test
-    void acceptsPlainTextInstructions() {
+    void acceptsInstructionsAsPlainTextEvenWhenTheyContainRouteLikeJson() {
         when(healthRecordRepository.findById(7L)).thenReturn(Optional.of(new HealthRecord()));
         when(treatmentPlanRepository.save(any(TreatmentPlan.class))).thenAnswer(invocation -> {
             TreatmentPlan plan = invocation.getArgument(0);
@@ -83,7 +72,7 @@ class TreatmentPlanServiceRouteTest {
             return plan;
         });
         when(prescriptionRepository.findByTreatmentPlanId(20L)).thenReturn(List.of());
-        CreateTreatmentPlanRequest request = treatmentPlan("Give medication with feed and monitor appetite.");
+        CreateTreatmentPlanRequest request = treatmentPlan("{\"items\":[{\"name\":\"Drug\",\"route\":\"IM\"}]}");
 
         assertNotNull(service.createTreatmentPlan(7L, request));
         verify(treatmentPlanRepository).save(any(TreatmentPlan.class));

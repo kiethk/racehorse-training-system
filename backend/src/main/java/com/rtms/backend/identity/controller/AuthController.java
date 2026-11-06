@@ -11,6 +11,7 @@ import com.rtms.backend.identity.service.AuthService;
 import com.rtms.backend.identity.service.AuthService.LoginResult;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -86,8 +87,13 @@ public class AuthController {
     @Operation(security = {})
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<OwnerRegistrationResponse>> register(
-            @jakarta.validation.Valid @RequestBody OwnerRegistrationRequest request) {
-        OwnerRegistrationResponse response = authService.registerOwner(request);
+            @RequestBody OwnerRegistrationRequest request,
+            HttpServletRequest httpRequest) {
+        String forwardedFor = httpRequest.getHeader("X-Forwarded-For");
+        String clientIp = forwardedFor == null || forwardedFor.isBlank()
+                ? httpRequest.getRemoteAddr()
+                : forwardedFor.split(",", 2)[0].trim();
+        OwnerRegistrationResponse response = authService.registerOwner(request, clientIp);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response));
     }

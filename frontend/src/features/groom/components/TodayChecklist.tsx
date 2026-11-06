@@ -196,7 +196,8 @@ export function TodayChecklist({ horseId }: { horseId?: number }) {
         stallCode={selectedTask.stallCode ?? '—'}
         diagnosis={selectedPlan.diagnosis}
         veterinarianName={selectedPlan.veterinarianName}
-        instructions={selectedPlan.instructions}
+        prescriptions={selectedPlan.prescriptions ?? []}
+        notes={selectedPlan.instructions}
         endDate={selectedPlan.endDate ? formatDate(selectedPlan.endDate) : null}
       />}
     </div>

@@ -266,8 +266,8 @@ INSERT INTO seed_check VALUES
      WHERE a.trainer_id <> r.trainer_id OR r.event_date < r.created_at::DATE OR r.nomination_deadline > r.event_date
         OR (r.status = 'PENDING') <> (r.reviewed_at IS NULL) $q$),
 -- ---------------- Dược lâm sàng (Track 0: catalog + đơn thuốc + severity D4)
-('Medication catalog missing or incomplete (needs 10+ active FEI entries)',
- $q$ SELECT 1 WHERE (SELECT count(*) FROM clinical_medications WHERE active) < 10 $q$),
+('Treatment plan instructions stored as JSON',
+ $q$ SELECT id FROM treatment_plans WHERE BTRIM(instructions) LIKE '[%' $q$),
 ('Health condition severity outside the MILD/MODERATE/SEVERE/CRITICAL vocabulary',
  $q$ SELECT id FROM health_conditions
      WHERE UPPER(severity) NOT IN ('MILD', 'MODERATE', 'SEVERE', 'CRITICAL') $q$),

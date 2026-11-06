@@ -365,7 +365,8 @@ export function StallDetailPanel({
           stallCode={stall.stallCode}
           diagnosis={activePlan.diagnosis}
           veterinarianName={activePlan.veterinarianName}
-          instructions={activePlan.instructions}
+          prescriptions={activePlan.prescriptions ?? []}
+          notes={activePlan.instructions}
           endDate={activePlan.endDate ? formatDate(activePlan.endDate) : null}
         />
       )}

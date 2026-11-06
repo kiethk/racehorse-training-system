@@ -41,6 +41,7 @@ import {
   Textarea,
   Th,
   THead,
+  TurnstileWidget,
   Tooltip,
   Tr,
 } from '@/components/ui';
@@ -227,6 +228,17 @@ export default function DesignTestPage() {
               ]}
             />
           </div>
+        </Panel>
+      </Section>
+
+      <Section title="Turnstile widget">
+        <Panel padded>
+          <TurnstileWidget
+            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA'}
+            onVerify={() => undefined}
+            onExpire={() => undefined}
+            onError={() => undefined}
+          />
         </Panel>
       </Section>
 

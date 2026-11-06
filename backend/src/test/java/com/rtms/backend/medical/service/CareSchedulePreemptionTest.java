@@ -79,7 +79,6 @@ class CareSchedulePreemptionTest {
                 trainingDecisionService,
                 mock(PreventiveVaccinationService.class),
                 mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                mock(com.rtms.backend.medical.repository.ClinicalMedicationRepository.class),
                 mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
                 mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
         );
