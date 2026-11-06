@@ -852,11 +852,12 @@ function HealthRecordsContent() {
                               <Line
                                 type="monotone"
                                 dataKey="heartRate"
-                                stroke="var(--color-danger)"
+                                stroke="var(--color-danger, #c33c3c)"
                                 strokeWidth={2}
                                 name="Heart Rate"
                                 unit=" bpm"
-                                dot={{ r: 3 }}
+                                dot={{ r: 3, fill: '#c33c3c' }}
+                                activeDot={{ r: 5 }}
                                 connectNulls
                               />
                             </LineChart>
@@ -905,11 +906,12 @@ function HealthRecordsContent() {
                               <Line
                                 type="monotone"
                                 dataKey="temperature"
-                                stroke="var(--color-warning)"
+                                stroke="var(--color-warning, #8a5b08)"
                                 strokeWidth={2}
                                 name="Temperature"
                                 unit=" °C"
-                                dot={{ r: 3 }}
+                                dot={{ r: 3, fill: '#8a5b08' }}
+                                activeDot={{ r: 5 }}
                                 connectNulls
                               />
                             </LineChart>
@@ -921,7 +923,7 @@ function HealthRecordsContent() {
                       <Panel padded className="space-y-3 border border-[var(--color-border)]">
                         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
                           <div className="flex items-center gap-2">
-                            <Icon name="trending-up" size={16} className="text-[var(--color-secondary)]" />
+                            <Icon name="trending-up" size={16} className="text-[var(--color-primary)]" />
                             <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Respiratory Rate</h3>
                           </div>
                           {respStats?.latest != null && (
@@ -958,11 +960,12 @@ function HealthRecordsContent() {
                               <Line
                                 type="monotone"
                                 dataKey="respiratoryRate"
-                                stroke="var(--color-secondary)"
+                                stroke="var(--color-primary, #6657c7)"
                                 strokeWidth={2}
                                 name="Respiratory Rate"
                                 unit=" rpm"
-                                dot={{ r: 3 }}
+                                dot={{ r: 3, fill: '#6657c7' }}
+                                activeDot={{ r: 5 }}
                                 connectNulls
                               />
                             </LineChart>
@@ -1011,11 +1014,12 @@ function HealthRecordsContent() {
                               <Line
                                 type="monotone"
                                 dataKey="weight"
-                                stroke="var(--color-info)"
+                                stroke="var(--color-info, #315fa8)"
                                 strokeWidth={2}
                                 name="Weight"
                                 unit=" kg"
-                                dot={{ r: 3 }}
+                                dot={{ r: 3, fill: '#315fa8' }}
+                                activeDot={{ r: 5 }}
                                 connectNulls
                               />
                             </LineChart>
