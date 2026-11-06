@@ -6,6 +6,7 @@ import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.enums.RescheduleReason;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public record CareScheduleResponse(
@@ -16,6 +17,7 @@ public record CareScheduleResponse(
         Long sourceIncidentId,
         CareType careType,
         CareScheduleStatus status,
+        LocalDate scheduledDate,
         LocalDateTime scheduledAt,
         int durationMinutes,
         String description,
@@ -27,9 +29,10 @@ public record CareScheduleResponse(
         LocalDateTime requestedAt,
         RescheduleReason rescheduleReason,
         String rescheduleNote,
+        int rolloverCount,
         /** D1 cờ dẫn xuất: IN_PROGRESS quá 30 phút so với scheduled_at (không phải trạng thái DB). */
         boolean overdue,
-        /** D2 thời điểm ca khám bị tạm dừng do ưu tiên ca cấp cứu khác. */
+        /** D2 thời điểm ca khám bị tạm dừng do ưu tiên ca cấp cứu khác (legacy null). */
         LocalDateTime pausedFrom
 ) {
     public static CareScheduleResponse from(CareSchedule cs) {
@@ -38,6 +41,12 @@ public record CareScheduleResponse(
         boolean overdue = CareScheduleStatus.ACTIVE_EXAM.contains(cs.getStatus())
                 && cs.getScheduledAt() != null
                 && java.time.LocalDateTime.now().isAfter(cs.getScheduledAt().plusMinutes(30));
+        LocalDate date = cs.getScheduledDate();
+        if (date == null && cs.getScheduledAt() != null) {
+            date = cs.getScheduledAt().toLocalDate();
+        } else if (date == null && cs.getRequestedAt() != null) {
+            date = cs.getRequestedAt().toLocalDate();
+        }
         return new CareScheduleResponse(
                 cs.getId(),
                 cs.getHorseId(),
@@ -46,19 +55,21 @@ public record CareScheduleResponse(
                 cs.getSourceIncidentId(),
                 cs.getCareType(),
                 cs.getStatus(),
+                date,
                 cs.getScheduledAt(),
                 cs.getDurationMinutes(),
                 cs.getDescription(),
                 cs.getCompletedAt(),
-                cs.getCancelReason(),
+                null,
                 cs.getCreatedAt(),
                 cs.getUpdatedAt(),
                 cs.getPurpose(),
                 cs.getRequestedAt(),
                 cs.getRescheduleReason(),
                 cs.getRescheduleNote(),
+                cs.getRolloverCount(),
                 overdue,
-                cs.getPausedFrom()
+                null
         );
     }
 }

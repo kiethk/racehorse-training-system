@@ -144,22 +144,12 @@ export function getCareTypeTone(
           label: 'Preventive',
         };
       }
-      if (purpose === 'FOLLOW_UP') {
-        return {
-          bg: 'bg-[var(--color-surface-muted)]',
-          border: 'border-[var(--color-border-strong)]',
-          text: 'text-[var(--color-text-secondary)]',
-          pillTone: 'neutral',
-          icon: 'clipboard',
-          label: 'Follow-up',
-        };
-      }
       return {
         bg: 'bg-[var(--color-surface-muted)]',
         border: 'border-[var(--color-border-strong)]',
         text: 'text-[var(--color-text-secondary)]',
         pillTone: 'neutral',
-        icon: 'clock',
+        icon: 'clipboard',
         label: 'Routine',
       };
   }

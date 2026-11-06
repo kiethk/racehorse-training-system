@@ -89,10 +89,6 @@ public class HorseIncidentReportService {
                 request.getSeverity()));
 
         boolean serious = saved.getSeverity() == IncidentSeverity.HIGH || saved.getSeverity() == IncidentSeverity.CRITICAL;
-        // Ngựa đã bị chặn thì giữ nguyên lý do của Vet.
-        if (serious && horse.getTrainingDecision() != TrainingDecision.BLOCKED) {
-            trainingDecisionService.block(horse, "Urgent veterinary care pending: " + saved.getTitle());
-        }
 
         CareSchedule openCase = careScheduleService.findOpenIncidentCase(horse.getId()).orElse(null);
         boolean escalate = serious && openCase != null && openCase.getCareType() == CareType.ROUTINE

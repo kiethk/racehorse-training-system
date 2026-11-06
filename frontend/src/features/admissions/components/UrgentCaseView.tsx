@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -14,7 +15,7 @@ import { admissionsApi } from '../services/api';
 import { healthApi } from '@/features/health/services/healthApi';
 import { displayError, formatDateTime } from '@/lib/display';
 import { ClinicalExamForm, type ClinicalExamFormHandle } from './vet-review/ClinicalExamForm';
-import { IncidentCaseReports } from './IncidentCaseReports';
+import { INCIDENT_SEVERITY_MAP } from '@/features/groom/lib/incidentDisplay';
 import { ApiError } from '@/services/api';
 import type { HorseHealthMetric } from '@/features/horses/types';
 import type {
@@ -29,6 +30,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
   const autoStartRef = useRef(false);
   const formRef = useRef<ClinicalExamFormHandle>(null);
   const [reports, setReports] = useState<UrgentCaseReport[]>([]);
+  const [showAdditional, setShowAdditional] = useState(false);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
@@ -49,6 +51,7 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
 
   useEffect(() => {
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUrgentCase(null);
     setLoading(true);
     setReports([]);
@@ -259,8 +262,8 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
       />
 
       {/* Reported Incident & Observations from Groom */}
-      <Panel padded className="space-y-4">
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
+      <Panel padded className="space-y-3">
+        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
           <div className="flex items-center gap-2">
             <Icon name="file-text" size={16} className="text-[var(--color-medical)]" />
             <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
@@ -272,34 +275,105 @@ export function UrgentCaseView({ scheduleId }: { scheduleId: number }) {
           </span>
         </div>
 
-        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-secondary)]">
-          {urgentCase.description || 'No detailed clinical description provided by reporter.'}
-        </p>
-
-        {urgentCase.imageUrl && (
-          <div className="pt-2">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-              Photo Evidence
-            </label>
-            <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-2">
+        <div className="flex flex-col sm:flex-row gap-4 items-start">
+          {urgentCase.imageUrl && (
+            <div className="group relative h-28 w-28 sm:h-32 sm:w-32 shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
               <ProtectedImage
                 src={urgentCase.imageUrl}
                 alt="Urgent case report incident photo"
                 openOnClick
-                className="max-h-72 w-full rounded-[var(--radius-sm)] object-contain"
+                className="h-28 w-28 sm:h-32 sm:w-32 object-cover transition-transform duration-200 group-hover:scale-105"
               />
-              <p className="mt-1.5 text-center text-[11px] text-[var(--color-text-muted)]">
-                Click photo to open full resolution view
-              </p>
+              <div className="pointer-events-none absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-xs backdrop-blur-xs">
+                <Icon name="search" size={10} />
+                <span>Zoom</span>
+              </div>
             </div>
+          )}
+
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-secondary)]">
+              {urgentCase.description || 'No detailed clinical description provided by reporter.'}
+            </p>
+            <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+              <span>Reported at {formatDateTime(urgentCase.reportedAt)}</span>
+            </div>
+          </div>
+        </div>
+
+        {additionalReports.length > 0 && (
+          <div className="border-t border-[var(--color-border)] pt-2.5">
+            <button
+              type="button"
+              onClick={() => setShowAdditional((prev) => !prev)}
+              className="flex w-full items-center justify-between rounded-[var(--radius-md)] bg-[var(--color-surface-subtle)] px-3 py-2 text-xs font-semibold text-[var(--color-text-primary)] transition-all hover:bg-[var(--color-surface)] hover:text-[var(--color-primary)] active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2">
+                <Icon
+                  name={showAdditional ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  className="text-[var(--color-primary)]"
+                />
+                <span>Additional merged reports ({additionalReports.length})</span>
+              </div>
+              <span className="text-[11px] font-normal text-[var(--color-text-muted)]">
+                {showAdditional ? 'Hide' : 'View'}
+              </span>
+            </button>
+
+            {showAdditional && (
+              <div className="mt-3 space-y-3">
+                {additionalReports.map((report) => {
+                  const severity = INCIDENT_SEVERITY_MAP[report.severity];
+                  return (
+                    <div
+                      key={report.id}
+                      className="flex flex-col sm:flex-row items-start gap-3.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"
+                    >
+                      {report.imageUrl && (
+                        <div className="group relative h-20 w-20 sm:h-22 sm:w-22 shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xs transition-all hover:border-[var(--color-primary)] hover:shadow-sm">
+                          <ProtectedImage
+                            src={report.imageUrl}
+                            alt={`Report: ${report.title}`}
+                            openOnClick
+                            className="h-20 w-20 sm:h-22 sm:w-22 object-cover transition-transform duration-200 group-hover:scale-105"
+                          />
+                          <div className="pointer-events-none absolute bottom-1 right-1 flex items-center gap-0.5 rounded bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white shadow-xs backdrop-blur-xs">
+                            <Icon name="search" size={9} />
+                            <span>Zoom</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <strong className="text-xs font-bold text-[var(--color-text-primary)]">
+                            {report.title}
+                          </strong>
+                          <Pill tone={severity.tone} size="sm">
+                            {severity.label}
+                          </Pill>
+                        </div>
+                        <p className="whitespace-pre-wrap break-words text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                          {report.description}
+                        </p>
+                        <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
+                          <span>
+                            {[report.reportedByRole, report.reportedByName].filter(Boolean).join(' ') ||
+                              `#${report.reportedById}`}
+                          </span>
+                          <span>·</span>
+                          <span>{formatDateTime(report.reportedAt)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </Panel>
-
-      <IncidentCaseReports
-        title={`Additional reports merged into this case (${additionalReports.length})`}
-        reports={additionalReports}
-      />
 
       {/* Main Workspace Area */}
       {(urgentCase.status === 'SCHEDULED' || urgentCase.status === 'PAUSED') && (

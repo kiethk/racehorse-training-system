@@ -106,11 +106,12 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
         CareSchedule rolled = careSchedules.findById(stale.getId()).orElseThrow();
         assertEquals(CareScheduleStatus.SCHEDULED, rolled.getStatus());
-        assertEquals(RescheduleReason.EOD_ROLLOVER, rolled.getRescheduleReason());
+        assertEquals(RescheduleReason.TIME_EXCEEDED, rolled.getRescheduleReason());
+        assertEquals(1, rolled.getRolloverCount());
+        assertNotNull(rolled.getScheduledDate());
         // Slot hợp lệ: sau giờ đóng cửa 17:05 và nằm trên lưới 30 phút của ngày làm việc kế.
-        assertTrue(rolled.getScheduledAt().isAfter(evening), rolled.getScheduledAt().toString());
-        assertTrue(rolled.getScheduledAt().getMinute() == 0 || rolled.getScheduledAt().getMinute() == 30,
-                rolled.getScheduledAt().toString());
+        assertTrue(rolled.getScheduledDate().isAfter(evening.toLocalDate()));
+        assertNull(rolled.getScheduledAt());
     }
 
     @Test

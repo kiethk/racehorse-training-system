@@ -1,4 +1,7 @@
-package com.rtms.backend.medical.service;
+package com.rtms.backend.medical.service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.audit.repository.AuditLogRepository;
@@ -138,8 +141,9 @@ class CareScheduleLifecycleSweepTest {
         service.runLifecycleSweep(LocalDateTime.of(2026, 11, 1, 17, 1));
 
         assertEquals(CareScheduleStatus.SCHEDULED, initial.getStatus());
-        assertEquals(LocalDateTime.of(2026, 11, 2, 8, 0), initial.getScheduledAt());
-        assertEquals(RescheduleReason.EOD_ROLLOVER, initial.getRescheduleReason());
+        assertEquals(LocalDate.of(2026, 11, 2), initial.getScheduledDate());
+        assertNull(initial.getScheduledAt());
+        assertEquals(RescheduleReason.TIME_EXCEEDED, initial.getRescheduleReason());
         assertNotNull(initial.getRescheduleNote());
         assertTrue(initial.getRescheduleNote().contains("(was in progress)"));
         verify(notificationService).sendAssignmentNotification(eq(20L),
@@ -161,7 +165,8 @@ class CareScheduleLifecycleSweepTest {
 
         service.runLifecycleSweep(LocalDateTime.of(2026, 11, 1, 17, 1));
 
-        assertEquals(LocalDateTime.of(2026, 11, 2, 13, 30), routine.getScheduledAt());
+        assertEquals(LocalDate.of(2026, 11, 2), routine.getScheduledDate());
+        assertNull(routine.getScheduledAt());
         assertEquals(CareScheduleStatus.SCHEDULED, routine.getStatus());
     }
 
@@ -237,6 +242,6 @@ class CareScheduleLifecycleSweepTest {
 
         ArgumentCaptor<CareSchedule> saved = ArgumentCaptor.forClass(CareSchedule.class);
         verify(careScheduleRepository).save(saved.capture());
-        assertEquals(RescheduleReason.EOD_ROLLOVER, saved.getValue().getRescheduleReason());
+        assertEquals(RescheduleReason.TIME_EXCEEDED, saved.getValue().getRescheduleReason());
     }
 }

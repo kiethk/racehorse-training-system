@@ -336,9 +336,10 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       }
     }, [show3DTab, anatomyTab]);
 
-    // AD-022 / AD-026: DELAYED and OVERDUE exams are still open and must remain editable so the vet can submit findings.
+    // Care Scheduling V2: SCHEDULED, IN_PROGRESS, DELAYED, and OVERDUE exams are open and directly editable.
     const isGated =
       scheduleStatus != null &&
+      scheduleStatus !== 'SCHEDULED' &&
       scheduleStatus !== 'IN_PROGRESS' &&
       scheduleStatus !== 'DELAYED' &&
       scheduleStatus !== 'OVERDUE';
@@ -772,9 +773,10 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
       event.preventDefault();
-      if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS' && scheduleStatus !== 'DELAYED' && scheduleStatus !== 'OVERDUE') {
+      const openStatuses = ['SCHEDULED', 'IN_PROGRESS', 'DELAYED', 'OVERDUE'];
+      if (scheduleStatus && !openStatuses.includes(scheduleStatus)) {
         setFormError(
-          'Care schedule is SCHEDULED. Physical examination must be started before recording and submitting findings.',
+          'Care schedule must be in an active state before recording and submitting findings.',
         );
         return;
       }
@@ -798,9 +800,10 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     async function executeSubmit() {
       if (inFlight.current) return;
-      if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS' && scheduleStatus !== 'DELAYED' && scheduleStatus !== 'OVERDUE') {
+      const openStatuses = ['SCHEDULED', 'IN_PROGRESS', 'DELAYED', 'OVERDUE'];
+      if (scheduleStatus && !openStatuses.includes(scheduleStatus)) {
         setFormError(
-          'Care schedule is SCHEDULED. Physical examination must be started before recording and submitting findings.',
+          'Care schedule must be in an active state before recording and submitting findings.',
         );
         setShowApproveConfirm(false);
         return;
@@ -1361,40 +1364,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     const renderGates = () => (
       <>
-        {scheduleStatus === 'SCHEDULED' && (
-          <div
-            role="status"
-            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-3 text-sm text-[var(--color-warning)]"
-          >
-            <div className="flex items-center gap-2">
-              <Icon
-                name="alert-triangle"
-                size={18}
-                className="shrink-0 text-[var(--color-warning)]"
-              />
-              <strong className="block text-sm font-bold">Care schedule is SCHEDULED</strong>
-            </div>
-            {onStartExam && !asideTop && (
-              <Button
-                type="button"
-                size="sm"
-                variant="primary"
-                loading={startingExam}
-                onClick={async () => {
-                  try {
-                    setStartingExam(true);
-                    await onStartExam();
-                  } finally {
-                    setStartingExam(false);
-                  }
-                }}
-                icon="activity"
-              >
-                Start Examination
-              </Button>
-            )}
-          </div>
-        )}
         {scheduleStatus === 'REQUESTED' && (
           <div
             role="status"

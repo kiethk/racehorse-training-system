@@ -1,7 +1,9 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PreventiveCareHub } from '@/features/care/components/preventive/PreventiveCareHub';
+import { ListSkeleton } from '@/components/ui';
 
 export const metadata: Metadata = {
   title: 'Preventive Care | Veterinarian | RTMS',
@@ -12,7 +14,9 @@ export default function PreventiveCarePage() {
   return (
     <RoleGuard allowedRoles={['VETERINARIAN', 'CLUB_MANAGER']}>
       <PageContainer>
-        <PreventiveCareHub />
+        <Suspense fallback={<ListSkeleton rows={4} />}>
+          <PreventiveCareHub />
+        </Suspense>
       </PageContainer>
     </RoleGuard>
   );

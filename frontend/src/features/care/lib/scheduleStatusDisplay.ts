@@ -37,19 +37,10 @@ export interface ScheduleExamAction {
   icon: IconName;
 }
 
-/** The primary action button for a schedule row/card, identical on every screen. */
+/** The primary action button for a schedule row/card, unified across all screens. */
 export function getScheduleExamAction(status: CareScheduleStatus | string | null | undefined): ScheduleExamAction {
-  switch (status) {
-    case 'COMPLETED':
-      return { label: 'View Record', icon: 'file-text' };
-    case 'PAUSED':
-      return { label: 'Continue (Paused)', icon: 'activity' };
-    case 'IN_PROGRESS':
-    case 'DELAYED':
-      return { label: 'Continue Exam', icon: 'activity' };
-    case 'OVERDUE':
-      return { label: 'Start Exam', icon: 'alert-triangle' };
-    default:
-      return { label: 'Start Exam', icon: 'chevron-right' };
+  if (status === 'COMPLETED') {
+    return { label: 'View Record', icon: 'file-text' };
   }
+  return { label: 'Examine', icon: 'activity' };
 }

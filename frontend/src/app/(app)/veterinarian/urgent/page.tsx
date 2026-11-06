@@ -108,13 +108,10 @@ export default function UrgentCasesPage() {
         <div className="space-y-6">
           {/* Header */}
           <PageHeader
-            eyebrow="Clinical Emergency Operations"
             title="Urgent Cases"
             actions={
               <div className="flex items-center gap-2">
-                {urgentCases.length > 0 && (
-                  <Pill tone="danger">{urgentCases.length} active</Pill>
-                )}
+                
                 <Button variant="secondary" icon="refresh" onClick={handleRefresh} loading={loading}>
                   Refresh
                 </Button>

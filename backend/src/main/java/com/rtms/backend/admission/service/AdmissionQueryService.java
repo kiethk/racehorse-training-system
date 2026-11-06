@@ -530,6 +530,11 @@ public class AdmissionQueryService {
         Map<Long, StableStall> stalls = stableStallRepository.findAllById(stallIds).stream()
                 .collect(Collectors.toMap(StableStall::getId, s -> s));
 
+        Map<Long, AdmissionDocument> photos = admissionDocumentRepository
+                .findByAdmissionIdInAndDocumentType(admissionIds, AdmissionDocumentType.HORSE_PHOTO).stream()
+                .collect(Collectors.toMap(AdmissionDocument::getAdmissionId, d -> d,
+                        (left, right) -> left.getId() <= right.getId() ? left : right));
+
         List<VetAdmissionQueueItemResponse> items = schedulePage.getContent().stream().map(cs -> {
             AdmissionApplication adm = admissions.get(cs.getAdmissionId());
             CandidateHorseProfile cand = candidates.get(cs.getAdmissionId());
@@ -538,12 +543,17 @@ public class AdmissionQueryService {
             Long trainerId = admissionTrainerMap.get(adm.getId());
             User trainer = trainerId == null ? null : users.get(trainerId);
             StableStall stall = stalls.get(adm.getQuarantineStallId());
+            AdmissionDocument photo = photos.get(adm.getId());
+            String imageUrl = photo == null
+                    ? (adm.getHorseId() == null ? null : "/api/horses/" + adm.getHorseId() + "/photo")
+                    : documentUrl(photo);
             return new VetAdmissionQueueItemResponse(
                     adm.getId(),
                     adm.getOwnerId(),
                     owner == null ? null : owner.getFullName(),
                     cand.getName(),
                     cand.getBreed(),
+                    imageUrl,
                     cand.getDateOfBirth(),
                     adm.getStatus(),
                     adm.getSubmittedAt(),
