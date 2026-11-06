@@ -27,6 +27,16 @@ import type { Horse, StableStall } from '@/features/stable/types';
 import type { HorseHealthMetric } from '@/features/horses/types';
 import type { HorsePreventiveStatus } from '@/features/care/types/preventive';
 import type { TreatmentPlan } from '@/features/care/types';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 type StatusFilter = 'ALL' | 'ALLOWED' | 'BLOCKED';
 
@@ -378,6 +388,16 @@ function HealthRecordsContent() {
       const tb = b.examinedAt ? new Date(b.examinedAt).getTime() : 0;
       return tb - ta;
     });
+    const chartMetrics = [...metrics]
+      .sort((a, b) => {
+        const ta = a.recordedAt ? new Date(a.recordedAt).getTime() : 0;
+        const tb = b.recordedAt ? new Date(b.recordedAt).getTime() : 0;
+        return ta - tb;
+      })
+      .map((m) => ({
+        ...m,
+        date: formatDate(m.recordedAt),
+      }));
 
     return (
       <RoleGuard allowedRoles={['VETERINARIAN']}>
@@ -819,8 +839,106 @@ function HealthRecordsContent() {
                 </Panel>
               </div>
 
-              {/* Right: Active Injuries & Preventive protocols */}
+              {/* Right: Vitals Trend Chart, Active Injuries & Preventive protocols */}
               <div className="lg:col-span-5 space-y-4">
+                {/* Vitals Telemetry Trend Chart */}
+                <Panel padded className="space-y-3 border border-[var(--color-border)]">
+                  <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Icon name="activity" size={16} className="text-[var(--color-primary)]" />
+                      <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
+                        Vitals Telemetry Trend
+                      </h2>
+                    </div>
+                    <span className="text-xs text-[var(--color-text-muted)] font-mono">
+                      {chartMetrics.length} reading{chartMetrics.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+
+                  {chartMetrics.length === 0 ? (
+                    <p className="text-xs text-[var(--color-text-muted)] py-4 text-center">
+                      No historical telemetry readings on file.
+                    </p>
+                  ) : (
+                    <div className="h-56 w-full pt-1">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartMetrics}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                          <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
+                          <YAxis
+                            yAxisId="left"
+                            tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                            domain={['auto', 'auto']}
+                            label={{
+                              value: 'Vitals (bpm / °C / rpm)',
+                              angle: -90,
+                              position: 'insideLeft',
+                              style: { fontSize: 9, fill: 'var(--color-text-muted)' },
+                            }}
+                          />
+                          <YAxis
+                            yAxisId="right"
+                            orientation="right"
+                            tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                            domain={['auto', 'auto']}
+                            label={{
+                              value: 'Weight (kg)',
+                              angle: 90,
+                              position: 'insideRight',
+                              style: { fontSize: 9, fill: 'var(--color-text-muted)' },
+                            }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'var(--color-surface)',
+                              borderColor: 'var(--color-border)',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                            }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '4px' }} />
+                          <Line
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="heartRate"
+                            stroke="var(--color-danger)"
+                            name="Heart Rate (bpm)"
+                            dot={{ r: 3 }}
+                            connectNulls
+                          />
+                          <Line
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="temperature"
+                            stroke="var(--color-warning)"
+                            name="Temp (°C)"
+                            dot={{ r: 3 }}
+                            connectNulls
+                          />
+                          <Line
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="respiratoryRate"
+                            stroke="var(--color-secondary)"
+                            name="Respiration (rpm)"
+                            dot={{ r: 3 }}
+                            connectNulls
+                          />
+                          <Line
+                            yAxisId="right"
+                            type="monotone"
+                            dataKey="weight"
+                            stroke="var(--color-info)"
+                            name="Weight (kg)"
+                            dot={{ r: 3 }}
+                            connectNulls
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </Panel>
+
                 {/* Injuries Panel */}
                 <Panel padded className="space-y-3 border border-[var(--color-border)]">
                   <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
@@ -836,9 +954,17 @@ function HealthRecordsContent() {
                   </div>
 
                   {injuries.length === 0 ? (
-                    <p className="text-xs text-[var(--color-text-muted)] py-3 text-center">
-                      No active injury records.
-                    </p>
+                    <div className="flex flex-col items-center justify-center py-3 text-center">
+                      <div className="rounded-full bg-[var(--color-surface-subtle)] p-1.5 mb-1 text-[var(--color-text-muted)]">
+                        <Icon name="check" size={16} className="text-[var(--color-success)]" />
+                      </div>
+                      <p className="text-xs font-medium text-[var(--color-text-primary)]">
+                        No active injury records
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
+                        Equine musculoskeletal and physical condition clear.
+                      </p>
+                    </div>
                   ) : (
                     <div className="space-y-2">
                       {injuries.map((inj) => (
