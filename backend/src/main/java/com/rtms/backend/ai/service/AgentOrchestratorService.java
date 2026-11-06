@@ -677,7 +677,16 @@ public class AgentOrchestratorService {
         return switch (key) {
             // Ngựa & Phả hệ
             case "horseName", "tenNgua" -> "Tên ngựa";
-            case "registrationNumber", "horseId", "maDangKy", "maSoNgua" -> "Mã đăng ký";
+            case "horseId", "maSoNgua" -> "ID Ngựa";
+            case "registrationNumber", "maDangKy" -> "Mã đăng ký";
+            case "candidateName" -> "Tên ngựa ứng viên";
+            case "sex" -> "Giới tính";
+            case "dateOfBirth" -> "Ngày sinh";
+            case "trainingDecisionReason" -> "Lý do hạn chế tập luyện";
+            case "registryName" -> "Tổ chức đăng kiểm";
+            case "sireRegistrationNumber" -> "Mã UELN cha";
+            case "damRegistrationNumber" -> "Mã UELN mẹ";
+            case "pedigreeNotes" -> "Ghi chú nguồn gốc";
             case "breed" -> "Giống ngựa";
             case "sire" -> "Ngựa cha (Sire)";
             case "dam" -> "Ngựa mẹ (Dam)";
@@ -694,9 +703,27 @@ public class AgentOrchestratorService {
             case "temperature", "thanNhiet" -> "Thân nhiệt";
             case "heartRate", "avgHeartRate", "maxHeartRate", "nhipTim" -> "Nhịp tim";
             case "respiratoryRate", "nhipTho" -> "Nhịp thở";
+            case "bodyConditionScore" -> "Điểm thể trạng (BCS 1-9)";
+            case "hydrationStatus" -> "Tình trạng bù nước";
             case "clinicalNotes", "clinicalObservations", "notes", "nhanXet" -> "Ghi chú lâm sàng";
             case "diagnosis", "latestDiagnosis" -> "Chẩn đoán bệnh lý";
             case "treatmentPlan" -> "Phác đồ điều trị";
+            case "treatmentPlanName" -> "Tên phác đồ điều trị";
+            case "medicationName" -> "Tên thuốc";
+            case "dosage" -> "Liều lượng";
+            case "frequency" -> "Tần suất dùng";
+            case "route" -> "Đường dùng thuốc";
+            case "duration" -> "Thời gian dùng (ngày)";
+            case "withdrawalDays" -> "Thời gian ngưng Doping (ngày)";
+            case "administeredByRole" -> "Người thực hiện cấp thuốc";
+            case "recordType" -> "Phân loại bệnh án";
+            case "veterinarianName" -> "Bác sĩ phụ trách";
+            case "rescheduleReason" -> "Lý do dời lịch";
+            case "rescheduleNote" -> "Ghi chú dời lịch";
+            case "activeInjuries" -> "Chấn thương đang điều trị";
+            case "conditionType" -> "Loại chấn thương/bệnh";
+            case "expectedRecoveryDate" -> "Dự kiến hồi phục";
+            case "zoneId" -> "Vị trí giải phẫu (Zone)";
             case "medicalRestrictionNotes", "restrictionDetails" -> "Chỉ định y tế";
             case "symptoms", "intakeSymptoms" -> "Triệu chứng";
             case "severity" -> "Mức độ nghiêm trọng";
@@ -733,6 +760,9 @@ public class AgentOrchestratorService {
             case "totalStalls" -> "Tổng số ô chuồng";
             case "occupiedStalls" -> "Số chuồng đang sử dụng";
             case "vacantStalls" -> "Số chuồng trống";
+            case "occupiedStallsCount" -> "Số ô chuồng đang dùng";
+            case "vacantStallsCount" -> "Số ô chuồng còn trống";
+            case "occupiedRegularStalls" -> "Chuồng thường đang dùng";
             case "quarantineCasesCount" -> "Số ca cách ly";
             case "occupancyRate" -> "Tỷ lệ lấp đầy";
             case "bottleneckForecast" -> "Dự báo điểm nghẽn chuồng";
@@ -747,6 +777,11 @@ public class AgentOrchestratorService {
             case "role", "roleTitle", "vaiTro" -> "Vai trò";
             case "activeStatus" -> "Trạng thái hoạt động";
             case "specialtyInfo" -> "Thông tin chuyên môn";
+            case "address" -> "Địa chỉ";
+            case "joinedDate" -> "Ngày gia nhập";
+            case "certificationNumber" -> "Số chứng chỉ HLV";
+            case "licenseNumber" -> "Số CCHN Bác sĩ thú y";
+            case "specialization" -> "Chuyên khoa thú y";
             case "totalStaff", "tongSoNhanSu" -> "Tổng số nhân sự";
             case "roleBreakdown", "phanLoaiTheoVaiTro" -> "Phân loại theo vai trò";
             case "staffList", "danhSachNhanSu" -> "Danh sách nhân sự";
@@ -795,6 +830,14 @@ public class AgentOrchestratorService {
             case "durationMinutes" -> "Thời lượng (phút)";
             case "targetDistance" -> "Cự ly mục tiêu";
             case "actualDistanceMeters" -> "Cự ly thực tế (m)";
+            case "actualDurationMinutes" -> "Thời lượng chạy thực tế (phút)";
+            case "averageSpeedKmh" -> "Tốc độ trung bình (km/h)";
+            case "videoUrl" -> "Video buổi tập";
+            case "surfaceType" -> "Mặt sân tập";
+            case "intensityLevel" -> "Cường độ bài tập";
+            case "targetDistanceMeters" -> "Cự ly giáo án (m)";
+            case "trainingDays" -> "Lịch tập trong tuần";
+            case "trainerName" -> "Huấn luyện viên";
             case "topSpeedKmh", "optimalSpeed" -> "Tốc độ tối ưu";
             case "fitnessProgressionRate" -> "Tiến độ thể lực";
             case "racingPotentialEvaluation" -> "Tiềm năng thi đấu";
@@ -831,6 +874,11 @@ public class AgentOrchestratorService {
             case "totalTasksCount" -> "Tổng số công việc";
             case "totalWorkItemsCount" -> "Tổng số đầu việc";
             case "biosecurityNotes" -> "Quy tắc an toàn sinh học";
+            case "imageUrl" -> "Ảnh hiện trường";
+            case "handlerName" -> "Người xử lý";
+            case "handledAt" -> "Thời điểm xử lý";
+            case "handlerNote" -> "Ghi chú xử lý";
+            case "careScheduleId" -> "Mã lịch khám phát sinh";
             case "incidentTitle", "title" -> "Tiêu đề sự cố";
             case "incidentStatus" -> "Trạng thái sự cố";
             case "reportedAt", "timestamp" -> "Thời gian ghi nhận";
@@ -847,6 +895,13 @@ public class AgentOrchestratorService {
             case "rejectedOrExpiredApplications", "rejected", "arrivalExpired" -> "Số đơn từ chối / quá hạn";
             case "applicationList" -> "Danh sách đơn đăng ký";
             case "applicationStatus" -> "Trạng thái đơn";
+            case "arrivalDeadlineAt" -> "Hạn chót xe chở tới trại";
+            case "arrivedAt" -> "Thời điểm tới cổng";
+            case "quarantineStallCode" -> "Chuồng cách ly";
+            case "groomFeedback" -> "Nhận xét của Groom";
+            case "vetFeedback" -> "Nhận xét của Bác sĩ thú y";
+            case "trainerFeedback" -> "Nhận xét của HLV";
+            case "managerFeedback" -> "Ý kiến của Quản lý";
             case "currentStage" -> "Giai đoạn hiện tại";
             case "submittedDate" -> "Ngày nộp đơn";
             case "ownerName" -> "Chủ sở hữu";
@@ -860,12 +915,29 @@ public class AgentOrchestratorService {
 
             // Giải đua
             case "raceName" -> "Tên giải đua";
+            case "raceCategory" -> "Hạng mục giải đua";
+            case "location" -> "Địa điểm / Trường đua";
+            case "organizer" -> "Đơn vị tổ chức";
+            case "distanceMeters" -> "Cự ly thi đấu (m)";
+            case "trackType" -> "Mặt sân đua";
+            case "eventDate" -> "Ngày thi đấu chính thức";
+            case "eventTime" -> "Giờ xuất phát";
+            case "nominationDeadline" -> "Hạn chót đăng ký nộp hồ sơ";
+            case "jockeyName" -> "Nài ngựa";
+            case "entryFee" -> "Lệ phí tham gia";
+            case "prizeDetails" -> "Cơ cấu giải thưởng";
             case "registrationDate" -> "Ngày đăng ký đua";
             case "totalRaceRegistrations" -> "Tổng số giải đăng ký";
             case "raceList" -> "Danh sách giải đua";
 
             // Nhật ký kiểm toán
             case "action" -> "Hành động thao tác";
+            case "entityName" -> "Đối tượng tác động";
+            case "entityId" -> "ID đối tượng";
+            case "httpMethod" -> "Phương thức HTTP";
+            case "requestPath" -> "Đường dẫn API";
+            case "statusCode" -> "Mã HTTP";
+            case "details" -> "Chi tiết dữ liệu";
             case "performedBy" -> "Người thực hiện";
             case "changeDetails" -> "Chi tiết thay đổi";
             case "totalAuditLogs" -> "Tổng số nhật ký";
