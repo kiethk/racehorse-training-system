@@ -189,7 +189,7 @@ export function RoutineChecksWorkspace() {
         </div>
         <div className="flex items-center gap-2">
           <Icon name="activity" size={14} className="text-[var(--color-text-muted)] shrink-0" />
-          <span>Daily quota: <strong>Max 4 exams per vet</strong></span>
+          <span>Daily quota: <strong>Max 3 routine exams per vet</strong></span>
         </div>
       </div>
 
@@ -217,10 +217,6 @@ export function RoutineChecksWorkspace() {
           options={[
             { value: 'ALL', label: 'All', count: schedules.length },
             { value: 'SCHEDULED', label: 'Scheduled', count: stats.scheduled },
-            { value: 'IN_PROGRESS', label: 'In Progress', count: stats.inProgress },
-            ...(stats.delayed > 0 ? [{ value: 'DELAYED' as const, label: 'Delayed', count: stats.delayed }] : []),
-            ...(stats.overdue > 0 ? [{ value: 'OVERDUE' as const, label: 'Overdue', count: stats.overdue }] : []),
-            { value: 'PAUSED', label: 'Paused', count: stats.paused },
             { value: 'COMPLETED', label: 'Completed', count: stats.completed },
           ]}
         />

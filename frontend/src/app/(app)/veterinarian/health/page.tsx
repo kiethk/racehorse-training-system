@@ -157,10 +157,11 @@ function HealthRecordsContent() {
     if (paramHorseId) {
       const id = Number(paramHorseId);
       if (!Number.isNaN(id) && id > 0) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedHorseId(id);
         void loadHorseDetail(id);
       }
+    } else {
+      setSelectedHorseId(null);
     }
   }, [paramHorseId, loadHorseDetail]);
 
@@ -173,7 +174,7 @@ function HealthRecordsContent() {
     setPreventive(null);
     setPlansByRecordId({});
     setExpandedRecordPlans(new Set());
-    router.replace('/veterinarian/health');
+    router.push('/veterinarian/health');
   }, [router]);
 
   const stallMap = useMemo(() => {
@@ -193,8 +194,8 @@ function HealthRecordsContent() {
     return map;
   }, [vetAdmissions]);
 
-  // Clicking a row does exactly what that row's Action button would do; rows whose case
-  // is held by someone else (or still in intake) answer with a warning toast instead.
+  // Clicking a row opens the comprehensive in-page health profile for that horse.
+  // Rows whose case is held by someone else (or still in intake) answer with a warning toast.
   const handleHorseRow = (row: HorseListItem) => {
     const { pendingUrgentScheduleId, pendingUrgentVetId, pendingUrgentVetName, pendingAdmissionId } = row.summary ?? {};
     if (pendingUrgentScheduleId) {
@@ -220,15 +221,7 @@ function HealthRecordsContent() {
       toast.warning('No health record yet', `${row.horse.name} is still in admission intake (${stage}).`);
       return;
     }
-    // Dead-end guard: horses that have never been examined (in-progress intake exams
-    // create their record only on completion) must not land on an empty record page.
-    if (!row.summary?.lastExaminedAt) {
-      toast.warning('No health record yet', `${row.horse.name} has no examination on file. Complete the in-progress exam, or schedule a routine exam from Routine Checks.`);
-      return;
-    }
-    router.push(
-      `/veterinarian/records?horseId=${row.horse.id}${row.horse.name ? `&horseName=${encodeURIComponent(row.horse.name)}` : ''}`,
-    );
+    router.push(`/veterinarian/health?horseId=${row.horse.id}`);
   };
 
   // Rejected horses are out of the clinical roster: no training to clear, so keep them out of the list and metrics.
@@ -1186,14 +1179,14 @@ function HealthRecordsContent() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          icon="chevron-right"
+                          icon="clipboard"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleHorseRow(row);
                           }}
                           className="transition-all active:scale-[0.97]"
                         >
-                          View record
+                          Health details
                         </Button>
                       );
                     },
