@@ -540,7 +540,7 @@ function HealthRecordsContent() {
 
             {/* Tab 1: Overview */}
             {activeTab === 'overview' && (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 items-start">
                 <Panel padded className="space-y-3 border border-[var(--color-border)]">
                   <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
                     <div className="flex items-center gap-2">
