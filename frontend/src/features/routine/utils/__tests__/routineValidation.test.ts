@@ -99,3 +99,18 @@ test('filterRoutineSchedules sorts newest created first (Option 1: createdAt DES
   const sorted = filterRoutineSchedules(schedules, 'ALL', '', horseMap);
   assert.deepEqual(sorted.map((s) => s.id), [2, 3, 1]);
 });
+
+test('filterRoutineSchedules excludes schedules with purpose PREVENTIVE', () => {
+  const horseMap = new Map<number, { name: string; stallCode?: string }>([
+    [10, { name: 'Thunderbolt', stallCode: 'A-01' }],
+  ]);
+  const schedules: CareSchedule[] = [
+    { id: 1, horseId: 10, careType: 'ROUTINE', purpose: 'FOLLOW_UP', status: 'SCHEDULED', description: 'General routine exam' },
+    { id: 2, horseId: 10, careType: 'ROUTINE', purpose: 'PREVENTIVE', status: 'SCHEDULED', description: 'Annual vaccination' },
+    { id: 3, horseId: 10, careType: 'ROUTINE', status: 'SCHEDULED', description: 'Routine checkup' },
+  ];
+
+  const result = filterRoutineSchedules(schedules, 'ALL', '', horseMap);
+  assert.equal(result.length, 2);
+  assert.deepEqual(result.map((s) => s.id), [3, 1]);
+});

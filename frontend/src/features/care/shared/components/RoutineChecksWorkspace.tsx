@@ -50,7 +50,10 @@ export function RoutineChecksWorkspace() {
         stableApi.getStalls(),
       ]);
 
-      setSchedules(schedulePage.content || []);
+      // Routine Checks tab strictly manages clinical routine exams and follow-ups.
+      // Preventive care (vaccinations & deworming) is managed in the Preventive Care tab.
+      const routineOnly = (schedulePage.content || []).filter((s) => s.purpose !== 'PREVENTIVE');
+      setSchedules(routineOnly);
       setHorses(horseList || []);
       setStalls(stallList || []);
     } catch (err) {
@@ -129,7 +132,7 @@ export function RoutineChecksWorkspace() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
-        title="Routine & Preventive Care"
+        title="Routine Checks"
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -147,7 +150,7 @@ export function RoutineChecksWorkspace() {
               onClick={() => setCreateModalOpen(true)}
               className="transition-all active:scale-[0.98]"
             >
-              Schedule Care
+              Schedule Routine Check
             </Button>
           </div>
         }
@@ -156,7 +159,7 @@ export function RoutineChecksWorkspace() {
       {/* Metric Cards Banner */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <MetricCard
-          label="Total Care Schedules"
+          label="Total Routine Schedules"
           value={stats.total}
           icon="calendar"
           tone={stats.total > 0 ? 'default' : 'neutral'}
@@ -174,7 +177,7 @@ export function RoutineChecksWorkspace() {
           tone={stats.inProgress > 0 ? 'info' : 'neutral'}
         />
         <MetricCard
-          label="Completed Care"
+          label="Completed Checks"
           value={stats.completed}
           icon="check"
           tone={stats.completed > 0 ? 'success' : 'neutral'}
@@ -255,7 +258,7 @@ export function RoutineChecksWorkspace() {
                 onClick={() => setCreateModalOpen(true)}
                 className="transition-all active:scale-[0.98]"
               >
-                Schedule Care
+                Schedule Routine Check
               </Button>
             }
           />

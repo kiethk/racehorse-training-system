@@ -50,6 +50,11 @@ export function filterRoutineSchedules(
   const normalizedSearch = searchTerm.trim().toLowerCase();
 
   const filtered = schedules.filter((s) => {
+    // Exclude preventive care: Routine Checks strictly handles clinical routine & follow-up exams
+    if (s.purpose === 'PREVENTIVE') {
+      return false;
+    }
+
     if (statusFilter !== 'ALL' && s.status !== statusFilter) {
       return false;
     }
