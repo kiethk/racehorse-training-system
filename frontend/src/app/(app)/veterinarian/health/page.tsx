@@ -195,32 +195,7 @@ function HealthRecordsContent() {
   }, [vetAdmissions]);
 
   // Clicking a row opens the comprehensive in-page health profile for that horse.
-  // Rows whose case is held by someone else (or still in intake) answer with a warning toast.
   const handleHorseRow = (row: HorseListItem) => {
-    const { pendingUrgentScheduleId, pendingUrgentVetId, pendingUrgentVetName, pendingAdmissionId } = row.summary ?? {};
-    if (pendingUrgentScheduleId) {
-      if (pendingUrgentVetId != null && pendingUrgentVetId === user?.userId) {
-        router.push(`/veterinarian/urgent/${pendingUrgentScheduleId}`);
-      } else if (pendingUrgentVetName) {
-        toast.warning('Urgent case held by another vet', `${pendingUrgentVetName} is examining ${row.horse.name}. No record opens until that case is closed.`);
-      } else {
-        toast.warning('Urgent case awaiting assignment', `${row.horse.name} has an open urgent case. It is assigned from the Admissions queue.`);
-      }
-      return;
-    }
-    if (pendingAdmissionId) {
-      const admission = admissionByHorse.get(row.horse.id);
-      if (admission?.admissionStatus === 'VET_REVIEW') {
-        router.push(`/veterinarian/admissions?id=${pendingAdmissionId}`);
-        return;
-      }
-      const stage =
-        admission?.admissionStatus === 'TRAINER_REVIEW' ? 'trainer review'
-        : admission?.admissionStatus === 'MANAGER_REVIEW' ? 'manager review'
-        : 'intake review';
-      toast.warning('No health record yet', `${row.horse.name} is still in admission intake (${stage}).`);
-      return;
-    }
     router.push(`/veterinarian/health?horseId=${row.horse.id}`);
   };
 
@@ -481,7 +456,9 @@ function HealthRecordsContent() {
                 {decision === 'BLOCKED' && (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)]/20 p-2.5 text-xs">
                     <span className="text-[var(--color-danger)] font-medium">
-                      {followUpLoading
+                      {healthSummary?.pendingAdmissionId
+                        ? 'This horse is currently undergoing admission intake review (Quarantine Stall).'
+                        : followUpLoading
                         ? 'Looking for an open follow-up examination…'
                         : openFollowUp
                           ? `Open follow-up #${openFollowUp.id}${
@@ -489,7 +466,16 @@ function HealthRecordsContent() {
                             } — complete it to reassess clearance.`
                           : 'No open follow-up examination for this horse. Schedule one in Routine Care to reassess clearance.'}
                     </span>
-                    {!followUpLoading &&
+                    {healthSummary?.pendingAdmissionId ? (
+                      <LinkButton
+                        href={`/veterinarian/admissions?id=${healthSummary.pendingAdmissionId}`}
+                        size="sm"
+                        icon="clipboard"
+                        className="transition-all active:scale-[0.98]"
+                      >
+                        Review Admission
+                      </LinkButton>
+                    ) : !followUpLoading &&
                       (openFollowUp ? (
                         <Button
                           variant="primary"
@@ -1078,9 +1064,21 @@ function HealthRecordsContent() {
                     render: (row: HorseListItem) => {
                       const d = row.summary?.trainingDecision ?? row.horse.trainingDecision ?? 'ALLOWED';
                       return (
-                        <Pill tone={d === 'ALLOWED' ? 'success' : 'danger'} size="sm">
-                          {d}
-                        </Pill>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Pill tone={d === 'ALLOWED' ? 'success' : 'danger'} size="sm">
+                            {d}
+                          </Pill>
+                          {row.summary?.hasPendingUrgent && (
+                            <Pill tone="warning" size="sm">
+                              Urgent
+                            </Pill>
+                          )}
+                          {Boolean(row.summary?.pendingAdmissionId) && (
+                            <Pill tone="info" size="sm">
+                              Intake
+                            </Pill>
+                          )}
+                        </div>
                       );
                     },
                   },
@@ -1102,80 +1100,20 @@ function HealthRecordsContent() {
                     id: 'action',
                     header: 'Action',
                     align: 'right',
-                    render: (row: HorseListItem) => {
-                      // Reported but not yet examined → the assigned vet examines; a vet
-                      // looking at someone else's case only sees who holds it. A block from
-                      // the admission intake → review it while it is the vet's turn, or just
-                      // show which intake stage holds it. Once nothing is open → View Record.
-                      const { pendingUrgentScheduleId, pendingUrgentVetId, pendingUrgentVetName, pendingAdmissionId } =
-                        row.summary ?? {};
-                      if (pendingUrgentScheduleId) {
-                        if (pendingUrgentVetId != null && pendingUrgentVetId === user?.userId) {
-                          return (
-                            <Button
-                              variant="warning"
-                              size="sm"
-                              icon="activity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleHorseRow(row);
-                              }}
-                              className="transition-all active:scale-[0.97]"
-                            >
-                              Examine
-                            </Button>
-                          );
-                        }
-                        return (
-                          <span className="text-xs text-[var(--color-text-muted)] italic">
-                            {pendingUrgentVetName ? `With ${pendingUrgentVetName}` : 'Awaiting assignment'}
-                          </span>
-                        );
-                      }
-                      if (pendingAdmissionId) {
-                        const admission = admissionByHorse.get(row.horse.id);
-                        if (admission && admission.admissionStatus === 'VET_REVIEW') {
-                          // Deep link supported by VetAdmissionQueue via ?id=
-                          return (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              icon="clipboard"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleHorseRow(row);
-                              }}
-                              className="transition-all active:scale-[0.97]"
-                            >
-                              Review admission
-                            </Button>
-                          );
-                        }
-                        const stageLabel =
-                          admission?.admissionStatus === 'TRAINER_REVIEW'
-                            ? 'In intake · trainer review'
-                            : admission?.admissionStatus === 'MANAGER_REVIEW'
-                              ? 'In intake · manager review'
-                              : 'In intake review';
-                        return (
-                          <span className="text-xs text-[var(--color-text-muted)] italic">{stageLabel}</span>
-                        );
-                      }
-                      return (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          icon="clipboard"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleHorseRow(row);
-                          }}
-                          className="transition-all active:scale-[0.97]"
-                        >
-                          Health details
-                        </Button>
-                      );
-                    },
+                    render: (row: HorseListItem) => (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon="clipboard"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleHorseRow(row);
+                        }}
+                        className="transition-all active:scale-[0.97]"
+                      >
+                        Health details
+                      </Button>
+                    ),
                   },
                 ]}
                 getRowKey={(row: HorseListItem) => row.horse.id}
