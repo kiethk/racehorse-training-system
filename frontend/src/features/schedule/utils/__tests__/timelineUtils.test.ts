@@ -77,7 +77,7 @@ test('isOutsideWorkday flags exams before 08:00 or from 17:00', () => {
   assert.equal(isOutsideWorkday('2026-10-18T22:47:00'), true);
 });
 
-test('getCareTypeTone labels admission, routine, and urgent exams', () => {
+test('getCareTypeTone labels admission, routine, preventive and urgent exams', () => {
   assert.equal(getCareTypeTone('URGENT').label, 'Urgent');
   assert.equal(getCareTypeTone('URGENT').pillTone, 'danger');
 
@@ -85,11 +85,12 @@ test('getCareTypeTone labels admission, routine, and urgent exams', () => {
   assert.equal(getCareTypeTone('INITIAL').pillTone, 'info');
 
   assert.equal(getCareTypeTone('ROUTINE').label, 'Routine');
-  assert.equal(getCareTypeTone('ROUTINE').pillTone, 'primary');
   assert.equal(getCareTypeTone('ROUTINE', null).label, 'Routine');
 
-  // Purpose no longer splits ROUTINE on schedule: consistently labeled Routine
-  assert.equal(getCareTypeTone('ROUTINE', 'PREVENTIVE').label, 'Routine');
+  assert.equal(getCareTypeTone('ROUTINE', 'PREVENTIVE').label, 'Preventive');
+  assert.equal(getCareTypeTone('ROUTINE', 'PREVENTIVE').pillTone, 'primary');
+
+  // FOLLOW_UP or null displays Routine
   assert.equal(getCareTypeTone('ROUTINE', 'FOLLOW_UP').label, 'Routine');
 
   // INITIAL keeps the Admission label even when the seed stored a purpose on it.

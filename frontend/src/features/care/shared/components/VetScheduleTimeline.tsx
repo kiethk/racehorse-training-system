@@ -98,18 +98,24 @@ export function VetScheduleTimeline() {
   const stats = useMemo(() => {
     let initial = 0;
     let routine = 0;
+    let preventive = 0;
 
     for (const s of schedules) {
       if (s.careType === 'INITIAL') initial++;
-      if (s.careType === 'ROUTINE') routine++;
+      if (s.careType === 'ROUTINE') {
+        if (s.purpose === 'PREVENTIVE') preventive++;
+        else routine++;
+      }
     }
 
-    return { total: schedules.length, initial, routine };
+    return { total: schedules.length, initial, routine, preventive };
   }, [schedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
     if (item.careType === 'INITIAL') {
       router.push(`/veterinarian/admissions?scheduleId=${item.id}`);
+    } else if (item.purpose === 'PREVENTIVE') {
+      router.push(`/veterinarian/preventive-care?horseId=${item.horseId}`);
     } else if (item.careType === 'ROUTINE') {
       router.push(`/veterinarian/routine/${item.id}`);
     } else {
@@ -221,9 +227,25 @@ export function VetScheduleTimeline() {
                   </div>
                   <div className="mt-1 flex items-center gap-2">
                     <span className="text-xl font-bold text-[var(--color-text-primary)]">
-                      {stats.routine}/4
+                      {stats.routine}/3
                     </span>
-                    <Pill tone={stats.routine >= 4 ? 'warning' : 'primary'} size="sm">
+                    <Pill tone={stats.routine >= 3 ? 'warning' : 'neutral'} size="sm">
+                      Window 13:30 – 15:30
+                    </Pill>
+                  </div>
+                </div>
+
+                <div className="hidden sm:block h-8 w-px bg-[var(--color-border)]" />
+
+                <div>
+                  <div className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                    Preventive Care Bucket
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-xl font-bold text-[var(--color-text-primary)]">
+                      {stats.preventive}/3
+                    </span>
+                    <Pill tone={stats.preventive >= 3 ? 'warning' : 'primary'} size="sm">
                       Window 13:30 – 15:30
                     </Pill>
                   </div>

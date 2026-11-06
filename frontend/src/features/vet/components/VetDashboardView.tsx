@@ -113,6 +113,8 @@ export function VetDashboardView() {
   const handleStartExam = (schedule: CareSchedule) => {
     if (schedule.careType === "INITIAL") {
       router.push(`/veterinarian/admissions?scheduleId=${schedule.id}`);
+    } else if (schedule.purpose === "PREVENTIVE") {
+      router.push(`/veterinarian/preventive-care?horseId=${schedule.horseId}`);
     } else if (schedule.careType === "ROUTINE") {
       router.push(`/veterinarian/routine/${schedule.id}`);
     } else if (schedule.careType === "URGENT") {

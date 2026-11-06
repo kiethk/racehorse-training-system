@@ -70,6 +70,10 @@ import com.rtms.backend.event.UrgentAssignmentCommittedEvent;
 @Service
 public class CareScheduleService {
 
+    public static final int ROUTINE_DAILY_QUOTA = 3;
+    public static final int PREVENTIVE_DAILY_QUOTA = 3;
+    public static final int ADMISSION_DAILY_QUOTA = 2;
+
     private static final int DEFAULT_DURATION_MINUTES = 30;
     /** PAUSED vẫn là ca đang khám dở: Vet quay lại sau ca khẩn cấp. */
     private static final List<CareScheduleStatus> OPEN_CASE_STATUSES = CareScheduleStatus.OPEN;
@@ -384,12 +388,20 @@ public class CareScheduleService {
 
         List<User> activeVets = userRepository.findActiveVeterinarians();
         for (CareSchedule routine : uncompletedRoutines) {
+            boolean isPreventive = routine.getPurpose() == CareSchedulePurpose.PREVENTIVE;
+            int quota = isPreventive ? PREVENTIVE_DAILY_QUOTA : ROUTINE_DAILY_QUOTA;
             User peer = activeVets.stream()
                     .filter(v -> !Objects.equals(v.getId(), vetId))
                     .filter(v -> {
-                        long count = careScheduleRepository.countByVeterinarianIdAndScheduledDateAndCareTypeAndStatusIn(
-                                v.getId(), date, CareType.ROUTINE, CareScheduleStatus.BOOKED_OR_ACTIVE);
-                        return count < 4;
+                        long count = careScheduleRepository
+                                .findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
+                                        v.getId(), date, CareType.ROUTINE, CareScheduleStatus.BOOKED_OR_ACTIVE)
+                                .stream()
+                                .filter(cs -> isPreventive
+                                        ? cs.getPurpose() == CareSchedulePurpose.PREVENTIVE
+                                        : cs.getPurpose() != CareSchedulePurpose.PREVENTIVE)
+                                .count();
+                        return count < quota;
                     })
                     .findFirst()
                     .orElse(null);
@@ -1325,10 +1337,18 @@ public class CareScheduleService {
 
     private void cascadeIfTomorrowFull(CareSchedule cs, LocalDate targetDate) {
         if (cs.getVeterinarianId() == null) return;
-        int maxQuota = cs.getCareType() == CareType.ROUTINE ? 4 : 2;
-        List<CareSchedule> targetVisits = careScheduleRepository
+        boolean isPreventive = cs.getCareType() == CareType.ROUTINE && cs.getPurpose() == CareSchedulePurpose.PREVENTIVE;
+        int maxQuota = cs.getCareType() == CareType.INITIAL
+                ? ADMISSION_DAILY_QUOTA
+                : (isPreventive ? PREVENTIVE_DAILY_QUOTA : ROUTINE_DAILY_QUOTA);
+        List<CareSchedule> allVisits = careScheduleRepository
                 .findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
                         cs.getVeterinarianId(), targetDate, cs.getCareType(), CareScheduleStatus.BOOKED_OR_ACTIVE);
+        List<CareSchedule> targetVisits = allVisits.stream()
+                .filter(visit -> cs.getCareType() != CareType.ROUTINE || (isPreventive
+                        ? visit.getPurpose() == CareSchedulePurpose.PREVENTIVE
+                        : visit.getPurpose() != CareSchedulePurpose.PREVENTIVE))
+                .collect(Collectors.toList());
         if (targetVisits.size() >= maxQuota) {
             CareSchedule toCascade = targetVisits.stream()
                     .min(Comparator.comparingInt(CareSchedule::getRolloverCount)
@@ -1891,21 +1911,26 @@ public class CareScheduleService {
                     if (schedule.getCareType() == CareType.INITIAL && schedule.getVeterinarianId() != null) {
                         return Objects.equals(v.getId(), schedule.getVeterinarianId());
                     }
-                    // V2 Daily bucket quota: Routine max 4/vet/day, Initial/Admission max 2/vet/day
+                    // V2 Daily bucket quota: Routine max 3/vet/day, Preventive max 3/vet/day, Initial/Admission max 2/vet/day
                     if (schedule.getCareType() == CareType.ROUTINE) {
+                        boolean isPreventive = schedule.getPurpose() == CareSchedulePurpose.PREVENTIVE;
                         long count = assigned.stream()
                                 .filter(cs -> Objects.equals(cs.getVeterinarianId(), v.getId())
                                         && cs.getCareType() == CareType.ROUTINE
+                                        && (isPreventive
+                                                ? cs.getPurpose() == CareSchedulePurpose.PREVENTIVE
+                                                : cs.getPurpose() != CareSchedulePurpose.PREVENTIVE)
                                         && !Objects.equals(cs.getId(), schedule.getId()))
                                 .count();
-                        if (count >= 4) return false;
+                        int quota = isPreventive ? PREVENTIVE_DAILY_QUOTA : ROUTINE_DAILY_QUOTA;
+                        if (count >= quota) return false;
                     } else if (schedule.getCareType() == CareType.INITIAL) {
                         long count = assigned.stream()
                                 .filter(cs -> Objects.equals(cs.getVeterinarianId(), v.getId())
                                         && cs.getCareType() == CareType.INITIAL
                                         && !Objects.equals(cs.getId(), schedule.getId()))
                                 .count();
-                        if (count >= 2) return false;
+                        if (count >= ADMISSION_DAILY_QUOTA) return false;
                     }
                     // For URGENT the in-progress conflict check below decides, so a
                     // stale overdue exam never disqualifies the vet from an emergency.

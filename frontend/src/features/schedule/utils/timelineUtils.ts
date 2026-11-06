@@ -134,11 +134,21 @@ export function getCareTypeTone(
           label: 'Incident Case',
         };
       }
+      if (purpose === 'PREVENTIVE') {
+        return {
+          bg: 'bg-[var(--color-primary-soft)]',
+          border: 'border-[var(--color-primary)]',
+          text: 'text-[var(--color-primary)]',
+          pillTone: 'primary',
+          icon: 'pill',
+          label: 'Preventive',
+        };
+      }
       return {
-        bg: 'bg-[var(--color-primary-soft)]',
-        border: 'border-[var(--color-primary)]',
-        text: 'text-[var(--color-primary)]',
-        pillTone: 'primary',
+        bg: 'bg-[var(--color-surface-muted)]',
+        border: 'border-[var(--color-border-strong)]',
+        text: 'text-[var(--color-text-secondary)]',
+        pillTone: 'neutral',
         icon: 'clipboard',
         label: 'Routine',
       };
