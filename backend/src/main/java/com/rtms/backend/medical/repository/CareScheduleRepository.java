@@ -221,7 +221,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
           AND cs.veterinarianId = :vetId
           AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
                OR (:scheduleStatus IS NULL
-                   AND (:admissionStatus IS NOT NULL OR :pill = 'APPROVED' OR cs.status <> 'COMPLETED')))
+                   AND (:admissionStatus IS NOT NULL OR :pill IN ('REVIEWED', 'APPROVED') OR cs.status <> 'COMPLETED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
@@ -255,6 +255,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
                        com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
                        com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
                        com.rtms.backend.admission.enums.AdmissionStatus.REJECTED))
+               OR (:pill = 'REVIEWED' AND cs.status = 'COMPLETED')
                OR (:pill = 'APPROVED'
                    AND ((cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED
                          AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.REJECTED
@@ -290,7 +291,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
           AND cs.veterinarianId = :vetId
           AND ((:scheduleStatus IS NOT NULL AND cs.status = :scheduleStatus)
                OR (:scheduleStatus IS NULL
-                   AND (:admissionStatus IS NOT NULL OR :pill = 'APPROVED' OR cs.status <> 'COMPLETED')))
+                   AND (:admissionStatus IS NOT NULL OR :pill IN ('REVIEWED', 'APPROVED') OR cs.status <> 'COMPLETED')))
           AND (:searching = false OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(COALESCE(c.breed, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                OR CAST(a.id AS string) LIKE CONCAT('%', :search, '%'))
@@ -324,6 +325,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
                        com.rtms.backend.admission.enums.AdmissionStatus.MANAGER_REVIEW,
                        com.rtms.backend.admission.enums.AdmissionStatus.APPROVED,
                        com.rtms.backend.admission.enums.AdmissionStatus.REJECTED))
+               OR (:pill = 'REVIEWED' AND cs.status = 'COMPLETED')
                OR (:pill = 'APPROVED'
                    AND ((cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.COMPLETED
                          AND a.status <> com.rtms.backend.admission.enums.AdmissionStatus.REJECTED
@@ -385,6 +387,13 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
                    )))
     """)
     long countApprovedVetQueueItems(@Param("vetId") Long vetId, @Param("statuses") Collection<CareScheduleStatus> statuses);
+
+    @Query("""
+        SELECT COUNT(cs.id) FROM CareSchedule cs, AdmissionApplication a, CandidateHorseProfile c
+        WHERE cs.admissionId = a.id AND c.admissionId = a.id AND cs.veterinarianId = :vetId
+          AND cs.status = 'COMPLETED'
+    """)
+    long countReviewedVetQueueItems(@Param("vetId") Long vetId);
 
 
     boolean existsByHorseIdAndStatusInAndIdNot(Long horseId, Collection<CareScheduleStatus> statuses, Long id);

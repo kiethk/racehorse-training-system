@@ -7,11 +7,8 @@ import { PdfViewer } from '@/components/ui/PdfViewer';
 import { openBlobInTab, openProtectedFile } from '@/lib/protectedFile';
 import { toast } from '@/lib/toast';
 import { displayError } from '@/lib/display';
-import { admissionsApi } from '../../services/api';
 import type { AdmissionDocument } from '../../types';
-import { isImageDocument, isPdfDocument } from '../lib/documentKind';
-
-type LoadedFile = { url: string; kind: 'image' | 'pdf' | 'unsupported'; blob: Blob };
+import { useAdmissionDocumentFile } from './useAdmissionDocumentFile';
 
 export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: {
   document: AdmissionDocument;
@@ -21,8 +18,7 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const [file, setFile] = useState<LoadedFile | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { file, error, setError } = useAdmissionDocumentFile(document);
   const [zoom, setZoom] = useState(100);
   const filename = document.originalFileName || label;
 
@@ -38,41 +34,6 @@ export function AdmissionDocumentPreview({ document, label, fileUrl, onClose }: 
       if (previousFocus instanceof HTMLElement) previousFocus.focus();
     };
   }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let objectUrl: string | undefined;
-    admissionsApi.getDocumentFile(document.fileUrl, controller.signal).then((rawBlob) => {
-      if (controller.signal.aborted) return;
-      const fn = (document.originalFileName || '').toLowerCase();
-      const urlPath = document.fileUrl.split('?')[0].toLowerCase();
-      const isPdf = rawBlob.type === 'application/pdf'
-        || fn.endsWith('.pdf')
-        || urlPath.endsWith('.pdf')
-        || isPdfDocument(document);
-      const isImage = ['image/jpeg', 'image/png', 'image/webp'].includes(rawBlob.type)
-        || /\.(jpe?g|png|webp)$/i.test(fn)
-        || isImageDocument(document);
-
-      let blob = rawBlob;
-      if (isPdf && rawBlob.type !== 'application/pdf') {
-        blob = new Blob([rawBlob], { type: 'application/pdf' });
-      } else if (isImage && !['image/jpeg', 'image/png', 'image/webp'].includes(rawBlob.type)) {
-        const mime = fn.endsWith('.png') ? 'image/png' : fn.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
-        blob = new Blob([rawBlob], { type: mime });
-      }
-
-      objectUrl = URL.createObjectURL(blob);
-      const kind = isImage ? 'image' : isPdf ? 'pdf' : 'unsupported';
-      setFile({ url: objectUrl, kind, blob });
-    }).catch(() => {
-      if (!controller.signal.aborted) setError('Unable to load this file. Try opening it in a new tab.');
-    });
-    return () => {
-      controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [document]);
 
   const actionClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]';
 

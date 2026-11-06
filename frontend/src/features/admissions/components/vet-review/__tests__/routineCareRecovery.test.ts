@@ -7,7 +7,7 @@ import {
 import type { PrescriptionFormItem } from '../../../../medical/types/index.ts';
 
 describe('Track 3a & 3b & 3d — Routine Care Prescriptions, Condition Recovery & Recheck Calculation', () => {
-  it('toPrescriptionRequests: converts form items and filters out unselected medications', () => {
+  it('toPrescriptionRequests: converts named prescription items and filters blank names', () => {
     const items: PrescriptionFormItem[] = [
       {
         id: 'rx-1',
@@ -15,8 +15,9 @@ describe('Track 3a & 3b & 3d — Routine Care Prescriptions, Condition Recovery 
         dosage: ' 4.4 mg/kg ',
         route: 'ORAL',
         frequency: ' SID ',
-        duration: 7,
-        notes: ' Administer with morning grain feed ',
+        startDate: '2026-11-01',
+        endDate: '2026-11-08',
+        instructions: ' Administer with morning grain feed ',
       },
       {
         id: 'rx-2',
@@ -24,17 +25,19 @@ describe('Track 3a & 3b & 3d — Routine Care Prescriptions, Condition Recovery 
         dosage: '',
         route: 'TOPICAL',
         frequency: 'BID',
-        duration: 3,
-        notes: '',
+        startDate: '2026-11-01',
+        endDate: '2026-11-04',
+        instructions: '',
       },
       {
         id: 'rx-3',
         medicationName: 'Flunixin Meglumine',
         dosage: '10 ml',
-        route: 'INJECTION_IV',
+        route: 'ORAL',
         frequency: 'EOD',
-        duration: 5,
-        notes: '',
+        startDate: '2026-11-01',
+        endDate: '2026-11-06',
+        instructions: '',
       },
     ];
 
@@ -46,16 +49,18 @@ describe('Track 3a & 3b & 3d — Routine Care Prescriptions, Condition Recovery 
       dosage: '4.4 mg/kg',
       route: 'ORAL',
       frequency: 'SID',
-      duration: 7,
-      notes: 'Administer with morning grain feed',
+      startDate: '2026-11-01',
+        endDate: '2026-11-08',
+        instructions: 'Administer with morning grain feed',
     });
     assert.deepEqual(requests[1], {
       medicationName: 'Flunixin Meglumine',
       dosage: '10 ml',
-      route: 'INJECTION_IV',
+      route: 'ORAL',
       frequency: 'EOD',
-      duration: 5,
-      notes: undefined,
+      startDate: '2026-11-01',
+      endDate: '2026-11-06',
+      instructions: '',
     });
   });
 

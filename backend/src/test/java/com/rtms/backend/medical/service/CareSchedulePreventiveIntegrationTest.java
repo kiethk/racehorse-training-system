@@ -6,6 +6,8 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
+import com.rtms.backend.identity.entity.Role;
+import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
@@ -22,6 +24,9 @@ import com.rtms.backend.medical.enums.VaccinationSource;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import org.junit.jupiter.api.DisplayName;
 
@@ -40,6 +45,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -81,9 +87,9 @@ class CareSchedulePreventiveIntegrationTest {
         service = new CareScheduleService(schedules, horses, healthRecords, metrics, admissions, stalls, users,
                 incidents, profiles, audits, events, entityManager, notifications,
                 new TrainingDecisionService(horses, schedules, workouts), vaccinations,
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                new com.fasterxml.jackson.databind.ObjectMapper());
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class));
 
         horse = new Horse();
         horse.setId(10L);
@@ -139,7 +145,7 @@ class CareSchedulePreventiveIntegrationTest {
         CompleteCareScheduleRequest request = request();
         request.setVaccinations(List.of(vaccination(1L)));
         when(vaccinations.validate(any(), any())).thenThrow(new ApiException(
-                org.springframework.http.HttpStatus.BAD_REQUEST, "INVALID_VACCINATION", "bad"));
+                HttpStatus.BAD_REQUEST, "INVALID_VACCINATION", "bad"));
 
         assertThrows(ApiException.class, () -> service.completeCareSchedule(100L, request, 20L));
 
@@ -295,10 +301,10 @@ class CareSchedulePreventiveIntegrationTest {
         return schedule;
     }
 
-    private static com.rtms.backend.identity.entity.User manager() {
-        com.rtms.backend.identity.entity.Role role = new com.rtms.backend.identity.entity.Role();
+    private static User manager() {
+        Role role = new Role();
         role.setName("CLUB_MANAGER");
-        com.rtms.backend.identity.entity.User user = new com.rtms.backend.identity.entity.User();
+        User user = new User();
         user.setId(1L);
         user.setRole(role);
         return user;

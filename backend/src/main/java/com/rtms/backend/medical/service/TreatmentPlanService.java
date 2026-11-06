@@ -1,6 +1,7 @@
 package com.rtms.backend.medical.service;
 
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.dto.CreatePrescriptionRequest;
 import com.rtms.backend.medical.dto.CreateTreatmentPlanRequest;
 import com.rtms.backend.medical.dto.PrescriptionResponse;
@@ -28,7 +29,7 @@ public class TreatmentPlanService {
     private final HealthRecordRepository healthRecordRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final PrescriptionRepository prescriptionRepository;
-    private final com.rtms.backend.identity.repository.UserRepository userRepository;
+    private final UserRepository userRepository;
 
     public TreatmentPlanService(
             HealthRecordRepository healthRecordRepository,
@@ -43,7 +44,7 @@ public class TreatmentPlanService {
             HealthRecordRepository healthRecordRepository,
             TreatmentPlanRepository treatmentPlanRepository,
             PrescriptionRepository prescriptionRepository,
-            com.rtms.backend.identity.repository.UserRepository userRepository)
+            UserRepository userRepository)
     {
         this.healthRecordRepository = healthRecordRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;
@@ -122,6 +123,8 @@ public class TreatmentPlanService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HEALTH_RECORD_NOT_FOUND", "Health record not found with id: " + plan.getHealthRecordId()));
 
         verifyVetAccess(record, currentUser);
+
+        rejectInjectionRoute(request.getRoute());
 
         validateDates(request.getStartDate(), request.getEndDate());
 
@@ -237,5 +240,16 @@ public class TreatmentPlanService {
         if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", "Start date cannot be after end date");
         }
+    }
+
+    private void rejectInjectionRoute(String route) {
+        if (!TreatmentRoutes.isAllowedTreatmentRoute(route)) {
+            throw injectionNotAllowed();
+        }
+    }
+
+    private ApiException injectionNotAllowed() {
+        return new ApiException(HttpStatus.BAD_REQUEST, "INJECTION_NOT_ALLOWED",
+                "Treatment plans cannot contain injections");
     }
 }

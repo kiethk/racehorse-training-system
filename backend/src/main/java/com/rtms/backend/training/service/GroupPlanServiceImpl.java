@@ -54,7 +54,9 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -375,8 +377,8 @@ public class GroupPlanServiceImpl implements GroupPlanService {
         }
         List<Long> planIds = plans.stream().map(GroupPlan::getId).toList();
         Map<Long, TrainingGroup> groupsById = groupRepository
-                .findAllById(plans.stream().map(GroupPlan::getGroupId).filter(java.util.Objects::nonNull).collect(Collectors.toSet()))
-                .stream().collect(Collectors.toMap(TrainingGroup::getId, java.util.function.Function.identity()));
+                .findAllById(plans.stream().map(GroupPlan::getGroupId).filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(TrainingGroup::getId, Function.identity()));
         Map<Long, String> courseNames = courseNames(plans.stream().map(GroupPlan::getCourseId).toList());
         Map<Long, Map<SessionStatus, Long>> counts = sessionRepository.countByPlanAndStatus(planIds).stream()
                 .collect(Collectors.groupingBy(PlanSessionCountRow::planId,
@@ -446,7 +448,7 @@ public class GroupPlanServiceImpl implements GroupPlanService {
         Integer sessions = course.getTotalSessions();
         if (sessions == null || sessions < TrainingLimits.MIN_COURSE_SESSIONS || sessions > TrainingLimits.MAX_COURSE_SESSIONS) {
             throw new ApiException(HttpStatus.CONFLICT, "COURSE_INVALID_SESSIONS", String.format(
-                    "Course '%s' has %s sessions; a course needs between %d and %d sessions to be assigned.",
+                    "Course '%s' has %s sessions. A course needs between %d and %d sessions to be assigned.",
                     course.getName(), sessions, TrainingLimits.MIN_COURSE_SESSIONS, TrainingLimits.MAX_COURSE_SESSIONS));
         }
     }

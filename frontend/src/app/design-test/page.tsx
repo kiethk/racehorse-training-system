@@ -10,6 +10,7 @@ import {
   BackLink,
   ConfirmDialog,
   EmptyState,
+  EntityLink,
   FieldLabel,
   FilterChips,
   FormField,
@@ -40,6 +41,7 @@ import {
   Textarea,
   Th,
   THead,
+  TurnstileWidget,
   Tooltip,
   Tr,
 } from '@/components/ui';
@@ -118,6 +120,7 @@ export default function DesignTestPage() {
           <IconButton icon="refresh" label="Refresh" />
           <IconButton icon="x" label="Close" size="sm" />
           <BackLink href="/design-test">Back to list</BackLink>
+          <EntityLink href="/manager/horses/1">Example horse</EntityLink>
         </div>
       </Section>
 
@@ -225,6 +228,17 @@ export default function DesignTestPage() {
               ]}
             />
           </div>
+        </Panel>
+      </Section>
+
+      <Section title="Turnstile widget">
+        <Panel padded>
+          <TurnstileWidget
+            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA'}
+            onVerify={() => undefined}
+            onExpire={() => undefined}
+            onError={() => undefined}
+          />
         </Panel>
       </Section>
 

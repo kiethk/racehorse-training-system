@@ -20,6 +20,9 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.service.TrainingDecisionService;
@@ -79,9 +82,9 @@ class CareSchedulePreemptionTest {
                 notifications,
                 trainingDecisionService,
                 mock(PreventiveVaccinationService.class),
-                mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                new com.fasterxml.jackson.databind.ObjectMapper()
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class)
         );
 
         when(schedules.save(any())).thenAnswer(inv -> inv.getArgument(0));

@@ -10,11 +10,9 @@ import type { MedicationRoute, PrescriptionFormItem, PrescriptionSectionProps } 
 import medicationsCatalog from '../data/medications.json';
 
 const ROUTE_OPTIONS: Array<{ value: MedicationRoute; label: string }> = [
-  { value: 'ORAL', label: 'Oral (Groom Administered)' },
-  { value: 'TOPICAL', label: 'Topical (Groom Administered)' },
-  { value: 'FEED_ADDITIVE', label: 'Feed Additive (Groom Administered)' },
-  { value: 'INJECTION_IV', label: 'Intravenous — IV (Veterinarian Administered)' },
-  { value: 'INJECTION_IM', label: 'Intramuscular — IM (Veterinarian Administered)' },
+  { value: 'ORAL', label: 'Oral' },
+  { value: 'TOPICAL', label: 'Topical' },
+  { value: 'FEED_ADDITIVE', label: 'Feed additive' },
 ];
 
 const MEDICATION_OPTIONS: CreatableComboboxOption[] = medicationsCatalog.map((m) => ({
@@ -40,8 +38,9 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
       dosage: '',
       route: 'ORAL',
       frequency: 'BID',
-      duration: 5,
-      notes: '',
+      startDate: new Date().toISOString().slice(0, 10),
+      endDate: new Date().toISOString().slice(0, 10),
+      instructions: '',
     };
     setPrescriptions((prev) => [...prev, newItem]);
   };
@@ -125,8 +124,6 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
       {prescriptions.length > 0 && (
         <div className="space-y-4">
           {prescriptions.map((rx, index) => {
-            const isVetRoute = rx.route === 'INJECTION_IV' || rx.route === 'INJECTION_IM';
-
             return (
               <div
                 key={rx.id}
@@ -204,32 +201,23 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
                     />
                   </FormField>
 
-                  <FormField label="Duration (days)" required error={fieldErrors[`rx.${rx.id}.duration`]}>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={365}
-                      disabled={isFormDisabled}
-                      value={rx.duration}
-                      onChange={(e) =>
-                        handleFieldChange(rx.id, 'duration', Math.max(1, parseInt(e.target.value || '1', 10)))
-                      }
-                    />
-                    <span className="text-[11px] text-[var(--color-text-muted)] mt-1 block">
-                      {isVetRoute ? 'Veterinarian administers' : 'Groom administers'}
-                    </span>
+                  <FormField label="Start date" required error={fieldErrors[`rx.${rx.id}.startDate`]}>
+                    <Input type="date" disabled={isFormDisabled} value={rx.startDate} onChange={(e) => handleFieldChange(rx.id, 'startDate', e.target.value)} />
+                  </FormField>
+                  <FormField label="End date" required error={fieldErrors[`rx.${rx.id}.endDate`]}>
+                    <Input type="date" disabled={isFormDisabled} value={rx.endDate} onChange={(e) => handleFieldChange(rx.id, 'endDate', e.target.value)} />
                   </FormField>
                 </div>
 
                 <FormField
-                  label="Notes (for Groom / Handler)"
-                  error={fieldErrors[`rx.${rx.id}.notes`]}
+                  label="Instructions"
+                  error={fieldErrors[`rx.${rx.id}.instructions`]}
                 >
                   <Input
                     disabled={isFormDisabled}
-                    placeholder="e.g. Administer with morning grain feed; monitor for colic signs"
-                    value={rx.notes}
-                    onChange={(e) => handleFieldChange(rx.id, 'notes', e.target.value)}
+                    placeholder="Enter medication instructions"
+                    value={rx.instructions}
+                    onChange={(e) => handleFieldChange(rx.id, 'instructions', e.target.value)}
                   />
                 </FormField>
               </div>

@@ -24,6 +24,7 @@ public class TodayTaskItemResponse {
 
     private Long horseId;
     private String horseName;
+    private String stallCode;
     private String title;
     private String note;
 
@@ -62,6 +63,7 @@ public class TodayTaskItemResponse {
     public LocalTime getEndTime() { return endTime; }
     public Long getHorseId() { return horseId; }
     public String getHorseName() { return horseName; }
+    public String getStallCode() { return stallCode; }
     public String getTitle() { return title; }
     public String getNote() { return note; }
     public String getStatus() { return status; }
@@ -75,6 +77,11 @@ public class TodayTaskItemResponse {
         this.completionId = completionId;
         this.completionNote = note;
         this.completionPhotoUrls = photoUrls == null ? List.of() : photoUrls;
+        return this;
+    }
+
+    public TodayTaskItemResponse withStallCode(String stallCode) {
+        this.stallCode = stallCode;
         return this;
     }
 }

@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
+import { FileInput } from '@/components/ui/Input';
+import { ImageLightbox, ImageThumbnail } from '@/components/ui/ImageLightbox';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ListSkeleton } from '@/components/ui/states';
 import { Notice } from '@/components/ui/Notice';
@@ -17,7 +20,10 @@ import { AdmissionDetailHeader } from '../shared/components/AdmissionDetailHeade
 import { AdmissionPipeline } from '../shared/components/AdmissionPipeline';
 import { AdmissionDetailTabs } from '../shared/components/AdmissionDetailTabs';
 import { AdmissionDocumentsSection } from '../shared/components/AdmissionDocumentsSection';
+import { ArrivalPhotosBlock } from '../shared/components/ArrivalPhotosBlock';
 import { AdmissionInfoSection, AdmissionSideCard, InfoRow } from '../shared/components/AdmissionInfoSection';
+import { EntityLink } from '@/components/ui/EntityLink';
+import { entityHref } from '@/lib/entityRoute';
 
 function date(value: string | null) {
   return value ? formatDate(value) : 'Not recorded';
@@ -37,6 +43,40 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
   const [decision, setDecision] = useState<ReviewDecisionValue | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [confirmingArrival, setConfirmingArrival] = useState(false);
+  const [arrivalPhotos, setArrivalPhotos] = useState<{ file: File; url: string }[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
+  const photoUrls = useRef<Set<string>>(new Set());
+
+  useEffect(() => () => {
+    photoUrls.current.forEach(URL.revokeObjectURL);
+    photoUrls.current.clear();
+  }, []);
+
+  const addArrivalPhotos = (files: FileList | null) => {
+    if (!files?.length) return;
+    const selected = Array.from(files);
+    if (selected.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
+      toast.error('Arrival photos must be JPEG, PNG, or WebP');
+      return;
+    }
+    if (arrivalPhotos.length + selected.length > 5) {
+      toast.error('Attach at most 5 arrival photos');
+      return;
+    }
+    const additions = selected.map(file => {
+      const url = URL.createObjectURL(file);
+      photoUrls.current.add(url);
+      return { file, url };
+    });
+    setArrivalPhotos(current => [...current, ...additions]);
+  };
+
+  const removeArrivalPhoto = (url: string) => {
+    URL.revokeObjectURL(url);
+    photoUrls.current.delete(url);
+    setArrivalPhotos(current => current.filter(photo => photo.url !== url));
+    setSelectedPhoto(null);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,22 +132,24 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
     setSubmitting(true);
     setError(null);
     try {
-      const updated = await admissionsApi.confirmArrival(admissionId);
+      const updated = await admissionsApi.confirmArrival(admissionId, arrivalPhotos.map(photo => photo.file));
       setDetail(updated);
       setConfirmingArrival(false);
+      photoUrls.current.forEach(URL.revokeObjectURL);
+      photoUrls.current.clear();
+      setArrivalPhotos([]);
       onUpdated?.();
       if (updated.status === 'ARRIVAL_EXPIRED') {
         toast.warning('Arrival window expired',
           'The reservation was released. Ask an authorized manager to reopen the admission.');
       } else {
-        toast.success('Arrival confirmed',
-          'The horse was registered and the initial veterinary exam is being scheduled.');
+        toast.success('Arrival confirmed');
       }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Unable to confirm horse arrival.';
       setConfirmingArrival(false);
       setError(message);
-      toast.error('Arrival not confirmed', message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -146,8 +188,8 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
                 content: (
                   <>
                     <AdmissionInfoSection title="Horse and owner">
-                      <InfoRow label="Horse name" value={candidate.name} />
-                      <InfoRow label="Owner" value={detail.ownerName ? `${detail.ownerName} (ID ${detail.ownerId})` : `ID ${detail.ownerId}`} />
+                      <InfoRow label="Horse name" value={<EntityLink href={detail.horseId ? entityHref('horse', detail.horseId, 'GROOM', { stallCode: detail.quarantineStallCode }) : null}>{candidate.name}</EntityLink>} />
+                      <InfoRow label="Owner" value={<EntityLink href={entityHref('owner', detail.ownerId, 'GROOM')}>{detail.ownerName ? `${detail.ownerName} (ID ${detail.ownerId})` : `ID ${detail.ownerId}`}</EntityLink>} />
                       <InfoRow label="Horse ID" value={detail.horseId ? String(detail.horseId) : 'Created after arrival confirmation'} />
                       <InfoRow label="Groom feedback" value={detail.groomFeedback} />
                     </AdmissionInfoSection>
@@ -179,7 +221,7 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
               <InfoRow label="Available quarantine stalls" value={String(capacity?.availableQuarantineStalls ?? '—')} />
               <InfoRow label="Available regular stalls" value={String(capacity?.availableRegularStalls ?? '—')} />
               <InfoRow label="Occupied quarantine stalls" value={String(capacity?.occupiedQuarantineStalls ?? '—')} />
-              {detail.quarantineStallCode && <InfoRow label="Assigned Q stall" value={detail.quarantineStallCode} />}
+              {detail.quarantineStallCode && <InfoRow label="Assigned Q stall" value={<EntityLink href={entityHref('stall', detail.quarantineStallCode, 'GROOM')}>{detail.quarantineStallCode}</EntityLink>} />}
               {detail.arrivalDeadlineAt && <InfoRow label="Arrival deadline" value={formatDateTime(detail.arrivalDeadlineAt)} />}
               <Notice tone={isReady ? 'success' : 'warning'}>
                 {isReady ? 'Capacity is sufficient for admission.' : blockingText}
@@ -188,6 +230,13 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
                 )}
               </Notice>
             </AdmissionSideCard>
+
+            {detail.arrivedAt && (
+              <AdmissionSideCard title="Arrival">
+                <InfoRow label="Checked in at" value={formatDateTime(detail.arrivedAt)} />
+                <ArrivalPhotosBlock documents={detail.documents} />
+              </AdmissionSideCard>
+            )}
 
             {canReview && (
               <AdmissionSideCard title="Groom decision" tone="primary" className="space-y-3">
@@ -214,11 +263,28 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
 
             {detail.status === 'WAITING_FOR_ARRIVAL' && (
               <AdmissionSideCard title="Confirm horse arrival" tone="primary">
-                <p className="text-[var(--color-text-secondary)]">
-                  Quarantine stall {detail.quarantineStallCode || 'reserved'} is held until {detail.arrivalDeadlineAt ? formatDateTime(detail.arrivalDeadlineAt) : 'the 14-day arrival deadline'}.
-                  Confirm only after the horse physically arrives. Confirmation creates the horse record and schedules veterinary review.
-                </p>
-                <Button type="button" variant="primary" className="w-full" disabled={submitting} onClick={() => setConfirmingArrival(true)}>Mark horse arrived</Button>
+                <FileInput
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  aria-label="Arrival photos"
+                  disabled={submitting}
+                  onChange={event => {
+                    addArrivalPhotos(event.currentTarget.files);
+                    event.currentTarget.value = '';
+                  }}
+                />
+                <span className="text-sm text-[var(--color-text-secondary)]">{arrivalPhotos.length}/5 photos</span>
+                {arrivalPhotos.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {arrivalPhotos.map((photo, index) => (
+                      <div key={photo.url} className="relative">
+                        <ImageThumbnail src={photo.url} alt={`Arrival photo ${index + 1}`} onClick={() => setSelectedPhoto(index)} />
+                        <Button type="button" variant="secondary" size="sm" aria-label={`Remove arrival photo ${index + 1}`} onClick={() => removeArrivalPhoto(photo.url)} className="absolute right-1 top-1 p-1"><Icon name="x" size={14} /></Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Button type="button" variant="primary" className="w-full" disabled={submitting || arrivalPhotos.length === 0} onClick={() => setConfirmingArrival(true)}>Mark horse arrived</Button>
               </AdmissionSideCard>
             )}
 
@@ -252,11 +318,16 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
       <ConfirmDialog
         open={confirmingArrival}
         title="Confirm the horse has arrived?"
-        description="This creates the horse record in the reserved quarantine stall and schedules the initial veterinary exam. It cannot be undone."
         confirmLabel="Mark arrived"
         loading={submitting}
         onConfirm={() => void confirmArrival()}
         onCancel={() => { if (!submitting) setConfirmingArrival(false); }}
+      />
+      <ImageLightbox
+        images={arrivalPhotos.map((photo, index) => ({ src: photo.url, alt: `Arrival photo ${index + 1}` }))}
+        index={selectedPhoto}
+        onIndexChange={setSelectedPhoto}
+        onClose={() => setSelectedPhoto(null)}
       />
     </div>
   );
