@@ -46,14 +46,15 @@ BEGIN
         v_prev_ids BIGINT[];
         v_cs RECORD;
     BEGIN
-        -- Đảm bảo tất cả ca Routine và Initial đều lên lịch theo ngày (scheduled_at = NULL)
+        -- Đảm bảo tất cả ca Routine, Preventive và Initial đều lên lịch theo ngày (scheduled_at = NULL)
         -- và luôn ở trạng thái SCHEDULED (không có IN_PROGRESS)
         UPDATE care_schedule
            SET scheduled_at = NULL,
                status = 'SCHEDULED'
-         WHERE care_type IN ('ROUTINE', 'INITIAL') AND status IN ('IN_PROGRESS', 'PAUSED');
+         WHERE (care_type IN ('ROUTINE', 'INITIAL') OR purpose = 'PREVENTIVE')
+           AND status IN ('IN_PROGRESS', 'PAUSED');
 
-        UPDATE care_schedule SET scheduled_at = NULL WHERE care_type IN ('ROUTINE', 'INITIAL');
+        UPDATE care_schedule SET scheduled_at = NULL WHERE care_type IN ('ROUTINE', 'INITIAL') OR purpose = 'PREVENTIVE';
 
         -- Lấy các ca Routine lâm sàng (purpose != 'PREVENTIVE') hôm nay của VT01
         SELECT ARRAY_AGG(id ORDER BY id ASC) INTO v_routine_ids

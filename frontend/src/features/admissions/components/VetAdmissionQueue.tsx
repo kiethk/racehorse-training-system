@@ -642,7 +642,6 @@ export function VetAdmissionQueue() {
           }}
           options={[
             { value: 'ACTIVE', label: 'Active', count: summary.active ?? summary.total },
-            { value: 'IN_PROGRESS', label: 'In exam', count: summary.inProgress },
             { value: 'APPROVED', label: 'Approved', count: summary.approved ?? 0 },
           ]}
         />
@@ -690,11 +689,6 @@ export function VetAdmissionQueue() {
                 isVetStageCompleted(row.admissionStatus) ||
                 row.careSchedule?.status === 'COMPLETED' ||
                 queuePillFilter === 'APPROVED';
-              const effectiveCareType: CareType | undefined = isVetApproved
-                ? 'INITIAL'
-                : row.careSchedule?.careType;
-              const effectivePurpose = isVetApproved ? null : row.careSchedule?.purpose;
-              const priority = getPriorityBadge(effectiveCareType, effectivePurpose);
               const stallCode =
                 stallCodes[row.admissionId] ||
                 row.quarantineStallCode ||
@@ -725,26 +719,31 @@ export function VetAdmissionQueue() {
                         <div className="text-base font-bold text-[var(--color-text-primary)] truncate">
                           {row.candidateName}
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <Pill tone={priority.tone} size="sm" icon={priority.icon}>
-                            {priority.label}
-                          </Pill>
-                          <AdmissionStatusBadge status={row.admissionStatus} size="sm" />
-                          {status && status !== 'SCHEDULED' && (
-                            <Pill
-                              tone={getScheduleStatusDisplay(status).tone}
-                              size="sm"
-                              icon={getScheduleStatusDisplay(status).icon}
-                            >
-                              {getScheduleStatusDisplay(status).label}
-                            </Pill>
-                          )}
-                          {Boolean((row.careSchedule?.rolloverCount ?? 0) > 0) && (
-                            <Pill tone="warning" size="sm">
-                              Rolled {row.careSchedule?.rolloverCount}x
-                            </Pill>
-                          )}
-                        </div>
+                        {((status && status !== 'SCHEDULED' && status !== 'IN_PROGRESS') ||
+                          Boolean((row.careSchedule?.rolloverCount ?? 0) > 0) ||
+                          row.careSchedule?.rescheduleReason === 'PEER_OFFLOAD') && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {status && status !== 'SCHEDULED' && status !== 'IN_PROGRESS' && (
+                              <Pill
+                                tone={getScheduleStatusDisplay(status).tone}
+                                size="sm"
+                                icon={getScheduleStatusDisplay(status).icon}
+                              >
+                                {getScheduleStatusDisplay(status).label}
+                              </Pill>
+                            )}
+                            {Boolean((row.careSchedule?.rolloverCount ?? 0) > 0) && (
+                              <Pill tone="warning" size="sm">
+                                Rolled {row.careSchedule?.rolloverCount}x
+                              </Pill>
+                            )}
+                            {row.careSchedule?.rescheduleReason === 'PEER_OFFLOAD' && (
+                              <Pill tone="neutral" size="sm">
+                                Transferred
+                              </Pill>
+                            )}
+                          </div>
+                        )}
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                           <span className="inline-flex items-center gap-1 shrink-0">
                             <Icon name="building" size={12} />
