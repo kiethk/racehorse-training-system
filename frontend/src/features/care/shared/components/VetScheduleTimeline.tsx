@@ -86,9 +86,17 @@ export function VetScheduleTimeline() {
   const horseMap = useMemo(() => new Map(horses.map((h) => [h.id, h])), [horses]);
   const stallMap = useMemo(() => new Map(stalls.map((s) => [s.id, s.stallCode])), [stalls]);
 
+  // Today's schedules strictly matched by selectedDate to avoid any flash/leak when switching from week view
+  const todaySchedules = useMemo(() => {
+    return schedules.filter((s) => {
+      const dateIso = s.scheduledDate || (s.scheduledAt ? s.scheduledAt.split('T')[0] : null);
+      return dateIso === selectedDate;
+    });
+  }, [schedules, selectedDate]);
+
   // Sorted and filtered schedules for Today view
   const filteredSchedules = useMemo(() => {
-    return schedules
+    return todaySchedules
       .filter((s) => {
         if (careTypeFilter === 'ALL') return true;
         if (careTypeFilter === 'INITIAL') return s.careType === 'INITIAL';
@@ -98,15 +106,15 @@ export function VetScheduleTimeline() {
       })
       .filter((s) => (statusFilter === 'ALL' ? true : s.status === statusFilter))
       .sort((a, b) => new Date(a.scheduledAt || 0).getTime() - new Date(b.scheduledAt || 0).getTime());
-  }, [schedules, careTypeFilter, statusFilter]);
+  }, [todaySchedules, careTypeFilter, statusFilter]);
 
-  // Quick stats
+  // Quick stats computed specifically for today's selectedDate
   const stats = useMemo(() => {
     let initial = 0;
     let routine = 0;
     let preventive = 0;
 
-    for (const s of schedules) {
+    for (const s of todaySchedules) {
       if (s.careType === 'INITIAL') initial++;
       if (s.careType === 'ROUTINE') {
         if (s.purpose === 'PREVENTIVE') preventive++;
@@ -114,8 +122,8 @@ export function VetScheduleTimeline() {
       }
     }
 
-    return { total: schedules.length, initial, routine, preventive };
-  }, [schedules]);
+    return { total: todaySchedules.length, initial, routine, preventive };
+  }, [todaySchedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
     if (item.careType === 'INITIAL') {
@@ -428,7 +436,8 @@ export function VetScheduleTimeline() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
               {weekDays.map((dayIso) => {
                 const daySchedules = schedules.filter((s) => (s.scheduledDate ? s.scheduledDate === dayIso : s.scheduledAt?.startsWith(dayIso)));
-                const routineCount = daySchedules.filter((s) => s.careType === 'ROUTINE').length;
+                const routineClinical = daySchedules.filter((s) => s.careType === 'ROUTINE' && s.purpose !== 'PREVENTIVE').length;
+                const prevCount = daySchedules.filter((s) => s.careType === 'ROUTINE' && s.purpose === 'PREVENTIVE').length;
                 const admissionCount = daySchedules.filter((s) => s.careType === 'INITIAL').length;
                 const isToday = dayIso === formatLocalDateIso();
                 const [year, month, day] = dayIso.split('-').map(Number);
@@ -462,7 +471,9 @@ export function VetScheduleTimeline() {
                         </Pill>
                       </div>
                       <div className="mt-1 flex items-center gap-1 text-[10px] text-[var(--color-text-muted)] font-medium">
-                        <span>R: {routineCount}/4</span>
+                        <span>R: {routineClinical}/3</span>
+                        <span>·</span>
+                        <span>P: {prevCount}/3</span>
                         <span>·</span>
                         <span>A: {admissionCount}/2</span>
                       </div>
