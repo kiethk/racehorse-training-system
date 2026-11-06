@@ -200,8 +200,6 @@ public class AdmissionQueryService {
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         Page<AdmissionApplication> result = admissionApplicationRepository.findGroomQueue(
                 groomId,
-                stableStallRepository.isQuarantineGroom(groomId),
-                AdmissionStatus.GROOM_REVIEW,
                 status != null,
                 status == null ? AdmissionStatus.GROOM_REVIEW : status,
                 !nameFilter.isEmpty(),
@@ -249,6 +247,12 @@ public class AdmissionQueryService {
         response.setCandidate(candidate);
         response.setDocuments(documents.stream().map(this::toDocumentResponse).toList());
 
+        response.setAssignedGroomId(admission.getAssignedGroomId());
+        response.setAssignedGroomName(admission.getAssignedGroomId() == null ? null
+                : userRepository.findById(admission.getAssignedGroomId()).map(User::getFullName).orElse(null));
+        response.setGroomAssignedAt(admission.getGroomAssignedAt());
+        response.setGroomReviewDueAt(admission.getGroomReviewDueAt());
+        response.setAssignedGroomFull(isAssignedGroomFull(admission));
         response.setGroomId(admission.getGroomId());
         response.setGroomName(admission.getGroomId() == null ? null
                 : userRepository.findById(admission.getGroomId())
@@ -392,7 +396,7 @@ public class AdmissionQueryService {
 
     private AdmissionSummaryResponse summaryResponse(AdmissionApplication admission,
             CandidateHorseProfile candidate, String stallCode, String imageUrl) {
-        return new AdmissionSummaryResponse(
+        AdmissionSummaryResponse response = new AdmissionSummaryResponse(
                 admission.getId(),
                 admission.getStatus(),
                 candidate.getName(),
@@ -404,6 +408,14 @@ public class AdmissionQueryService {
                 imageUrl,
                 admission.getTrainerId(),
                 admission.getTrainerReviewedAt());
+        response.setGroomReviewDueAt(admission.getGroomReviewDueAt());
+        response.setAssignedGroomFull(isAssignedGroomFull(admission));
+        return response;
+    }
+
+    private boolean isAssignedGroomFull(AdmissionApplication admission) {
+        return admission.getAssignedGroomId() != null && stableStallRepository
+                .findGroomIdsWithFreeQuarantineStall(List.of(admission.getAssignedGroomId())).isEmpty();
     }
 
     /** Where a client loads this document from: always this API, which checks the viewer before serving the file. */
@@ -467,16 +479,14 @@ public class AdmissionQueryService {
 
     public List<AdmissionSummaryResponse> getAdmissionsForGroom(Long groomId, AdmissionStatus status) {
         return admissionApplicationRepository.findVisibleToGroom(groomId,
-                        stableStallRepository.isQuarantineGroom(groomId), AdmissionStatus.GROOM_REVIEW,
-                        status != null, status == null ? AdmissionStatus.GROOM_REVIEW : status).stream()
+                status != null, status == null ? AdmissionStatus.GROOM_REVIEW : status).stream()
                 .map(this::toSummaryResponse)
                 .toList();
     }
 
     /** Server-side read check for grooms; same scope as the queue (see AdmissionApplicationRepository.findGroomQueue). */
     public boolean isVisibleToGroom(Long admissionId, Long groomId) {
-        return admissionApplicationRepository.isVisibleToGroom(admissionId, groomId,
-                stableStallRepository.isQuarantineGroom(groomId), AdmissionStatus.GROOM_REVIEW);
+        return admissionApplicationRepository.isVisibleToGroom(admissionId, groomId);
     }
 
     /** Removes capacity/final-manager data that is unrelated to a Vet's assigned clinical work. */

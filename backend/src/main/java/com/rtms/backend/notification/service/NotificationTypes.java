@@ -6,6 +6,8 @@ package com.rtms.backend.notification.service;
  */
 public final class NotificationTypes {
 
+    public static final String ADMISSION_GROOM_REVIEW_ASSIGNED = "ADMISSION_GROOM_REVIEW_ASSIGNED";
+    public static final String ADMISSION_GROOM_REVIEW_REASSIGNED = "ADMISSION_GROOM_REVIEW_REASSIGNED";
     public static final String ADMISSION_VET_ASSIGNED = "ADMISSION_VET_ASSIGNED";
     public static final String ADMISSION_TRAINER_ASSIGNED = "ADMISSION_TRAINER_ASSIGNED";
     public static final String CARE_SCHEDULE_URGENT_ASSIGNED = "CARE_SCHEDULE_URGENT_ASSIGNED";

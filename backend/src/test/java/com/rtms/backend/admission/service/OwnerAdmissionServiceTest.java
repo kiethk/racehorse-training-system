@@ -20,6 +20,8 @@ import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.repository.StableStallRepository;
+import com.rtms.backend.event.AdmissionEnteredGroomReviewEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -49,6 +51,7 @@ class OwnerAdmissionServiceTest {
     private HorseRepository horses;
     private StableStallRepository stalls;
     private NotificationService notifications;
+    private ApplicationEventPublisher events;
     private OwnerAdmissionService service;
     private AtomicLong sequence;
 
@@ -62,8 +65,9 @@ class OwnerAdmissionServiceTest {
         horses = mock(HorseRepository.class);
         stalls = mock(StableStallRepository.class);
         notifications = mock(NotificationService.class);
+        events = mock(ApplicationEventPublisher.class);
         service = new OwnerAdmissionService(admissions, candidates, documents, files, uelnPolicy,
-                new PedigreeBirthDateValidator(horses), stalls, notifications);
+                new PedigreeBirthDateValidator(horses), stalls, notifications, events);
         sequence = new AtomicLong(100);
         when(admissions.save(any())).thenAnswer(inv -> {
             AdmissionApplication app = inv.getArgument(0);
@@ -105,6 +109,7 @@ class OwnerAdmissionServiceTest {
         assertEquals("Family notes", result.candidate().pedigreeNotes());
         assertEquals(HorseSex.MALE, result.candidate().sex());
         assertEquals(101L, result.admissionId());
+        verify(events).publishEvent(new AdmissionEnteredGroomReviewEvent(101L));
         assertTrue(result.documents().isEmpty());
         var admission = ArgumentCaptor.forClass(AdmissionApplication.class);
         verify(admissions, times(1)).save(admission.capture());
@@ -115,6 +120,31 @@ class OwnerAdmissionServiceTest {
         verify(candidates, times(1)).save(candidate.capture());
         assertEquals(101L, candidate.getValue().getAdmissionId());
         assertEquals(HorseSex.MALE, candidate.getValue().getSex());
+    }
+
+    @Test
+    void successfulSubmitPublishesGroomReviewEvent() {
+        List<AdmissionDocumentMetadataRequest> metadata = List.of(
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.HORSE_PHOTO, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.REGISTRATION_DOCUMENT, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.PEDIGREE_CERTIFICATE, null, null),
+                new AdmissionDocumentMetadataRequest(AdmissionDocumentType.VACCINATION_RECORD, null, null));
+        List<MultipartFile> uploads = metadata.stream()
+                .map(item -> (MultipartFile) new MockMultipartFile("files", "document.png", "image/png", new byte[]{1}))
+                .toList();
+        when(files.store(any(), anyString())).thenReturn("admissions/document.png");
+        when(documents.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            var result = service.submit(7L, request(), metadata, uploads);
+            verify(events).publishEvent(new AdmissionEnteredGroomReviewEvent(result.admissionId()));
+            assertEquals(4, result.documents().size());
+            verifyNoInteractions(notifications);
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test
@@ -346,18 +376,11 @@ class OwnerAdmissionServiceTest {
     }
 
     @Test
-    void creatingAnAdmissionNotifiesEveryQuarantineGroomOnce() {
-        when(stalls.findQuarantineGroomIds()).thenReturn(List.of(31L, 32L));
-
+    void creatingAnAdmissionPublishesAssignmentEventWithoutPoolNotifications() {
         var detail = service.create(9L, request());
-
-        for (Long groomId : List.of(31L, 32L)) {
-            verify(notifications).createNotification(eq(groomId), anyString(), anyString(),
-                    eq(NotificationTypes.ADMISSION_NEW_FOR_GROOM),
-                    eq("ADMISSION"), eq(detail.admissionId()),
-                    eq(groomId + ":ADMISSION_" + detail.admissionId() + ":ADMISSION_NEW_FOR_GROOM"));
-        }
-        verifyNoMoreInteractions(notifications);
+        verify(events).publishEvent(new AdmissionEnteredGroomReviewEvent(detail.admissionId()));
+        verifyNoInteractions(notifications);
+        verify(stalls, never()).findQuarantineGroomIds();
     }
 
     @Test
@@ -366,14 +389,13 @@ class OwnerAdmissionServiceTest {
         admission.setId(5L);
         admission.setStatus(AdmissionStatus.GROOM_REVIEW);
         when(admissions.findById(5L)).thenReturn(Optional.of(admission));
-        when(stalls.isQuarantineGroom(41L)).thenReturn(false);
-        when(admissions.isVisibleToGroom(5L, 41L, false, AdmissionStatus.GROOM_REVIEW)).thenReturn(false);
+        when(admissions.isVisibleToGroom(5L, 41L)).thenReturn(false);
         var groom = new AuthenticatedUser(41L, "g@x", "GROOM");
 
         assertThrows(AccessDeniedException.class,
                 () -> service.assertViewerCanRead(5L, groom));
 
-        when(admissions.isVisibleToGroom(5L, 41L, false, AdmissionStatus.GROOM_REVIEW)).thenReturn(true);
+        when(admissions.isVisibleToGroom(5L, 41L)).thenReturn(true);
         assertDoesNotThrow(() -> service.assertViewerCanRead(5L, groom));
     }
 

@@ -17,11 +17,11 @@ import com.rtms.backend.horse.service.PedigreeBirthDateValidator;
 
 
 import com.rtms.backend.horse.util.UelnUtils;
-import com.rtms.backend.notification.entity.Notification;
 import com.rtms.backend.notification.service.NotificationService;
-import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.repository.StableStallRepository;
+import com.rtms.backend.event.AdmissionEnteredGroomReviewEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -67,13 +67,14 @@ public class OwnerAdmissionService {
     private final PedigreeBirthDateValidator birthDates;
     private final StableStallRepository stalls;
     private final NotificationService notifications;
+    private final ApplicationEventPublisher events;
 
     public OwnerAdmissionService(AdmissionApplicationRepository admissions,
             CandidateHorseProfileRepository candidates, AdmissionDocumentRepository documents,
             FileStorageService fileStorage, AdmissionUelnPolicy uelnPolicy,
             PedigreeBirthDateValidator birthDates,
             StableStallRepository stalls,
-            NotificationService notifications) {
+            NotificationService notifications, ApplicationEventPublisher events) {
         this.admissions = admissions;
         this.candidates = candidates;
         this.documents = documents;
@@ -82,6 +83,7 @@ public class OwnerAdmissionService {
         this.birthDates = birthDates;
         this.stalls = stalls;
         this.notifications = notifications;
+        this.events = events;
     }
 
     /** The transaction creates exactly one new Application and one new immutable snapshot. */
@@ -114,7 +116,7 @@ public class OwnerAdmissionService {
         snapshot.setDamRegistrationNumber(damUeln);
         snapshot.setPedigreeNotes(trimNullable(request.pedigreeNotes()));
         candidates.save(snapshot);
-        notifyQuarantineGrooms(application, snapshot.getName());
+        events.publishEvent(new AdmissionEnteredGroomReviewEvent(application.getId()));
 
         return toDetail(application, snapshot, List.of());
     }
@@ -179,7 +181,7 @@ public class OwnerAdmissionService {
 
             savedDocuments.add(documents.save(document));
         }
-        notifyQuarantineGrooms(application, snapshot.getName());
+        events.publishEvent(new AdmissionEnteredGroomReviewEvent(application.getId()));
         return toDetail(application, snapshot, savedDocuments);
     }
 
@@ -284,22 +286,6 @@ public class OwnerAdmissionService {
         });
     }
 
-    /**
-     * Scenario A: every quarantine groom may pick up a new admission, so all of them hear about it.
-     * Written in the submit transaction, so a rolled-back submission leaves no notification behind.
-     */
-    private void notifyQuarantineGrooms(AdmissionApplication application, String horseName) {
-        String type = NotificationTypes.ADMISSION_NEW_FOR_GROOM;
-        String refType = NotificationTypes.REFERENCE_ADMISSION;
-        for (Long groomId : stalls.findQuarantineGroomIds()) {
-            notifications.createNotification(groomId, "New admission to review",
-                    horseName + " was submitted for admission and is waiting for groom review.",
-                    type, refType, application.getId(),
-                    Notification.buildDeduplicationKey(
-                            groomId, refType, application.getId(), type));
-        }
-    }
-
     @Transactional(readOnly = true)
     public List<AdmissionSummaryResponse> getMyAdmissions(Long ownerId, AdmissionStatus status) {
         return admissions.findByOwnerIdOrderBySubmittedAtDesc(ownerId).stream()
@@ -357,8 +343,7 @@ public class OwnerAdmissionService {
             case "CLUB_MANAGER" -> true;
             case "HORSE_OWNER" -> Objects.equals(admission.getOwnerId(), viewer.getUserId());
             case "HEAD_TRAINER" -> Objects.equals(admission.getTrainerId(), viewer.getUserId());
-            case "GROOM" -> admissions.isVisibleToGroom(admissionId, viewer.getUserId(),
-                    stalls.isQuarantineGroom(viewer.getUserId()), AdmissionStatus.GROOM_REVIEW);
+            case "GROOM" -> admissions.isVisibleToGroom(admissionId, viewer.getUserId());
             default -> false;
         };
         if (!allowed) throw new AccessDeniedException("Admission is not assigned to you");

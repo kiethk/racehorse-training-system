@@ -562,7 +562,6 @@ class AdmissionManagerReviewServiceTest {
         verify(groomProfileRepository).touchLastHorseAssignedAt(org.mockito.ArgumentMatchers.eq(33L), any());
         verify(admissionGroomReviewService).notifyGroomAssigned(org.mockito.ArgumentMatchers.same(admission),
                 org.mockito.ArgumentMatchers.same(regularStall), org.mockito.ArgumentMatchers.anyString());
-        verify(admissionGroomReviewService).allocateWaitingAdmissions();
     }
 
     @Test
@@ -581,6 +580,5 @@ class AdmissionManagerReviewServiceTest {
 
         assertEquals(StallStatus.AVAILABLE, quarantineStall.getStatus());
         assertEquals("Not a good fit", admission.getManagerFeedback());
-        verify(admissionGroomReviewService).allocateWaitingAdmissions();
     }
 }

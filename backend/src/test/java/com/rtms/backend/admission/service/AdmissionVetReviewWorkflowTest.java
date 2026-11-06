@@ -458,7 +458,6 @@ class AdmissionVetReviewWorkflowTest {
                 admission, "Desert Star", "Veterinary Clinical Review", "Chronic lameness not suitable for racing");
         verify(admissionNotificationService).notifyManagersOfAdmissionRejection(
                 admission, "Desert Star", "Veterinary Clinical Review", "Chronic lameness not suitable for racing");
-        verify(admissionGroomReviewService).allocateWaitingAdmissions();
         verify(healthRecordRepository, never()).save(any());
     }
 

@@ -1,5 +1,7 @@
 package com.rtms.backend.stable.service;
 
+import com.rtms.backend.admission.service.GroomAssignmentTriggers;
+
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.repository.*;
 import com.rtms.backend.security.AuthenticatedUser;
@@ -48,7 +50,7 @@ class StableAssignmentPostgresTest {
     @Autowired GroomProfileRepository profiles;
     @Autowired HorseRepository horses;
     @Autowired GroupWorkoutSyncService workouts;
-    @Autowired com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
+    @Autowired GroomAssignmentTriggers groomAssignmentTriggers;
     @Autowired EntityManager em;
     @Autowired AreaTrainerAssignmentPolicy trainerPolicy;
     @Autowired com.rtms.backend.identity.service.StaffManagementService staffManagement;
@@ -127,7 +129,7 @@ class StableAssignmentPostgresTest {
     }
     StableAssignmentService independentService(GroomProfileRepository profileRepository) {
         return new StableAssignmentService(areas, stalls, users, profileRepository, horses, workouts, em, trainerPolicy,
-                admissionAllocation);
+                groomAssignmentTriggers);
     }
     String emptyAssignmentJson(long target, long groom) {
         return "{\"groomAssignments\":[{\"areaId\":" + target + ",\"blockNumber\":1,\"groomId\":" + groom

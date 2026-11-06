@@ -96,6 +96,11 @@ export interface AdmissionDetailResponse {
 
   groomId: number | null;
   groomName?: string | null;
+  assignedGroomId: number | null;
+  assignedGroomName: string | null;
+  groomAssignedAt: string | null;
+  groomReviewDueAt: string | null;
+  assignedGroomFull: boolean;
   groomDecision: string | null;
   groomFeedback: string | null;
   groomReviewedAt: string | null;
@@ -472,8 +477,30 @@ export interface GroomQueueFilters {
   page: number;
 }
 
+export interface GroomQueueItem extends AdmissionSummaryResponse {
+  groomReviewDueAt: string | null;
+  assignedGroomFull: boolean;
+}
+
+export interface GroomAssignmentHistoryItem {
+  id: number;
+  groomId: number;
+  groomName: string;
+  assignedAt: string;
+  endedAt: string | null;
+  endReason: 'DECIDED' | 'OVERDUE' | 'FULL' | 'LOST_QUARANTINE' | 'MANUAL' | 'REOPENED' | null;
+  assignedByName: string | null;
+}
+
+export interface QuarantineGroomOption {
+  groomId: number;
+  name: string;
+  workload: number;
+  full: boolean;
+}
+
 export interface GroomQueueResponse {
-  content: AdmissionSummaryResponse[];
+  content: GroomQueueItem[];
   page: number;
   size: number;
   totalElements: number;

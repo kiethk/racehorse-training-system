@@ -74,3 +74,27 @@ _Avoid_: Recheck, Re-examination
 **Closed**:
 The end of an Incident Report whose Incident Case was cancelled, so no vet examined it; the reason stays on the report.
 _Avoid_: Dismissed, No issue
+
+### Admissions
+
+**Quarantine Groom**:
+A Groom who looks after at least one stall in a quarantine area. Only Quarantine Grooms can be given an Admission to review.
+
+**Assigned Groom**:
+The one Quarantine Groom an Admission in Groom review is given to. Only the Assigned Groom sees and decides it, and the same Groom keeps the horse in one of their own quarantine stalls when it arrives. An Admission is assigned even when every quarantine stall is taken, but it can only be approved once the Assigned Groom has a free quarantine stall.
+_Avoid_: Reviewer pool, any quarantine groom
+
+**Full**:
+A Quarantine Groom with no free quarantine stall left. A Full Groom can still reject an Admission but cannot approve one. When an approval makes a Groom Full, their Admissions still waiting for a decision are reassigned to the Quarantine Groom with a free stall and the lowest Groom Workload; if every Groom is Full they stay where they are.
+
+**Groom Workload**:
+The number of horses in a Groom's stalls plus the Admissions assigned to that Groom that are still waiting for the Groom's decision. The lower it is, the sooner the Groom gets the next Admission. On a tie, the Groom who last confirmed a horse's arrival longest ago (or never) goes first.
+_Avoid_: Load, capacity
+
+**Reassignment**:
+Handing an Admission in Groom review from its Assigned Groom to the Quarantine Groom with the next lowest Groom Workload who has not had it yet, because the Assigned Groom did not decide within 72 hours of being assigned, became Full, was deactivated or no longer looks after a quarantine stall. The 72 hours are counted around the clock and restart with every Reassignment. Once every Quarantine Groom has had it, the rotation starts again from the lowest Groom Workload. The Manager can also reassign an Admission by hand to any Quarantine Groom. The new Assigned Groom, the previous one and the Manager are told every time.
+_Avoid_: Escalation, transfer
+
+**Review Due**:
+The moment, 72 hours after the latest assignment, when an Admission still waiting for its Assigned Groom's decision is reassigned. Shown to the Groom and the Manager.
+_Avoid_: Deadline, SLA

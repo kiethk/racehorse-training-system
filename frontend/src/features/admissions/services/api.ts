@@ -7,6 +7,8 @@ import {
   CareScheduleDetail,
   CareScheduleFilters,
   CompleteCareScheduleRequest,
+  GroomAssignmentHistoryItem,
+  QuarantineGroomOption,
   GroomQueueFilters,
   GroomQueueResponse,
   GroomReviewRequest,
@@ -29,6 +31,18 @@ interface ApiResponse<T> {
 }
 
 export const admissionsApi = {
+  getGroomAssignments: async (id: number): Promise<GroomAssignmentHistoryItem[]> => {
+    const response = await apiGet<ApiResponse<GroomAssignmentHistoryItem[]>>(`/api/admissions/${id}/groom-assignments`);
+    return response.data;
+  },
+  getQuarantineGrooms: async (): Promise<QuarantineGroomOption[]> => {
+    const response = await apiGet<ApiResponse<QuarantineGroomOption[]>>('/api/admissions/quarantine-grooms');
+    return response.data;
+  },
+  reassignGroom: async (id: number, groomId: number): Promise<AdmissionDetailResponse> => {
+    const response = await apiPost<ApiResponse<AdmissionDetailResponse>>(`/api/admissions/${id}/groom-assignment`, { groomId });
+    return response.data;
+  },
   getDocumentFile: (fileUrl: string, signal?: AbortSignal): Promise<Blob> => apiGetBlob(fileUrl, signal),
   getGroomQueue: async (filters: GroomQueueFilters): Promise<GroomQueueResponse> => {
     const params = new URLSearchParams();
