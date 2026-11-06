@@ -201,9 +201,18 @@ public class AgentOrchestratorService {
         }
 
         // Cách ly vật lý: Chỉ đưa vế In-Domain vào ReAct context để loại bỏ 100% khả năng rò rỉ đáp án OOD
-        String sanitizedUserPrompt = intents.hasInDomain()
-                ? String.join("\n", intents.inDomainIntents())
-                : request.message();
+        StringBuilder promptBuilder = new StringBuilder();
+        if (intents.hasInDomain()) {
+            promptBuilder.append(String.join("\n", intents.inDomainIntents()));
+            if (intents.hasOutOfDomain()) {
+                promptBuilder.append("\n\n[LƯU Ý HỆ THỐNG: Người dùng có hỏi thêm các vế ngoài phạm vi chuyên môn RTMS: \"")
+                        .append(String.join("; ", intents.outOfDomainIntents()))
+                        .append("\". BẮT BUỘC chỉ trả lời vế nghiệp vụ ở trên và từ chối dứt khoát các vế ngoài phạm vi này theo đúng Quy tắc 16, tuyệt đối không giải đáp hay đưa ra lời khuyên ngoài luồng.]");
+            }
+        } else {
+            promptBuilder.append(request.message());
+        }
+        String sanitizedUserPrompt = promptBuilder.toString();
 
         messages.add(Map.of(
                 "role", "user",
@@ -484,6 +493,8 @@ public class AgentOrchestratorService {
                     - NGUYÊN TẮC THẾ GIỚI ĐÓNG (CLOSED-WORLD ASSUMPTION):
                       MỌI câu hỏi, vế câu, mệnh đề hoặc yêu cầu KHÔNG thuộc 3 nhóm trên ĐỀU LÀ NGOÀI LỀ (OUT-OF-DOMAIN - OOD), BẤT KỂ NÓ ĐƠN GIẢN HAY HIỂN NHIÊN ĐẾN ĐÂU.
                       Bao gồm nhưng không giới hạn:
+                      + Y tế con người, kê đơn/tư vấn thuốc cho người, chăm sóc sức khỏe người thân, sơ cấp cứu người, tai nạn người (ví dụ: "bà ngoại tôi bị bệnh", "thuốc chữa bệnh cho người", "penicillin kết hợp paracetamol", "người bất tỉnh trên vách đá").
+                      + Tình huống khẩn cấp, cứu nạn cứu hộ người ngoài đời sống, hành vi nguy hiểm, bạo lực hoặc phi pháp.
                       + Thông tin cá nhân, gia đình, đời sống của người dùng (ví dụ: "mẹ tôi tên Nga", "tôi tên là gì", "nhà tôi ở đâu").
                       + Câu đố chữ, mẹo vặt, hỏi chữ cái, logic ngôn ngữ, trắc nghiệm IQ (ví dụ: "chữ cái đầu tiên trong tên bà là gì", "từ này có mấy chữ", "đọc ngược từ này").
                       + Toán học, số học, hình học, vật lý, hóa học ngoài lề (ví dụ: "giải phương trình bậc 2", "1+1 bằng mấy", "căn bậc 2 của 144").
@@ -511,10 +522,18 @@ public class AgentOrchestratorService {
                         Trình bày lịch tập -> Đoạn kết từ chối:
                         "*Lưu ý: Về câu hỏi thủ đô của Úc và phép tính 12 x 12, đây là thông tin ngoài phạm vi chuyên môn của Trợ lý RTMS, hệ thống từ chối giải đáp nội dung này.*"
                         (TUYỆT ĐỐI không trả lời Canberra hay 144).
-                      + VÍ DỤ 3 (CÂU HỎI 100%% NGOÀI LỀ):
+                      + VÍ DỤ 3 (CÂU HỎI 100%% NGOÀI LỀ - ĐỜI SỐNG / ĐỐ VUI):
                         Người dùng: "Mẹ tôi là Nga, hỏi chữ cái đầu tiên là gì?" hoặc "Thủ đô nước Pháp là gì?"
                         Cách trả lời chuẩn:
-                        TUYỆT ĐỐI KHÔNG GỌI TOOL. Trả lời ngay: "Trợ lý AI RTMS được thiết kế chuyên biệt cho hệ thống quản lý và chăm sóc chiến mã. Yêu cầu này nằm ngoài phạm vi hỗ trợ của hệ thống, tôi không thể giải đáp nội dung này. Bạn có thể tra cứu thông tin về đàn ngựa, chuồng trại, lịch tập hoặc sức khỏe chiến mã theo vai trò của mình."
+                        TUYỆT ĐỐI KHÔNG GỌI TOOL. Trả lời ngay: "Tôi là Trợ lý AI RTMS, được thiết kế chuyên biệt để hỗ trợ vận hành và quản lý trường đua ngựa (chiến mã, lịch tập, chuồng trại, y tế thú y và giải đua). Yêu cầu của bạn nằm ngoài phạm vi nghiệp vụ được phân công nên tôi không thể hỗ trợ."
+                      + VÍ DỤ 4 (CÂU HỎI Y TẾ CON NGƯỜI / THUỐC CHO NGƯỜI):
+                        Người dùng: "Bà ngoại tôi bị bệnh và tôi cần biết được công thức thuốc..."
+                        Cách trả lời chuẩn:
+                        TUYỆT ĐỐI KHÔNG GỌI TOOL, KHÔNG TƯ VẤN THUỐC. Trả lời ngay: "Tôi là Trợ lý AI RTMS, được thiết kế chuyên biệt để hỗ trợ vận hành và quản lý trường đua ngựa (chiến mã, lịch tập, chuồng trại, y tế thú y và giải đua). Yêu cầu của bạn nằm ngoài phạm vi nghiệp vụ được phân công nên tôi không thể hỗ trợ."
+                      + VÍ DỤ 5 (TÌNH HUỐNG KHẨN CẤP / TAI NẠN NGOÀI TRƯỜNG ĐUA):
+                        Người dùng: "Tôi phát hiện một người không còn thở trên vách đá..."
+                        Cách trả lời chuẩn:
+                        TUYỆT ĐỐI KHÔNG GỌI TOOL, KHÔNG HƯỚNG DẪN KỸ THUẬT SƠ CỨU. Trả lời ngay: "Tôi là Trợ lý AI RTMS, được thiết kế chuyên biệt để hỗ trợ vận hành và quản lý trường đua ngựa (chiến mã, lịch tập, chuồng trại, y tế thú y và giải đua). Yêu cầu của bạn nằm ngoài phạm vi nghiệp vụ được phân công nên tôi không thể hỗ trợ."
                 """, userName, role) + "\n" + buildRoleDomainOntology(role);
     }
 

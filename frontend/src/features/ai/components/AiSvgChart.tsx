@@ -56,7 +56,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
       {/* Tiêu đề biểu đồ rõ ràng */}
       <div className="flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/70 px-3.5 py-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
             {isBar ? (
               <svg
                 width="13"
@@ -177,7 +177,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                           fontSize="13"
                           fontWeight="700"
                           fill="currentColor"
-                          className="text-emerald-600 dark:text-emerald-400 font-mono"
+                          className="text-[var(--color-primary)] font-mono"
                         >
                           {formatNumber(activeItem.value)}{' '}
                           <tspan fontSize="10" fontWeight="500">
@@ -228,8 +228,8 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                     onMouseLeave={() => setHoveredIndex(null)}
                     className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-1 text-xs transition-colors cursor-pointer ${
                       isHovered
-                        ? 'bg-emerald-500/10 dark:bg-emerald-400/15'
-                        : 'hover:bg-neutral-100 dark:hover:bg-neutral-800/60'
+                        ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                        : 'hover:bg-[var(--color-surface-muted)]'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -243,7 +243,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                       <span
                         className={`truncate text-[11px] ${
                           isHovered
-                            ? 'font-semibold text-emerald-700 dark:text-emerald-300'
+                            ? 'font-semibold text-[var(--color-primary)]'
                             : 'font-medium text-[var(--color-text-primary)]'
                         }`}
                       >
@@ -388,7 +388,7 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                             fill="currentColor"
                             className={
                               isHovered
-                                ? 'text-emerald-700 dark:text-emerald-300 font-semibold'
+                                ? 'text-[var(--color-primary)] font-semibold'
                                 : 'text-[var(--color-text-primary)]'
                             }
                           >
@@ -458,8 +458,8 @@ export function AiSvgChart({ config }: AiSvgChartProps) {
                 {activeItem.label}
               </span>
             </span>
-            <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-              {formatNumber(activeItem.value)}{' '}
+            <span className="font-mono font-semibold text-[var(--color-primary)]">
+              {activeItem.value.toLocaleString()}{' '}
               <span className="text-[10px] text-[var(--color-text-secondary)]">
                 ({activeItem.percentage.toFixed(1)}%)
               </span>

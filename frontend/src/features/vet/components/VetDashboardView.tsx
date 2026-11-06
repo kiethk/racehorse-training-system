@@ -27,6 +27,7 @@ import { VetTodayAgenda } from "./dashboard/VetTodayAgenda";
 import { VetImmediateAttention } from "./dashboard/VetImmediateAttention";
 import { VetClearanceWatchlist } from "./dashboard/VetClearanceWatchlist";
 import { VetExamActivityCard } from "./dashboard/VetExamActivityCard";
+import { KaplanMeierSurvivalChart } from "@/features/medical-analytics";
 
 export function VetDashboardView() {
   const router = useRouter();
@@ -232,9 +233,10 @@ export function VetDashboardView() {
         horseMap={horseMap}
       />
 
-      {/* TIER 5: Trends — full-width so the shared chart keeps readable labels (its min-width breaks side-by-side) */}
+      {/* TIER 5: Trends & Survival EDA Analysis */}
       <VetExamActivityCard />
       <HealthTrendCard hideCaption />
+      <KaplanMeierSurvivalChart />
 
       {/* Routine Check Modal */}
       <CreateRoutineModal

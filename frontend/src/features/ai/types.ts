@@ -42,7 +42,9 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   toolCalls?: string;
+  executedTools?: Record<string, unknown>[];
   pendingProposals?: unknown[];
-  status?: 'sending' | 'streaming' | 'done' | 'error';
+  status?: 'sending' | 'streaming' | 'done' | 'error' | 'stopped';
   errorMessage?: string;
+  isStopped?: boolean;
 }
