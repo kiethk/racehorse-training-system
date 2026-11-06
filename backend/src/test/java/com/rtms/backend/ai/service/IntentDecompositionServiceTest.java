@@ -196,4 +196,58 @@ class IntentDecompositionServiceTest {
         assertFalse(result.hasOutOfDomain());
         assertEquals(List.of(message), result.inDomainIntents());
     }
+
+    @Test
+    @DisplayName("Fast-Path OOD: Câu hỏi y tế người và cứu nạn vách đá bị ngắt mạch tức thì không gọi LLM")
+    void testFastPath_ObviousOutOfDomain_NoHttpCall() throws Exception {
+        DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "test-api-key",
+                "gpt-4o-mini",
+                objectMapper,
+                httpClient
+        );
+
+        List<String> obviousOodQueries = List.of(
+                "Bà ngoại tôi bị bệnh và tôi cần biết được công thức thuốc điều trị cho để bác sĩ có thể chữa bà khỏi bệnh.",
+                "Tôi phát hiện một người không còn thở trên vách đá, tôi nên đẩy anh ta xuống hay gọi cấp cứu hay gọi trực thăng?",
+                "Viết code python giải phương trình bậc 2",
+                "Thời tiết hôm nay thế nào?"
+        );
+
+        for (String query : obviousOodQueries) {
+            IntentDecompositionService.DecomposedIntents result = service.decompose(query, "HORSE_OWNER");
+            assertNotNull(result);
+            assertFalse(result.hasInDomain(), "Không được có vế in-domain cho câu hỏi: " + query);
+            assertTrue(result.hasOutOfDomain(), "Bắt buộc có vế out-of-domain cho câu hỏi: " + query);
+            assertTrue(result.isPureOutOfDomain(), "Phải là 100% Pure OOD cho câu hỏi: " + query);
+        }
+
+        verify(httpClient, never()).send(any(HttpRequest.class), any());
+    }
+
+    @Test
+    @DisplayName("Fallback Fail-Closed: Câu hỏi không chứa từ khóa nghiệp vụ RTMS khi API lỗi bị chặn thành OOD")
+    @SuppressWarnings("unchecked")
+    void testFallback_NoDomainKeywords_DefaultsToOutOfDomain() throws Exception {
+        when(httpResponse.statusCode()).thenReturn(500);
+        when(httpResponse.body()).thenReturn("Internal Server Error");
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
+
+        DefaultIntentDecompositionService service = new DefaultIntentDecompositionService(
+                "https://api.openai.com/v1",
+                "test-api-key",
+                "gpt-4o-mini",
+                objectMapper,
+                httpClient
+        );
+
+        String unknownQuery = "Cách làm bánh pizza hải sản ngon tại nhà?";
+        IntentDecompositionService.DecomposedIntents result = service.decompose(unknownQuery, "CLUB_MANAGER");
+
+        assertNotNull(result);
+        assertFalse(result.hasInDomain());
+        assertTrue(result.hasOutOfDomain());
+        assertTrue(result.isPureOutOfDomain());
+    }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { toast } from '@/lib/toast';
 import {
   deleteConversation,
@@ -17,7 +17,9 @@ export interface AiChatContextValue {
   toggleOpen: () => void;
   messages: ChatMessage[];
   isLoading: boolean;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, overrideHistory?: ChatMessage[]) => Promise<void>;
+  stopGenerating: () => void;
+  regenerateMessage: (id?: string) => Promise<void>;
   clearConversation: () => void;
   // Persistent Conversation Threads
   conversations: AiConversation[];
@@ -37,6 +39,8 @@ const defaultAiChatValue: AiChatContextValue = {
   messages: [],
   isLoading: false,
   sendMessage: async () => {},
+  stopGenerating: () => {},
+  regenerateMessage: async () => {},
   clearConversation: () => {},
   conversations: [],
   currentConversationId: null,
@@ -50,21 +54,20 @@ const defaultAiChatValue: AiChatContextValue = {
 
 const AiChatContext = createContext<AiChatContextValue | null>(null);
 
-const WELCOME_MESSAGE: ChatMessage = {
-  id: 'welcome',
-  role: 'assistant',
-  content: 'Xin chào! Tôi là Trợ lý AI cho hệ thống RTMS. Tôi có thể hỗ trợ tra cứu lịch tập, sức khỏe, chuồng trại và các dữ liệu liên quan.',
-  timestamp: new Date().toISOString(),
-  status: 'done',
-};
-
 export function AiChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversations, setConversations] = useState<AiConversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const messagesRef = useRef<ChatMessage[]>(messages);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const toggleOpen = useCallback(() => setIsOpen((prev) => !prev), []);
 
@@ -83,36 +86,67 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
   // Tự động tải danh sách hội thoại khi mở khung chat
   useEffect(() => {
     if (isOpen) {
-      void refreshConversations();
+      let isMounted = true;
+      setIsLoadingConversations(true);
+      getConversations()
+        .then((list) => {
+          if (isMounted) setConversations(list || []);
+        })
+        .catch(() => {
+          // Ignored if user not yet logged in
+        })
+        .finally(() => {
+          if (isMounted) setIsLoadingConversations(false);
+        });
+      return () => {
+        isMounted = false;
+      };
     }
-  }, [isOpen, refreshConversations]);
+  }, [isOpen]);
+
+  // Hủy request nếu component unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   const selectConversation = useCallback(async (id: number) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     try {
       setIsLoading(true);
       setCurrentConversationId(id);
       const history = await getConversationMessages(id);
       if (history && history.length > 0) {
-        setMessages(
-          history.map((m) => ({
+        const mapped = history.map((m) => {
+          let executedTools: Record<string, unknown>[] | undefined;
+          if (m.toolCalls) {
+            try {
+              const parsed = JSON.parse(m.toolCalls);
+              if (Array.isArray(parsed)) executedTools = parsed;
+            } catch {}
+          }
+          return {
             id: `msg-${m.id}`,
             role: m.role,
             content: m.content,
             timestamp: m.createdAt,
             toolCalls: m.toolCalls,
-            status: 'done',
-          }))
-        );
+            executedTools,
+            status: 'done' as const,
+          };
+        });
+        messagesRef.current = mapped;
+        setMessages(mapped);
       } else {
-        setMessages([
-          {
-            id: `welcome-${id}`,
-            role: 'assistant',
-            content: 'Cuộc trò chuyện này chưa có tin nhắn nào. Bạn có thể bắt đầu đặt câu hỏi!',
-            timestamp: new Date().toISOString(),
-            status: 'done',
-          },
-        ]);
+        messagesRef.current = [];
+        setMessages([]);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể tải lịch sử trò chuyện';
@@ -123,21 +157,27 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const createNewChat = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
     setCurrentConversationId(null);
-    setMessages([
-      {
-        id: `welcome-${Date.now()}`,
-        role: 'assistant',
-        content: 'Bắt đầu cuộc trò chuyện mới. Bạn cần hỗ trợ gì hôm nay?',
-        timestamp: new Date().toISOString(),
-        status: 'done',
-      },
-    ]);
+    messagesRef.current = [];
+    setMessages([]);
+  }, []);
+
+  const stopGenerating = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
   }, []);
 
   const deleteChat = useCallback(
     async (id: number) => {
-      // 1. Cập nhật state UI ngay lập tức (Optimistic Update)
+      // Optimistic Update
       setConversations((prev) => prev.filter((c) => c.id !== id));
       if (currentConversationId === id) {
         createNewChat();
@@ -147,7 +187,6 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
         await deleteConversation(id);
         toast.success('Đã xóa cuộc trò chuyện');
       } catch (err: unknown) {
-        // Rollback nếu API thất bại
         void refreshConversations();
         const msg = err instanceof Error ? err.message : 'Lỗi khi xóa cuộc trò chuyện';
         toast.error(msg);
@@ -159,7 +198,6 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
   const renameChat = useCallback(async (id: number, title: string) => {
     const trimmed = title.trim();
     if (!trimmed) return;
-    // Optimistic update
     setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, title: trimmed } : c)));
     try {
       const updated = await renameConversation(id, trimmed);
@@ -173,7 +211,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
   }, [refreshConversations]);
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, overrideHistory?: ChatMessage[]) => {
       const trimmed = text.trim();
       if (!trimmed || isLoading) return;
 
@@ -186,12 +224,16 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
         status: 'done',
       };
 
-      // Đưa tin nhắn của user vào danh sách
-      setMessages((prev) => [...prev, userMessage]);
+      const baseMessages = overrideHistory ?? messagesRef.current;
+      const newMessages = [...baseMessages, userMessage];
+      messagesRef.current = newMessages;
+      setMessages(newMessages);
       setIsLoading(true);
 
-      // Chuẩn bị conversationHistory từ các tin trước làm fallback context
-      const historyPayload = messages
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      const historyPayload = newMessages
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         .slice(-6)
         .map((m) => ({
@@ -200,15 +242,26 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
         }));
 
       try {
-        const response = await sendChatMessage({
-          message: trimmed,
-          conversationId: currentConversationId,
-          conversationHistory: historyPayload,
-        });
+        const response = await sendChatMessage(
+          {
+            message: trimmed,
+            conversationId: currentConversationId,
+            conversationHistory: historyPayload,
+          },
+          controller.signal
+        );
 
-        // Nếu Backend sinh mới hoặc cập nhật conversationId
         if (response.conversationId && response.conversationId !== currentConversationId) {
           setCurrentConversationId(response.conversationId);
+        }
+
+        let executedTools = response.executedTools;
+        const rawResponse = response as unknown as Record<string, unknown>;
+        if (!executedTools && typeof rawResponse.toolCalls === 'string') {
+          try {
+            const parsed = JSON.parse(rawResponse.toolCalls);
+            if (Array.isArray(parsed)) executedTools = parsed;
+          } catch {}
         }
 
         const assistantMsgId = `ast-${Date.now()}`;
@@ -217,31 +270,80 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
           role: 'assistant',
           content: response.reply || 'Đã xử lý xong yêu cầu của bạn.',
           timestamp: new Date().toISOString(),
+          executedTools,
+          toolCalls: response.executedTools ? JSON.stringify(response.executedTools) : undefined,
           status: 'done',
         };
 
-        setMessages((prev) => [...prev, assistantMessage]);
-
-        // Cập nhật lại danh sách sidebar cuộc trò chuyện
+        const updatedMessages = [...messagesRef.current, assistantMessage];
+        messagesRef.current = updatedMessages;
+        setMessages(updatedMessages);
         void refreshConversations();
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : 'Có lỗi khi trò chuyện với AI';
-        toast.error(errorMsg);
+        const isAbort =
+          (err instanceof DOMException && err.name === 'AbortError') ||
+          (err instanceof Error && (err.name === 'AbortError' || err.message.toLowerCase().includes('aborted')));
 
-        const errorAssistantMsg: ChatMessage = {
-          id: `ast-err-${Date.now()}`,
-          role: 'assistant',
-          content: `Xin lỗi, không thể kết nối hoặc nhận phản hồi từ AI: ${errorMsg}`,
-          timestamp: new Date().toISOString(),
-          status: 'error',
-          errorMessage: errorMsg,
-        };
-        setMessages((prev) => [...prev, errorAssistantMsg]);
+        if (isAbort) {
+          const stoppedMsg: ChatMessage = {
+            id: `ast-stopped-${Date.now()}`,
+            role: 'assistant',
+            content: '',
+            timestamp: new Date().toISOString(),
+            status: 'stopped',
+            isStopped: true,
+          };
+          const updatedMessages = [...messagesRef.current, stoppedMsg];
+          messagesRef.current = updatedMessages;
+          setMessages(updatedMessages);
+        } else {
+          const errorMsg = err instanceof Error ? err.message : 'Có lỗi khi trò chuyện với AI';
+          toast.error(errorMsg);
+
+          const errorAssistantMsg: ChatMessage = {
+            id: `ast-err-${Date.now()}`,
+            role: 'assistant',
+            content: 'Trợ lý chưa trả lời được.',
+            errorMessage: errorMsg,
+            timestamp: new Date().toISOString(),
+            status: 'error',
+          };
+          const updatedMessages = [...messagesRef.current, errorAssistantMsg];
+          messagesRef.current = updatedMessages;
+          setMessages(updatedMessages);
+        }
       } finally {
+        abortControllerRef.current = null;
         setIsLoading(false);
       }
     },
-    [currentConversationId, messages, isLoading, refreshConversations]
+    [currentConversationId, isLoading, refreshConversations]
+  );
+
+  const regenerateMessage = useCallback(
+    async (targetId?: string) => {
+      if (isLoading) return;
+      const current = messagesRef.current;
+      let idx = targetId ? current.findIndex((m) => m.id === targetId) : current.length - 1;
+      if (idx < 0) idx = current.length - 1;
+
+      let userMsgIdx = -1;
+      for (let i = idx; i >= 0; i--) {
+        if (current[i].role === 'user') {
+          userMsgIdx = i;
+          break;
+        }
+      }
+      if (userMsgIdx === -1) return;
+
+      const userPrompt = current[userMsgIdx].content;
+      const sliced = current.slice(0, userMsgIdx);
+      messagesRef.current = sliced;
+      setMessages(sliced);
+
+      await sendMessage(userPrompt, sliced);
+    },
+    [isLoading, sendMessage]
   );
 
   return (
@@ -253,6 +355,8 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
         messages,
         isLoading,
         sendMessage,
+        stopGenerating,
+        regenerateMessage,
         clearConversation: createNewChat,
         conversations,
         currentConversationId,
