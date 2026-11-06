@@ -65,6 +65,7 @@ export function UrgentAssignmentNotifier() {
       const scheduleId = Number(match[1]);
       if (!Number.isNaN(scheduleId)) {
         markAsSeen(scheduleId);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setAlerts((current) => current.filter((item) => item.scheduleId !== scheduleId));
       }
     }
