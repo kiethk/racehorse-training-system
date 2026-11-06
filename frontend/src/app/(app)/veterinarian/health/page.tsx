@@ -540,244 +540,167 @@ function HealthRecordsContent() {
 
             {/* Tab 1: Overview */}
             {activeTab === 'overview' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                  <Panel padded className="space-y-3 lg:col-span-2 border border-[var(--color-border)]">
-                    <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <Icon name="shield" size={16} className="text-[var(--color-primary)]" />
-                        <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
-                          Clinical Status & Training Clearance
-                        </h2>
-                      </div>
-                      <Pill tone={decision === 'ALLOWED' ? 'success' : 'danger'}>{decision}</Pill>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Panel padded className="space-y-3 border border-[var(--color-border)]">
+                  <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Icon name="shield" size={16} className="text-[var(--color-primary)]" />
+                      <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
+                        Clinical Status & Training Clearance
+                      </h2>
                     </div>
-                    {reason && (
-                      <div className="rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)]/20 p-2.5 text-xs text-[var(--color-warning)]">
-                        <strong>Clearance Reason:</strong> {reason}
-                      </div>
-                    )}
-                    {decision === 'BLOCKED' && (
-                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)]/20 p-2.5 text-xs">
-                        <span className="text-[var(--color-danger)] font-medium">
-                          {healthSummary?.pendingAdmissionId
-                            ? 'This horse is currently undergoing admission intake review (Quarantine Stall).'
-                            : followUpLoading
-                            ? 'Looking for an open follow-up examination…'
-                            : openFollowUp
-                              ? `Open follow-up #${openFollowUp.id}${
-                                  openFollowUp.scheduledAt ? ` · ${formatDate(openFollowUp.scheduledAt)}` : ''
-                                } — complete it to reassess clearance.`
-                              : 'No open follow-up examination for this horse. Schedule one in Routine Care to reassess clearance.'}
-                        </span>
-                        {healthSummary?.pendingAdmissionId ? (
-                          <LinkButton
-                            href={`/veterinarian/admissions?id=${healthSummary.pendingAdmissionId}`}
+                    <Pill tone={decision === 'ALLOWED' ? 'success' : 'danger'}>{decision}</Pill>
+                  </div>
+                  {reason && (
+                    <div className="rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)]/20 p-2.5 text-xs text-[var(--color-warning)]">
+                      <strong>Clearance Reason:</strong> {reason}
+                    </div>
+                  )}
+                  {decision === 'BLOCKED' && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)]/20 p-2.5 text-xs">
+                      <span className="text-[var(--color-danger)] font-medium">
+                        {healthSummary?.pendingAdmissionId
+                          ? 'This horse is currently undergoing admission intake review (Quarantine Stall).'
+                          : followUpLoading
+                          ? 'Looking for an open follow-up examination…'
+                          : openFollowUp
+                            ? `Open follow-up #${openFollowUp.id}${
+                                openFollowUp.scheduledAt ? ` · ${formatDate(openFollowUp.scheduledAt)}` : ''
+                              } — complete it to reassess clearance.`
+                            : 'No open follow-up examination for this horse. Schedule one in Routine Care to reassess clearance.'}
+                      </span>
+                      {healthSummary?.pendingAdmissionId ? (
+                        <LinkButton
+                          href={`/veterinarian/admissions?id=${healthSummary.pendingAdmissionId}`}
+                          size="sm"
+                          icon="clipboard"
+                          className="transition-all active:scale-[0.98]"
+                        >
+                          Review Admission
+                        </LinkButton>
+                      ) : !followUpLoading &&
+                        (openFollowUp ? (
+                          <Button
+                            variant="primary"
                             size="sm"
-                            icon="clipboard"
+                            icon="stethoscope"
+                            onClick={() => router.push(`/veterinarian/routine/${openFollowUp.id}`)}
                             className="transition-all active:scale-[0.98]"
                           >
-                            Review Admission
+                            Reassess clearance
+                          </Button>
+                        ) : (
+                          <LinkButton
+                            href="/veterinarian/routine"
+                            size="sm"
+                            icon="calendar"
+                            className="transition-all active:scale-[0.98]"
+                          >
+                            Open Routine Care
                           </LinkButton>
-                        ) : !followUpLoading &&
-                          (openFollowUp ? (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              icon="stethoscope"
-                              onClick={() => router.push(`/veterinarian/routine/${openFollowUp.id}`)}
-                              className="transition-all active:scale-[0.98]"
-                            >
-                              Reassess clearance
-                            </Button>
-                          ) : (
-                            <LinkButton
-                              href="/veterinarian/routine"
-                              size="sm"
-                              icon="calendar"
-                              className="transition-all active:scale-[0.98]"
-                            >
-                              Open Routine Care
-                            </LinkButton>
-                          ))}
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
-                      <div>
-                        <span className="text-[var(--color-text-muted)] font-semibold uppercase tracking-wider text-[11px] block">
-                          Last Examined
-                        </span>
-                        <span className="font-medium text-[var(--color-text-primary)]">
-                          {healthSummary?.lastExaminedAt
-                            ? formatDate(healthSummary.lastExaminedAt)
-                            : 'No examination on record'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[var(--color-text-muted)] font-semibold uppercase tracking-wider text-[11px] block">
-                          Last Diagnosis
-                        </span>
-                        <span className="font-medium text-[var(--color-text-primary)]">
-                          {healthSummary?.lastDiagnosis || 'None reported'}
-                        </span>
-                      </div>
+                        ))}
                     </div>
-                  </Panel>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
+                    <div>
+                      <span className="text-[var(--color-text-muted)] font-semibold uppercase tracking-wider text-[11px] block">
+                        Last Examined
+                      </span>
+                      <span className="font-medium text-[var(--color-text-primary)]">
+                        {healthSummary?.lastExaminedAt
+                          ? formatDate(healthSummary.lastExaminedAt)
+                          : 'No examination on record'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[var(--color-text-muted)] font-semibold uppercase tracking-wider text-[11px] block">
+                        Last Diagnosis
+                      </span>
+                      <span className="font-medium text-[var(--color-text-primary)]">
+                        {healthSummary?.lastDiagnosis || 'None reported'}
+                      </span>
+                    </div>
+                  </div>
+                </Panel>
 
-                  <Panel padded className="space-y-2 border border-[var(--color-border)]">
-                    <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <Icon name="heart-pulse" size={16} className="text-[var(--color-medical)]" />
-                        <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
-                          Latest Vitals Telemetry
-                        </h2>
-                      </div>
-                      {latestMetric && (
-                        <Button
-                          variant="tertiary"
-                          size="sm"
-                          icon="activity"
-                          onClick={() => handleTabChange('vitals')}
-                          className="text-[11px] text-[var(--color-primary)] p-0 h-auto"
-                        >
-                          View Trends →
-                        </Button>
+                <Panel padded className="space-y-2 border border-[var(--color-border)]">
+                  <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Icon name="heart-pulse" size={16} className="text-[var(--color-medical)]" />
+                      <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
+                        Latest Vitals Telemetry
+                      </h2>
+                    </div>
+                    {latestMetric && (
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        icon="activity"
+                        onClick={() => handleTabChange('vitals')}
+                        className="text-[11px] text-[var(--color-primary)] p-0 h-auto"
+                      >
+                        View Trends →
+                      </Button>
+                    )}
+                  </div>
+                  {latestMetric ? (
+                    <div className="grid grid-cols-2 gap-2.5 text-xs pt-1">
+                      {latestMetric.heartRate != null && (
+                        <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                          <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                            Heart Rate
+                          </span>
+                          <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                            {latestMetric.heartRate} bpm
+                          </span>
+                        </div>
+                      )}
+                      {latestMetric.temperature != null && (
+                        <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                          <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                            Temperature
+                          </span>
+                          <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                            {latestMetric.temperature} °C
+                          </span>
+                        </div>
+                      )}
+                      {latestMetric.respiratoryRate != null && (
+                        <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                          <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                            Respiration
+                          </span>
+                          <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                            {latestMetric.respiratoryRate} rpm
+                          </span>
+                        </div>
+                      )}
+                      {latestMetric.weight != null && (
+                        <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
+                          <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
+                            Weight
+                          </span>
+                          <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
+                            {latestMetric.weight} kg
+                          </span>
+                        </div>
+                      )}
+                      {latestMetric.hydrationStatus && (
+                        <div className="col-span-2 text-xs">
+                          <span className="text-[var(--color-text-muted)]">Hydration: </span>
+                          <span className="font-semibold">{latestMetric.hydrationStatus}</span>
+                        </div>
+                      )}
+                      {latestMetric.notes && (
+                        <div className="col-span-2 text-xs text-[var(--color-text-secondary)] italic">
+                          &quot;{latestMetric.notes}&quot;
+                        </div>
                       )}
                     </div>
-                    {latestMetric ? (
-                      <div className="grid grid-cols-2 gap-2.5 text-xs pt-1">
-                        {latestMetric.heartRate != null && (
-                          <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
-                            <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
-                              Heart Rate
-                            </span>
-                            <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
-                              {latestMetric.heartRate} bpm
-                            </span>
-                          </div>
-                        )}
-                        {latestMetric.temperature != null && (
-                          <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
-                            <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
-                              Temperature
-                            </span>
-                            <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
-                              {latestMetric.temperature} °C
-                            </span>
-                          </div>
-                        )}
-                        {latestMetric.respiratoryRate != null && (
-                          <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
-                            <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
-                              Respiration
-                            </span>
-                            <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
-                              {latestMetric.respiratoryRate} rpm
-                            </span>
-                          </div>
-                        )}
-                        {latestMetric.weight != null && (
-                          <div className="rounded bg-[var(--color-surface-subtle)] p-2 border border-[var(--color-border)]">
-                            <span className="text-[var(--color-text-muted)] block text-[10px] uppercase font-bold">
-                              Weight
-                            </span>
-                            <span className="font-metric text-sm font-bold text-[var(--color-text-primary)]">
-                              {latestMetric.weight} kg
-                            </span>
-                          </div>
-                        )}
-                        {latestMetric.hydrationStatus && (
-                          <div className="col-span-2 text-xs">
-                            <span className="text-[var(--color-text-muted)]">Hydration: </span>
-                            <span className="font-semibold">{latestMetric.hydrationStatus}</span>
-                          </div>
-                        )}
-                        {latestMetric.notes && (
-                          <div className="col-span-2 text-xs text-[var(--color-text-secondary)] italic">
-                            &quot;{latestMetric.notes}&quot;
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-[var(--color-text-muted)] pt-3">No telemetry recorded yet.</p>
-                    )}
-                  </Panel>
-                </div>
-
-                {/* Quick Clinical Section Jumpers */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Panel padded className="border border-[var(--color-border)] flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="rounded-full p-2.5 bg-[var(--color-surface-subtle)] text-[var(--color-primary)]">
-                        <Icon name="activity" size={18} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-[var(--color-text-primary)]">
-                          {chartMetrics.length} Telemetry Reading{chartMetrics.length === 1 ? '' : 's'}
-                        </div>
-                        <div className="text-xs text-[var(--color-text-muted)] truncate">
-                          {latestMetric ? `Latest: ${formatDate(latestMetric.recordedAt)}` : 'No readings logged'}
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleTabChange('vitals')}
-                      className="shrink-0 text-xs"
-                    >
-                      View Charts
-                    </Button>
-                  </Panel>
-
-                  <Panel padded className="border border-[var(--color-border)] flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`rounded-full p-2.5 ${injuries.length > 0 ? 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]' : 'bg-[var(--color-success-soft)] text-[var(--color-success)]'}`}>
-                        <Icon name={injuries.length > 0 ? 'alert-triangle' : 'check'} size={18} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-[var(--color-text-primary)]">
-                          {injuries.length > 0 ? `${injuries.length} Active Condition${injuries.length > 1 ? 's' : ''}` : 'No Active Injuries'}
-                        </div>
-                        <div className="text-xs text-[var(--color-text-muted)] truncate">
-                          {injuries.length > 0 ? `${injuries[0].injuryType} (${injuries[0].severity})` : 'Musculoskeletal clear'}
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleTabChange('injuries-preventive')}
-                      className="shrink-0 text-xs"
-                    >
-                      View Status
-                    </Button>
-                  </Panel>
-
-                  <Panel padded className="border border-[var(--color-border)] flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="rounded-full p-2.5 bg-[var(--color-surface-subtle)] text-[var(--color-info)]">
-                        <Icon name="clipboard" size={18} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-[var(--color-text-primary)]">
-                          {sortedRecords.length} Clinical Exam{sortedRecords.length === 1 ? '' : 's'}
-                        </div>
-                        <div className="text-xs text-[var(--color-text-muted)] truncate">
-                          {sortedRecords[0]?.examinedAt ? `Last: ${formatDate(sortedRecords[0].examinedAt)}` : 'No exam records'}
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleTabChange('records')}
-                      className="shrink-0 text-xs"
-                    >
-                      View History
-                    </Button>
-                  </Panel>
-                </div>
+                  ) : (
+                    <p className="text-xs text-[var(--color-text-muted)] pt-3">No telemetry recorded yet.</p>
+                  )}
+                </Panel>
               </div>
             )}
 
