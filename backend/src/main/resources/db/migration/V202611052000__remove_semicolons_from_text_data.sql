@@ -84,9 +84,16 @@ UPDATE treatment_plans
 SET instructions = regexp_replace(regexp_replace(instructions, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
 WHERE instructions LIKE '%;%';
 
-UPDATE care_schedule
-SET cancel_reason = regexp_replace(regexp_replace(cancel_reason, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
-WHERE cancel_reason LIKE '%;%';
+-- Guarded: V202611042100 drops care_schedule.cancel_reason earlier on a fresh database.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'care_schedule' AND column_name = 'cancel_reason') THEN
+        UPDATE care_schedule
+        SET cancel_reason = regexp_replace(regexp_replace(cancel_reason, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
+        WHERE cancel_reason LIKE '%;%';
+    END IF;
+END $$;
 
 UPDATE care_schedule
 SET description = regexp_replace(regexp_replace(description, ';\s*$', '', 'g'), '\s*;\s*', ', ', 'g'), updated_at = now()
