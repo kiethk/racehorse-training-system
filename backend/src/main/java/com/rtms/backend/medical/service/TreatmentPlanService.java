@@ -1,6 +1,7 @@
 package com.rtms.backend.medical.service;
 
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.medical.dto.CreatePrescriptionRequest;
 import com.rtms.backend.medical.dto.CreateTreatmentPlanRequest;
 import com.rtms.backend.medical.dto.PrescriptionResponse;
@@ -28,7 +29,7 @@ public class TreatmentPlanService {
     private final HealthRecordRepository healthRecordRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final PrescriptionRepository prescriptionRepository;
-    private final com.rtms.backend.identity.repository.UserRepository userRepository;
+    private final UserRepository userRepository;
 
     public TreatmentPlanService(
             HealthRecordRepository healthRecordRepository,
@@ -43,7 +44,7 @@ public class TreatmentPlanService {
             HealthRecordRepository healthRecordRepository,
             TreatmentPlanRepository treatmentPlanRepository,
             PrescriptionRepository prescriptionRepository,
-            com.rtms.backend.identity.repository.UserRepository userRepository)
+            UserRepository userRepository)
     {
         this.healthRecordRepository = healthRecordRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;

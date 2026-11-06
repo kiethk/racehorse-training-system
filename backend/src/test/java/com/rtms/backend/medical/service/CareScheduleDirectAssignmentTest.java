@@ -16,6 +16,9 @@ import com.rtms.backend.medical.enums.CareType;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.medical.repository.HealthRecordRepository;
 import com.rtms.backend.medical.repository.HorseHealthMetricRepository;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.incident.entity.HorseIncidentReport;
 import com.rtms.backend.incident.enums.IncidentSeverity;
@@ -78,10 +81,10 @@ class CareScheduleDirectAssignmentTest {
                 mock(EntityManager.class),
                 mock(NotificationService.class),
                 new TrainingDecisionService(horses, schedules, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class));
+                mock(PreventiveVaccinationService.class),
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class));
         when(schedules.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(schedules.findScheduledForHorse(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
         when(schedules.findScheduledForVet(anyLong(), eq(CareScheduleStatus.SCHEDULED))).thenReturn(List.of());
@@ -334,7 +337,7 @@ class CareScheduleDirectAssignmentTest {
         assertEquals(2L, incident.getHandledById());
         assertNotNull(incident.getHandledAt());
         verify(incidents).save(incident);
-        verify(events).publishEvent(any(com.rtms.backend.event.UrgentAssignmentCommittedEvent.class));
+        verify(events).publishEvent(any(UrgentAssignmentCommittedEvent.class));
     }
 
     @Test

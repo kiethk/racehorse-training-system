@@ -18,6 +18,10 @@ import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.UserRepository;
+import com.rtms.backend.medical.entity.InjuryRecord;
+import com.rtms.backend.medical.repository.InjuryRecordRepository;
+import com.rtms.backend.medical.repository.PrescriptionRepository;
+import com.rtms.backend.medical.repository.TreatmentPlanRepository;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
@@ -133,10 +137,10 @@ class AdmissionVetReviewWorkflowTest {
                 entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
+                mock(PreventiveVaccinationService.class),
+                mock(InjuryRecordRepository.class),
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class)
         );
 
         admissionQueryService = new AdmissionQueryService(
@@ -662,7 +666,7 @@ class AdmissionVetReviewWorkflowTest {
         req.setTrainingDecision(TrainingDecision.ALLOWED);
         CreateNextScheduleRequest next = new CreateNextScheduleRequest();
         next.setCareType(CareType.ROUTINE);
-        next.setScheduledDate(java.time.LocalDate.now().plusDays(3).toString());
+        next.setScheduledDate(LocalDate.now().plusDays(3).toString());
         next.setDescription("Recheck urgent case");
         req.setNextSchedule(next);
         HorseHealthMetricRequest m = new HorseHealthMetricRequest();
@@ -749,9 +753,9 @@ class AdmissionVetReviewWorkflowTest {
         admission.setHorseId(horseId);
         admission.setStatus(AdmissionStatus.VET_REVIEW);
 
-        com.rtms.backend.medical.repository.InjuryRecordRepository injuryRepo =
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.InjuryRecordRepository.class);
-        when(injuryRepo.save(any(com.rtms.backend.medical.entity.InjuryRecord.class))).thenAnswer(i -> i.getArgument(0));
+        InjuryRecordRepository injuryRepo =
+                mock(InjuryRecordRepository.class);
+        when(injuryRepo.save(any(InjuryRecord.class))).thenAnswer(i -> i.getArgument(0));
 
         CareScheduleService serviceWithInjuryRepo = new CareScheduleService(
                 careScheduleRepository,
@@ -768,10 +772,10 @@ class AdmissionVetReviewWorkflowTest {
                 entityManager,
                 notificationService,
                 new TrainingDecisionService(horseRepository, careScheduleRepository, workoutService),
-                org.mockito.Mockito.mock(PreventiveVaccinationService.class),
+                mock(PreventiveVaccinationService.class),
                 injuryRepo,
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.TreatmentPlanRepository.class),
-                org.mockito.Mockito.mock(com.rtms.backend.medical.repository.PrescriptionRepository.class)
+                mock(TreatmentPlanRepository.class),
+                mock(PrescriptionRepository.class)
         );
 
         when(careScheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));

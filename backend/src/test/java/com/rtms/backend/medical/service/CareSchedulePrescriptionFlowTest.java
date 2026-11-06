@@ -11,6 +11,7 @@ import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.medical.dto.CompleteCareScheduleRequest;
 import com.rtms.backend.medical.dto.CreateNextScheduleRequest;
+import com.rtms.backend.medical.dto.InjuryMarkerRequest;
 import com.rtms.backend.medical.dto.PrescriptionItemRequest;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.entity.HealthRecord;
@@ -286,7 +287,7 @@ class CareSchedulePrescriptionFlowTest {
     @DisplayName("D4: severity ngoài MILD/MODERATE/SEVERE/CRITICAL bị chặn trước khi khóa ca")
     void injuryMarkerWithLegacySeverity_isRejected() {
         CompleteCareScheduleRequest req = baseRequest();
-        com.rtms.backend.medical.dto.InjuryMarkerRequest marker = new com.rtms.backend.medical.dto.InjuryMarkerRequest();
+        InjuryMarkerRequest marker = new InjuryMarkerRequest();
         marker.setInjuryType("TENDON");
         marker.setBodyRegionId(1L);
         marker.setSeverity("LOW");

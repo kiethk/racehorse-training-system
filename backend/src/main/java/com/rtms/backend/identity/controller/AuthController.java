@@ -51,7 +51,7 @@ public class AuthController {
             HttpServletResponse response) {
         
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new com.rtms.backend.config.ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Refresh token missing");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Refresh token missing");
         }
 
         AuthService.RefreshResult result = authService.refresh(refreshToken);

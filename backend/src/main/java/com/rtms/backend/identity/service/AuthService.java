@@ -16,6 +16,7 @@ import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.security.JwtUtil;
 import com.rtms.backend.notification.service.EmailService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -31,6 +33,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 @Service
@@ -45,7 +48,7 @@ public class AuthService {
     private final TrainerProfileRepository trainerProfileRepository;
     private final GroomProfileRepository groomProfileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final com.rtms.backend.notification.service.EmailService emailService;
+    private final EmailService emailService;
     private final TurnstileVerifier turnstileVerifier;
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
@@ -109,8 +112,8 @@ public class AuthService {
     }
 
     private static TurnstileVerifier disabledTurnstileVerifier() {
-        return new TurnstileVerifier(new com.fasterxml.jackson.databind.ObjectMapper(), false, "", "",
-                java.net.http.HttpClient.newHttpClient());
+        return new TurnstileVerifier(new ObjectMapper(), false, "", "",
+                HttpClient.newHttpClient());
     }
 
     @Transactional
@@ -260,7 +263,7 @@ public class AuthService {
         if (rawEmail.isEmpty() || rawEmail.length() > 255 || !EMAIL_PATTERN.matcher(rawEmail).matches()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_EMAIL", "A valid email address is required");
         }
-        String email = rawEmail.toLowerCase(java.util.Locale.ROOT);
+        String email = rawEmail.toLowerCase(Locale.ROOT);
 
         String password = request.getPassword() == null ? "" : request.getPassword();
         byte[] passwordBytes = password.getBytes(StandardCharsets.UTF_8);

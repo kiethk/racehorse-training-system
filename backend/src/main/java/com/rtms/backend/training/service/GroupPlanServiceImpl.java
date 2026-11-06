@@ -54,7 +54,9 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -375,8 +377,8 @@ public class GroupPlanServiceImpl implements GroupPlanService {
         }
         List<Long> planIds = plans.stream().map(GroupPlan::getId).toList();
         Map<Long, TrainingGroup> groupsById = groupRepository
-                .findAllById(plans.stream().map(GroupPlan::getGroupId).filter(java.util.Objects::nonNull).collect(Collectors.toSet()))
-                .stream().collect(Collectors.toMap(TrainingGroup::getId, java.util.function.Function.identity()));
+                .findAllById(plans.stream().map(GroupPlan::getGroupId).filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(TrainingGroup::getId, Function.identity()));
         Map<Long, String> courseNames = courseNames(plans.stream().map(GroupPlan::getCourseId).toList());
         Map<Long, Map<SessionStatus, Long>> counts = sessionRepository.countByPlanAndStatus(planIds).stream()
                 .collect(Collectors.groupingBy(PlanSessionCountRow::planId,

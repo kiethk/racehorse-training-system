@@ -27,7 +27,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -170,7 +172,7 @@ class HorseEditRequestServiceTest {
 
     @Test
     void submitRunsTheSharedParentSexRule() {
-        doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "The sire must be a male horse"))
+        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "The sire must be a male horse"))
                 .when(pedigreeService).validateParentSexesByUeln("999999SIR000001", null);
 
         assertEquals(400, status(() -> service.submit(OWNER, HORSE, fields("Mercury", "999999SIR000001"), null, null)));
@@ -352,7 +354,7 @@ class HorseEditRequestServiceTest {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static int status(org.junit.jupiter.api.function.Executable call) {
+    private static int status(Executable call) {
         return assertThrows(ResponseStatusException.class, call).getStatusCode().value();
     }
 

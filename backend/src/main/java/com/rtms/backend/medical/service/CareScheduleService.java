@@ -58,9 +58,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.nio.charset.StandardCharsets;
@@ -289,7 +292,7 @@ public class CareScheduleService {
         if (schedule.getStatus() == CareScheduleStatus.PAUSED) {
             LocalDateTime now = LocalDateTime.now();
             if (schedule.getPausedFrom() != null && schedule.getScheduledAt() != null) {
-                java.time.Duration pausedDuration = java.time.Duration.between(schedule.getPausedFrom(), now);
+                Duration pausedDuration = Duration.between(schedule.getPausedFrom(), now);
                 if (!pausedDuration.isNegative()) {
                     schedule.setScheduledAt(schedule.getScheduledAt().plus(pausedDuration));
                 }
@@ -576,7 +579,7 @@ public class CareScheduleService {
         }
 
         if (schedule.getCareType() == CareType.URGENT) {
-            List<HorseIncidentReport> openIncidents = new java.util.ArrayList<>(
+            List<HorseIncidentReport> openIncidents = new ArrayList<>(
                     incidentReportRepository.findByHorseIdAndStatusIn(
                             horse.getId(),
                             List.of(IncidentStatus.REPORTED, IncidentStatus.IN_REVIEW)
@@ -591,7 +594,7 @@ public class CareScheduleService {
                 });
             }
 
-            java.util.Set<Long> recipients = new java.util.HashSet<>();
+            Set<Long> recipients = new HashSet<>();
             for (HorseIncidentReport inc : openIncidents) {
                 inc.setStatus(IncidentStatus.RESOLVED);
                 inc.setHandledById(vetId);
@@ -1000,7 +1003,7 @@ public class CareScheduleService {
         if (requestedAt == null && request.getScheduledDate() != null && !request.getScheduledDate().isBlank()) {
             try {
                 requestedAt = LocalDate.parse(request.getScheduledDate()).atTime(14, 0);
-            } catch (java.time.format.DateTimeParseException ex) {
+            } catch (DateTimeParseException ex) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE", "scheduledDate must use ISO format yyyy-MM-dd");
             }
         }
@@ -1079,7 +1082,7 @@ public class CareScheduleService {
         String value = horseId + "|" + admissionId + "|ROUTINE|" + requestedAt + "|" + description;
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(digest);
+            return HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException(impossible);
         }
@@ -1091,8 +1094,8 @@ public class CareScheduleService {
 
     private static final LocalTime WORKDAY_START = LocalTime.of(8, 0);
     private static final LocalTime WORKDAY_END = LocalTime.of(17, 0);
-    private static final java.time.format.DateTimeFormatter SWEEP_TIME_FMT =
-            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter SWEEP_TIME_FMT =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     /**
      * Job 60s: (1) auto-activate ca SCHEDULED đã đến giờ trong 08:00–17:00 — semantics
@@ -1448,7 +1451,7 @@ public class CareScheduleService {
 
         LocalDateTime now = LocalDateTime.now();
         if (paused.getPausedFrom() != null && paused.getScheduledAt() != null) {
-            java.time.Duration pausedDuration = java.time.Duration.between(paused.getPausedFrom(), now);
+            Duration pausedDuration = Duration.between(paused.getPausedFrom(), now);
             if (!pausedDuration.isNegative()) {
                 paused.setScheduledAt(paused.getScheduledAt().plus(pausedDuration));
             }

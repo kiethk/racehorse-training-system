@@ -7,6 +7,7 @@ import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
+import com.rtms.backend.medical.dto.CareScheduleResponse;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareSchedulePurpose;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
@@ -209,15 +210,15 @@ class CareScheduleLifecycleSweepTest {
     void overdueFlag_isDerivedNotStored() {
         CareSchedule late = schedule(105L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS,
                 LocalDateTime.now().minusMinutes(40));
-        assertTrue(com.rtms.backend.medical.dto.CareScheduleResponse.from(late).overdue());
+        assertTrue(CareScheduleResponse.from(late).overdue());
 
         CareSchedule fresh = schedule(106L, CareType.ROUTINE, CareScheduleStatus.IN_PROGRESS,
                 LocalDateTime.now().minusMinutes(10));
-        assertFalse(com.rtms.backend.medical.dto.CareScheduleResponse.from(fresh).overdue());
+        assertFalse(CareScheduleResponse.from(fresh).overdue());
 
         CareSchedule waiting = schedule(107L, CareType.ROUTINE, CareScheduleStatus.SCHEDULED,
                 LocalDateTime.now().minusMinutes(90));
-        assertFalse(com.rtms.backend.medical.dto.CareScheduleResponse.from(waiting).overdue());
+        assertFalse(CareScheduleResponse.from(waiting).overdue());
     }
 
     @Test

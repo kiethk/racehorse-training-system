@@ -15,6 +15,7 @@ import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorsePedigreeRepository;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.horse.service.PedigreeBirthDateValidator;
+import com.rtms.backend.horse.util.UelnUtils;
 import com.rtms.backend.medical.entity.CareSchedule;
 import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.enums.CareType;
@@ -42,6 +43,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class AdmissionGroomReviewService {
@@ -173,7 +175,7 @@ public class AdmissionGroomReviewService {
                 .findQuarantineStallByIdForUpdate(admission.getQuarantineStallId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Reserved quarantine stall no longer exists"));
         // The stall's current groom, not the reviewer: a block can change hands while the horse travels.
-        if (!java.util.Objects.equals(quarantineStall.getGroomId(), groomId)) {
+        if (!Objects.equals(quarantineStall.getGroomId(), groomId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the groom of the reserved quarantine stall can confirm arrival");
         }
         if (quarantineStall.getStatus() != StallStatus.RESERVED) {
@@ -405,7 +407,7 @@ public class AdmissionGroomReviewService {
      */
     private void assertArrivalDoesNotCollide(AdmissionApplication admission, Horse horse, StableStall quarantineStall) {
         horseRepository.findByCurrentStallId(quarantineStall.getId())
-                .filter(other -> !java.util.Objects.equals(other.getId(), horse.getId()))
+                .filter(other -> !Objects.equals(other.getId(), horse.getId()))
                 .ifPresent(other -> {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
                             "Quarantine stall " + quarantineStall.getStallCode() + " is still linked to another horse");
@@ -439,7 +441,7 @@ public class AdmissionGroomReviewService {
         HorsePedigree pedigree = horsePedigreeRepository.findByHorseId(horseId).orElseGet(HorsePedigree::new);
         pedigree.setHorseId(horseId);
 
-        String sireUeln = com.rtms.backend.horse.util.UelnUtils.normalize(candidate.getSireRegistrationNumber());
+        String sireUeln = UelnUtils.normalize(candidate.getSireRegistrationNumber());
         String sireName = candidate.getSireName() != null && !candidate.getSireName().isBlank() ? candidate.getSireName().trim() : null;
 
         if (sireUeln != null) {
@@ -460,7 +462,7 @@ public class AdmissionGroomReviewService {
             pedigree.setSireRegistrationNumber(null);
         }
 
-        String damUeln = com.rtms.backend.horse.util.UelnUtils.normalize(candidate.getDamRegistrationNumber());
+        String damUeln = UelnUtils.normalize(candidate.getDamRegistrationNumber());
         String damName = candidate.getDamName() != null && !candidate.getDamName().isBlank() ? candidate.getDamName().trim() : null;
 
         if (damUeln != null) {
