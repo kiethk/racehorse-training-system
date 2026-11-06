@@ -54,12 +54,18 @@ export function EdaScatterChart({
     const xVals = points.map((p) => p.x);
     const yVals = points.map((p) => p.y);
 
-    const minXVal = Math.floor(Math.min(...xVals) * 0.95);
-    const maxXVal = Math.ceil(Math.max(...xVals) * 1.05);
-    const minYVal = Math.floor(Math.min(...yVals) * 0.90);
-    const maxYVal = Math.ceil(Math.max(...yVals) * 1.10);
+    const minXVal = Math.floor((Math.min(...xVals) * 0.95) / 5) * 5;
+    const maxXVal = Math.ceil((Math.max(...xVals) * 1.05) / 5) * 5;
 
     const trend = calculateTrendLinePoints(minXVal, maxXVal, slope, intercept);
+
+    const allYVals = [...yVals];
+    if (trend.length > 0) {
+      allYVals.push(...trend.map((t) => t.y));
+    }
+
+    const minYVal = Math.max(0, Math.floor((Math.min(...allYVals) * 0.95) / 10) * 10);
+    const maxYVal = Math.ceil((Math.max(...allYVals) * 1.05) / 10) * 10;
 
     return {
       minX: minXVal,
@@ -168,23 +174,22 @@ export function EdaScatterChart({
         </div>
       </div>
 
-      <div className="w-full h-[300px]">
+      <div className="w-full h-[420px]">
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 10, right: 20, bottom: 25, left: 30 }}>
+          <ScatterChart margin={{ top: 15, right: 25, bottom: 30, left: 30 }}>
             <XAxis
               type="number"
               dataKey="x"
               name="Speed"
-              unit=" km/h"
               domain={[minX, maxX]}
-              label={{ value: xAxisLabel, position: 'bottom', offset: 10, fontSize: 11, fill: 'var(--color-text-secondary)' }}
+              label={{ value: xAxisLabel, position: 'bottom', offset: 14, fontSize: 11, fill: 'var(--color-text-secondary)' }}
               tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
+              tickMargin={8}
             />
             <YAxis
               type="number"
               dataKey="y"
               name="Recovery HR"
-              unit=" bpm"
               domain={[minY, maxY]}
               label={{
                 value: yAxisLabel,
@@ -195,6 +200,7 @@ export function EdaScatterChart({
                 offset: -10,
               }}
               tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
+              tickMargin={8}
             />
             <ZAxis range={[50, 90]} />
             <Tooltip content={<CustomTooltip />} />
