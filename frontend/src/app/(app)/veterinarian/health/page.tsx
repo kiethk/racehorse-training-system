@@ -1085,20 +1085,6 @@ function HealthRecordsContent() {
                     },
                   },
                   {
-                    id: 'reporter',
-                    header: 'Report by',
-                    render: (row: HorseListItem) => {
-                      // Who stands behind the block: the incident reporter (urgent) or the
-                      // owner of the still-running admission (quarantine).
-                      const name = row.summary?.pendingUrgentReportedByName ?? row.summary?.pendingAdmissionOwnerName;
-                      return name ? (
-                        <span className="font-medium text-[var(--color-text-secondary)]">{name}</span>
-                      ) : (
-                        <span className="text-xs text-[var(--color-text-muted)]">—</span>
-                      );
-                    },
-                  },
-                  {
                     id: 'injury',
                     header: 'Injuries',
                     render: (row: HorseListItem) => {
