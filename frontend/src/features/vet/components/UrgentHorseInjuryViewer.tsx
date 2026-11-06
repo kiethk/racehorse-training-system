@@ -2,7 +2,7 @@
 
 import React, { Suspense, useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Html } from '@react-three/drei';
+import { OrbitControls, useGLTF, Html, Bvh } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 
@@ -97,9 +97,10 @@ function HorseModel({
 
     const hitPoint = event.point;
     let normal: [number, number, number] = [0, 1, 0];
+    let worldNormal = new THREE.Vector3(0, 1, 0);
     if (event.face && event.object) {
       const normalMatrix = new THREE.Matrix3().getNormalMatrix(event.object.matrixWorld);
-      const worldNormal = event.face.normal.clone().applyMatrix3(normalMatrix).normalize();
+      worldNormal = event.face.normal.clone().applyMatrix3(normalMatrix).normalize();
       normal = resolveInjuryNormal(
         [
           Number(worldNormal.x.toFixed(4)),
@@ -112,18 +113,22 @@ function HorseModel({
       normal = resolveInjuryNormal(undefined, [hitPoint.x, hitPoint.y, hitPoint.z]);
     }
 
+    // Normal offset 1mm (0.001) to eliminate Z-fighting on surface hit
+    const normalOffset = 0.001;
+    const snappedWorldPoint = hitPoint.clone().add(worldNormal.clone().multiplyScalar(normalOffset));
+
     const local = {
-      x: (hitPoint.x - transform.position[0]) / transform.scale,
-      y: (hitPoint.y - transform.position[1]) / transform.scale,
-      z: (hitPoint.z - transform.position[2]) / transform.scale,
+      x: (snappedWorldPoint.x - transform.position[0]) / transform.scale,
+      y: (snappedWorldPoint.y - transform.position[1]) / transform.scale,
+      z: (snappedWorldPoint.z - transform.position[2]) / transform.scale,
     };
     const zoneId = zoneForPoint(local);
 
     onPointerHit?.({
       position: [
-        Number(hitPoint.x.toFixed(4)),
-        Number(hitPoint.y.toFixed(4)),
-        Number(hitPoint.z.toFixed(4)),
+        Number(snappedWorldPoint.x.toFixed(4)),
+        Number(snappedWorldPoint.y.toFixed(4)),
+        Number(snappedWorldPoint.z.toFixed(4)),
       ],
       normal,
       zoneId,
@@ -192,7 +197,7 @@ function snapToHorseSurface(
     if (found.point.distanceTo(pos) >= SNAP_RADIUS) continue;
     const normalMatrix = new THREE.Matrix3().getNormalMatrix(found.hit.object.matrixWorld);
     const worldNormal = found.hit.face!.normal.clone().applyMatrix3(normalMatrix).normalize();
-    const surfacePoint = found.point.clone().addScaledVector(worldNormal, 0.02);
+    const surfacePoint = found.point.clone().addScaledVector(worldNormal, 0.001);
     if (!best || surfacePoint.distanceTo(pos) < best.point.distanceTo(pos)) {
       best = { point: surfacePoint, normal: worldNormal };
     }
@@ -276,40 +281,24 @@ function Marker({
 
     tagWrapperRef.current.style.display = 'block';
 
-    // Multi-directional side detection:
-    // Determine whether the marker is facing the camera or occluded by the horse's solid body
-    const mx = markerWorldPos.current.x;
-    const my = markerWorldPos.current.y;
-    const mz = markerWorldPos.current.z;
-    const cx = camera.position.x;
-    const cy = camera.position.y;
-    const cz = camera.position.z;
-
-    // Top of the horse (withers, spine, crest, head top) is visible from almost all angles above ground
-    const isTop = my > 0.35 && cy > -0.5;
-
-    let isOppositeSide = false;
-    if (!isTop) {
-      // Lateral flank check:
-      // Marker on left flank (mx > 0.08) dims only when camera orbits to far right (cx < -0.6)
-      // Marker on right flank (mx < -0.08) dims only when camera orbits to far left (cx > 0.6)
-      if (mx > 0.08 && cx < -0.6) {
-        isOppositeSide = true;
-      } else if (mx < -0.08 && cx > 0.6) {
-        isOppositeSide = true;
-      }
-
-      // Longitudinal check (front head/chest vs rear rump):
-      // In urgent-horse.glb: +Z is Front/Nose, -Z is Rear/Tail
-      if (mz > 0.5 && cz < -1.6) {
-        isOppositeSide = true;
-      } else if (mz < -0.5 && cz > 1.6) {
-        isOppositeSide = true;
+    // Occlusion raycast: check if horse body is between camera and marker
+    let isOccluded = false;
+    if (horseGroupRef?.current) {
+      const origin = camera.position;
+      const dir = markerWorldPos.current.clone().sub(origin);
+      const dist = dir.length();
+      if (dist > 0.05) {
+        dir.normalize();
+        raycaster.current.set(origin, dir);
+        raycaster.current.near = 0.1;
+        raycaster.current.far = Math.max(0.1, dist - 0.005);
+        const hits = raycaster.current.intersectObject(horseGroupRef.current, true);
+        isOccluded = hits.length > 0;
       }
     }
 
-    tagWrapperRef.current.style.opacity = isOppositeSide ? '0.2' : '1';
-    tagWrapperRef.current.style.pointerEvents = isOppositeSide ? 'none' : 'auto';
+    tagWrapperRef.current.style.opacity = isOccluded ? '0.25' : '1';
+    tagWrapperRef.current.style.pointerEvents = isOccluded ? 'none' : 'auto';
   });
 
   const label = injury.label || (injury.zoneId && zoneById(injury.zoneId)?.label) || 'INJURY';
@@ -545,19 +534,23 @@ export default function UrgentHorseInjuryViewer({
       <div className="relative h-[420px] w-full overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)]">
         <Canvas
           camera={{ position: [3.2, 1.6, 3.2], fov: 45 }}
-          gl={{ powerPreference: 'high-performance', antialias: true }}
+          frameloop="demand"
+          dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2)]}
+          gl={{ powerPreference: 'high-performance', antialias: true, stencil: false, depth: true }}
         >
           <ambientLight intensity={1.2} />
           <directionalLight position={[6, 12, 6]} intensity={1.8} />
           <directionalLight position={[-6, 6, -6]} intensity={0.8} />
           <Suspense fallback={null}>
-            <HorseModel
+            <Bvh firstHitOnly>
+              <HorseModel
               groupRef={horseGroupRef}
               isAddMode={isAddMode}
               readOnly={readOnly}
               onPointerHit={onPointerHit}
               onReady={handleModelReady}
             />
+            </Bvh>
             {(markersReady ? injuries : []).map((injury) => (
               <Marker
                 key={injury.id}
@@ -571,7 +564,7 @@ export default function UrgentHorseInjuryViewer({
             ))}
             <gridHelper args={[14, 28, '#0d9488', '#1e293b']} position={[0, -1.3, 0]} />
           </Suspense>
-          <OrbitControls enableDamping minDistance={1.2} maxDistance={9} />
+          <OrbitControls makeDefault enableDamping minDistance={1.2} maxDistance={9} />
         </Canvas>
       </div>
     </ViewerErrorBoundary>

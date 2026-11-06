@@ -198,7 +198,7 @@ export function UrgentP1Overlay({ alerts, onOpenCase, onSnooze }: Props) {
             size="md"
             onClick={() => handleSnooze(targetAlert)}
           >
-            Snooze 10 minutes
+            Remind me in 10 minutes
           </Button>
 
           {eligibleAlerts.length > 1 && (

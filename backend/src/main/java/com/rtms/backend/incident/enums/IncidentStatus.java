@@ -7,6 +7,6 @@ public enum IncidentStatus {
     IN_REVIEW,
     /** Đã khám và xử lý xong (thường kèm bệnh án). */
     RESOLVED,
-    /** Báo động giả — kiểm tra thực tế không có vấn đề. */
+    /** Đóng mà không khám, ví dụ ca khám bị hủy vì ngựa rời trại. Lý do nằm ở ghi chú xử lý. */
     DISMISSED
 }

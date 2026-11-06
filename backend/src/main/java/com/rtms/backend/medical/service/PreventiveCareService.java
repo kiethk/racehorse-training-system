@@ -42,8 +42,7 @@ import java.util.Set;
 @Service
 public class PreventiveCareService {
     private static final Set<String> TYPES = Set.of("ROUTINE_EXAM", "VACCINATION", "DEWORMING");
-    private static final List<CareScheduleStatus> ACTIVE_PREVENTIVE_STATUSES = List.of(
-            CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+    private static final List<CareScheduleStatus> ACTIVE_PREVENTIVE_STATUSES = CareScheduleStatus.OPEN;
     private final CareScheduleRepository schedules;
     private final HorseRepository horses;
     private final CareScheduleService care;

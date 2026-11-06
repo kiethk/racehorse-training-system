@@ -109,12 +109,12 @@ BEGIN
     --    (Swollen right hind cannon, just reported and assigned, not started yet.)
     s := pg_temp.urgent_case('H005', 'GR02', pg_temp.clock() - INTERVAL '25 minutes', 'Swollen right hind cannon',
                              'Firm swelling on the inside of the right hind cannon noticed during grooming, no lameness at walk.',
-                             'MEDIUM', 'VT02', 'SCHEDULED', p_image => 'admission-packs/h005-douglas/horse-photo.jpg');
+                             'HIGH', 'VT02', 'SCHEDULED', p_image => 'admission-packs/h005-douglas/horse-photo.jpg');
 
     -- 3. FC NAJAA (B01): vết rách nông chân trước trái, khám xong cho tập ngay (ALLOWED); chấn thương đã lành.
     --    (Superficial cut on the left fore, cleared to train at once; the injury has healed.)
     s := pg_temp.urgent_case('H010', 'GR05', pg_temp.at(-20, TIME '08:20'), 'Cut on the left fore',
-                             'Kicked the stall door, 4 cm cut above the left fore coronet, bleeding stopped.', 'LOW', 'VT01',
+                             'Kicked the stall door, 4 cm cut above the left fore coronet, bleeding stopped.', 'HIGH', 'VT01',
                              'COMPLETED', 40, 'ALLOWED', 'Small bleeding cut, sound at walk and trot',
                              'Superficial 4 cm laceration above the coronet band, no joint or tendon involvement.',
                              'Superficial laceration, left fore', 'Wound cleaned and dressed, topical antiseptic for 5 days.',
@@ -194,7 +194,7 @@ BEGIN
     -- 6. BV KAROL (D04): ho, chảy mũi -> đang nghỉ, tái khám trong vài ngày tới, phác đồ kháng sinh đang dùng.
     --    (Cough and nasal discharge: resting now, recheck in a few days, antibiotics running.)
     s := pg_temp.urgent_case('H031', 'GR14', pg_temp.at(-3, TIME '08:10'), 'Coughing and nasal discharge',
-                             'Coughing during the warm-up and thick nasal discharge from both nostrils.', 'MEDIUM', 'VT03',
+                             'Coughing during the warm-up and thick nasal discharge from both nostrils.', 'HIGH', 'VT03',
                              'COMPLETED', 40, 'BLOCKED', 'Cough, bilateral mucopurulent nasal discharge, temperature 38.9 °C',
                              'Enlarged submandibular lymph nodes, harsh lung sounds cranially.',
                              'Upper respiratory tract infection', 'Antibiotics for 7 days, stable in a well-ventilated box.',
@@ -233,10 +233,10 @@ BEGIN
     -- 8. AG NOBEL EMIR (A07): xây xát nhẹ, Groom báo trùng hai lần; Manager bác báo cáo trùng (DISMISSED), ca khẩn cấp
     --    khám xong đóng báo cáo còn lại. (A scrape reported twice; the manager dismisses the duplicate.)
     s := pg_temp.urgent_case('H007', 'GR03', pg_temp.at(-15, TIME '10:20'), 'Scrape on the left hip',
-                             'Hair rubbed off and a small scrape on the left hip, probably from the stall wall.', 'LOW', 'VT01',
+                             'Hair rubbed off and a small scrape on the left hip, probably from the stall wall.', 'HIGH', 'VT01',
                              'SCHEDULED', p_image => 'admission-packs/h007-ag-nobel-emir/horse-photo.jpg');
     v_dup := pg_temp.report_incident(pg_temp.hid('H007'), pg_temp.uid('GR03'), pg_temp.at(-15, TIME '10:35'),
-                                     'Scrape on the left hip', 'Same scrape on the left hip, reporting again.', 'LOW', NULL);
+                                     'Scrape on the left hip', 'Same scrape on the left hip, reporting again.', 'HIGH', NULL);
     UPDATE horse_incident_reports SET status = 'DISMISSED', handled_by_id = pg_temp.uid('ADMIN'),
                                       handled_at = pg_temp.at(-15, TIME '10:50'),
                                       handler_note = 'Duplicate of the report sent at 10:20, the vet is already on this case.'
@@ -251,7 +251,7 @@ BEGIN
 
     -- 9. D ADOOB (C08): sự cố cũ hai tháng trước, mắt chảy nước, khám xong cho tập. (Two-month-old case: watery eye.)
     s := pg_temp.urgent_case('H026', 'GR11', pg_temp.at(-60, TIME '09:10'), 'Watery left eye',
-                             'Left eye half closed and watering after turnout.', 'MEDIUM', 'VT02', 'COMPLETED', 35, 'ALLOWED',
+                             'Left eye half closed and watering after turnout.', 'HIGH', 'VT02', 'COMPLETED', 35, 'ALLOWED',
                              'Squinting, tear staining', 'Fluorescein stain negative, mild conjunctivitis.', 'Conjunctivitis, left eye',
                              'Eye ointment for 5 days, fly mask at turnout.',
                              p_note => 'No corneal involvement, expect full recovery on the ointment.',

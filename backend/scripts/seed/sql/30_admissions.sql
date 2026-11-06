@@ -49,6 +49,9 @@ BEGIN
             v_assign := c.updated_at + INTERVAL '1 day';
             EXIT WHEN v_assign > v_limit OR v_assign >= c.scheduled_at;
             PERFORM pg_temp.cancel_care(c.id, 'Horse recovered at the previous recheck, no further rechecks needed.', v_assign);
+            -- AD-022: ngua da khoi (ALLOWED) -> ket thuc chuoi tai kham dot ngot;
+            -- ca hen ke tiep (c) da duoc xep gio va giu nguyen lam lich dinh ky.
+            EXIT;
         END IF;
     END LOOP;
 END $$ LANGUAGE plpgsql;
@@ -389,8 +392,8 @@ BEGIN
                 IF EXISTS (SELECT 1 FROM care_schedule WHERE horse_id = v_horse AND status IN ('REQUESTED', 'IN_PROGRESS')) THEN
                     RAISE EXCEPTION 'Admission % cannot be rejected while veterinary care is REQUESTED or IN_PROGRESS', a.k;
                 END IF;
-                UPDATE care_schedule SET status = 'CANCELLED', cancel_reason = 'Admission rejected by manager', updated_at = v_t
-                 WHERE horse_id = v_horse AND status = 'SCHEDULED';
+                DELETE FROM care_schedule
+                 WHERE horse_id = v_horse AND status IN ('SCHEDULED', 'PAUSED', 'DELAYED', 'OVERDUE');
                 UPDATE stable_stalls SET status = 'AVAILABLE', updated_at = v_t WHERE id = v_q;
                 UPDATE horses SET current_status = 'REJECTED', current_stall_id = NULL, updated_at = v_t WHERE id = v_horse;
                 UPDATE admission_applications

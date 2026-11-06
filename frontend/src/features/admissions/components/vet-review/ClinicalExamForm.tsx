@@ -14,9 +14,13 @@ import { z } from 'zod';
 import { VitalsSection } from './VitalsSection';
 import { DiagnosisSection } from './DiagnosisSection';
 import { TrainingDecisionSection } from './TrainingDecisionSection';
-import { FollowUpSection } from './FollowUpSection';
-import { PrescriptionSection, toPrescriptionRequests, type PrescriptionFormItem } from './PrescriptionSection';
-import { computeSuggestedRecheckDate } from './prescriptionDrafts';
+import { FollowUpMergeNotice, FollowUpSection } from './FollowUpSection';
+import {
+  PrescriptionSection,
+  toPrescriptionRequests,
+  computeSuggestedRecheckDate,
+  type PrescriptionFormItem,
+} from '@/features/medical';
 import { ActiveConditionsSection } from './ActiveConditionsSection';
 import { ApiError } from '@/services/api';
 import { Button } from '@/components/ui/Button';
@@ -25,7 +29,7 @@ import { Notice } from '@/components/ui/Notice';
 import { Icon } from '@/components/ui/Icon';
 import { Input, Textarea, ChoiceInput } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
-import { formatDateTime } from '@/lib/display';
+import { formatDate, formatDateTime } from '@/lib/display';
 import { admissionsApi } from '../../services/api';
 import {
   ExamVaccinationSection,
@@ -124,6 +128,12 @@ export interface ClinicalExamFormProps {
   careType?: CareType;
   scheduleStatus?: CareScheduleStatus;
   schedulePurpose?: 'FOLLOW_UP' | 'PREVENTIVE';
+  /** The visit was opened by an incident report, so Follow-up rules do not apply. */
+  fromIncident?: boolean;
+  /** Set when another exam decides this horse's block, so this visit cannot lift it. */
+  blockHeldUntil?: string | null;
+  /** The horse's waiting Follow-up: a new date merges into it. */
+  waitingFollowUpAt?: string | null;
   onStartExam?: () => Promise<void>;
   asideTop?: ReactNode;
   onSuccess: (
@@ -148,6 +158,9 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       careType = 'INITIAL',
       scheduleStatus,
       schedulePurpose,
+      fromIncident,
+      blockHeldUntil,
+      waitingFollowUpAt,
       onStartExam,
       asideTop,
       onSuccess,
@@ -158,7 +171,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     } = props;
 
     const config = EXAM_VARIANT_CONFIG[variant];
-    const isPrescriptionActive = config.prescription || careType === 'ROUTINE';
+    const isPrescriptionActive = config.prescription || careType === 'ROUTINE' || careType === 'URGENT';
 
     const draftStorageKey = careScheduleId
       ? `draft:care-schedule:${careScheduleId}`
@@ -169,23 +182,18 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const [openDocumentId, setOpenDocumentId] = useState<number | null>(null);
     const [rejectReason, setRejectReason] = useState('');
 
-    const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>(config.defaultDecision);
+    const [trainingDecision, setTrainingDecision] = useState<TrainingDecision>(careType === 'URGENT' ? 'BLOCKED' : config.defaultDecision);
     const [restrictionDetails, setRestrictionDetails] = useState('');
     const [scheduleFollowUp, setScheduleFollowUp] = useState(false);
-    const [followUpDate, setFollowUpDate] = useState('');
-    const [followUpDescription, setFollowUpDescription] = useState(
-      'Routine follow-up recheck examination',
-    );
+    const defaultFollowUpDate = variant === 'URGENT' ? businessDateFromToday(3) : '';
+    const defaultFollowUpDescription =
+      variant === 'URGENT' ? 'Follow-up after the urgent examination' : 'Routine follow-up examination';
+    const [followUpDate, setFollowUpDate] = useState(defaultFollowUpDate);
+    // The follow-up reason is not asked: a blocked horse reuses the Assessment note so the next Vet sees why,
+    // every other case gets the standard wording the backend requires.
+    const followUpDescription =
+      trainingDecision === 'BLOCKED' && restrictionDetails.trim() ? restrictionDetails.trim() : defaultFollowUpDescription;
     const [followUpIdempotencyKey, setFollowUpIdempotencyKey] = useState(newIdempotencyKey);
-    const [followUps, setFollowUps] = useState<
-      Array<{ key: string; date: string; description: string }>
-    >([
-      {
-        key: newIdempotencyKey(),
-        date: businessDateFromToday(3),
-        description: 'Follow-up after the urgent examination',
-      },
-    ]);
 
     const [markers, setMarkers] = useState<InjuryMarker[]>([]);
     const [bodyRegions, setBodyRegions] = useState<HorseBodyRegion[]>([]);
@@ -233,9 +241,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       restrictionDetails?: string;
       scheduleFollowUp?: boolean;
       followUpDate?: string;
-      followUpDescription?: string;
       followUpIdempotencyKey?: string;
-      followUps?: Array<{ key: string; date: string; description: string }>;
       markers?: InjuryMarker[];
       resolvedConditionIds?: number[];
       timestamp: string;
@@ -271,6 +277,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       if (prefillFindings && !prefillApplied.current) {
         prefillApplied.current = true;
         setFindings((prev) => prev || prefillFindings);
+        setAbnormalFindings((prev) => prev || prefillFindings);
       }
     }, [prefillFindings]);
 
@@ -334,12 +341,15 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       }
     }, [show3DTab, anatomyTab]);
 
-    const isGated = scheduleStatus != null && scheduleStatus !== 'IN_PROGRESS';
-    const followUpRequired = config.followUpMode === 'single-required-select';
-    const followUpActive =
-      config.followUpMode === 'single-required-select'
-        ? scheduleFollowUp || followUpRequired
-        : true;
+    // AD-022 / AD-026: DELAYED and OVERDUE exams are still open and must remain editable so the vet can submit findings.
+    const isGated =
+      scheduleStatus != null &&
+      scheduleStatus !== 'IN_PROGRESS' &&
+      scheduleStatus !== 'DELAYED' &&
+      scheduleStatus !== 'OVERDUE';
+    // A visit opened by an incident report needs a Follow-up only when the horse stays blocked.
+    const followUpRequired = !fromIncident || trainingDecision === 'BLOCKED';
+    const followUpActive = scheduleFollowUp || followUpRequired;
     const isFormDisabled = submitting || startingExam || isGated;
 
     const generatedFindings =
@@ -370,7 +380,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           restrictionDetails.trim() !== '' ||
           scheduleFollowUp ||
           followUpDate !== '' ||
-          followUps.some((row) => row.date !== '' || row.description.trim() !== '') ||
           markers.length > 0;
 
     useEffect(() => {
@@ -396,11 +405,8 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       if (availableDraft.scheduleFollowUp !== undefined)
         setScheduleFollowUp(availableDraft.scheduleFollowUp);
       if (availableDraft.followUpDate !== undefined) setFollowUpDate(availableDraft.followUpDate);
-      if (availableDraft.followUpDescription !== undefined)
-        setFollowUpDescription(availableDraft.followUpDescription);
       if (availableDraft.followUpIdempotencyKey)
         setFollowUpIdempotencyKey(availableDraft.followUpIdempotencyKey);
-      if (availableDraft.followUps) setFollowUps(availableDraft.followUps);
       if (availableDraft.markers && Array.isArray(availableDraft.markers)) {
         setMarkers(availableDraft.markers);
       }
@@ -444,9 +450,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           restrictionDetails,
           scheduleFollowUp,
           followUpDate,
-          followUpDescription,
           followUpIdempotencyKey,
-          followUps,
           markers,
           resolvedConditionIds,
           timestamp,
@@ -475,9 +479,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       restrictionDetails,
       scheduleFollowUp,
       followUpDate,
-      followUpDescription,
       followUpIdempotencyKey,
-      followUps,
       markers,
       resolvedConditionIds,
     ]);
@@ -500,15 +502,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       setTrainingDecision(config.defaultDecision);
       setRestrictionDetails('');
       setScheduleFollowUp(false);
-      setFollowUpDate('');
-      setFollowUpDescription('Routine follow-up recheck examination');
-      setFollowUps([
-        {
-          key: newIdempotencyKey(),
-          date: businessDateFromToday(3),
-          description: 'Follow-up after the urgent examination',
-        },
-      ]);
+      setFollowUpDate(defaultFollowUpDate);
       setMarkers([]);
       setResolvedConditionIds([]);
       setVerdict('ACCEPT');
@@ -519,9 +513,23 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     };
 
     const handleRandomizeData = () => {
-      if (config.simulateMode === 'hot-profiles') {
-        setMetrics(randomizeUrgentVitals());
-        setFieldErrors((prev) => ({ ...prev, metrics: '' }));
+      if (careType === 'URGENT' || config.simulateMode === 'hot-profiles') {
+        const urgentVitals = randomizeUrgentVitals();
+        setMetrics(urgentVitals);
+        setPhysicalExamConfirmed(true);
+        setExamMode('ABNORMAL');
+        setStructuredDiagnosis('Musculoskeletal condition suspected');
+        setAbnormalFindings(
+          urgentVitals.notes || 'Acute localized pain and mild vital elevation secondary to trauma.',
+        );
+        setTrainingDecision('BLOCKED');
+        setFieldErrors((prev) => ({
+          ...prev,
+          metrics: '',
+          abnormalFindings: '',
+          diagnosis: '',
+          trainingDecision: '',
+        }));
         return;
       }
 
@@ -627,7 +635,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           effectiveDiagnosis: z.string().min(1, config.diagnosisRequiredMessage),
           restrictionDetails: z.string(),
           followUpDate: z.string(),
-          followUpDescription: z.string(),
         })
         .superRefine((data, ctx) => {
           if (config.section2Mode === 'structured' && !physicalExamConfirmed) {
@@ -656,7 +663,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
               message: config.restrictionZodMessage,
             });
           }
-          if (config.followUpMode === 'single-required-select' && followUpActive) {
+          if (followUpActive) {
             if (!data.followUpDate) {
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -671,46 +678,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
                   config.followUpDateMinMessage ?? 'Follow-up date must be at least one day in the future.',
               });
             }
-            if (!data.followUpDescription.trim()) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['followUpDescription'],
-                message:
-                  config.followUpDescriptionRequiredMessage ??
-                  'Follow-up care description is required.',
-              });
-            }
-          }
-          if (config.followUpMode === 'multi-optional-freetext') {
-            if (followUps.length === 0) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['followUps'],
-                message: config.followUpsRequiredZodMessage ?? 'At least one follow-up is required.',
-              });
-            }
-            for (const row of followUps) {
-              if (!row.date) {
-                ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  path: [`followUpDate:${row.key}`],
-                  message: config.followUpDateZodMessage ?? 'Follow-up date is required.',
-                });
-              } else if (row.date < businessDateFromToday(1)) {
-                ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  path: [`followUpDate:${row.key}`],
-                  message: config.followUpDateMinZodMessage ?? 'Follow-up date must be tomorrow or later.',
-                });
-              }
-              if (!row.description.trim()) {
-                ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  path: [`followUpDescription:${row.key}`],
-                  message: config.followUpDescriptionZodMessage ?? 'Follow-up description is required.',
-                });
-              }
-            }
           }
         });
 
@@ -720,7 +687,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
         effectiveDiagnosis,
         restrictionDetails,
         followUpDate,
-        followUpDescription,
       });
       if (!parsed.success) {
         for (const issue of parsed.error.issues) {
@@ -740,18 +706,13 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           if (!rx.frequency.trim()) {
             errors["rx." + rx.id + ".frequency"] = "Frequency is required.";
           }
-          if (!rx.startDate) {
-            errors["rx." + rx.id + ".startDate"] = "Start date is required.";
-          }
-          if (!rx.endDate) {
-            errors["rx." + rx.id + ".endDate"] = "End date is required.";
-          } else if (rx.startDate && rx.endDate < rx.startDate) {
-            errors["rx." + rx.id + ".endDate"] = "End date must be on or after start date.";
-          }
+          if (!rx.startDate) errors["rx." + rx.id + ".startDate"] = "Start date is required.";
+          if (!rx.endDate) errors["rx." + rx.id + ".endDate"] = "End date is required.";
+          else if (rx.startDate && rx.endDate < rx.startDate) errors["rx." + rx.id + ".endDate"] = "End date must be on or after start date.";
         }
       }
 
-      const isSixVitalsMandatory = sixVitalsRequired(variant, careType, schedulePurpose);
+      const isSixVitalsMandatory = sixVitalsRequired(variant, careType, schedulePurpose, fromIncident);
       if (isSixVitalsMandatory) {
         const vitalErrors = validateSixVitals(metrics);
         if (Object.keys(vitalErrors).length > 0) {
@@ -816,7 +777,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
       event.preventDefault();
-      if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS') {
+      if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS' && scheduleStatus !== 'DELAYED' && scheduleStatus !== 'OVERDUE') {
         setFormError(
           'Care schedule is SCHEDULED. Physical examination must be started before recording and submitting findings.',
         );
@@ -842,7 +803,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
     async function executeSubmit() {
       if (inFlight.current) return;
-      if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS') {
+      if (scheduleStatus && scheduleStatus !== 'IN_PROGRESS' && scheduleStatus !== 'DELAYED' && scheduleStatus !== 'OVERDUE') {
         setFormError(
           'Care schedule is SCHEDULED. Physical examination must be started before recording and submitting findings.',
         );
@@ -876,7 +837,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
       ) as HorseHealthMetricRequest;
 
       const nextScheduleRequest =
-        config.followUpMode === 'single-required-select' && followUpActive && followUpDate
+        followUpActive && followUpDate
           ? {
               horseId: horseId ?? undefined,
               admissionId: admissionId || undefined,
@@ -885,17 +846,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
               description: followUpDescription.trim() || 'Follow-up veterinary examination',
               idempotencyKey: followUpIdempotencyKey,
             }
-          : undefined;
-
-      const nextSchedules =
-        config.followUpMode === 'multi-optional-freetext'
-          ? followUps.map((row) => ({
-              horseId: horseId ?? undefined,
-              careType: 'ROUTINE' as const,
-              scheduledDate: row.date,
-              description: row.description.trim(),
-              idempotencyKey: row.key,
-            }))
           : undefined;
 
       try {
@@ -937,7 +887,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             trainingDecision,
             restrictionDetails: restrictionDetails.trim() || undefined,
             nextSchedule: nextScheduleRequest,
-            nextSchedules,
             metrics: Object.keys(metricValues).length ? [metricValues] : undefined,
             vaccinations: vaccinationDrafts.length ? toVaccinationRequests(vaccinationDrafts) : undefined,
             deferVaccinationDays: deferVaccinationDays ?? undefined,
@@ -1032,7 +981,6 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
           setGeneralCareInstructions={setGeneralCareInstructions}
           fieldErrors={fieldErrors}
           setFieldErrors={setFieldErrors}
-          todayLocalDate={businessDateFromToday(0)}
         />
       );
     };
@@ -1250,7 +1198,7 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
             </div>
           )}
 
-          {config.followUpMode === 'multi-optional-freetext' && (
+          {variant === 'URGENT' && (
             <div className="mt-4">
               {renderFollowUps()}
             </div>
@@ -1260,178 +1208,70 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     };
 
     const renderFollowUps = () => {
-      const activeRxEndDates = prescriptions.map((p) => p.endDate).filter(Boolean);
+      const prescriptionEndDates = prescriptions.map((p) => p.endDate).filter(Boolean);
       const activeInjuryRecoveryDates = activeInjuries.map((inj) => inj.expectedRecoveryDate).filter(Boolean) as string[];
-      const suggestedRecheckDate = computeSuggestedRecheckDate(activeRxEndDates, activeInjuryRecoveryDates);
-
-      if (config.followUpMode === 'single-required-select') {
-        return (
-          <FollowUpSection
-            isFormDisabled={isFormDisabled}
-            careType={careType}
-            schedulePurpose={schedulePurpose}
-            followUpRequired={followUpRequired}
-            followUpActive={followUpActive}
-            scheduleFollowUp={scheduleFollowUp}
-            setScheduleFollowUp={setScheduleFollowUp}
-            followUpDate={followUpDate}
-            setFollowUpDate={setFollowUpDate}
-            followUpDescription={followUpDescription}
-            setFollowUpDescription={setFollowUpDescription}
-            fieldErrors={fieldErrors}
-            setFieldErrors={setFieldErrors}
-            businessDateFromToday={businessDateFromToday}
-            tomorrowBusinessDate={tomorrowBusinessDate}
-            suggestedRecheckDate={suggestedRecheckDate}
-          />
-        );
-      }
+      const suggestedRecheckDate = computeSuggestedRecheckDate(prescriptionEndDates, activeInjuryRecoveryDates);
 
       return (
-        <div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[var(--color-text-secondary)]">
-              Follow-up recheck days
-              <span className="ml-1 text-[var(--color-danger)]">*</span>
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              icon="plus"
-              onClick={() =>
-                setFollowUps((rows) => [
-                  ...rows,
-                  {
-                    key: newIdempotencyKey(),
-                    date: '',
-                    description: 'Follow-up after the urgent examination',
-                  },
-                ])
-              }
-            >
-              Add another day
-            </Button>
-          </div>
-          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-            A follow-up schedule is required before completing urgent examination per WF-02.
-          </p>
-          <div className="mt-2 space-y-3">
-            {followUps.map((row, index) => (
-              <div
-                key={row.key}
-                className="rounded-[var(--radius-sm)] border border-[var(--color-border)] p-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                    Recheck #{index + 1}
-                  </span>
-                  {followUps.length > 1 && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="tertiary"
-                      onClick={() =>
-                        setFollowUps((rows) => rows.filter((r) => r.key !== row.key))
-                      }
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-                <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <FormField
-                      label="Examination date"
-                      htmlFor={`follow-up-date-${row.key}`}
-                      required
-                    >
-                      <Input
-                        id={`follow-up-date-${row.key}`}
-                        type="date"
-                        min={businessDateFromToday(1)}
-                        value={row.date}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setFollowUps((rows) =>
-                            rows.map((r) => (r.key === row.key ? { ...r, date: value } : r)),
-                          );
-                          if (fieldErrors[`followUpDate:${row.key}`]) {
-                            setFieldErrors((prev) => ({
-                              ...prev,
-                              [`followUpDate:${row.key}`]: '',
-                            }));
-                          }
-                        }}
-                      />
-                    </FormField>
-                    <div className="mt-1.5 flex gap-1.5">
-                      {[3, 7, 14].map((days) => (
-                        <Button
-                          type="button"
-                          key={days}
-                          size="sm"
-                          variant="secondary"
-                          onClick={() =>
-                            setFollowUps((rows) =>
-                              rows.map((r) =>
-                                r.key === row.key ? { ...r, date: businessDateFromToday(days) } : r,
-                              ),
-                            )
-                          }
-                          className="transition-all active:scale-[0.97]"
-                        >
-                          +{days} days
-                        </Button>
-                      ))}
-                    </div>
-                    {fieldErrors[`followUpDate:${row.key}`] && (
-                      <p className="mt-1 text-xs text-[var(--color-danger)]">
-                        {fieldErrors[`followUpDate:${row.key}`]}
-                      </p>
-                    )}
-                  </div>
+        <FollowUpSection
+          isFormDisabled={isFormDisabled}
+          careType={careType}
+          schedulePurpose={schedulePurpose}
+          fromIncident={fromIncident}
+          waitingFollowUpAt={waitingFollowUpAt}
+          followUpRequired={followUpRequired}
+          followUpActive={followUpActive}
+          scheduleFollowUp={scheduleFollowUp}
+          setScheduleFollowUp={setScheduleFollowUp}
+          followUpDate={followUpDate}
+          setFollowUpDate={setFollowUpDate}
+          fieldErrors={fieldErrors}
+          setFieldErrors={setFieldErrors}
+          businessDateFromToday={businessDateFromToday}
+          tomorrowBusinessDate={tomorrowBusinessDate}
+          suggestedRecheckDate={suggestedRecheckDate}
+        />
+      );
+    };
 
-                  <div>
-                    <FormField
-                      label="Clinical purpose"
-                      htmlFor={`follow-up-desc-${row.key}`}
-                      required
-                    >
-                      <Input
-                        id={`follow-up-desc-${row.key}`}
-                        type="text"
-                        value={row.description}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setFollowUps((rows) =>
-                            rows.map((r) =>
-                              r.key === row.key ? { ...r, description: value } : r,
-                            ),
-                          );
-                          if (fieldErrors[`followUpDescription:${row.key}`]) {
-                            setFieldErrors((prev) => ({
-                              ...prev,
-                              [`followUpDescription:${row.key}`]: '',
-                            }));
-                          }
-                        }}
-                      />
-                    </FormField>
-                    {fieldErrors[`followUpDescription:${row.key}`] && (
-                      <p className="mt-1 text-xs text-[var(--color-danger)]">
-                        {fieldErrors[`followUpDescription:${row.key}`]}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+    const renderInjuryMarkers = () => {
+      const isVisible =
+        careType === 'URGENT' ||
+        config.markersEnabled ||
+        trainingDecision === 'BLOCKED' ||
+        examMode === 'ABNORMAL';
+      if (!isVisible) return null;
+
+      return (
+        <fieldset
+          disabled={isFormDisabled}
+          className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-panel)] space-y-4"
+        >
+          <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
+            <h3 className="text-sm font-semibold tracking-tight text-[var(--color-text-primary)]">
+              3. 3D Anatomy &amp; Injury Markers
+            </h3>
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              {markers.length} marker{markers.length === 1 ? '' : 's'} placed
+            </span>
           </div>
-          {fieldErrors.followUps && (
-            <p className="mt-1 text-xs text-[var(--color-danger)]">{fieldErrors.followUps}</p>
-          )}
-        </div>
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Click on the 3D model to pinpoint injury or pain locations.
+          </p>
+          <InjuryMarkerPanel
+            markers={markers}
+            setMarkers={setMarkers}
+            bodyRegions={bodyRegions}
+            readOnly={isFormDisabled}
+            fieldErrors={fieldErrors}
+            setFieldErrors={setFieldErrors}
+            onAppendToFindings={
+              config.markersAppendToFindings
+                ? (line) => setFindings((prev) => (prev ? `${prev}\n${line}` : line))
+                : undefined
+            }
+          />
+        </fieldset>
       );
     };
 
@@ -1588,56 +1428,12 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
 
         <div className={openDocumentId == null ? admissionDetailGridClassName : 'grid min-w-0 gap-5'}>
           <div className="min-w-0 space-y-5">
-            {show3DTab && (
-              <div className="border-b border-[var(--color-border)] pb-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant={anatomyTab === 'form' ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => setAnatomyTab('form')}
-                  >
-                    Examination Form
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={anatomyTab === 'anatomy3d' ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => setAnatomyTab('anatomy3d')}
-                  >
-                    3D Anatomy{markers.length > 0 ? ` (${markers.length})` : ''}
-                  </Button>
-                </div>
-                {anatomyTab === 'form' ? (
-                  <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                    Record vitals telemetry, clinical diagnosis, and training restriction decision.
-                  </p>
-                ) : (
-                  <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                    Click the horse to place injury markers. At least one marker is required when training is blocked.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {show3DTab && anatomyTab === 'anatomy3d' ? (
-              <InjuryMarkerPanel
-                markers={markers}
-                setMarkers={setMarkers}
-                bodyRegions={bodyRegions}
-                readOnly={isFormDisabled}
-                fieldErrors={fieldErrors}
-                setFieldErrors={setFieldErrors}
-              />
-            ) : (
-              <>
-                {renderVitals()}
-                {renderSection2()}
-                {verdict !== 'REJECT' && renderActiveConditions()}
-                {verdict !== 'REJECT' && renderVaccination()}
-                {verdict !== 'REJECT' && renderPrescription()}
-              </>
-            )}
+            {renderVitals()}
+            {renderSection2()}
+            {renderInjuryMarkers()}
+            {verdict !== 'REJECT' && renderActiveConditions()}
+            {verdict !== 'REJECT' && careType !== 'URGENT' && renderVaccination()}
+            {verdict !== 'REJECT' && renderPrescription()}
           </div>
 
           <div className={admissionAsideClassName}>
@@ -1815,17 +1611,18 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
                     </strong>
                     .
                   </p>
-                  {followUpActive && config.followUpMode === 'single-required-select' && (
+                  {blockHeldUntil && trainingDecision === 'ALLOWED' && (
                     <div className="rounded-[var(--radius-sm)] bg-[var(--color-warning-soft)] p-2 text-xs font-medium text-[var(--color-warning)]">
-                      Follow-up scheduled for <strong>{followUpDate}</strong>: {followUpDescription}.
+                      The horse stays blocked until its Follow-up on {formatDate(blockHeldUntil)}.
                     </div>
                   )}
-                  {followUpActive && config.followUpMode === 'multi-optional-freetext' && (
+                  {followUpActive && (waitingFollowUpAt ? (
+                    <FollowUpMergeNotice chosenDate={followUpDate} waitingAt={waitingFollowUpAt} />
+                  ) : (
                     <div className="rounded-[var(--radius-sm)] bg-[var(--color-warning-soft)] p-2 text-xs font-medium text-[var(--color-warning)]">
-                      Follow-up rechecks scheduled on{' '}
-                      {followUps.map((row) => row.date).join(', ')}.
+                      Follow-up scheduled for <strong>{followUpDate}</strong>.
                     </div>
-                  )}
+                  ))}
                   <p className="text-xs text-[var(--color-text-secondary)]">
                     {careType === 'INITIAL'
                       ? 'This action writes the official clinical record and advances the admission to trainer review.'
@@ -1852,85 +1649,23 @@ export const ClinicalExamForm = forwardRef<ClinicalExamFormHandle, ClinicalExamF
     const renderStackedForm = () => (
       <form onSubmit={handleFormSubmit} noValidate className="space-y-6">
         {renderFormError()}
-        {show3DTab && (
-          <div className="border-b border-[var(--color-border)] pb-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant={anatomyTab === 'form' ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setAnatomyTab('form')}
-              >
-                Examination Form
-              </Button>
-              <Button
-                type="button"
-                variant={anatomyTab === 'anatomy3d' ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setAnatomyTab('anatomy3d')}
-              >
-                3D Anatomy{markers.length > 0 ? ` (${markers.length})` : ''}
-              </Button>
-            </div>
-            {anatomyTab === 'form' ? (
-              <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                Record vitals telemetry, clinical diagnosis, and immediate training restriction decision.
-              </p>
-            ) : (
-              <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                Click the horse to place injury markers. Markers are appended to examination findings.
-              </p>
-            )}
-          </div>
-        )}
-
-        {show3DTab && anatomyTab === 'anatomy3d' ? (
-          <div className="space-y-6">
-            <InjuryMarkerPanel
-              markers={markers}
-              setMarkers={setMarkers}
-              bodyRegions={bodyRegions}
-              readOnly={isFormDisabled}
-              onAppendToFindings={
-                config.markersAppendToFindings
-                  ? (line) => setFindings((prev) => (prev ? `${prev}\n${line}` : line))
-                  : undefined
-              }
-              fieldErrors={fieldErrors}
-              setFieldErrors={setFieldErrors}
-            />
-            <div className="border-t border-[var(--color-border)] pt-5">
-              <Button
-                type="submit"
-                variant="primary"
-                loading={submitting}
-                icon="check"
-                className="w-full transition-all active:scale-[0.97] sm:w-auto"
-              >
-                {config.submitLabel}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {renderVitals()}
-            {renderSection2()}
-            {renderTrainingDecision()}
-            {renderActiveConditions()}
-            {renderPrescription()}
-            <div className="border-t border-[var(--color-border)] pt-5">
-              <Button
-                type="submit"
-                variant="primary"
-                loading={submitting}
-                icon="check"
-                className="w-full transition-all active:scale-[0.97] sm:w-auto"
-              >
-                {config.submitLabel}
-              </Button>
-            </div>
-          </>
-        )}
+        {renderVitals()}
+        {renderSection2()}
+        {renderInjuryMarkers()}
+        {renderTrainingDecision()}
+        {renderActiveConditions()}
+        {renderPrescription()}
+        <div className="border-t border-[var(--color-border)] pt-5">
+          <Button
+            type="submit"
+            variant="primary"
+            loading={submitting}
+            icon="check"
+            className="w-full transition-all active:scale-[0.97] sm:w-auto"
+          >
+            {config.submitLabel}
+          </Button>
+        </div>
       </form>
     );
 

@@ -140,7 +140,8 @@ export function GroomAdmissionReview({ admissionId, returnTo, onUpdated }: Props
       setArrivalPhotos([]);
       onUpdated?.();
       if (updated.status === 'ARRIVAL_EXPIRED') {
-        toast.warning('Arrival window expired');
+        toast.warning('Arrival window expired',
+          'The reservation was released. Ask an authorized manager to reopen the admission.');
       } else {
         toast.success('Arrival confirmed');
       }

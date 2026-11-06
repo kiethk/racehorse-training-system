@@ -2,30 +2,23 @@
 
 import type { Dispatch, SetStateAction } from 'react';
 import { Button } from '@/components/ui/Button';
+import { CreatableCombobox, type CreatableComboboxOption } from '@/components/ui/CreatableCombobox';
 import { FormField } from '@/components/ui/FormField';
 import { Input, Select, Textarea } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
-import { Notice } from '@/components/ui/Notice';
-import type { MedicationRoute } from '@/features/care/types';
-export { toPrescriptionRequests, type PrescriptionFormItem } from './prescriptionDrafts';
-import type { PrescriptionFormItem } from './prescriptionDrafts';
-
-export interface PrescriptionSectionProps {
-  isFormDisabled: boolean;
-  prescriptions: PrescriptionFormItem[];
-  setPrescriptions: Dispatch<SetStateAction<PrescriptionFormItem[]>>;
-  generalCareInstructions: string;
-  setGeneralCareInstructions: Dispatch<SetStateAction<string>>;
-  fieldErrors: Record<string, string>;
-  setFieldErrors: Dispatch<SetStateAction<Record<string, string>>>;
-  todayLocalDate: string;
-}
+import type { MedicationRoute, PrescriptionFormItem, PrescriptionSectionProps } from '../types';
+import medicationsCatalog from '../data/medications.json';
 
 const ROUTE_OPTIONS: Array<{ value: MedicationRoute; label: string }> = [
   { value: 'ORAL', label: 'Oral' },
   { value: 'TOPICAL', label: 'Topical' },
   { value: 'FEED_ADDITIVE', label: 'Feed additive' },
 ];
+
+const MEDICATION_OPTIONS: CreatableComboboxOption[] = medicationsCatalog.map((m) => ({
+  value: m.name,
+  label: `${m.name} (${m.therapeuticClass})`,
+}));
 
 export function PrescriptionSection(props: PrescriptionSectionProps) {
   const {
@@ -36,7 +29,6 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
     setGeneralCareInstructions,
     fieldErrors,
     setFieldErrors,
-    todayLocalDate,
   } = props;
 
   const handleAddMedication = () => {
@@ -46,8 +38,8 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
       dosage: '',
       route: 'ORAL',
       frequency: 'BID',
-      startDate: todayLocalDate,
-      endDate: todayLocalDate,
+      startDate: new Date().toISOString().slice(0, 10),
+      endDate: new Date().toISOString().slice(0, 10),
       instructions: '',
     };
     setPrescriptions((prev) => [...prev, newItem]);
@@ -64,6 +56,30 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
       });
       return next;
     });
+  };
+
+  const handleMedicationNameChange = (itemId: string, name: string) => {
+    const med = medicationsCatalog.find((m) => m.name.toLowerCase() === name.toLowerCase());
+    setPrescriptions((prev) =>
+      prev.map((item) => {
+        if (item.id !== itemId) return item;
+        return {
+          ...item,
+          medicationName: name,
+          dosage: med && !item.dosage ? med.defaultDosage : item.dosage,
+          route: med ? (med.defaultRoute as MedicationRoute) : item.route,
+          frequency: med && !item.frequency ? med.defaultFrequency : item.frequency,
+        };
+      })
+    );
+    const errorKey = `rx.${itemId}.medicationName`;
+    if (fieldErrors[errorKey]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[errorKey];
+        return next;
+      });
+    }
   };
 
   const handleFieldChange = <K extends keyof PrescriptionFormItem>(
@@ -105,11 +121,7 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
         </Button>
       </div>
 
-      {prescriptions.length === 0 ? (
-        <Notice tone="info" className="py-2.5">
-          No medications prescribed for this examination. Click <strong>Add Medication</strong> if pharmacological treatment, pain management, or doping-controlled substances are required.
-        </Notice>
-      ) : (
+      {prescriptions.length > 0 && (
         <div className="space-y-4">
           {prescriptions.map((rx, index) => {
             return (
@@ -134,21 +146,21 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <FormField
-                    label="Medication name"
-                    required
-                    error={fieldErrors[`rx.${rx.id}.medicationName`]}
-                  >
-                    <Input
-                      disabled={isFormDisabled}
-                      placeholder="e.g. Phenylbutazone paste"
-                      maxLength={150}
-                      value={rx.medicationName}
-                      onChange={(e) => handleFieldChange(rx.id, 'medicationName', e.target.value)}
-                    />
-                  </FormField>
+                <FormField
+                  label="Medication Name"
+                  required
+                  error={fieldErrors[`rx.${rx.id}.medicationName`]}
+                >
+                  <CreatableCombobox
+                    disabled={isFormDisabled}
+                    value={rx.medicationName}
+                    onChange={(val) => handleMedicationNameChange(rx.id, val)}
+                    options={MEDICATION_OPTIONS}
+                    placeholder="Select or type a medication name"
+                  />
+                </FormField>
 
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <FormField
                     label="Administration Route"
                     required
@@ -168,18 +180,18 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
                       ))}
                     </Select>
                   </FormField>
-                </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <FormField label="Dosage" required error={fieldErrors[`rx.${rx.id}.dosage`]}>
                     <Input
                       disabled={isFormDisabled}
-                      placeholder="e.g. 1.1 mg/kg or 10 mL"
+                      placeholder="e.g. 1.1 mg/kg or 10ml"
                       value={rx.dosage}
                       onChange={(e) => handleFieldChange(rx.id, 'dosage', e.target.value)}
                     />
                   </FormField>
+                </div>
 
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <FormField label="Frequency" required error={fieldErrors[`rx.${rx.id}.frequency`]}>
                     <Input
                       disabled={isFormDisabled}
@@ -188,37 +200,22 @@ export function PrescriptionSection(props: PrescriptionSectionProps) {
                       onChange={(e) => handleFieldChange(rx.id, 'frequency', e.target.value)}
                     />
                   </FormField>
-                </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <FormField label="Start Date" required error={fieldErrors[`rx.${rx.id}.startDate`]}>
-                    <Input
-                      type="date"
-                      disabled={isFormDisabled}
-                      value={rx.startDate}
-                      onChange={(e) => handleFieldChange(rx.id, 'startDate', e.target.value)}
-                    />
+                  <FormField label="Start date" required error={fieldErrors[`rx.${rx.id}.startDate`]}>
+                    <Input type="date" disabled={isFormDisabled} value={rx.startDate} onChange={(e) => handleFieldChange(rx.id, 'startDate', e.target.value)} />
                   </FormField>
-
-                  <FormField label="End Date" required error={fieldErrors[`rx.${rx.id}.endDate`]}>
-                    <Input
-                      type="date"
-                      disabled={isFormDisabled}
-                      min={rx.startDate}
-                      value={rx.endDate}
-                      onChange={(e) => handleFieldChange(rx.id, 'endDate', e.target.value)}
-                    />
+                  <FormField label="End date" required error={fieldErrors[`rx.${rx.id}.endDate`]}>
+                    <Input type="date" disabled={isFormDisabled} value={rx.endDate} onChange={(e) => handleFieldChange(rx.id, 'endDate', e.target.value)} />
                   </FormField>
-
                 </div>
 
                 <FormField
-                  label="Specific Instructions for Groom / Handler"
+                  label="Instructions"
                   error={fieldErrors[`rx.${rx.id}.instructions`]}
                 >
                   <Input
                     disabled={isFormDisabled}
-                    placeholder="e.g. Administer with morning grain feed. Monitor for colic signs"
+                    placeholder="Enter medication instructions"
                     value={rx.instructions}
                     onChange={(e) => handleFieldChange(rx.id, 'instructions', e.target.value)}
                   />

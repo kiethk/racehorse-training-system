@@ -11,12 +11,12 @@ export function getTodayLocalDate(): string {
 }
 
 /**
- * Filters urgent schedules to return active (pending/in-progress) emergency cases.
- * Excludes COMPLETED and CANCELLED schedules.
+ * Filters urgent schedules to return active (pending/in-progress/overdue) emergency cases.
+ * Excludes COMPLETED schedules (AD-022: CANCELLED has been abolished).
  */
 export function filterActiveEmergencies(schedules: CareSchedule[]): CareSchedule[] {
   return schedules.filter(
-    (s) => s.careType === 'URGENT' && s.status !== 'COMPLETED' && s.status !== 'CANCELLED'
+    (s) => s.careType === 'URGENT' && s.status !== 'COMPLETED'
   );
 }
 
@@ -117,7 +117,7 @@ export function examActivityByWeek(
     if (schedule.status === 'COMPLETED') {
       entry.completed += 1;
       if (schedule.careType === 'URGENT') entry.urgent += 1;
-    } else if (schedule.status === 'IN_PROGRESS') {
+    } else if (schedule.status === 'IN_PROGRESS' || schedule.status === 'DELAYED' || schedule.status === 'OVERDUE') {
       entry.inProgress += 1;
     }
   }

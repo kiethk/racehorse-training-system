@@ -129,8 +129,10 @@ INSERT INTO seed_check VALUES
         OR i.care_schedule_id IS NULL $q$),
 ('PAUSED schedule without a paused_from timestamp',
  $q$ SELECT id FROM care_schedule WHERE status = 'PAUSED' AND paused_from IS NULL $q$),
-('Cancelled schedule without a reason',
- $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' AND (cancel_reason IS NULL OR btrim(cancel_reason) = '') $q$),
+('Cancelled care schedule exists (AD-022 forbids CANCELLED in care_schedule)',
+ $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' $q$),
+('Care schedule with status outside the 6-status enum (AD-022)',
+ $q$ SELECT id FROM care_schedule WHERE status NOT IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS', 'PAUSED', 'DELAYED', 'OVERDUE', 'COMPLETED') $q$),
 ('Health metric hydration status outside the HydrationStatus enum',
  $q$ SELECT id FROM horse_health_metrics
      WHERE hydration_status NOT IN ('NORMAL', 'MILD_DEHYDRATION', 'MODERATE_DEHYDRATION', 'SEVERE_DEHYDRATION', 'ABNORMAL_CRT') $q$),

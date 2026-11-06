@@ -34,7 +34,8 @@ public record CareScheduleResponse(
 ) {
     public static CareScheduleResponse from(CareSchedule cs) {
         if (cs == null) return null;
-        boolean overdue = cs.getStatus() == CareScheduleStatus.IN_PROGRESS
+        // AD-022: OVERDUE is a real status; the flag mirrors it for clients that only read the boolean.
+        boolean overdue = CareScheduleStatus.ACTIVE_EXAM.contains(cs.getStatus())
                 && cs.getScheduledAt() != null
                 && java.time.LocalDateTime.now().isAfter(cs.getScheduledAt().plusMinutes(30));
         return new CareScheduleResponse(

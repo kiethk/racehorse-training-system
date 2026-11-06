@@ -5,12 +5,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { openAuthenticatedEventStream } from '@/services/api';
 import type { UrgentAssignmentAlert } from '../types';
 import { admissionsApi } from '../services/api';
-import { UrgentP1Overlay } from '@/features/vet/components/UrgentP1Overlay';
 import { UrgentAssignmentBanner } from './UrgentAssignmentBanner';
 
 const RECONNECT_DELAY_MS = 5000;
 const MAX_RECONNECT_DELAY_MS = 60000;
-const SNOOZE_MS = 10 * 60 * 1000; // remind again after 10 minutes
 const SNOOZE_KEY = 'vet:urgent:snoozed';
 
 function readSnooze(): Map<number, number> {
@@ -55,14 +53,6 @@ export function UrgentAssignmentNotifier() {
       }
       return [...bySchedule.values()].sort((a, b) => new Date(a.reportedAt).getTime() - new Date(b.reportedAt).getTime());
     });
-  }, []);
-
-  const handleSnooze = useCallback((alert: UrgentAssignmentAlert) => {
-    const next = new Map(snoozed.current);
-    next.set(alert.scheduleId, Date.now() + SNOOZE_MS);
-    snoozed.current = next;
-    writeSnooze(next);
-    setAlerts((current) => current.filter((a) => a.scheduleId !== alert.scheduleId));
   }, []);
 
   const handleBannerDismiss = useCallback((alert: UrgentAssignmentAlert) => {
@@ -165,13 +155,10 @@ export function UrgentAssignmentNotifier() {
   }
 
   return (
-    <>
-      <UrgentP1Overlay alerts={active} onOpenCase={openCase} onSnooze={handleSnooze} />
-      <UrgentAssignmentBanner
-        alerts={active.slice(1).filter((a) => !hiddenBannerIds.has(a.scheduleId))}
-        onOpenCase={openCase}
-        onDismiss={handleBannerDismiss}
-      />
-    </>
+    <UrgentAssignmentBanner
+      alerts={active.filter((a) => !hiddenBannerIds.has(a.scheduleId))}
+      onOpenCase={openCase}
+      onDismiss={handleBannerDismiss}
+    />
   );
 }

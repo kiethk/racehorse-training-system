@@ -1,4 +1,4 @@
-export type CareScheduleStatus = 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+export type CareScheduleStatus = 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'PAUSED' | 'DELAYED' | 'OVERDUE' | 'COMPLETED';
 export type CareType = 'INITIAL' | 'ROUTINE' | 'URGENT';
 export type TrainingDecision = 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
 
@@ -108,10 +108,6 @@ export interface CompleteCareScheduleRequest {
   resolvedConditionIds?: number[];
 }
 
-export interface CancelCareScheduleRequest {
-  cancelReason: string;
-}
-
 export interface Prescription {
   id: number;
   medicationName: string;
@@ -155,8 +151,9 @@ export interface PrescriptionJsonItem {
   dosage: string;
   frequency: string;
   route: PrescriptionRoute;
-  duration: number;
-  notes?: string;
+  startDate: string;
+  endDate: string;
+  instructions: string;
 }
 
 export interface CreateTreatmentPlanRequest {
@@ -183,5 +180,5 @@ export interface PrescriptionItemRequest {
   frequency: string;
   startDate: string;
   endDate: string;
-  instructions?: string;
+  instructions: string;
 }

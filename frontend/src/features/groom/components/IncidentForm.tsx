@@ -17,10 +17,10 @@ import type { Horse, StableStall } from '@/features/stable/types';
 import type { IncidentReport, IncidentSeverity } from '../types';
 
 const SEVERITY_OPTIONS: { value: IncidentSeverity; label: string; hint: string; tone: string }[] = [
-  { value: 'LOW', label: 'Minor', hint: 'Monitor the horse. No urgent intervention is required.', tone: 'text-[var(--color-text-secondary)]' },
-  { value: 'MEDIUM', label: 'Moderate', hint: 'Veterinary review is needed today.', tone: 'text-[var(--color-info)]' },
-  { value: 'HIGH', label: 'Major', hint: 'Request veterinary attention as soon as possible.', tone: 'text-[var(--color-warning)]' },
-  { value: 'CRITICAL', label: 'Critical', hint: 'A health emergency requiring an immediate call.', tone: 'text-[var(--color-danger)] font-semibold' },
+  { value: 'LOW', label: 'Low', hint: 'Vet checks at the next routine slot. The horse keeps training.', tone: 'text-[var(--color-text-secondary)]' },
+  { value: 'MEDIUM', label: 'Medium', hint: 'Vet checks at the next routine slot. The horse keeps training.', tone: 'text-[var(--color-info)]' },
+  { value: 'HIGH', label: 'High', hint: 'Vet called now, even from another exam. The horse stops training and leaves its group.', tone: 'text-[var(--color-warning)]' },
+  { value: 'CRITICAL', label: 'Critical', hint: 'Vet called now, even from another exam. The horse stops training and leaves its group.', tone: 'text-[var(--color-danger)] font-semibold' },
 ];
 
 export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {}) {
@@ -29,8 +29,6 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
 
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [horses, setHorses] = useState<Horse[]>([]);
-  const [myHorses, setMyHorses] = useState<Horse[]>([]);
-  const [otherHorses, setOtherHorses] = useState<Horse[]>([]);
   const [stalls, setStalls] = useState<StableStall[]>([]);
 
   const [horseId, setHorseId] = useState<number | ''>('');
@@ -59,26 +57,12 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
 
         setStalls(stallList);
 
-        // Ưu tiên ngựa thuộc chuồng do Groom quản lý lên đầu; vẫn cho phép chọn các ngựa khác trong trại khi cấp cứu
-        const myStallIds = stallList
-          .filter((s) => s.groomId === user?.userId)
-          .map((s) => s.id);
+        // A Groom reports only horses in their own stalls; /api/horses is already scoped to those.
+        setHorses(horseList);
 
-        const assignedHorses = horseList.filter(
-          (h) => h.currentStallId && myStallIds.includes(h.currentStallId)
-        );
-        const unassignedOrOther = horseList.filter(
-          (h) => !h.currentStallId || !myStallIds.includes(h.currentStallId)
-        );
-
-        setMyHorses(assignedHorses);
-        setOtherHorses(unassignedOrOther);
-        const allHorses = [...assignedHorses, ...unassignedOrOther];
-        setHorses(allHorses);
-
-        if (allHorses.length > 0) {
-          const preselected = allHorses.find((h) => h.id === initialHorseId);
-          setHorseId((preselected ?? assignedHorses[0] ?? unassignedOrOther[0]).id);
+        if (horseList.length > 0) {
+          const preselected = horseList.find((h) => h.id === initialHorseId);
+          setHorseId((preselected ?? horseList[0]).id);
         }
       } catch (err) {
         console.error('Unable to load horse and stall data:', err);
@@ -217,39 +201,18 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
                   onChange={(e) => setHorseId(Number(e.target.value))}
                   required
                 >
-                  {myHorses.length > 0 && (
-                    <optgroup label="Horses in your assigned stalls">
-                      {myHorses.map((h) => {
-                        const stallLabel = h.currentStallId
-                          ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
-                          : 'No stall assigned';
-                        return (
-                          <option key={h.id} value={h.id}>
-                            {h.name} (#{h.id}) — {stallLabel}
-                          </option>
-                        );
-                      })}
-                    </optgroup>
-                  )}
-                  {otherHorses.length > 0 && (
-                    <optgroup label="Other horses in facility (Paddocks / Wash bays / Training)">
-                      {otherHorses.map((h) => {
-                        const stallLabel = h.currentStallId
-                          ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
-                          : 'No stall assigned';
-                        return (
-                          <option key={h.id} value={h.id}>
-                            {h.name} (#{h.id}) — {stallLabel}
-                          </option>
-                        );
-                      })}
-                    </optgroup>
-                  )}
+                  {horses.map((h) => {
+                    const stallLabel = h.currentStallId
+                      ? stallMap.get(h.currentStallId) || `Stall #${h.currentStallId}`
+                      : 'No stall assigned';
+                    return (
+                      <option key={h.id} value={h.id}>
+                        {h.name} (#{h.id}) — {stallLabel}
+                      </option>
+                    );
+                  })}
                 </Select>
               </FormField>
-              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                Horses in your assigned stalls are prioritized. You can also select any horse in the facility if an incident occurs outside stalls.
-              </p>
             </div>
 
             {/* Severity */}
@@ -282,7 +245,7 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
                 ))}
               </div>
 
-              {severity === 'CRITICAL' && (
+              {(severity === 'HIGH' || severity === 'CRITICAL') && (
                 <div className="mt-2.5 rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-[var(--color-danger-soft)] p-3 text-xs text-[var(--color-danger)]">
                   <div className="font-semibold flex items-center gap-1.5">
                     <Icon name="alert-triangle" size={14} />
@@ -303,6 +266,7 @@ export function IncidentForm({ initialHorseId }: { initialHorseId?: number } = {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Example: Swollen right front knee, missed breakfast..."
+                  maxLength={255}
                   required
                 />
               </FormField>

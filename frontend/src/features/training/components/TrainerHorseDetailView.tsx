@@ -23,7 +23,7 @@ export function TrainerHorseDetailView({ horseId }: TrainerHorseDetailViewProps)
       horseId={horseId}
       returnTo="/trainer/horses"
       backLabel="Back to horses"
-      extraTabs={({ horse }) => [
+      extraTabs={({ horse, refreshHorse }) => [
         {
           id: 'training-schedule',
           label: 'Training schedule',
@@ -41,12 +41,12 @@ export function TrainerHorseDetailView({ horseId }: TrainerHorseDetailViewProps)
         {
           id: 'fitness-trends',
           label: 'Fitness & Trends',
-          content: <HorseFitnessTrendView horseId={horse.id} hideHeader />,
+          content: <HorseFitnessTrendView horseId={horse.id} hideHeader onReported={refreshHorse} />,
         },
         {
           id: 'incidents',
           label: 'Incident Reports',
-          content: <TrainerHorseIncidentsTab horseId={horse.id} horseName={horse.name} />,
+          content: <TrainerHorseIncidentsTab horseId={horse.id} horseName={horse.name} onReported={refreshHorse} />,
         },
       ]}
     />

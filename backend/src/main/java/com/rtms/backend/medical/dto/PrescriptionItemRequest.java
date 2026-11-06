@@ -1,15 +1,15 @@
 package com.rtms.backend.medical.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.rtms.backend.medical.enums.MedicationRoute;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
 
-/** Prescription details recorded when an examination is completed. */
+/** Prescription details recorded when an examination is completed. One row per medication in prescriptions. */
 public class PrescriptionItemRequest {
 
     @NotBlank(message = "Medication name is required")
@@ -24,6 +24,7 @@ public class PrescriptionItemRequest {
     private MedicationRoute route;
 
     @NotBlank(message = "Frequency is required")
+    @Size(max = 50, message = "Frequency must not exceed 50 characters")
     private String frequency;
 
     @NotNull(message = "Start date is required")

@@ -29,8 +29,7 @@ import java.util.List;
 @Service
 public class TrainingDecisionService {
 
-    private static final List<CareScheduleStatus> PENDING_EXAM_STATUSES = List.of(
-            CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+    private static final List<CareScheduleStatus> PENDING_EXAM_STATUSES = CareScheduleStatus.OPEN;
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final HorseRepository horseRepository;

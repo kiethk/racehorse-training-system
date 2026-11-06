@@ -7,18 +7,18 @@ import {
 } from '../lib/dashboardUtils.ts';
 import type { CareScheduleResponse } from '../types.ts';
 
-test('filterActiveEmergencies includes only pending/in-progress URGENT schedules', () => {
+test('filterActiveEmergencies includes pending, in-progress and overdue URGENT schedules', () => {
   const mockSchedules = [
     { id: 1, careType: 'URGENT', status: 'REQUESTED' },
     { id: 2, careType: 'URGENT', status: 'IN_PROGRESS' },
     { id: 3, careType: 'URGENT', status: 'COMPLETED' },
-    { id: 4, careType: 'URGENT', status: 'CANCELLED' },
+    { id: 4, careType: 'URGENT', status: 'OVERDUE' },
     { id: 5, careType: 'ROUTINE', status: 'REQUESTED' },
   ] as CareScheduleResponse[];
 
   const active = filterActiveEmergencies(mockSchedules);
-  assert.equal(active.length, 2);
-  assert.deepEqual(active.map((s) => s.id), [1, 2]);
+  assert.equal(active.length, 3);
+  assert.deepEqual(active.map((s) => s.id), [1, 2, 4]);
 });
 
 test('filterBlockedHorses returns horses with BLOCKED training decision', () => {
