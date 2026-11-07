@@ -199,8 +199,7 @@ export function ManagerDashboardView() {
     <ScreenLayout variant="dashboard">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <PageHeader
-          title="Executive Operations Hub"
-          description="Real-time facility management, admission pipeline, and equine training strategy."
+          title="Dashboard"
         />
         <div className="shrink-0 self-start sm:self-center">
           <Button
