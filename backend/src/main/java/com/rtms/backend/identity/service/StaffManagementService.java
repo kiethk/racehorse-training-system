@@ -19,6 +19,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.validation.Validator;
 import com.rtms.backend.audit.dto.DomainAuditEvent;
 import com.rtms.backend.audit.service.AuditLogService;
+import com.rtms.backend.notification.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -69,6 +70,7 @@ public class StaffManagementService {
     private final EntityManager em;
     private final Validator validator;
     private final AuditLogService auditLogService;
+    private final EmailService emailService;
 
     private static final List<String> STAFF_ROLES = Arrays.asList("GROOM", "VETERINARIAN", "HEAD_TRAINER");
 
@@ -84,7 +86,23 @@ public class StaffManagementService {
             AreaTrainerAssignmentPolicy trainerAssignmentPolicy, EntityManager em, Validator validator) {
         this(userRepository, roleRepository, passwordEncoder, groomProfileRepository,
              vetProfileRepository, trainerProfileRepository, areaRepository,
-             stableStallRepository, trainerAssignmentPolicy, em, validator, null);
+             stableStallRepository, trainerAssignmentPolicy, em, validator, null, null);
+    }
+
+    public StaffManagementService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            GroomProfileRepository groomProfileRepository,
+            VeterinarianProfileRepository vetProfileRepository,
+            TrainerProfileRepository trainerProfileRepository,
+            AreaRepository areaRepository,
+            StableStallRepository stableStallRepository,
+            AreaTrainerAssignmentPolicy trainerAssignmentPolicy, EntityManager em, Validator validator,
+            AuditLogService auditLogService) {
+        this(userRepository, roleRepository, passwordEncoder, groomProfileRepository,
+             vetProfileRepository, trainerProfileRepository, areaRepository,
+             stableStallRepository, trainerAssignmentPolicy, em, validator, auditLogService, null);
     }
 
     @Autowired
@@ -98,7 +116,8 @@ public class StaffManagementService {
             AreaRepository areaRepository,
             StableStallRepository stableStallRepository,
             AreaTrainerAssignmentPolicy trainerAssignmentPolicy, EntityManager em, Validator validator,
-            AuditLogService auditLogService) {
+            AuditLogService auditLogService,
+            @Autowired(required = false) EmailService emailService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -111,6 +130,7 @@ public class StaffManagementService {
         this.em = em;
         this.validator = validator;
         this.auditLogService = auditLogService;
+        this.emailService = emailService;
     }
 
     // ── READ ──────────────────────────────────────────────────────────────────
@@ -315,6 +335,10 @@ public class StaffManagementService {
             case "HEAD_TRAINER" -> response = createHeadTrainer(user, request, response);
             case "GROOM"        -> response = createGroom(user, request, response);
             case "VETERINARIAN" -> response = createVeterinarian(user, request, response);
+        }
+
+        if (emailService != null) {
+            emailService.sendStaffWelcomeEmail(response.getEmail(), response.getFullName(), response.getRole(), request.getPassword());
         }
 
         return response;

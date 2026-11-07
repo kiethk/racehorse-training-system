@@ -1,6 +1,7 @@
 package com.rtms.backend.identity.service;
 
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.identity.dto.ChangePasswordRequest;
 import com.rtms.backend.identity.dto.LoginRequest;
 import com.rtms.backend.identity.dto.LoginResponse;
 import com.rtms.backend.identity.dto.OwnerRegistrationRequest;
@@ -22,7 +23,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -48,7 +48,7 @@ public class AuthService {
     private final com.rtms.backend.notification.service.EmailService emailService;
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    private static final Pattern PHONE_PATTERN = Pattern.compile("^(0|\\+84)[3|5|7|8|9][0-9]{8}$|^[+]?[0-9]{9,15}$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^(0|\\+84)[3|5|7|8|9][0-9]{8}$|^[+]?[0-9]{10,15}$");
 
     public static final long GRACE_PERIOD_SECONDS = 30L;
 
@@ -103,6 +103,10 @@ public class AuthService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw invalidCredentials();
         }
+
+        // BR-MGR-02: Each account must only have one valid Refresh Token at a time.
+        // Revoke any existing active refresh tokens immediately before issuing a new one.
+        refreshTokenRepository.revokeAllActiveTokensByUser(user, LocalDateTime.now().minusSeconds(GRACE_PERIOD_SECONDS + 1));
 
         String accessToken = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
         String rawRefreshToken = generateOpaqueToken();
@@ -169,7 +173,7 @@ public class AuthService {
         if (rawRefreshToken != null && !rawRefreshToken.isBlank()) {
             String hash = hashToken(rawRefreshToken);
             refreshTokenRepository.findByTokenHash(hash).ifPresent(token -> {
-                token.setRevokedAt(LocalDateTime.now());
+                token.setRevokedAt(LocalDateTime.now().minusSeconds(GRACE_PERIOD_SECONDS + 1));
                 refreshTokenRepository.save(token);
             });
         }
@@ -212,6 +216,36 @@ public class AuthService {
         };
 
         return LoginResponse.fromUser(user, profile);
+    }
+
+    @Transactional
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        if (request == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request body is required");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CURRENT_PASSWORD", "Current password is incorrect");
+        }
+
+        String newPassword = request.getNewPassword() == null ? "" : request.getNewPassword();
+        byte[] passwordBytes = newPassword.getBytes(StandardCharsets.UTF_8);
+        if (newPassword.length() < 8 || passwordBytes.length > 72) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD_LENGTH", "Password must be 8-72 characters and at most 72 UTF-8 bytes");
+        }
+
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_UNCHANGED", "New password must be different from current password");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Revoke all active tokens so user must log in again with new password
+        refreshTokenRepository.revokeAllActiveTokensByUser(user, LocalDateTime.now().minusSeconds(GRACE_PERIOD_SECONDS + 1));
     }
 
     public OwnerRegistrationResponse registerOwner(OwnerRegistrationRequest request) {

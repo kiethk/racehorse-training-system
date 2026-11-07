@@ -240,10 +240,8 @@ public class AdmissionManagerReviewService {
         horse.setCurrentStallId(null);
         horseRepository.save(horse);
 
-        // AD-022/AD-025 rule 6: lịch chưa diễn ra của ngựa rớt tuyển bị xóa cứng, không CANCELLED.
+        // Tự động chuyển CANCELLED các lịch chưa diễn ra của ngựa khi manager từ chối nhập viện.
         if (careScheduleRepository != null) {
-            // AD-022: OVERDUE thay thế IN_PROGRESS trong danh sách chặn — ca đã bắt đầu khám
-            // thì vẫn phải chặn reject như trước, không được âm thầm xóa mất.
             List<CareSchedule> nonCancellableSchedules =
                     careScheduleRepository.findByHorseIdAndStatusIn(horse.getId(),
                             CareScheduleStatus.OPEN);
@@ -251,9 +249,10 @@ public class AdmissionManagerReviewService {
                 throw new IllegalStateException(
                         "Admission cannot be rejected while veterinary care is SCHEDULED or IN_PROGRESS");
             }
-            // Chỉ lịch chưa diễn ra (SCHEDULED) bị xóa cứng.
-            careScheduleRepository.deleteOpenSchedulesIfUnreferenced(
-                    horse.getId(), List.of(CareScheduleStatus.SCHEDULED));
+            careScheduleRepository.cancelOpenSchedulesIfUnreferenced(
+                    horse.getId(), List.of(CareScheduleStatus.SCHEDULED),
+                    "Admission application rejected by Club Manager: " + feedback,
+                    LocalDateTime.now());
         }
 
         admission.setManagerId(managerId);
