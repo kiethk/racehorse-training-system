@@ -1,6 +1,7 @@
 package com.rtms.backend.identity.service;
 
 import com.rtms.backend.config.ApiException;
+import com.rtms.backend.identity.dto.ChangePasswordRequest;
 import com.rtms.backend.identity.dto.LoginRequest;
 import com.rtms.backend.identity.entity.RefreshToken;
 import com.rtms.backend.identity.entity.Role;
@@ -250,5 +251,66 @@ class AuthServiceRefreshTest {
         authService.logout(null);
         authService.logout("");
         verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void testChangePassword_Success() {
+        User user = new User();
+        user.setId(5L);
+        user.setPasswordHash("hashed_old");
+
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("OldPassword@123", "hashed_old")).thenReturn(true);
+        when(passwordEncoder.matches("NewPassword@456", "hashed_old")).thenReturn(false);
+        when(passwordEncoder.encode("NewPassword@456")).thenReturn("hashed_new");
+
+        ChangePasswordRequest request = new ChangePasswordRequest("OldPassword@123", "NewPassword@456");
+        authService.changePassword(5L, request);
+
+        assertEquals("hashed_new", user.getPasswordHash());
+        verify(userRepository).save(user);
+        verify(refreshTokenRepository).revokeAllActiveTokensByUser(eq(user), any(LocalDateTime.class));
+    }
+
+    @Test
+    void testChangePassword_WrongCurrentPassword_Throws() {
+        User user = new User();
+        user.setId(5L);
+        user.setPasswordHash("hashed_old");
+
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("WrongPassword@123", "hashed_old")).thenReturn(false);
+
+        ChangePasswordRequest request = new ChangePasswordRequest("WrongPassword@123", "NewPassword@456");
+        ApiException ex = assertThrows(ApiException.class, () -> authService.changePassword(5L, request));
+        assertTrue(ex.getMessage().contains("Current password is incorrect"));
+    }
+
+    @Test
+    void testChangePassword_SamePassword_Throws() {
+        User user = new User();
+        user.setId(5L);
+        user.setPasswordHash("hashed_old");
+
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("SamePassword@123", "hashed_old")).thenReturn(true);
+
+        ChangePasswordRequest request = new ChangePasswordRequest("SamePassword@123", "SamePassword@123");
+        ApiException ex = assertThrows(ApiException.class, () -> authService.changePassword(5L, request));
+        assertTrue(ex.getMessage().contains("different from current password"));
+    }
+
+    @Test
+    void testChangePassword_TooShort_Throws() {
+        User user = new User();
+        user.setId(5L);
+        user.setPasswordHash("hashed_old");
+
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("OldPassword@123", "hashed_old")).thenReturn(true);
+
+        ChangePasswordRequest request = new ChangePasswordRequest("OldPassword@123", "short");
+        ApiException ex = assertThrows(ApiException.class, () -> authService.changePassword(5L, request));
+        assertTrue(ex.getMessage().contains("8-72 characters"));
     }
 }

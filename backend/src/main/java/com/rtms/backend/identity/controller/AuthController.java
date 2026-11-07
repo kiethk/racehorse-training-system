@@ -1,7 +1,7 @@
 package com.rtms.backend.identity.controller;
-import com.rtms.backend.config.ApiException;
 
 import com.rtms.backend.common.dto.ApiResponse;
+import com.rtms.backend.identity.dto.ChangePasswordRequest;
 import com.rtms.backend.identity.dto.LoginRequest;
 import com.rtms.backend.identity.dto.LoginResponse;
 import com.rtms.backend.identity.dto.OwnerRegistrationRequest;
@@ -81,6 +81,21 @@ public class AuthController {
                 .getAuthentication().getPrincipal();
 
         return ApiResponse.success(authService.getMe(currentUser.getUserId()));
+    }
+
+    @PostMapping("/change-password")
+    public ApiResponse<String> changePassword(
+            @jakarta.validation.Valid @RequestBody ChangePasswordRequest request,
+            HttpServletResponse response) {
+        AuthenticatedUser currentUser = (AuthenticatedUser) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+
+        authService.changePassword(currentUser.getUserId(), request);
+
+        // Expire refresh token cookie so user logs in afresh
+        setRefreshCookie(response, "deleted", 0);
+
+        return ApiResponse.success("Password changed successfully. Please sign in with your new password.");
     }
 
     @Operation(security = {})

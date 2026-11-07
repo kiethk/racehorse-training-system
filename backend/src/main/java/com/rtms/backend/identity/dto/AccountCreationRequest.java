@@ -14,10 +14,11 @@ public class AccountCreationRequest {
     private String email;
 
     @NotBlank(message = "Password is required")
-    @Size(max = 72)
+    @Size(min = 8, max = 72, message = "Password must be between 8 and 72 characters")
     private String password;
 
     @Size(max = 20, message = "Phone number must be at most 20 characters")
+    @Pattern(regexp = "^$|^(0|\\+84)[3|5|7|8|9][0-9]{8}$|^[+]?[0-9]{10,15}$", message = "Phone number must be between 10 and 15 digits or valid Vietnamese phone number")
     private String phone;
 
     @Size(max = 255)
