@@ -89,7 +89,7 @@ export default function UrgentCasesPage() {
 
   const filteredCases = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return urgentCases.filter((c) => {
+    const list = urgentCases.filter((c) => {
       if (filter === 'PENDING' && c.status !== 'SCHEDULED') return false;
       if (filter === 'IN_PROGRESS' && c.status !== 'IN_PROGRESS') return false;
       if (filter === 'COMPLETED' && c.status !== 'COMPLETED') return false;
@@ -104,6 +104,24 @@ export default function UrgentCasesPage() {
         String(c.horseId).includes(q) ||
         String(c.scheduleId).includes(q)
       );
+    });
+
+    // Sắp xếp theo thời gian mới nhất đứng trước (reportedAt DESC, scheduledAt DESC, scheduleId DESC)
+    return list.sort((a, b) => {
+      const timeA = a.reportedAt
+        ? new Date(a.reportedAt).getTime()
+        : a.scheduledAt
+        ? new Date(a.scheduledAt).getTime()
+        : 0;
+      const timeB = b.reportedAt
+        ? new Date(b.reportedAt).getTime()
+        : b.scheduledAt
+        ? new Date(b.scheduledAt).getTime()
+        : 0;
+      if (timeB !== timeA) {
+        return timeB - timeA;
+      }
+      return (b.scheduleId || 0) - (a.scheduleId || 0);
     });
   }, [urgentCases, filter, searchQuery]);
 

@@ -2050,7 +2050,9 @@ public class CareScheduleService {
                             : buildUrgentAlert(schedule, incident, horse, veterinarianId, schedule.getUpdatedAt());
                 })
                 .filter(Objects::nonNull)
-                .sorted((a, b) -> Long.compare(b.scheduleId(), a.scheduleId()))
+                .sorted(Comparator.comparing(
+                        (UrgentAssignmentAlert a) -> a.reportedAt() != null ? a.reportedAt() : (a.scheduledAt() != null ? a.scheduledAt() : LocalDateTime.MIN)
+                ).reversed().thenComparing(Comparator.comparing(UrgentAssignmentAlert::scheduleId).reversed()))
                 .toList();
     }
 
