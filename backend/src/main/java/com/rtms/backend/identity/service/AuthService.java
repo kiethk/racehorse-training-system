@@ -104,6 +104,10 @@ public class AuthService {
             throw invalidCredentials();
         }
 
+        // BR-MGR-02: Each account must only have one valid Refresh Token at a time.
+        // Revoke any existing active refresh tokens immediately before issuing a new one.
+        refreshTokenRepository.revokeAllActiveTokensByUser(user, LocalDateTime.now().minusSeconds(GRACE_PERIOD_SECONDS + 1));
+
         String accessToken = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().getName());
         String rawRefreshToken = generateOpaqueToken();
 
@@ -169,7 +173,7 @@ public class AuthService {
         if (rawRefreshToken != null && !rawRefreshToken.isBlank()) {
             String hash = hashToken(rawRefreshToken);
             refreshTokenRepository.findByTokenHash(hash).ifPresent(token -> {
-                token.setRevokedAt(LocalDateTime.now());
+                token.setRevokedAt(LocalDateTime.now().minusSeconds(GRACE_PERIOD_SECONDS + 1));
                 refreshTokenRepository.save(token);
             });
         }

@@ -84,6 +84,8 @@ class AuthServiceRefreshTest {
         assertNotNull(result.refreshToken());
         assertFalse(result.refreshToken().isBlank());
 
+        verify(refreshTokenRepository).revokeAllActiveTokensByUser(eq(user), any(LocalDateTime.class));
+
         ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(captor.capture());
 
@@ -92,6 +94,34 @@ class AuthServiceRefreshTest {
         assertNotNull(savedToken.getTokenHash());
         assertNotEquals(result.refreshToken(), savedToken.getTokenHash()); // Hash is not raw token
         assertNotNull(savedToken.getExpiresAt());
+    }
+
+    @Test
+    void testLogin_RevokesExistingActiveTokensForUser_EnforcesSingleSession() {
+        User user = new User();
+        user.setId(2L);
+        user.setEmail("user2@test.com");
+        user.setPasswordHash("hashed_pw");
+        user.setActive(true);
+        Role role = new Role();
+        role.setName("CLUB_MANAGER");
+        user.setRole(role);
+
+        when(userRepository.findByEmail("user2@test.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "hashed_pw")).thenReturn(true);
+        when(jwtUtil.generateToken(2L, "user2@test.com", "CLUB_MANAGER")).thenReturn("access_token_2");
+
+        LoginRequest request = new LoginRequest();
+        request.setEmail("user2@test.com");
+        request.setPassword("password");
+
+        authService.login(request);
+
+        ArgumentCaptor<LocalDateTime> cutoffCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(refreshTokenRepository).revokeAllActiveTokensByUser(eq(user), cutoffCaptor.capture());
+
+        // Revocation cutoff must be in the past beyond grace period (30s) so old tokens fail immediately
+        assertTrue(cutoffCaptor.getValue().isBefore(LocalDateTime.now().minusSeconds(30)));
     }
 
     @Test
