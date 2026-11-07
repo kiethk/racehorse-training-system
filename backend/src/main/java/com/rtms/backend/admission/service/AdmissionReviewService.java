@@ -250,11 +250,10 @@ public class AdmissionReviewService {
         Horse horse = horseId != null ? horses.findById(horseId).orElse(null) : null;
         LocalDateTime now = LocalDateTime.now();
 
-        // AD-022/AD-025 rule 6: mở rộng như nghiệp vụ cũ (mọi lịch còn mở của ngựa),
-        // nhưng xóa cứng thay vì CANCELLED. NOT EXISTS trong hàm xóa bảo vệ ca URGENT
-        // còn horse_incident_reports / health_records tham chiếu — những ca đó ở lại.
+        // Tự động chuyển CANCELLED các lịch chưa diễn ra của ngựa khi vet từ chối nhập viện.
         if (horseId != null) {
-            careSchedules.deleteOpenSchedulesIfUnreferenced(horseId, CareScheduleStatus.OPEN);
+            careSchedules.cancelOpenSchedulesIfUnreferenced(horseId, CareScheduleStatus.OPEN,
+                    "Admission application rejected during veterinary review: " + reason, now);
         }
 
         // Release the quarantine stall if one is recorded for this admission.

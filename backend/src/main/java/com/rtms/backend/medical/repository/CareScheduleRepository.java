@@ -106,15 +106,19 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
 
 
     /**
-     * AD-025 rule 5: xóa cứng lịch chưa diễn ra, chỉ khi không bản ghi y tế nào tham chiếu.
+     * Tự động chuyển CANCELLED các lịch chưa diễn ra của ngựa (khi Admission bị từ chối hoặc ngựa chuyển INACTIVE).
      */
     @Modifying(clearAutomatically = true)
-    @Query("DELETE FROM CareSchedule cs WHERE cs.horseId = :horseId "
+    @Query("UPDATE CareSchedule cs SET cs.status = com.rtms.backend.medical.enums.CareScheduleStatus.CANCELLED, "
+            + "cs.cancelReason = :cancelReason, cs.updatedAt = :now "
+            + "WHERE cs.horseId = :horseId "
             + "AND cs.status IN :statuses AND cs.completedAt IS NULL "
             + "AND NOT EXISTS (SELECT hr.id FROM HealthRecord hr WHERE hr.careScheduleId = cs.id) "
             + "AND NOT EXISTS (SELECT ir.id FROM HorseIncidentReport ir WHERE ir.careScheduleId = cs.id)")
-    int deleteOpenSchedulesIfUnreferenced(@Param("horseId") Long horseId,
-            @Param("statuses") java.util.Collection<CareScheduleStatus> statuses);
+    int cancelOpenSchedulesIfUnreferenced(@Param("horseId") Long horseId,
+            @Param("statuses") java.util.Collection<CareScheduleStatus> statuses,
+            @Param("cancelReason") String cancelReason,
+            @Param("now") LocalDateTime now);
 
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.horseId = :horseId AND cs.status = :status AND (cs.scheduledDate IS NOT NULL OR cs.scheduledAt IS NOT NULL)")
     List<CareSchedule> findScheduledForHorse(@Param("horseId") Long horseId, @Param("status") CareScheduleStatus status);
