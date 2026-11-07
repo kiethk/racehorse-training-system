@@ -2029,9 +2029,18 @@ public class CareScheduleService {
 
     @Transactional(readOnly = true)
     public List<UrgentAssignmentAlert> getPendingUrgentAlerts(Long veterinarianId) {
+        return getPendingUrgentAlerts(veterinarianId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UrgentAssignmentAlert> getPendingUrgentAlerts(Long veterinarianId, boolean includeCompleted) {
+        List<CareScheduleStatus> statuses = includeCompleted
+                ? List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.DELAYED, CareScheduleStatus.OVERDUE, CareScheduleStatus.COMPLETED)
+                : CareScheduleStatus.BOOKED_OR_ACTIVE;
+
         return careScheduleRepository.findByVeterinarianIdAndCareTypeAndStatusIn(
                         veterinarianId, CareType.URGENT,
-                        CareScheduleStatus.BOOKED_OR_ACTIVE).stream()
+                        statuses).stream()
                 .map(schedule -> {
                     HorseIncidentReport incident = schedule.getSourceIncidentId() != null
                             ? incidentReportRepository.findById(schedule.getSourceIncidentId()).orElse(null)
@@ -2041,6 +2050,7 @@ public class CareScheduleService {
                             : buildUrgentAlert(schedule, incident, horse, veterinarianId, schedule.getUpdatedAt());
                 })
                 .filter(Objects::nonNull)
+                .sorted((a, b) -> Long.compare(b.scheduleId(), a.scheduleId()))
                 .toList();
     }
 

@@ -40,8 +40,9 @@ public class CareScheduleController {
     @GetMapping("/urgent-alerts/pending")
     @PreAuthorize("principal.role == 'VETERINARIAN'")
     public ApiResponse<List<UrgentAssignmentAlert>> pendingUrgentAlerts(
+            @RequestParam(required = false, defaultValue = "false") boolean includeCompleted,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(careScheduleService.getPendingUrgentAlerts(currentUser.getUserId()));
+        return ApiResponse.success(careScheduleService.getPendingUrgentAlerts(currentUser.getUserId(), includeCompleted));
     }
 
     @GetMapping("/urgent-alerts/{scheduleId}")
