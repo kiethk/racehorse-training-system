@@ -127,7 +127,7 @@ class HorseStatusChangeTest {
 
         // Assert Care hard-deleted (AD-025 rule 6: no more CANCELLED)
         verify(careScheduleRepository).deleteOpenSchedulesIfUnreferenced(
-                eq(horseId), eq(List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED)));
+                eq(horseId), eq(List.of(CareScheduleStatus.SCHEDULED)));
         verify(careScheduleRepository, never()).saveAll(any());
 
         // Assert Groom tasks deleted

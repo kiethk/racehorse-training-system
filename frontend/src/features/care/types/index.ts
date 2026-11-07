@@ -1,4 +1,4 @@
-export type CareScheduleStatus = 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'PAUSED' | 'DELAYED' | 'OVERDUE' | 'COMPLETED';
+export type CareScheduleStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type CareType = 'INITIAL' | 'ROUTINE' | 'URGENT';
 export type TrainingDecision = 'ALLOWED' | 'RESTRICTED' | 'BLOCKED';
 

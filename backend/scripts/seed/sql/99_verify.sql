@@ -94,14 +94,9 @@ INSERT INTO seed_check VALUES
  $q$ SELECT id FROM care_schedule WHERE care_type IN ('ROUTINE', 'INITIAL') AND scheduled_at IS NOT NULL $q$),
 ('Horse with more than one examination in progress',
  $q$ SELECT horse_id FROM care_schedule WHERE status = 'IN_PROGRESS' GROUP BY horse_id HAVING count(*) > 1 $q$),
-('Booked schedule without vet or date / unbooked schedule with a vet slot',
+('Booked schedule without vet or date',
  $q$ SELECT id FROM care_schedule
-     WHERE (status IN ('SCHEDULED', 'IN_PROGRESS', 'COMPLETED') AND (veterinarian_id IS NULL OR scheduled_date IS NULL))
-        OR (status = 'REQUESTED' AND scheduled_at IS NOT NULL)
-        OR (status = 'REQUESTED' AND care_type = 'ROUTINE' AND veterinarian_id IS NOT NULL) $q$),
-('Pending routine schedule inside the 14-day horizon left unbooked',
- $q$ SELECT id FROM care_schedule WHERE status = 'REQUESTED' AND care_type = 'ROUTINE'
-       AND GREATEST(created_at, requested_at - INTERVAL '14 days') <= pg_temp.clock() $q$),
+     WHERE status IN ('IN_PROGRESS', 'COMPLETED') AND (veterinarian_id IS NULL OR scheduled_date IS NULL) $q$),
 ('Completed schedule without exactly one health record / open schedule with one',
  $q$ SELECT c.id FROM care_schedule c
      WHERE (c.status = 'COMPLETED') <> EXISTS (SELECT 1 FROM health_records h WHERE h.care_schedule_id = c.id)
@@ -119,23 +114,23 @@ INSERT INTO seed_check VALUES
 ('BLOCKED horse without a pending examination to lift the block',
  $q$ SELECT h.id FROM horses h WHERE h.training_decision = 'BLOCKED'
        AND NOT EXISTS (SELECT 1 FROM care_schedule c WHERE c.horse_id = h.id AND c.purpose = 'FOLLOW_UP'
-                        AND c.status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS')) $q$),
+                        AND c.status IN ('SCHEDULED', 'IN_PROGRESS')) $q$),
 ('Incident status does not match its urgent case',
  $q$ SELECT i.id FROM horse_incident_reports i JOIN care_schedule c ON c.id = i.care_schedule_id
-     WHERE (i.status IN ('REPORTED', 'IN_REVIEW') AND c.status NOT IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS'))
+     WHERE (i.status IN ('REPORTED', 'IN_REVIEW') AND c.status NOT IN ('SCHEDULED', 'IN_PROGRESS'))
         OR (i.status = 'RESOLVED' AND (c.status <> 'COMPLETED' OR i.handled_by_id IS DISTINCT FROM c.veterinarian_id))
         OR i.care_schedule_id IS NULL $q$),
-('Cancelled care schedule exists (AD-022 forbids CANCELLED in care_schedule)',
- $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' $q$),
-('Care schedule with status outside the 6-status enum (AD-022)',
- $q$ SELECT id FROM care_schedule WHERE status NOT IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS', 'PAUSED', 'DELAYED', 'OVERDUE', 'COMPLETED') $q$),
+('Cancelled schedule without cancel_reason',
+ $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' AND (cancel_reason IS NULL OR trim(cancel_reason) = '') $q$),
+('Care schedule with status outside the 4-status enum',
+ $q$ SELECT id FROM care_schedule WHERE status NOT IN ('SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED') $q$),
 ('Health metric hydration status outside the HydrationStatus enum',
  $q$ SELECT id FROM horse_health_metrics
      WHERE hydration_status NOT IN ('NORMAL', 'MILD_DEHYDRATION', 'MODERATE_DEHYDRATION', 'SEVERE_DEHYDRATION', 'ABNORMAL_CRT') $q$),
 ('Admitted or candidate horse without a pending vaccination milestone',
  $q$ SELECT h.id FROM horses h WHERE h.current_status = 'ELIGIBLE'
        AND NOT EXISTS (SELECT 1 FROM care_schedule c WHERE c.horse_id = h.id AND c.purpose = 'PREVENTIVE'
-                        AND c.status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS')) $q$),
+                        AND c.status IN ('SCHEDULED', 'IN_PROGRESS')) $q$),
 ('Vaccination milestone without the list of due protocols',
  $q$ SELECT id FROM care_schedule WHERE purpose = 'PREVENTIVE' AND (description IS NULL OR description NOT LIKE 'Preventive care: _%') $q$),
 ('Vital reading outside what a living horse can show',

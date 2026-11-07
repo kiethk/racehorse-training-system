@@ -80,12 +80,7 @@ public class CareScheduleController {
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         Long requestedById = null;
         if ("VETERINARIAN".equals(currentUser.getRole())) {
-            if (status == CareScheduleStatus.REQUESTED) {
-                // REQUESTED schedules have no veterinarian assigned yet; show the ones this vet created
-                requestedById = currentUser.getUserId();
-            } else {
-                veterinarianId = currentUser.getUserId();
-            }
+            veterinarianId = currentUser.getUserId();
         }
         if ("GROOM".equals(currentUser.getRole())) {
             return ApiResponse.success(careScheduleService.listSchedulesForAdmissionAssignee(status, careType,
@@ -125,11 +120,14 @@ public class CareScheduleController {
         return ApiResponse.success(careScheduleService.completeCareSchedule(id, request, currentUser.getUserId()));
     }
 
-    /**
-     * AD-022 removed POST /{id}/cancel: a care schedule is never cancelled. Use
-     * POST /{id}/reschedule to move it, or let the lifecycle sweep mark it OVERDUE and
-     * roll it to the next working day at 17:00.
-     */
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasRole('CLUB_MANAGER') or principal.role == 'CLUB_MANAGER'")
+    public ApiResponse<CareScheduleResponse> cancel(
+            @PathVariable Long id,
+            @Valid @RequestBody CancelCareScheduleRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.success(careScheduleService.cancelCareSchedule(id, request, currentUser.getUserId()));
+    }
 
     @PostMapping("/create-next")
     @PreAuthorize("hasAuthority('VET_EXAM_MANAGE') or hasAuthority('ROLE_VETERINARIAN') or principal.role == 'VETERINARIAN'")

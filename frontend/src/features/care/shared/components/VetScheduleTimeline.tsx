@@ -309,10 +309,8 @@ export function VetScheduleTimeline() {
                 <option value="ALL">All Statuses</option>
                 <option value="SCHEDULED">Scheduled</option>
                 <option value="IN_PROGRESS">In Progress</option>
-                <option value="DELAYED">Delayed</option>
-                <option value="OVERDUE">Overdue</option>
-                <option value="PAUSED">Paused</option>
                 <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
               </Select>
             </div>
           </div>

@@ -497,13 +497,13 @@ class UrgentCareCompletionTest {
     void testCancel_lastPendingExamOfBlockedHorse_rejected() {
         // Under AD-022, cancelCareSchedule is removed entirely. The LAST_FOLLOW_UP
         // vulnerability no longer exists because neither Vet nor Manager can delete exams.
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test
     @DisplayName("AD-022: duplicate booking cancellation abolished — reschedule used instead")
     void testCancel_blockedHorseWithAnotherPendingExam_allowed() {
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     private void stubCompletion() {

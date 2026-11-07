@@ -60,7 +60,7 @@ public record CareScheduleResponse(
                 cs.getDurationMinutes(),
                 cs.getDescription(),
                 cs.getCompletedAt(),
-                null,
+                cs.getCancelReason(),
                 cs.getCreatedAt(),
                 cs.getUpdatedAt(),
                 cs.getPurpose(),

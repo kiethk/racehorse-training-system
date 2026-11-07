@@ -132,7 +132,7 @@ class PreventiveStatusServiceTest {
 
         assertEquals(CareType.ROUTINE, milestone.getCareType());
         assertEquals(CareSchedulePurpose.PREVENTIVE, milestone.getPurpose());
-        assertEquals(CareScheduleStatus.REQUESTED, milestone.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, milestone.getStatus());
         assertEquals(TODAY.plusDays(165).atTime(14, 0), milestone.getRequestedAt());
         assertNull(milestone.getVeterinarianId());
         assertEquals(ACTOR, milestone.getRequestedById());
@@ -172,7 +172,7 @@ class PreventiveStatusServiceTest {
 
     @Test
     void movesAnExistingRequestedMilestoneInsteadOfCreatingAnother() {
-        CareSchedule existing = milestone(CareScheduleStatus.REQUESTED, TODAY.plusDays(3).atTime(14, 0), null);
+        CareSchedule existing = milestone(CareScheduleStatus.SCHEDULED, TODAY.plusDays(3).atTime(14, 0), null);
         when(schedules.findFirstByHorseIdAndPurposeAndStatusIn(eq(HORSE), eq(CareSchedulePurpose.PREVENTIVE), any()))
                 .thenReturn(Optional.of(existing));
         dose(1L, TODAY);
@@ -200,7 +200,7 @@ class PreventiveStatusServiceTest {
         verify(schedules).delete(booked);
         verify(schedules).flush();
         assertNotSame(booked, next);
-        assertEquals(CareScheduleStatus.REQUESTED, next.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, next.getStatus());
         assertEquals(TODAY.plusDays(180).atTime(14, 0), next.getRequestedAt());
         assertEquals(RescheduleReason.OTHER, next.getRescheduleReason());
         assertNotNull(next.getRescheduleNote());
@@ -312,7 +312,7 @@ class PreventiveStatusServiceTest {
 
         assertEquals(TODAY.plusDays(8).atTime(14, 0), milestone.getRequestedAt());
         assertEquals(com.rtms.backend.medical.enums.RescheduleReason.UNDER_TREATMENT, milestone.getRescheduleReason());
-        assertEquals(CareScheduleStatus.REQUESTED, milestone.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, milestone.getStatus());
     }
 
     @Test

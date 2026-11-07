@@ -216,12 +216,12 @@ class CareSchedulePreventiveIntegrationTest {
         milestone.setHorseId(10L);
         milestone.setCareType(CareType.ROUTINE);
         milestone.setPurpose(CareSchedulePurpose.PREVENTIVE);
-        milestone.setStatus(CareScheduleStatus.REQUESTED);
+        milestone.setStatus(CareScheduleStatus.SCHEDULED);
         milestone.setRequestedAt(LocalDateTime.now().plusDays(180));
 
         service.assignRequestedSchedule(milestone);
 
-        assertEquals(CareScheduleStatus.REQUESTED, milestone.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, milestone.getStatus());
         assertNull(milestone.getVeterinarianId());
         verify(horses, never()).findByIdForUpdate(any());
         verify(schedules, never()).save(any());
@@ -254,13 +254,13 @@ class CareSchedulePreventiveIntegrationTest {
     @DisplayName("AD-022: cancelCareSchedule abolished — care schedules are moved via reschedule instead")
     void blockedHorseCannotLoseItsLastFollowUpEvenIfAPreventiveMilestoneExists() {
         // Under AD-022, cancelCareSchedule is removed. Blocked horses retain their follow-ups.
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     @Test
     @DisplayName("AD-022: preventive milestone cancellation abolished")
     void preventiveMilestoneOfABlockedHorseCanBeCancelled() {
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 
     // ---- helpers ----
