@@ -10,6 +10,7 @@ export interface CareScheduleResponse {
   sourceIncidentId: number | null;
   careType: CareType;
   status: CareScheduleStatus;
+  scheduledDate?: string | null;
   scheduledAt: string | null;
   durationMinutes: number;
   description: string | null;
@@ -19,8 +20,9 @@ export interface CareScheduleResponse {
   updatedAt: string;
   purpose: 'FOLLOW_UP' | 'PREVENTIVE';
   requestedAt: string | null;
-  rescheduleReason: 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'EOD_ROLLOVER' | 'OTHER' | null;
+  rescheduleReason: 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'EOD_ROLLOVER' | 'URGENT_PREEMPTION' | 'TIME_EXCEEDED' | 'PEER_OFFLOAD' | 'OTHER' | null;
   rescheduleNote: string | null;
+  rolloverCount?: number;
   /** D1 cờ dẫn xuất từ BE: ca IN_PROGRESS quá 30' so với giờ hẹn (không phải trạng thái DB). */
   overdue?: boolean;
   pausedFrom?: string | null;

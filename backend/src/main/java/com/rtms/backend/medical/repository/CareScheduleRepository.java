@@ -17,6 +17,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -27,9 +28,15 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
 
     List<CareSchedule> findByHorseIdOrderByScheduledAtAsc(Long horseId);
 
+    @Query("SELECT cs FROM CareSchedule cs WHERE cs.horseId IN :horseIds "
+            + "AND cs.status IN :statuses "
+            + "AND ((cs.scheduledDate IS NOT NULL AND cs.scheduledDate = cast(:start as date)) "
+            + "     OR (cs.scheduledDate IS NULL AND cs.scheduledAt >= :start AND cs.scheduledAt < :end))")
     List<CareSchedule> findByHorseIdInAndScheduledAtBetweenAndStatusIn(
-            Collection<Long> horseIds, LocalDateTime start, LocalDateTime end,
-            Collection<CareScheduleStatus> statuses);
+            @Param("horseIds") Collection<Long> horseIds,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("statuses") Collection<CareScheduleStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.id = :id")
@@ -72,7 +79,9 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
                                               @Param("horizon") LocalDateTime horizon);
 
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.veterinarianId IS NOT NULL "
-            + "AND cs.status IN :statuses AND cs.scheduledAt >= :dayStart AND cs.scheduledAt < :dayEnd")
+            + "AND cs.status IN :statuses "
+            + "AND ((cs.scheduledDate IS NOT NULL AND cs.scheduledDate = cast(:dayStart as date)) "
+            + "     OR (cs.scheduledDate IS NULL AND cs.scheduledAt >= :dayStart AND cs.scheduledAt < :dayEnd))")
     List<CareSchedule> findAssignedInDay(@Param("dayStart") LocalDateTime dayStart,
             @Param("dayEnd") LocalDateTime dayEnd,
             @Param("statuses") Collection<CareScheduleStatus> statuses);
@@ -129,7 +138,7 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     int deleteOpenSchedulesIfUnreferenced(@Param("horseId") Long horseId,
             @Param("statuses") java.util.Collection<CareScheduleStatus> statuses);
 
-    @Query("SELECT cs FROM CareSchedule cs WHERE cs.horseId = :horseId AND cs.status = :status AND cs.scheduledAt IS NOT NULL")
+    @Query("SELECT cs FROM CareSchedule cs WHERE cs.horseId = :horseId AND cs.status = :status AND (cs.scheduledDate IS NOT NULL OR cs.scheduledAt IS NOT NULL)")
     List<CareSchedule> findScheduledForHorse(@Param("horseId") Long horseId, @Param("status") CareScheduleStatus status);
 
     /** D1 auto-activate: mọi ca SCHEDULED đã đến giờ (job chạy trong 08:00–17:00). */
@@ -147,7 +156,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     @Query("SELECT cs FROM CareSchedule cs WHERE cs.status IN :statuses "
             + "AND cs.careType IN (com.rtms.backend.medical.enums.CareType.INITIAL, "
             + "com.rtms.backend.medical.enums.CareType.ROUTINE) "
-            + "AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now")
+            + "AND ((cs.scheduledDate IS NOT NULL AND cs.scheduledDate <= cast(:now as date)) "
+            + "     OR (cs.scheduledDate IS NULL AND cs.scheduledAt IS NOT NULL AND cs.scheduledAt <= :now))")
     List<CareSchedule> findRollableEodCandidates(@Param("statuses") Collection<CareScheduleStatus> statuses,
             @Param("now") LocalDateTime now);
 
@@ -158,10 +168,11 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     List<CareSchedule> findStaleUrgentForEscalation(@Param("statuses") Collection<CareScheduleStatus> statuses,
             @Param("now") LocalDateTime now);
 
-    @Query("SELECT cs FROM CareSchedule cs WHERE cs.veterinarianId = :vetId AND cs.status = :status AND cs.scheduledAt IS NOT NULL")
+    @Query("SELECT cs FROM CareSchedule cs WHERE cs.veterinarianId = :vetId AND cs.status = :status AND (cs.scheduledDate IS NOT NULL OR cs.scheduledAt IS NOT NULL)")
     List<CareSchedule> findScheduledForVet(@Param("vetId") Long vetId, @Param("status") CareScheduleStatus status);
 
-    List<CareSchedule> findByStatusInAndScheduledAtIsNotNull(Collection<CareScheduleStatus> statuses);
+    @Query("SELECT cs FROM CareSchedule cs WHERE cs.status IN :statuses AND (cs.scheduledDate IS NOT NULL OR cs.scheduledAt IS NOT NULL)")
+    List<CareSchedule> findByStatusInAndScheduledAtIsNotNull(@Param("statuses") Collection<CareScheduleStatus> statuses);
 
     List<CareSchedule> findByStatusInAndVeterinarianIdIsNotNull(Collection<CareScheduleStatus> statuses);
 
@@ -169,14 +180,27 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
     List<CareSchedule> findByVeterinarianId(Long veterinarianId);
     boolean existsByVeterinarianIdAndStatusIn(Long veterinarianId, Collection<CareScheduleStatus> statuses);
 
+    boolean existsByVeterinarianIdAndCareTypeAndStatusInAndScheduledDate(
+            Long veterinarianId, CareType careType, Collection<CareScheduleStatus> statuses, LocalDate scheduledDate);
+
+    List<CareSchedule> findByVeterinarianIdAndScheduledDateAndCareTypeAndStatusInOrderByCreatedAtAsc(
+            Long veterinarianId, LocalDate scheduledDate, CareType careType, Collection<CareScheduleStatus> statuses);
+
+    List<CareSchedule> findByScheduledDateAndCareTypeAndStatusIn(
+            LocalDate scheduledDate, CareType careType, Collection<CareScheduleStatus> statuses);
+
+    long countByVeterinarianIdAndScheduledDateAndCareTypeAndStatusIn(
+            Long veterinarianId, LocalDate scheduledDate, CareType careType, Collection<CareScheduleStatus> statuses);
+
     @Query("SELECT cs FROM CareSchedule cs WHERE (:status IS NULL OR cs.status = :status) "
             + "AND (:careType IS NULL OR cs.careType = :careType) "
             + "AND (:horseId IS NULL OR cs.horseId = :horseId) "
             + "AND (:vetId IS NULL OR cs.veterinarianId = :vetId) "
             + "AND (:requestedById IS NULL OR cs.requestedById = :requestedById) "
             + "AND (:admissionId IS NULL OR cs.admissionId = :admissionId) "
-            + "AND (cast(:dayStart as timestamp) IS NULL OR cs.scheduledAt >= :dayStart) "
-            + "AND (cast(:dayEnd as timestamp) IS NULL OR cs.scheduledAt < :dayEnd)")
+            + "AND (cast(:dayStart as timestamp) IS NULL OR (cs.scheduledDate IS NOT NULL AND cs.scheduledDate = cast(:dayStart as date)) OR (cs.scheduledDate IS NULL AND cs.scheduledAt >= :dayStart)) "
+            + "AND (cast(:dayEnd as timestamp) IS NULL OR (cs.scheduledDate IS NOT NULL AND cs.scheduledDate = cast(:dayStart as date)) OR (cs.scheduledDate IS NULL AND cs.scheduledAt < :dayEnd)) "
+            + "ORDER BY cs.createdAt DESC, cs.id DESC")
     Page<CareSchedule> findFiltered(@Param("status") CareScheduleStatus status,
             @Param("careType") CareType careType, @Param("horseId") Long horseId,
             @Param("vetId") Long vetId, @Param("requestedById") Long requestedById,
@@ -188,7 +212,8 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             + "AND (:status IS NULL OR cs.status = :status) AND (:careType IS NULL OR cs.careType = :careType) "
             + "AND (:horseId IS NULL OR cs.horseId = :horseId) AND (:vetId IS NULL OR cs.veterinarianId = :vetId) "
             + "AND (:admissionId IS NULL OR cs.admissionId = :admissionId) "
-            + "AND a.groomId = :userId")
+            + "AND a.groomId = :userId "
+            + "ORDER BY cs.createdAt DESC, cs.id DESC")
     Page<CareSchedule> findFilteredForGroom(@Param("status") CareScheduleStatus status,
             @Param("careType") CareType careType, @Param("horseId") Long horseId,
             @Param("vetId") Long vetId, @Param("admissionId") Long admissionId,

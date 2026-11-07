@@ -125,7 +125,7 @@ class CareSchedulePrescriptionFlowTest {
         req.setTrainingDecision(TrainingDecision.ALLOWED);
         CreateNextScheduleRequest next = new CreateNextScheduleRequest();
         next.setCareType(CareType.ROUTINE);
-        next.setScheduledAt(LocalDateTime.of(2026, 11, 6, 14, 0));
+        next.setScheduledAt(LocalDateTime.now().plusDays(7).withHour(14).withMinute(0).withSecond(0).withNano(0));
         next.setDescription("Follow-up recheck");
         req.setNextSchedule(next);
         return req;

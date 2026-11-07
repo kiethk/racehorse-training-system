@@ -31,7 +31,7 @@ import { MedicalFindingsSection } from '../shared/components/MedicalFindingsSect
 import { CareRecordDetailModal } from '@/features/care/components/CareRecordDetailModal';
 import { getCareTypeTone } from '@/features/schedule/utils/timelineUtils';
 import { formatDate, formatDateTime } from '@/lib/display';
-import { getScheduleStatusDisplay } from '@/features/care/lib/scheduleStatusDisplay';
+import { getScheduleExamAction, getScheduleStatusDisplay } from '@/features/care/lib/scheduleStatusDisplay';
 import { admissionsApi } from '../services/api';
 import type {
   AdmissionDetailResponse,
@@ -620,11 +620,8 @@ export function VetAdmissionQueue() {
       <InfoRow label="Schedule" value={currentActiveSchedule ? getScheduleStatusDisplay(currentActiveSchedule.status).label : 'Not scheduled'} />
       <InfoRow label="Quarantine stall" value={detail.quarantineStallCode || 'Not assigned'} />
       <InfoRow label="Trainer" value={<EntityLink href={detail.trainerId ? entityHref('user', detail.trainerId, 'VETERINARIAN') : null}>{detail.trainerName || (detail.trainerId ? `Trainer #${detail.trainerId}` : 'Pending assignment')}</EntityLink>} />
-      {currentActiveSchedule?.scheduledAt && <InfoRow label="Scheduled" value={formatDateTime(currentActiveSchedule.scheduledAt)} />}
-      {canStartExam && (
-        <Button type="button" className="w-full transition-all active:scale-[0.97]" variant="primary" loading={startingExam} onClick={handleStartExam} icon="activity">
-          Start examination
-        </Button>
+      {(currentActiveSchedule?.scheduledDate || currentActiveSchedule?.scheduledAt) && (
+        <InfoRow label="Scheduled" value={formatDate((currentActiveSchedule.scheduledDate || currentActiveSchedule.scheduledAt)!)} />
       )}
     </AdmissionSideCard>
   ) : null;
@@ -647,7 +644,6 @@ export function VetAdmissionQueue() {
           }}
           options={[
             { value: 'ACTIVE', label: 'Active', count: summary.active ?? summary.total },
-            { value: 'IN_PROGRESS', label: 'In exam', count: summary.inProgress },
             { value: 'APPROVED', label: 'Approved', count: summary.approved ?? 0 },
             { value: 'REVIEWED', label: 'Reviewed', count: summary.reviewed ?? 0 },
           ]}
@@ -696,11 +692,6 @@ export function VetAdmissionQueue() {
                 isVetStageCompleted(row.admissionStatus) ||
                 row.careSchedule?.status === 'COMPLETED' ||
                 queuePillFilter === 'APPROVED';
-              const effectiveCareType: CareType | undefined = isVetApproved
-                ? 'INITIAL'
-                : row.careSchedule?.careType;
-              const effectivePurpose = isVetApproved ? null : row.careSchedule?.purpose;
-              const priority = getPriorityBadge(effectiveCareType, effectivePurpose);
               const stallCode =
                 stallCodes[row.admissionId] ||
                 row.quarantineStallCode ||
@@ -708,17 +699,10 @@ export function VetAdmissionQueue() {
               const status: CareScheduleStatus | undefined = isVetApproved
                 ? 'COMPLETED'
                 : row.careSchedule?.status;
+              const examAction = getScheduleExamAction(status);
               const action = isVetApproved
-                ? ({ label: 'View Record', icon: 'clipboard' as const, primary: false })
-                : status === 'PAUSED'
-                ? ({ label: 'Continue (Paused)', icon: 'activity' as const, primary: true })
-                : status === 'IN_PROGRESS' || status === 'DELAYED'
-                ? ({ label: 'Continue', icon: 'activity' as const, primary: true })
-                : status === 'OVERDUE'
-                ? ({ label: 'Examine (Overdue)', icon: 'stethoscope' as const, primary: true })
-                : status === 'SCHEDULED'
-                ? ({ label: 'Examine', icon: 'stethoscope' as const, primary: true })
-                : ({ label: 'Details', icon: 'chevron-right' as const, primary: false });
+                ? ({ label: 'View Record', icon: 'file-text' as const, primary: false })
+                : ({ label: examAction.label, icon: examAction.icon, primary: examAction.label === 'Examine' });
 
               const rowVetId = row.careSchedule?.veterinarianId ?? row.careSchedule?.assignedVetId ?? null;
               const isAssignedToMe = Boolean(rowVetId && user?.userId && rowVetId === user.userId);
@@ -735,46 +719,50 @@ export function VetAdmissionQueue() {
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <HorseAvatar name={row.candidateName} image={row.imageUrl} size={42} rounded="md" />
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="truncate">
                           <EntityLink href={row.horseId ? entityHref('horse', row.horseId, 'VETERINARIAN') : null} className="text-base font-bold text-[var(--color-text-primary)] truncate">
                             {row.candidateName}
                           </EntityLink>
-                          <Pill tone={priority.tone} size="sm" icon={priority.icon}>
-                            {priority.label}
-                          </Pill>
-                          <AdmissionStatusBadge status={row.admissionStatus} size="sm" />
-                          {status && (
-                            <Pill
-                              tone={getScheduleStatusDisplay(status).tone}
-                              size="sm"
-                              icon={getScheduleStatusDisplay(status).icon}
-                            >
-                              {getScheduleStatusDisplay(status).label}
-                            </Pill>
-                          )}
                         </div>
+                        {((status && status !== 'SCHEDULED' && status !== 'IN_PROGRESS') ||
+                          Boolean((row.careSchedule?.rolloverCount ?? 0) > 0) ||
+                          row.careSchedule?.rescheduleReason === 'PEER_OFFLOAD') && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {status && status !== 'SCHEDULED' && status !== 'IN_PROGRESS' && (
+                              <Pill
+                                tone={getScheduleStatusDisplay(status).tone}
+                                size="sm"
+                                icon={getScheduleStatusDisplay(status).icon}
+                              >
+                                {getScheduleStatusDisplay(status).label}
+                              </Pill>
+                            )}
+                            {Boolean((row.careSchedule?.rolloverCount ?? 0) > 0) && (
+                              <Pill tone="warning" size="sm">
+                                Rolled {row.careSchedule?.rolloverCount}x
+                              </Pill>
+                            )}
+                            {row.careSchedule?.rescheduleReason === 'PEER_OFFLOAD' && (
+                              <Pill tone="neutral" size="sm">
+                                Transferred
+                              </Pill>
+                            )}
+                          </div>
+                        )}
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                           <span className="inline-flex items-center gap-1 shrink-0">
                             <Icon name="building" size={12} />
-                            <span>{isApproved ? 'Stall:' : 'Quarantine Stall:'} <strong>{stallCode}</strong></span>
+                            <span>{isApproved ? 'Stall' : 'Quarantine Stall'} <strong>{stallCode}</strong></span>
                           </span>
                           <span>·</span>
                           <span className="inline-flex items-center gap-1 shrink-0">
                             <Icon name="calendar" size={12} className="text-[var(--color-primary)]" />
-                            {row.careSchedule?.scheduledAt ? (
-                              <strong>{formatDateTime(row.careSchedule.scheduledAt)}</strong>
-                            ) : row.careSchedule?.scheduledDate ? (
-                              <span>Target: <strong>{formatDate(row.careSchedule.scheduledDate)}</strong></span>
+                            {row.careSchedule?.scheduledDate || row.careSchedule?.scheduledAt ? (
+                              <strong>{formatDate((row.careSchedule.scheduledDate || row.careSchedule.scheduledAt)!)}</strong>
                             ) : (
                               <span className="italic text-[var(--color-text-muted)]">Awaiting slot</span>
                             )}
                           </span>
-                          {isAssignedToMe && (
-                            <>
-                              <span>·</span>
-                              <span className="font-semibold text-[var(--color-primary)]">Assigned to you</span>
-                            </>
-                          )}
                         </div>
                       </div>
                     </div>

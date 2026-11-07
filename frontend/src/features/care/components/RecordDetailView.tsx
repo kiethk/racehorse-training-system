@@ -21,6 +21,7 @@ import type { HorseHealthMetric } from '@/features/horses/types';
 import { displayError, formatDate, formatDateTime } from '@/lib/display';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { BioSpcControlChart } from '@/features/medical-analytics';
 
 // The 3D canvas (three.js + GLB) must stay out of the server bundle.
 const UrgentHorseInjuryViewer = dynamic(
@@ -248,7 +249,7 @@ export function RecordDetailView({
     return <Notice tone="warning">No clinical record to display.</Notice>;
   }
 
-  const resolvedHorseId = detail?.schedule?.horseId ?? fullRecord?.horseId ?? null;
+  const resolvedHorseId = detail?.schedule?.horseId ?? fullRecord?.horseId ?? horseId ?? null;
   const resolvedHorseName = detail?.horse?.name || horseName || (resolvedHorseId != null ? `#${resolvedHorseId}` : '—');
   const recordIdShown = activeRecordId ?? detail?.healthRecord?.id ?? fullRecord?.id ?? null;
   const trainingDecision = detail?.healthRecord?.trainingDecision ?? fullRecord?.trainingDecision ?? null;
@@ -321,7 +322,12 @@ export function RecordDetailView({
           <Panel padded className="border-l-4 border-l-[var(--color-medical)]">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3.5">
-                <HorseAvatar name={resolvedHorseName} image={null} size={50} rounded="md" />
+                <HorseAvatar
+                  name={resolvedHorseName}
+                  image={resolvedHorseId ? `/api/horses/${resolvedHorseId}/photo` : null}
+                  size={50}
+                  rounded="md"
+                />
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
@@ -509,6 +515,11 @@ export function RecordDetailView({
               <p className="text-xs text-[var(--color-text-muted)] py-2 text-center">No vitals recorded yet.</p>
             )}
           </Panel>
+
+          {/* 3.1 Personalized Bio-Process Control (Bio-SPC) */}
+          {resolvedHorseId != null && (
+            <BioSpcControlChart horseId={resolvedHorseId} horseName={resolvedHorseName} />
+          )}
 
           {/* 4. Injury — list + button opening the 3D map modal */}
           <Panel padded className="space-y-3">
@@ -743,17 +754,50 @@ export function RecordDetailView({
                 <Icon name="activity" size={16} className="text-[var(--color-primary)]" />
                 Health Metrics Trend
               </h2>
-              <div className="h-48">
+              <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={metrics.map((m) => ({ ...m, date: formatDate(m.recordedAt) }))}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
+                    <YAxis
+                      yAxisId="left"
+                      tick={{ fontSize: 10 }}
+                      domain={['auto', 'auto']}
+                      label={{ value: 'Vitals (bpm / °C)', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--color-text-muted)' } }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fontSize: 10 }}
+                      domain={['auto', 'auto']}
+                      label={{ value: 'Weight (kg)', angle: 90, position: 'insideRight', style: { fontSize: 10, fill: 'var(--color-text-muted)' } }}
+                    />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="heartRate" stroke="var(--color-danger)" name="Heart rate" dot={false} />
-                    <Line type="monotone" dataKey="temperature" stroke="var(--color-warning)" name="Temp °C" dot={false} />
-                    <Line type="monotone" dataKey="weight" stroke="var(--color-info)" name="Weight kg" dot={false} />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="heartRate"
+                      stroke="var(--color-danger)"
+                      name="Heart rate (bpm)"
+                      dot={{ r: 2 }}
+                    />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="temperature"
+                      stroke="var(--color-warning)"
+                      name="Temp (°C)"
+                      dot={{ r: 2 }}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="weight"
+                      stroke="var(--color-info)"
+                      name="Weight (kg)"
+                      dot={{ r: 2 }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

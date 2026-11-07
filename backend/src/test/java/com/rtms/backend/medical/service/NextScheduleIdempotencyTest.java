@@ -72,12 +72,7 @@ class NextScheduleIdempotencyTest {
         existingSchedule.setHorseId(horse.getId());
         existingSchedule.setRequestedById(vet.getId());
         existingSchedule.setIdempotencyKey("idemp-unique-123");
-        // Compute matching fingerprint
-        String fp = horse.getId() + "|null|ROUTINE|" + future + "|Follow-up check";
-        try {
-            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(fp.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            existingSchedule.setRequestFingerprint(java.util.HexFormat.of().formatHex(digest));
-        } catch (Exception ignored) {}
+        existingSchedule.setDescription("Follow-up check");
 
         when(userRepository.findById(vet.getId())).thenReturn(Optional.of(vet));
         when(careScheduleRepository.findByIdForUpdate(sourceSchedule.getId())).thenReturn(Optional.of(sourceSchedule));
@@ -105,9 +100,10 @@ class NextScheduleIdempotencyTest {
 
         CareSchedule existingSchedule = new CareSchedule();
         existingSchedule.setId(777L);
+        existingSchedule.setHorseId(horse.getId());
         existingSchedule.setRequestedById(vet.getId());
         existingSchedule.setIdempotencyKey("idemp-unique-123");
-        existingSchedule.setRequestFingerprint("different_sha256_hash");
+        existingSchedule.setDescription("Original description");
 
         when(userRepository.findById(vet.getId())).thenReturn(Optional.of(vet));
         when(careScheduleRepository.findByIdForUpdate(sourceSchedule.getId())).thenReturn(Optional.of(sourceSchedule));

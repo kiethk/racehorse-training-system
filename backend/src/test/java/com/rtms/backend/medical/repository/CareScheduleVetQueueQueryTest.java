@@ -6,6 +6,7 @@ import com.rtms.backend.admission.enums.AdmissionStatus;
 import com.rtms.backend.admission.repository.AdmissionApplicationRepository;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
 import com.rtms.backend.horse.entity.Horse;
+import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.identity.repository.RoleRepository;
@@ -74,7 +75,9 @@ class CareScheduleVetQueueQueryTest {
         vetId = users.saveAndFlush(vet).getId();
 
         User owner = users.findByEmail("owner@rtms.com").orElseThrow();
-        Horse horse = horses.findAll().stream().findFirst().orElseThrow();
+        Horse horse = horses.findAll().stream()
+                .filter(h -> h.getCurrentStatus() == HorseStatus.ELIGIBLE)
+                .findFirst().orElseThrow();
         horseId = horse.getId();
 
         AdmissionApplication admission = new AdmissionApplication();

@@ -255,6 +255,7 @@ export interface CareSchedule {
   assignedVetId?: number | null;
   scheduledDate?: string | null;
   scheduledAt?: string | null;
+  rolloverCount?: number;
   completedAt?: string | null;
   durationMinutes?: number | null;
   notes?: string | null;
@@ -262,6 +263,8 @@ export interface CareSchedule {
   createdAt?: string;
   purpose?: 'FOLLOW_UP' | 'PREVENTIVE';
   requestedAt?: string | null;
+  rescheduleReason?: 'RACE_CONFLICT' | 'UNDER_TREATMENT' | 'OWNER_REQUEST' | 'WEATHER' | 'EOD_ROLLOVER' | 'URGENT_PREEMPTION' | 'TIME_EXCEEDED' | 'PEER_OFFLOAD' | 'OTHER' | null;
+  rescheduleNote?: string | null;
   /** D1 cờ dẫn xuất từ BE: ca IN_PROGRESS quá 30' so với giờ hẹn (không phải trạng thái DB). */
   overdue?: boolean;
   pausedFrom?: string | null;

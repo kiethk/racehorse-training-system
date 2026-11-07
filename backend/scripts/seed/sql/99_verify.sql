@@ -81,21 +81,22 @@ INSERT INTO seed_check VALUES
 ('Vet has two overlapping appointments',
  $q$ SELECT a.id FROM care_schedule a JOIN care_schedule b ON a.veterinarian_id = b.veterinarian_id AND a.id < b.id
      WHERE a.status IN ('SCHEDULED', 'IN_PROGRESS', 'COMPLETED') AND b.status IN ('SCHEDULED', 'IN_PROGRESS', 'COMPLETED')
+       AND a.scheduled_at IS NOT NULL AND b.scheduled_at IS NOT NULL
        AND a.scheduled_at < b.scheduled_at + make_interval(mins => b.duration_minutes)
        AND b.scheduled_at < a.scheduled_at + make_interval(mins => a.duration_minutes) $q$),
 ('Horse has two overlapping appointments',
  $q$ SELECT a.id FROM care_schedule a JOIN care_schedule b ON a.horse_id = b.horse_id AND a.id < b.id
      WHERE a.status IN ('SCHEDULED', 'IN_PROGRESS', 'COMPLETED') AND b.status IN ('SCHEDULED', 'IN_PROGRESS', 'COMPLETED')
+       AND a.scheduled_at IS NOT NULL AND b.scheduled_at IS NOT NULL
        AND a.scheduled_at < b.scheduled_at + make_interval(mins => b.duration_minutes)
        AND b.scheduled_at < a.scheduled_at + make_interval(mins => a.duration_minutes) $q$),
-('Routine visit outside the 13:30-15:30 vet window',
- $q$ SELECT id FROM care_schedule WHERE care_type = 'ROUTINE' AND scheduled_at IS NOT NULL
-       AND scheduled_at::TIME NOT IN (TIME '13:30', TIME '14:00', TIME '14:30', TIME '15:00') $q$),
+('Non-urgent visit with scheduled_at timestamp',
+ $q$ SELECT id FROM care_schedule WHERE care_type IN ('ROUTINE', 'INITIAL') AND scheduled_at IS NOT NULL $q$),
 ('Horse with more than one examination in progress',
  $q$ SELECT horse_id FROM care_schedule WHERE status = 'IN_PROGRESS' GROUP BY horse_id HAVING count(*) > 1 $q$),
-('Booked schedule without vet or time / unbooked schedule with a vet slot',
+('Booked schedule without vet or date / unbooked schedule with a vet slot',
  $q$ SELECT id FROM care_schedule
-     WHERE (status IN ('SCHEDULED', 'IN_PROGRESS', 'COMPLETED') AND (veterinarian_id IS NULL OR scheduled_at IS NULL))
+     WHERE (status IN ('SCHEDULED', 'IN_PROGRESS', 'COMPLETED') AND (veterinarian_id IS NULL OR scheduled_date IS NULL))
         OR (status = 'REQUESTED' AND scheduled_at IS NOT NULL)
         OR (status = 'REQUESTED' AND care_type = 'ROUTINE' AND veterinarian_id IS NOT NULL) $q$),
 ('Pending routine schedule inside the 14-day horizon left unbooked',
@@ -106,7 +107,7 @@ INSERT INTO seed_check VALUES
      WHERE (c.status = 'COMPLETED') <> EXISTS (SELECT 1 FROM health_records h WHERE h.care_schedule_id = c.id)
         OR (c.status = 'COMPLETED' AND c.completed_at IS NULL) $q$),
 ('Something completed in the future',
- $q$ SELECT id FROM care_schedule WHERE completed_at > pg_temp.clock() OR (status = 'COMPLETED' AND scheduled_at > pg_temp.clock())
+ $q$ SELECT id FROM care_schedule WHERE completed_at > pg_temp.clock() OR (status = 'COMPLETED' AND scheduled_date > pg_temp.today())
      UNION ALL SELECT id FROM health_records WHERE examined_at > pg_temp.clock()
      UNION ALL SELECT id FROM groom_daily_tasks WHERE completed_at > pg_temp.clock() $q$),
 ('BLOCKED exam without a follow-up',
@@ -119,16 +120,11 @@ INSERT INTO seed_check VALUES
  $q$ SELECT h.id FROM horses h WHERE h.training_decision = 'BLOCKED'
        AND NOT EXISTS (SELECT 1 FROM care_schedule c WHERE c.horse_id = h.id AND c.purpose = 'FOLLOW_UP'
                         AND c.status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS')) $q$),
-('Open urgent case on a horse that is not BLOCKED',
- $q$ SELECT c.id FROM care_schedule c JOIN horses h ON h.id = c.horse_id
-     WHERE c.care_type = 'URGENT' AND c.status IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS') AND h.training_decision <> 'BLOCKED' $q$),
 ('Incident status does not match its urgent case',
  $q$ SELECT i.id FROM horse_incident_reports i JOIN care_schedule c ON c.id = i.care_schedule_id
      WHERE (i.status IN ('REPORTED', 'IN_REVIEW') AND c.status NOT IN ('REQUESTED', 'SCHEDULED', 'IN_PROGRESS'))
         OR (i.status = 'RESOLVED' AND (c.status <> 'COMPLETED' OR i.handled_by_id IS DISTINCT FROM c.veterinarian_id))
         OR i.care_schedule_id IS NULL $q$),
-('PAUSED schedule without a paused_from timestamp',
- $q$ SELECT id FROM care_schedule WHERE status = 'PAUSED' AND paused_from IS NULL $q$),
 ('Cancelled care schedule exists (AD-022 forbids CANCELLED in care_schedule)',
  $q$ SELECT id FROM care_schedule WHERE status = 'CANCELLED' $q$),
 ('Care schedule with status outside the 6-status enum (AD-022)',

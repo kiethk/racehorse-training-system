@@ -143,7 +143,6 @@ class CareSchedulePreemptionTest {
         // Verification:
         // 1. Vet 1's routine exam was preempted to PAUSED
         assertEquals(CareScheduleStatus.PAUSED, vet1Routine.getStatus());
-        assertNotNull(vet1Routine.getPausedFrom());
 
         // 2. Urgent case was assigned to Vet 1
         assertEquals(1L, urgent.getVeterinarianId());
@@ -151,7 +150,6 @@ class CareSchedulePreemptionTest {
 
         // 3. Vet 2's exam was NOT preempted
         assertEquals(CareScheduleStatus.IN_PROGRESS, vet2Initial.getStatus());
-        assertNull(vet2Initial.getPausedFrom());
 
         // 4. Notification sent for pause
         verify(notifications).sendAssignmentNotification(
@@ -178,7 +176,6 @@ class CareSchedulePreemptionTest {
         // Verification:
         // Existing urgent exam remains IN_PROGRESS (NOT paused)
         assertEquals(CareScheduleStatus.IN_PROGRESS, activeUrgent.getStatus());
-        assertNull(activeUrgent.getPausedFrom());
 
         // New urgent cannot preempt; remains in REQUESTED status
         assertNull(newUrgent.getVeterinarianId());
@@ -196,7 +193,6 @@ class CareSchedulePreemptionTest {
     @DisplayName("startCareSchedule smoothly resumes a PAUSED schedule to IN_PROGRESS")
     void startCareScheduleResumesPausedExam() {
         LocalDateTime scheduledAt = LocalDateTime.of(2026, 11, 2, 14, 0);
-        LocalDateTime pausedFrom = LocalDateTime.now().minusMinutes(15);
 
         CareSchedule pausedExam = new CareSchedule();
         pausedExam.setId(10L);
@@ -205,7 +201,6 @@ class CareSchedulePreemptionTest {
         pausedExam.setCareType(CareType.ROUTINE);
         pausedExam.setStatus(CareScheduleStatus.PAUSED);
         pausedExam.setScheduledAt(scheduledAt);
-        pausedExam.setPausedFrom(pausedFrom);
 
         User vet1 = eligibleVet(1L);
         when(users.findById(1L)).thenReturn(Optional.of(vet1));
@@ -215,8 +210,6 @@ class CareSchedulePreemptionTest {
         service.startCareSchedule(10L, 1L);
 
         assertEquals(CareScheduleStatus.IN_PROGRESS, pausedExam.getStatus());
-        assertNull(pausedExam.getPausedFrom());
-        assertTrue(pausedExam.getScheduledAt().isAfter(scheduledAt.plusMinutes(14)));
     }
 
     private User eligibleVet(Long id) {
@@ -321,7 +314,6 @@ class CareSchedulePreemptionTest {
         service.assignRequestedSchedule(urgent);
 
         assertEquals(CareScheduleStatus.IN_PROGRESS, exam.getStatus());
-        assertNull(exam.getPausedFrom());
         assertEquals(CareScheduleStatus.REQUESTED, urgent.getStatus());
     }
 

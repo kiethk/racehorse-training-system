@@ -20,16 +20,16 @@ export interface ChartConfig {
 }
 
 export const CHART_PALETTE = [
-  '#10b981', // emerald-500
-  '#3b82f6', // blue-500
-  '#f59e0b', // amber-500
-  '#8b5cf6', // violet-500
-  '#ec4899', // pink-500
-  '#06b6d4', // cyan-500
-  '#f97316', // orange-500
-  '#14b8a6', // teal-500
-  '#6366f1', // indigo-500
-  '#e11d48', // rose-600
+  '#6657c7', // primary purple
+  '#496bc3', // training blue
+  '#b94b58', // medical red
+  '#8c6a2e', // grooming brown
+  '#5d4fb5', // racing indigo
+  '#28756e', // finance teal
+  '#1f7a4d', // success green
+  '#8a5b08', // warning amber
+  '#c33c3c', // danger red
+  '#315fa8', // info blue
 ];
 
 /**
@@ -119,7 +119,7 @@ export function parseChartConfig(rawText: string): ChartConfig | null {
     }
 
     // Trích xuất mảng dữ liệu (hỗ trợ nhiều tên trường data/items/series/slices/values)
-    let rawItems: any[] = [];
+    let rawItems: unknown[] = [];
     if (Array.isArray(obj.data)) {
       rawItems = obj.data;
     } else if (Array.isArray(obj.items)) {
@@ -142,7 +142,7 @@ export function parseChartConfig(rawText: string): ChartConfig | null {
 
     const items: ChartDataItem[] = [];
     for (let i = 0; i < rawItems.length; i++) {
-      const it = rawItems[i];
+      const it = rawItems[i] as Record<string, unknown> | null;
       if (!it || typeof it !== 'object') continue;
 
       const label = String(
@@ -154,7 +154,11 @@ export function parseChartConfig(rawText: string): ChartConfig | null {
       if (isNaN(numVal) || numVal < 0) numVal = 0;
 
       const color =
-        it.color || it.fill || CHART_PALETTE[i % CHART_PALETTE.length];
+        typeof it.color === 'string'
+          ? it.color
+          : typeof it.fill === 'string'
+          ? it.fill
+          : CHART_PALETTE[i % CHART_PALETTE.length];
 
       items.push({
         label,
