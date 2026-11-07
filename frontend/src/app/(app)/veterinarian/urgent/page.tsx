@@ -25,7 +25,7 @@ export default function UrgentCasesPage() {
   const [urgentCases, setUrgentCases] = useState<UrgentAssignmentAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'IN_PROGRESS'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadData = async (silent = false) => {
@@ -70,12 +70,12 @@ export default function UrgentCasesPage() {
     await loadData(false);
   };
 
-  const pendingCount = useMemo(
-    () => urgentCases.filter((c) => c.status === 'SCHEDULED').length,
+  const activeCount = useMemo(
+    () => urgentCases.filter((c) => c.status !== 'COMPLETED').length,
     [urgentCases],
   );
-  const inProgressCount = useMemo(
-    () => urgentCases.filter((c) => c.status === 'IN_PROGRESS').length,
+  const completedCount = useMemo(
+    () => urgentCases.filter((c) => c.status === 'COMPLETED').length,
     [urgentCases],
   );
   const criticalCount = useMemo(
@@ -86,8 +86,8 @@ export default function UrgentCasesPage() {
   const filteredCases = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return urgentCases.filter((c) => {
-      if (filter === 'PENDING' && c.status !== 'SCHEDULED') return false;
-      if (filter === 'IN_PROGRESS' && c.status !== 'IN_PROGRESS') return false;
+      if (filter === 'ACTIVE' && c.status === 'COMPLETED') return false;
+      if (filter === 'COMPLETED' && c.status !== 'COMPLETED') return false;
 
       if (!q) return true;
       return (
@@ -128,16 +128,16 @@ export default function UrgentCasesPage() {
               tone={urgentCases.length > 0 ? 'default' : 'neutral'}
             />
             <MetricCard
-              label="Pending Intake"
-              value={pendingCount}
-              icon="clock"
-              tone={pendingCount > 0 ? 'warning' : 'neutral'}
+              label="Active Cases"
+              value={activeCount}
+              icon="activity"
+              tone={activeCount > 0 ? 'warning' : 'neutral'}
             />
             <MetricCard
-              label="In Examination"
-              value={inProgressCount}
-              icon="activity"
-              tone={inProgressCount > 0 ? 'info' : 'neutral'}
+              label="Completed"
+              value={completedCount}
+              icon="check"
+              tone={completedCount > 0 ? 'success' : 'neutral'}
             />
             <MetricCard
               label="Critical Priority"
@@ -161,18 +161,18 @@ export default function UrgentCasesPage() {
             <FilterChips
               label="Urgent cases filter"
               value={filter}
-              onChange={(value) => setFilter(value as 'ALL' | 'PENDING' | 'IN_PROGRESS')}
+              onChange={(value) => setFilter(value as 'ALL' | 'ACTIVE' | 'COMPLETED')}
               options={[
                 { value: 'ALL', label: 'All', count: urgentCases.length },
                 {
-                  value: 'PENDING',
-                  label: 'Pending Intake',
-                  count: pendingCount,
+                  value: 'ACTIVE',
+                  label: 'Active',
+                  count: activeCount,
                 },
                 {
-                  value: 'IN_PROGRESS',
-                  label: 'In Progress',
-                  count: inProgressCount,
+                  value: 'COMPLETED',
+                  label: 'Completed',
+                  count: completedCount,
                 },
               ]}
             />
@@ -229,9 +229,11 @@ export default function UrgentCasesPage() {
                   padded
                   onClick={() => router.push(`/veterinarian/urgent/${item.scheduleId}`)}
                   className={`cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)] ${
-                    item.status === 'SCHEDULED'
-                      ? 'border-l-4 border-l-[var(--color-danger)]'
-                      : 'border-l-4 border-l-[var(--color-warning)]'
+                    item.status === 'COMPLETED'
+                      ? 'border-l-4 border-l-[var(--color-success)]'
+                      : item.status === 'SCHEDULED'
+                        ? 'border-l-4 border-l-[var(--color-danger)]'
+                        : 'border-l-4 border-l-[var(--color-warning)]'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -256,10 +258,14 @@ export default function UrgentCasesPage() {
                             {item.severity}
                           </Pill>
                           <Pill
-                            tone={item.status === 'SCHEDULED' ? 'warning' : 'primary'}
+                            tone={
+                              item.status === 'COMPLETED'
+                                ? 'success'
+                                : 'warning'
+                            }
                             size="sm"
                           >
-                            {item.status === 'SCHEDULED' ? 'Pending Intake' : 'In Progress'}
+                            {item.status === 'COMPLETED' ? 'Completed' : 'Active'}
                           </Pill>
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
@@ -284,7 +290,13 @@ export default function UrgentCasesPage() {
                     {/* Right: Action Button */}
                     <div className="shrink-0">
                       <Button
-                        variant={item.status === 'SCHEDULED' ? 'destructive' : 'primary'}
+                        variant={
+                          item.status === 'COMPLETED'
+                            ? 'secondary'
+                            : item.status === 'SCHEDULED'
+                              ? 'destructive'
+                              : 'primary'
+                        }
                         size="sm"
                         icon="chevron-right"
                         onClick={(e) => {
@@ -293,7 +305,11 @@ export default function UrgentCasesPage() {
                         }}
                         className="transition-all active:scale-[0.97]"
                       >
-                        {item.status === 'SCHEDULED' ? 'Intake Case' : 'Examine'}
+                        {item.status === 'COMPLETED'
+                          ? 'View Record'
+                          : item.status === 'SCHEDULED'
+                            ? 'Intake Case'
+                            : 'Examine'}
                       </Button>
                     </div>
                   </div>
