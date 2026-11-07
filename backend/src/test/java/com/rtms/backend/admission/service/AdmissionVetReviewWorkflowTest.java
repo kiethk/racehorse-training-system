@@ -357,10 +357,10 @@ class AdmissionVetReviewWorkflowTest {
         when(careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses))
                 .thenReturn(3L);
         when(careScheduleRepository.countActiveVetQueueItems(
-                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.OVERDUE)))
+                vetId, List.of(CareScheduleStatus.SCHEDULED)))
                 .thenReturn(2L);
         when(careScheduleRepository.countActiveVetQueueItems(
-                vetId, List.of(CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.DELAYED, CareScheduleStatus.PAUSED)))
+                vetId, List.of(CareScheduleStatus.IN_PROGRESS)))
                 .thenReturn(1L);
         when(careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses))
                 .thenReturn(2L);

@@ -368,7 +368,7 @@ public class HorseService {
             }
             if (careScheduleRepository != null) {
                 careScheduleRepository.deleteOpenSchedulesIfUnreferenced(horseId,
-                        List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED));
+                        List.of(CareScheduleStatus.SCHEDULED));
             }
 
             // 3.6. Clean uncompleted groom daily tasks

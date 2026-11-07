@@ -445,7 +445,7 @@ public class AdmissionGroomReviewService {
             schedule.setHorseId(horseId);
             schedule.setAdmissionId(admissionId);
             schedule.setCareType(CareType.INITIAL);
-            schedule.setStatus(CareScheduleStatus.REQUESTED);
+            schedule.setStatus(CareScheduleStatus.SCHEDULED);
             schedule.setDurationMinutes(30);
             schedule.setDescription("Initial admission physical examination in quarantine area");
             schedule = careScheduleRepository.save(schedule);

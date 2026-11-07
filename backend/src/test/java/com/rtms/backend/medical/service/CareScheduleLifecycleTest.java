@@ -93,6 +93,6 @@ class CareScheduleLifecycleTest {
     @DisplayName("AD-022: cancelCareSchedule abolished — lifecycle uses reschedule and OVERDUE instead")
     void testCancelCareSchedule_abolished() {
         // Under AD-022, cancelCareSchedule is removed; stuck exams are moved via reschedule().
-        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.OVERDUE));
+        assertTrue(CareScheduleStatus.OPEN.contains(CareScheduleStatus.SCHEDULED));
     }
 }

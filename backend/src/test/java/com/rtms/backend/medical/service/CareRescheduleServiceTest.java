@@ -74,13 +74,13 @@ class CareRescheduleServiceTest {
         var response = service.reschedule(100L, request(TODAY.plusDays(9), RescheduleReason.UNDER_TREATMENT, " sốt "),
                 assignedVet);
 
-        assertEquals(CareScheduleStatus.REQUESTED, schedule.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus());
         assertNull(schedule.getVeterinarianId());
         assertNull(schedule.getScheduledAt());
         assertEquals(TODAY.plusDays(9).atTime(14, 0), schedule.getRequestedAt());
         assertEquals(RescheduleReason.UNDER_TREATMENT, schedule.getRescheduleReason());
         assertEquals("sốt", schedule.getRescheduleNote());
-        assertEquals(CareScheduleStatus.REQUESTED, response.schedule().status());
+        assertEquals(CareScheduleStatus.SCHEDULED, response.schedule().status());
         assertTrue(response.warnings().isEmpty());
     }
 
@@ -103,7 +103,7 @@ class CareRescheduleServiceTest {
 
     @Test
     void unassignedScheduleCanOnlyBeMovedByAManager() {
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setVeterinarianId(null);
         schedule.setScheduledAt(null);
 
@@ -111,7 +111,7 @@ class CareRescheduleServiceTest {
 
         service.reschedule(100L, request(TODAY.plusDays(30), RescheduleReason.OWNER_REQUEST, null), manager);
         assertEquals(TODAY.plusDays(30).atTime(14, 0), schedule.getRequestedAt());
-        assertEquals(CareScheduleStatus.REQUESTED, schedule.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus());
     }
 
     @Test
@@ -149,7 +149,7 @@ class CareRescheduleServiceTest {
 
         assertEquals(List.of("The horse will be overdue for Cúm ngựa from 28/10/2026.",
                 "The horse has no record for Tẩy giun."), response.warnings());
-        assertEquals(CareScheduleStatus.REQUESTED, schedule.getStatus());
+        assertEquals(CareScheduleStatus.SCHEDULED, schedule.getStatus());
         response.warnings().forEach(warning -> assertFalse(warning.toLowerCase().contains("race")));
     }
 

@@ -226,7 +226,7 @@ class AdmissionManagerReviewServiceTest {
         CareSchedule pending = new CareSchedule();
         pending.setId(1L);
         pending.setHorseId(10L);
-        pending.setStatus(CareScheduleStatus.REQUESTED);
+        pending.setStatus(CareScheduleStatus.SCHEDULED);
 
         CareSchedule overdue = new CareSchedule();
         overdue.setId(2L);
@@ -281,7 +281,7 @@ class AdmissionManagerReviewServiceTest {
         CareSchedule requested = new CareSchedule();
         requested.setId(100L);
         requested.setHorseId(10L);
-        requested.setStatus(CareScheduleStatus.REQUESTED);
+        requested.setStatus(CareScheduleStatus.SCHEDULED);
 
         CareSchedule inProgress = new CareSchedule();
         inProgress.setId(101L);

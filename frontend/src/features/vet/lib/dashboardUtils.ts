@@ -16,7 +16,7 @@ export function getTodayLocalDate(): string {
  */
 export function filterActiveEmergencies(schedules: CareSchedule[]): CareSchedule[] {
   return schedules.filter(
-    (s) => s.careType === 'URGENT' && s.status !== 'COMPLETED'
+    (s) => s.careType === 'URGENT' && (s.status === 'SCHEDULED' || s.status === 'IN_PROGRESS')
   );
 }
 
@@ -117,7 +117,7 @@ export function examActivityByWeek(
     if (schedule.status === 'COMPLETED') {
       entry.completed += 1;
       if (schedule.careType === 'URGENT') entry.urgent += 1;
-    } else if (schedule.status === 'IN_PROGRESS' || schedule.status === 'DELAYED' || schedule.status === 'OVERDUE') {
+    } else if (schedule.status === 'IN_PROGRESS') {
       entry.inProgress += 1;
     }
   }

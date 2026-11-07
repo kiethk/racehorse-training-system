@@ -246,12 +246,10 @@ public class AdmissionManagerReviewService {
             // thì vẫn phải chặn reject như trước, không được âm thầm xóa mất.
             List<CareSchedule> nonCancellableSchedules =
                     careScheduleRepository.findByHorseIdAndStatusIn(horse.getId(),
-                            List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.IN_PROGRESS,
-                                    CareScheduleStatus.DELAYED, CareScheduleStatus.OVERDUE, CareScheduleStatus.PAUSED));
+                            CareScheduleStatus.OPEN);
             if (!nonCancellableSchedules.isEmpty()) {
                 throw new IllegalStateException(
-                        "Admission cannot be rejected while veterinary care is REQUESTED, IN_PROGRESS,"
-                                + " DELAYED, OVERDUE or PAUSED");
+                        "Admission cannot be rejected while veterinary care is SCHEDULED or IN_PROGRESS");
             }
             // Chỉ lịch chưa diễn ra (SCHEDULED) bị xóa cứng.
             careScheduleRepository.deleteOpenSchedulesIfUnreferenced(

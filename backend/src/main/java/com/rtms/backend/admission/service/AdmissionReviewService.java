@@ -119,33 +119,23 @@ public class AdmissionReviewService {
                 || (before.getStatus() == AdmissionStatus.VET_REVIEW && schedule.getCareType() != CareType.INITIAL)) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE", "Examination does not belong to this admission review");
         }
-        if (schedule.getStatus() == CareScheduleStatus.REQUESTED) {
+        if (schedule.getStatus() == CareScheduleStatus.SCHEDULED) {
             Long assignedVetId = schedule.getVeterinarianId() != null
                     ? schedule.getVeterinarianId()
                     : before.getVeterinarianId();
 
-            if (assignedVetId == null) {
-                schedule.setVeterinarianId(actorId);
-                schedule.setScheduledAt(java.time.LocalDateTime.now());
-                schedule.setStatus(CareScheduleStatus.SCHEDULED);
-                careSchedules.save(schedule);
-                careScheduleService.startCareSchedule(schedule.getId(), actorId);
-            } else if (java.util.Objects.equals(assignedVetId, actorId)) {
+            if (assignedVetId == null || java.util.Objects.equals(assignedVetId, actorId)) {
                 schedule.setVeterinarianId(actorId);
                 if (schedule.getScheduledAt() == null) {
                     schedule.setScheduledAt(java.time.LocalDateTime.now());
                 }
-                schedule.setStatus(CareScheduleStatus.SCHEDULED);
                 careSchedules.save(schedule);
                 careScheduleService.startCareSchedule(schedule.getId(), actorId);
             } else {
                 throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN",
                         "Only the assigned veterinarian can review this examination");
             }
-        } else if (schedule.getStatus() == CareScheduleStatus.SCHEDULED || schedule.getStatus() == CareScheduleStatus.PAUSED) {
-            careScheduleService.startCareSchedule(schedule.getId(), actorId);
         } else if (!CareScheduleStatus.ACTIVE_EXAM.contains(schedule.getStatus())) {
-            // AD-022: OVERDUE is an already-started exam, so it submits like IN_PROGRESS.
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_REVIEW_STATE",
                     "Start the examination before submitting a review");
         }
