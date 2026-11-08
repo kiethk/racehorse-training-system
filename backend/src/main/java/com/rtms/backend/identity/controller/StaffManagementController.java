@@ -1,6 +1,7 @@
 package com.rtms.backend.identity.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
+import com.rtms.backend.identity.dto.EligibleReplacementTrainerResponse;
 import com.rtms.backend.identity.dto.StaffCreationRequest;
 import com.rtms.backend.identity.dto.StaffCreationResponse;
 import com.rtms.backend.identity.dto.StaffDetailResponse;
@@ -52,11 +53,17 @@ public class StaffManagementController {
         return ApiResponse.success(staffManagementService.createStaff(request));
     }
 
+    @GetMapping("/trainers/{id}/eligible-replacements")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
+    public ApiResponse<List<EligibleReplacementTrainerResponse>> getEligibleReplacements(@PathVariable Long id) {
+        return ApiResponse.success(staffManagementService.getEligibleReplacementTrainers(id));
+    }
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<StaffSummaryResponse> updateStaffStatus(
             @PathVariable Long id,
             @RequestBody StaffStatusUpdateRequest request) {
-        return ApiResponse.success(staffManagementService.updateStaffStatus(id, request.isActive()));
+        return ApiResponse.success(staffManagementService.updateStaffStatus(id, request.isActive(), request.getReplacementTrainerId()));
     }
 }

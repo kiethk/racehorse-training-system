@@ -28,6 +28,8 @@ public interface GroupPlanRepository extends JpaRepository<GroupPlan, Long> {
 
     List<GroupPlan> findByTrainerIdOrderByStartDateDesc(Long trainerId);
 
+    List<GroupPlan> findByTrainerIdAndStatusIn(Long trainerId, Collection<TrainingPlanStatus> statuses);
+
     List<GroupPlan> findAllByOrderByStartDateDesc();
 
     List<GroupPlan> findByStatusAndStartDateLessThanEqual(TrainingPlanStatus status, LocalDate date);

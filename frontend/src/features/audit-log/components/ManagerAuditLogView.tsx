@@ -231,8 +231,8 @@ export function ManagerAuditLogView() {
             onClick={() => setIsArchiveModalOpen(true)}
             className={
               archiveStatus?.requiresMaintenance
-                ? 'border-rose-400 text-rose-700 bg-rose-50/50 hover:bg-rose-100/50 dark:border-rose-800 dark:text-rose-300 dark:bg-rose-950/30'
-                : ''
+                ? 'bg-transparent border border-dashed border-rose-300 dark:border-rose-800 text-[var(--color-text-secondary)] hover:border-rose-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10'
+                : 'hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10'
             }
             title={
               archiveStatus?.requiresMaintenance
@@ -241,12 +241,12 @@ export function ManagerAuditLogView() {
             }
           >
             {archiveStatus?.requiresMaintenance && (
-              <span className="relative flex size-2 mr-1">
+              <span className="relative flex size-2 mr-0.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
                 <span className="relative inline-flex size-2 rounded-full bg-rose-600" />
               </span>
             )}
-            <Icon name="archive" className="size-4 mr-1.5" />
+            <Icon name="archive" className="size-4 mr-1 text-[var(--color-text-muted)] group-hover:text-rose-600" />
             Archive &amp; Purge
           </Button>
           <Button

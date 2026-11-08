@@ -394,18 +394,31 @@ public class AuditLogService {
 
     @Transactional
     public AuditPurgeResponse purgeAuditLogs(Long actorUserId, AuditPurgeRequest request) {
-        int purgedCount;
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
         LocalDateTime beforeDate = request != null ? request.beforeDate() : null;
         LocalDateTime fromDate = request != null ? request.fromDate() : null;
 
+        if (beforeDate != null && beforeDate.isAfter(thirtyDaysAgo)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PURGE_RETENTION_VIOLATION",
+                    "Cannot purge audit logs within the last 30 days. Logs must be retained for at least 30 days.");
+        }
+        if (fromDate != null && fromDate.isAfter(thirtyDaysAgo)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PURGE_RETENTION_VIOLATION",
+                    "Cannot purge audit logs within the last 30 days. Logs must be retained for at least 30 days.");
+        }
+        if (fromDate != null && beforeDate != null && fromDate.isAfter(beforeDate)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE",
+                    "fromDate cannot be after beforeDate.");
+        }
+
+        int purgedCount;
         if (fromDate != null && beforeDate != null) {
             purgedCount = auditLogRepository.deleteByCreatedAtBetween(fromDate, beforeDate);
         } else if (fromDate != null) {
-            purgedCount = auditLogRepository.deleteByCreatedAtBetween(fromDate, LocalDateTime.now());
+            purgedCount = auditLogRepository.deleteByCreatedAtBetween(fromDate, thirtyDaysAgo);
         } else if (beforeDate != null) {
             purgedCount = auditLogRepository.deleteByCreatedAtBefore(beforeDate);
         } else {
-            LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
             purgedCount = auditLogRepository.deleteByCreatedAtBefore(thirtyDaysAgo);
         }
 
