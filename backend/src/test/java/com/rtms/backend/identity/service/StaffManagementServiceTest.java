@@ -8,6 +8,8 @@ import com.rtms.backend.identity.repository.RoleRepository;
 import com.rtms.backend.identity.repository.TrainerProfileRepository;
 import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.identity.repository.VeterinarianProfileRepository;
+import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.repository.AreaRepository;
@@ -45,6 +47,7 @@ class StaffManagementServiceTest {
     private TrainerProfileRepository trainerProfileRepository;
     private AreaRepository areaRepository;
     private StableStallRepository stableStallRepository;
+    private CareScheduleRepository careScheduleRepository;
     private StaffManagementService staffService;
     private AreaTrainerAssignmentPolicy trainerAssignmentPolicy;
     private jakarta.persistence.EntityManager em;
@@ -60,6 +63,7 @@ class StaffManagementServiceTest {
         trainerProfileRepository = mock(TrainerProfileRepository.class);
         areaRepository = mock(AreaRepository.class);
         stableStallRepository = mock(StableStallRepository.class);
+        careScheduleRepository = mock(CareScheduleRepository.class);
         trainerAssignmentPolicy = mock(AreaTrainerAssignmentPolicy.class);
         em = mock(jakarta.persistence.EntityManager.class);
         var query = mock(jakarta.persistence.Query.class);
@@ -74,7 +78,8 @@ class StaffManagementServiceTest {
         staffService = new StaffManagementService(
                 userRepository, roleRepository, passwordEncoder,
                 groomProfileRepository, vetProfileRepository, trainerProfileRepository,
-                areaRepository, stableStallRepository, trainerAssignmentPolicy, em, validator
+                areaRepository, stableStallRepository, trainerAssignmentPolicy, em, validator,
+                null, null, careScheduleRepository
         );
     }
 
@@ -465,6 +470,49 @@ class StaffManagementServiceTest {
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> staffService.updateStaffStatus(1L, false));
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+    }
+
+    @Test
+    void testDeactivateGroom_WithAssignedStalls_ThrowsConflict() {
+        Role groomRole = new Role(); groomRole.setName("GROOM");
+        User groom = new User(); groom.setId(2L); groom.setRole(groomRole); groom.setActive(true);
+
+        when(userRepository.findById(2L)).thenReturn(Optional.of(groom));
+        StableStall stall = new StableStall();
+        stall.setStallCode("ST-01");
+        when(stableStallRepository.findByGroomId(2L)).thenReturn(List.of(stall));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> staffService.updateStaffStatus(2L, false));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Cannot deactivate Groom while they are assigned to stalls"));
+    }
+
+    @Test
+    void testDeactivateTrainer_WithAssignedAreas_ThrowsConflict() {
+        Role trainerRole = new Role(); trainerRole.setName("HEAD_TRAINER");
+        User trainer = new User(); trainer.setId(3L); trainer.setRole(trainerRole); trainer.setActive(true);
+
+        when(userRepository.findById(3L)).thenReturn(Optional.of(trainer));
+        Area area = new Area();
+        area.setCode("AREA-A");
+        when(areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, 3L)).thenReturn(List.of(area));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> staffService.updateStaffStatus(3L, false));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Cannot deactivate Head Trainer while they are assigned to areas"));
+    }
+
+    @Test
+    void testDeactivateVet_WithPendingSchedules_ThrowsConflict() {
+        Role vetRole = new Role(); vetRole.setName("VETERINARIAN");
+        User vet = new User(); vet.setId(4L); vet.setRole(vetRole); vet.setActive(true);
+
+        when(userRepository.findById(4L)).thenReturn(Optional.of(vet));
+        when(careScheduleRepository.existsByVeterinarianIdAndStatusIn(eq(4L), eq(CareScheduleStatus.OPEN))).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> staffService.updateStaffStatus(4L, false));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Cannot deactivate Veterinarian while they have pending or in-progress care schedules"));
     }
 
     // ── Groom trainer reassignment ──────────────────────────────────────

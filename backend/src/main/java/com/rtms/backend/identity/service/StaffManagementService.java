@@ -19,7 +19,12 @@ import jakarta.persistence.EntityManager;
 import jakarta.validation.Validator;
 import com.rtms.backend.audit.dto.DomainAuditEvent;
 import com.rtms.backend.audit.service.AuditLogService;
+import com.rtms.backend.identity.entity.GroomProfile;
+import com.rtms.backend.medical.enums.CareScheduleStatus;
+import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.notification.service.EmailService;
+import com.rtms.backend.stable.entity.Area;
+import com.rtms.backend.stable.entity.StableStall;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -71,6 +76,7 @@ public class StaffManagementService {
     private final Validator validator;
     private final AuditLogService auditLogService;
     private final EmailService emailService;
+    private final CareScheduleRepository careScheduleRepository;
 
     private static final List<String> STAFF_ROLES = Arrays.asList("GROOM", "VETERINARIAN", "HEAD_TRAINER");
 
@@ -86,7 +92,7 @@ public class StaffManagementService {
             AreaTrainerAssignmentPolicy trainerAssignmentPolicy, EntityManager em, Validator validator) {
         this(userRepository, roleRepository, passwordEncoder, groomProfileRepository,
              vetProfileRepository, trainerProfileRepository, areaRepository,
-             stableStallRepository, trainerAssignmentPolicy, em, validator, null, null);
+             stableStallRepository, trainerAssignmentPolicy, em, validator, null, null, null);
     }
 
     public StaffManagementService(
@@ -102,7 +108,7 @@ public class StaffManagementService {
             AuditLogService auditLogService) {
         this(userRepository, roleRepository, passwordEncoder, groomProfileRepository,
              vetProfileRepository, trainerProfileRepository, areaRepository,
-             stableStallRepository, trainerAssignmentPolicy, em, validator, auditLogService, null);
+             stableStallRepository, trainerAssignmentPolicy, em, validator, auditLogService, null, null);
     }
 
     @Autowired
@@ -117,7 +123,8 @@ public class StaffManagementService {
             StableStallRepository stableStallRepository,
             AreaTrainerAssignmentPolicy trainerAssignmentPolicy, EntityManager em, Validator validator,
             AuditLogService auditLogService,
-            @Autowired(required = false) EmailService emailService) {
+            @Autowired(required = false) EmailService emailService,
+            @Autowired(required = false) CareScheduleRepository careScheduleRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -131,6 +138,7 @@ public class StaffManagementService {
         this.validator = validator;
         this.auditLogService = auditLogService;
         this.emailService = emailService;
+        this.careScheduleRepository = careScheduleRepository;
     }
 
     // ── READ ──────────────────────────────────────────────────────────────────
@@ -355,6 +363,10 @@ public class StaffManagementService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot update status of non-staff account through this API");
         }
 
+        if (!active && user.isActive()) {
+            validateDeactivationPrerequisites(user);
+        }
+
         boolean oldActive = user.isActive();
         user.setActive(active);
         user = userRepository.save(user);
@@ -373,6 +385,62 @@ public class StaffManagementService {
         }
 
         return mapToSummary(user);
+    }
+
+    private void validateDeactivationPrerequisites(User user) {
+        Long targetUserId = user.getId();
+        String roleName = user.getRole() != null ? user.getRole().getName() : "";
+
+        switch (roleName) {
+            case "GROOM": {
+                if (stableStallRepository != null) {
+                    List<StableStall> assignedStalls = stableStallRepository.findByGroomId(targetUserId);
+                    if (!assignedStalls.isEmpty()) {
+                        String stallCodes = assignedStalls.stream()
+                                .map(StableStall::getStallCode)
+                                .sorted()
+                                .collect(Collectors.joining(", "));
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Cannot deactivate Groom while they are assigned to stalls: [" + stallCodes + "]. Please unassign or reassign these stalls first.");
+                    }
+                }
+                break;
+            }
+            case "HEAD_TRAINER": {
+                if (areaRepository != null) {
+                    List<Area> regularAreas = areaRepository.findByTypeAndTrainerId(AreaType.REGULAR, targetUserId);
+                    if (!regularAreas.isEmpty()) {
+                        String areaCodes = regularAreas.stream()
+                                .map(Area::getCode)
+                                .sorted()
+                                .collect(Collectors.joining(", "));
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Cannot deactivate Head Trainer while they are assigned to areas: [" + areaCodes + "]. Please reassign or unassign these areas first.");
+                    }
+                }
+                if (groomProfileRepository != null) {
+                    List<GroomProfile> reportingGrooms = groomProfileRepository.findByTrainerId(targetUserId);
+                    for (GroomProfile groom : reportingGrooms) {
+                        groom.setTrainerId(null);
+                        groomProfileRepository.save(groom);
+                    }
+                }
+                break;
+            }
+            case "VETERINARIAN": {
+                if (careScheduleRepository != null) {
+                    boolean hasPendingSchedules = careScheduleRepository.existsByVeterinarianIdAndStatusIn(
+                            targetUserId,
+                            CareScheduleStatus.OPEN
+                    );
+                    if (hasPendingSchedules) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Cannot deactivate Veterinarian while they have pending or in-progress care schedules. Please reassign their schedules before deactivating.");
+                    }
+                }
+                break;
+            }
+        }
     }
 
     // ── Private creation helpers ──────────────────────────────────────────────
