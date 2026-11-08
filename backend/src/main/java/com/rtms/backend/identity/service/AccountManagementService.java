@@ -26,7 +26,6 @@ import com.rtms.backend.notification.service.NotificationService;
 import jakarta.validation.Validator;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -338,9 +337,6 @@ public class AccountManagementService {
         String roleName = request.getRole();
         if (STAFF_ROLES.contains(roleName)) {
             StaffCreationResponse staffResponse = staffManagementService.createStaff(request.toStaffCreationRequest());
-            if (emailService != null) {
-                emailService.sendStaffWelcomeEmail(staffResponse.getEmail(), staffResponse.getFullName(), staffResponse.getRole(), request.getPassword());
-            }
             return copyToAccountCreationResponse(staffResponse);
         }
 

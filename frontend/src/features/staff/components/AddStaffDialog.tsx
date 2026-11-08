@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, FormField, Input, Modal, Notice, Select } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { displayError } from '@/lib/display';
-import { localToday, validateStaffCreation, type StaffCreationErrors } from '../lib/creation';
+import { generateSecurePassword, localToday, validateStaffCreation, type StaffCreationErrors } from '../lib/creation';
 import type { StaffCreationRequest, StaffCreationResponse } from '../types';
 import { StaffCreationResult } from './StaffCreationResult';
 
@@ -81,7 +81,29 @@ function StaffCreationSession({ onClose, onSubmit, loading }: Props) {
           {input('fullName', 'Full name', { required: true, max: 255, autoComplete: 'name' })}
           {input('email', 'Email', { type: 'email', required: true, max: 255, autoComplete: 'off' })}
           <div className={cn('grid gap-4', groom && 'grid-cols-2')}>
-            {input('password', 'Password', { type: 'password', required: true, max: 72, autoComplete: 'new-password' })}
+            <FormField label="Password" htmlFor="staff-password" required error={errors.password}>
+              <div className="flex gap-2">
+                <Input
+                  id="staff-password"
+                  type="text"
+                  value={draft.password}
+                  disabled={loading}
+                  maxLength={72}
+                  autoComplete="new-password"
+                  placeholder="Min 8 characters"
+                  onChange={event => change('password', event.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => change('password', generateSecurePassword())}
+                  title="Generate a random secure password"
+                >
+                  Random
+                </Button>
+              </div>
+            </FormField>
             {input('phone', 'Phone', { type: 'tel', max: 20, autoComplete: 'tel' })}
           </div>
           {input('address', 'Address', { max: 255, autoComplete: 'street-address' })}

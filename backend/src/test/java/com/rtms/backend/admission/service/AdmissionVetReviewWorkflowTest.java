@@ -357,10 +357,10 @@ class AdmissionVetReviewWorkflowTest {
         when(careScheduleRepository.countActiveVetQueueItems(vetId, activeStatuses))
                 .thenReturn(3L);
         when(careScheduleRepository.countActiveVetQueueItems(
-                vetId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.OVERDUE)))
+                vetId, List.of(CareScheduleStatus.SCHEDULED)))
                 .thenReturn(2L);
         when(careScheduleRepository.countActiveVetQueueItems(
-                vetId, List.of(CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.DELAYED, CareScheduleStatus.PAUSED)))
+                vetId, List.of(CareScheduleStatus.IN_PROGRESS)))
                 .thenReturn(1L);
         when(careScheduleRepository.countApprovedVetQueueItems(vetId, activeStatuses))
                 .thenReturn(2L);
@@ -442,8 +442,9 @@ class AdmissionVetReviewWorkflowTest {
         assertEquals(AdmissionStatus.REJECTED, admission.getStatus());
         assertEquals("Chronic lameness not suitable for racing", admission.getVetFeedback());
         assertNull(admission.getVetTrainingDecision());
-        // AD-025 rule 6: lịch mở của ngựa bị xóa cứng khi vet reject, không CANCELLED.
-        verify(careScheduleRepository).deleteOpenSchedulesIfUnreferenced(horseId, CareScheduleStatus.OPEN);
+        // Lịch mở của ngựa được chuyển sang CANCELLED khi vet reject.
+        verify(careScheduleRepository).cancelOpenSchedulesIfUnreferenced(
+                eq(horseId), eq(CareScheduleStatus.OPEN), anyString(), any(LocalDateTime.class));
         assertEquals(HorseStatus.REJECTED, horse.getCurrentStatus());
         assertNull(horse.getCurrentStallId());
         assertEquals(StallStatus.AVAILABLE, stall.getStatus());

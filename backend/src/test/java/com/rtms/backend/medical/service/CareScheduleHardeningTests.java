@@ -140,7 +140,7 @@ class CareScheduleHardeningTests {
         routine.setId(101L);
         routine.setHorseId(10L);
         routine.setCareType(CareType.ROUTINE);
-        routine.setStatus(CareScheduleStatus.REQUESTED);
+        routine.setStatus(CareScheduleStatus.SCHEDULED);
         routine.setAdmissionId(null);
         routine.setDurationMinutes(30);
 
@@ -178,7 +178,7 @@ class CareScheduleHardeningTests {
         urgent.setId(102L);
         urgent.setHorseId(10L);
         urgent.setCareType(CareType.URGENT);
-        urgent.setStatus(CareScheduleStatus.REQUESTED);
+        urgent.setStatus(CareScheduleStatus.SCHEDULED);
         urgent.setSourceIncidentId(50L);
         urgent.setAdmissionId(null);
         urgent.setDurationMinutes(30);

@@ -21,6 +21,7 @@ import type { HorseHealthMetric } from '@/features/horses/types';
 import { displayError, formatDate, formatDateTime } from '@/lib/display';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { HorseAvatar } from '@/components/ui/HorseAvatar';
+import { BioSpcControlChart } from '@/features/medical-analytics';
 
 // The 3D canvas (three.js + GLB) must stay out of the server bundle.
 const UrgentHorseInjuryViewer = dynamic(
@@ -248,7 +249,7 @@ export function RecordDetailView({
     return <Notice tone="warning">No clinical record to display.</Notice>;
   }
 
-  const resolvedHorseId = detail?.schedule?.horseId ?? fullRecord?.horseId ?? null;
+  const resolvedHorseId = detail?.schedule?.horseId ?? fullRecord?.horseId ?? horseId ?? null;
   const resolvedHorseName = detail?.horse?.name || horseName || (resolvedHorseId != null ? `#${resolvedHorseId}` : '—');
   const recordIdShown = activeRecordId ?? detail?.healthRecord?.id ?? fullRecord?.id ?? null;
   const trainingDecision = detail?.healthRecord?.trainingDecision ?? fullRecord?.trainingDecision ?? null;
@@ -514,6 +515,11 @@ export function RecordDetailView({
               <p className="text-xs text-[var(--color-text-muted)] py-2 text-center">No vitals recorded yet.</p>
             )}
           </Panel>
+
+          {/* 3.1 Personalized Bio-Process Control (Bio-SPC) */}
+          {resolvedHorseId != null && (
+            <BioSpcControlChart horseId={resolvedHorseId} horseName={resolvedHorseName} />
+          )}
 
           {/* 4. Injury — list + button opening the 3D map modal */}
           <Panel padded className="space-y-3">
