@@ -1,5 +1,5 @@
 /**
- * Tiện ích hỗ trợ AI Assistant & Quick Prompts
+ * AI Assistant & Quick Prompts Utilities
  */
 
 import type { Role } from '../../../types/auth.ts';
@@ -7,44 +7,44 @@ import { ROLE_LABELS } from '../../../lib/roleRoute.ts';
 
 export const PROMPTS_BY_ROLE: Record<Role, string[]> = {
   HEAD_TRAINER: [
-    'Lịch tập các ca hôm nay',
-    'Tiến độ các kế hoạch huấn luyện',
-    'Cảnh báo nguy cơ chấn thương & nhịp tim',
-    'Phân tích sở trường của ngựa',
-    'Danh sách Groom làm việc cùng',
+    "Today's workout session schedule",
+    'Training plan progress & milestones',
+    'Injury risk & recovery heart rate alerts',
+    'Horse distance & track preferences',
+    'Assigned grooms on duty',
   ],
   VETERINARIAN: [
-    'Tổng quan ngựa đang & chờ khám',
-    'Tra cứu ca bệnh lâm sàng qua RAG',
-    'Lịch chăm sóc y tế định kỳ',
-    'Danh sách ngựa cách ly y tế',
-    'Báo cáo sự cố chuồng trại 48h qua',
+    'Pending & active clinical exam queue',
+    'Clinical case literature lookup via RAG',
+    'Preventive care & vaccination schedule',
+    'Medical quarantine horse list',
+    'Stable incident reports in past 48h',
   ],
   GROOM: [
-    'Checklist công việc hôm nay (3 nguồn)',
-    'Chuồng và ngựa tôi phụ trách',
-    'Cảnh báo ăn uống & vận động của ngựa',
-    'Tra cứu vị trí chuồng & người phụ trách',
+    "Today's care task checklist",
+    'My assigned stalls and horses',
+    'Feed intake & activity warnings',
+    'Stall assignments & caretaker directory',
   ],
   CLUB_MANAGER: [
-    'Danh sách nhân sự & bác sĩ',
-    'Vẽ biểu đồ công suất chuồng trại',
-    'Các đơn nhập chuồng chờ duyệt',
-    'Nhật ký kiểm toán gần đây',
+    'Staff directory & roster overview',
+    'Barn & stall occupancy chart',
+    'Pending admission applications',
+    'Recent compliance & audit log',
   ],
   HORSE_OWNER: [
-    'Danh sách chiến mã của tôi',
-    'Lịch tập sắp tới của ngựa',
-    'Tóm tắt sức khỏe và lần khám gần nhất',
-    'Tiến độ khóa huấn luyện của ngựa',
+    'My racehorses directory',
+    'Upcoming workout schedule',
+    'Health summary & recent vet exams',
+    'Training course progress & fitness',
   ],
 };
 
 /**
- * Trả về tên hiển thị chuẩn thân thiện cho vai trò của người dùng (thay vì enum thô như HEAD_TRAINER)
+ * Returns user-friendly display name for user role (instead of raw enum like HEAD_TRAINER)
  */
 export function getRoleDisplayName(role?: Role | string | null): string {
-  if (!role) return 'Trợ lý AI';
+  if (!role) return 'AI Assistant';
   return (ROLE_LABELS as Record<string, string>)[role] || role;
 }
 
