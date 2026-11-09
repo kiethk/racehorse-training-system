@@ -47,6 +47,10 @@ describe('Manager Stable assignment draft', () => {
     const data = fixture(); assign(data, 1, 1, 10); horse(data, 102);
     assert.throws(() => planAssignment(data, createDraft(data), groom(1), null), /Swap Groom/);
   });
+  it('blocks removal when any slot is RESERVED', () => {
+    const data = fixture(); assign(data, 1, 1, 10); data.stalls[0].status = 'RESERVED';
+    assert.throws(() => planAssignment(data, createDraft(data), groom(1), null), /Swap Groom/);
+  });
   it('blocks moving a Groom away from an occupied block to an empty target', () => {
     const data = fixture(); assign(data, 1, 1, 10); horse(data, 103);
     assert.throws(() => planAssignment(data, createDraft(data), groom(2), 10), /Swap Groom/);

@@ -121,7 +121,9 @@ export function planAssignment(data: StableSnapshot, current: AssignmentDraft, t
     if (t.kind !== 'groom') return;
     const rows = blockStalls(data, t.areaId, t.blockNumber);
     if (rows.length !== 3) throw new Error('This block does not contain three stalls. Refresh the board.');
-    if (id == null && rows.some(s => horses.has(s.id))) throw new Error('This block has horses. Swap Groom instead of removing.');
+    if (id == null && rows.some(s => horses.has(s.id) || s.status === 'OCCUPIED' || s.status === 'RESERVED')) {
+      throw new Error('This block has active horses or reserved stalls. Swap Groom instead of removing.');
+    }
     rows.forEach(s => { next.grooms[s.id] = id; }); touch(t);
   };
   if (personId != null && !(target.kind === 'trainer' ? data.trainers : data.grooms).some(u => u.id === personId)) {
