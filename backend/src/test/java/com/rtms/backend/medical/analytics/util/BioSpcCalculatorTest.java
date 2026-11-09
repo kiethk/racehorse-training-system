@@ -103,7 +103,7 @@ class BioSpcCalculatorTest {
 
         assertTrue(anomalyPoint.isSpecialCause());
         assertNotNull(anomalyPoint.anomalyDescription());
-        assertTrue(anomalyPoint.anomalyDescription().contains("exceeds UCL"));
+        assertTrue(anomalyPoint.anomalyDescription().contains("exceeds upper safe threshold"));
     }
 
     @Test

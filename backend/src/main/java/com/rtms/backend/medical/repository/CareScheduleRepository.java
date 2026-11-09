@@ -436,4 +436,13 @@ public interface CareScheduleRepository extends JpaRepository<CareSchedule, Long
             """)
     LocalDateTime findNextExamTime(@Param("horseId") Long horseId,
                                    @Param("statuses") Collection<CareScheduleStatus> statuses);
+    @Query("""
+            SELECT cs FROM CareSchedule cs
+            WHERE cs.veterinarianId IS NOT NULL
+              AND (cs.scheduledDate >= :sinceDate OR (cs.scheduledDate IS NULL AND cs.createdAt >= :sinceDateTime))
+            ORDER BY cs.scheduledDate ASC, cs.id ASC
+            """)
+    List<CareSchedule> findAssignedSchedulesSince(
+            @Param("sinceDate") java.time.LocalDate sinceDate,
+            @Param("sinceDateTime") java.time.LocalDateTime sinceDateTime);
 }
