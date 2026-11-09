@@ -11,7 +11,7 @@ export default function OwnerSchedulePage() {
   return (
     <RoleGuard allowedRoles={['HORSE_OWNER']}>
       <PageContainer>
-        <SchedulePage canManage={false} />
+        <SchedulePage canManage={false} showTrainers />
       </PageContainer>
     </RoleGuard>
   );

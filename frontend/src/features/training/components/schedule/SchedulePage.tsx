@@ -38,7 +38,7 @@ const NEEDS_RESULT_LOOKBACK_DAYS = 90;
  * - Needs result tab: Sessions whose workout results were never recorded.
  * - Horse calendar tab: Inline 7-day calendar for each individual horse (not a popup).
  */
-export function SchedulePage({ canManage }: { canManage: boolean }) {
+export function SchedulePage({ canManage, showTrainers = false }: { canManage: boolean; showTrainers?: boolean }) {
   const today = toIsoDate(new Date());
 
   const [view, setView] = useState<View>('today');
@@ -289,7 +289,7 @@ export function SchedulePage({ canManage }: { canManage: boolean }) {
               sessions={todaySessions}
               rules={rules}
               movable={canManage}
-              showTrainers={!canManage}
+              showTrainers={showTrainers}
               onMove={moveSession}
               onOpen={setOpenId}
             />
