@@ -44,3 +44,12 @@ export function totalNeedingResult(sessions: SessionSummary[]): number {
 export function attendanceLabel(attended: number, total: number): string {
   return `${attended} of ${total} ran`;
 }
+
+/**
+ * What names a Session on a schedule: its group for a Trainer or a Manager, and for an Owner or a Groom, who know horses and not
+ * groups, the horses of the Session they may see.
+ */
+export function sessionTitle(session: Pick<SessionSummary, 'groupName' | 'horseNames'>): string {
+  if (session.groupName) return session.groupName;
+  return session.horseNames.length > 0 ? session.horseNames.join(', ') : 'Session';
+}

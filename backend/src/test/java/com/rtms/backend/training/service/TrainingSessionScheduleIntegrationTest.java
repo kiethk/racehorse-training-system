@@ -36,6 +36,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -186,6 +187,25 @@ class TrainingSessionScheduleIntegrationTest {
 
         assertEquals(1, detail.horses().size());
         assertEquals("Blaze", detail.horses().get(0).horseName());
+    }
+
+    @Test
+    void anOwnerAndAGroomDoNotSeeTheGroupButTheirHorsesStandInForIt() {
+        AuthenticatedUser owner = new AuthenticatedUser(blaze.getOwnerId(), "o@test.invalid", Roles.HORSE_OWNER);
+        Long thunderGroomId = stalls.findById(thunder.getCurrentStallId()).orElseThrow().getGroomId();
+        AuthenticatedUser groom = new AuthenticatedUser(thunderGroomId, "g@test.invalid", Roles.GROOM);
+
+        SessionSummaryResponse forOwner = schedule.getSessions(monday, monday.plusDays(6), null, false, owner).get(0);
+        SessionSummaryResponse forGroom = schedule.getSessions(monday, monday.plusDays(6), null, false, groom).get(0);
+        SessionSummaryResponse forTrainer = schedule.getSessions(monday, monday.plusDays(6), null, false, trainer).get(0);
+
+        assertNull(forOwner.groupName());
+        assertNull(forOwner.groupId());
+        assertEquals(List.of("Blaze"), forOwner.horseNames());
+        assertNull(forGroom.groupName());
+        assertEquals(List.of("Thunder"), forGroom.horseNames());
+        assertEquals("Nhom 1", forTrainer.groupName());
+        assertEquals(List.of("Blaze", "Thunder"), forTrainer.horseNames());
     }
 
     @Test

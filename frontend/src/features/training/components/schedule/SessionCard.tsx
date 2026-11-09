@@ -2,6 +2,7 @@
 
 import { Icon, Pill, SelectableCard } from '@/components/ui';
 import { formatTime } from '@/lib/display';
+import { sessionTitle } from '../../lib/groupSchedule';
 import { SESSION_STATUS } from '../../lib/status';
 import type { SessionSummary } from '../../types';
 import { StatusPill } from '../shared/StatusPill';
@@ -20,7 +21,7 @@ export function SessionCard({ session, onOpen }: { session: SessionSummary; onOp
         <StatusPill status={SESSION_STATUS[session.status]} />
       </div>
       <div className="mt-1 flex items-center gap-1.5 min-w-0">
-        <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{session.groupName}</p>
+        <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{sessionTitle(session)}</p>
         {session.groupDisbanded && <Pill tone="neutral" size="sm">Disbanded</Pill>}
       </div>
       <p className="truncate text-xs text-[var(--color-text-secondary)]">{session.exerciseName}</p>

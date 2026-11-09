@@ -283,6 +283,8 @@ export interface SessionSummary {
   /** The Trainer who leads the Session: an Owner or a Groom may see Sessions of several Trainers. */
   trainerId: number;
   trainerName: string | null;
+  /** The horses the viewer may see in this Session, not cancelled: an Owner or a Groom sees these instead of a group name. */
+  horseNames: string[];
 }
 
 export interface SessionHorse {

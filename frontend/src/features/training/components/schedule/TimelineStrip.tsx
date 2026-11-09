@@ -5,6 +5,7 @@ import { Panel } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
+import { sessionTitle } from '../../lib/groupSchedule';
 import { assignTrainerLanes, clockOf, hourMarks, minutesOf, snapSessionStart, stripPosition } from '../../lib/timeline';
 import type { SessionSummary, TrainingRules } from '../../types';
 
@@ -201,7 +202,7 @@ export function TimelineStrip({
                 top: (laneOf.get(session.id) ?? 0) * LANE_HEIGHT + 4,
                 height: LANE_HEIGHT - 4,
               }}
-              title={`${session.groupName} · ${formatTime(currentStart)}–${formatTime(currentEnd)} · ${session.exerciseName}`}
+              title={`${sessionTitle(session)} · ${formatTime(currentStart)}–${formatTime(currentEnd)} · ${session.exerciseName}`}
               onPointerDown={(e) => handlePointerDown(e, session)}
               onPointerMove={(e) => handlePointerMove(e, session)}
               onPointerUp={() => handlePointerUp(session)}
@@ -226,7 +227,7 @@ export function TimelineStrip({
                         : 'border-[var(--color-primary)] bg-[var(--color-surface)] text-[var(--color-primary)] hover:border-[var(--color-primary-hover)]',
               )}
             >
-              <p className="truncate font-semibold">{session.groupName}</p>
+              <p className="truncate font-semibold">{sessionTitle(session)}</p>
               <p className="truncate text-xs opacity-80">
                 {formatTime(currentStart)}–{formatTime(currentEnd)} · {session.exerciseName}
               </p>

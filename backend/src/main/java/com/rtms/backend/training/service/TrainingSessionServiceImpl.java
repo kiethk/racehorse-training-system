@@ -98,12 +98,13 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
         Map<Long, List<TrainingWorkout>> workoutsBySession = workoutRepository
                 .findBySessionIdIn(sessions.stream().map(TrainingSession::getId).toList()).stream()
                 .collect(Collectors.groupingBy(TrainingWorkout::getSessionId));
-        Lookups lookups = assembler.lookups(sessions);
+        Lookups lookups = assembler.lookups(sessions, workoutsBySession.values().stream().flatMap(List::stream).toList());
         Predicate<TrainingWorkout> visible = visibleWorkouts(currentUser, workoutsBySession.values());
+        boolean showGroup = knowsGroups(currentUser);
 
         return sessions.stream()
                 .filter(session -> groupId == null || groupId.equals(lookups.courseRuns().get(session.getCourseRunId()).getGroupId()))
-                .map(session -> assembler.summary(session, workoutsBySession.getOrDefault(session.getId(), List.of()), visible, lookups))
+                .map(session -> assembler.summary(session, workoutsBySession.getOrDefault(session.getId(), List.of()), visible, lookups, showGroup))
                 .filter(summary -> !needsResultOnly || summary.needsResultCount() > 0)
                 .toList();
     }
@@ -140,7 +141,12 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
                         workout.getStatus() == WorkoutStatus.RAN ? SessionWorkoutResponse.of(workout) : null))
                 .toList();
         return new SessionDetailResponse(
-                assembler.summary(session, workouts, visible, assembler.lookups(List.of(session))), horses);
+                assembler.summary(session, workouts, visible, assembler.lookups(List.of(session), workouts), knowsGroups(currentUser)), horses);
+    }
+
+    /** Chỉ Trainer và Quản lý biết đến Training Group; Owner và Groom chỉ biết ngựa. (Only a Trainer and a Manager know Training Groups; an Owner and a Groom know horses.) */
+    private static boolean knowsGroups(AuthenticatedUser user) {
+        return Roles.HEAD_TRAINER.equals(user.getRole()) || Roles.CLUB_MANAGER.equals(user.getRole());
     }
 
     /** Các buổi người xem được phép thấy: Trainer của mình, Groom có ngựa mình dắt, Owner có ngựa của mình, Quản lý tất cả. */

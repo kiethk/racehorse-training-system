@@ -18,7 +18,7 @@ import { displayError, formatDate } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { useTrainingRules } from '../../hooks/useTrainingRules';
 import { shiftIsoDate, toIsoDate, DAY_HEADING_FORMAT } from '../../lib/dateRange';
-import { groupByDate, mondayOf, totalNeedingResult } from '../../lib/groupSchedule';
+import { groupByDate, mondayOf, sessionTitle, totalNeedingResult } from '../../lib/groupSchedule';
 import { trainingService } from '../../services/trainingService';
 import type { SessionSummary, TrainingGroup } from '../../types';
 import { ScheduleWeekCalendar } from './ScheduleWeekCalendar';
@@ -141,7 +141,7 @@ export function SchedulePage({ canManage, showTrainers = false }: { canManage: b
   async function moveSession(session: SessionSummary, newStart: string) {
     try {
       await trainingService.rescheduleSession(session.id, `${newStart}:00`);
-      toast.success(`${session.groupName} moved to ${newStart}.`);
+      toast.success(`${sessionTitle(session)} moved to ${newStart}.`);
       await Promise.all([load(), loadMissingCount()]);
     } catch (cause) {
       toast.error(displayError(cause, 'Unable to move this session.'));

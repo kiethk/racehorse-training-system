@@ -17,7 +17,7 @@ import { cn } from '@/lib/cn';
 import { displayError, formatDate, formatEnumLabel } from '@/lib/display';
 import type { Horse } from '@/features/stable/types';
 import { shiftIsoDate, toIsoDate } from '../../lib/dateRange';
-import { mondayOf } from '../../lib/groupSchedule';
+import { mondayOf, sessionTitle } from '../../lib/groupSchedule';
 import { scheduleDates, SCHEDULE_DAYS } from '../../lib/horseSchedule';
 import { SESSION_STATUS, WORKOUT_STATUS } from '../../lib/status';
 import { trainingService } from '../../services/trainingService';
@@ -160,7 +160,7 @@ export function ScheduleWeekCalendar({
           startTime: s.startTime,
           endTime: s.endTime,
           exerciseName: s.exerciseName,
-          groupName: s.groupName,
+          groupName: sessionTitle(s),
           groupDisbanded: s.groupDisbanded,
           horseCount: s.horseCount,
           cancelled: s.status === 'CANCELLED',
