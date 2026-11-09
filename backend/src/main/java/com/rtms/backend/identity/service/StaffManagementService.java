@@ -332,7 +332,11 @@ public class StaffManagementService {
                 VeterinarianProfile vetProfile = vetProfileRepository.findById(user.getId())
                         .orElseGet(() -> { VeterinarianProfile p = new VeterinarianProfile(); p.setUserId(user.getId()); return p; });
                 if (request.getLicenseNumber() != null && !request.getLicenseNumber().isBlank()) {
-                    vetProfile.setLicenseNumber(request.getLicenseNumber().trim());
+                    String cleanedLicense = request.getLicenseNumber().trim();
+                    if (vetProfileRepository.existsByLicenseNumberAndUserIdNot(cleanedLicense, user.getId())) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "License number already in use");
+                    }
+                    vetProfile.setLicenseNumber(cleanedLicense);
                 }
                 vetProfile.setLicenseIssuedDate(request.getLicenseIssuedDate());
                 vetProfile.setSpecialization(request.getSpecialization());
@@ -342,7 +346,11 @@ public class StaffManagementService {
                 TrainerProfile trainerProfile = trainerProfileRepository.findById(user.getId())
                         .orElseGet(() -> { TrainerProfile p = new TrainerProfile(); p.setUserId(user.getId()); return p; });
                 if (request.getCertificationNumber() != null && !request.getCertificationNumber().isBlank()) {
-                    trainerProfile.setCertificationNumber(request.getCertificationNumber().trim());
+                    String cleanedCert = request.getCertificationNumber().trim();
+                    if (trainerProfileRepository.existsByCertificationNumberAndUserIdNot(cleanedCert, user.getId())) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "Certification number already in use");
+                    }
+                    trainerProfile.setCertificationNumber(cleanedCert);
                 }
                 trainerProfile.setCertificationIssuedDate(request.getCertificationIssuedDate());
                 trainerProfileRepository.save(trainerProfile);
@@ -597,9 +605,13 @@ public class StaffManagementService {
         if (request.getCertificationNumber() == null || request.getCertificationNumber().trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Certification number is required for Head Trainer");
         }
+        String cert = request.getCertificationNumber().trim();
+        if (trainerProfileRepository.existsByCertificationNumber(cert)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Certification number already in use");
+        }
         TrainerProfile profile = new TrainerProfile();
         profile.setUserId(user.getId());
-        profile.setCertificationNumber(request.getCertificationNumber().trim());
+        profile.setCertificationNumber(cert);
         profile.setCertificationIssuedDate(request.getCertificationIssuedDate());
         trainerProfileRepository.save(profile);
 
@@ -807,9 +819,13 @@ public class StaffManagementService {
         if (request.getLicenseNumber() == null || request.getLicenseNumber().trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "License number is required for Veterinarian");
         }
+        String license = request.getLicenseNumber().trim();
+        if (vetProfileRepository.existsByLicenseNumber(license)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "License number already in use");
+        }
         VeterinarianProfile vet = new VeterinarianProfile();
         vet.setUserId(user.getId());
-        vet.setLicenseNumber(request.getLicenseNumber().trim());
+        vet.setLicenseNumber(license);
         vet.setLicenseIssuedDate(request.getLicenseIssuedDate());
         vet.setSpecialization(request.getSpecialization());
         vetProfileRepository.save(vet);

@@ -61,6 +61,10 @@ function StaffCreationSession({ onClose, onSubmit, loading }: Props) {
       const message = displayError(cause, 'Unable to create staff.');
       if (message.toLowerCase().includes('email already')) {
         pendingFocus.current = 'staff-email'; setErrors({ email: message });
+      } else if (message.toLowerCase().includes('certification number')) {
+        pendingFocus.current = 'staff-certificationNumber'; setErrors({ certificationNumber: message });
+      } else if (message.toLowerCase().includes('license number')) {
+        pendingFocus.current = 'staff-licenseNumber'; setErrors({ licenseNumber: message });
       } else setError(message);
     } finally { pending.current = false; }
   }

@@ -136,6 +136,11 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
         }
         assertNoGroomClash(changing, groomByHorse);
 
+        // Phase 1: Tam thoi set null va flush de tranh Unique Constraint Violation khi hoan doi (swap) Groom trong cung Group
+        changing.forEach(member -> member.setGroomId(null));
+        memberRepository.saveAllAndFlush(changing);
+
+        // Phase 2: Gan groom moi va flush
         changing.forEach(member -> member.setGroomId(groomByHorse.get(member.getHorseId())));
         memberRepository.saveAllAndFlush(changing);
 

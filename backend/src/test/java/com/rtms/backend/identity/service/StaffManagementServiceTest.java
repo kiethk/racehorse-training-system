@@ -465,6 +465,42 @@ class StaffManagementServiceTest {
     }
 
     @Test
+    void testDuplicateCertificationNumberRejectedOnCreate() {
+        mockBasicCreation("HEAD_TRAINER");
+        mockUserSaveWithId(10L);
+
+        StaffCreationRequest request = new StaffCreationRequest();
+        request.setEmail("trainer.dupe@rtms.com"); request.setRole("HEAD_TRAINER");
+        request.setFullName("Duplicate Trainer"); request.setPassword("pass123456");
+        request.setCertificationNumber("CERT-DUPE");
+
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+        when(trainerProfileRepository.existsByCertificationNumber("CERT-DUPE")).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> staffService.createStaff(request));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("Certification number already in use", ex.getReason());
+    }
+
+    @Test
+    void testDuplicateLicenseNumberRejectedOnCreate() {
+        mockBasicCreation("VETERINARIAN");
+        mockUserSaveWithId(10L);
+
+        StaffCreationRequest request = new StaffCreationRequest();
+        request.setEmail("vet.dupe@rtms.com"); request.setRole("VETERINARIAN");
+        request.setFullName("Duplicate Vet"); request.setPassword("pass123456");
+        request.setLicenseNumber("VET-DUPE");
+
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+        when(vetProfileRepository.existsByLicenseNumber("VET-DUPE")).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> staffService.createStaff(request));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("License number already in use", ex.getReason());
+    }
+
+    @Test
     void testActivateDeactivateWorks() {
         Role groomRole = new Role(); groomRole.setName("GROOM");
         User groom = new User(); groom.setId(1L); groom.setRole(groomRole); groom.setActive(true);

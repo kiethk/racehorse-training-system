@@ -143,6 +143,12 @@ function AccountCreationSession({ onClose, onSubmit, loading, defaultRole }: Pro
       if (message.toLowerCase().includes('email already')) {
         pendingFocus.current = 'account-email';
         setErrors({ email: message });
+      } else if (message.toLowerCase().includes('certification number')) {
+        pendingFocus.current = 'account-certificationNumber';
+        setErrors({ certificationNumber: message });
+      } else if (message.toLowerCase().includes('license number')) {
+        pendingFocus.current = 'account-licenseNumber';
+        setErrors({ licenseNumber: message });
       } else {
         setError(message);
       }
