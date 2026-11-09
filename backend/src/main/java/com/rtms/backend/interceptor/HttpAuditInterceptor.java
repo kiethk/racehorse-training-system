@@ -25,7 +25,7 @@ public class HttpAuditInterceptor implements HandlerInterceptor {
      * - Personal notification reading (/api/notifications/...)
      * - AI conversation streaming and chat state (/api/v1/ai/chat/..., /api/v1/ai/conversations/...)
      * - Transient multipart OCR scanning (/api/owner/admissions/ocr-scan)
-     * - Plan preview simulation (/api/group-plans/preview)
+     * - Course run preview simulation (/api/course-runs/preview; the old /api/group-plans/preview stays excluded)
      */
     private static final List<String> EXCLUDED_PREFIXES = List.of(
             "/api/auth/login",
@@ -36,6 +36,7 @@ public class HttpAuditInterceptor implements HandlerInterceptor {
             "/api/v1/ai/chat",
             "/api/v1/ai/conversations",
             "/api/owner/admissions/ocr-scan",
+            "/api/course-runs/preview",
             "/api/group-plans/preview"
     );
 

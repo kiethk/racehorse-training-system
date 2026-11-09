@@ -543,8 +543,7 @@ function HealthRecordsContent() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 items-start">
                 <Panel padded className="space-y-3 border border-[var(--color-border)]">
                   <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <Icon name="shield" size={16} className="text-[var(--color-primary)]" />
+                    <div>
                       <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                         Clinical Status & Training Clearance
                       </h2>
@@ -625,8 +624,7 @@ function HealthRecordsContent() {
 
                 <Panel padded className="space-y-2 border border-[var(--color-border)]">
                   <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <Icon name="heart-pulse" size={16} className="text-[var(--color-medical)]" />
+                    <div>
                       <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                         Latest Vitals Telemetry
                       </h2>
@@ -719,7 +717,6 @@ function HealthRecordsContent() {
                   <>
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-xs">
                       <div className="flex items-center gap-2">
-                        <Icon name="activity" size={16} className="text-[var(--color-primary)]" />
                         <span className="font-semibold text-[var(--color-text-primary)]">
                           Physiological Telemetry Progression
                         </span>
@@ -737,8 +734,7 @@ function HealthRecordsContent() {
                       {/* 1. Heart Rate Chart */}
                       <Panel padded className="space-y-3 border border-[var(--color-border)]">
                         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                          <div className="flex items-center gap-2">
-                            <Icon name="heart-pulse" size={16} className="text-[var(--color-danger)]" />
+                          <div>
                             <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Heart Rate</h3>
                           </div>
                           {hrStats?.latest != null && (
@@ -757,7 +753,7 @@ function HealthRecordsContent() {
                         <div className="h-48 w-full pt-1">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartMetrics}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-border)" />
                               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
                               <YAxis
                                 tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
@@ -791,8 +787,7 @@ function HealthRecordsContent() {
                       {/* 2. Body Temperature Chart */}
                       <Panel padded className="space-y-3 border border-[var(--color-border)]">
                         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                          <div className="flex items-center gap-2">
-                            <Icon name="activity" size={16} className="text-[var(--color-warning)]" />
+                          <div>
                             <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Body Temperature</h3>
                           </div>
                           {tempStats?.latest != null && (
@@ -811,7 +806,7 @@ function HealthRecordsContent() {
                         <div className="h-48 w-full pt-1">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartMetrics}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-border)" />
                               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
                               <YAxis
                                 tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
@@ -845,8 +840,7 @@ function HealthRecordsContent() {
                       {/* 3. Respiratory Rate Chart */}
                       <Panel padded className="space-y-3 border border-[var(--color-border)]">
                         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                          <div className="flex items-center gap-2">
-                            <Icon name="trending-up" size={16} className="text-[var(--color-primary)]" />
+                          <div>
                             <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Respiratory Rate</h3>
                           </div>
                           {respStats?.latest != null && (
@@ -865,7 +859,7 @@ function HealthRecordsContent() {
                         <div className="h-48 w-full pt-1">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartMetrics}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-border)" />
                               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
                               <YAxis
                                 tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
@@ -899,8 +893,7 @@ function HealthRecordsContent() {
                       {/* 4. Body Weight Chart */}
                       <Panel padded className="space-y-3 border border-[var(--color-border)]">
                         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                          <div className="flex items-center gap-2">
-                            <Icon name="gauge" size={16} className="text-[var(--color-info)]" />
+                          <div>
                             <h3 className="text-sm font-bold text-[var(--color-text-primary)]">Body Weight</h3>
                           </div>
                           {weightStats?.latest != null && (
@@ -919,7 +912,7 @@ function HealthRecordsContent() {
                         <div className="h-48 w-full pt-1">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartMetrics}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-border)" />
                               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
                               <YAxis
                                 tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
@@ -960,8 +953,7 @@ function HealthRecordsContent() {
               <div className="space-y-4">
                 <Panel padded className="space-y-3 border border-[var(--color-border)]">
                   <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <Icon name="clipboard" size={16} className="text-[var(--color-primary)]" />
+                    <div>
                       <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                         Clinical Examination History
                       </h2>

@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { GroupsView } from '@/features/training/components/GroupsView';
+import { GroupsView } from '@/features/training/components/groups/GroupsView';
 
 export const metadata: Metadata = {
   title: 'Groups | Trainer | RTMS',

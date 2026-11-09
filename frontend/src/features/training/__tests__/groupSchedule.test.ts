@@ -1,13 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { attendanceLabel, groupByDate, mondayOf, sessionHasStarted, totalNeedingResult, weekDates } from '../lib/groupSchedule.ts';
-import type { ScheduleSession } from '../types';
+import { attendanceLabel, groupByDate, mondayOf, sessionHasStarted, sessionTitle, totalNeedingResult, weekDates } from '../lib/groupSchedule.ts';
+import type { SessionSummary } from '../types';
 
-function session(overrides: Partial<ScheduleSession>): ScheduleSession {
+function session(overrides: Partial<SessionSummary>): SessionSummary {
   return {
-    id: 1, planId: 1, groupId: 1, groupName: 'Nhom 1', groupDisbanded: false, courseName: 'Sprint', subjectName: 'S1',
+    id: 1, courseRunId: 1, groupId: 1, groupName: 'Nhom 1', groupDisbanded: false, courseName: 'Sprint', exerciseName: 'S1',
     date: '2026-11-04', startTime: '06:00:00', endTime: '06:30:00', status: 'SCHEDULED',
-    horseCount: 3, needsResultCount: 0, ...overrides,
+    horseCount: 3, needsResultCount: 0, trainerId: 1, trainerName: 'Trainer 1', horseNames: [], ...overrides,
   };
 }
 
@@ -54,6 +54,20 @@ describe('totalNeedingResult', () => {
 });
 
 describe('attendanceLabel', () => {
-  it('reads as X of Y sessions', () => assert.equal(attendanceLabel(7, 20), '7 of 20 sessions'));
-  it('uses the singular for one session', () => assert.equal(attendanceLabel(0, 1), '0 of 1 session'));
+  it('reads as X of Y ran', () => assert.equal(attendanceLabel(7, 20), '7 of 20 ran'));
+  it('counts against every session, so a horse that missed none of one still reads 0 of 1 ran', () => assert.equal(attendanceLabel(0, 1), '0 of 1 ran'));
+});
+
+describe('sessionTitle', () => {
+  it('names a Session by its group for a Trainer', () => {
+    assert.equal(sessionTitle(session({ groupName: 'Morning Group 1', horseNames: ['THUNDER'] })), 'Morning Group 1');
+  });
+
+  it('names it by the horses of the Session for an Owner or a Groom, who do not see groups', () => {
+    assert.equal(sessionTitle(session({ groupName: null, horseNames: ['AMNESIA', 'EROE DE SALUTE'] })), 'AMNESIA, EROE DE SALUTE');
+  });
+
+  it('falls back to a plain word when there is neither', () => {
+    assert.equal(sessionTitle(session({ groupName: null, horseNames: [] })), 'Session');
+  });
 });

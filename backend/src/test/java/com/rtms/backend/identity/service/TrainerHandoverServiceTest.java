@@ -12,12 +12,12 @@ import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.repository.AreaRepository;
-import com.rtms.backend.training.entity.GroupPlan;
+import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.entity.TrainingGroup;
 import com.rtms.backend.training.entity.TrainingSession;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.SessionStatus;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingGroupRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +41,7 @@ class TrainerHandoverServiceTest {
     private AreaRepository areaRepository;
     private GroomProfileRepository groomProfileRepository;
     private TrainingGroupRepository trainingGroupRepository;
-    private GroupPlanRepository groupPlanRepository;
+    private CourseRunRepository courseRunRepository;
     private TrainingSessionRepository trainingSessionRepository;
     private AdmissionApplicationRepository admissionApplicationRepository;
 
@@ -53,7 +53,7 @@ class TrainerHandoverServiceTest {
         areaRepository = mock(AreaRepository.class);
         groomProfileRepository = mock(GroomProfileRepository.class);
         trainingGroupRepository = mock(TrainingGroupRepository.class);
-        groupPlanRepository = mock(GroupPlanRepository.class);
+        courseRunRepository = mock(CourseRunRepository.class);
         trainingSessionRepository = mock(TrainingSessionRepository.class);
         admissionApplicationRepository = mock(AdmissionApplicationRepository.class);
 
@@ -62,7 +62,7 @@ class TrainerHandoverServiceTest {
                 areaRepository,
                 groomProfileRepository,
                 trainingGroupRepository,
-                groupPlanRepository,
+                courseRunRepository,
                 trainingSessionRepository,
                 admissionApplicationRepository
         );
@@ -260,12 +260,12 @@ class TrainerHandoverServiceTest {
         when(trainingGroupRepository.existsByTrainerIdAndNameIgnoreCaseAndDisbandedAtIsNull(replacementId, "Group Alpha"))
                 .thenReturn(true);
 
-        // 4. Group plan
-        GroupPlan plan = new GroupPlan();
+        // 4. Course run
+        CourseRun plan = new CourseRun();
         plan.setId(301L);
-        plan.setStatus(TrainingPlanStatus.ACTIVE);
+        plan.setStatus(CourseRunStatus.ACTIVE);
         plan.setTrainerId(oldTrainerId);
-        when(groupPlanRepository.findByTrainerIdAndStatusIn(eq(oldTrainerId), any()))
+        when(courseRunRepository.findByTrainerIdAndStatusIn(eq(oldTrainerId), any()))
                 .thenReturn(List.of(plan));
 
         // 5. Training session
@@ -301,9 +301,9 @@ class TrainerHandoverServiceTest {
         assertEquals("Group Alpha (Handover)", group.getName());
         verify(trainingGroupRepository).save(group);
 
-        // Verify plan transferred
+        // Verify course run transferred
         assertEquals(replacementId, plan.getTrainerId());
-        verify(groupPlanRepository).save(plan);
+        verify(courseRunRepository).save(plan);
 
         // Verify session transferred
         assertEquals(replacementId, session.getTrainerId());

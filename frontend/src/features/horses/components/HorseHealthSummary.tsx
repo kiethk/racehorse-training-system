@@ -2,7 +2,7 @@
 import { hydrationStatusLabel } from '@/features/health/lib/hydrationStatus';
 
 import { EmptyState, Icon, MetricCard, Notice, Panel, Pill } from '@/components/ui';
-import { HorseAlertList } from '@/features/training/components/HorseAlertList';
+import { HorseAlertList } from '@/features/training/components/horses/HorseAlertList';
 import type { HorseAlert } from '@/features/training/types';
 import type { HorseHealthMetric } from '../types';
 import { formatDate } from '@/lib/display';

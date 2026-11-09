@@ -35,7 +35,6 @@ const MODULE_OPTIONS = [
   { label: 'Horse Lifecycle', value: 'HORSES' },
   { label: 'Staff & Accounts', value: 'STAFF' },
   { label: 'Training & Courses', value: 'TRAINING' },
-  { label: 'Racing & Registration', value: 'RACING' },
   { label: 'System & Admin', value: 'SYSTEM' },
 ] as const;
 

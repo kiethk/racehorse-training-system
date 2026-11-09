@@ -36,15 +36,14 @@ import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.stable.service.GroomDailyTaskService;
-import com.rtms.backend.training.dto.GroomConflictRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
-import com.rtms.backend.training.dto.SessionHorseNameRow;
-import com.rtms.backend.training.dto.PlanSummaryResponse;
+import com.rtms.backend.training.repository.projection.SessionHorseNameRow;
+import com.rtms.backend.training.dto.HorseCourseRunResponse;
 import com.rtms.backend.training.dto.HorseAttendanceResponse;
-import com.rtms.backend.training.dto.PastWorkoutRow;
-import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
-import com.rtms.backend.training.dto.SessionRow;
+import com.rtms.backend.training.repository.projection.PastWorkoutRow;
+import com.rtms.backend.training.repository.projection.SpecialtyWorkoutRow;
+import com.rtms.backend.training.repository.projection.SessionRow;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.RacingReadinessAssessment;
 import com.rtms.backend.training.entity.TrainingWorkout;
@@ -52,26 +51,24 @@ import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.GroupPlanRepository;
-import com.rtms.backend.training.entity.GroupPlan;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
+import com.rtms.backend.training.repository.CourseRunRepository;
+import com.rtms.backend.training.entity.CourseRun;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.repository.RacingReadinessAssessmentRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseSpecialtyService;
 import com.rtms.backend.training.service.HorseAttendanceService;
-import com.rtms.backend.training.service.SessionScheduleService;
+import com.rtms.backend.training.service.TrainingSessionService;
 import com.rtms.backend.training.service.TrainingGroupService;
-import com.rtms.backend.training.dto.ScheduleSessionResponse;
+import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.training.dto.SessionHorseResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.dto.GroupMemberResponse;
 import com.rtms.backend.training.enums.SessionStatus;
-import com.rtms.backend.racing.entity.RaceRegistration;
-import com.rtms.backend.racing.repository.RaceRegistrationRepository;
-import com.rtms.backend.training.entity.Subject;
-import com.rtms.backend.training.repository.SubjectRepository;
+import com.rtms.backend.training.entity.Exercise;
+import com.rtms.backend.training.repository.ExerciseRepository;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
 import com.rtms.backend.medical.entity.TreatmentPlan;
 import com.rtms.backend.medical.repository.TreatmentPlanRepository;
@@ -142,7 +139,7 @@ public class AiToolExecutionService {
     private final GroomDailyTaskService groomDailyTaskService;
     private final AdmissionApplicationRepository admissionApplicationRepository;
     private final TrainingSessionRepository trainingSessionRepository;
-    private final GroupPlanRepository groupPlanRepository;
+    private final CourseRunRepository courseRunRepository;
     private final HorseSpecialtyService horseSpecialtyService;
     private final HorsePerformanceService horsePerformanceService;
     private final RacingReadinessAssessmentRepository racingReadinessAssessmentRepository;
@@ -151,15 +148,14 @@ public class AiToolExecutionService {
     private final CourseRepository courseRepository;
     private final AuditLogRepository auditLogRepository;
     private final CandidateHorseProfileRepository candidateHorseProfileRepository;
-    private final RaceRegistrationRepository raceRegistrationRepository;
-    private final SubjectRepository subjectRepository;
+    private final ExerciseRepository exerciseRepository;
     private final HorseHealthMetricRepository horseHealthMetricRepository;
     private final HorsePedigreeRepository horsePedigreeRepository;
     private final HorseIncidentReportRepository horseIncidentReportRepository;
     private final GroomTaskCompletionRepository groomTaskCompletionRepository;
     private final HorseAttendanceService horseAttendanceService;
     private final TrainingGroupService trainingGroupService;
-    private final SessionScheduleService sessionScheduleService;
+    private final TrainingSessionService trainingSessionService;
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final InjuryRecordRepository injuryRecordRepository;
     private final VeterinarianProfileRepository veterinarianProfileRepository;
@@ -178,7 +174,7 @@ public class AiToolExecutionService {
                                   GroomDailyTaskService groomDailyTaskService,
                                   AdmissionApplicationRepository admissionApplicationRepository,
                                   TrainingSessionRepository trainingSessionRepository,
-                                  GroupPlanRepository groupPlanRepository,
+                                  CourseRunRepository courseRunRepository,
                                   HorseSpecialtyService horseSpecialtyService,
                                   HorsePerformanceService horsePerformanceService,
                                   RacingReadinessAssessmentRepository racingReadinessAssessmentRepository,
@@ -187,15 +183,14 @@ public class AiToolExecutionService {
                                   @Autowired(required = false) CourseRepository courseRepository,
                                   @Autowired(required = false) AuditLogRepository auditLogRepository,
                                   @Autowired(required = false) CandidateHorseProfileRepository candidateHorseProfileRepository,
-                                  @Autowired(required = false) RaceRegistrationRepository raceRegistrationRepository,
-                                  @Autowired(required = false) SubjectRepository subjectRepository,
+                                  @Autowired(required = false) ExerciseRepository exerciseRepository,
                                   @Autowired(required = false) HorseHealthMetricRepository horseHealthMetricRepository,
                                   @Autowired(required = false) HorsePedigreeRepository horsePedigreeRepository,
                                   @Autowired(required = false) HorseIncidentReportRepository horseIncidentReportRepository,
                                   @Autowired(required = false) GroomTaskCompletionRepository groomTaskCompletionRepository,
                                   HorseAttendanceService horseAttendanceService,
                                   TrainingGroupService trainingGroupService,
-                                  SessionScheduleService sessionScheduleService,
+                                  TrainingSessionService trainingSessionService,
                                    @Autowired(required = false) TreatmentPlanRepository treatmentPlanRepository,
                                    @Autowired(required = false) InjuryRecordRepository injuryRecordRepository,
                                    @Autowired(required = false) VeterinarianProfileRepository veterinarianProfileRepository,
@@ -212,7 +207,7 @@ public class AiToolExecutionService {
         this.groomDailyTaskService = groomDailyTaskService;
         this.admissionApplicationRepository = admissionApplicationRepository;
         this.trainingSessionRepository = trainingSessionRepository;
-        this.groupPlanRepository = groupPlanRepository;
+        this.courseRunRepository = courseRunRepository;
         this.horseSpecialtyService = horseSpecialtyService;
         this.horsePerformanceService = horsePerformanceService;
         this.racingReadinessAssessmentRepository = racingReadinessAssessmentRepository;
@@ -221,15 +216,14 @@ public class AiToolExecutionService {
         this.courseRepository = courseRepository;
         this.auditLogRepository = auditLogRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
-        this.raceRegistrationRepository = raceRegistrationRepository;
-        this.subjectRepository = subjectRepository;
+        this.exerciseRepository = exerciseRepository;
         this.horseHealthMetricRepository = horseHealthMetricRepository;
         this.horsePedigreeRepository = horsePedigreeRepository;
         this.horseIncidentReportRepository = horseIncidentReportRepository;
         this.groomTaskCompletionRepository = groomTaskCompletionRepository;
         this.horseAttendanceService = horseAttendanceService;
         this.trainingGroupService = trainingGroupService;
-        this.sessionScheduleService = sessionScheduleService;
+        this.trainingSessionService = trainingSessionService;
         this.treatmentPlanRepository = treatmentPlanRepository;
         this.injuryRecordRepository = injuryRecordRepository;
         this.veterinarianProfileRepository = veterinarianProfileRepository;
@@ -279,9 +273,7 @@ public class AiToolExecutionService {
             case "getHorseSpecialtyAnalysis" -> handleGetHorseSpecialtyAnalysis(args, currentUser);
             case "getTrainerRiskAlerts" -> handleGetTrainerRiskAlerts(args, currentUser);
             case "getRacingReadinessAssessment" -> handleGetRacingReadinessAssessment(args);
-            case "checkGroomConflict" -> handleCheckGroomConflict(args);
             case "getTrainerAssignedGrooms" -> handleGetTrainerAssignedGrooms(currentUser);
-            case "getMyHorseRaceRegistrations" -> handleGetMyHorseRaceRegistrations(args, currentUser);
             case "getAssignedAdmissionReviews" -> handleGetAssignedAdmissionReviews(currentUser);
             case "getCourseCurriculumOverview" -> handleGetCourseCurriculumOverview();
             case "analyzeWorkoutLoadAndOvertrainingRisk" -> handleAnalyzeWorkoutLoadAndOvertrainingRisk(args);
@@ -435,7 +427,7 @@ public class AiToolExecutionService {
         item.put("planName", line.courseName() != null ? line.courseName() : "Khóa huấn luyện");
         item.put("horseName", horseName);
         item.put("groupName", groupLabel(line.groupName(), line.groupDisbanded()));
-        item.put("status", planStatusLabel(line.planStatus()));
+        item.put("status", courseRunStatusLabel(line.courseRunStatus()));
         item.put("progress", line.attended() + "/" + line.total() + " buổi đã chạy");
         item.put("completedSessions", line.attended());
         item.put("totalSessions", line.total());
@@ -452,7 +444,7 @@ public class AiToolExecutionService {
         return disbanded ? groupName + " (Disbanded)" : groupName;
     }
 
-    private static String planStatusLabel(String status) {
+    private static String courseRunStatusLabel(String status) {
         if (status == null) {
             return "N/A";
         }
@@ -491,7 +483,7 @@ public class AiToolExecutionService {
             item.put("workoutDate", session.sessionDate() != null ? session.sessionDate().toString() : "N/A");
             item.put("startTime", session.startTime() != null ? session.startTime().toString() : "N/A");
             item.put("endTime", session.endTime() != null ? session.endTime().toString() : "N/A");
-            item.put("subjectName", session.subjectName());
+            item.put("exerciseName", session.exerciseName());
             item.put("myHorseList", namesBySession.getOrDefault(session.sessionId(), Collections.emptyList()));
             result.add(item);
         }
@@ -805,7 +797,7 @@ public class AiToolExecutionService {
             item.put("workoutDate", row.sessionDate().toString());
             item.put("sessionTime", formatCaTap(row.startTime(), row.endTime()));
             item.put("groupName", groupLabel(row.groupName(), row.groupDisbanded()));
-            item.put("subjectName", row.subjectName());
+            item.put("exerciseName", row.exerciseName());
             item.put("outcome", outcome(row));
             if (w.getStatus() == WorkoutStatus.RAN) {
                 item.put("actualDistanceMeters", w.getActualDistanceMeters());
@@ -848,9 +840,9 @@ public class AiToolExecutionService {
      * (Whether any heart-rate reading passes share × the app's safe limit, the same limits the UI alerts on.)
      */
     private static boolean overLimit(int maxHr, int avgHr, int recoveryHr, double share) {
-        return maxHr > share * HorsePerformanceService.MAX_HEART_RATE_LIMIT
-                || avgHr > share * HorsePerformanceService.AVERAGE_HEART_RATE_LIMIT
-                || recoveryHr > share * HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT;
+        return maxHr > share * TrainingLimits.MAX_HEART_RATE_LIMIT
+                || avgHr > share * TrainingLimits.AVERAGE_HEART_RATE_LIMIT
+                || recoveryHr > share * TrainingLimits.RECOVERY_HEART_RATE_LIMIT;
     }
 
     /** Kết cục của một Workout, đúng nhãn trên giao diện. (A Workout's outcome, with the labels the UI uses.) */
@@ -881,12 +873,12 @@ public class AiToolExecutionService {
      */
     private Object sessionsNeedingResult(AuthenticatedUser currentUser) {
         LocalDate today = LocalDate.now();
-        List<ScheduleSessionResponse> sessions = sessionScheduleService.getSessions(
+        List<SessionSummaryResponse> sessions = trainingSessionService.getSessions(
                 today.minusDays(NEEDS_RESULT_LOOKBACK_DAYS), today, null, true, currentUser);
         List<Map<String, Object>> list = new ArrayList<>();
         int waiting = 0;
-        for (ScheduleSessionResponse session : sessions) {
-            List<String> horses = sessionScheduleService.getSession(session.id(), currentUser).horses().stream()
+        for (SessionSummaryResponse session : sessions) {
+            List<String> horses = trainingSessionService.getSession(session.id(), currentUser).horses().stream()
                     .filter(horse -> "HELD".equals(horse.status()))
                     .map(SessionHorseResponse::horseName)
                     .toList();
@@ -895,7 +887,7 @@ public class AiToolExecutionService {
             item.put("workoutDate", session.date().toString());
             item.put("sessionTime", formatCaTap(session.startTime(), session.endTime()));
             item.put("groupName", groupLabel(session.groupName(), session.groupDisbanded()));
-            item.put("subjectName", session.subjectName());
+            item.put("exerciseName", session.exerciseName());
             item.put("needsResultCount", horses.size());
             item.put("horseList", horses);
             list.add(item);
@@ -928,10 +920,10 @@ public class AiToolExecutionService {
         item.put("horseList", group.members().stream()
                 .map(member -> member.horseName() + " (Groom: " + (member.groomName() != null ? member.groomName() : "chưa có") + ")")
                 .toList());
-        if (group.currentPlanStatus() != null) {
+        if (group.currentCourseRunStatus() != null) {
             item.put("currentCourse", group.currentCourseName());
-            item.put("currentPlanStatus", planStatusLabel(group.currentPlanStatus()));
-            item.put("currentPlanPeriod", group.currentPlanStartDate() + " → " + group.currentPlanEndDate());
+            item.put("currentCourseRunStatus", courseRunStatusLabel(group.currentCourseRunStatus()));
+            item.put("currentCourseRunPeriod", group.currentCourseRunStartDate() + " → " + group.currentCourseRunEndDate());
         } else {
             item.put("currentCourse", group.disbanded() ? "Đã giải tán" : "Đang rảnh (chưa giao khóa)");
         }
@@ -975,8 +967,8 @@ public class AiToolExecutionService {
             item.put("workoutDate", session.sessionDate() != null ? session.sessionDate().toString() : "Hôm nay");
             item.put("startTime", session.startTime() != null ? session.startTime().toString() : "N/A");
             item.put("endTime", session.endTime() != null ? session.endTime().toString() : "N/A");
-            item.put("subjectName", session.subjectName() != null ? session.subjectName() : "Bài tập thể lực");
-            Subject subj = (session.subjectId() != null && subjectRepository != null) ? subjectRepository.findById(session.subjectId()).orElse(null) : null;
+            item.put("exerciseName", session.exerciseName() != null ? session.exerciseName() : "Bài tập thể lực");
+            Exercise subj = (session.exerciseId() != null && exerciseRepository != null) ? exerciseRepository.findById(session.exerciseId()).orElse(null) : null;
             item.put("surfaceType", subj != null && subj.getSurfaceType() != null ? subj.getSurfaceType().name() : "N/A");
             item.put("intensityLevel", subj != null && subj.getIntensityLevel() != null ? subj.getIntensityLevel().name() : "N/A");
             item.put("targetDistanceMeters", subj != null && subj.getTargetDistanceMeters() != null ? subj.getTargetDistanceMeters() : BigDecimal.ZERO);
@@ -997,18 +989,18 @@ public class AiToolExecutionService {
         Long horseId = targetHorse != null ? targetHorse.getId() : parseLong(args.get("horseId"));
         String status = args.get("status") != null ? args.get("status").toString().trim() : null;
 
-        List<PlanSummaryResponse> summaries = groupPlanRepository.findPlanSummaries(trainerId, horseId);
+        List<HorseCourseRunResponse> summaries = courseRunRepository.findHorseCourseRuns(trainerId, horseId);
         // Số buổi và trạng thái lấy từ Attendance, như màn hình lịch sử. (Counts and status come from Attendance, as on screen.)
         Map<Long, Map<Long, HorseAttendanceResponse>> historyByHorse = new HashMap<>();
-        for (Long id : summaries.stream().map(PlanSummaryResponse::getHorseId).distinct().toList()) {
+        for (Long id : summaries.stream().map(HorseCourseRunResponse::getHorseId).distinct().toList()) {
             historyByHorse.put(id, horseAttendanceService.getHistory(id, currentUser).stream()
-                    .collect(Collectors.toMap(HorseAttendanceResponse::planId, Function.identity(), (a, b) -> a)));
+                    .collect(Collectors.toMap(HorseAttendanceResponse::courseRunId, Function.identity(), (a, b) -> a)));
         }
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (PlanSummaryResponse p : summaries) {
-            HorseAttendanceResponse line = historyByHorse.getOrDefault(p.getHorseId(), Map.of()).get(p.getPlanId());
-            if (line == null || (status != null && !status.isBlank() && !status.equalsIgnoreCase(line.planStatus()))) {
+        for (HorseCourseRunResponse p : summaries) {
+            HorseAttendanceResponse line = historyByHorse.getOrDefault(p.getHorseId(), Map.of()).get(p.getCourseRunId());
+            if (line == null || (status != null && !status.isBlank() && !status.equalsIgnoreCase(line.courseRunStatus()))) {
                 continue;
             }
             String targetGoal = "Nâng cao thể lực, sức bền và kỹ năng thi đấu";
@@ -1020,8 +1012,8 @@ public class AiToolExecutionService {
             }
             Map<String, Object> item = attendanceItem(p.getHorseName() != null ? p.getHorseName() : "Ngựa thi đấu", line);
             item.put("targetGoal", targetGoal);
-            if (groupPlanRepository != null && p.getPlanId() != null) {
-                GroupPlan gp = groupPlanRepository.findById(p.getPlanId()).orElse(null);
+            if (courseRunRepository != null && p.getCourseRunId() != null) {
+                CourseRun gp = courseRunRepository.findById(p.getCourseRunId()).orElse(null);
                 if (gp != null && gp.getTrainingDays() != null && !gp.getTrainingDays().isEmpty()) {
                     String daysStr = gp.getTrainingDays().stream().map(Enum::name).collect(Collectors.joining(", "));
                     item.put("trainingDays", daysStr);
@@ -1394,34 +1386,6 @@ public class AiToolExecutionService {
         return result;
     }
 
-    private Object handleCheckGroomConflict(Map<String, Object> args) {
-        Horse horse = resolveHorse(args);
-        Long horseId = horse != null ? horse.getId() : parseLong(args.get("horseId"));
-        Long groomId = parseLong(args.get("groomId"));
-
-        if (horseId == null || groomId == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Thiếu thông tin ngựa hoặc groom");
-        }
-
-        LocalDate fromDate = parseDate(args.get("date"), LocalDate.now());
-        List<GroomConflictRow> conflicts = trainingWorkoutRepository.findGroomConflicts(horseId, groomId, fromDate);
-
-        String horseName = horse != null ? horse.getName() : "Ngựa #" + horseId;
-        String groomName = "Groom #" + groomId;
-        if (userRepository != null) {
-            groomName = userRepository.findById(groomId).map(User::getFullName).orElse(groomName);
-        }
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("horseName", horseName);
-        result.put("groomName", groomName);
-        result.put("inspectionDate", fromDate.toString());
-        result.put("hasScheduleConflict", !conflicts.isEmpty());
-        result.put("conflictShiftCount", conflicts.size());
-        result.put("conflictDetails", conflicts);
-        return result;
-    }
-
     private Object handleGetTrainerAssignedGrooms(AuthenticatedUser currentUser) {
         Long trainerId = currentUser.getUserId();
         List<Area> areas = areaRepository.findAll().stream()
@@ -1479,55 +1443,6 @@ public class AiToolExecutionService {
         );
     }
 
-    private Object handleGetMyHorseRaceRegistrations(Map<String, Object> args, AuthenticatedUser currentUser) {
-        if (raceRegistrationRepository == null) {
-            Map<String, Object> emptyResp = new LinkedHashMap<>();
-            emptyResp.put("totalRaceRegistrations", 0);
-            emptyResp.put("raceList", Collections.emptyList());
-            return emptyResp;
-        }
-        Long trainerId = currentUser.getUserId();
-        Horse targetHorse = resolveHorse(args);
-        List<RaceRegistration> regs;
-        if (targetHorse != null) {
-            regs = raceRegistrationRepository.findByTrainerIdAndHorseIdOrderByCreatedAtDesc(trainerId, targetHorse.getId());
-        } else {
-            regs = raceRegistrationRepository.findByTrainerIdOrderByCreatedAtDesc(trainerId);
-        }
-
-        Map<Long, String> horseNames = horseRepository.findAll().stream()
-                .collect(Collectors.toMap(Horse::getId, Horse::getName, (a, b) -> a));
-
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (RaceRegistration r : regs) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("horseName", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
-            item.put("raceName", r.getRaceName() != null ? r.getRaceName() : "Giải đua");
-            item.put("raceCategory", r.getRaceCategory() != null ? r.getRaceCategory() : "N/A");
-            item.put("location", r.getLocation() != null ? r.getLocation() : "Trường đua");
-            item.put("organizer", r.getOrganizer() != null ? r.getOrganizer() : "N/A");
-            item.put("distanceMeters", r.getDistanceMeters() != null ? r.getDistanceMeters() : BigDecimal.ZERO);
-            item.put("trackType", r.getTrackType() != null ? r.getTrackType() : "N/A");
-            item.put("eventDate", r.getEventDate() != null ? r.getEventDate().toString() : "N/A");
-            item.put("eventTime", r.getEventTime() != null ? r.getEventTime().toString() : "N/A");
-            item.put("nominationDeadline", r.getNominationDeadline() != null ? r.getNominationDeadline().toString() : "N/A");
-            item.put("jockeyName", r.getJockeyName() != null ? r.getJockeyName() : "Chưa chọn nài");
-            item.put("entryFee", r.getEntryFee() != null ? r.getEntryFee() : BigDecimal.ZERO);
-            item.put("prizeDetails", r.getPrizeDetails() != null ? r.getPrizeDetails() : "");
-            item.put("managerFeedback", r.getManagerFeedback() != null ? r.getManagerFeedback() : "");
-            item.put("registrationDate", r.getEventDate() != null ? r.getEventDate().toString() : (r.getCreatedAt() != null ? r.getCreatedAt().toString() : "N/A"));
-            item.put("status", r.getStatus() != null ? r.getStatus().name() : "PENDING");
-            item.put("notes", r.getTrainerNotes() != null ? r.getTrainerNotes() : (r.getSelectionReason() != null ? r.getSelectionReason() : ""));
-            item.put("actionUrl", r.getId() != null ? "/trainer/racing/" + r.getId() : "/trainer/racing");
-            result.add(item);
-        }
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("totalRaceRegistrations", result.size());
-        response.put("raceList", result);
-        response.put("actionUrl", "/trainer/racing");
-        return response;
-    }
-
     private Object handleGetAssignedAdmissionReviews(AuthenticatedUser currentUser) {
         List<AdmissionApplication> apps = admissionApplicationRepository.findAllByOrderBySubmittedAtDesc();
         Long trainerId = currentUser.getUserId();
@@ -1580,7 +1495,7 @@ public class AiToolExecutionService {
 
     private Object handleGetCourseCurriculumOverview() {
         List<Course> courses = courseRepository != null ? courseRepository.findAll() : Collections.emptyList();
-        List<Subject> subjects = subjectRepository != null ? subjectRepository.findAll() : Collections.emptyList();
+        List<Exercise> exercises = exerciseRepository != null ? exerciseRepository.findAll() : Collections.emptyList();
 
         List<Map<String, Object>> courseList = new ArrayList<>();
         for (Course c : courses) {
@@ -1591,21 +1506,21 @@ public class AiToolExecutionService {
             courseList.add(item);
         }
 
-        List<Map<String, Object>> subjectList = new ArrayList<>();
-        for (Subject s : subjects) {
+        List<Map<String, Object>> exerciseList = new ArrayList<>();
+        for (Exercise s : exercises) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("subjectName", s.getName());
+            item.put("exerciseName", s.getName());
             item.put("technicalGroup", s.getCategory() != null ? s.getCategory().name() : "N/A");
             item.put("surface", s.getSurfaceType() != null ? s.getSurfaceType().name() : "N/A");
             item.put("targetDistance", s.getTargetDistanceMeters() != null ? s.getTargetDistanceMeters() + "m" : "N/A");
             item.put("intensity", s.getIntensityLevel() != null ? s.getIntensityLevel().name() : "MEDIUM");
             item.put("durationMinutes", s.getDurationMinutes() != null ? s.getDurationMinutes() : 60);
-            subjectList.add(item);
+            exerciseList.add(item);
         }
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("courseCurriculumList", courseList);
-        response.put("technicalSubjectList", subjectList);
+        response.put("technicalExerciseList", exerciseList);
         response.put("actionUrl", "/trainer/courses");
         return response;
     }
@@ -1646,7 +1561,7 @@ public class AiToolExecutionService {
             if (rHr != null && rHr > maxRecoveryHr) {
                 maxRecoveryHr = rHr;
             }
-            if ((mHr != null && mHr >= HIGH_INTENSITY_SHARE * HorsePerformanceService.MAX_HEART_RATE_LIMIT)
+            if ((mHr != null && mHr >= HIGH_INTENSITY_SHARE * TrainingLimits.MAX_HEART_RATE_LIMIT)
                     || (w.getTopSpeedKmh() != null && w.getTopSpeedKmh().doubleValue() >= 55.0)) {
                 highIntensityCount++;
             }
@@ -1738,7 +1653,6 @@ public class AiToolExecutionService {
         result.put("preferredSurface", matSanUaThich);
         result.put("optimalSpeed", tocDoToiUu);
         result.put("recommendationReason", lyDoDeXuat);
-        result.put("actionUrl", "/trainer/racing");
         return result;
     }
 
@@ -1772,9 +1686,9 @@ public class AiToolExecutionService {
             if (highHeartRate) {
                 buoiTapGanNhat = "Cự ly " + (latest.getActualDistanceMeters() != null ? latest.getActualDistanceMeters() + "m" : "tiêu chuẩn")
                         + ", nhịp tim tối đa " + latest.getMaxHeartRate() + " bpm, hồi phục " + latest.getRecoveryHeartRate() + " bpm";
-                nhanXetTheLuc = "Nhịp tim vượt ngưỡng an toàn của hệ thống (tối đa " + HorsePerformanceService.MAX_HEART_RATE_LIMIT
-                        + ", trung bình " + HorsePerformanceService.AVERAGE_HEART_RATE_LIMIT + ", hồi phục "
-                        + HorsePerformanceService.RECOVERY_HEART_RATE_LIMIT + " bpm).";
+                nhanXetTheLuc = "Nhịp tim vượt ngưỡng an toàn của hệ thống (tối đa " + TrainingLimits.MAX_HEART_RATE_LIMIT
+                        + ", trung bình " + TrainingLimits.AVERAGE_HEART_RATE_LIMIT + ", hồi phục "
+                        + TrainingLimits.RECOVERY_HEART_RATE_LIMIT + " bpm).";
                 baiTapKeTiepDeXuat = "Giảm tải 30% cự ly, chuyển sang bài tập đi bộ phục hồi nhẹ nhàng trên sân cỏ tự nhiên (Turf Walking).";
                 lyDoDieuChinh = "Tạo thời gian cho cơ tim và cơ bắp giải phóng acid lactic, tránh nguy cơ căng cơ hoặc chấn thương gân.";
             } else {
@@ -1815,7 +1729,6 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
         result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
         result.put("chienLuocCuLyVaSanDua", raceObj);
         result.put("dieuChinhBaiTapKeTiep", workoutObj);
-        result.put("actionUrl", "/trainer/racing");
         return result;
     }
 
@@ -3075,9 +2988,9 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
             boolean isBlocked = h.getTrainingDecision() == TrainingDecision.BLOCKED;
 
             boolean hasActivePlan = false;
-            if (groupPlanRepository != null) {
-                List<GroupPlan> activePlans = groupPlanRepository.findPlansOfHorse(
-                        h.getId(), List.of(TrainingPlanStatus.ACTIVE));
+            if (courseRunRepository != null) {
+                List<CourseRun> activePlans = courseRunRepository.findCourseRunsOfHorse(
+                        h.getId(), List.of(CourseRunStatus.ACTIVE));
                 hasActivePlan = !activePlans.isEmpty();
             }
 
@@ -3170,9 +3083,9 @@ private Object handleGetUrgentCareAndIncidentAlerts(AuthenticatedUser currentUse
                 }
             }
         }
-        if (groupPlanRepository != null) {
-            List<GroupPlan> plans = groupPlanRepository.findPlansOfHorse(
-                    h.getId(), List.of(TrainingPlanStatus.ACTIVE, TrainingPlanStatus.UPCOMING));
+        if (courseRunRepository != null) {
+            List<CourseRun> plans = courseRunRepository.findCourseRunsOfHorse(
+                    h.getId(), List.of(CourseRunStatus.ACTIVE, CourseRunStatus.UPCOMING));
             if (!plans.isEmpty() && plans.get(0).getTrainerId() != null && userRepository != null) {
                 return userRepository.findById(plans.get(0).getTrainerId()).map(User::getFullName).orElse("HLV #" + plans.get(0).getTrainerId());
             }

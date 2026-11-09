@@ -11,12 +11,12 @@ import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.repository.AreaRepository;
-import com.rtms.backend.training.entity.GroupPlan;
+import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.entity.TrainingGroup;
 import com.rtms.backend.training.entity.TrainingSession;
+import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.SessionStatus;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingGroupRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import org.springframework.http.HttpStatus;
@@ -40,7 +40,7 @@ public class TrainerHandoverService {
     private final AreaRepository areaRepository;
     private final GroomProfileRepository groomProfileRepository;
     private final TrainingGroupRepository trainingGroupRepository;
-    private final GroupPlanRepository groupPlanRepository;
+    private final CourseRunRepository courseRunRepository;
     private final TrainingSessionRepository trainingSessionRepository;
     private final AdmissionApplicationRepository admissionApplicationRepository;
 
@@ -49,14 +49,14 @@ public class TrainerHandoverService {
             AreaRepository areaRepository,
             GroomProfileRepository groomProfileRepository,
             TrainingGroupRepository trainingGroupRepository,
-            GroupPlanRepository groupPlanRepository,
+            CourseRunRepository courseRunRepository,
             TrainingSessionRepository trainingSessionRepository,
             AdmissionApplicationRepository admissionApplicationRepository) {
         this.userRepository = userRepository;
         this.areaRepository = areaRepository;
         this.groomProfileRepository = groomProfileRepository;
         this.trainingGroupRepository = trainingGroupRepository;
-        this.groupPlanRepository = groupPlanRepository;
+        this.courseRunRepository = courseRunRepository;
         this.trainingSessionRepository = trainingSessionRepository;
         this.admissionApplicationRepository = admissionApplicationRepository;
     }
@@ -173,16 +173,16 @@ public class TrainerHandoverService {
             }
         }
 
-        // 4. Handover UPCOMING and ACTIVE plans
-        if (groupPlanRepository != null) {
-            List<GroupPlan> livePlans = groupPlanRepository.findByTrainerIdAndStatusIn(
+        // 4. Handover UPCOMING and ACTIVE course runs
+        if (courseRunRepository != null) {
+            List<CourseRun> liveRuns = courseRunRepository.findByTrainerIdAndStatusIn(
                     targetTrainerId,
-                    List.of(TrainingPlanStatus.UPCOMING, TrainingPlanStatus.ACTIVE)
+                    List.of(CourseRunStatus.UPCOMING, CourseRunStatus.ACTIVE)
             );
-            if (livePlans != null) {
-                for (GroupPlan plan : livePlans) {
-                    plan.setTrainerId(replacementTrainerId);
-                    groupPlanRepository.save(plan);
+            if (liveRuns != null) {
+                for (CourseRun run : liveRuns) {
+                    run.setTrainerId(replacementTrainerId);
+                    courseRunRepository.save(run);
                 }
             }
         }

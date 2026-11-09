@@ -9,7 +9,7 @@ import com.rtms.backend.stable.entity.*;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.*;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.*;
 import org.junit.jupiter.api.*;
 import org.springframework.http.HttpStatus;
@@ -25,7 +25,7 @@ class StableAssignmentServiceTest {
     UserRepository users;
     GroomProfileRepository profiles;
     HorseRepository horses;
-    GroupWorkoutSyncService workouts;
+    TrainingGroupService workouts;
     EntityManager em;
     StableAssignmentService service;
     AreaTrainerAssignmentPolicy trainerPolicy;
@@ -37,7 +37,7 @@ class StableAssignmentServiceTest {
     @BeforeEach void setup() {
         areas = mock(AreaRepository.class); stalls = mock(StableStallRepository.class);
         users = mock(UserRepository.class); profiles = mock(GroomProfileRepository.class);
-        horses = mock(HorseRepository.class); workouts = mock(GroupWorkoutSyncService.class);
+        horses = mock(HorseRepository.class); workouts = mock(TrainingGroupService.class);
         em = mock(EntityManager.class);
         Query query = mock(Query.class);
         when(em.createNativeQuery(anyString())).thenReturn(query);
@@ -176,7 +176,7 @@ class StableAssignmentServiceTest {
     }
     @Test void genuineWorkoutConflictDoesNotWriteAssignments() {
         when(horses.findByCurrentStallIdIn(anyList())).thenReturn(List.of(occupied(101, 50)));
-        when(workouts.reassignFutureWorkoutsToGrooms(anyMap())).thenThrow(new IllegalStateException("BR-09"));
+        when(workouts.reassignFutureWorkoutsToGrooms(anyMap())).thenThrow(new IllegalStateException("workout sync failed"));
         status(HttpStatus.CONFLICT, () -> apply(groom(1, 1, 200L)));
     }
     @Test void missingBaselineIsRejected() {
