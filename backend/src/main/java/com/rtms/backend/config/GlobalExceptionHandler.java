@@ -104,6 +104,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage(), "VALIDATION_ERROR"));
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Object>> handleIllegalState(IllegalStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage(), "INVALID_REVIEW_STATE"));
+    }
+
     @ExceptionHandler({DataAccessException.class, PersistenceException.class})
     public ResponseEntity<ApiResponse<Object>> handlePersistenceException(RuntimeException ex) {
         // The client only sees a generic message, so the cause (constraint name, SQLState) must reach the log.

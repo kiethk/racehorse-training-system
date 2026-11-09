@@ -272,11 +272,22 @@ public class StaffManagementService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a staff account");
         }
 
-        if (request.getFullName() != null && !request.getFullName().isBlank()) {
-            user.setFullName(request.getFullName().trim());
+        if (request.getFullName() != null) {
+            String trimmedName = request.getFullName().trim();
+            if (trimmedName.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Full name cannot be blank");
+            }
+            if (trimmedName.length() > 255) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Full name cannot exceed 255 characters");
+            }
+            user.setFullName(trimmedName);
         }
-        user.setPhone(request.getPhone());
-        user.setAddress(request.getAddress());
+        String cleanedPhone = clean(request.getPhone());
+        if (cleanedPhone != null && cleanedPhone.length() > 20) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone number cannot exceed 20 characters");
+        }
+        user.setPhone(cleanedPhone);
+        user.setAddress(clean(request.getAddress()));
         userRepository.save(user);
 
         switch (user.getRole().getName()) {
