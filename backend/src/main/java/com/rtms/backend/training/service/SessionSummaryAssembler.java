@@ -1,5 +1,7 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.identity.entity.User;
+import com.rtms.backend.identity.repository.UserRepository;
 import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.CourseRun;
@@ -33,22 +35,25 @@ class SessionSummaryAssembler {
 
     /** Những gì cần tra thêm cho một nhóm buổi. (What is looked up for a set of Sessions.) */
     record Lookups(Map<Long, CourseRun> courseRuns, Map<Long, TrainingGroup> groups, Map<Long, String> courseNames,
-                   Map<Long, String> exerciseNames) {
+                   Map<Long, String> exerciseNames, Map<Long, String> trainerNames) {
     }
 
     private final CourseRunRepository courseRunRepository;
     private final TrainingGroupRepository groupRepository;
     private final CourseRepository courseRepository;
     private final ExerciseRepository exerciseRepository;
+    private final UserRepository userRepository;
 
     SessionSummaryAssembler(CourseRunRepository courseRunRepository,
                             TrainingGroupRepository groupRepository,
                             CourseRepository courseRepository,
-                            ExerciseRepository exerciseRepository) {
+                            ExerciseRepository exerciseRepository,
+                            UserRepository userRepository) {
         this.courseRunRepository = courseRunRepository;
         this.groupRepository = groupRepository;
         this.courseRepository = courseRepository;
         this.exerciseRepository = exerciseRepository;
+        this.userRepository = userRepository;
     }
 
     Lookups lookups(Collection<TrainingSession> sessions) {
@@ -64,7 +69,10 @@ class SessionSummaryAssembler {
         Map<Long, String> exerciseNames = exerciseRepository
                 .findAllById(sessions.stream().map(TrainingSession::getExerciseId).collect(Collectors.toSet())).stream()
                 .collect(Collectors.toMap(Exercise::getId, Exercise::getName));
-        return new Lookups(courseRuns, groups, courseNames, exerciseNames);
+        Map<Long, String> trainerNames = userRepository
+                .findAllById(sessions.stream().map(TrainingSession::getTrainerId).collect(Collectors.toSet())).stream()
+                .collect(Collectors.toMap(User::getId, User::getFullName));
+        return new Lookups(courseRuns, groups, courseNames, exerciseNames, trainerNames);
     }
 
     /** Một buổi, chỉ đếm các Workout người xem được phép thấy. (One Session, counting only the Workouts the viewer may see.) */
@@ -79,7 +87,7 @@ class SessionSummaryAssembler {
                 group == null ? null : group.getName(), group != null && group.isDisbanded(),
                 lookups.courseNames().get(courseRun.getCourseId()), lookups.exerciseNames().get(session.getExerciseId()),
                 session.getSessionDate(), session.getStartTime(), session.getEndTime(), session.getStatus().name(),
-                horseCount, needsResult);
+                horseCount, needsResult, session.getTrainerId(), lookups.trainerNames().get(session.getTrainerId()));
     }
 
     /** Một buổi của Trainer (thấy mọi Workout). (One Session for a Trainer, who sees every Workout.) */

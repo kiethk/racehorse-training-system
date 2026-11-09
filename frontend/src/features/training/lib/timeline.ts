@@ -102,3 +102,48 @@ export function assignLanes(sessions: LanedSessionLike[]): Lanes {
   }
   return { laneOf, laneCount: Math.max(laneEnds.length, 1) };
 }
+
+export interface TrainerLanedSession extends LanedSessionLike {
+  trainerId: number;
+  trainerName: string | null;
+}
+
+/** The rows that belong to one Trainer, so their name can be written beside them. */
+export interface TrainerRow {
+  trainerId: number;
+  trainerName: string;
+  firstLane: number;
+  laneCount: number;
+}
+
+export interface TrainerLanes {
+  laneOf: Map<number, number>;
+  rows: TrainerRow[];
+  /** Every row of every Trainer; at least 1. */
+  laneCount: number;
+}
+
+/**
+ * Groups sessions by Trainer, one band of rows each in name order. Inside a band the sessions are put into rows by assignLanes, so a
+ * Trainer (whose own sessions never overlap) gets exactly one row, and two Trainers who train at the same time never share one.
+ */
+export function assignTrainerLanes(sessions: TrainerLanedSession[]): TrainerLanes {
+  const byTrainer = new Map<number, TrainerLanedSession[]>();
+  for (const session of sessions) {
+    byTrainer.set(session.trainerId, [...(byTrainer.get(session.trainerId) ?? []), session]);
+  }
+  const trainers = [...byTrainer.entries()]
+    .map(([trainerId, own]) => ({ trainerId, trainerName: own[0].trainerName ?? 'Trainer', own }))
+    .sort((a, b) => a.trainerName.localeCompare(b.trainerName, undefined, { sensitivity: 'base' }) || a.trainerId - b.trainerId);
+
+  const laneOf = new Map<number, number>();
+  const rows: TrainerRow[] = [];
+  let offset = 0;
+  for (const trainer of trainers) {
+    const { laneOf: local, laneCount } = assignLanes(trainer.own);
+    for (const [id, lane] of local) laneOf.set(id, offset + lane);
+    rows.push({ trainerId: trainer.trainerId, trainerName: trainer.trainerName, firstLane: offset, laneCount });
+    offset += laneCount;
+  }
+  return { laneOf, rows, laneCount: Math.max(offset, 1) };
+}

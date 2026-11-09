@@ -5,11 +5,17 @@ import { Panel } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
-import { assignLanes, clockOf, hourMarks, minutesOf, snapSessionStart, stripPosition } from '../../lib/timeline';
+import { assignTrainerLanes, clockOf, hourMarks, minutesOf, snapSessionStart, stripPosition } from '../../lib/timeline';
 import type { SessionSummary, TrainingRules } from '../../types';
 
 /** Height of one row of the strip, in pixels. */
 const LANE_HEIGHT = 52;
+
+/** Width of the column with the Trainers' names, in pixels. */
+const LABEL_WIDTH = 120;
+
+/** Gap kept between two sessions that follow each other, in pixels. */
+const GAP = 2;
 
 interface DragState {
   sessionId: number;
@@ -43,12 +49,15 @@ export function TimelineStrip({
   sessions,
   rules,
   movable,
+  showTrainers = false,
   onMove,
   onOpen,
 }: {
   sessions: SessionSummary[];
   rules: TrainingRules;
   movable: boolean;
+  /** Writes each Trainer's name beside their rows: for a view that mixes the Sessions of several Trainers. */
+  showTrainers?: boolean;
   onMove: (session: SessionSummary, newStart: string) => void;
   onOpen: (id: number) => void;
 }) {
@@ -61,7 +70,7 @@ export function TimelineStrip({
   const step = rules.sessionStartStepMinutes || 15;
   const windowMinutes = minutesOf(end) - minutesOf(start);
   // Sessions of different Trainers can share a time (an Owner's horses may be in several groups), so each one gets its own row.
-  const { laneOf, laneCount } = assignLanes(sessions);
+  const { laneOf, rows, laneCount } = assignTrainerLanes(sessions);
 
   function canDrag(session: SessionSummary) {
     return movable && session.status === 'SCHEDULED' && !session.groupDisbanded;
@@ -136,10 +145,9 @@ export function TimelineStrip({
       </div>
 
       {/* Hour ruler */}
-      <div
-        className="relative h-5 border-b border-[var(--color-border)] text-xs text-[var(--color-text-muted)]"
-        aria-hidden="true"
-      >
+      <div className="flex gap-2" aria-hidden="true">
+        {showTrainers && <div className="shrink-0" style={{ width: LABEL_WIDTH }} />}
+        <div className="relative h-5 flex-1 border-b border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
         {hourMarks(start, end).map((mark) => (
           <span
             key={mark.label}
@@ -149,13 +157,29 @@ export function TimelineStrip({
             {mark.label}
           </span>
         ))}
+        </div>
       </div>
 
-      {/* Strip track */}
+      {/* Strip track, with each Trainer's name beside their rows */}
+      <div className="flex gap-2">
+      {showTrainers && (
+        <div className="relative shrink-0" style={{ width: LABEL_WIDTH, height: laneCount * LANE_HEIGHT + 8 }}>
+          {rows.map((row) => (
+            <p
+              key={row.trainerId}
+              title={row.trainerName}
+              className="absolute inset-x-0 flex items-center text-xs font-semibold text-[var(--color-text-secondary)]"
+              style={{ top: row.firstLane * LANE_HEIGHT + 4, height: row.laneCount * LANE_HEIGHT - 4 }}
+            >
+              <span className="truncate">{row.trainerName}</span>
+            </p>
+          ))}
+        </div>
+      )}
       <div
         ref={stripRef}
         style={{ height: laneCount * LANE_HEIGHT + 8 }}
-        className="relative w-full overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]"
+        className="relative w-full flex-1 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]"
       >
         {sessions.map((session) => {
           const isDragging = drag?.sessionId === session.id;
@@ -172,8 +196,8 @@ export function TimelineStrip({
             <div
               key={session.id}
               style={{
-                left: `${leftPercent}%`,
-                width: `${widthPercent}%`,
+                left: `calc(${leftPercent}% + ${GAP / 2}px)`,
+                width: `calc(${widthPercent}% - ${GAP}px)`,
                 top: (laneOf.get(session.id) ?? 0) * LANE_HEIGHT + 4,
                 height: LANE_HEIGHT - 4,
               }}
@@ -209,6 +233,7 @@ export function TimelineStrip({
             </div>
           );
         })}
+      </div>
       </div>
     </Panel>
   );

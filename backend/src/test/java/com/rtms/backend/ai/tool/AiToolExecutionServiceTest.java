@@ -376,7 +376,7 @@ class AiToolExecutionServiceTest {
     void testTrainer_GetTrainerScheduleNeedsResult() {
         AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
         SessionSummaryResponse session = new SessionSummaryResponse(50L, 1L, 1L, "Morning Group 1", false, "Sprint Course",
-                "Gallop 1200m", LocalDate.now().minusDays(1), LocalTime.of(6, 0), LocalTime.of(6, 30), "HELD", 2, 1);
+                "Gallop 1200m", LocalDate.now().minusDays(1), LocalTime.of(6, 0), LocalTime.of(6, 30), "HELD", 2, 1, 5L, "Daniel Foster");
         when(trainingSessionService.getSessions(any(), any(), isNull(), eq(true), eq(trainer))).thenReturn(List.of(session));
         when(trainingSessionService.getSession(50L, trainer)).thenReturn(new SessionDetailResponse(session, List.of(
                 new SessionHorseResponse(1L, 10L, "THUNDER", "Groom An", "HELD", null, null),

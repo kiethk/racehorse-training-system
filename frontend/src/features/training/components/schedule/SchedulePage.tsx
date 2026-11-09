@@ -289,6 +289,7 @@ export function SchedulePage({ canManage }: { canManage: boolean }) {
               sessions={todaySessions}
               rules={rules}
               movable={canManage}
+              showTrainers={!canManage}
               onMove={moveSession}
               onOpen={setOpenId}
             />

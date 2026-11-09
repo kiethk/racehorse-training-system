@@ -280,6 +280,9 @@ export interface SessionSummary {
   horseCount: number;
   /** Held Workouts that still have no recorded result. */
   needsResultCount: number;
+  /** The Trainer who leads the Session: an Owner or a Groom may see Sessions of several Trainers. */
+  trainerId: number;
+  trainerName: string | null;
 }
 
 export interface SessionHorse {

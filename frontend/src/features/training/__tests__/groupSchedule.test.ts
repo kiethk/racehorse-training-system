@@ -7,7 +7,7 @@ function session(overrides: Partial<SessionSummary>): SessionSummary {
   return {
     id: 1, courseRunId: 1, groupId: 1, groupName: 'Nhom 1', groupDisbanded: false, courseName: 'Sprint', exerciseName: 'S1',
     date: '2026-11-04', startTime: '06:00:00', endTime: '06:30:00', status: 'SCHEDULED',
-    horseCount: 3, needsResultCount: 0, ...overrides,
+    horseCount: 3, needsResultCount: 0, trainerId: 1, trainerName: 'Trainer 1', ...overrides,
   };
 }
 
