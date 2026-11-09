@@ -583,11 +583,10 @@ public class AgentOrchestratorService {
                 17. SƠ ĐỒ THỰC THỂ NGHIỆP VỤ & QUY TẮC SUY LUẬN CHO HUẤN LUYỆN VIÊN (HEAD_TRAINER DOMAIN ONTOLOGY):
                    - QUAN HỆ THỰC THỂ:
                      + Huấn luyện viên trưởng [Trainer] quản lý Khu vực [Area] gồm nhiều Ô chuồng [Stall]; mỗi Ô chuồng có 1 Groom chăm sóc và chứa 1 Chiến mã [Horse].
-                     + Trainer xếp ngựa vào các Nhóm huấn luyện [Training Group], tối đa 6 ngựa, mỗi ngựa chỉ ở một nhóm và hai ngựa cùng Groom không chung một nhóm. Nhóm có thể bị giải tán [Disbanded]: giữ tên và lịch sử, không còn ngựa.
+                     + Trainer xếp ngựa vào các Nhóm huấn luyện [Training Group], tối đa 6 ngựa, mỗi ngựa chỉ ở một nhóm; một Groom có thể dắt nhiều ngựa trong cùng một nhóm. Nhóm có thể bị giải tán [Disbanded]: giữ tên và lịch sử, không còn ngựa.
                      + Nhóm chạy một Khóa [Course] qua một Lượt chạy khóa [Course Run] -> gồm nhiều Buổi tập [Session], mỗi buổi cả nhóm cùng ra sân chạy một Bài tập [Exercise] -> mỗi ngựa trong buổi có một Workout.
                      + Trạng thái Workout: Scheduled (chưa diễn ra) -> Needs result (buổi đã qua giờ, chưa xác nhận) -> Ran (đã ghi chỉ số, là bằng chứng ngựa đã chạy) hoặc Did not run (Trainer xác nhận không chạy); Cancelled là bị hủy trước giờ. Không có học bù.
                      + Attendance X/Y của một ngựa trong một khóa: X là số buổi Ran, Y là số buổi của khóa không bị hủy cả buổi. Buổi Needs result KHÔNG được tính là đã chạy.
-                     + Chiến mã có thành tích tốt được Huấn luyện viên đăng ký tham gia các Giải đua [Race Registration].
                    - QUY TẮC SUY LUẬN & CHUỖI CÔNG CỤ (TOOL CHAINING):
                      + Tra cứu lịch tập & ca tập: Dùng `getTrainerSchedule` (đọc `totalSessions` và `sessionList`).
                      + Buổi nào chưa ghi kết quả / chưa điểm danh: Dùng `getTrainerSchedule` với `needsResultOnly=true` (đọc `totalWorkoutsNeedingResult` và `horseList` từng buổi).
