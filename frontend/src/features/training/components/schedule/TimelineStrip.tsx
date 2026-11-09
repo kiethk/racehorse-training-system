@@ -5,8 +5,11 @@ import { Panel } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
-import { clockOf, hourMarks, minutesOf, snapSessionStart, stripPosition } from '../../lib/timeline';
+import { assignLanes, clockOf, hourMarks, minutesOf, snapSessionStart, stripPosition } from '../../lib/timeline';
 import type { SessionSummary, TrainingRules } from '../../types';
+
+/** Height of one row of the strip, in pixels. */
+const LANE_HEIGHT = 52;
 
 interface DragState {
   sessionId: number;
@@ -57,6 +60,8 @@ export function TimelineStrip({
   const end = rules.goldenHoursEnd || '10:00:00';
   const step = rules.sessionStartStepMinutes || 15;
   const windowMinutes = minutesOf(end) - minutesOf(start);
+  // Sessions of different Trainers can share a time (an Owner's horses may be in several groups), so each one gets its own row.
+  const { laneOf, laneCount } = assignLanes(sessions);
 
   function canDrag(session: SessionSummary) {
     return movable && session.status === 'SCHEDULED' && !session.groupDisbanded;
@@ -123,9 +128,11 @@ export function TimelineStrip({
         <p className="text-sm font-semibold text-[var(--color-text-primary)]">
           Schedule window ({formatTime(start)} – {formatTime(end)})
         </p>
-        <span className="text-xs text-[var(--color-text-muted)]">
-          Drag scheduled sessions to reschedule · 15m step
-        </span>
+        {movable && (
+          <span className="text-xs text-[var(--color-text-muted)]">
+            Drag scheduled sessions to reschedule · 15m step
+          </span>
+        )}
       </div>
 
       {/* Hour ruler */}
@@ -147,7 +154,8 @@ export function TimelineStrip({
       {/* Strip track */}
       <div
         ref={stripRef}
-        className="relative h-16 w-full overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]"
+        style={{ height: laneCount * LANE_HEIGHT + 8 }}
+        className="relative w-full overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]"
       >
         {sessions.map((session) => {
           const isDragging = drag?.sessionId === session.id;
@@ -163,7 +171,13 @@ export function TimelineStrip({
           return (
             <div
               key={session.id}
-              style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+              style={{
+                left: `${leftPercent}%`,
+                width: `${widthPercent}%`,
+                top: (laneOf.get(session.id) ?? 0) * LANE_HEIGHT + 4,
+                height: LANE_HEIGHT - 4,
+              }}
+              title={`${session.groupName} · ${formatTime(currentStart)}–${formatTime(currentEnd)} · ${session.exerciseName}`}
               onPointerDown={(e) => handlePointerDown(e, session)}
               onPointerMove={(e) => handlePointerMove(e, session)}
               onPointerUp={() => handlePointerUp(session)}
@@ -175,7 +189,7 @@ export function TimelineStrip({
                 onOpen(session.id);
               }}
               className={cn(
-                'absolute top-1 bottom-1 flex cursor-pointer select-none flex-col justify-center rounded-[var(--radius-sm)] border px-2 text-xs transition-shadow',
+                'absolute flex cursor-pointer select-none flex-col justify-center rounded-[var(--radius-sm)] border px-2 text-xs transition-shadow',
                 canDrag(session) && 'cursor-grab active:cursor-grabbing',
                 isClash
                   ? 'border-[var(--color-danger)] bg-[var(--color-danger-soft)] text-[var(--color-danger)] z-30'
