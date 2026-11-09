@@ -269,16 +269,10 @@ export function VetAdmissionQueue() {
         });
 
         const awaitingCount = activeRows.filter(
-          (r) =>
-            r.careSchedule?.status === 'REQUESTED' ||
-            r.careSchedule?.status === 'SCHEDULED' ||
-            r.careSchedule?.status === 'OVERDUE'
+          (r) => r.careSchedule?.status === 'SCHEDULED'
         ).length;
         const inProgressRows = activeRows.filter(
-          (r) =>
-            r.careSchedule?.status === 'IN_PROGRESS' ||
-            r.careSchedule?.status === 'DELAYED' ||
-            r.careSchedule?.status === 'PAUSED'
+          (r) => r.careSchedule?.status === 'IN_PROGRESS'
         );
 
         setSummary({
@@ -422,11 +416,11 @@ export function VetAdmissionQueue() {
     : null;
   const assignedActiveSchedule = careSchedules
     .filter((schedule) =>
-      ['SCHEDULED', 'IN_PROGRESS', 'DELAYED', 'OVERDUE', 'PAUSED'].includes(schedule.status) &&
+      ['SCHEDULED', 'IN_PROGRESS'].includes(schedule.status) &&
       (schedule.veterinarianId ?? schedule.assignedVetId) === user?.userId,
     )
     .sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'IN_PROGRESS' || a.status === 'DELAYED' ? -1 : 1;
+      if (a.status !== b.status) return a.status === 'IN_PROGRESS' ? -1 : 1;
       return new Date(a.scheduledAt ?? a.scheduledDate ?? 0).getTime()
         - new Date(b.scheduledAt ?? b.scheduledDate ?? 0).getTime();
     })[0] ?? null;
@@ -454,14 +448,14 @@ export function VetAdmissionQueue() {
     currentActiveSchedule?.status === 'COMPLETED' ||
     Boolean(detail?.initialVetExam && detail?.status !== 'VET_REVIEW');
 
-  // Requirement: Disable Start for REQUESTED schedules; allow starting when SCHEDULED, OVERDUE, or PAUSED
+  // Allow starting when SCHEDULED
   // If admission has already passed VET_REVIEW (TRAINER_REVIEW / MANAGER_REVIEW / APPROVED) or the exam is COMPLETED,
   // examining is disabled (read-only record viewing only).
   const canStartExam = Boolean(
     !isVetStageDone &&
     !isApprovedAdmission &&
     currentActiveSchedule &&
-      ['SCHEDULED', 'OVERDUE', 'PAUSED'].includes(currentActiveSchedule.status) &&
+      currentActiveSchedule.status === 'SCHEDULED' &&
       assignedVetId === user?.userId,
   );
 
@@ -469,7 +463,7 @@ export function VetAdmissionQueue() {
     !isVetStageDone &&
     !isApprovedAdmission &&
     currentActiveSchedule &&
-      ['SCHEDULED', 'IN_PROGRESS', 'DELAYED', 'OVERDUE', 'PAUSED'].includes(currentActiveSchedule.status) &&
+      ['SCHEDULED', 'IN_PROGRESS'].includes(currentActiveSchedule.status) &&
       assignedVetId === user?.userId,
   );
 
@@ -601,7 +595,7 @@ export function VetAdmissionQueue() {
     // Examine = go straight to the examination workspace (it auto-starts the
     // SCHEDULED/OVERDUE exam). Continue/View results/Details keep opening the drawer.
     if (
-      (row.careSchedule?.status === 'SCHEDULED' || row.careSchedule?.status === 'OVERDUE') &&
+      row.careSchedule?.status === 'SCHEDULED' &&
       row.careSchedule.id
     ) {
       router.push(`/veterinarian/schedule/${row.careSchedule.id}?back=admissions`);
@@ -948,11 +942,9 @@ export function VetAdmissionQueue() {
                           Clinical review locked
                         </p>
                         <p className="text-xs mt-1">
-                          {currentActiveSchedule?.status === 'REQUESTED'
-                            ? 'The care schedule is waiting for automatic assignment.'
-                            : assignedElsewhere
-                              ? 'This case is assigned to another veterinarian.'
-                              : 'No active examination found for this admission.'}
+                          {assignedElsewhere
+                            ? 'This case is assigned to another veterinarian.'
+                            : 'No active examination found for this admission.'}
                         </p>
                       </div>
                     )}

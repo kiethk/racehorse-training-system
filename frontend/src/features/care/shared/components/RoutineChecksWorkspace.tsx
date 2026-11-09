@@ -102,22 +102,14 @@ export function RoutineChecksWorkspace() {
   // Stats calculation
   const stats = useMemo(() => {
     let scheduled = 0;
-    let inProgress = 0;
-    let delayed = 0;
-    let overdue = 0;
-    let paused = 0;
     let completed = 0;
 
     for (const s of schedules) {
       if (s.status === 'SCHEDULED') scheduled++;
-      else if (s.status === 'IN_PROGRESS') inProgress++;
-      else if (s.status === 'DELAYED') delayed++;
-      else if (s.status === 'OVERDUE') overdue++;
-      else if (s.status === 'PAUSED') paused++;
       else if (s.status === 'COMPLETED') completed++;
     }
 
-    return { total: schedules.length, scheduled, inProgress, delayed, overdue, paused, completed };
+    return { total: schedules.length, scheduled, completed };
   }, [schedules]);
 
   const handleOpenSchedule = (item: CareSchedule) => {
@@ -157,7 +149,7 @@ export function RoutineChecksWorkspace() {
       />
 
       {/* Metric Cards Banner */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-3">
         <MetricCard
           label="Total Routine Schedules"
           value={stats.total}
@@ -169,12 +161,6 @@ export function RoutineChecksWorkspace() {
           value={stats.scheduled}
           icon="clock"
           tone={stats.scheduled > 0 ? 'warning' : 'neutral'}
-        />
-        <MetricCard
-          label="In Examination"
-          value={stats.inProgress}
-          icon="activity"
-          tone={stats.inProgress > 0 ? 'info' : 'neutral'}
         />
         <MetricCard
           label="Completed Checks"
@@ -297,34 +283,9 @@ export function RoutineChecksWorkspace() {
                         <Pill tone={tone.pillTone} icon={tone.icon} size="sm">
                           {tone.label}
                         </Pill>
-                        {cs.status !== 'SCHEDULED' && (
-                          <Pill
-                            tone={
-                              cs.status === 'COMPLETED'
-                                ? 'success'
-                                : cs.status === 'OVERDUE'
-                                ? 'danger'
-                                : cs.status === 'DELAYED'
-                                ? 'warning'
-                                : cs.status === 'PAUSED'
-                                ? 'warning'
-                                : cs.status === 'IN_PROGRESS'
-                                ? 'primary'
-                                : 'warning'
-                            }
-                            size="sm"
-                          >
-                            {cs.status === 'PAUSED'
-                              ? 'Paused'
-                              : cs.status === 'IN_PROGRESS'
-                              ? 'In Progress'
-                              : cs.status === 'DELAYED'
-                              ? 'Delayed'
-                              : cs.status === 'OVERDUE'
-                              ? 'Overdue'
-                              : cs.status === 'REQUESTED'
-                              ? 'Requested'
-                              : 'Completed'}
+                        {cs.status === 'COMPLETED' && (
+                          <Pill tone="success" size="sm">
+                            Completed
                           </Pill>
                         )}
                         {Boolean(cs.rolloverCount && cs.rolloverCount > 0) && (

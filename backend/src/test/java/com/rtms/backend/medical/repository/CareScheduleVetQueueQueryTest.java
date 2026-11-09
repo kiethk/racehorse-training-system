@@ -99,9 +99,9 @@ class CareScheduleVetQueueQueryTest {
                 LocalDateTime.now().plusDays(1));
         scheduledFollowUp = schedule(CareType.ROUTINE, CareScheduleStatus.SCHEDULED,
                 LocalDateTime.now().plusDays(2));
-        requestedFollowUp = schedule(CareType.ROUTINE, CareScheduleStatus.REQUESTED, null);
+        requestedFollowUp = schedule(CareType.ROUTINE, CareScheduleStatus.SCHEDULED, null);
         // Ca đã hủy: mặc định ẩn, chỉ thấy khi lọc tường minh.
-        overdueExam = schedule(CareType.ROUTINE, CareScheduleStatus.OVERDUE,
+        overdueExam = schedule(CareType.ROUTINE, CareScheduleStatus.CANCELLED,
                 LocalDateTime.now().plusDays(3));
     }
 
@@ -125,8 +125,8 @@ class CareScheduleVetQueueQueryTest {
     }
 
     @Test
-    void overdueFilterReturnsOverdueExamsOnlyWhenAsked() {
-        Page<CareSchedule> page = queue(CareScheduleStatus.OVERDUE, "");
+    void cancelledFilterReturnsCancelledExamsOnlyWhenAsked() {
+        Page<CareSchedule> page = queue(CareScheduleStatus.CANCELLED, "");
 
         assertEquals(1L, page.getTotalElements());
         assertEquals(Set.of(overdueExam.getId()), idsOf(page));
@@ -136,8 +136,8 @@ class CareScheduleVetQueueQueryTest {
     void scheduledFilterReturnsOnlyScheduledExams() {
         Page<CareSchedule> page = queue(CareScheduleStatus.SCHEDULED, "");
 
-        assertEquals(2L, page.getTotalElements());
-        assertEquals(Set.of(scheduledInitial.getId(), scheduledFollowUp.getId()), idsOf(page));
+        assertEquals(3L, page.getTotalElements());
+        assertEquals(Set.of(scheduledInitial.getId(), scheduledFollowUp.getId(), requestedFollowUp.getId()), idsOf(page));
     }
 
     @Test
@@ -208,8 +208,7 @@ class CareScheduleVetQueueQueryTest {
         assertEquals(Set.of(routineOnApproved.getId(), completedExam.getId()), idsOf(approvedPage));
 
         // Summary counts
-        List<CareScheduleStatus> activeStatuses = List.of(
-                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS);
+        List<CareScheduleStatus> activeStatuses = CareScheduleStatus.OPEN;
         assertEquals(3L, careSchedules.countActiveVetQueueItems(vetId, activeStatuses));
         assertEquals(2L, careSchedules.countApprovedVetQueueItems(vetId, activeStatuses));
     }

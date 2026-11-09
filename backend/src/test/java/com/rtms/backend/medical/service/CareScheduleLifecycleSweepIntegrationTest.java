@@ -1,6 +1,5 @@
 package com.rtms.backend.medical.service;
 
-import java.util.List;
 import com.rtms.backend.horse.entity.Horse;
 
 import com.rtms.backend.horse.repository.HorseRepository;
@@ -95,12 +94,8 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
         vetId = users.saveAndFlush(vet).getId();
 
-        List<CareScheduleStatus> activeStatuses = List.of(
-                CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED,
-                CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.PAUSED,
-                CareScheduleStatus.DELAYED, CareScheduleStatus.OVERDUE);
         Horse horse = horses.findAll().stream()
-                .filter(h -> !careSchedules.existsByHorseIdAndCareTypeAndStatusIn(h.getId(), CareType.URGENT, activeStatuses))
+                .filter(h -> !careSchedules.existsByHorseIdAndCareTypeAndStatusIn(h.getId(), CareType.URGENT, CareScheduleStatus.OPEN))
                 .findFirst().orElseThrow();
 
         horseId = horse.getId();
@@ -153,9 +148,11 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
         careScheduleService.runLifecycleSweep(workdayNow);
 
+        entityManager.flush();
+
         entityManager.clear();
 
-        assertEquals(CareScheduleStatus.OVERDUE,
+        assertEquals(CareScheduleStatus.SCHEDULED,
 
                 careSchedules.findById(unstarted.getId()).orElseThrow().getStatus());
 
@@ -163,7 +160,7 @@ class CareScheduleLifecycleSweepIntegrationTest {
 
                 careSchedules.findById(waiting.getId()).orElseThrow().getStatus());
 
-        assertEquals(CareScheduleStatus.DELAYED,
+        assertEquals(CareScheduleStatus.IN_PROGRESS,
 
                 careSchedules.findById(runningLong.getId()).orElseThrow().getStatus());
 
@@ -182,6 +179,8 @@ class CareScheduleLifecycleSweepIntegrationTest {
         LocalDateTime evening = today.toLocalDate().atTime(17, 5);
 
         careScheduleService.runLifecycleSweep(evening);
+
+        entityManager.flush();
 
         entityManager.clear();
 
@@ -211,6 +210,8 @@ class CareScheduleLifecycleSweepIntegrationTest {
                 today.minusDays(1));
 
         careScheduleService.runLifecycleSweep(today.toLocalDate().atTime(17, 5));
+
+        entityManager.flush();
 
         entityManager.clear();
 

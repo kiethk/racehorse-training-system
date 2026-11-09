@@ -5,6 +5,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import RippleDistortion from '@/components/ui/RippleDistortion';
+import { useAuth } from '@/context/AuthContext';
+import { getRoleRoute, ROLE_LABELS } from '@/lib/roleRoute';
+import { Avatar } from '@/components/ui/Avatar';
 import {
   Timer,
   Stethoscope,
@@ -23,6 +26,16 @@ import {
 
 export default function LandingPage() {
   const router = useRouter();
+  const { user, loading, isAuthenticated } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
+  const isLoggedIn = mounted && !loading && isAuthenticated && !!user;
+  const dashboardRoute = user ? getRoleRoute(user.role) : '/login';
 
   // Scroll state for sticky header and mobile conversion bar
   const [isScrolled, setIsScrolled] = useState(false);
@@ -225,25 +238,61 @@ export default function LandingPage() {
               </button>
             </nav>
 
-            {/* Desktop Action Buttons: "Login" (ghost/outline) + "Register" (solid primary) */}
-            <div className="hidden md:flex items-center gap-3">
-              <button
-                onClick={() => router.push('/login')}
-                className={`h-10 px-4 rounded-lg text-sm font-semibold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                  isScrolled
-                    ? 'border border-border text-foreground hover:bg-muted'
-                    : 'border border-white/30 text-white hover:bg-white/10'
-                }`}
-              >
-                Login
-              </button>
-              <button
-                onClick={() => router.push('/register')}
-                className="h-10 px-5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold shadow-sm transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-              >
-                Register
-              </button>
-            </div>
+            {/* Desktop Action Buttons: User info (click to view profile) + "Go to Dashboard" when logged in, or "Login" + "Register" when logged out */}
+            {isLoggedIn && user ? (
+              <div className="hidden md:flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.push('/profile')}
+                  title="View your profile"
+                  className={`flex items-center gap-2.5 px-3 py-1.5 border rounded-lg transition-all cursor-pointer group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                    isScrolled
+                      ? 'border-border bg-muted/60 text-foreground hover:bg-muted hover:border-primary/40'
+                      : 'border-white/20 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 hover:border-white/40'
+                  }`}
+                >
+                  <Avatar name={user.fullName} image={user.avatarUrl} size="sm" />
+                  <div className="flex flex-col text-left leading-tight max-w-[140px]">
+                    <span className="text-xs font-semibold truncate group-hover:text-primary transition-colors">
+                      {user.fullName}
+                    </span>
+                    <span
+                      className={`text-[10px] font-medium truncate ${
+                        isScrolled ? 'text-muted-foreground' : 'text-white/70'
+                      }`}
+                    >
+                      {ROLE_LABELS[user.role] ?? user.role}
+                    </span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => router.push(dashboardRoute)}
+                  className="h-10 px-4 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold shadow-sm transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-focus inline-flex items-center gap-1.5"
+                >
+                  <span>Go to Dashboard</span>
+                  <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
+                </button>
+              </div>
+            ) : (
+              <div className="hidden md:flex items-center gap-3">
+                <button
+                  onClick={() => router.push('/login')}
+                  className={`h-10 px-4 rounded-lg text-sm font-semibold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                    isScrolled
+                      ? 'border border-border text-foreground hover:bg-muted'
+                      : 'border border-white/30 text-white hover:bg-white/10'
+                  }`}
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => router.push('/register')}
+                  className="h-10 px-5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold shadow-sm transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                >
+                  Register
+                </button>
+              </div>
+            )}
 
             {/* Mobile Hamburger */}
             <button
@@ -286,18 +335,54 @@ export default function LandingPage() {
                 FAQ
               </button>
               <div className="pt-3 border-t border-border space-y-2">
-                <button
-                  onClick={() => router.push('/register')}
-                  className="w-full h-10 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold"
-                >
-                  Register
-                </button>
-                <button
-                  onClick={() => router.push('/login')}
-                  className="w-full h-10 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-semibold"
-                >
-                  Login
-                </button>
+                {isLoggedIn && user ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        router.push('/profile');
+                      }}
+                      className="w-full flex items-center gap-3 p-2.5 rounded-lg bg-muted/50 hover:bg-muted border border-border transition-colors text-left cursor-pointer group"
+                    >
+                      <Avatar name={user.fullName} image={user.avatarUrl} size="md" />
+                      <div className="flex flex-col text-left leading-tight min-w-0 flex-1">
+                        <span className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                          {user.fullName}
+                        </span>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {ROLE_LABELS[user.role] ?? user.role}
+                        </span>
+                      </div>
+                      <span className="text-xs text-primary font-medium">Profile &rarr;</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        router.push(dashboardRoute);
+                      }}
+                      className="w-full h-10 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold flex items-center justify-center gap-2"
+                    >
+                      <span>Go to Dashboard</span>
+                      <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => router.push('/register')}
+                      className="w-full h-10 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold"
+                    >
+                      Register
+                    </button>
+                    <button
+                      onClick={() => router.push('/login')}
+                      className="w-full h-10 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-semibold"
+                    >
+                      Login
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -346,14 +431,12 @@ export default function LandingPage() {
 
               <div className="pt-2 flex flex-wrap items-center gap-4">
                 <button
-                  onClick={() => router.push('/register')}
+                  onClick={() => router.push(isLoggedIn ? dashboardRoute : '/register')}
                   className="h-12 px-8 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold tracking-wide shadow-md transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
-                  <span>Get Started</span>
+                  <span>{isLoggedIn ? 'Go to Dashboard' : 'Get Started'}</span>
                   <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
                 </button>
-
-                
               </div>
             </div>
           </div>
@@ -737,14 +820,14 @@ export default function LandingPage() {
                   Frequently asked questions
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Ready to get started?
+                  {isLoggedIn ? 'Ready to resume your work?' : 'Ready to get started?'}
                 </p>
                 <div>
                   <button
-                    onClick={() => router.push('/register')}
+                    onClick={() => router.push(isLoggedIn ? dashboardRoute : '/register')}
                     className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer group"
                   >
-                    <span>Create an account</span>
+                    <span>{isLoggedIn ? 'Go to Dashboard' : 'Create an account'}</span>
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" strokeWidth={1.5} />
                   </button>
                 </div>
@@ -820,14 +903,12 @@ export default function LandingPage() {
             {/* Dual CTA buttons */}
             <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
               <button
-                onClick={() => router.push('/register')}
+                onClick={() => router.push(isLoggedIn ? dashboardRoute : '/register')}
                 className="h-12 px-8 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold tracking-wide shadow-md transition-colors cursor-pointer inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
-                <span>Let go!</span>
+                <span>{isLoggedIn ? 'Go to Dashboard' : 'Let go!'}</span>
                 <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
               </button>
-
-              
             </div>
 
             {/* 3-item trust row */}
@@ -939,11 +1020,11 @@ export default function LandingPage() {
                 </li>
                 <li className="pt-1">
                   <button
-                    onClick={() => router.push('/login')}
+                    onClick={() => router.push(isLoggedIn ? dashboardRoute : '/login')}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer"
                   >
                     <Lock className="w-3 h-3" strokeWidth={1.5} />
-                    <span>Client Portal</span>
+                    <span>{isLoggedIn ? 'Go to Dashboard' : 'Client Portal'}</span>
                   </button>
                 </li>
               </ul>
@@ -993,23 +1074,33 @@ export default function LandingPage() {
          ========================================================================= */}
       {isHeroPassed && !isCtaInView && (
         <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-background/95 backdrop-blur-md border-t border-border p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-2xl transition-all duration-300">
-          <div className="flex flex-col gap-2">
+          {isLoggedIn ? (
             <button
-              onClick={() => router.push('/register')}
+              onClick={() => router.push(dashboardRoute)}
               className="w-full h-12 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold shadow-md transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
-              <span>Register</span>
+              <span>Go to Dashboard</span>
               <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
             </button>
-            <div className="text-center">
+          ) : (
+            <div className="flex flex-col gap-2">
               <button
-                onClick={() => router.push('/login')}
-                className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer py-1"
+                onClick={() => router.push('/register')}
+                className="w-full h-12 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold shadow-md transition-colors cursor-pointer flex items-center justify-center gap-2"
               >
-                Already an owner? <span className="text-primary font-semibold underline underline-offset-2">Login</span>
+                <span>Register</span>
+                <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
               </button>
+              <div className="text-center">
+                <button
+                  onClick={() => router.push('/login')}
+                  className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer py-1"
+                >
+                  Already an owner? <span className="text-primary font-semibold underline underline-offset-2">Login</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

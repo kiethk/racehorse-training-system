@@ -25,15 +25,15 @@ export default function UrgentCasesPage() {
   const [urgentCases, setUrgentCases] = useState<UrgentAssignmentAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'IN_PROGRESS'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
       setError(null);
-      const pending = await admissionsApi.getPendingUrgentAlerts();
-      setUrgentCases(pending || []);
+      const allCases = await admissionsApi.getPendingUrgentAlerts(true);
+      setUrgentCases(allCases || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load urgent cases list');
     } finally {
@@ -78,16 +78,21 @@ export default function UrgentCasesPage() {
     () => urgentCases.filter((c) => c.status === 'IN_PROGRESS').length,
     [urgentCases],
   );
+  const completedCount = useMemo(
+    () => urgentCases.filter((c) => c.status === 'COMPLETED').length,
+    [urgentCases],
+  );
   const criticalCount = useMemo(
-    () => urgentCases.filter((c) => c.severity === 'CRITICAL').length,
+    () => urgentCases.filter((c) => c.severity === 'CRITICAL' && c.status !== 'COMPLETED').length,
     [urgentCases],
   );
 
   const filteredCases = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return urgentCases.filter((c) => {
+    const list = urgentCases.filter((c) => {
       if (filter === 'PENDING' && c.status !== 'SCHEDULED') return false;
       if (filter === 'IN_PROGRESS' && c.status !== 'IN_PROGRESS') return false;
+      if (filter === 'COMPLETED' && c.status !== 'COMPLETED') return false;
 
       if (!q) return true;
       return (
@@ -100,6 +105,24 @@ export default function UrgentCasesPage() {
         String(c.scheduleId).includes(q)
       );
     });
+
+    // Sắp xếp theo thời gian mới nhất đứng trước (reportedAt DESC, scheduledAt DESC, scheduleId DESC)
+    return list.sort((a, b) => {
+      const timeA = a.reportedAt
+        ? new Date(a.reportedAt).getTime()
+        : a.scheduledAt
+        ? new Date(a.scheduledAt).getTime()
+        : 0;
+      const timeB = b.reportedAt
+        ? new Date(b.reportedAt).getTime()
+        : b.scheduledAt
+        ? new Date(b.scheduledAt).getTime()
+        : 0;
+      if (timeB !== timeA) {
+        return timeB - timeA;
+      }
+      return (b.scheduleId || 0) - (a.scheduleId || 0);
+    });
   }, [urgentCases, filter, searchQuery]);
 
   return (
@@ -111,7 +134,6 @@ export default function UrgentCasesPage() {
             title="Urgent Cases"
             actions={
               <div className="flex items-center gap-2">
-                
                 <Button variant="secondary" icon="refresh" onClick={handleRefresh} loading={loading}>
                   Refresh
                 </Button>
@@ -140,10 +162,10 @@ export default function UrgentCasesPage() {
               tone={inProgressCount > 0 ? 'info' : 'neutral'}
             />
             <MetricCard
-              label="Critical Priority"
-              value={criticalCount}
-              icon="alert-triangle"
-              tone={criticalCount > 0 ? 'danger' : 'neutral'}
+              label="Completed Cases"
+              value={completedCount}
+              icon="check"
+              tone={completedCount > 0 ? 'success' : 'neutral'}
             />
           </div>
 
@@ -161,7 +183,7 @@ export default function UrgentCasesPage() {
             <FilterChips
               label="Urgent cases filter"
               value={filter}
-              onChange={(value) => setFilter(value as 'ALL' | 'PENDING' | 'IN_PROGRESS')}
+              onChange={(value) => setFilter(value as 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED')}
               options={[
                 { value: 'ALL', label: 'All', count: urgentCases.length },
                 {
@@ -173,6 +195,11 @@ export default function UrgentCasesPage() {
                   value: 'IN_PROGRESS',
                   label: 'In Progress',
                   count: inProgressCount,
+                },
+                {
+                  value: 'COMPLETED',
+                  label: 'Completed',
+                  count: completedCount,
                 },
               ]}
             />
@@ -223,82 +250,88 @@ export default function UrgentCasesPage() {
             </Panel>
           ) : (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {filteredCases.map((item) => (
-                <Panel
-                  key={item.scheduleId}
-                  padded
-                  onClick={() => router.push(`/veterinarian/urgent/${item.scheduleId}`)}
-                  className={`cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)] ${
-                    item.status === 'SCHEDULED'
-                      ? 'border-l-4 border-l-[var(--color-danger)]'
-                      : 'border-l-4 border-l-[var(--color-warning)]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    {/* Left: Avatar + Details */}
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <HorseAvatar
-                        name={item.horseName}
-                        image={item.horseId ? `/api/horses/${item.horseId}/photo` : null}
-                        size={42}
-                        rounded="md"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
-                            {item.horseName}
-                          </span>
-                          <Pill
-                            tone={item.severity === 'CRITICAL' ? 'danger' : 'warning'}
-                            size="sm"
-                            icon="alert-triangle"
-                          >
-                            {item.severity}
-                          </Pill>
-                          <Pill
-                            tone={item.status === 'SCHEDULED' ? 'warning' : 'primary'}
-                            size="sm"
-                          >
-                            {item.status === 'SCHEDULED' ? 'Pending Intake' : 'In Progress'}
-                          </Pill>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                          <span className="inline-flex items-center gap-1 min-w-0 max-w-[200px] truncate">
-                            <Icon name="alert-triangle" size={12} className="text-[var(--color-danger)] shrink-0" />
-                            <strong className="truncate">{item.title}</strong>
-                          </span>
-                          <span>·</span>
-                          <span className="inline-flex items-center gap-1 shrink-0">
-                            <Icon name="building" size={12} />
-                            <span>Stall: <strong>{item.stallCode || 'Unassigned'}</strong></span>
-                          </span>
-                          <span>·</span>
-                          <span className="inline-flex items-center gap-1 shrink-0">
-                            <Icon name="clock" size={12} />
-                            <span>{formatDateTime(item.reportedAt)}</span>
-                          </span>
+              {filteredCases.map((item) => {
+                const isCompleted = item.status === 'COMPLETED';
+                const isScheduled = item.status === 'SCHEDULED';
+                return (
+                  <Panel
+                    key={item.scheduleId}
+                    padded
+                    onClick={() => router.push(`/veterinarian/urgent/${item.scheduleId}`)}
+                    className={`cursor-pointer border border-[var(--color-border)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--color-border-strong)] ${
+                      isScheduled
+                        ? 'border-l-4 border-l-[var(--color-danger)]'
+                        : isCompleted
+                        ? 'border-l-4 border-l-[var(--color-success)]'
+                        : 'border-l-4 border-l-[var(--color-warning)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      {/* Left: Avatar + Details */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <HorseAvatar
+                          name={item.horseName}
+                          image={item.horseId ? `/api/horses/${item.horseId}/photo` : null}
+                          size={42}
+                          rounded="md"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-base font-bold text-[var(--color-text-primary)] truncate">
+                              {item.horseName}
+                            </span>
+                            <Pill
+                              tone={item.severity === 'CRITICAL' ? 'danger' : 'warning'}
+                              size="sm"
+                              icon="alert-triangle"
+                            >
+                              {item.severity}
+                            </Pill>
+                            <Pill
+                              tone={isScheduled ? 'warning' : isCompleted ? 'success' : 'primary'}
+                              size="sm"
+                            >
+                              {isScheduled ? 'Pending Intake' : isCompleted ? 'Completed' : 'In Progress'}
+                            </Pill>
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                            <span className="inline-flex items-center gap-1 min-w-0 max-w-[200px] truncate">
+                              <Icon name="alert-triangle" size={12} className="text-[var(--color-danger)] shrink-0" />
+                              <strong className="truncate">{item.title}</strong>
+                            </span>
+                            <span>·</span>
+                            <span className="inline-flex items-center gap-1 shrink-0">
+                              <Icon name="building" size={12} />
+                              <span>Stall: <strong>{item.stallCode || 'Unassigned'}</strong></span>
+                            </span>
+                            <span>·</span>
+                            <span className="inline-flex items-center gap-1 shrink-0">
+                              <Icon name="clock" size={12} />
+                              <span>{formatDateTime(item.reportedAt)}</span>
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Right: Action Button */}
-                    <div className="shrink-0">
-                      <Button
-                        variant={item.status === 'SCHEDULED' ? 'destructive' : 'primary'}
-                        size="sm"
-                        icon="chevron-right"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/veterinarian/urgent/${item.scheduleId}`);
-                        }}
-                        className="transition-all active:scale-[0.97]"
-                      >
-                        {item.status === 'SCHEDULED' ? 'Intake Case' : 'Examine'}
-                      </Button>
+                      {/* Right: Action Button */}
+                      <div className="shrink-0">
+                        <Button
+                          variant={isScheduled ? 'destructive' : isCompleted ? 'secondary' : 'primary'}
+                          size="sm"
+                          icon={isCompleted ? 'file-text' : 'chevron-right'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/veterinarian/urgent/${item.scheduleId}`);
+                          }}
+                          className="transition-all active:scale-[0.97]"
+                        >
+                          {isScheduled ? 'Intake Case' : isCompleted ? 'View Record' : 'Examine'}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </Panel>
-              ))}
+                  </Panel>
+                );
+              })}
             </div>
           )}
         </div>

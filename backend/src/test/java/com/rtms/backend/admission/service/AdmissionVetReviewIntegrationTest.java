@@ -165,7 +165,7 @@ class AdmissionVetReviewIntegrationTest {
         assertEquals(StallStatus.AVAILABLE, updatedStall.getStatus());
 
         long openSchedules = careSchedules.findByHorseIdAndStatusIn(horse.getId(),
-                java.util.List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)).size();
+                java.util.List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS)).size();
         assertEquals(0L, openSchedules);
 
         long completedHealthRecords = healthRecords.findByHorseIdOrderByExaminedAtDesc(horse.getId()).size();

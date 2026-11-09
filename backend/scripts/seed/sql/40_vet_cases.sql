@@ -105,15 +105,15 @@ BEGIN
                                     'The swelling is larger now and she is reluctant to put full weight on the leg.', 'HIGH', NULL,
                                     'admission-packs/h002-eagle-atena/horse-photo.jpg');
 
-    -- 1b. WILD IVANA (A08, groom4): đau bụng (colic) cấp, vừa báo cáo 25 phút trước, chưa gán Thú y (REQUESTED).
-    --     (Acute colic symptoms reported 25 minutes ago, unassigned urgent case waiting for vet intake.)
+    -- 1b. WILD IVANA (A08, groom4): đau bụng (colic) cấp, vừa báo cáo 25 phút trước, đã gán VT01 (SCHEDULED - Pending Intake).
+    --     (Acute colic symptoms reported 25 minutes ago, assigned to VT01 waiting for vet intake.)
     s := pg_temp.report_incident(pg_temp.hid('H008'), pg_temp.uid('GR04'), pg_temp.clock() - INTERVAL '25 minutes',
                                  'Acute colic signs - sweating and rolling',
                                  'Sweating profusely, pawing ground and attempting to roll in the stall. Urgent veterinary exam requested.',
                                  'CRITICAL', NULL, 'admission-packs/h008-wild-ivana/horse-photo.jpg', p_auto_assign => FALSE);
-    UPDATE care_schedule SET status = 'REQUESTED', veterinarian_id = NULL, scheduled_at = NULL, updated_at = pg_temp.clock() - INTERVAL '25 minutes'
+    UPDATE care_schedule SET status = 'SCHEDULED', veterinarian_id = pg_temp.uid('VT01'), scheduled_at = pg_temp.clock() - INTERVAL '25 minutes', updated_at = pg_temp.clock() - INTERVAL '25 minutes'
      WHERE id = (SELECT care_schedule_id FROM horse_incident_reports WHERE id = s);
-    UPDATE horse_incident_reports SET status = 'REPORTED', handled_by_id = NULL, handled_at = NULL
+    UPDATE horse_incident_reports SET status = 'IN_REVIEW', handled_by_id = pg_temp.uid('VT01'), handled_at = pg_temp.clock() - INTERVAL '25 minutes'
      WHERE id = s;
 
     -- 2. DOUGLAS (A05, groom2): sưng ống chân sau phải, vừa báo, đã giao Thú y (SCHEDULED, chưa bắt đầu khám).

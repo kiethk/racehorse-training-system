@@ -181,13 +181,10 @@ export interface InitialVetExamResponse {
 
 // Care Schedule Types
 export type CareScheduleStatus =
-  | 'REQUESTED'
   | 'SCHEDULED'
   | 'IN_PROGRESS'
-  | 'PAUSED'
-  | 'DELAYED'
-  | 'OVERDUE'
-  | 'COMPLETED';
+  | 'COMPLETED'
+  | 'CANCELLED';
 
 export type CareType = 'INITIAL' | 'ROUTINE' | 'URGENT';
 

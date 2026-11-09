@@ -186,7 +186,7 @@ public class CareScheduleService {
         schedule.setHorseId(horseId);
         schedule.setAdmissionId(admissionId);
         schedule.setCareType(CareType.INITIAL);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(DEFAULT_DURATION_MINUTES);
         schedule.setDescription("Initial admission physical examination in quarantine area");
         // Không khóa ngựa ở đây: ngựa CANDIDATE vốn không tập được (Horse.canTrain()),
@@ -204,7 +204,7 @@ public class CareScheduleService {
         CareSchedule schedule = new CareSchedule();
         schedule.setHorseId(horseId);
         schedule.setCareType(careType);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setRequestedAt(requestedAt);
         schedule.setDurationMinutes(DEFAULT_DURATION_MINUTES);
         schedule.setDescription(description != null ? description.trim() : null);
@@ -256,7 +256,7 @@ public class CareScheduleService {
         if (openReports.isEmpty()) return;
 
         Set<Long> unexaminedCaseIds = careScheduleRepository.findByHorseIdAndStatusIn(
-                        horseId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED, CareScheduleStatus.OVERDUE))
+                        horseId, List.of(CareScheduleStatus.SCHEDULED))
                 .stream()
                 .map(CareSchedule::getId)
                 .collect(Collectors.toSet());
@@ -331,13 +331,9 @@ public class CareScheduleService {
     private void ensureAvailable(CareSchedule schedule, Long vetId, LocalDateTime start) {
         List<CareSchedule> activeExams = new ArrayList<>(
                 careScheduleRepository.findByVeterinarianIdAndStatus(vetId, CareScheduleStatus.IN_PROGRESS));
-        activeExams.addAll(careScheduleRepository.findByVeterinarianIdAndStatus(vetId, CareScheduleStatus.DELAYED));
-        activeExams.addAll(careScheduleRepository.findByVeterinarianIdAndStatus(vetId, CareScheduleStatus.OVERDUE));
         boolean vetHasConflict = activeExams.stream()
                 .anyMatch(other -> inProgressConflictsWithSlot(schedule, start, other));
-        boolean horseBusy = careScheduleRepository.existsByHorseIdAndStatus(schedule.getHorseId(), CareScheduleStatus.IN_PROGRESS)
-                || careScheduleRepository.existsByHorseIdAndStatus(schedule.getHorseId(), CareScheduleStatus.DELAYED)
-                || careScheduleRepository.existsByHorseIdAndStatus(schedule.getHorseId(), CareScheduleStatus.OVERDUE);
+        boolean horseBusy = careScheduleRepository.existsByHorseIdAndStatus(schedule.getHorseId(), CareScheduleStatus.IN_PROGRESS);
         if (horseBusy && schedule.getCareType() == CareType.URGENT) {
             // An emergency must reach a horse whose in-progress visit is stale (past
             // its booked duration); only a genuinely current examination blocks it.
@@ -373,7 +369,7 @@ public class CareScheduleService {
             if (booked.getCareType() == CareType.URGENT || !overlaps(urgentCase, slot, booked)) continue;
             if (booked.getCareType() == CareType.ROUTINE) booked.setVeterinarianId(null);
             booked.setScheduledAt(null);
-            booked.setStatus(CareScheduleStatus.REQUESTED);
+            booked.setStatus(CareScheduleStatus.SCHEDULED);
             careScheduleRepository.save(booked);
         }
     }
@@ -441,14 +437,9 @@ public class CareScheduleService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "VET_NOT_FOUND", "Veterinarian not found"));
         CareSchedule schedule = lockClinicalSchedule(scheduleId);
 
-        // AD-022: OVERDUE stays startable. PAUSED must stay in this list — the branch below
-        // resumes a preempted exam from PAUSED (BOOKED_OR_ACTIVE would silently drop it).
-        if (schedule.getStatus() != CareScheduleStatus.SCHEDULED
-                && schedule.getStatus() != CareScheduleStatus.OVERDUE
-                && schedule.getStatus() != CareScheduleStatus.DELAYED
-                && schedule.getStatus() != CareScheduleStatus.PAUSED) {
+        if (schedule.getStatus() != CareScheduleStatus.SCHEDULED) {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS",
-                    "Only SCHEDULED, OVERDUE, DELAYED or PAUSED care schedules can be started");
+                    "Only SCHEDULED care schedules can be started");
         }
 
         if (!Objects.equals(schedule.getVeterinarianId(), vetId)) {
@@ -716,10 +707,6 @@ public class CareScheduleService {
         schedule.setStatus(CareScheduleStatus.COMPLETED);
         schedule.setCompletedAt(now);
         CareSchedule completedSchedule = careScheduleRepository.save(schedule);
-
-        if (schedule.getCareType() == CareType.URGENT) {
-            resumePausedExamIfAny(schedule.getVeterinarianId());
-        }
 
         // Sau khi ca này COMPLETED (không còn là mốc active) mới đặt mốc tiêm kế tiếp.
         // Ca tiêm phòng mà vet hoãn tiêm vẫn phải để lại một mốc mới cho ngựa.
@@ -1011,6 +998,46 @@ public class CareScheduleService {
         return getScheduleDetail(scheduleId);
     }
 
+    @Transactional
+    public CareScheduleResponse cancelCareSchedule(Long scheduleId, CancelCareScheduleRequest request, Long managerId) {
+        CareSchedule schedule = lockClinicalSchedule(scheduleId);
+        if (schedule.getStatus() == CareScheduleStatus.COMPLETED) {
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS", "Completed care schedules cannot be cancelled");
+        }
+        if (schedule.getStatus() == CareScheduleStatus.CANCELLED) {
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATUS", "Care schedule is already cancelled");
+        }
+        User manager = userRepository.findById(managerId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
+
+        schedule.setStatus(CareScheduleStatus.CANCELLED);
+        schedule.setCancelReason(request.getReason());
+        CareSchedule saved = careScheduleRepository.save(schedule);
+
+        AuditLog audit = new AuditLog();
+        audit.setAction("Care Schedule Cancelled");
+        audit.setEntityName("CareSchedule");
+        audit.setEntityId(saved.getId());
+        audit.setUser(manager);
+        audit.setDetails("Care schedule #" + saved.getId() + " was cancelled by Club Manager. Reason: " + request.getReason());
+        auditLogRepository.save(audit);
+
+        if (saved.getVeterinarianId() != null) {
+            String horseName = horseNameOf(saved);
+            notificationService.sendAssignmentNotification(
+                    saved.getVeterinarianId(),
+                    NotificationTypes.REFERENCE_CARE_SCHEDULE,
+                    saved.getId(),
+                    saved.getHorseId(),
+                    NotificationTypes.CARE_SCHEDULE_CANCELLED,
+                    "Care schedule cancelled",
+                    "Care schedule #" + saved.getId() + " for " + horseName + " was cancelled by manager. Reason: " + request.getReason()
+            );
+        }
+
+        return CareScheduleResponse.from(saved);
+    }
+
     @Transactional(readOnly = true)
     public CareScheduleDetailResponse getScheduleDetailForAdmissionAssignee(Long scheduleId, Long userId,
             String role) {
@@ -1186,7 +1213,7 @@ public class CareScheduleService {
         schedule.setRequestedById(userId);
         schedule.setIdempotencyKey(operationKey);
         schedule.setCareType(CareType.ROUTINE);
-        schedule.setStatus(CareScheduleStatus.REQUESTED);
+        schedule.setStatus(CareScheduleStatus.SCHEDULED);
         schedule.setDurationMinutes(DEFAULT_DURATION_MINUTES);
         schedule.setDescription(description);
         schedule.setRequestedAt(requestedAt);
@@ -1221,7 +1248,7 @@ public class CareScheduleService {
     /** Lịch Follow-up đang chờ của ngựa. Ca từ báo cáo sự cố và mốc tiêm phòng không phải Follow-up. */
     private Optional<CareSchedule> findWaitingFollowUp(Long horseId) {
         return careScheduleRepository
-                .findByHorseIdAndStatusIn(horseId, List.of(CareScheduleStatus.REQUESTED, CareScheduleStatus.SCHEDULED)).stream()
+                .findByHorseIdAndStatusIn(horseId, List.of(CareScheduleStatus.SCHEDULED)).stream()
                 .filter(cs -> cs.getCareType() == CareType.ROUTINE && cs.getPurpose() == CareSchedulePurpose.FOLLOW_UP
                         && cs.getSourceIncidentId() == null)
                 .min(Comparator.comparing(CareScheduleService::plannedAt, Comparator.nullsLast(Comparator.naturalOrder())));
@@ -1244,7 +1271,7 @@ public class CareScheduleService {
         waiting.setRequestedAt(requestedAt);
         waiting.setVeterinarianId(null);
         waiting.setScheduledAt(null);
-        waiting.setStatus(CareScheduleStatus.REQUESTED);
+        waiting.setStatus(CareScheduleStatus.SCHEDULED);
         CareSchedule saved = careScheduleRepository.save(waiting);
         assignRequestedSchedule(saved, userId);
         return saved;
@@ -1293,11 +1320,6 @@ public class CareScheduleService {
     void runLifecycleSweep(LocalDateTime now) {
         LocalTime tod = now.toLocalTime();
         if (!tod.isBefore(WORKDAY_START) && tod.isBefore(WORKDAY_END)) {
-            // AD-026: Ca SCHEDULED qua 30 phut chua start -> OVERDUE (Vet bo ca)
-            careScheduleRepository.markOverdueAfterSlotPassed(now, now.minusMinutes(OVERDUE_GRACE_MINUTES));
-            // AD-026: Ca IN_PROGRESS dang kham nhung qua gio -> DELAYED (Dang kham keo dai)
-            careScheduleRepository.markDelayedAfterSlotPassed(now, now.minusMinutes(OVERDUE_GRACE_MINUTES));
-
             // V2: Khung Routine kết thúc lúc 15:30. Sau 15:30 ca Routine chưa xong dời sang ngày làm việc kế.
             if (!tod.isBefore(FarmSchedulePolicy.VET_WINDOW_END)) {
                 rollOverRoutineIfPastWindow(now);
@@ -1489,7 +1511,8 @@ public class CareScheduleService {
      *                       created; otherwise the normal assignment flow decides.
      */
     void assignRequestedSchedule(CareSchedule schedule, Long preferredVetId) {
-        if (schedule.getStatus() != CareScheduleStatus.REQUESTED) return;
+        if (schedule.getStatus() != CareScheduleStatus.SCHEDULED) return;
+        if (schedule.getVeterinarianId() != null && (schedule.getScheduledDate() != null || schedule.getScheduledAt() != null)) return;
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime horizon = now.plusDays(ASSIGNMENT_HORIZON_DAYS);
         if (isBeyondAssignmentHorizon(schedule, horizon)) return;
@@ -1517,12 +1540,8 @@ public class CareScheduleService {
             scheduledMinutesByVet.merge(assigned.getVeterinarianId(),
                     assigned.getDurationMinutes() > 0 ? assigned.getDurationMinutes() : DEFAULT_DURATION_MINUTES,
                     Integer::sum);
-            // AD-022: an OVERDUE appointment is by definition past due, so it must weigh in
-            // the least-loaded ranking — otherwise the sweep would hide the busiest vet.
-            // AD-026: Chi phat ca OVERDUE (Vet khong vao kham); ca DELAYED (dang kham keo dai) khong bi phat
-            if (assigned.getScheduledAt() != null && assigned.getScheduledAt().isBefore(now)
-                    && assigned.getStatus() == CareScheduleStatus.OVERDUE) {
-                overdueAppointmentsByVet.merge(assigned.getVeterinarianId(), 1, Integer::sum);
+            if (assigned.getRolloverCount() > 0) {
+                overdueAppointmentsByVet.merge(assigned.getVeterinarianId(), assigned.getRolloverCount(), Integer::sum);
             }
         }
 
@@ -1622,128 +1641,7 @@ public class CareScheduleService {
             List<User> candidateVets,
             Map<Long, Integer> overdueAppointmentsByVet,
             Map<Long, Integer> scheduledMinutesByVet) {
-
-        List<User> preemptibleVets = new ArrayList<>();
-        Map<Long, CareSchedule> inProgressExamByVet = new HashMap<>();
-
-        for (User vet : candidateVets) {
-            List<CareSchedule> inProgress = new ArrayList<>(careScheduleRepository.findByVeterinarianIdAndStatus(
-                    vet.getId(), CareScheduleStatus.IN_PROGRESS));
-            inProgress.addAll(careScheduleRepository.findByVeterinarianIdAndStatus(
-                    vet.getId(), CareScheduleStatus.DELAYED));
-            inProgress.addAll(careScheduleRepository.findByVeterinarianIdAndStatus(
-                    vet.getId(), CareScheduleStatus.OVERDUE));
-            if (inProgress.isEmpty()) continue;
-
-            // Ca IN_PROGRESS cũ quá giờ không giữ Vet lại, nên chỉ xét các ca còn trong giờ khám.
-            LocalDateTime checkedAt = LocalDateTime.now();
-
-            // Inviolable rule: NEVER preempt if vet is already handling an URGENT emergency
-            boolean hasUrgent = inProgress.stream().anyMatch(cs -> cs.getCareType() == CareType.URGENT
-                    && inProgressConflictsWithSlot(urgentSchedule, checkedAt, cs));
-            if (hasUrgent) continue;
-
-            CareSchedule pausable = inProgress.stream()
-                    .filter(cs -> cs.getCareType() == CareType.ROUTINE || cs.getCareType() == CareType.INITIAL)
-                    .filter(cs -> inProgressConflictsWithSlot(urgentSchedule, checkedAt, cs))
-                    .findFirst()
-                    .orElse(null);
-            if (pausable != null) {
-                preemptibleVets.add(vet);
-                inProgressExamByVet.put(vet.getId(), pausable);
-            }
-        }
-
-        if (preemptibleVets.isEmpty()) {
-            return null;
-        }
-
-        // Rank by lowest load
-        List<User> ranked = preemptibleVets.stream()
-                .sorted(Comparator
-                        .comparingInt((User v) -> overdueAppointmentsByVet.getOrDefault(v.getId(), 0))
-                        .thenComparingInt(v -> scheduledMinutesByVet.getOrDefault(v.getId(), 0))
-                        .thenComparing(User::getId))
-                .toList();
-
-        for (User candidate : ranked) {
-            User lockedVet = userRepository.findByIdForUpdate(candidate.getId()).orElse(null);
-            if (!isStillEligible(lockedVet)) continue;
-
-            CareSchedule examToPause = careScheduleRepository.findByIdForUpdate(
-                    inProgressExamByVet.get(lockedVet.getId()).getId()).orElse(null);
-            // AD-022: an OVERDUE exam is preemptible exactly like an IN_PROGRESS one.
-            if (examToPause == null || !CareScheduleStatus.ACTIVE_EXAM.contains(examToPause.getStatus())
-                    || examToPause.getCareType() == CareType.URGENT) {
-                continue;
-            }
-
-            LocalDateTime now = LocalDateTime.now();
-            if (!canTakeOverFrom(examToPause, urgentSchedule, now)) continue;
-
-            examToPause.setStatus(CareScheduleStatus.PAUSED);
-            careScheduleRepository.save(examToPause);
-
-            Horse pausedHorse = horseRepository.findById(examToPause.getHorseId()).orElse(null);
-            String horseName = pausedHorse != null ? pausedHorse.getName() : "the horse";
-            notificationService.sendAssignmentNotification(
-                    lockedVet.getId(),
-                    NotificationTypes.REFERENCE_CARE_SCHEDULE,
-                    examToPause.getId(),
-                    examToPause.getHorseId(),
-                    NotificationTypes.CARE_SCHEDULE_PAUSED,
-                    "Examination paused for emergency",
-                    "Your examination for horse " + horseName + " (schedule #" + examToPause.getId()
-                            + ") was paused to prioritize an emergency case."
-            );
-
-            return new SlotAssignment(now, List.of(lockedVet));
-        }
-
         return null;
-    }
-
-    /** Kiểm tra trước khi dừng ca: dừng ca rồi mà ca khẩn cấp vẫn không gán được thì Vet bị ngắt oan. */
-    private boolean canTakeOverFrom(CareSchedule examToPause, CareSchedule urgentSchedule, LocalDateTime start) {
-        Long vetId = examToPause.getVeterinarianId();
-        boolean vetBusy = careScheduleRepository.findByVeterinarianIdAndStatus(vetId, CareScheduleStatus.IN_PROGRESS).stream()
-                .anyMatch(other -> !Objects.equals(other.getId(), examToPause.getId())
-                        && inProgressConflictsWithSlot(urgentSchedule, start, other));
-        boolean horseBusy = careScheduleRepository
-                .findByHorseIdAndStatusIn(urgentSchedule.getHorseId(), List.of(CareScheduleStatus.IN_PROGRESS)).stream()
-                .anyMatch(other -> !Objects.equals(other.getId(), examToPause.getId())
-                        && inProgressConflictsWithSlot(urgentSchedule, start, other));
-        boolean urgentBooked = careScheduleRepository.findScheduledForVet(vetId, CareScheduleStatus.SCHEDULED).stream()
-                .anyMatch(other -> blocksSlot(urgentSchedule, start, other));
-        return !vetBusy && !horseBusy && !urgentBooked;
-    }
-
-    private void resumePausedExamIfAny(Long veterinarianId) {
-        if (veterinarianId == null) return;
-        List<CareSchedule> pausedList = careScheduleRepository.findByVeterinarianIdAndStatus(
-                veterinarianId, CareScheduleStatus.PAUSED);
-        if (pausedList.isEmpty()) return;
-
-        // Resume the most recently paused exam
-        CareSchedule paused = pausedList.stream()
-                .max(Comparator.comparing(CareSchedule::getUpdatedAt))
-                .orElse(pausedList.get(0));
-
-        paused.setStatus(CareScheduleStatus.IN_PROGRESS);
-        careScheduleRepository.save(paused);
-
-        Horse horse = horseRepository.findById(paused.getHorseId()).orElse(null);
-        String horseName = horse != null ? horse.getName() : "the horse";
-        notificationService.sendAssignmentNotification(
-                veterinarianId,
-                NotificationTypes.REFERENCE_CARE_SCHEDULE,
-                paused.getId(),
-                paused.getHorseId(),
-                NotificationTypes.ROUTINE_ASSIGNED,
-                "Examination resumed",
-                "Emergency care concluded. Your examination for horse " + horseName
-                        + " (schedule #" + paused.getId() + ") has been resumed to In Progress."
-        );
     }
 
     static boolean isBeyondAssignmentHorizon(CareSchedule schedule, LocalDateTime horizon) {
@@ -1932,24 +1830,14 @@ public class CareScheduleService {
                                 .count();
                         if (count >= ADMISSION_DAILY_QUOTA) return false;
                     }
-                    // For URGENT the in-progress conflict check below decides, so a
-                    // stale overdue exam never disqualifies the vet from an emergency.
-                    // AD-022 / AD-026: DELAYED and OVERDUE exams block the vet just as much as an IN_PROGRESS one.
                     boolean activeExamBlocks = schedule.getCareType() != CareType.URGENT
                             && slot.toLocalDate().isEqual(LocalDate.now())
                             && vetCache.hasInProgressByVet.computeIfAbsent(v.getId(),
-                                    id -> careScheduleRepository.existsByVeterinarianIdAndStatus(id, CareScheduleStatus.IN_PROGRESS)
-                                            || careScheduleRepository.existsByVeterinarianIdAndStatus(id, CareScheduleStatus.DELAYED)
-                                            || careScheduleRepository.existsByVeterinarianIdAndStatus(id, CareScheduleStatus.OVERDUE));
+                                    id -> careScheduleRepository.existsByVeterinarianIdAndStatus(id, CareScheduleStatus.IN_PROGRESS));
                     return !activeExamBlocks;
                 })
                 .filter(v -> vetCache.inProgressByVet.computeIfAbsent(v.getId(),
-                                id -> {
-                                    List<CareSchedule> list = new ArrayList<>(careScheduleRepository.findByVeterinarianIdAndStatus(id, CareScheduleStatus.IN_PROGRESS));
-                                    list.addAll(careScheduleRepository.findByVeterinarianIdAndStatus(id, CareScheduleStatus.DELAYED));
-                                    list.addAll(careScheduleRepository.findByVeterinarianIdAndStatus(id, CareScheduleStatus.OVERDUE));
-                                    return list;
-                                })
+                                id -> careScheduleRepository.findByVeterinarianIdAndStatus(id, CareScheduleStatus.IN_PROGRESS))
                         .stream()
                         .noneMatch(other -> inProgressConflictsWithSlot(schedule, slot, other)))
                 .filter(v -> vetCache.scheduledByVet.computeIfAbsent(v.getId(),
@@ -1967,8 +1855,7 @@ public class CareScheduleService {
                 vetCache.historyByVet.computeIfAbsent(v.getId(),
                         id -> careScheduleRepository.existsByVeterinarianIdAndHorseIdAndStatusIn(
                                 id, schedule.getHorseId(),
-                                List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS,
-                                        CareScheduleStatus.DELAYED, CareScheduleStatus.OVERDUE, CareScheduleStatus.COMPLETED)));
+                                List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.COMPLETED)));
             }
         }
 
@@ -2029,9 +1916,18 @@ public class CareScheduleService {
 
     @Transactional(readOnly = true)
     public List<UrgentAssignmentAlert> getPendingUrgentAlerts(Long veterinarianId) {
+        return getPendingUrgentAlerts(veterinarianId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UrgentAssignmentAlert> getPendingUrgentAlerts(Long veterinarianId, boolean includeCompleted) {
+        List<CareScheduleStatus> statuses = includeCompleted
+                ? List.of(CareScheduleStatus.SCHEDULED, CareScheduleStatus.IN_PROGRESS, CareScheduleStatus.COMPLETED)
+                : CareScheduleStatus.BOOKED_OR_ACTIVE;
+
         return careScheduleRepository.findByVeterinarianIdAndCareTypeAndStatusIn(
                         veterinarianId, CareType.URGENT,
-                        CareScheduleStatus.BOOKED_OR_ACTIVE).stream()
+                        statuses).stream()
                 .map(schedule -> {
                     HorseIncidentReport incident = schedule.getSourceIncidentId() != null
                             ? incidentReportRepository.findById(schedule.getSourceIncidentId()).orElse(null)
@@ -2041,6 +1937,9 @@ public class CareScheduleService {
                             : buildUrgentAlert(schedule, incident, horse, veterinarianId, schedule.getUpdatedAt());
                 })
                 .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(
+                        (UrgentAssignmentAlert a) -> a.reportedAt() != null ? a.reportedAt() : (a.scheduledAt() != null ? a.scheduledAt() : LocalDateTime.MIN)
+                ).reversed().thenComparing(Comparator.comparing(UrgentAssignmentAlert::scheduleId).reversed()))
                 .toList();
     }
 
