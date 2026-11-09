@@ -20,16 +20,32 @@ interface AdmissionFunnelEdaViewProps {
   data: AdmissionFunnelEdaDto;
 }
 
+const STAGE_ORDER = [
+  'Submitted',
+  'Groom Checked',
+  'Arrived at Facility',
+  'Vet Examined',
+  'Trainer Evaluated',
+  'Manager Cleared',
+];
+
 export const AdmissionFunnelEdaView: React.FC<AdmissionFunnelEdaViewProps> = ({ data }) => {
-  const funnelChartData = data.stageFunnel.map((s) => ({
+  const sortedStages = [...data.stageFunnel].sort((a, b) => {
+    const idxA = STAGE_ORDER.indexOf(a.stage);
+    const idxB = STAGE_ORDER.indexOf(b.stage);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    return 0;
+  });
+
+  const funnelChartData = sortedStages.map((s) => ({
     stage: s.stage,
     count: s.count,
     conversion: s.conversionPercentage,
   }));
 
   const latencyData = [
-    { stage: 'Arrival Lead Time', stageKey: 'ARRIVAL', hours: data.medianLatenciesHours.arrivalLeadTimeHours },
     { stage: 'Groom Inspection', stageKey: 'GROOM_REVIEW', hours: data.medianLatenciesHours.groomReviewHours },
+    { stage: 'Arrival Lead Time', stageKey: 'ARRIVAL', hours: data.medianLatenciesHours.arrivalLeadTimeHours },
     { stage: 'Veterinary Review', stageKey: 'VET_REVIEW', hours: data.medianLatenciesHours.vetReviewHours },
     { stage: 'Trainer Assessment', stageKey: 'TRAINER_REVIEW', hours: data.medianLatenciesHours.trainerReviewHours },
     { stage: 'Manager Approval', stageKey: 'MANAGER_REVIEW', hours: data.medianLatenciesHours.managerReviewHours },
@@ -73,7 +89,7 @@ export const AdmissionFunnelEdaView: React.FC<AdmissionFunnelEdaViewProps> = ({ 
       {data.bottleneckStage !== 'NONE' && (
         <Notice tone="warning">
           <span className="font-semibold">
-            Primary Pipeline Bottleneck: {formatAdmissionStage(data.bottleneckStage)} is experiencing the highest median turnaround time across the admission lifecycle.
+            Pipeline Bottleneck: {formatAdmissionStage(data.bottleneckStage)} is experiencing the highest turnaround latency.
           </span>
         </Notice>
       )}
@@ -85,9 +101,6 @@ export const AdmissionFunnelEdaView: React.FC<AdmissionFunnelEdaViewProps> = ({ 
           <div className="text-2xl font-bold text-[var(--color-text-primary)]">
             {data.totalApplications}
           </div>
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            Submissions in selected timeframe
-          </span>
         </Panel>
 
         <Panel padded className="space-y-1">
@@ -96,7 +109,7 @@ export const AdmissionFunnelEdaView: React.FC<AdmissionFunnelEdaViewProps> = ({ 
             {data.approvalRate.toFixed(1)}%
           </div>
           <span className="text-xs text-[var(--color-text-secondary)]">
-            {data.approvedCount} horses successfully admitted
+            {data.approvedCount} admitted
           </span>
         </Panel>
 
@@ -106,20 +119,29 @@ export const AdmissionFunnelEdaView: React.FC<AdmissionFunnelEdaViewProps> = ({ 
             {data.rejectionRate.toFixed(1)}%
           </div>
           <span className="text-xs text-[var(--color-text-secondary)]">
-            {data.rejectedCount} rejected · {data.expiredCount} arrival expired
+            {data.rejectedCount} rejected · {data.expiredCount} expired
           </span>
         </Panel>
 
         <Panel padded className="space-y-1">
           <span className="text-xs text-[var(--color-text-muted)]">End-to-End Turnaround</span>
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {data.medianLatenciesHours.totalEndToEndHours > 0
-              ? `${data.medianLatenciesHours.totalEndToEndHours.toFixed(1)}h`
-              : '—'}
+            {data.medianLatenciesHours.totalEndToEndHours > 0 ? (
+              data.medianLatenciesHours.totalEndToEndHours > 48 ? (
+                <span>
+                  {(data.medianLatenciesHours.totalEndToEndHours / 24).toFixed(1)}{' '}
+                  <span className="text-base font-semibold">days</span>{' '}
+                  <span className="text-xs font-normal text-[var(--color-text-muted)]">
+                    ({data.medianLatenciesHours.totalEndToEndHours.toFixed(0)}h)
+                  </span>
+                </span>
+              ) : (
+                `${data.medianLatenciesHours.totalEndToEndHours.toFixed(1)}h`
+              )
+            ) : (
+              '—'
+            )}
           </div>
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            Median submission to clearance SLA
-          </span>
         </Panel>
       </div>
 
@@ -127,14 +149,9 @@ export const AdmissionFunnelEdaView: React.FC<AdmissionFunnelEdaViewProps> = ({ 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Stage Conversion Chart */}
         <Panel padded className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-              Admission Pipeline Funnel & Stage Drop-off
-            </h3>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              Percentage of horse applications advancing through each review step.
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            Admission Pipeline Funnel & Stage Drop-off
+          </h3>
 
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -146,8 +163,8 @@ export const AdmissionFunnelEdaView: React.FC<AdmissionFunnelEdaViewProps> = ({ 
                 <XAxis dataKey="stage" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" />
                 <YAxis unit="%" domain={[0, 100]} width={45} tick={{ fontSize: 11 }} />
                 <Tooltip
-                  formatter={(val: unknown, _name: unknown, item: any) => [
-                    `${val}% (${item.payload.count} horses)`,
+                  formatter={(val: unknown, _name: unknown, item: { payload?: { count?: number } }) => [
+                    `${val}% (${item.payload?.count ?? 0} horses)`,
                     'Pass Rate',
                   ]}
                 />
@@ -159,14 +176,9 @@ export const AdmissionFunnelEdaView: React.FC<AdmissionFunnelEdaViewProps> = ({ 
 
         {/* Stage Turnaround Latency */}
         <Panel padded className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-              Average Review Time by Stage (Hours)
-            </h3>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              Identifies stage SLA bottlenecks where applications experience review delays.
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            Average Review Time by Stage (Hours)
+          </h3>
 
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -179,7 +191,7 @@ export const AdmissionFunnelEdaView: React.FC<AdmissionFunnelEdaViewProps> = ({ 
                 <XAxis type="number" unit="h" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="stage" tick={{ fontSize: 11 }} width={140} />
                 <Tooltip
-                  formatter={(val: unknown, _name: unknown, item: any) => [
+                  formatter={(val: unknown, _name: unknown, item: { payload?: { stageKey?: string } }) => [
                     `${val} hours`,
                     item?.payload?.stageKey === data.bottleneckStage ? 'Bottleneck Turnaround' : 'Average Review Time',
                   ]}
@@ -210,7 +222,7 @@ export const AdmissionFunnelEdaView: React.FC<AdmissionFunnelEdaViewProps> = ({ 
         </h3>
         <DataTable
           ariaLabel="Admission funnel table"
-          rows={data.stageFunnel}
+          rows={sortedStages}
           columns={columns}
           getRowKey={(row: StageFunnelPointDto) => row.stage}
           pageSize={6}

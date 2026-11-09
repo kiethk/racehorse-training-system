@@ -107,7 +107,7 @@ public class HorseController {
         return ApiResponse.success(response);
     }
 
-    @PreAuthorize("hasAuthority('HORSE_CREATE')")
+    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('HORSE_CREATE')")
     @PostMapping
     public ApiResponse<Horse> createHorse(@Valid @RequestBody CreateHorseRequest request) {
         return ApiResponse.success(horseService.createHorse(request));

@@ -244,10 +244,10 @@ public class AdmissionManagerReviewService {
         if (careScheduleRepository != null) {
             List<CareSchedule> nonCancellableSchedules =
                     careScheduleRepository.findByHorseIdAndStatusIn(horse.getId(),
-                            CareScheduleStatus.OPEN);
+                            CareScheduleStatus.ACTIVE_EXAM);
             if (!nonCancellableSchedules.isEmpty()) {
                 throw new IllegalStateException(
-                        "Admission cannot be rejected while veterinary care is SCHEDULED or IN_PROGRESS");
+                        "Admission cannot be rejected while veterinary care is IN_PROGRESS");
             }
             careScheduleRepository.cancelOpenSchedulesIfUnreferenced(
                     horse.getId(), List.of(CareScheduleStatus.SCHEDULED),

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Button, LinkButton, Modal, Pill } from '@/components/ui';
 import { formatEnumLabel } from '@/lib/display';
 import type { AccountCreationResponse } from '../types';
@@ -13,6 +14,7 @@ interface Props {
 
 export function AccountCreationResult({ result, initialPassword, onClose }: Props) {
   const [copied, setCopied] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const isStaffAllocation = result.role === 'GROOM' || result.role === 'HEAD_TRAINER';
   const assigned =
     result.role === 'GROOM'
@@ -72,11 +74,22 @@ ${initialPassword ? `Initial Password: ${initialPassword}` : ''}`;
             <p className="text-xs text-[var(--color-text-muted)]">Address: {result.address}</p>
           )}
           {initialPassword && (
-            <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
-              <span className="text-xs text-[var(--color-text-muted)]">Initial Password: </span>
-              <span className="font-mono text-xs font-semibold text-[var(--color-text-primary)]">
-                {initialPassword}
-              </span>
+            <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-center justify-between">
+              <div>
+                <span className="text-xs text-[var(--color-text-muted)]">Initial Password: </span>
+                <span className="font-mono text-xs font-semibold text-[var(--color-text-primary)]">
+                  {showPassword ? initialPassword : '•'.repeat(Math.max(initialPassword.length, 8))}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPassword(prev => !prev)}
+                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors p-1 rounded"
+                title={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
             </div>
           )}
         </div>

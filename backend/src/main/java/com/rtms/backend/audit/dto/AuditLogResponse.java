@@ -74,8 +74,23 @@ public class AuditLogResponse {
         dto.setRequestPath(log.getRequestPath());
         dto.setStatusCode(log.getStatusCode());
         dto.setAction(log.getAction());
-        dto.setEntityName(log.getEntityName());
-        dto.setEntityId(log.getEntityId());
+        Long entityId = log.getEntityId();
+        String entityName = log.getEntityName();
+        if (entityId == null && log.getRequestPath() != null) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("/(?:areas|stalls|horses|admissions|accounts|staff|users)/(\\d+)").matcher(log.getRequestPath());
+            if (m.find()) {
+                entityId = Long.parseLong(m.group(1));
+            }
+        }
+        if (entityName == null || "Stable".equalsIgnoreCase(entityName)) {
+            if (log.getRequestPath() != null && log.getRequestPath().contains("/areas")) {
+                entityName = "Area";
+            } else if (log.getRequestPath() != null && log.getRequestPath().contains("/stalls")) {
+                entityName = "StableStall";
+            }
+        }
+        dto.setEntityName(entityName);
+        dto.setEntityId(entityId);
         dto.setDetails(log.getDetails());
         dto.setModule(resolveModule(log.getEntityName(), log.getDetails(), log.getRequestPath(), log.getAction()));
         dto.setSuccess(log.getStatusCode() == null || (log.getStatusCode() >= 200 && log.getStatusCode() < 300));

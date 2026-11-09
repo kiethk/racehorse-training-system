@@ -153,6 +153,8 @@ public interface AdmissionApplicationRepository
     List<AdmissionApplication> findByTrainerIdAndStatusOrderBySubmittedAtAscIdAsc(Long trainerId,
                                                                                AdmissionStatus status);
 
+    boolean existsByTrainerIdAndStatus(Long trainerId, AdmissionStatus status);
+
     /**
      * Hồ sơ Trainer này ĐÃ đánh giá — không lọc theo status.
      *

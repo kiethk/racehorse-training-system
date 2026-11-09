@@ -130,11 +130,11 @@ public class ManagerDashboardService {
         );
 
         // 2. Fleet Summary
-        long totalHorses = horseRepository.count();
         long activeEligible = horseRepository.countByCurrentStatus(HorseStatus.ELIGIBLE);
         long inTraining = courseRunRepository.countHorsesInTraining();
-        long medicalBlocked = horseRepository.countByTrainingDecision(TrainingDecision.BLOCKED);
+        long medicalBlocked = horseRepository.countByCurrentStatusAndTrainingDecision(HorseStatus.ELIGIBLE, TrainingDecision.BLOCKED);
         long inactive = horseRepository.countByCurrentStatus(HorseStatus.INACTIVE);
+        long totalHorses = activeEligible;
 
         FleetSummary fleetSummary = new FleetSummary(
                 totalHorses,
@@ -147,10 +147,11 @@ public class ManagerDashboardService {
         // 3. Admission Pipeline & Actions
         long managerReviewCount = admissionApplicationRepository.countByStatus(AdmissionStatus.MANAGER_REVIEW);
         long waitingArrivalCount = admissionApplicationRepository.countByStatus(AdmissionStatus.WAITING_FOR_ARRIVAL);
+        long waitingStallCount = admissionApplicationRepository.countByStatus(AdmissionStatus.WAITING_FOR_STALL);
         long groomReviewCount = admissionApplicationRepository.countByStatus(AdmissionStatus.GROOM_REVIEW);
         long vetReviewCount = admissionApplicationRepository.countByStatus(AdmissionStatus.VET_REVIEW);
         long trainerReviewCount = admissionApplicationRepository.countByStatus(AdmissionStatus.TRAINER_REVIEW);
-        long totalPending = managerReviewCount + waitingArrivalCount + groomReviewCount + vetReviewCount + trainerReviewCount;
+        long totalPending = managerReviewCount + waitingArrivalCount + waitingStallCount + groomReviewCount + vetReviewCount + trainerReviewCount;
 
         // Find admissions waiting for Manager review
         List<AdmissionApplication> managerReviewApps =

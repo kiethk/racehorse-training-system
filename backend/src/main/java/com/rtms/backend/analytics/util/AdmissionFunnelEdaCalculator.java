@@ -42,8 +42,8 @@ public final class AdmissionFunnelEdaCalculator {
 
         List<StageFunnelPointDto> stageFunnel = new ArrayList<>();
         stageFunnel.add(new StageFunnelPointDto("Submitted", countSubmitted, 100.0));
-        stageFunnel.add(new StageFunnelPointDto("Arrived at Facility", countArrived, calcPct(countArrived, countSubmitted)));
         stageFunnel.add(new StageFunnelPointDto("Groom Checked", countGroom, calcPct(countGroom, countSubmitted)));
+        stageFunnel.add(new StageFunnelPointDto("Arrived at Facility", countArrived, calcPct(countArrived, countSubmitted)));
         stageFunnel.add(new StageFunnelPointDto("Vet Examined", countVet, calcPct(countVet, countSubmitted)));
         stageFunnel.add(new StageFunnelPointDto("Trainer Evaluated", countTrainer, calcPct(countTrainer, countSubmitted)));
         stageFunnel.add(new StageFunnelPointDto("Manager Cleared", approved, calcPct(approved, countSubmitted)));
@@ -58,34 +58,44 @@ public final class AdmissionFunnelEdaCalculator {
 
         for (AdmissionApplication a : applications) {
             LocalDateTime sub = a.getSubmittedAt();
-            LocalDateTime arr = a.getArrivedAt();
             LocalDateTime grm = a.getGroomReviewedAt();
+            LocalDateTime arr = a.getArrivedAt();
             LocalDateTime vet = a.getVetReviewedAt();
             LocalDateTime trn = a.getTrainerReviewedAt();
             LocalDateTime mgr = a.getManagerReviewedAt();
 
-            if (sub != null && arr != null && !arr.isBefore(sub)) {
+            // 1. Groom inspection: from submission to groom review
+            if (sub != null && grm != null && !grm.isBefore(sub)) {
+                groomLatencies.add(toHours(sub, grm));
+            }
+            // 2. Arrival: from groom approval to horse arrival
+            if (grm != null && arr != null && !arr.isBefore(grm)) {
+                arrivalLatencies.add(toHours(grm, arr));
+            } else if (sub != null && arr != null && !arr.isBefore(sub)) {
                 arrivalLatencies.add(toHours(sub, arr));
             }
-            if (arr != null && grm != null && !grm.isBefore(arr)) {
-                groomLatencies.add(toHours(arr, grm));
-            }
-            if (grm != null && vet != null && !vet.isBefore(grm)) {
+            // 3. Vet review: from horse arrival to vet review
+            if (arr != null && vet != null && !vet.isBefore(arr)) {
+                vetLatencies.add(toHours(arr, vet));
+            } else if (grm != null && vet != null && !vet.isBefore(grm)) {
                 vetLatencies.add(toHours(grm, vet));
             }
+            // 4. Trainer assessment: from vet review to trainer review
             if (vet != null && trn != null && !trn.isBefore(vet)) {
                 trainerLatencies.add(toHours(vet, trn));
             }
+            // 5. Manager approval: from trainer review to manager review
             if (trn != null && mgr != null && !mgr.isBefore(trn)) {
                 managerLatencies.add(toHours(trn, mgr));
             }
+            // 6. End-to-end: from submission to manager review
             if (sub != null && mgr != null && !mgr.isBefore(sub)) {
                 endToEndLatencies.add(toHours(sub, mgr));
             }
         }
 
-        double medArrival = median(arrivalLatencies);
         double medGroom = median(groomLatencies);
+        double medArrival = median(arrivalLatencies);
         double medVet = median(vetLatencies);
         double medTrainer = median(trainerLatencies);
         double medManager = median(managerLatencies);
@@ -93,8 +103,8 @@ public final class AdmissionFunnelEdaCalculator {
 
         // Identify bottleneck stage
         Map<String, Double> stageMedianMap = new LinkedHashMap<>();
-        stageMedianMap.put("ARRIVAL", medArrival);
         stageMedianMap.put("GROOM_REVIEW", medGroom);
+        stageMedianMap.put("ARRIVAL", medArrival);
         stageMedianMap.put("VET_REVIEW", medVet);
         stageMedianMap.put("TRAINER_REVIEW", medTrainer);
         stageMedianMap.put("MANAGER_REVIEW", medManager);

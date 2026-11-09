@@ -110,7 +110,19 @@ public class AuditActivityResolver {
 
         Matcher m;
 
-        // 0. AI Assistant & HITL
+        // 0. System Administration & Audit Maintenance
+        if (normalizedPath.contains("/manager/audit-logs/purge") || normalizedPath.contains("/audit-logs/purge")) {
+            return new ResolvedActivity(
+                    "Archive & Purge Audit Trail",
+                    "AuditLog",
+                    null,
+                    isSuccess
+                            ? "Manager successfully archived and purged eligible historical audit logs."
+                            : "Manager requested audit log purge, but the operation was blocked by safety policy"
+            );
+        }
+
+        // 0.1 AI Assistant & HITL
         if (normalizedPath.contains("/ai/chat") || normalizedPath.contains("/ai/conversations")) {
             return new ResolvedActivity(
                     "AI Assistant Consultation",
@@ -372,7 +384,7 @@ public class AuditActivityResolver {
         if (STABLE_ASSIGNMENTS.matcher(normalizedPath).matches()) {
             return new ResolvedActivity(
                     "Update Stable Assignments",
-                    "StableStall",
+                    "Area",
                     null,
                     "Manager updated area trainer assignments and groom stall assignments" + statusSuffix
             );
@@ -392,6 +404,16 @@ public class AuditActivityResolver {
                     "StableStall",
                     null,
                     "Created a new stable stall" + statusSuffix
+            );
+        }
+        if ((m = STABLE_AREAS_DETAIL.matcher(normalizedPath)).matches()) {
+            Long id = parseId(m.group(1));
+            String action = "DELETE".equals(normalizedMethod) ? "Remove Barn Area" : "Update Barn Area";
+            return new ResolvedActivity(
+                    action,
+                    "Area",
+                    id,
+                    ("DELETE".equals(normalizedMethod) ? "Manager removed barn area #" : "Manager updated barn area #") + id + statusSuffix
             );
         }
         if (STABLE_AREAS_BASE.matcher(normalizedPath).matches() && "POST".equals(normalizedMethod)) {
@@ -682,15 +704,17 @@ public class AuditActivityResolver {
         };
         String friendlyEntity = humanizeEntity(entityName);
         String actionTitle = "System".equalsIgnoreCase(entityName)
-                ? actionVerb + " Resource"
+                ? actionVerb + " Farm Setting"
                 : actionVerb + " " + friendlyEntity;
+        String details = isSuccess
+                ? "Successfully updated " + friendlyEntity.toLowerCase() + " record."
+                : "Attempted to update " + friendlyEntity.toLowerCase() + ", but the action was blocked by system policy.";
+
         return new ResolvedActivity(
                 actionTitle,
                 entityName,
                 null,
-                (isSuccess ? "Successfully processed " : "Attempted ")
-                        + actionVerb.toLowerCase() + " operation for " + friendlyEntity.toLowerCase()
-                        + statusSuffix
+                details
         );
     }
 
@@ -713,7 +737,8 @@ public class AuditActivityResolver {
         if (path.contains("/training-rules")) return "TrainingRule";
         if (path.contains("/horses")) return "Horse";
         if (path.contains("/staff") || path.contains("/users") || path.contains("/accounts")) return "Staff";
-        if (path.contains("/stalls") || path.contains("/areas")) return "Stable";
+        if (path.contains("/areas")) return "Area";
+        if (path.contains("/stalls")) return "StableStall";
         if (path.contains("/care-schedules") || path.contains("/health-records") || path.contains("/preventive")) return "Medical";
         if (path.contains("/incidents")) return "IncidentReport";
         if (path.contains("/ai")) return "AI Assistant";
@@ -730,6 +755,7 @@ public class AuditActivityResolver {
             case "TrainingWorkout" -> "Workout Session";
             case "TrainingRule" -> "Training Rules";
             case "IncidentReport" -> "Incident Report";
+            case "Area" -> "Barn Area";
             case "StableStall" -> "Stable Stall";
             case "CareSchedule" -> "Medical Schedule";
             case "HealthRecord" -> "Health Record";

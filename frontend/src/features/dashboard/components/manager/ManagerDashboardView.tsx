@@ -1,26 +1,18 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
   FilterChips,
-  LinkButton,
   MetricCard,
   Notice,
   PageHeader,
-  Pill,
-  ProgressBar,
   ScreenLayout,
   Skeleton,
 } from '@/components/ui';
-import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
-import { HorseSpecialtyBadges } from '@/features/horses/shared/components/HorseSpecialtyBadges';
+import { DataTable } from '@/components/ui/DataTable';
 import { displayError, formatNumber } from '@/lib/display';
-import { COURSE_RUN_STATUS } from '@/features/training/lib/status';
-import { RatingPill } from '@/features/training/components/shared/RatingPill';
-import { StatusPill } from '@/features/training/components/shared/StatusPill';
 import { dashboardService } from '../../services/dashboardService';
 import type { DashboardHorse, ManagerDashboardSummary } from '../../types';
 import { HealthTrendCard } from '../HealthTrendCard';
@@ -28,132 +20,12 @@ import { PerformanceLineTrendCard } from './PerformanceLineTrendCard';
 import { BarnOccupancyWidget } from './BarnOccupancyWidget';
 import { FleetDistributionWidget } from './FleetDistributionWidget';
 import { ManagerActionCenter } from './ManagerActionCenter';
-import { ManagerEdaExecutiveCard } from '@/features/manager-analytics/components/ManagerEdaExecutiveCard';
-
+import { AdmissionFunnelExecutiveWidget } from './AdmissionFunnelExecutiveWidget';
+import { VetWorkloadExecutiveWidget } from './VetWorkloadExecutiveWidget';
+import { LazySection } from './LazySection';
+import { columnsFor as horseColumnsFor, newestHorseFirst } from '../HorseDashboardView';
 
 type HorseFilter = 'ALL' | 'ACTIVE' | 'ALERT';
-
-function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
-  return [
-    {
-      id: 'horse',
-      header: 'Horse',
-      sortValue: (horse) => horse.horseName,
-      render: (horse) => (
-        <div className="min-w-0">
-          <Link
-            href={`${horseBasePath}/${horse.horseId}`}
-            className="font-semibold hover:text-[var(--color-primary)] focus-visible:rounded-sm focus-visible:outline-2"
-          >
-            {horse.horseName}
-          </Link>
-          <div className="text-xs text-[var(--color-text-muted)]">
-            {horse.stallCode ? (
-              <Link
-                href={`/manager/stable?stall=${encodeURIComponent(horse.stallCode)}`}
-                className="hover:text-[var(--color-primary)] hover:underline"
-              >
-                Stall {horse.stallCode}
-              </Link>
-            ) : null}
-            {horse.stallCode && horse.breed ? ' · ' : null}
-            {horse.breed}
-            {!horse.stallCode && !horse.breed ? '—' : null}
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 'specialty',
-      header: 'Specialty',
-      render: (horse) => <HorseSpecialtyBadges specialty={horse.specialty} />,
-    },
-    {
-      id: 'course',
-      header: 'Training course',
-      render: (horse) =>
-        horse.courseRunStatus === 'NONE' ? (
-          <span className="text-[var(--color-text-muted)]">Not enrolled</span>
-        ) : (
-          <Link
-            href={`${horseBasePath}/${horse.horseId}`}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] hover:underline"
-          >
-            {horse.courseName}
-          </Link>
-        ),
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      sortValue: (horse) => COURSE_RUN_STATUS[horse.courseRunStatus].label,
-      render: (horse) => <StatusPill status={COURSE_RUN_STATUS[horse.courseRunStatus]} />,
-    },
-    {
-      id: 'progress',
-      header: 'Course progress',
-      className: 'min-w-36',
-      sortValue: (horse) => horse.progressPercent,
-      render: (horse) =>
-        horse.totalSessions > 0 ? (
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
-              <span>{horse.completedSessions}/{horse.totalSessions} sessions</span>
-              <span className="font-semibold">{formatNumber(horse.progressPercent)}%</span>
-            </div>
-            <ProgressBar label={`${horse.horseName} progress`} value={horse.progressPercent} size="sm" tone="info" />
-          </div>
-        ) : (
-          <span className="text-[var(--color-text-muted)]">—</span>
-        ),
-    },
-    {
-      id: 'latest',
-      header: 'Latest rating',
-      align: 'center',
-      sortValue: (horse) => horse.latestPerformanceRating,
-      render: (horse) => <RatingPill rating={horse.latestPerformanceRating} />,
-    },
-    {
-      id: 'average',
-      header: '30-day average',
-      align: 'center',
-      sortValue: (horse) => horse.avgPerformanceRating30d,
-      render: (horse) =>
-        horse.avgPerformanceRating30d != null ? (
-          <span className="font-semibold">{formatNumber(horse.avgPerformanceRating30d, 1)}</span>
-        ) : (
-          <span className="text-[var(--color-text-muted)]">—</span>
-        ),
-    },
-    {
-      id: 'alerts',
-      header: 'Risk alerts',
-      align: 'center',
-      sortValue: (horse) => horse.alertsCount,
-      render: (horse) =>
-        horse.alertsCount > 0 ? (
-          <Pill tone="danger" size="sm" icon="alert-triangle">
-            {horse.alertsCount}
-          </Pill>
-        ) : (
-          <Pill tone="success" size="sm" icon="check">
-            Clear
-          </Pill>
-        ),
-    },
-    {
-      id: 'actions',
-      header: <span className="sr-only">Actions</span>,
-      align: 'right',
-      render: (horse) => (
-        <LinkButton href={`${horseBasePath}/${horse.horseId}`} size="sm" icon="trending-up" variant="tertiary">
-          Details
-        </LinkButton>
-      ),
-    },
-  ];
-}
 
 export function ManagerDashboardView() {
   const [summary, setSummary] = useState<ManagerDashboardSummary | null>(null);
@@ -165,7 +37,7 @@ export function ManagerDashboardView() {
 
   const router = useRouter();
   const horseBasePath = '/manager/horses';
-  const columns = useMemo(() => columnsFor(horseBasePath), [horseBasePath]);
+  const columns = useMemo(() => horseColumnsFor(horseBasePath), [horseBasePath]);
 
   const loadData = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
@@ -199,10 +71,9 @@ export function ManagerDashboardView() {
 
   return (
     <ScreenLayout variant="dashboard">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <PageHeader
-          title="Dashboard"
-        />
+        <PageHeader title="Dashboard" />
         <div className="shrink-0 self-start sm:self-center">
           <Button
             size="sm"
@@ -218,7 +89,7 @@ export function ManagerDashboardView() {
 
       {error && <Notice tone="error">{error}</Notice>}
 
-      {/* Top Executive KPI Cards */}
+      {/* Row 1: Top Executive KPI Cards */}
       {loading && !summary ? (
         <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-4">
           <Skeleton className="h-24 w-full rounded-md" />
@@ -270,7 +141,7 @@ export function ManagerDashboardView() {
         </div>
       ) : null}
 
-      {/* Urgent Action Center */}
+      {/* Row 2: Urgent Action Center */}
       {summary && (
         <ManagerActionCenter
           pendingAdmissions={summary.pendingAdmissions}
@@ -278,7 +149,7 @@ export function ManagerDashboardView() {
         />
       )}
 
-      {/* Two-Column Grid: Stables & Fleet Readiness */}
+      {/* Row 3: Pair 1 - Stables & Fleet Readiness */}
       {summary && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <BarnOccupancyWidget
@@ -287,50 +158,67 @@ export function ManagerDashboardView() {
           />
           <FleetDistributionWidget
             summary={summary.fleetSummary}
+            horses={horses}
           />
         </div>
       )}
 
-      {/* Executive Exploratory Analytics (EDA) */}
-      <ManagerEdaExecutiveCard />
+      {/* Row 4: Pair 2 - Operations & Intake EDA (Lazy Loaded) */}
+      <LazySection height="320px">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <AdmissionFunnelExecutiveWidget />
+          <VetWorkloadExecutiveWidget />
+        </div>
+      </LazySection>
 
-      {/* Historical Performance & Health Trends */}
-      <div className="space-y-4">
-        <PerformanceLineTrendCard />
-        <HealthTrendCard />
-      </div>
+      {/* Row 5: Pair 3 - Historical Performance & Health Trends (Lazy Loaded) */}
+      <LazySection height="320px">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <PerformanceLineTrendCard />
+          <HealthTrendCard />
+        </div>
+      </LazySection>
 
-      {/* Comprehensive Club Horse Directory Table */}
-      <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-            Club Horse Roster
-          </h2>
-          <FilterChips
-            label="Horse filter"
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: 'ALL', label: 'All', count: horses.length },
-              { value: 'ACTIVE', label: 'In training', count: inTraining.length },
-              { value: 'ALERT', label: 'With alerts', count: withAlerts.length },
-            ]}
+      {/* Row 6: Comprehensive Club Horse Directory Table (Lazy Loaded) */}
+      <LazySection height="420px">
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+              Club Horse Roster
+            </h2>
+            <FilterChips
+              label="Horse filter"
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: 'ALL', label: 'All', count: horses.length },
+                { value: 'ACTIVE', label: 'In training', count: inTraining.length },
+                { value: 'ALERT', label: 'With alerts', count: withAlerts.length },
+              ]}
+            />
+          </div>
+
+          <DataTable
+            ariaLabel="All horses in the club"
+            rows={visibleHorses}
+            defaultOrder={newestHorseFirst}
+            columns={columns}
+            getRowKey={(horse) => horse.horseId}
+            onRowClick={(horse) => router.push(`${horseBasePath}/${horse.horseId}`)}
+            loading={loading}
+            pageSize={8}
+            getSearchText={(horse) =>
+              `${horse.horseName} ${horse.courseName} ${horse.stallCode ?? ''} ${horse.breed ?? ''}`
+            }
+            searchPlaceholder="Search horses by name, stall, course..."
+            emptyTitle={
+              horses.length === 0
+                ? 'No horses registered in the club'
+                : 'No horses match the selected filters'
+            }
           />
         </div>
-
-        <DataTable
-          ariaLabel="All horses in the club"
-          rows={visibleHorses}
-          columns={columns}
-          getRowKey={(horse) => horse.horseId}
-          onRowClick={(horse) => router.push(`${horseBasePath}/${horse.horseId}`)}
-          loading={loading}
-          pageSize={8}
-          getSearchText={(horse) => `${horse.horseName} ${horse.courseName} ${horse.stallCode ?? ''} ${horse.breed ?? ''}`}
-          searchPlaceholder="Search horses by name, stall, course..."
-          emptyTitle={horses.length === 0 ? 'No horses registered in the club' : 'No horses match the selected filters'}
-        />
-      </div>
+      </LazySection>
     </ScreenLayout>
   );
 }

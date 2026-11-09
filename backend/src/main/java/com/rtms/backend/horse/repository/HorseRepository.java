@@ -149,4 +149,6 @@ public interface HorseRepository extends JpaRepository<Horse, Long> {
     long countByCurrentStatusIn(Collection<HorseStatus> statuses);
 
     long countByTrainingDecision(TrainingDecision decision);
+
+    long countByCurrentStatusAndTrainingDecision(HorseStatus status, TrainingDecision decision);
 }

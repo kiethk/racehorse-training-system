@@ -28,6 +28,8 @@ public interface CourseRunRepository extends JpaRepository<CourseRun, Long> {
 
     List<CourseRun> findByTrainerIdOrderByStartDateDesc(Long trainerId);
 
+    List<CourseRun> findByTrainerIdAndStatusIn(Long trainerId, Collection<CourseRunStatus> statuses);
+
     List<CourseRun> findAllByOrderByStartDateDesc();
 
     List<CourseRun> findByStatusAndStartDateLessThanEqual(CourseRunStatus status, LocalDate date);

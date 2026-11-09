@@ -18,6 +18,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -25,14 +27,28 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    public static final String AUDIT_ERROR_MESSAGE_ATTR = "AUDIT_ERROR_MESSAGE";
+
+    private void recordAuditErrorMessage(String message) {
+        if (message == null || message.isBlank()) return;
+        try {
+            var attributes = RequestContextHolder.getRequestAttributes();
+            if (attributes instanceof ServletRequestAttributes servletAttrs) {
+                servletAttrs.getRequest().setAttribute(AUDIT_ERROR_MESSAGE_ATTR, message);
+            }
+        } catch (Exception ignored) {
+        }
+    }
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiResponse<Object>> handleApiException(ApiException ex) {
+        recordAuditErrorMessage(ex.getMessage());
         return ResponseEntity.status(ex.getStatus()).body(ApiResponse.error(ex.getMessage(), ex.getErrorCode()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Object>> handleAccessDenied(AccessDeniedException ex) {
+        recordAuditErrorMessage(ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error(ex.getMessage(), "FORBIDDEN"));
     }
@@ -43,6 +59,7 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .map(error -> error.getDefaultMessage())
                 .orElse("Invalid request");
+        recordAuditErrorMessage(message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(message, "VALIDATION_ERROR"));
     }
@@ -50,6 +67,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         String message = "Invalid value for parameter '" + ex.getName() + "': " + ex.getValue();
+        recordAuditErrorMessage(message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(message, "VALIDATION_ERROR"));
     }
@@ -61,21 +79,26 @@ public class GlobalExceptionHandler {
             MissingServletRequestParameterException.class
     })
     public ResponseEntity<ApiResponse<Object>> handleMediaTypeAndParameterExceptions(Exception ex) {
+        recordAuditErrorMessage(ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ex.getMessage(), "VALIDATION_ERROR"));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Object>> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        String message = "The file is too large. The limit is 10 MB per file.";
+        recordAuditErrorMessage(message);
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
-                .body(ApiResponse.error("The file is too large. The limit is 10 MB per file.", "VALIDATION_ERROR"));
+                .body(ApiResponse.error(message, "VALIDATION_ERROR"));
     }
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiResponse<Object>> handleStatus(ResponseStatusException ex) {
+        String message = ex.getStatusCode().is5xxServerError() && !isStorageFailure(ex) ? "Unexpected server error" :
+                ex.getReason() == null ? "Request failed" : ex.getReason();
+        recordAuditErrorMessage(message);
         return ResponseEntity.status(ex.getStatusCode())
-                .body(ApiResponse.error(ex.getStatusCode().is5xxServerError() && !isStorageFailure(ex) ? "Unexpected server error" :
-                        ex.getReason() == null ? "Request failed" : ex.getReason(),
+                .body(ApiResponse.error(message,
                         ex.getStatusCode().value() == 404 ? "RESOURCE_NOT_FOUND" :
                         ex.getStatusCode().value() == 409 ? "INVALID_REVIEW_STATE" :
                         ex.getStatusCode().value() == 403 ? "FORBIDDEN" :
@@ -90,30 +113,45 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Object>> handleMalformedRequest(HttpMessageNotReadableException ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.error("Invalid request body or unsupported field", "VALIDATION_ERROR"));
+        String message = "Invalid request body or unsupported field";
+        recordAuditErrorMessage(message);
+        return ResponseEntity.badRequest().body(ApiResponse.error(message, "VALIDATION_ERROR"));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Object>> handleNoResourceFound(NoResourceFoundException ex) {
+        String message = "Resource not found: " + ex.getResourcePath();
+        recordAuditErrorMessage(message);
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error("Resource not found: " + ex.getResourcePath(), "RESOURCE_NOT_FOUND"));
+                .body(ApiResponse.error(message, "RESOURCE_NOT_FOUND"));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Object>> handleBadRequest(IllegalArgumentException ex) {
+        recordAuditErrorMessage(ex.getMessage());
         return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage(), "VALIDATION_ERROR"));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Object>> handleIllegalState(IllegalStateException ex) {
+        recordAuditErrorMessage(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage(), "INVALID_REVIEW_STATE"));
     }
 
     @ExceptionHandler({DataAccessException.class, PersistenceException.class})
     public ResponseEntity<ApiResponse<Object>> handlePersistenceException(RuntimeException ex) {
         // The client only sees a generic message, so the cause (constraint name, SQLState) must reach the log.
         log.error("Unhandled persistence error", ex);
+        String message = "Unexpected server error";
+        recordAuditErrorMessage(message);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Unexpected server error", "INTERNAL_ERROR"));
+                .body(ApiResponse.error(message, "INTERNAL_ERROR"));
     }
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Object>> handleRuntimeException(RuntimeException ex) {
+        recordAuditErrorMessage(ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage(), "RESOURCE_NOT_FOUND"));
     }
@@ -121,7 +159,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
         log.error("Unhandled server error", ex);
+        String message = "Unexpected server error";
+        recordAuditErrorMessage(message);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Unexpected server error", "INTERNAL_ERROR"));
+                .body(ApiResponse.error(message, "INTERNAL_ERROR"));
     }
 }

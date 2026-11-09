@@ -10,8 +10,8 @@ export function HorseSpecialtySection({ specialty }: { specialty: HorseSpecialty
 
   return (
     <HorseInfoSection
-      title="Racing specialty"
-      icon="flag"
+      title="Distance specialty"
+      icon="trending-up"
       aside={(
         <Tooltip content="Workouts in the last 90 days, recovery sessions excluded. The tick marks the average a distance needs, with at least the minimum rated workouts, to earn a badge. Faded bars do not have enough workouts yet.">
           <span

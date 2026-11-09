@@ -10,6 +10,7 @@ import com.rtms.backend.stable.dto.*;
 import com.rtms.backend.stable.entity.Area;
 import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
+import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.service.TrainingGroupService;
@@ -192,9 +193,12 @@ public class StableAssignmentService {
         for (var edit : groomEdits) {
             for (StableStall stall : blocks.get(new Block(edit.getAreaId(), edit.getBlockNumber()))) {
                 Horse horse = horseByStall.get(stall.getId());
-                if (horse != null && edit.getGroomId() == null) {
+                boolean hasHorseOrReservation = horse != null
+                        || stall.getStatus() == StallStatus.OCCUPIED
+                        || stall.getStatus() == StallStatus.RESERVED;
+                if (hasHorseOrReservation && edit.getGroomId() == null) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
-                            "Cannot remove Groom from a block with horses. Swap Groom instead.");
+                            "Cannot remove Groom from a block with active horses or reserved stalls. Swap Groom instead.");
                 }
                 if (horse != null && !Objects.equals(stall.getGroomId(), edit.getGroomId())) {
                     horseGroomChanges.put(horse.getId(), edit.getGroomId());

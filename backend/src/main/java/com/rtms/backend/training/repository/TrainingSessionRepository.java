@@ -41,6 +41,12 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     List<TrainingSession> findByTrainerIdAndSessionDateBetweenAndStatusNot(
             Long trainerId, LocalDate from, LocalDate to, SessionStatus status);
 
+    @Query("SELECT s FROM TrainingSession s WHERE s.trainerId = :trainerId AND s.status <> :cancelledStatus AND s.sessionDate >= :today")
+    List<TrainingSession> findLiveSessionsFromDate(
+            @Param("trainerId") Long trainerId,
+            @Param("cancelledStatus") SessionStatus cancelledStatus,
+            @Param("today") LocalDate today);
+
     /** Số buổi của nhiều kế hoạch theo trạng thái bằng MỘT truy vấn. (Session counts of many course runs per status in ONE query.) */
     @Query("""
            SELECT new com.rtms.backend.training.repository.projection.CourseRunSessionCountRow(s.courseRunId, s.status, COUNT(s))

@@ -126,15 +126,15 @@ class ManagerDashboardServiceTest {
         ));
 
         // 2. Fleet
-        when(horseRepository.count()).thenReturn(20L);
         when(horseRepository.countByCurrentStatus(HorseStatus.ELIGIBLE)).thenReturn(15L);
         when(horseTrainingPlanRepository.countHorsesInTraining()).thenReturn(12L);
-        when(horseRepository.countByTrainingDecision(TrainingDecision.BLOCKED)).thenReturn(2L);
+        when(horseRepository.countByCurrentStatusAndTrainingDecision(HorseStatus.ELIGIBLE, TrainingDecision.BLOCKED)).thenReturn(2L);
         when(horseRepository.countByCurrentStatus(HorseStatus.INACTIVE)).thenReturn(3L);
 
         // 3. Admission Pipeline
         when(admissionApplicationRepository.countByStatus(AdmissionStatus.MANAGER_REVIEW)).thenReturn(1L);
         when(admissionApplicationRepository.countByStatus(AdmissionStatus.WAITING_FOR_ARRIVAL)).thenReturn(2L);
+        when(admissionApplicationRepository.countByStatus(AdmissionStatus.WAITING_FOR_STALL)).thenReturn(0L);
         when(admissionApplicationRepository.countByStatus(AdmissionStatus.GROOM_REVIEW)).thenReturn(3L);
         when(admissionApplicationRepository.countByStatus(AdmissionStatus.VET_REVIEW)).thenReturn(1L);
         when(admissionApplicationRepository.countByStatus(AdmissionStatus.TRAINER_REVIEW)).thenReturn(1L);
@@ -207,7 +207,7 @@ class ManagerDashboardServiceTest {
         assertEquals("REGULAR", response.barnOccupancies().get(1).areaType());
 
         // Fleet Summary
-        assertEquals(20L, response.fleetSummary().totalHorses());
+        assertEquals(15L, response.fleetSummary().totalHorses());
         assertEquals(15L, response.fleetSummary().activeEligible());
         assertEquals(12L, response.fleetSummary().inTraining());
         assertEquals(2L, response.fleetSummary().medicalBlocked());

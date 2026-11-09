@@ -7,6 +7,7 @@ import com.rtms.backend.identity.repository.*;
 import com.rtms.backend.stable.dto.*;
 import com.rtms.backend.stable.entity.*;
 import com.rtms.backend.stable.enums.AreaType;
+import com.rtms.backend.stable.enums.StallStatus;
 import com.rtms.backend.stable.repository.*;
 import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.*;
@@ -149,6 +150,12 @@ class StableAssignmentServiceTest {
     @Test void occupiedBlockCannotBeCleared() {
         owner(1, 1, 200L);
         when(horses.findByCurrentStallIdIn(anyList())).thenReturn(List.of(occupied(102, 50)));
+        status(HttpStatus.CONFLICT, () -> apply(groom(1, 1, null)));
+        verifyNoInteractions(workouts);
+    }
+    @Test void reservedBlockCannotBeCleared() {
+        owner(1, 1, 200L);
+        block(1, 1).get(0).setStatus(StallStatus.RESERVED);
         status(HttpStatus.CONFLICT, () -> apply(groom(1, 1, null)));
         verifyNoInteractions(workouts);
     }

@@ -9,7 +9,6 @@ public class AccountSummaryResponse extends StaffSummaryResponse {
     private String assignedAreaType;
     private List<String> assignedStallCodes;
     private String trainerName;
-    private List<String> managedAreaCodes;
 
     public Long getOwnedHorsesCount() {
         return ownedHorsesCount;
@@ -57,14 +56,6 @@ public class AccountSummaryResponse extends StaffSummaryResponse {
 
     public void setTrainerName(String trainerName) {
         this.trainerName = trainerName;
-    }
-
-    public List<String> getManagedAreaCodes() {
-        return managedAreaCodes;
-    }
-
-    public void setManagedAreaCodes(List<String> managedAreaCodes) {
-        this.managedAreaCodes = managedAreaCodes;
     }
 }
 

@@ -32,7 +32,7 @@ import { HorseEdaAnalyticsCard } from '@/features/analytics';
 type HorseFilter = 'ALL' | 'ACTIVE' | 'ALERT';
 
 /** The horse added to the club last comes first. */
-function newestHorseFirst(left: DashboardHorse, right: DashboardHorse): number {
+export function newestHorseFirst(left: DashboardHorse, right: DashboardHorse): number {
   return right.horseId - left.horseId;
 }
 
@@ -40,7 +40,7 @@ function newestHorseFirst(left: DashboardHorse, right: DashboardHorse): number {
  * The third line of the course cell: the bar and how many of the course run's sessions this horse ran, out of every session the
  * course run was created with. Cancelled sessions are named in the tooltip to keep the row short.
  */
-function CourseProgress({ horse }: { horse: DashboardHorse }) {
+export function CourseProgress({ horse }: { horse: DashboardHorse }) {
   const progress = courseRunProgress(horse.completedSessions, horse.totalSessions, horse.cancelledSessions);
   if (progress.allCancelled) {
     return <p className="text-xs text-[var(--color-text-muted)]">All {progress.cancelled} sessions cancelled</p>;
@@ -62,7 +62,7 @@ function CourseProgress({ horse }: { horse: DashboardHorse }) {
   );
 }
 
-function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
+export function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
   return [
   {
     id: 'horse',
@@ -81,6 +81,13 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
             horseBasePath.startsWith('/trainer') ? (
               <Link
                 href={`/trainer/stable?stall=${encodeURIComponent(horse.stallCode)}`}
+                className="hover:text-[var(--color-primary)] hover:underline"
+              >
+                Stall {horse.stallCode}
+              </Link>
+            ) : horseBasePath.startsWith('/manager') ? (
+              <Link
+                href={`/manager/stable?stall=${encodeURIComponent(horse.stallCode)}`}
                 className="hover:text-[var(--color-primary)] hover:underline"
               >
                 Stall {horse.stallCode}
@@ -117,6 +124,13 @@ function columnsFor(horseBasePath: string): DataTableColumn<DashboardHorse>[] {
             {horseBasePath.startsWith('/trainer') && horse.courseRunId ? (
               <Link
                 href={`/trainer/course-runs/${horse.courseRunId}`}
+                className="hover:text-[var(--color-primary)] hover:underline"
+              >
+                {horse.courseName}
+              </Link>
+            ) : horseBasePath.startsWith('/manager') && horse.courseRunId ? (
+              <Link
+                href={`/manager/horses/${horse.horseId}`}
                 className="hover:text-[var(--color-primary)] hover:underline"
               >
                 {horse.courseName}
