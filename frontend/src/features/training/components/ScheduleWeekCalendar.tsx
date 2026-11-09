@@ -21,7 +21,7 @@ import { mondayOf } from '../lib/groupSchedule';
 import { scheduleDates, SCHEDULE_DAYS } from '../lib/horseSchedule';
 import { SESSION_STATUS, WORKOUT_STATUS, type StatusStyle } from '../lib/status';
 import { trainingService } from '../services/trainingService';
-import type { HorseScheduleItem, ScheduleSession, TrainingGroup } from '../types';
+import type { HorseScheduleItem, SessionSummary, TrainingGroup } from '../types';
 import { StatusPill } from './StatusPill';
 
 interface CommonCalendarItem {
@@ -49,7 +49,7 @@ export interface ScheduleWeekCalendarProps {
   groupId?: number | '';
   groups?: TrainingGroup[];
   // If pre-loaded sessions are passed from page:
-  sessions?: ScheduleSession[];
+  sessions?: SessionSummary[];
   loading?: boolean;
   onOpenSession?: (sessionId: number) => void;
   hideHeader?: boolean;
@@ -96,7 +96,7 @@ export function ScheduleWeekCalendar({
 
   // Self-fetching for horse mode or when sessions not passed
   const [horseItems, setHorseItems] = useState<HorseScheduleItem[]>([]);
-  const [groupSessions, setGroupSessions] = useState<ScheduleSession[]>([]);
+  const [groupSessions, setGroupSessions] = useState<SessionSummary[]>([]);
   const [internalLoading, setInternalLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 

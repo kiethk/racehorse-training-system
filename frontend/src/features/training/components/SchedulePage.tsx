@@ -20,7 +20,7 @@ import { useTrainingRules } from '../hooks/useTrainingRules';
 import { shiftIsoDate, toIsoDate } from '../lib/dateRange';
 import { groupByDate, mondayOf, totalNeedingResult } from '../lib/groupSchedule';
 import { trainingService } from '../services/trainingService';
-import type { ScheduleSession, TrainingGroup } from '../types';
+import type { SessionSummary, TrainingGroup } from '../types';
 import { ScheduleWeekCalendar } from './ScheduleWeekCalendar';
 import { SessionCard } from './SessionCard';
 import { SessionDialog, SessionDetailContent } from './SessionDialog';
@@ -49,7 +49,7 @@ export function SchedulePage({ canManage }: { canManage: boolean }) {
   const [groupId, setGroupId] = useState<number | ''>('');
   const [missingCount, setMissingCount] = useState<number | null>(null);
   const [groups, setGroups] = useState<TrainingGroup[]>([]);
-  const [sessions, setSessions] = useState<ScheduleSession[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
@@ -140,7 +140,7 @@ export function SchedulePage({ canManage }: { canManage: boolean }) {
     load();
   }, [load]);
 
-  async function moveSession(session: ScheduleSession, newStart: string) {
+  async function moveSession(session: SessionSummary, newStart: string) {
     try {
       await trainingService.rescheduleSession(session.id, `${newStart}:00`);
       toast.success(`${session.groupName} moved to ${newStart}.`);
@@ -354,7 +354,7 @@ function DayList({
   onOpen,
   emptyTitle,
 }: {
-  byDate: Record<string, ScheduleSession[]>;
+  byDate: Record<string, SessionSummary[]>;
   onOpen: (id: number) => void;
   emptyTitle: string;
 }) {

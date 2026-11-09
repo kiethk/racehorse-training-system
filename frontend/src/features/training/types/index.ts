@@ -244,16 +244,6 @@ export interface CourseRunSummary {
   sessionsTotal: number;
 }
 
-export interface CourseRunSessionItem {
-  id: number;
-  date: string;
-  startTime: string;
-  endTime: string;
-  exerciseName: string;
-  status: SessionStatus;
-  horseCount: number;
-}
-
 export type SessionHorseOutcome = 'TO_RUN' | 'NEEDS_RESULT' | 'RAN' | 'CANCELLED' | 'DID_NOT_RUN';
 
 /** A horse of a course run with its Attendance (attended of total Sessions). */
@@ -265,24 +255,17 @@ export interface CourseRunHorse {
 }
 
 /** A horse in one Session of a course run with what became of it. */
-export interface SessionHorseOutcomeItem {
-  workoutId: number;
-  horseId: number;
-  horseName: string;
-  outcome: SessionHorseOutcome;
-}
-
 export interface CourseRunDetail {
   courseRun: CourseRunSummary;
   trainingDays: TrainingDay[];
-  sessions: CourseRunSessionItem[];
+  sessions: SessionSummary[];
 }
 
 // ---------------------------------------------------------------------------
 // Group sessions (schedule, results, attendance)
 // ---------------------------------------------------------------------------
 
-export interface ScheduleSession {
+export interface SessionSummary {
   id: number;
   courseRunId: number;
   groupId: number | null;
@@ -311,7 +294,7 @@ export interface SessionHorse {
 }
 
 export interface SessionDetail {
-  session: ScheduleSession;
+  session: SessionSummary;
   horses: SessionHorse[];
 }
 

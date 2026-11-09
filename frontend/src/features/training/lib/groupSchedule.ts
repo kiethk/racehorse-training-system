@@ -1,4 +1,4 @@
-import type { ScheduleSession } from '../types';
+import type { SessionSummary } from '../types';
 import { shiftIsoDate, toIsoDate } from './dateRange.ts';
 
 export const WEEK_DAYS = 7;
@@ -16,8 +16,8 @@ export function weekDates(start: string): string[] {
 }
 
 /** Sessions grouped by their date, each day ordered by start time. */
-export function groupByDate(sessions: ScheduleSession[]): Record<string, ScheduleSession[]> {
-  const days: Record<string, ScheduleSession[]> = {};
+export function groupByDate(sessions: SessionSummary[]): Record<string, SessionSummary[]> {
+  const days: Record<string, SessionSummary[]> = {};
   for (const session of sessions) {
     (days[session.date] ??= []).push(session);
   }
@@ -28,7 +28,7 @@ export function groupByDate(sessions: ScheduleSession[]): Record<string, Schedul
 }
 
 /** A Session has started once its start time has passed; from then on it can no longer be moved or cancelled. */
-export function sessionHasStarted(session: Pick<ScheduleSession, 'date' | 'startTime'>, now: Date = new Date()): boolean {
+export function sessionHasStarted(session: Pick<SessionSummary, 'date' | 'startTime'>, now: Date = new Date()): boolean {
   const today = toIsoDate(now);
   if (session.date !== today) return session.date < today;
   const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
@@ -36,7 +36,7 @@ export function sessionHasStarted(session: Pick<ScheduleSession, 'date' | 'start
 }
 
 /** How many Held Workouts across the Sessions still wait for a result. */
-export function totalNeedingResult(sessions: ScheduleSession[]): number {
+export function totalNeedingResult(sessions: SessionSummary[]): number {
   return sessions.reduce((sum, session) => sum + session.needsResultCount, 0);
 }
 

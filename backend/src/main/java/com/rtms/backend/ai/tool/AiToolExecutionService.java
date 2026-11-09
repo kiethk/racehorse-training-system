@@ -60,9 +60,9 @@ import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import com.rtms.backend.training.service.HorsePerformanceService;
 import com.rtms.backend.training.service.HorseSpecialtyService;
 import com.rtms.backend.training.service.HorseAttendanceService;
-import com.rtms.backend.training.service.SessionScheduleService;
+import com.rtms.backend.training.service.TrainingSessionService;
 import com.rtms.backend.training.service.TrainingGroupService;
-import com.rtms.backend.training.dto.ScheduleSessionResponse;
+import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.training.dto.SessionHorseResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.dto.GroupMemberResponse;
@@ -155,7 +155,7 @@ public class AiToolExecutionService {
     private final GroomTaskCompletionRepository groomTaskCompletionRepository;
     private final HorseAttendanceService horseAttendanceService;
     private final TrainingGroupService trainingGroupService;
-    private final SessionScheduleService sessionScheduleService;
+    private final TrainingSessionService trainingSessionService;
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final InjuryRecordRepository injuryRecordRepository;
     private final VeterinarianProfileRepository veterinarianProfileRepository;
@@ -190,7 +190,7 @@ public class AiToolExecutionService {
                                   @Autowired(required = false) GroomTaskCompletionRepository groomTaskCompletionRepository,
                                   HorseAttendanceService horseAttendanceService,
                                   TrainingGroupService trainingGroupService,
-                                  SessionScheduleService sessionScheduleService,
+                                  TrainingSessionService trainingSessionService,
                                    @Autowired(required = false) TreatmentPlanRepository treatmentPlanRepository,
                                    @Autowired(required = false) InjuryRecordRepository injuryRecordRepository,
                                    @Autowired(required = false) VeterinarianProfileRepository veterinarianProfileRepository,
@@ -223,7 +223,7 @@ public class AiToolExecutionService {
         this.groomTaskCompletionRepository = groomTaskCompletionRepository;
         this.horseAttendanceService = horseAttendanceService;
         this.trainingGroupService = trainingGroupService;
-        this.sessionScheduleService = sessionScheduleService;
+        this.trainingSessionService = trainingSessionService;
         this.treatmentPlanRepository = treatmentPlanRepository;
         this.injuryRecordRepository = injuryRecordRepository;
         this.veterinarianProfileRepository = veterinarianProfileRepository;
@@ -873,12 +873,12 @@ public class AiToolExecutionService {
      */
     private Object sessionsNeedingResult(AuthenticatedUser currentUser) {
         LocalDate today = LocalDate.now();
-        List<ScheduleSessionResponse> sessions = sessionScheduleService.getSessions(
+        List<SessionSummaryResponse> sessions = trainingSessionService.getSessions(
                 today.minusDays(NEEDS_RESULT_LOOKBACK_DAYS), today, null, true, currentUser);
         List<Map<String, Object>> list = new ArrayList<>();
         int waiting = 0;
-        for (ScheduleSessionResponse session : sessions) {
-            List<String> horses = sessionScheduleService.getSession(session.id(), currentUser).horses().stream()
+        for (SessionSummaryResponse session : sessions) {
+            List<String> horses = trainingSessionService.getSession(session.id(), currentUser).horses().stream()
                     .filter(horse -> "HELD".equals(horse.status()))
                     .map(SessionHorseResponse::horseName)
                     .toList();

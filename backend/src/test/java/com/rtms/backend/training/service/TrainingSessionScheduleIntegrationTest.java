@@ -10,7 +10,7 @@ import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.CourseRunDetailResponse;
 import com.rtms.backend.training.dto.CourseRunRequest;
-import com.rtms.backend.training.dto.ScheduleSessionResponse;
+import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.training.dto.SessionDetailResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
@@ -48,13 +48,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 @Import({TestClockConfig.class, TrainingFixtures.class})
 @Transactional
-class SessionScheduleServiceIntegrationTest {
+class TrainingSessionScheduleIntegrationTest {
 
     private static final List<TrainingDay> MON_WED_FRI =
             List.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY, TrainingDay.FRIDAY);
 
-    @Autowired private SessionScheduleService schedule;
-    @Autowired private SessionWorkoutService workoutService;
+    @Autowired private TrainingSessionService schedule;
+    @Autowired private TrainingWorkoutService workoutService;
     @Autowired private CourseRunService courseRunService;
     @Autowired private TrainingGroupService groupService;
     @Autowired private TrainingFixtures fixtures;
@@ -97,7 +97,7 @@ class SessionScheduleServiceIntegrationTest {
 
     @Test
     void aTrainerSeesTheirOwnSessionsOverARange() {
-        List<ScheduleSessionResponse> week = schedule.getSessions(monday, monday.plusDays(6), null, false, trainer);
+        List<SessionSummaryResponse> week = schedule.getSessions(monday, monday.plusDays(6), null, false, trainer);
 
         assertEquals(3, week.size());
         assertEquals("Nhom 1", week.get(0).groupName());
@@ -109,7 +109,7 @@ class SessionScheduleServiceIntegrationTest {
 
     @Test
     void todayIsTheSameQueryOverOneDay() {
-        List<ScheduleSessionResponse> today = schedule.getSessions(monday, monday, null, false, trainer);
+        List<SessionSummaryResponse> today = schedule.getSessions(monday, monday, null, false, trainer);
 
         assertEquals(1, today.size());
         assertEquals(monday, today.get(0).date());
@@ -133,7 +133,7 @@ class SessionScheduleServiceIntegrationTest {
         courseRunService.createCourseRun(new CourseRunRequest(other.id(), second.getId(), monday, MON_WED_FRI), trainer);
 
         assertEquals(6, schedule.getSessions(monday, monday.plusDays(6), null, false, trainer).size());
-        List<ScheduleSessionResponse> onlySecond = schedule.getSessions(monday, monday.plusDays(6), other.id(), false, trainer);
+        List<SessionSummaryResponse> onlySecond = schedule.getSessions(monday, monday.plusDays(6), other.id(), false, trainer);
         assertEquals(3, onlySecond.size());
         assertTrue(onlySecond.stream().allMatch(session -> session.groupName().equals("Nhom 2")));
     }
@@ -142,7 +142,7 @@ class SessionScheduleServiceIntegrationTest {
     void aHeldSessionShowsHowManyHorsesStillNeedAResult() {
         clock.set(monday.atTime(12, 0));
 
-        ScheduleSessionResponse first = schedule.getSessions(monday, monday, null, false, trainer).get(0);
+        SessionSummaryResponse first = schedule.getSessions(monday, monday, null, false, trainer).get(0);
 
         assertEquals("HELD", first.status());
         assertEquals(2, first.needsResultCount());
@@ -158,7 +158,7 @@ class SessionScheduleServiceIntegrationTest {
         workoutService.recordResult(workoutOf(thunder, 0).getId(), validResult(), trainer);
         workoutService.recordResult(workoutOf(blaze, 0).getId(), validResult(), trainer);
 
-        List<ScheduleSessionResponse> missing = schedule.getSessions(monday, monday.plusDays(6), null, true, trainer);
+        List<SessionSummaryResponse> missing = schedule.getSessions(monday, monday.plusDays(6), null, true, trainer);
 
         assertEquals(1, missing.size());
         assertEquals(monday.plusDays(2), missing.get(0).date());
@@ -169,7 +169,7 @@ class SessionScheduleServiceIntegrationTest {
         Long thunderGroomId = stalls.findById(thunder.getCurrentStallId()).orElseThrow().getGroomId();
         AuthenticatedUser groom = new AuthenticatedUser(thunderGroomId, "g@test.invalid", Roles.GROOM);
 
-        List<ScheduleSessionResponse> mine = schedule.getSessions(monday, monday.plusDays(6), null, false, groom);
+        List<SessionSummaryResponse> mine = schedule.getSessions(monday, monday.plusDays(6), null, false, groom);
         SessionDetailResponse detail = schedule.getSession(mine.get(0).id(), groom);
 
         assertEquals(3, mine.size());

@@ -6,7 +6,6 @@ import com.rtms.backend.training.dto.CourseRunPreviewResponse;
 import com.rtms.backend.training.dto.CourseRunRequest;
 import com.rtms.backend.training.dto.CourseRunSummaryResponse;
 import com.rtms.backend.training.dto.CourseRunHorseResponse;
-import com.rtms.backend.training.dto.SessionHorseOutcomeResponse;
 
 import java.util.List;
 
@@ -34,12 +33,6 @@ public interface CourseRunService {
      * (Every horse that ever had a Workout in the course run, with Attendance; independent of the group's current members.)
      */
     List<CourseRunHorseResponse> getCourseRunHorses(Long courseRunId, AuthenticatedUser currentUser);
-
-    /**
-     * Các chiến mã của một buổi và kết cục của từng con, suy từ Workout của buổi đó.
-     * (The horses of one Session and each one's outcome, derived from that Session's Workouts.)
-     */
-    List<SessionHorseOutcomeResponse> getSessionHorses(Long courseRunId, Long sessionId, AuthenticatedUser currentUser);
 
     /**
      * Bỏ khóa: mọi buổi CHƯA bắt đầu bị hủy và kế hoạch thành CANCELLED ngay, kể cả khi một buổi đang chạy. Buổi đang chạy vẫn chạy

@@ -7,7 +7,7 @@ import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.CourseRunDetailResponse;
 import com.rtms.backend.training.dto.CourseRunRequest;
-import com.rtms.backend.training.dto.CourseRunSessionResponse;
+import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.CourseRun;
@@ -56,6 +56,7 @@ class TrainingSessionServiceIntegrationTest {
             List.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY, TrainingDay.FRIDAY);
 
     @Autowired private TrainingSessionService service;
+    @Autowired private TrainingWorkoutService workoutService;
     @Autowired private CourseRunService courseRunService;
     @Autowired private TrainingGroupService groupService;
     @Autowired private SessionSettlementService settlement;
@@ -100,7 +101,7 @@ class TrainingSessionServiceIntegrationTest {
 
     @Test
     void aSessionIsMovedToAnotherQuarterHourKeepingItsLength() {
-        CourseRunSessionResponse moved = service.reschedule(sessionId(0), LocalTime.of(7, 15), trainer);
+        SessionSummaryResponse moved = service.reschedule(sessionId(0), LocalTime.of(7, 15), trainer);
 
         assertEquals(LocalTime.of(7, 15), moved.startTime());
         assertEquals(LocalTime.of(7, 45), moved.endTime());
@@ -143,7 +144,7 @@ class TrainingSessionServiceIntegrationTest {
 
     @Test
     void cancellingASessionCancelsItsWorkoutsAndKeepsTheCourseRunOpen() {
-        CourseRunSessionResponse cancelled = service.cancel(sessionId(1), trainer);
+        SessionSummaryResponse cancelled = service.cancel(sessionId(1), trainer);
 
         assertEquals("CANCELLED", cancelled.status());
         assertTrue(workoutsOf(1).stream().allMatch(workout -> workout.getStatus() == WorkoutStatus.CANCELLED));
@@ -195,7 +196,7 @@ class TrainingSessionServiceIntegrationTest {
     void cancellingOneHorsesWorkoutKeepsTheRestOfTheSessionAndTheHorseInTheGroup() {
         TrainingWorkout thunder = workoutsOf(1).get(0);
 
-        service.cancelWorkout(thunder.getId(), trainer);
+        workoutService.cancel(thunder.getId(), trainer);
 
         assertEquals(WorkoutStatus.CANCELLED, workouts.findById(thunder.getId()).orElseThrow().getStatus());
         assertEquals(WorkoutStatus.SCHEDULED, workoutsOf(1).get(1).getStatus());
@@ -208,8 +209,8 @@ class TrainingSessionServiceIntegrationTest {
 
     @Test
     void cancellingTheLastWorkoutOfASessionCancelsTheSession() {
-        service.cancelWorkout(workoutsOf(1).get(0).getId(), trainer);
-        service.cancelWorkout(workoutsOf(1).get(1).getId(), trainer);
+        workoutService.cancel(workoutsOf(1).get(0).getId(), trainer);
+        workoutService.cancel(workoutsOf(1).get(1).getId(), trainer);
 
         assertEquals(SessionStatus.CANCELLED, sessions.findById(sessionId(1)).orElseThrow().getStatus());
     }
@@ -219,7 +220,7 @@ class TrainingSessionServiceIntegrationTest {
         clock.set(monday.atTime(6, 10));
         Long workoutId = workoutsOf(0).get(0).getId();
 
-        ApiException error = assertThrows(ApiException.class, () -> service.cancelWorkout(workoutId, trainer));
+        ApiException error = assertThrows(ApiException.class, () -> workoutService.cancel(workoutId, trainer));
         assertEquals("SESSION_ALREADY_STARTED", error.getErrorCode());
     }
 

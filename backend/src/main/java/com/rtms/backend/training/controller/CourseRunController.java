@@ -7,7 +7,6 @@ import com.rtms.backend.training.dto.CourseRunPreviewResponse;
 import com.rtms.backend.training.dto.CourseRunRequest;
 import com.rtms.backend.training.dto.CourseRunSummaryResponse;
 import com.rtms.backend.training.dto.CourseRunHorseResponse;
-import com.rtms.backend.training.dto.SessionHorseOutcomeResponse;
 import com.rtms.backend.training.service.CourseRunService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -58,13 +57,6 @@ public class CourseRunController {
     public ApiResponse<List<CourseRunHorseResponse>> getCourseRunHorses(
             @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(courseRunService.getCourseRunHorses(id, currentUser));
-    }
-
-    @GetMapping("/{id}/sessions/{sessionId}/horses")
-    @PreAuthorize("hasAuthority('COURSE_RUN_VIEW')")
-    public ApiResponse<List<SessionHorseOutcomeResponse>> getSessionHorses(
-            @PathVariable Long id, @PathVariable Long sessionId, @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(courseRunService.getSessionHorses(id, sessionId, currentUser));
     }
 
     @PostMapping("/preview")

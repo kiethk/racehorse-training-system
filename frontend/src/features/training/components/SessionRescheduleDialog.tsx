@@ -7,7 +7,7 @@ import { toast } from '@/lib/toast';
 import { useTrainingRules } from '../hooks/useTrainingRules';
 import { minutesOf, sessionStartOptions } from '../lib/timeline';
 import { trainingService } from '../services/trainingService';
-import type { ScheduleSession } from '../types';
+import type { SessionSummary } from '../types';
 
 /**
  * Moves a Session to another start, picked from the quarter-hour starts that keep it inside the Golden Window. The backend still
@@ -18,7 +18,7 @@ export function SessionRescheduleDialog({
   onClose,
   onMoved,
 }: {
-  session: ScheduleSession | null;
+  session: SessionSummary | null;
   onClose: () => void;
   onMoved: () => Promise<void> | void;
 }) {
@@ -34,7 +34,7 @@ function MoveForm({
   onClose,
   onMoved,
 }: {
-  session: ScheduleSession;
+  session: SessionSummary;
   onClose: () => void;
   onMoved: () => Promise<void> | void;
 }) {

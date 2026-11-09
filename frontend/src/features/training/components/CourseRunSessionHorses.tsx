@@ -5,26 +5,44 @@ import { useEffect, useMemo, useState } from 'react';
 import { HorseAvatar, Spinner } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { displayError } from '@/lib/display';
-import { SESSION_HORSE_OUTCOME } from '../lib/status';
+import { SESSION_HORSE_OUTCOME, sessionHorseOutcome } from '../lib/status';
 import { trainingService } from '../services/trainingService';
-import type { SessionHorseOutcomeItem } from '../types';
+import type { SessionHorseOutcome } from '../types';
 import { StatusPill } from './StatusPill';
 
+/** A horse of one Session with what became of it. */
+interface HorseOutcome {
+  workoutId: number;
+  horseId: number;
+  horseName: string;
+  outcome: SessionHorseOutcome;
+}
+
 /** The horses that were in one Session of a course run, each with its outcome. Loaded when the row is opened. */
-export function CourseRunSessionHorses({ courseRunId, sessionId }: { courseRunId: number; sessionId: number }) {
-  const [horses, setHorses] = useState<SessionHorseOutcomeItem[] | null>(null);
+export function CourseRunSessionHorses({ sessionId }: { sessionId: number }) {
+  const [horses, setHorses] = useState<HorseOutcome[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     trainingService
-      .getCourseRunSessionHorses(courseRunId, sessionId)
-      .then((result) => active && setHorses(result))
+      .getSession(sessionId)
+      .then(({ session, horses: found }) =>
+        active &&
+        setHorses(
+          found.map((horse) => ({
+            workoutId: horse.workoutId,
+            horseId: horse.horseId,
+            horseName: horse.horseName,
+            outcome: sessionHorseOutcome(horse.status, session.status),
+          })),
+        ),
+      )
       .catch((cause) => active && setError(displayError(cause, 'Unable to load the horses.')));
     return () => {
       active = false;
     };
-  }, [courseRunId, sessionId]);
+  }, [sessionId]);
 
   const sortedHorses = useMemo(() => {
     if (!horses) return [];

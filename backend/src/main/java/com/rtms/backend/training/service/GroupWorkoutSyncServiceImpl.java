@@ -36,6 +36,7 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
     private final TrainingWorkoutRepository workoutRepository;
     private final TrainingGroupMemberRepository memberRepository;
     private final SessionSettlementService settlement;
+    private final SessionRules rules;
     private final Clock clock;
 
     public GroupWorkoutSyncServiceImpl(CourseRunRepository courseRunRepository,
@@ -43,12 +44,14 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
                                        TrainingWorkoutRepository workoutRepository,
                                        TrainingGroupMemberRepository memberRepository,
                                        SessionSettlementService settlement,
+                                       SessionRules rules,
                                        Clock clock) {
         this.courseRunRepository = courseRunRepository;
         this.sessionRepository = sessionRepository;
         this.workoutRepository = workoutRepository;
         this.memberRepository = memberRepository;
         this.settlement = settlement;
+        this.rules = rules;
         this.clock = clock;
     }
 
@@ -99,10 +102,7 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
 
             // Buổi không còn Workout nào hiệu lực thì tự hủy. (A Session with no effective Workout left cancels itself.)
             for (TrainingSession session : future) {
-                if (workoutRepository.countBySessionIdAndStatusNot(session.getId(), WorkoutStatus.CANCELLED) == 0) {
-                    session.setStatus(SessionStatus.CANCELLED);
-                    sessionRepository.saveAndFlush(session);
-                }
+                rules.cancelIfEmpty(session);
             }
         }
         member.setLeftAt(LocalDateTime.now(clock));

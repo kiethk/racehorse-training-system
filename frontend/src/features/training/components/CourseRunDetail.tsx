@@ -174,7 +174,7 @@ export function CourseRunDetail({ courseRunId }: { courseRunId: number }) {
                   {open && (
                     <Tr>
                       <Td colSpan={7} className="bg-[var(--color-surface-subtle)] p-4 border-t border-[var(--color-border)]">
-                        <CourseRunSessionHorses courseRunId={courseRunId} sessionId={session.id} />
+                        <CourseRunSessionHorses sessionId={session.id} />
                       </Td>
                     </Tr>
                   )}

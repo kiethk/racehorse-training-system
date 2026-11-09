@@ -48,3 +48,20 @@ export const SESSION_HORSE_OUTCOME: Record<SessionHorseOutcome, StatusStyle> = {
   CANCELLED: { label: 'Cancelled', tone: 'danger' },
   DID_NOT_RUN: { label: 'Did not run', tone: 'warning' },
 };
+
+/**
+ * What became of one horse in one Session, derived from its Workout status and its Session status: a cancelled Workout in a Session
+ * that took place is "Did not run"; a cancelled one before that is "Cancelled".
+ */
+export function sessionHorseOutcome(workoutStatus: WorkoutStatus, sessionStatus: SessionStatus): SessionHorseOutcome {
+  switch (workoutStatus) {
+    case 'SCHEDULED':
+      return 'TO_RUN';
+    case 'HELD':
+      return 'NEEDS_RESULT';
+    case 'RAN':
+      return 'RAN';
+    case 'CANCELLED':
+      return sessionStatus === 'HELD' ? 'DID_NOT_RUN' : 'CANCELLED';
+  }
+}

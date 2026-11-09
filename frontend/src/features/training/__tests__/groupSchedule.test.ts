@@ -1,9 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { attendanceLabel, groupByDate, mondayOf, sessionHasStarted, totalNeedingResult, weekDates } from '../lib/groupSchedule.ts';
-import type { ScheduleSession } from '../types';
+import type { SessionSummary } from '../types';
 
-function session(overrides: Partial<ScheduleSession>): ScheduleSession {
+function session(overrides: Partial<SessionSummary>): SessionSummary {
   return {
     id: 1, courseRunId: 1, groupId: 1, groupName: 'Nhom 1', groupDisbanded: false, courseName: 'Sprint', exerciseName: 'S1',
     date: '2026-11-04', startTime: '06:00:00', endTime: '06:30:00', status: 'SCHEDULED',

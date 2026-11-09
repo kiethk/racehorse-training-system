@@ -17,7 +17,7 @@ import com.rtms.backend.training.dto.CourseRunDetailResponse;
 import com.rtms.backend.training.dto.CourseRunPreviewResponse;
 import com.rtms.backend.training.dto.CourseRunRequest;
 import com.rtms.backend.training.dto.CourseRunSummaryResponse;
-import com.rtms.backend.training.dto.CourseRunSessionResponse;
+import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.CourseExercise;
@@ -116,7 +116,7 @@ class CourseRunServiceIntegrationTest {
         assertEquals(monday.plusDays(2).plusDays(12), courseRun.courseRun().endDate());
         assertEquals("UPCOMING", courseRun.courseRun().status());
         assertEquals(List.of("S1", "S2", "S3", "S1", "S2", "S3"),
-                courseRun.sessions().stream().map(CourseRunSessionResponse::exerciseName).toList());
+                courseRun.sessions().stream().map(SessionSummaryResponse::exerciseName).toList());
         assertTrue(courseRun.sessions().stream().allMatch(session -> session.startTime().equals(LocalTime.of(6, 0))));
         assertTrue(courseRun.sessions().stream().allMatch(session -> session.horseCount() == 3));
         assertEquals(6, courseRun.courseRun().sessionsTotal());
@@ -140,7 +140,7 @@ class CourseRunServiceIntegrationTest {
 
         CourseRunDetailResponse created = service.createCourseRun(request, trainerPrincipal);
         assertEquals(preview.sessions().stream().map(session -> session.startTime()).toList(),
-                created.sessions().stream().map(CourseRunSessionResponse::startTime).toList());
+                created.sessions().stream().map(SessionSummaryResponse::startTime).toList());
     }
 
     @Test

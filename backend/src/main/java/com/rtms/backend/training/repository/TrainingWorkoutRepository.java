@@ -6,7 +6,6 @@ import com.rtms.backend.training.dto.HorseScheduleItemResponse;
 import com.rtms.backend.training.dto.PastWorkoutRow;
 import com.rtms.backend.training.dto.PerformanceSessionRow;
 import com.rtms.backend.training.dto.RecentWorkoutRow;
-import com.rtms.backend.training.dto.SessionCountRow;
 import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
@@ -209,15 +208,6 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
            WHERE w.id = :workoutId AND s.trainerId = :trainerId
            """)
     Optional<TrainingWorkout> findByIdAndTrainerId(@Param("workoutId") Long workoutId, @Param("trainerId") Long trainerId);
-
-    /** Số Workout còn hiệu lực của nhiều buổi bằng MỘT truy vấn. (Non-cancelled Workout counts of many Sessions in ONE query.) */
-    @Query("""
-           SELECT new com.rtms.backend.training.dto.SessionCountRow(w.sessionId, COUNT(w))
-           FROM TrainingWorkout w
-           WHERE w.sessionId IN :sessionIds AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
-           GROUP BY w.sessionId
-           """)
-    List<SessionCountRow> countActiveBySession(@Param("sessionIds") Collection<Long> sessionIds);
 
     /** Workout còn SCHEDULED của các buổi đã HELD thành HELD. (SCHEDULED Workouts of HELD Sessions become HELD.) */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

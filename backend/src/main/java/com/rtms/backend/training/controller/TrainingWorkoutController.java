@@ -5,8 +5,7 @@ import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.CompleteWorkoutRequest;
 import com.rtms.backend.training.dto.SessionWorkoutResponse;
 import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
-import com.rtms.backend.training.service.SessionWorkoutService;
-import com.rtms.backend.training.service.TrainingSessionService;
+import com.rtms.backend.training.service.TrainingWorkoutService;
 import jakarta.validation.Valid;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -22,19 +21,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Controller chỉ nhận request và gọi service; luật ghi kết quả nằm ở SessionWorkoutService.
- * (The controller only receives requests and calls the service; the recording rules live in SessionWorkoutService.)
+ * Controller chỉ nhận request và gọi service; luật ghi kết quả nằm ở TrainingWorkoutService.
+ * (The controller only receives requests and calls the service; the recording rules live in TrainingWorkoutService.)
  */
 @RestController
 @RequestMapping("/api/session-workouts")
-public class SessionWorkoutController {
+public class TrainingWorkoutController {
 
-    private final SessionWorkoutService workoutService;
-    private final TrainingSessionService sessionService;
+    private final TrainingWorkoutService workoutService;
 
-    public SessionWorkoutController(SessionWorkoutService workoutService, TrainingSessionService sessionService) {
+    public TrainingWorkoutController(TrainingWorkoutService workoutService) {
         this.workoutService = workoutService;
-        this.sessionService = sessionService;
     }
 
     /** Số đo mô phỏng mới sau khi buổi đã hết giờ; không lưu. (A fresh simulated measurement after the Session ended; not saved.) */
@@ -77,6 +74,6 @@ public class SessionWorkoutController {
     @PreAuthorize("hasAuthority('SESSION_UPDATE')")
     public ApiResponse<SessionWorkoutResponse> cancelWorkout(
             @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(sessionService.cancelWorkout(id, currentUser));
+        return ApiResponse.success(workoutService.cancel(id, currentUser));
     }
 }

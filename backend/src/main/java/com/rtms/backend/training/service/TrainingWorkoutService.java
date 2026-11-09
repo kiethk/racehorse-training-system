@@ -11,7 +11,7 @@ import com.rtms.backend.training.dto.WorkoutResultPreviewResponse;
  * (Confirming the Workouts of a Session that took place: recording results turns HELD into RAN (the proof the horse took part),
  * "Did not run" turns HELD into CANCELLED. Sessions and course runs still follow the clock.)
  */
-public interface SessionWorkoutService {
+public interface TrainingWorkoutService {
 
     /** Số đo mô phỏng mới, không lưu. Chỉ sau khi buổi đã hết giờ. (A fresh simulated measurement, not saved. Only after the Session ended.) */
     WorkoutResultPreviewResponse previewResult(Long workoutId, AuthenticatedUser currentUser);
@@ -29,4 +29,7 @@ public interface SessionWorkoutService {
      * no longer counts in Attendance. Only while still HELD.)
      */
     SessionWorkoutResponse markDidNotRun(Long workoutId, AuthenticatedUser currentUser);
+
+    /** Hủy Workout của riêng một chiến mã trước khi buổi bắt đầu; con vẫn ở trong nhóm. Buổi không còn Workout nào thì tự hủy. (Cancels one horse's Workout before its Session starts; the horse stays in the group. A Session left with none cancels itself.) */
+    SessionWorkoutResponse cancel(Long workoutId, AuthenticatedUser currentUser);
 }

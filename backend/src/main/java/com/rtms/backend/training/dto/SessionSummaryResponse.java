@@ -9,7 +9,7 @@ import java.time.LocalTime;
  * (A Session on the schedule of a Trainer, Groom or Owner. horseCount and needsResultCount only count the horses the viewer may see;
  * needsResultCount is the number of HELD Workouts that still have no result.)
  */
-public record ScheduleSessionResponse(Long id,
+public record SessionSummaryResponse(Long id,
                                       Long courseRunId,
                                       Long groupId,
                                       String groupName,

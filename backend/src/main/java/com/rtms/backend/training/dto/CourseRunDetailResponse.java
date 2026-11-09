@@ -6,5 +6,5 @@ import java.util.List;
 
 public record CourseRunDetailResponse(CourseRunSummaryResponse courseRun,
                                       List<TrainingDay> trainingDays,
-                                      List<CourseRunSessionResponse> sessions) {
+                                      List<SessionSummaryResponse> sessions) {
 }

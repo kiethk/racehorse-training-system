@@ -10,7 +10,7 @@ import com.rtms.backend.training.dto.CourseRunDetailResponse;
 import com.rtms.backend.training.dto.CourseRunRequest;
 import com.rtms.backend.training.dto.CourseRunSummaryResponse;
 import com.rtms.backend.training.dto.CourseRunHorseResponse;
-import com.rtms.backend.training.dto.SessionHorseOutcomeResponse;
+import com.rtms.backend.training.dto.SessionHorseResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.enums.TrainingDay;
@@ -52,7 +52,8 @@ class CourseRunHorsesIntegrationTest {
 
     @Autowired private TrainingGroupService groupService;
     @Autowired private CourseRunService courseRunService;
-    @Autowired private SessionWorkoutService workoutService;
+    @Autowired private TrainingSessionService sessionService;
+    @Autowired private TrainingWorkoutService workoutService;
     @Autowired private SessionSettlementService settlement;
     @Autowired private TrainingFixtures fixtures;
     @Autowired private MutableClock clock;
@@ -121,7 +122,7 @@ class CourseRunHorsesIntegrationTest {
         settlement.settle();
 
         assertEquals(0, courseRunHorses().get("Thunder").attended());
-        assertEquals("NEEDS_RESULT", sessionHorse(courseRun.sessions().get(0).id(), "Thunder").outcome());
+        assertEquals("HELD", sessionHorse(courseRun.sessions().get(0).id(), "Thunder").status());
     }
 
     @Test
@@ -132,10 +133,10 @@ class CourseRunHorsesIntegrationTest {
         workoutService.markDidNotRun(sessionHorse(courseRun.sessions().get(0).id(), "Thunder").workoutId(), trainer);
         groupService.removeHorse(group.id(), blaze.getId(), trainer);
 
-        assertEquals("DID_NOT_RUN", sessionHorse(courseRun.sessions().get(0).id(), "Thunder").outcome());
-        assertEquals("RAN", sessionHorse(courseRun.sessions().get(0).id(), "Blaze").outcome());
-        assertEquals("TO_RUN", sessionHorse(courseRun.sessions().get(1).id(), "Thunder").outcome());
-        assertEquals("CANCELLED", sessionHorse(courseRun.sessions().get(1).id(), "Blaze").outcome());
+        assertEquals("CANCELLED", sessionHorse(courseRun.sessions().get(0).id(), "Thunder").status());
+        assertEquals("RAN", sessionHorse(courseRun.sessions().get(0).id(), "Blaze").status());
+        assertEquals("SCHEDULED", sessionHorse(courseRun.sessions().get(1).id(), "Thunder").status());
+        assertEquals("CANCELLED", sessionHorse(courseRun.sessions().get(1).id(), "Blaze").status());
     }
 
     @Test
@@ -170,20 +171,8 @@ class CourseRunHorsesIntegrationTest {
 
         assertEquals("COURSE_RUN_NOT_FOUND", assertThrows(ApiException.class,
                 () -> courseRunService.getCourseRunHorses(courseRun.courseRun().id(), other)).getErrorCode());
-        assertEquals("COURSE_RUN_NOT_FOUND", assertThrows(ApiException.class,
-                () -> courseRunService.getSessionHorses(courseRun.courseRun().id(), courseRun.sessions().get(0).id(), other)).getErrorCode());
-    }
-
-    @Test
-    void aSessionOfAnotherCourseRunIsNotFoundThroughThisCourseRun() {
-        Horse echo = fixtures.horse("Echo");
-        TrainingGroupResponse other = groupService.createGroup(new CreateTrainingGroupRequest("Nhom 2", List.of(echo.getId())), trainer);
-        Course course = fixtures.course(trainerUser, "Other", 1, fixtures.exercise(trainerUser, "S2", 30));
-        CourseRunDetailResponse otherCourseRun = courseRunService.createCourseRun(
-                new CourseRunRequest(other.id(), course.getId(), monday.plusDays(28), MON_WED_FRI), trainer);
-
         assertEquals("SESSION_NOT_FOUND", assertThrows(ApiException.class,
-                () -> courseRunService.getSessionHorses(courseRun.courseRun().id(), otherCourseRun.sessions().get(0).id(), trainer)).getErrorCode());
+                () -> sessionService.getSession(courseRun.sessions().get(0).id(), other)).getErrorCode());
     }
 
     @Test
@@ -214,15 +203,15 @@ class CourseRunHorsesIntegrationTest {
                 .collect(Collectors.toMap(CourseRunHorseResponse::horseName, Function.identity()));
     }
 
-    private List<SessionHorseOutcomeResponse> sessionHorses(Long sessionId) {
-        return courseRunService.getSessionHorses(courseRun.courseRun().id(), sessionId, trainer);
+    private List<SessionHorseResponse> sessionHorses(Long sessionId) {
+        return sessionService.getSession(sessionId, trainer).horses();
     }
 
     private List<String> horsesOfSession(int index) {
-        return sessionHorses(courseRun.sessions().get(index).id()).stream().map(SessionHorseOutcomeResponse::horseName).toList();
+        return sessionHorses(courseRun.sessions().get(index).id()).stream().map(SessionHorseResponse::horseName).toList();
     }
 
-    private SessionHorseOutcomeResponse sessionHorse(Long sessionId, String name) {
+    private SessionHorseResponse sessionHorse(Long sessionId, String name) {
         return sessionHorses(sessionId).stream().filter(h -> h.horseName().equals(name)).findFirst().orElseThrow();
     }
 }

@@ -87,10 +87,10 @@ import com.rtms.backend.training.dto.HorseAttendanceResponse;
 import com.rtms.backend.training.dto.PastWorkoutRow;
 import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.service.HorseAttendanceService;
-import com.rtms.backend.training.service.SessionScheduleService;
+import com.rtms.backend.training.service.TrainingSessionService;
 import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.dto.GroupMemberResponse;
-import com.rtms.backend.training.dto.ScheduleSessionResponse;
+import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.training.dto.SessionDetailResponse;
 import com.rtms.backend.training.dto.SessionHorseResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
@@ -133,7 +133,7 @@ class AiToolExecutionServiceTest {
     private GroomTaskCompletionRepository groomTaskCompletionRepository;
     private HorseAttendanceService horseAttendanceService;
     private TrainingGroupService trainingGroupService;
-    private SessionScheduleService sessionScheduleService;
+    private TrainingSessionService trainingSessionService;
     private TreatmentPlanRepository treatmentPlanRepository;
     private InjuryRecordRepository injuryRecordRepository;
     private VeterinarianProfileRepository veterinarianProfileRepository;
@@ -172,7 +172,7 @@ class AiToolExecutionServiceTest {
 
         horseAttendanceService = Mockito.mock(HorseAttendanceService.class);
         trainingGroupService = Mockito.mock(TrainingGroupService.class);
-        sessionScheduleService = Mockito.mock(SessionScheduleService.class);
+        trainingSessionService = Mockito.mock(TrainingSessionService.class);
         treatmentPlanRepository = Mockito.mock(TreatmentPlanRepository.class);
         injuryRecordRepository = Mockito.mock(InjuryRecordRepository.class);
         veterinarianProfileRepository = Mockito.mock(VeterinarianProfileRepository.class);
@@ -206,7 +206,7 @@ class AiToolExecutionServiceTest {
                 groomTaskCompletionRepository,
                 horseAttendanceService,
                 trainingGroupService,
-                sessionScheduleService,
+                trainingSessionService,
                 treatmentPlanRepository,
                 injuryRecordRepository,
                 veterinarianProfileRepository,
@@ -373,10 +373,10 @@ class AiToolExecutionServiceTest {
     @DisplayName("HEAD_TRAINER gọi getTrainerSchedule với needsResultOnly để xem buổi còn ngựa chưa ghi kết quả")
     void testTrainer_GetTrainerScheduleNeedsResult() {
         AuthenticatedUser trainer = new AuthenticatedUser(5L, "trainer@rtms.com", "HEAD_TRAINER");
-        ScheduleSessionResponse session = new ScheduleSessionResponse(50L, 1L, 1L, "Morning Group 1", false, "Sprint Course",
+        SessionSummaryResponse session = new SessionSummaryResponse(50L, 1L, 1L, "Morning Group 1", false, "Sprint Course",
                 "Gallop 1200m", LocalDate.now().minusDays(1), LocalTime.of(6, 0), LocalTime.of(6, 30), "HELD", 2, 1);
-        when(sessionScheduleService.getSessions(any(), any(), isNull(), eq(true), eq(trainer))).thenReturn(List.of(session));
-        when(sessionScheduleService.getSession(50L, trainer)).thenReturn(new SessionDetailResponse(session, List.of(
+        when(trainingSessionService.getSessions(any(), any(), isNull(), eq(true), eq(trainer))).thenReturn(List.of(session));
+        when(trainingSessionService.getSession(50L, trainer)).thenReturn(new SessionDetailResponse(session, List.of(
                 new SessionHorseResponse(1L, 10L, "THUNDER", "Groom An", "HELD", null, null),
                 new SessionHorseResponse(2L, 11L, "BLAZE", "Groom Binh", "RAN", 7, null))));
 

@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
 import { formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
 import { clockOf, hourMarks, minutesOf, snapSessionStart, stripPosition } from '../lib/timeline';
-import type { ScheduleSession, TrainingRules } from '../types';
+import type { SessionSummary, TrainingRules } from '../types';
 
 interface DragState {
   sessionId: number;
@@ -17,7 +17,7 @@ interface DragState {
 }
 
 function overlapsAnother(
-  sessions: ScheduleSession[],
+  sessions: SessionSummary[],
   sessionId: number,
   startMinutes: number,
   duration: number,
@@ -43,10 +43,10 @@ export function TimelineStrip({
   onMove,
   onOpen,
 }: {
-  sessions: ScheduleSession[];
+  sessions: SessionSummary[];
   rules: TrainingRules;
   movable: boolean;
-  onMove: (session: ScheduleSession, newStart: string) => void;
+  onMove: (session: SessionSummary, newStart: string) => void;
   onOpen: (id: number) => void;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
@@ -58,11 +58,11 @@ export function TimelineStrip({
   const step = rules.sessionStartStepMinutes || 15;
   const windowMinutes = minutesOf(end) - minutesOf(start);
 
-  function canDrag(session: ScheduleSession) {
+  function canDrag(session: SessionSummary) {
     return movable && session.status === 'SCHEDULED' && !session.groupDisbanded;
   }
 
-  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>, session: ScheduleSession) {
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>, session: SessionSummary) {
     if (!canDrag(session)) return;
     didDragRef.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -76,7 +76,7 @@ export function TimelineStrip({
     });
   }
 
-  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>, session: ScheduleSession) {
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>, session: SessionSummary) {
     const width = stripRef.current?.clientWidth;
     if (!drag || drag.sessionId !== session.id || !width) return;
     const movedMinutes = ((event.clientX - drag.pointerX) / width) * windowMinutes;
@@ -96,7 +96,7 @@ export function TimelineStrip({
     }
   }
 
-  function handlePointerUp(session: ScheduleSession) {
+  function handlePointerUp(session: SessionSummary) {
     if (!drag || drag.sessionId !== session.id) return;
     const hasMoved = drag.hasMoved;
     const targetStart = drag.startMinutes;

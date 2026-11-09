@@ -3,14 +3,14 @@
 import { Icon, Pill, SelectableCard } from '@/components/ui';
 import { formatTime } from '@/lib/display';
 import { SESSION_STATUS } from '../lib/status';
-import type { ScheduleSession } from '../types';
+import type { SessionSummary } from '../types';
 import { StatusPill } from './StatusPill';
 
 /**
  * One Session as a card: time, group, exercise, how many horses and its status. A Held Session that still misses results carries a
  * "Needs result" label with the number of horses, so the Trainer notices what is left to record.
  */
-export function SessionCard({ session, onOpen }: { session: ScheduleSession; onOpen: (id: number) => void }) {
+export function SessionCard({ session, onOpen }: { session: SessionSummary; onOpen: (id: number) => void }) {
   return (
     <SelectableCard dimmed={session.status === 'CANCELLED'} onClick={() => onOpen(session.id)}>
       <div className="flex items-center justify-between gap-2">

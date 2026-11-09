@@ -52,13 +52,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 @Import({TestClockConfig.class, TrainingFixtures.class})
 @Transactional
-class SessionWorkoutServiceIntegrationTest {
+class TrainingWorkoutServiceIntegrationTest {
 
     private static final List<TrainingDay> MON_WED_FRI =
             List.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY, TrainingDay.FRIDAY);
 
-    @Autowired private SessionWorkoutService service;
-    @Autowired private SessionScheduleService scheduleService;
+    @Autowired private TrainingWorkoutService service;
+    @Autowired private TrainingSessionService scheduleService;
     @Autowired private CourseRunService courseRunService;
     @Autowired private TrainingGroupService groupService;
     @Autowired private TrainingFixtures fixtures;

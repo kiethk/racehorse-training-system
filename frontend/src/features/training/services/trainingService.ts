@@ -20,8 +20,7 @@ import type {
   CourseRunSummary,
   CourseRunDetail,
   CourseRunHorse,
-  SessionHorseOutcomeItem,
-  ScheduleSession,
+  SessionSummary,
   SessionDetail,
   SessionWorkoutResult,
   HorseAttendance,
@@ -129,18 +128,16 @@ export const trainingService = {
   getCourseRunHorses: async (courseRunId: number): Promise<CourseRunHorse[]> =>
     (await apiGet<ApiResponse<CourseRunHorse[]>>(`/api/course-runs/${courseRunId}/horses`)).data,
 
-  getCourseRunSessionHorses: async (courseRunId: number, sessionId: number): Promise<SessionHorseOutcomeItem[]> =>
-    (await apiGet<ApiResponse<SessionHorseOutcomeItem[]>>(`/api/course-runs/${courseRunId}/sessions/${sessionId}/horses`)).data,
 
   cancelCourseRun: async (id: number): Promise<CourseRunDetail> =>
     (await apiPost<ApiResponse<CourseRunDetail>>(`/api/course-runs/${id}/cancel`, {})).data,
 
   // Group sessions
-  getSessions: async (params: { from: string; to: string; groupId?: number; needsResult?: boolean }): Promise<ScheduleSession[]> => {
+  getSessions: async (params: { from: string; to: string; groupId?: number; needsResult?: boolean }): Promise<SessionSummary[]> => {
     const query = new URLSearchParams({ from: params.from, to: params.to });
     if (params.groupId) query.set('groupId', String(params.groupId));
     if (params.needsResult) query.set('needsResult', 'true');
-    return (await apiGet<ApiResponse<ScheduleSession[]>>(`/api/training-sessions?${query}`)).data;
+    return (await apiGet<ApiResponse<SessionSummary[]>>(`/api/training-sessions?${query}`)).data;
   },
 
   getSession: async (id: number): Promise<SessionDetail> =>

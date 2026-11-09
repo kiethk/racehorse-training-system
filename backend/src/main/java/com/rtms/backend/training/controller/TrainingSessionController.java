@@ -2,11 +2,9 @@ package com.rtms.backend.training.controller;
 
 import com.rtms.backend.common.dto.ApiResponse;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.dto.CourseRunSessionResponse;
-import com.rtms.backend.training.dto.ScheduleSessionResponse;
+import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.training.dto.SessionDetailResponse;
 import com.rtms.backend.training.dto.RescheduleSessionRequest;
-import com.rtms.backend.training.service.SessionScheduleService;
 import com.rtms.backend.training.service.TrainingSessionService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -34,35 +32,33 @@ import java.util.List;
 public class TrainingSessionController {
 
     private final TrainingSessionService sessionService;
-    private final SessionScheduleService scheduleService;
 
-    public TrainingSessionController(TrainingSessionService sessionService, SessionScheduleService scheduleService) {
+    public TrainingSessionController(TrainingSessionService sessionService) {
         this.sessionService = sessionService;
-        this.scheduleService = scheduleService;
     }
 
     /** Lịch theo khoảng ngày: lịch hôm nay và lịch tuần dùng chung truy vấn này. (The schedule over a date range: Today and Week share this query.) */
     @GetMapping
     @PreAuthorize("hasAuthority('SESSION_VIEW')")
-    public ApiResponse<List<ScheduleSessionResponse>> getSessions(
+    public ApiResponse<List<SessionSummaryResponse>> getSessions(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long groupId,
             @RequestParam(required = false, defaultValue = "false") boolean needsResult,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(scheduleService.getSessions(from, to, groupId, needsResult, currentUser));
+        return ApiResponse.success(sessionService.getSessions(from, to, groupId, needsResult, currentUser));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('SESSION_VIEW')")
     public ApiResponse<SessionDetailResponse> getSession(
             @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
-        return ApiResponse.success(scheduleService.getSession(id, currentUser));
+        return ApiResponse.success(sessionService.getSession(id, currentUser));
     }
 
     @PatchMapping("/{id}/reschedule")
     @PreAuthorize("hasAuthority('SESSION_UPDATE')")
-    public ApiResponse<CourseRunSessionResponse> reschedule(
+    public ApiResponse<SessionSummaryResponse> reschedule(
             @PathVariable Long id,
             @Valid @RequestBody RescheduleSessionRequest request,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
@@ -71,7 +67,7 @@ public class TrainingSessionController {
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasAuthority('SESSION_UPDATE')")
-    public ApiResponse<CourseRunSessionResponse> cancel(
+    public ApiResponse<SessionSummaryResponse> cancel(
             @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return ApiResponse.success(sessionService.cancel(id, currentUser));
     }

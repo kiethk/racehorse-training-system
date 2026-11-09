@@ -8,7 +8,7 @@ import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.GroupMemberResponse;
 import com.rtms.backend.training.dto.CourseRunDetailResponse;
 import com.rtms.backend.training.dto.CourseRunRequest;
-import com.rtms.backend.training.dto.CourseRunSessionResponse;
+import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.enums.TrainingDay;
@@ -109,7 +109,7 @@ class GroupDisbandIntegrationTest {
         CourseRunDetailResponse after = courseRunService.getCourseRun(courseRun.courseRun().id(), trainer);
         assertEquals("CANCELLED", after.courseRun().status());
         assertEquals(List.of("SCHEDULED", "CANCELLED", "CANCELLED"),
-                after.sessions().stream().map(CourseRunSessionResponse::status).toList());
+                after.sessions().stream().map(SessionSummaryResponse::status).toList());
         assertTrue(members.findByHorseIdAndLeftAtIsNull(horseId).isEmpty());
         assertEquals(0, members.countByGroupIdAndLeftAtIsNull(group.id()));
 
@@ -214,7 +214,7 @@ class GroupDisbandIntegrationTest {
         assertEquals(2, members.countByGroupIdAndLeftAtIsNull(group.id()));
         assertEquals("UPCOMING", courseRuns.findById(courseRun.courseRun().id()).orElseThrow().getStatus().name());
         assertEquals(List.of("SCHEDULED", "SCHEDULED", "SCHEDULED"),
-                courseRunService.getCourseRun(courseRun.courseRun().id(), trainer).sessions().stream().map(CourseRunSessionResponse::status).toList());
+                courseRunService.getCourseRun(courseRun.courseRun().id(), trainer).sessions().stream().map(SessionSummaryResponse::status).toList());
     }
 
     @Test

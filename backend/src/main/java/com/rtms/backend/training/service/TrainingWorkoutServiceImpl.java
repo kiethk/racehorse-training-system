@@ -17,28 +17,31 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cài đặt SessionWorkoutService. Mọi thao tác bắt đầu bằng settle() để Workout của buổi đã hết giờ đã là HELD.
- * (Implements SessionWorkoutService. Every operation starts with settle() so the Workouts of an ended Session are already HELD.)
+ * Cài đặt TrainingWorkoutService. Mọi thao tác bắt đầu bằng settle() để Workout của buổi đã hết giờ đã là HELD.
+ * (Implements TrainingWorkoutService. Every operation starts with settle() so the Workouts of an ended Session are already HELD.)
  */
 @Service
-public class SessionWorkoutServiceImpl implements SessionWorkoutService {
+public class TrainingWorkoutServiceImpl implements TrainingWorkoutService {
 
     private final TrainingWorkoutRepository workoutRepository;
     private final TrainingSessionRepository sessionRepository;
     private final ExerciseRepository exerciseRepository;
     private final WorkoutResultSimulationService simulationService;
     private final SessionSettlementService settlement;
+    private final SessionRules rules;
 
-    public SessionWorkoutServiceImpl(TrainingWorkoutRepository workoutRepository,
+    public TrainingWorkoutServiceImpl(TrainingWorkoutRepository workoutRepository,
                                      TrainingSessionRepository sessionRepository,
                                      ExerciseRepository exerciseRepository,
                                      WorkoutResultSimulationService simulationService,
-                                     SessionSettlementService settlement) {
+                                     SessionSettlementService settlement,
+                                     SessionRules rules) {
         this.workoutRepository = workoutRepository;
         this.sessionRepository = sessionRepository;
         this.exerciseRepository = exerciseRepository;
         this.simulationService = simulationService;
         this.settlement = settlement;
+        this.rules = rules;
     }
 
     @Override
@@ -96,6 +99,28 @@ public class SessionWorkoutServiceImpl implements SessionWorkoutService {
         }
         workout.setStatus(WorkoutStatus.CANCELLED);
         return SessionWorkoutResponse.of(workoutRepository.saveAndFlush(workout));
+    }
+
+    @Override
+    @Transactional
+    public SessionWorkoutResponse cancel(Long workoutId, AuthenticatedUser currentUser) {
+        sessionRepository.lockSchedule(ScheduleLocks.of(currentUser.getUserId()));
+        settlement.settle();
+        TrainingWorkout workout = workoutRepository.findById(workoutId)
+                .filter(found -> found.getSessionId() != null)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "WORKOUT_NOT_FOUND", "Workout not found!"));
+        TrainingSession session = rules.findOwnSession(workout.getSessionId(), currentUser);
+        rules.assertNotStarted(session);
+        if (workout.getStatus() != WorkoutStatus.SCHEDULED) {
+            throw new ApiException(HttpStatus.CONFLICT, "WORKOUT_NOT_SCHEDULED", "Only a scheduled workout can be cancelled!");
+        }
+
+        workout.setStatus(WorkoutStatus.CANCELLED);
+        workoutRepository.saveAndFlush(workout);
+        if (rules.cancelIfEmpty(session)) {
+            settlement.settle();
+        }
+        return SessionWorkoutResponse.of(workoutRepository.findById(workoutId).orElseThrow());
     }
 
     // =================================================================

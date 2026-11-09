@@ -1,5 +1,6 @@
 package com.rtms.backend.training.service;
 
+import com.rtms.backend.training.dto.SessionSummaryResponse;
 import com.rtms.backend.config.ApiException;
 import com.rtms.backend.config.FarmSchedulePolicy;
 import com.rtms.backend.config.TrainingLimits;
@@ -14,11 +15,8 @@ import com.rtms.backend.training.dto.CourseRunSummaryResponse;
 import com.rtms.backend.training.dto.CourseRunHorseResponse;
 import com.rtms.backend.training.dto.CourseRunOverlapResponse;
 import com.rtms.backend.training.dto.CourseRunSessionCountRow;
-import com.rtms.backend.training.dto.CourseRunSessionResponse;
 import com.rtms.backend.training.dto.PlannedSessionResponse;
 import com.rtms.backend.training.dto.RunningCourseRunRow;
-import com.rtms.backend.training.dto.SessionCountRow;
-import com.rtms.backend.training.dto.SessionHorseOutcomeResponse;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.entity.Exercise;
@@ -78,6 +76,7 @@ public class CourseRunServiceImpl implements CourseRunService {
     private final ExerciseRepository exerciseRepository;
     private final SessionSettlementService settlement;
     private final HorseRepository horseRepository;
+    private final SessionSummaryAssembler assembler;
     private final Clock clock;
 
     public CourseRunServiceImpl(CourseRunRepository courseRunRepository,
@@ -90,6 +89,7 @@ public class CourseRunServiceImpl implements CourseRunService {
                                 ExerciseRepository exerciseRepository,
                                 SessionSettlementService settlement,
                                 HorseRepository horseRepository,
+                                SessionSummaryAssembler assembler,
                                 Clock clock) {
         this.courseRunRepository = courseRunRepository;
         this.sessionRepository = sessionRepository;
@@ -101,6 +101,7 @@ public class CourseRunServiceImpl implements CourseRunService {
         this.exerciseRepository = exerciseRepository;
         this.settlement = settlement;
         this.horseRepository = horseRepository;
+        this.assembler = assembler;
         this.clock = clock;
     }
 
@@ -284,33 +285,6 @@ public class CourseRunServiceImpl implements CourseRunService {
                 .toList();
     }
 
-    @Override
-    @Transactional
-    public List<SessionHorseOutcomeResponse> getSessionHorses(Long courseRunId, Long sessionId, AuthenticatedUser currentUser) {
-        settlement.settle();
-        visibleCourseRun(courseRunId, currentUser);
-        TrainingSession session = sessionRepository.findById(sessionId)
-                .filter(found -> courseRunId.equals(found.getCourseRunId()))
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "Session not found!"));
-        List<TrainingWorkout> workouts = workoutRepository.findBySessionId(session.getId());
-        Map<Long, String> names = horseNames(workouts);
-        return workouts.stream()
-                .map(workout -> new SessionHorseOutcomeResponse(workout.getId(), workout.getHorseId(), names.get(workout.getHorseId()),
-                        outcome(session, workout)))
-                .sorted(Comparator.comparing(SessionHorseOutcomeResponse::horseName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
-    }
-
-    /** Workout hủy trong buổi đã diễn ra là "Did not run"; hủy trước đó là "Cancelled". (A cancelled Workout in a Session that took place is "Did not run"; otherwise "Cancelled".) */
-    private String outcome(TrainingSession session, TrainingWorkout workout) {
-        return switch (workout.getStatus()) {
-            case SCHEDULED -> "TO_RUN";
-            case HELD -> "NEEDS_RESULT";
-            case RAN -> "RAN";
-            case CANCELLED -> session.getStatus() == SessionStatus.HELD ? "DID_NOT_RUN" : "CANCELLED";
-        };
-    }
-
     private Map<Long, String> horseNames(List<TrainingWorkout> workouts) {
         return horseRepository.findAllById(workouts.stream().map(TrainingWorkout::getHorseId).collect(Collectors.toSet())).stream()
                 .collect(Collectors.toMap(Horse::getId, Horse::getName));
@@ -356,16 +330,10 @@ public class CourseRunServiceImpl implements CourseRunService {
     private CourseRunDetailResponse detail(CourseRun courseRun) {
         CourseRunSummaryResponse summary = summaries(List.of(courseRun)).get(0);
         List<TrainingSession> sessions = sessionRepository.findByCourseRunIdOrderBySessionDateAscStartTimeAsc(courseRun.getId());
-        Map<Long, Long> horseCounts = workoutRepository
-                .countActiveBySession(sessions.stream().map(TrainingSession::getId).toList()).stream()
-                .collect(Collectors.toMap(SessionCountRow::sessionId, SessionCountRow::count));
-        Map<Long, String> exerciseNames = exerciseNames(sessions);
-
-        List<CourseRunSessionResponse> items = sessions.stream()
-                .map(session -> new CourseRunSessionResponse(session.getId(), session.getSessionDate(), session.getStartTime(),
-                        session.getEndTime(), exerciseNames.get(session.getExerciseId()), session.getStatus().name(),
-                        horseCounts.getOrDefault(session.getId(), 0L).intValue()))
-                .toList();
+        Map<Long, List<TrainingWorkout>> workoutsBySession = workoutRepository
+                .findBySessionIdIn(sessions.stream().map(TrainingSession::getId).toList()).stream()
+                .collect(Collectors.groupingBy(TrainingWorkout::getSessionId));
+        List<SessionSummaryResponse> items = assembler.summariesForTrainer(sessions, workoutsBySession);
         return new CourseRunDetailResponse(summary, new ArrayList<>(courseRun.getTrainingDays()), items);
     }
 
