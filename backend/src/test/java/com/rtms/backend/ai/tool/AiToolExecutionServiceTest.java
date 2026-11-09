@@ -409,7 +409,7 @@ class AiToolExecutionServiceTest {
         when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
 
         HorseSpecialtyResponse specialty = new HorseSpecialtyResponse(
-                3,
+                3, new java.math.BigDecimal("7.0"),
                 List.of(DistanceBand.SPRINT),
                 SurfaceType.TURF,
                 List.of(new DistanceStat(DistanceBand.SPRINT, 5, new BigDecimal("8.5"), new BigDecimal("62.0")))
@@ -456,10 +456,10 @@ class AiToolExecutionServiceTest {
 
         // h1 has 1 specialty (SPRINT, rating 9.5), h2 has 2 specialties (MILE 7.1, MIDDLE 7.3 => avg 7.2)
         HorseSpecialtyResponse spec1 = new HorseSpecialtyResponse(
-                3, List.of(DistanceBand.SPRINT), SurfaceType.TURF,
+                3, new java.math.BigDecimal("7.0"), List.of(DistanceBand.SPRINT), SurfaceType.TURF,
                 List.of(new DistanceStat(DistanceBand.SPRINT, 5, new BigDecimal("9.5"), new BigDecimal("64.0"))));
         HorseSpecialtyResponse spec2 = new HorseSpecialtyResponse(
-                3, List.of(DistanceBand.MILE, DistanceBand.MIDDLE), SurfaceType.DIRT,
+                3, new java.math.BigDecimal("7.0"), List.of(DistanceBand.MILE, DistanceBand.MIDDLE), SurfaceType.DIRT,
                 List.of(
                         new DistanceStat(DistanceBand.MILE, 3, new BigDecimal("7.1"), new BigDecimal("58.0")),
                         new DistanceStat(DistanceBand.MIDDLE, 3, new BigDecimal("7.3"), new BigDecimal("56.0"))
@@ -522,10 +522,10 @@ class AiToolExecutionServiceTest {
 
         // h1 has 1 specialty (SPRINT, rating 9.5), h2 has 2 specialties (MILE 7.1, MIDDLE 7.3 => avg 7.2)
         HorseSpecialtyResponse spec1 = new HorseSpecialtyResponse(
-                3, List.of(DistanceBand.SPRINT), SurfaceType.TURF,
+                3, new java.math.BigDecimal("7.0"), List.of(DistanceBand.SPRINT), SurfaceType.TURF,
                 List.of(new DistanceStat(DistanceBand.SPRINT, 5, new BigDecimal("9.5"), new BigDecimal("64.0"))));
         HorseSpecialtyResponse spec2 = new HorseSpecialtyResponse(
-                3, List.of(DistanceBand.MILE, DistanceBand.MIDDLE), SurfaceType.DIRT,
+                3, new java.math.BigDecimal("7.0"), List.of(DistanceBand.MILE, DistanceBand.MIDDLE), SurfaceType.DIRT,
                 List.of(
                         new DistanceStat(DistanceBand.MILE, 3, new BigDecimal("7.1"), new BigDecimal("58.0")),
                         new DistanceStat(DistanceBand.MIDDLE, 3, new BigDecimal("7.3"), new BigDecimal("56.0"))
@@ -576,7 +576,7 @@ class AiToolExecutionServiceTest {
         when(horseRepository.findAll()).thenReturn(List.of(h1));
 
         HorseSpecialtyResponse spec = new HorseSpecialtyResponse(
-                3, List.of(DistanceBand.STAYER), SurfaceType.TURF,
+                3, new java.math.BigDecimal("7.0"), List.of(DistanceBand.STAYER), SurfaceType.TURF,
                 List.of(new DistanceStat(DistanceBand.STAYER, 4, new BigDecimal("8.8"), new BigDecimal("60.0"))));
         when(horseSpecialtyService.getSpecialties(anyCollection()))
                 .thenReturn(Map.of(101L, spec));
@@ -1435,7 +1435,7 @@ class AiToolExecutionServiceTest {
         when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
 
         HorseSpecialtyResponse specialty = new HorseSpecialtyResponse(
-                3,
+                3, new java.math.BigDecimal("7.0"),
                 List.of(DistanceBand.SPRINT),
                 SurfaceType.TURF,
                 List.of()
@@ -1709,7 +1709,7 @@ class AiToolExecutionServiceTest {
         when(horseRepository.findById(10L)).thenReturn(Optional.of(horse));
 
         HorseSpecialtyResponse specialty = new HorseSpecialtyResponse(
-                3,
+                3, new java.math.BigDecimal("7.0"),
                 List.of(DistanceBand.SPRINT),
                 SurfaceType.TURF,
                 List.of()

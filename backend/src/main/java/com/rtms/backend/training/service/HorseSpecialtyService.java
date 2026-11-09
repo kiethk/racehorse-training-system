@@ -94,14 +94,14 @@ public class HorseSpecialtyService {
         List<DistanceStat> stats = distanceStats(rows);
         boolean anyBandJudged = stats.stream().anyMatch(stat -> stat.workoutCount() >= MIN_WORKOUTS);
         if (!anyBandJudged) {
-            return new HorseSpecialtyResponse(MIN_WORKOUTS, List.of(), null, stats);
+            return new HorseSpecialtyResponse(MIN_WORKOUTS, MIN_RATING, List.of(), null, stats);
         }
 
         List<DistanceBand> strongDistances = stats.stream()
                 .filter(stat -> stat.workoutCount() >= MIN_WORKOUTS && stat.averageRating().compareTo(MIN_RATING) >= 0)
                 .map(DistanceStat::band)
                 .toList();
-        return new HorseSpecialtyResponse(MIN_WORKOUTS, strongDistances, preferredSurface(rows), stats);
+        return new HorseSpecialtyResponse(MIN_WORKOUTS, MIN_RATING, strongDistances, preferredSurface(rows), stats);
     }
 
     // =================================================================
