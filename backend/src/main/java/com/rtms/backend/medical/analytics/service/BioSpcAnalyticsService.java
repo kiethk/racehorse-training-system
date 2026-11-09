@@ -16,7 +16,7 @@ import com.rtms.backend.notification.entity.Notification;
 import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.service.HorseViewAccessService;
+import com.rtms.backend.training.service.TrainingAccessPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -32,20 +32,20 @@ public class BioSpcAnalyticsService {
 
     private final HorseHealthMetricRepository metricRepository;
     private final HorseRepository horseRepository;
-    private final HorseViewAccessService accessService;
+    private final TrainingAccessPolicy accessPolicy;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
 
     public BioSpcAnalyticsService(
             HorseHealthMetricRepository metricRepository,
             HorseRepository horseRepository,
-            HorseViewAccessService accessService,
+            TrainingAccessPolicy accessPolicy,
             UserRepository userRepository,
             NotificationService notificationService
     ) {
         this.metricRepository = metricRepository;
         this.horseRepository = horseRepository;
-        this.accessService = accessService;
+        this.accessPolicy = accessPolicy;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
     }
@@ -57,7 +57,7 @@ public class BioSpcAnalyticsService {
             AuthenticatedUser currentUser
     ) {
         if (currentUser != null) {
-            accessService.assertCanViewHorse(horseId, currentUser);
+            accessPolicy.assertCanViewHorse(horseId, currentUser);
         }
 
         Horse horse = horseRepository.findById(horseId)

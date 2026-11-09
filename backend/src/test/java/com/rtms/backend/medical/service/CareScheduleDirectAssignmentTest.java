@@ -23,7 +23,7 @@ import com.rtms.backend.incident.enums.IncidentStatus;
 import com.rtms.backend.incident.repository.HorseIncidentReportRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 
 
@@ -51,7 +51,7 @@ class CareScheduleDirectAssignmentTest {
     private VeterinarianProfileRepository profiles;
     private HorseIncidentReportRepository incidents;
     private ApplicationEventPublisher events;
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
     private CareScheduleService service;
 
     @BeforeEach
@@ -62,7 +62,7 @@ class CareScheduleDirectAssignmentTest {
         profiles = mock(VeterinarianProfileRepository.class);
         incidents = mock(HorseIncidentReportRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        workoutService = mock(GroupWorkoutSyncService.class);
+        workoutService = mock(TrainingGroupService.class);
         service = new CareScheduleService(
                 schedules,
                 horses,

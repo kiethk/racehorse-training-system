@@ -6,14 +6,14 @@ import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.DashboardHorseResponse;
-import com.rtms.backend.training.dto.DashboardHorseRow;
-import com.rtms.backend.training.dto.DashboardCourseRunRow;
+import com.rtms.backend.training.repository.projection.DashboardHorseRow;
+import com.rtms.backend.training.repository.projection.DashboardCourseRunRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
-import com.rtms.backend.training.dto.PerformanceSessionRow;
+import com.rtms.backend.training.repository.projection.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
-import com.rtms.backend.training.dto.RecentWorkoutRow;
+import com.rtms.backend.training.repository.projection.RecentWorkoutRow;
 import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
@@ -65,8 +65,7 @@ class HorsePerformanceServiceTest {
         // Bộ kiểm quyền chạy thật trên repository giả, nên các test phân quyền cũ giữ nguyên.
         // (The access check runs for real on mocked repositories, so the existing authorization tests stay valid.)
         service = new HorsePerformanceService(workoutRepository, courseRunRepository,
-                new HorseViewAccessService(horseRepository, courseRunRepository, stallRepository), specialtyService,
-                new HorseScopeService(courseRunRepository));
+                new TrainingAccessPolicy(horseRepository, courseRunRepository, stallRepository), specialtyService);
     }
 
     private Horse horse(Long id, Long ownerId) {
@@ -372,7 +371,7 @@ class HorsePerformanceServiceTest {
         when(courseRunRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(own));
         when(courseRunRepository.findDashboardHorses(9L)).thenReturn(List.of(area));
         when(courseRunRepository.findAllDashboardHorses()).thenReturn(List.of(own, area, farm));
-        HorseScopeService scope = new HorseScopeService(courseRunRepository);
+        TrainingAccessPolicy scope = new TrainingAccessPolicy(horseRepository, courseRunRepository, stallRepository);
 
         assertEquals(List.of(own), scope.horsesOf(new AuthenticatedUser(5L, "o@example.com", Roles.HORSE_OWNER)));
         assertEquals(List.of(area), scope.horsesOf(new AuthenticatedUser(9L, "t@example.com", Roles.HEAD_TRAINER)));

@@ -61,7 +61,7 @@ class GroupMidCourseIntegrationTest {
     @Autowired private SessionSettlementService settlement;
     @Autowired private HorseAttendanceService attendanceService;
     @Autowired private TrainingDecisionService decisionService;
-    @Autowired private GroupWorkoutSyncService groupSync;
+    @Autowired private GroupMemberSync groupSync;
     @Autowired private TrainingFixtures fixtures;
     @Autowired private MutableClock clock;
     @Autowired private HorseRepository horses;

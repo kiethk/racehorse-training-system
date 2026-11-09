@@ -1,6 +1,6 @@
 package com.rtms.backend.training.service;
 
-import com.rtms.backend.training.dto.RunningCourseRunRow;
+import com.rtms.backend.training.repository.projection.RunningCourseRunRow;
 import com.rtms.backend.training.enums.TrainingDay;
 import com.rtms.backend.training.enums.CourseRunStatus;
 import org.junit.jupiter.api.DisplayName;
@@ -18,7 +18,7 @@ class TrainingCalendarTest {
             Set.of(TrainingDay.MONDAY, TrainingDay.WEDNESDAY, TrainingDay.FRIDAY);
 
     private RunningCourseRunRow courseRun(long id, LocalDate start, LocalDate end) {
-        return new RunningCourseRunRow(id, 1L, "Course " + id, start, end, CourseRunStatus.ACTIVE);
+        return new RunningCourseRunRow(id, "Course " + id, start, end, CourseRunStatus.ACTIVE);
     }
 
     @Test

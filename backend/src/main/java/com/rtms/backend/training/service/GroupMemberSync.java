@@ -13,7 +13,7 @@ import com.rtms.backend.training.repository.TrainingGroupMemberRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -25,11 +25,17 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Cài đặt GroupWorkoutSyncService. Mọi hàm bắt đầu bằng settle() để "chưa bắt đầu" được xét theo đồng hồ hiện tại.
- * (Implements GroupWorkoutSyncService. Every method starts with settle() so "not started" is judged by the current clock.)
+ * Giữ Workout khớp với thành viên của nhóm khi nhóm đang chạy một khóa: ngựa vào giữa khóa chỉ có Workout cho các buổi CHƯA bắt đầu,
+ * ngựa ra (rút, chuyển nhóm, bị Thú y chặn tập) bị hủy các Workout của buổi chưa bắt đầu, và nhóm cùng các ngựa còn lại không đổi.
+ * Mọi hàm bắt đầu bằng settle() để "chưa bắt đầu" được xét theo đồng hồ hiện tại. Chỉ TrainingGroupService và TrainingDecisionService
+ * dùng lớp này; module khác đi qua TrainingGroupService.
+ * (Keeps Workouts matching the members of a group while it runs a course: a horse that joins mid-course only gets Workouts for the
+ * Sessions that have NOT started, and a horse that leaves (withdrawn, moved, blocked by the Vet) has its not-yet-started Workouts
+ * cancelled while the group and the other horses stay as they are. Every method starts with settle() so "not started" is judged by
+ * the current clock. Only TrainingGroupService and TrainingDecisionService use this class; other modules go through TrainingGroupService.)
  */
-@Service
-public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
+@Component
+class GroupMemberSync {
 
     private final CourseRunRepository courseRunRepository;
     private final TrainingSessionRepository sessionRepository;
@@ -39,7 +45,7 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
     private final SessionRules rules;
     private final Clock clock;
 
-    public GroupWorkoutSyncServiceImpl(CourseRunRepository courseRunRepository,
+    GroupMemberSync(CourseRunRepository courseRunRepository,
                                        TrainingSessionRepository sessionRepository,
                                        TrainingWorkoutRepository workoutRepository,
                                        TrainingGroupMemberRepository memberRepository,
@@ -55,9 +61,8 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
         this.clock = clock;
     }
 
-    @Override
     @Transactional
-    public void assertCanJoin(Long groupId) {
+    void assertCanJoin(Long groupId) {
         settlement.settle();
         List<Long> courseRunIds = unfinishedCourseRunIds(groupId);
         if (!courseRunIds.isEmpty() && notStartedSessions(courseRunIds).isEmpty()) {
@@ -66,9 +71,8 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
         }
     }
 
-    @Override
     @Transactional
-    public int createFutureWorkouts(TrainingGroupMember member) {
+    int createFutureWorkouts(TrainingGroupMember member) {
         settlement.settle();
         List<Long> courseRunIds = unfinishedCourseRunIds(member.getGroupId());
         if (courseRunIds.isEmpty()) {
@@ -87,9 +91,8 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
         return created.size();
     }
 
-    @Override
     @Transactional
-    public void exitGroup(TrainingGroupMember member) {
+    void exitGroup(TrainingGroupMember member) {
         settlement.settle();
         List<Long> courseRunIds = unfinishedCourseRunIds(member.getGroupId());
         if (!courseRunIds.isEmpty()) {
@@ -110,17 +113,15 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
         settlement.settle();
     }
 
-    @Override
     @Transactional
-    public int reassignFutureWorkoutsToGroom(Long horseId, Long newGroomId) {
+    int reassignFutureWorkoutsToGroom(Long horseId, Long newGroomId) {
         Map<Long, Long> single = new HashMap<>();
         single.put(horseId, newGroomId);
         return reassignFutureWorkoutsToGrooms(single);
     }
 
-    @Override
     @Transactional
-    public int reassignFutureWorkoutsToGrooms(Map<Long, Long> groomByHorse) {
+    int reassignFutureWorkoutsToGrooms(Map<Long, Long> groomByHorse) {
         if (groomByHorse.isEmpty()) {
             return 0;
         }
@@ -142,9 +143,8 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
         return future.size();
     }
 
-    @Override
     @Transactional
-    public void exitAnyGroup(Long horseId) {
+    void exitAnyGroup(Long horseId) {
         memberRepository.findByHorseIdAndLeftAtIsNull(horseId).ifPresent(this::exitGroup);
     }
 

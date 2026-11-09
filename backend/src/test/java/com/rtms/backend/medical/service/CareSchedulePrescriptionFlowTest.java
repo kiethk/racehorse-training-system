@@ -28,7 +28,7 @@ import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
 import com.rtms.backend.training.service.TrainingDecisionService;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +66,7 @@ class CareSchedulePrescriptionFlowTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private EntityManager entityManager;
     @Mock private NotificationService notificationService;
-    @Mock private GroupWorkoutSyncService groupSync;
+    @Mock private TrainingGroupService groupSync;
     @Mock private PreventiveVaccinationService preventiveVaccinationService;
     @Mock private InjuryRecordRepository injuryRecordRepository;
     @Mock private TreatmentPlanRepository treatmentPlanRepository;

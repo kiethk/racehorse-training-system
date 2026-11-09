@@ -1,12 +1,12 @@
 package com.rtms.backend.training.repository;
 
-import com.rtms.backend.training.dto.GroomWorkoutRow;
+import com.rtms.backend.training.repository.projection.GroomWorkoutRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
-import com.rtms.backend.training.dto.PastWorkoutRow;
-import com.rtms.backend.training.dto.PerformanceSessionRow;
-import com.rtms.backend.training.dto.RecentWorkoutRow;
-import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
+import com.rtms.backend.training.repository.projection.PastWorkoutRow;
+import com.rtms.backend.training.repository.projection.PerformanceSessionRow;
+import com.rtms.backend.training.repository.projection.RecentWorkoutRow;
+import com.rtms.backend.training.repository.projection.SpecialtyWorkoutRow;
 import com.rtms.backend.training.entity.TrainingWorkout;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -64,7 +64,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      * course is assigned, so the order follows the Session date, never the creation date.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.PastWorkoutRow(
+           SELECT new com.rtms.backend.training.repository.projection.PastWorkoutRow(
                       w, s.sessionDate, s.startTime, s.endTime, sub.name, g.name,
                       CASE WHEN g.disbandedAt IS NULL THEN false ELSE true END, s.status)
            FROM TrainingWorkout w
@@ -105,7 +105,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      * (Source 2 of the groom Today Tasks screen: the day workouts with times, horse and exercise names.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.GroomWorkoutRow(
+           SELECT new com.rtms.backend.training.repository.projection.GroomWorkoutRow(
                       w.id, w.horseId, h.name, w.status, s.startTime, s.endTime, sub.name)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
@@ -149,7 +149,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      * done in PerformanceTrendCalculator.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.PerformanceSessionRow(
+           SELECT new com.rtms.backend.training.repository.projection.PerformanceSessionRow(
                       w.horseId, s.sessionDate, w.performanceRating, w.averageSpeedKmh, w.maxHeartRate)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
@@ -167,7 +167,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      * (Workouts with results since a date for MANY horses, newest first: the source for the alert rules and the dashboard.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.RecentWorkoutRow(
+           SELECT new com.rtms.backend.training.repository.projection.RecentWorkoutRow(
                       w.horseId, s.sessionDate, s.endTime, w.maxHeartRate, w.averageHeartRate, w.recoveryHeartRate, w.performanceRating)
            FROM TrainingWorkout w
            JOIN TrainingSession s ON w.sessionId = s.id
@@ -186,7 +186,7 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
      * Exercise target distance), not in the recovery category, since a date.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.SpecialtyWorkoutRow(
+           SELECT new com.rtms.backend.training.repository.projection.SpecialtyWorkoutRow(
                       w.horseId, COALESCE(w.actualDistanceMeters, sub.targetDistanceMeters),
                       sub.surfaceType, w.performanceRating, w.topSpeedKmh)
            FROM TrainingWorkout w

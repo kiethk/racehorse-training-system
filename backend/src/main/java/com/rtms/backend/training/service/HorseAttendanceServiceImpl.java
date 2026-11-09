@@ -2,7 +2,7 @@ package com.rtms.backend.training.service;
 
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.HorseAttendanceResponse;
-import com.rtms.backend.training.dto.CourseRunSessionCountRow;
+import com.rtms.backend.training.repository.projection.CourseRunSessionCountRow;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.entity.TrainingGroup;
@@ -44,7 +44,7 @@ public class HorseAttendanceServiceImpl implements HorseAttendanceService {
     private final CourseRunRepository courseRunRepository;
     private final TrainingGroupRepository groupRepository;
     private final CourseRepository courseRepository;
-    private final HorseViewAccessService accessService;
+    private final TrainingAccessPolicy accessPolicy;
     private final SessionSettlementService settlement;
 
     public HorseAttendanceServiceImpl(TrainingWorkoutRepository workoutRepository,
@@ -52,21 +52,21 @@ public class HorseAttendanceServiceImpl implements HorseAttendanceService {
                                       CourseRunRepository courseRunRepository,
                                       TrainingGroupRepository groupRepository,
                                       CourseRepository courseRepository,
-                                      HorseViewAccessService accessService,
+                                      TrainingAccessPolicy accessPolicy,
                                       SessionSettlementService settlement) {
         this.workoutRepository = workoutRepository;
         this.sessionRepository = sessionRepository;
         this.courseRunRepository = courseRunRepository;
         this.groupRepository = groupRepository;
         this.courseRepository = courseRepository;
-        this.accessService = accessService;
+        this.accessPolicy = accessPolicy;
         this.settlement = settlement;
     }
 
     @Override
     @Transactional
     public List<HorseAttendanceResponse> getHistory(Long horseId, AuthenticatedUser currentUser) {
-        accessService.assertCanViewHorse(horseId, currentUser);
+        accessPolicy.assertCanViewHorse(horseId, currentUser);
         settlement.settle();
 
         List<TrainingWorkout> workouts = workoutRepository.findByHorseIdAndSessionIdIsNotNull(horseId);

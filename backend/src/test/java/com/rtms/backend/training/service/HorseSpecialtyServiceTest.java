@@ -4,7 +4,7 @@ import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.DistanceStat;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
-import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
+import com.rtms.backend.training.repository.projection.SpecialtyWorkoutRow;
 import com.rtms.backend.training.enums.DistanceBand;
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -33,7 +33,7 @@ class HorseSpecialtyServiceTest {
     private TrainingWorkoutRepository workoutRepository;
 
     @Mock
-    private HorseViewAccessService accessService;
+    private TrainingAccessPolicy accessPolicy;
 
     private HorseSpecialtyService service;
 
@@ -41,7 +41,7 @@ class HorseSpecialtyServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new HorseSpecialtyService(workoutRepository, accessService);
+        service = new HorseSpecialtyService(workoutRepository, accessPolicy);
     }
 
     private SpecialtyWorkoutRow run(long meters, SurfaceType surface, int rating) {
@@ -249,7 +249,7 @@ class HorseSpecialtyServiceTest {
     @Test
     @DisplayName("getSpecialty checks the view permission before loading anything")
     void getSpecialty_checksAccessFirst() {
-        doThrow(new AccessDeniedException("no access")).when(accessService).assertCanViewHorse(5L, trainer);
+        doThrow(new AccessDeniedException("no access")).when(accessPolicy).assertCanViewHorse(5L, trainer);
 
         assertThrows(AccessDeniedException.class, () -> service.getSpecialty(5L, trainer));
         verifyNoInteractions(workoutRepository);
@@ -264,6 +264,6 @@ class HorseSpecialtyServiceTest {
         HorseSpecialtyResponse response = service.getSpecialty(1L, trainer);
 
         assertEquals(List.of(DistanceBand.SPRINT), response.strongDistances());
-        verify(accessService).assertCanViewHorse(1L, trainer);
+        verify(accessPolicy).assertCanViewHorse(1L, trainer);
     }
 }

@@ -4,14 +4,14 @@ import com.rtms.backend.config.TrainingLimits;
 import com.rtms.backend.notification.dto.HorseAlertResponse;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.DashboardHorseResponse;
-import com.rtms.backend.training.dto.DashboardHorseRow;
-import com.rtms.backend.training.dto.DashboardCourseRunRow;
+import com.rtms.backend.training.repository.projection.DashboardHorseRow;
+import com.rtms.backend.training.repository.projection.DashboardCourseRunRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
-import com.rtms.backend.training.dto.PerformanceSessionRow;
+import com.rtms.backend.training.repository.projection.PerformanceSessionRow;
 import com.rtms.backend.training.dto.PerformanceTrendResponse;
-import com.rtms.backend.training.dto.RecentWorkoutRow;
+import com.rtms.backend.training.repository.projection.RecentWorkoutRow;
 import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.repository.CourseRunRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -45,20 +45,17 @@ public class HorsePerformanceService {
 
     private final TrainingWorkoutRepository workoutRepository;
     private final CourseRunRepository courseRunRepository;
-    private final HorseViewAccessService accessService;
+    private final TrainingAccessPolicy accessPolicy;
     private final HorseSpecialtyService specialtyService;
-    private final HorseScopeService scopeService;
 
     public HorsePerformanceService(TrainingWorkoutRepository workoutRepository,
                                    CourseRunRepository courseRunRepository,
-                                   HorseViewAccessService accessService,
-                                   HorseSpecialtyService specialtyService,
-                                   HorseScopeService scopeService) {
+                                   TrainingAccessPolicy accessPolicy,
+                                   HorseSpecialtyService specialtyService) {
         this.workoutRepository = workoutRepository;
         this.courseRunRepository = courseRunRepository;
-        this.accessService = accessService;
+        this.accessPolicy = accessPolicy;
         this.specialtyService = specialtyService;
-        this.scopeService = scopeService;
     }
 
     // =================================================================
@@ -72,7 +69,7 @@ public class HorsePerformanceService {
     @Transactional(readOnly = true)
     public List<HorseFitnessTrendItemResponse> getFitnessTrend(Long horseId, LocalDate fromDate,
                                                                LocalDate toDate, AuthenticatedUser currentUser) {
-        accessService.assertCanViewHorse(horseId, currentUser);
+        accessPolicy.assertCanViewHorse(horseId, currentUser);
 
         // Bỏ trống thì dùng mốc bao trùm, để câu truy vấn luôn có BETWEEN cụ thể và khỏi phải viết
         // "(:from IS NULL OR ...)" vốn hay lỗi ép kiểu tham số null trên PostgreSQL.
@@ -90,7 +87,7 @@ public class HorsePerformanceService {
     @Transactional(readOnly = true)
     public List<HorseScheduleItemResponse> getHorseSchedule(Long horseId, LocalDate from, LocalDate to,
                                                             AuthenticatedUser currentUser) {
-        accessService.assertCanViewHorse(horseId, currentUser);
+        accessPolicy.assertCanViewHorse(horseId, currentUser);
         if (to.isBefore(from)) {
             throw new IllegalArgumentException("The end date cannot be before the start date");
         }
@@ -107,7 +104,7 @@ public class HorsePerformanceService {
      */
     @Transactional(readOnly = true)
     public List<HorseAlertResponse> getHorseAlerts(Long horseId, AuthenticatedUser currentUser) {
-        accessService.assertCanViewHorse(horseId, currentUser);
+        accessPolicy.assertCanViewHorse(horseId, currentUser);
 
         List<RecentWorkoutRow> recent = workoutRepository.findRecentCompletedWorkouts(
                 List.of(horseId), LocalDate.now().minusDays(RECENT_WORKOUT_DAYS));
@@ -205,7 +202,7 @@ public class HorsePerformanceService {
      */
     @Transactional(readOnly = true)
     public List<DashboardHorseResponse> getDashboard(AuthenticatedUser currentUser) {
-        List<DashboardHorseRow> horses = scopeService.horsesOf(currentUser);
+        List<DashboardHorseRow> horses = accessPolicy.horsesOf(currentUser);
         if (horses.isEmpty()) {
             return Collections.emptyList();
         }
@@ -257,7 +254,7 @@ public class HorsePerformanceService {
     public PerformanceTrendResponse getPerformanceTrend(AuthenticatedUser currentUser) {
         LocalDate to = LocalDate.now();
         LocalDate from = PerformanceTrendCalculator.weekStartOf(to).minusWeeks(TREND_WEEKS - 1L);
-        List<Long> horseIds = scopeService.horseIdsOf(currentUser);
+        List<Long> horseIds = accessPolicy.horseIdsOf(currentUser);
         List<PerformanceSessionRow> sessions = horseIds.isEmpty()
                 ? List.of()
                 : workoutRepository.findPerformanceSessions(horseIds, from, to);

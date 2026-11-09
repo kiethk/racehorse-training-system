@@ -1,4 +1,4 @@
-package com.rtms.backend.training.dto;
+package com.rtms.backend.training.repository.projection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

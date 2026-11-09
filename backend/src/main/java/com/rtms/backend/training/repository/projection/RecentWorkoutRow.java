@@ -1,4 +1,4 @@
-package com.rtms.backend.training.dto;
+package com.rtms.backend.training.repository.projection;
 
 import java.time.LocalDate;
 import java.time.LocalTime;

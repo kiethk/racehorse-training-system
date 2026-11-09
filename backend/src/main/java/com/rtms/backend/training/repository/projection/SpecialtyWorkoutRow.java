@@ -1,4 +1,4 @@
-package com.rtms.backend.training.dto;
+package com.rtms.backend.training.repository.projection;
 
 import com.rtms.backend.training.enums.SurfaceType;
 

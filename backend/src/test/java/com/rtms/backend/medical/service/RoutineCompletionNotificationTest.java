@@ -26,7 +26,7 @@ import com.rtms.backend.notification.service.NotificationService;
 import com.rtms.backend.notification.service.NotificationTypes;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import com.rtms.backend.training.service.TrainingDecisionService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,7 +74,7 @@ class RoutineCompletionNotificationTest {
             hr.setId(99L);
             return hr;
         });
-        GroupWorkoutSyncService groupSync = mock(GroupWorkoutSyncService.class);
+        TrainingGroupService groupSync = mock(TrainingGroupService.class);
 
         TrainingDecisionService trainingDecisionService = new TrainingDecisionService(horses, schedules, groupSync);
 

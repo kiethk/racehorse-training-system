@@ -3,7 +3,7 @@ package com.rtms.backend.training.service;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.training.dto.DistanceStat;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
-import com.rtms.backend.training.dto.SpecialtyWorkoutRow;
+import com.rtms.backend.training.repository.projection.SpecialtyWorkoutRow;
 import com.rtms.backend.training.enums.DistanceBand;
 import com.rtms.backend.training.enums.SurfaceType;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -52,18 +52,18 @@ public class HorseSpecialtyService {
     static final BigDecimal SURFACE_LEAD = new BigDecimal("1.0");
 
     private final TrainingWorkoutRepository workoutRepository;
-    private final HorseViewAccessService accessService;
+    private final TrainingAccessPolicy accessPolicy;
 
     public HorseSpecialtyService(TrainingWorkoutRepository workoutRepository,
-                                 HorseViewAccessService accessService) {
+                                 TrainingAccessPolicy accessPolicy) {
         this.workoutRepository = workoutRepository;
-        this.accessService = accessService;
+        this.accessPolicy = accessPolicy;
     }
 
     /** Sở trường của một chiến mã, có kiểm quyền xem. (The specialty of one horse, with the view check.) */
     @Transactional(readOnly = true)
     public HorseSpecialtyResponse getSpecialty(Long horseId, AuthenticatedUser currentUser) {
-        accessService.assertCanViewHorse(horseId, currentUser);
+        accessPolicy.assertCanViewHorse(horseId, currentUser);
         return getSpecialties(List.of(horseId)).get(horseId);
     }
 

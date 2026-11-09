@@ -1,6 +1,6 @@
 package com.rtms.backend.training.service;
 
-import com.rtms.backend.training.dto.RunningCourseRunRow;
+import com.rtms.backend.training.repository.projection.RunningCourseRunRow;
 import com.rtms.backend.training.enums.TrainingDay;
 
 import java.time.LocalDate;

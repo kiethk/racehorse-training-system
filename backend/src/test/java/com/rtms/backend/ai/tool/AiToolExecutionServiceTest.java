@@ -35,6 +35,8 @@ import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.stable.service.GroomDailyTaskService;
+import com.rtms.backend.training.repository.projection.SessionHorseNameRow;
+import com.rtms.backend.training.repository.projection.SessionRow;
 import com.rtms.backend.training.dto.*;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.RacingReadinessAssessment;
@@ -84,7 +86,7 @@ import org.mockito.Mockito;
 import org.springframework.http.HttpStatus;
 
 import com.rtms.backend.training.dto.HorseAttendanceResponse;
-import com.rtms.backend.training.dto.PastWorkoutRow;
+import com.rtms.backend.training.repository.projection.PastWorkoutRow;
 import com.rtms.backend.training.enums.SessionStatus;
 import com.rtms.backend.training.service.HorseAttendanceService;
 import com.rtms.backend.training.service.TrainingSessionService;

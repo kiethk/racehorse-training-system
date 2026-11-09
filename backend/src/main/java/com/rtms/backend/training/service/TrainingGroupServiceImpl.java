@@ -11,7 +11,7 @@ import com.rtms.backend.security.Roles;
 import com.rtms.backend.training.dto.CreateTrainingGroupRequest;
 import com.rtms.backend.training.dto.GroupCandidateResponse;
 import com.rtms.backend.training.dto.GroupMemberResponse;
-import com.rtms.backend.training.dto.HorseStallInfo;
+import com.rtms.backend.training.repository.projection.HorseStallInfo;
 import com.rtms.backend.training.dto.RenameTrainingGroupRequest;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.entity.Course;
@@ -57,8 +57,8 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     private final CourseRepository courseRepository;
     private final HorseRepository horseRepository;
     private final UserRepository userRepository;
-    private final TrainingDecisionService trainingDecisionService;
-    private final GroupWorkoutSyncService groupSync;
+    private final TrainingEligibility eligibility;
+    private final GroupMemberSync groupSync;
     private final CourseRunService courseRunService;
     private final Clock clock;
 
@@ -68,8 +68,8 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
                                     CourseRepository courseRepository,
                                     HorseRepository horseRepository,
                                     UserRepository userRepository,
-                                    TrainingDecisionService trainingDecisionService,
-                                    GroupWorkoutSyncService groupSync,
+                                    TrainingEligibility eligibility,
+                                    GroupMemberSync groupSync,
                                     CourseRunService courseRunService,
                                     Clock clock) {
         this.groupRepository = groupRepository;
@@ -78,7 +78,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         this.courseRepository = courseRepository;
         this.horseRepository = horseRepository;
         this.userRepository = userRepository;
-        this.trainingDecisionService = trainingDecisionService;
+        this.eligibility = eligibility;
         this.groupSync = groupSync;
         this.courseRunService = courseRunService;
         this.clock = clock;
@@ -235,6 +235,24 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         return toResponse(target);
     }
 
+    @Override
+    @Transactional
+    public void exitAnyGroup(Long horseId) {
+        groupSync.exitAnyGroup(horseId);
+    }
+
+    @Override
+    @Transactional
+    public int reassignFutureWorkoutsToGroom(Long horseId, Long newGroomId) {
+        return groupSync.reassignFutureWorkoutsToGroom(horseId, newGroomId);
+    }
+
+    @Override
+    @Transactional
+    public int reassignFutureWorkoutsToGrooms(Map<Long, Long> groomByHorse) {
+        return groupSync.reassignFutureWorkoutsToGrooms(groomByHorse);
+    }
+
     // =================================================================
     // LUẬT THÀNH VIÊN (Membership rules)
     // =================================================================
@@ -251,7 +269,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         HorseStallInfo stall = stallInfo(List.of(horseId)).get(horseId);
 
         assertInTrainerArea(horse, stall, currentUser.getUserId());
-        trainingDecisionService.assertCanTrain(horse);
+        eligibility.assertCanTrain(horse);
         if (stall.stallGroomId() == null) {
             throw new ApiException(HttpStatus.CONFLICT, "STALL_NO_GROOM", String.format(
                     "Stall '%s' of horse '%s' has no groom assigned. Contact the club manager to assign one!",

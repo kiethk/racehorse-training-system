@@ -14,9 +14,9 @@ import com.rtms.backend.training.dto.CourseRunRequest;
 import com.rtms.backend.training.dto.CourseRunSummaryResponse;
 import com.rtms.backend.training.dto.CourseRunHorseResponse;
 import com.rtms.backend.training.dto.CourseRunOverlapResponse;
-import com.rtms.backend.training.dto.CourseRunSessionCountRow;
+import com.rtms.backend.training.repository.projection.CourseRunSessionCountRow;
 import com.rtms.backend.training.dto.PlannedSessionResponse;
-import com.rtms.backend.training.dto.RunningCourseRunRow;
+import com.rtms.backend.training.repository.projection.RunningCourseRunRow;
 import com.rtms.backend.training.entity.Course;
 import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.entity.Exercise;
@@ -29,10 +29,7 @@ import com.rtms.backend.training.enums.TrainingDay;
 import com.rtms.backend.training.enums.CourseRunStatus;
 import com.rtms.backend.training.enums.WorkoutStatus;
 import com.rtms.backend.training.repository.CourseRepository;
-import com.rtms.backend.training.repository.CourseExerciseRepository;
-import com.rtms.backend.training.repository.ExerciseRepository;
 import com.rtms.backend.training.repository.CourseRunRepository;
-import com.rtms.backend.training.repository.TrainingGroupMemberRepository;
 import com.rtms.backend.training.repository.TrainingGroupRepository;
 import com.rtms.backend.training.repository.TrainingSessionRepository;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
@@ -64,57 +61,37 @@ import java.util.stream.Collectors;
 @Service
 public class CourseRunServiceImpl implements CourseRunService {
 
-    private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-
     private final CourseRunRepository courseRunRepository;
     private final TrainingSessionRepository sessionRepository;
     private final TrainingWorkoutRepository workoutRepository;
     private final TrainingGroupRepository groupRepository;
-    private final TrainingGroupMemberRepository memberRepository;
     private final CourseRepository courseRepository;
-    private final CourseExerciseRepository courseExerciseRepository;
-    private final ExerciseRepository exerciseRepository;
     private final SessionSettlementService settlement;
     private final HorseRepository horseRepository;
     private final SessionSummaryAssembler assembler;
+    private final CourseRunScheduler scheduler;
     private final Clock clock;
 
     public CourseRunServiceImpl(CourseRunRepository courseRunRepository,
                                 TrainingSessionRepository sessionRepository,
                                 TrainingWorkoutRepository workoutRepository,
                                 TrainingGroupRepository groupRepository,
-                                TrainingGroupMemberRepository memberRepository,
                                 CourseRepository courseRepository,
-                                CourseExerciseRepository courseExerciseRepository,
-                                ExerciseRepository exerciseRepository,
                                 SessionSettlementService settlement,
                                 HorseRepository horseRepository,
                                 SessionSummaryAssembler assembler,
+                                CourseRunScheduler scheduler,
                                 Clock clock) {
         this.courseRunRepository = courseRunRepository;
         this.sessionRepository = sessionRepository;
         this.workoutRepository = workoutRepository;
         this.groupRepository = groupRepository;
-        this.memberRepository = memberRepository;
         this.courseRepository = courseRepository;
-        this.courseExerciseRepository = courseExerciseRepository;
-        this.exerciseRepository = exerciseRepository;
         this.settlement = settlement;
         this.horseRepository = horseRepository;
         this.assembler = assembler;
+        this.scheduler = scheduler;
         this.clock = clock;
-    }
-
-    /** Mọi thứ cần để tính lịch, đã kiểm hợp lệ. (Everything needed to calculate a schedule, already validated.) */
-    private record Context(TrainingGroup group, Course course, List<Exercise> exercises,
-                           List<TrainingGroupMember> members, Set<TrainingDay> days) {
-    }
-
-    /** Một buổi sắp được xếp; slot rỗng khi ngày đó hết khe. (A Session about to be placed; slot is null when the day has none.) */
-    private record PlannedSession(LocalDate date, Exercise exercise, LocalTime slot) {
-    }
-
-    private record Schedule(LocalDate startDate, LocalDate endDate, List<PlannedSession> sessions, List<LocalDate> fullDates) {
     }
 
     // =================================================================
@@ -124,13 +101,13 @@ public class CourseRunServiceImpl implements CourseRunService {
     @Override
     @Transactional(readOnly = true)
     public CourseRunPreviewResponse previewCourseRun(CourseRunRequest request, AuthenticatedUser currentUser) {
-        Context context = prepare(request, currentUser);
-        Schedule schedule = buildSchedule(context, request.startDate(), currentUser.getUserId());
-        List<CourseRun> overlapping = overlappingCourseRuns(context.group().getId(), schedule);
+        CourseRunScheduler.Context context = scheduler.prepare(request, currentUser);
+        CourseRunScheduler.Schedule schedule = scheduler.buildSchedule(context, request.startDate(), currentUser.getUserId());
+        List<CourseRun> overlapping = scheduler.overlappingCourseRuns(context.group().getId(), schedule);
         Map<Long, String> courseNames = courseNames(overlapping.stream().map(CourseRun::getCourseId).toList());
 
         List<RunningCourseRunRow> busy = courseRunRepository.findByGroupIdAndStatusIn(context.group().getId(), CourseRunStatus.UNFINISHED).stream()
-                .map(courseRun -> new RunningCourseRunRow(courseRun.getId(), null, courseNames.getOrDefault(courseRun.getCourseId(), ""),
+                .map(courseRun -> new RunningCourseRunRow(courseRun.getId(), courseNames.getOrDefault(courseRun.getCourseId(), ""),
                         courseRun.getStartDate(), courseRun.getEndDate(), courseRun.getStatus()))
                 .toList();
         LocalDate earliest = TrainingCalendar.earliestFreeStart(
@@ -165,15 +142,15 @@ public class CourseRunServiceImpl implements CourseRunService {
         // the second sees the course runs of the first and reports a clash instead of both creating overlapping course runs.)
         sessionRepository.lockSchedule(ScheduleLocks.of(trainerId));
 
-        Context context = prepare(request, currentUser);
-        Schedule schedule = buildSchedule(context, request.startDate(), trainerId);
+        CourseRunScheduler.Context context = scheduler.prepare(request, currentUser);
+        CourseRunScheduler.Schedule schedule = scheduler.buildSchedule(context, request.startDate(), trainerId);
 
-        List<CourseRun> overlapping = overlappingCourseRuns(context.group().getId(), schedule);
+        List<CourseRun> overlapping = scheduler.overlappingCourseRuns(context.group().getId(), schedule);
         if (!overlapping.isEmpty()) {
-            throw courseRunOverlap(overlapping);
+            throw scheduler.courseRunOverlap(overlapping);
         }
         if (!schedule.fullDates().isEmpty()) {
-            throw scheduleFull(schedule.fullDates());
+            throw scheduler.scheduleFull(schedule.fullDates());
         }
 
         try {
@@ -189,7 +166,7 @@ public class CourseRunServiceImpl implements CourseRunService {
         }
     }
 
-    private CourseRun saveCourseRun(Context context, Schedule schedule, Long trainerId) {
+    private CourseRun saveCourseRun(CourseRunScheduler.Context context, CourseRunScheduler.Schedule schedule, Long trainerId) {
         CourseRun courseRun = new CourseRun();
         courseRun.setGroupId(context.group().getId());
         courseRun.setCourseId(context.course().getId());
@@ -201,9 +178,9 @@ public class CourseRunServiceImpl implements CourseRunService {
         return courseRunRepository.saveAndFlush(courseRun);
     }
 
-    private List<TrainingSession> saveSessions(CourseRun courseRun, Schedule schedule, Long trainerId) {
+    private List<TrainingSession> saveSessions(CourseRun courseRun, CourseRunScheduler.Schedule schedule, Long trainerId) {
         List<TrainingSession> sessions = new ArrayList<>();
-        for (PlannedSession planned : schedule.sessions()) {
+        for (CourseRunScheduler.PlannedSession planned : schedule.sessions()) {
             TrainingSession session = new TrainingSession();
             session.setCourseRunId(courseRun.getId());
             session.setExerciseId(planned.exercise().getId());
@@ -364,132 +341,6 @@ public class CourseRunServiceImpl implements CourseRunService {
     }
 
     // =================================================================
-    // KIỂM HỢP LỆ VÀ TÍNH LỊCH (Validation and the schedule calculation)
-    // =================================================================
-
-    private Context prepare(CourseRunRequest request, AuthenticatedUser currentUser) {
-        Long trainerId = currentUser.getUserId();
-        validateDates(request);
-
-        TrainingGroup group = groupRepository.findById(request.groupId())
-                .filter(found -> found.getTrainerId().equals(trainerId))
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "Group not found!"));
-        if (group.isDisbanded()) {
-            throw new ApiException(HttpStatus.CONFLICT, "GROUP_DISBANDED", "Group '" + group.getName() + "' is disbanded!");
-        }
-        Course course = courseRepository.findById(request.courseId())
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "Training course not found!"));
-        if (course.getTrainerId() != null && !course.getTrainerId().equals(trainerId)) {
-            throw new IllegalArgumentException("You can only assign your own training courses!");
-        }
-        assertCourseCanBePlanned(course);
-
-        List<Exercise> exercises = courseExerciseRepository.findExercisesOfCourseInOrder(course.getId());
-        if (exercises.isEmpty()) {
-            throw new ApiException(HttpStatus.CONFLICT, "COURSE_HAS_NO_EXERCISES",
-                    "This course has no exercises yet, so it cannot be assigned to a group!");
-        }
-        List<TrainingGroupMember> members = memberRepository.findByGroupIdAndLeftAtIsNullOrderByJoinedAtAsc(group.getId());
-        if (members.isEmpty()) {
-            throw new ApiException(HttpStatus.CONFLICT, "GROUP_EMPTY",
-                    "Group '" + group.getName() + "' has no horses yet. Add horses before assigning a course!");
-        }
-        Set<TrainingDay> days = TrainingCalendar.requireWeekdays(new LinkedHashSet<>(request.trainingDays()));
-        return new Context(group, course, exercises, members, days);
-    }
-
-    private void validateDates(CourseRunRequest request) {
-        LocalDate today = today();
-        if (request.startDate().isBefore(today)) {
-            throw new IllegalArgumentException("Start date cannot be in the past!");
-        }
-        if (request.startDate().isAfter(today.plusDays(TrainingLimits.MAX_START_HORIZON_DAYS))) {
-            throw new IllegalArgumentException(
-                    "Start date cannot be more than " + TrainingLimits.MAX_START_HORIZON_DAYS + " days from today!");
-        }
-    }
-
-    /** Khóa phải có số buổi trong giới hạn. (A course must have a session count within the limits.) */
-    private void assertCourseCanBePlanned(Course course) {
-        Integer sessions = course.getTotalSessions();
-        if (sessions == null || sessions < TrainingLimits.MIN_COURSE_SESSIONS || sessions > TrainingLimits.MAX_COURSE_SESSIONS) {
-            throw new ApiException(HttpStatus.CONFLICT, "COURSE_INVALID_SESSIONS", String.format(
-                    "Course '%s' has %s sessions; a course needs between %d and %d sessions to be assigned.",
-                    course.getName(), sessions, TrainingLimits.MIN_COURSE_SESSIONS, TrainingLimits.MAX_COURSE_SESSIONS));
-        }
-    }
-
-    /**
-     * Phép tính lịch DUY NHẤT cho xem trước và tạo: ngày bắt đầu thật, ngày kết thúc, bài và giờ của từng buổi. Một truy vấn lấy
-     * mọi buổi đã có của Trainer trong khoảng ngày của khóa, rồi mỗi ngày quét khe trống riêng.
-     * (The ONE schedule calculation for preview and create: the real start date, the end date, and the Exercise and time of each
-     * Session. One query loads the Trainer's existing Sessions over the course range, then each day scans its own free slots.)
-     */
-    private Schedule buildSchedule(Context context, LocalDate requestedStart, Long trainerId) {
-        LocalDateTime now = LocalDateTime.now(clock);
-        LocalDate start = TrainingCalendar.firstSessionOnOrAfter(requestedStart, context.days());
-        if (start.equals(now.toLocalDate()) && !now.toLocalTime().isBefore(FarmSchedulePolicy.GOLDEN_HOURS_END)) {
-            throw new ApiException(HttpStatus.CONFLICT, "TRAINING_WINDOW_OVER", String.format(
-                    "Today's training window (%s–%s) is over. Choose a later start date.",
-                    FarmSchedulePolicy.GOLDEN_HOURS_START, FarmSchedulePolicy.GOLDEN_HOURS_END));
-        }
-        int total = context.course().getTotalSessions();
-        LocalDate end = TrainingCalendar.endDate(start, context.days(), total);
-
-        Map<LocalDate, List<Busy>> busyByDate = sessionRepository
-                .findByTrainerIdAndSessionDateBetweenAndStatusNot(trainerId, start, end, SessionStatus.CANCELLED).stream()
-                .collect(Collectors.groupingBy(TrainingSession::getSessionDate,
-                        Collectors.mapping(session -> new Busy(session.getStartTime(), session.getEndTime()),
-                                Collectors.toList())));
-
-        List<PlannedSession> planned = new ArrayList<>();
-        List<LocalDate> fullDates = new ArrayList<>();
-        LocalDate cursor = start;
-        int index = 0;
-        while (index < total) {
-            if (TrainingCalendar.isTrainingDay(cursor, context.days())) {
-                // Xoay vòng bài tập: exercises[i % n] (Rotate the Exercises: exercises[i % n])
-                Exercise exercise = context.exercises().get(index % context.exercises().size());
-                LocalTime slot = SessionSlotFinder.firstFreeSlot(busyByDate.getOrDefault(cursor, List.of()),
-                        exercise.getDurationMinutes(), SessionSlotFinder.earliestStart(cursor, now));
-                planned.add(new PlannedSession(cursor, exercise, slot));
-                if (slot == null) {
-                    fullDates.add(cursor);
-                }
-                index++;
-            }
-            if (index < total) {
-                cursor = cursor.plusDays(1);
-            }
-        }
-        return new Schedule(start, end, planned, fullDates);
-    }
-
-    /** Các kế hoạch chưa đóng của nhóm có khoảng ngày giao với lịch mới. (Unfinished course runs of the group whose dates meet the new schedule.) */
-    private List<CourseRun> overlappingCourseRuns(Long groupId, Schedule schedule) {
-        return courseRunRepository.findByGroupIdAndStatusIn(groupId, CourseRunStatus.UNFINISHED).stream()
-                .filter(courseRun -> !courseRun.getStartDate().isAfter(schedule.endDate()) && !courseRun.getEndDate().isBefore(schedule.startDate()))
-                .sorted(Comparator.comparing(CourseRun::getStartDate))
-                .toList();
-    }
-
-    private ApiException courseRunOverlap(List<CourseRun> overlapping) {
-        Map<Long, String> names = courseNames(overlapping.stream().map(CourseRun::getCourseId).toList());
-        String described = overlapping.stream()
-                .map(courseRun -> String.format("'%s' (%s to %s)", names.get(courseRun.getCourseId()),
-                        courseRun.getStartDate().format(DAY_FORMAT), courseRun.getEndDate().format(DAY_FORMAT)))
-                .collect(Collectors.joining(", "));
-        return new ApiException(HttpStatus.CONFLICT, "COURSE_RUN_OVERLAP",
-                "This group is already busy with " + described + ". Choose a start date after it ends!");
-    }
-
-    private ApiException scheduleFull(List<LocalDate> fullDates) {
-        String days = fullDates.stream().map(day -> day.format(DAY_FORMAT)).collect(Collectors.joining(", "));
-        return new ApiException(HttpStatus.CONFLICT, "SCHEDULE_FULL",
-                "Your schedule is full on " + days + ". Choose other dates or weekdays!");
-    }
-
-    // =================================================================
     // TIỆN ÍCH (Helpers)
     // =================================================================
 
@@ -502,12 +353,4 @@ public class CourseRunServiceImpl implements CourseRunService {
                 .collect(Collectors.toMap(Course::getId, Course::getName));
     }
 
-    private Map<Long, String> exerciseNames(List<TrainingSession> sessions) {
-        Set<Long> exerciseIds = sessions.stream().map(TrainingSession::getExerciseId).collect(Collectors.toSet());
-        if (exerciseIds.isEmpty()) {
-            return Map.of();
-        }
-        return exerciseRepository.findAllById(exerciseIds).stream()
-                .collect(Collectors.toMap(Exercise::getId, Exercise::getName));
-    }
 }

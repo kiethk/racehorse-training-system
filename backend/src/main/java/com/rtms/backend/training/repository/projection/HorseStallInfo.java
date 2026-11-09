@@ -1,4 +1,4 @@
-package com.rtms.backend.training.dto;
+package com.rtms.backend.training.repository.projection;
 
 /**
  * Chuồng và khu của một chiến mã, lấy bằng một câu JOIN.

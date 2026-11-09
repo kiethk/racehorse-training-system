@@ -30,7 +30,7 @@ class TrainingDecisionServiceTest {
     private CareScheduleRepository careScheduleRepository;
 
     @Mock
-    private GroupWorkoutSyncService workoutService;
+    private TrainingGroupService workoutService;
 
     private TrainingDecisionService service;
     private Horse horse;

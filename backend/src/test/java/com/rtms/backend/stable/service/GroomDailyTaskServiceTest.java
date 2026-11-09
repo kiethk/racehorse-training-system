@@ -231,7 +231,7 @@ class GroomDailyTaskServiceTest {
                 .thenReturn(List.of(sopTask));
 
         // Source 2: a workout joined with its session at 06:00 (horse and exercise names come in the same row)
-        com.rtms.backend.training.dto.GroomWorkoutRow workoutRow = new com.rtms.backend.training.dto.GroomWorkoutRow(
+        com.rtms.backend.training.repository.projection.GroomWorkoutRow workoutRow = new com.rtms.backend.training.repository.projection.GroomWorkoutRow(
                 201L, 1L, "Silver Moon", com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED,
                 java.time.LocalTime.of(6, 0), java.time.LocalTime.of(7, 30), "Steady 1200m run");
 

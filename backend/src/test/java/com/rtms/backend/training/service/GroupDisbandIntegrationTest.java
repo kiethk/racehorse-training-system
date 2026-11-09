@@ -74,7 +74,7 @@ class GroupDisbandIntegrationTest {
     @Autowired private CourseRunRepository courseRuns;
     @Autowired private EntityManager entityManager;
     @Autowired private DataSource dataSource;
-    @MockitoSpyBean private GroupWorkoutSyncService groupSync;
+    @MockitoSpyBean private GroupMemberSync groupSync;
 
     private User trainerUser;
     private AuthenticatedUser trainer;

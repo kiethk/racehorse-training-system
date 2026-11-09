@@ -1,8 +1,8 @@
 package com.rtms.backend.training.repository;
 
-import com.rtms.backend.training.dto.CourseRunSessionCountRow;
-import com.rtms.backend.training.dto.SessionHorseNameRow;
-import com.rtms.backend.training.dto.SessionRow;
+import com.rtms.backend.training.repository.projection.CourseRunSessionCountRow;
+import com.rtms.backend.training.repository.projection.SessionHorseNameRow;
+import com.rtms.backend.training.repository.projection.SessionRow;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.enums.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -43,7 +43,7 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     /** Số buổi của nhiều kế hoạch theo trạng thái bằng MỘT truy vấn. (Session counts of many course runs per status in ONE query.) */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.CourseRunSessionCountRow(s.courseRunId, s.status, COUNT(s))
+           SELECT new com.rtms.backend.training.repository.projection.CourseRunSessionCountRow(s.courseRunId, s.status, COUNT(s))
            FROM TrainingSession s
            WHERE s.courseRunId IN :courseRunIds
            GROUP BY s.courseRunId, s.status
@@ -126,7 +126,7 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     /** Phần SELECT dùng chung cho mọi truy vấn xem buổi. (SELECT part shared by every Session view query.) */
     String SESSION_ROW_SELECT = """
-            SELECT new com.rtms.backend.training.dto.SessionRow(
+            SELECT new com.rtms.backend.training.repository.projection.SessionRow(
                        s.id, s.trainerId, s.sessionDate, s.startTime, s.endTime, s.exerciseId, sub.name,
                        sub.durationMinutes, s.status,
                        (SELECT COUNT(w) FROM TrainingWorkout w
@@ -166,7 +166,7 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     /** Tên các ngựa còn hiệu lực trong NHIỀU buổi bằng MỘT truy vấn. (Names of active horses in MANY Sessions with ONE query.) */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.SessionHorseNameRow(w.sessionId, h.id, h.name)
+           SELECT new com.rtms.backend.training.repository.projection.SessionHorseNameRow(w.sessionId, h.id, h.name)
            FROM TrainingWorkout w
            JOIN Horse h ON w.horseId = h.id
            WHERE w.sessionId IN :sessionIds
@@ -177,7 +177,7 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     /** Như trên nhưng chỉ ngựa của một owner, để owner không thấy tên ngựa của chủ khác. (Same, but only one owner's horses.) */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.SessionHorseNameRow(w.sessionId, h.id, h.name)
+           SELECT new com.rtms.backend.training.repository.projection.SessionHorseNameRow(w.sessionId, h.id, h.name)
            FROM TrainingWorkout w
            JOIN Horse h ON w.horseId = h.id
            WHERE w.sessionId IN :sessionIds

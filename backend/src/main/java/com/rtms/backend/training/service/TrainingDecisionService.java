@@ -1,19 +1,12 @@
 package com.rtms.backend.training.service;
 
-import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
-import com.rtms.backend.horse.enums.HorseStatus;
 import com.rtms.backend.horse.repository.HorseRepository;
-import com.rtms.backend.medical.enums.CareScheduleStatus;
 import com.rtms.backend.medical.repository.CareScheduleRepository;
 import com.rtms.backend.training.enums.TrainingDecision;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 /**
  * Nơi DUY NHẤT đổi quyết định "ngựa có được tập không".
@@ -29,19 +22,16 @@ import java.util.List;
 @Service
 public class TrainingDecisionService {
 
-    private static final List<CareScheduleStatus> PENDING_EXAM_STATUSES = CareScheduleStatus.OPEN;
-    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-
     private final HorseRepository horseRepository;
-    private final CareScheduleRepository careScheduleRepository;
-    private final GroupWorkoutSyncService groupSync;
+    private final TrainingGroupService groupService;
+    private final TrainingEligibility eligibility;
 
     public TrainingDecisionService(HorseRepository horseRepository,
                                    CareScheduleRepository careScheduleRepository,
-                                   GroupWorkoutSyncService groupSync) {
+                                   TrainingGroupService groupService) {
         this.horseRepository = horseRepository;
-        this.careScheduleRepository = careScheduleRepository;
-        this.groupSync = groupSync;
+        this.groupService = groupService;
+        this.eligibility = new TrainingEligibility(careScheduleRepository);
     }
 
     /**
@@ -56,7 +46,7 @@ public class TrainingDecisionService {
         horse.setTrainingDecisionReason(reason);
         horseRepository.save(horse);
         // Ngựa bị chặn ra khỏi nhóm; các ngựa còn lại vẫn tập bình thường. (A blocked horse leaves its group; the others train on.)
-        groupSync.exitAnyGroup(horse.getId());
+        groupService.exitAnyGroup(horse.getId());
     }
 
     @Transactional
@@ -66,38 +56,13 @@ public class TrainingDecisionService {
         horseRepository.save(horse);
     }
 
-    /**
-     * Ném lỗi kèm lý do cụ thể nếu ngựa chưa tập được. Trainer cần biết VÌ SAO và ĐẾN KHI NÀO, không chỉ "đang bị khóa".
-     * (Throws an error with a concrete reason if the horse cannot train yet. The trainer needs to know WHY and
-     * UNTIL WHEN, not just "locked".)
-     */
+    /** Ném lỗi kèm lý do cụ thể nếu ngựa chưa tập được. (Throws an error with a concrete reason if the horse cannot train yet.) */
     public void assertCanTrain(Horse horse) {
-        if (horse.getCurrentStatus() != HorseStatus.ELIGIBLE) {
-            throw new ApiException(HttpStatus.CONFLICT, "HORSE_NOT_ELIGIBLE", String.format(
-                    "Horse '%s' has not been admitted to the club (status %s), so a course run cannot be created yet!",
-                    horse.getName(), horse.getCurrentStatus()));
-        }
-        if (horse.getTrainingDecision() == TrainingDecision.BLOCKED) {
-            throw new ApiException(HttpStatus.CONFLICT, "TRAINING_BLOCKED", String.format(
-                    "Horse '%s' is resting: %s. A new course run cannot be created!",
-                    horse.getName(), describeRest(horse)));
-        }
+        eligibility.assertCanTrain(horse);
     }
 
-    /**
-     * Lý do nghỉ tập và hạn khám lại của một ngựa đang bị chặn, ví dụ "Tendon strain (re-examination at
-     * 20/10/2026 14:00)". Dùng chung cho thông báo lỗi khi tạo kế hoạch và cho màn hình xem trước kế hoạch.
-     * (The rest reason and re-examination time of a blocked horse, for example "Tendon strain (re-examination at
-     * 20/10/2026 14:00)". Shared by the course run creation error and the course run preview screen.)
-     */
+    /** Lý do nghỉ tập và hạn khám lại, ví dụ "Tendon strain (re-examination at 20/10/2026 14:00)". (The rest reason and re-examination time.) */
     public String describeRest(Horse horse) {
-        LocalDateTime nextExam = careScheduleRepository.findNextExamTime(horse.getId(), PENDING_EXAM_STATUSES);
-        String reason = horse.getTrainingDecisionReason() == null || horse.getTrainingDecisionReason().isBlank()
-                ? "as directed by the vet"
-                : horse.getTrainingDecisionReason();
-        String until = nextExam == null
-                ? "no follow-up exam scheduled"
-                : "re-examination at " + nextExam.format(DATE_TIME);
-        return reason + " (" + until + ")";
+        return eligibility.describeRest(horse);
     }
 }

@@ -2,8 +2,8 @@ package com.rtms.backend.training.repository;
 
 import com.rtms.backend.training.entity.CourseRun;
 import com.rtms.backend.training.enums.CourseRunStatus;
-import com.rtms.backend.training.dto.DashboardHorseRow;
-import com.rtms.backend.training.dto.DashboardCourseRunRow;
+import com.rtms.backend.training.repository.projection.DashboardHorseRow;
+import com.rtms.backend.training.repository.projection.DashboardCourseRunRow;
 import com.rtms.backend.training.dto.HorseCourseRunResponse;
 import com.rtms.backend.training.enums.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -93,7 +93,7 @@ public interface CourseRunRepository extends JpaRepository<CourseRun, Long> {
 
     /** Chiến mã trong các khu của Trainer, kèm mã chuồng. (Horses in the Trainer's areas, with stall code.) */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.DashboardHorseRow(h.id, h.name, h.breed, ss.stallCode)
+           SELECT new com.rtms.backend.training.repository.projection.DashboardHorseRow(h.id, h.name, h.breed, ss.stallCode)
            FROM Horse h
            JOIN StableStall ss ON h.currentStallId = ss.id
            JOIN Area a ON ss.areaId = a.id
@@ -104,7 +104,7 @@ public interface CourseRunRepository extends JpaRepository<CourseRun, Long> {
 
     /** Chiến mã đã nhập trại của một Owner; ngựa chưa có chuồng vẫn được liệt kê. (The admitted horses of one Owner, stall or not.) */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.DashboardHorseRow(h.id, h.name, h.breed, ss.stallCode)
+           SELECT new com.rtms.backend.training.repository.projection.DashboardHorseRow(h.id, h.name, h.breed, ss.stallCode)
            FROM Horse h
            LEFT JOIN StableStall ss ON h.currentStallId = ss.id
            WHERE h.ownerId = :ownerId
@@ -115,7 +115,7 @@ public interface CourseRunRepository extends JpaRepository<CourseRun, Long> {
 
     /** Mọi chiến mã đã nhập trại của trang trại. (Every admitted horse of the farm.) */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.DashboardHorseRow(h.id, h.name, h.breed, ss.stallCode)
+           SELECT new com.rtms.backend.training.repository.projection.DashboardHorseRow(h.id, h.name, h.breed, ss.stallCode)
            FROM Horse h
            LEFT JOIN StableStall ss ON h.currentStallId = ss.id
            WHERE h.currentStatus = com.rtms.backend.horse.enums.HorseStatus.ELIGIBLE
@@ -130,7 +130,7 @@ public interface CourseRunRepository extends JpaRepository<CourseRun, Long> {
      * cancelled as a whole and the horse's own HELD Workouts.)
      */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.DashboardCourseRunRow(
+           SELECT new com.rtms.backend.training.repository.projection.DashboardCourseRunRow(
                       p.id, w.horseId, p.status, p.startDate, p.endDate, c.name,
                       CAST((SELECT COUNT(a) FROM TrainingSession a WHERE a.courseRunId = p.id) AS integer),
                       COUNT(CASE WHEN w.status = com.rtms.backend.training.enums.WorkoutStatus.RAN THEN 1 END),

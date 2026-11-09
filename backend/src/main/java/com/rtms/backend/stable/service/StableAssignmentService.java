@@ -12,7 +12,7 @@ import com.rtms.backend.stable.entity.StableStall;
 import com.rtms.backend.stable.enums.AreaType;
 import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,14 +33,14 @@ public class StableAssignmentService {
     private final UserRepository users;
     private final GroomProfileRepository profiles;
     private final HorseRepository horses;
-    private final GroupWorkoutSyncService workouts;
+    private final TrainingGroupService workouts;
     private final EntityManager em;
     private final AreaTrainerAssignmentPolicy trainerPolicy;
     private final com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
 
     public StableAssignmentService(AreaRepository areas, StableStallRepository stalls,
                                    UserRepository users, GroomProfileRepository profiles,
-                                   HorseRepository horses, GroupWorkoutSyncService workouts, EntityManager em,
+                                   HorseRepository horses, TrainingGroupService workouts, EntityManager em,
                                    AreaTrainerAssignmentPolicy trainerPolicy,
                                    com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation) {
         this.areas = areas;
