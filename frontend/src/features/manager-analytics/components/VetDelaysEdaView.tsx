@@ -127,9 +127,6 @@ export const VetDelaysEdaView: React.FC<VetDelaysEdaViewProps> = ({ data }) => {
           <div className="text-2xl font-bold text-[var(--color-text-primary)]">
             {(data.clinicRolloverRate * 100).toFixed(1)}%
           </div>
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            Mean rate across all active veterinarians
-          </span>
         </Panel>
 
         <Panel padded className="space-y-1">
@@ -140,9 +137,6 @@ export const VetDelaysEdaView: React.FC<VetDelaysEdaViewProps> = ({ data }) => {
               / {data.totalCareSchedules} exams
             </span>
           </div>
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            Rescheduled appointments in selected period
-          </span>
         </Panel>
 
         <Panel padded className="space-y-1">
@@ -162,9 +156,6 @@ export const VetDelaysEdaView: React.FC<VetDelaysEdaViewProps> = ({ data }) => {
               </Pill>
             )}
           </div>
-          <span className="block text-xs text-[var(--color-text-secondary)] mt-1">
-            Evaluated via workload monitoring and appointment overtime
-          </span>
         </Panel>
       </div>
 
@@ -172,14 +163,9 @@ export const VetDelaysEdaView: React.FC<VetDelaysEdaViewProps> = ({ data }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Veterinarian Rollover Rate Bar Chart */}
         <Panel padded className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-              Veterinarian Rollover Rates vs. Clinic Average
-            </h3>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              Dotted red line indicates clinic mean ({clinicMeanPercent}%). Outliers are highlighted.
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            Veterinarian Rollover Rates vs. Clinic Average
+          </h3>
 
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -230,14 +216,9 @@ export const VetDelaysEdaView: React.FC<VetDelaysEdaViewProps> = ({ data }) => {
 
         {/* Reschedule Reasons Distribution */}
         <Panel padded className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-              Reschedule Reason Breakdown
-            </h3>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              High appointment overtime indicates capacity strain; emergency care preemption reflects urgent escalations.
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            Reschedule Reason Breakdown
+          </h3>
 
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -250,6 +231,7 @@ export const VetDelaysEdaView: React.FC<VetDelaysEdaViewProps> = ({ data }) => {
                 <XAxis type="number" unit="%" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="reason" tick={{ fontSize: 11 }} width={160} />
                 <RechartsTooltip
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   formatter={(val: unknown, _name: unknown, item: any) => [
                     `${val}% (${item.payload.count} events)`,
                     'Share',

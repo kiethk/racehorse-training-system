@@ -115,9 +115,6 @@ export const TrainerEvaluationEdaView: React.FC<TrainerEvaluationEdaViewProps> =
           <div className="text-2xl font-bold text-[var(--color-text-primary)]">
             {data.overallAdherenceRate.toFixed(1)}%
           </div>
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            Percentage of scheduled workouts successfully executed (RAN)
-          </span>
         </Panel>
 
         <Panel padded className="space-y-1">
@@ -128,9 +125,6 @@ export const TrainerEvaluationEdaView: React.FC<TrainerEvaluationEdaViewProps> =
               / {data.totalWorkoutsScheduled} workouts
             </span>
           </div>
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            Executed workouts across all trainer stables
-          </span>
         </Panel>
 
         <Panel padded className="space-y-1">
@@ -138,22 +132,14 @@ export const TrainerEvaluationEdaView: React.FC<TrainerEvaluationEdaViewProps> =
           <div className="text-2xl font-bold text-[var(--color-text-primary)]">
             {data.trainers.length}
           </div>
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            Trainers assigned to active courses and groups
-          </span>
         </Panel>
       </div>
 
       {/* Trainer Performance Chart */}
       <Panel padded className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Trainer Workload Adherence vs. Performance Rating
-          </h3>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Compare execution discipline (Adherence %) alongside equine performance ratings (1–10 scaled to 100%).
-          </p>
-        </div>
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+          Trainer Workload Adherence vs. Performance Rating
+        </h3>
 
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">

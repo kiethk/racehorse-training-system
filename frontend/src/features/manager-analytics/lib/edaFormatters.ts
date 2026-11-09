@@ -20,7 +20,7 @@ export const formatAdmissionStage = (stage: string): string => {
     case 'TRAINER_REVIEW':
       return 'Trainer Assessment';
     case 'MANAGER_REVIEW':
-      return 'Manager Approval';
+      return 'Quarantine & Manager Approval';
     case 'APPROVED':
       return 'Admitted';
     case 'REJECTED':
@@ -79,3 +79,18 @@ export const formatFacilityAreaType = (type: string): string => {
         .replace(/\b\w/g, (c) => c.toUpperCase());
   }
 };
+
+/**
+ * Formats turnaround latency in hours or days.
+ * If hours > 48, formats as days with hours in parentheses (e.g. '4.2 days (101h)').
+ * Otherwise formats in hours (e.g. '24.5h').
+ */
+export const formatTurnaroundTime = (hours: number): string => {
+  if (!hours || hours <= 0) return '—';
+  if (hours > 48) {
+    const days = (hours / 24).toFixed(1);
+    return `${days} days (${hours.toFixed(0)}h)`;
+  }
+  return `${hours.toFixed(1)}h`;
+};
+

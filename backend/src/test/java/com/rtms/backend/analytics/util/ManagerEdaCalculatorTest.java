@@ -156,12 +156,12 @@ class ManagerEdaCalculatorTest {
         List<AdmissionApplication> apps = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
 
-        // Application 1: Full pipeline (submitted -> arrived -> groom -> vet -> trainer -> manager approved)
+        // Application 1: Full pipeline (submitted -> groom -> arrived -> vet -> trainer -> manager approved)
         AdmissionApplication a1 = new AdmissionApplication();
         a1.setStatus(AdmissionStatus.APPROVED);
         a1.setSubmittedAt(now.minusHours(50));
-        a1.setArrivedAt(now.minusHours(40));      // +10h arrival
-        a1.setGroomReviewedAt(now.minusHours(35)); // +5h groom
+        a1.setGroomReviewedAt(now.minusHours(45)); // +5h groom
+        a1.setArrivedAt(now.minusHours(35));       // +10h arrival
         a1.setVetReviewedAt(now.minusHours(15));   // +20h vet (bottleneck!)
         a1.setTrainerReviewedAt(now.minusHours(10));// +5h trainer
         a1.setManagerReviewedAt(now.minusHours(2)); // +8h manager
@@ -171,8 +171,8 @@ class ManagerEdaCalculatorTest {
         AdmissionApplication a2 = new AdmissionApplication();
         a2.setStatus(AdmissionStatus.REJECTED);
         a2.setSubmittedAt(now.minusHours(30));
-        a2.setArrivedAt(now.minusHours(24));
-        a2.setGroomReviewedAt(now.minusHours(20));
+        a2.setGroomReviewedAt(now.minusHours(25));
+        a2.setArrivedAt(now.minusHours(20));
         a2.setVetReviewedAt(now.minusHours(10));
         apps.add(a2);
 
@@ -184,6 +184,8 @@ class ManagerEdaCalculatorTest {
         assertThat(result.rejectionRate()).isEqualTo(50.0);
         assertThat(result.bottleneckStage()).isEqualTo("VET_REVIEW");
         assertThat(result.stageFunnel()).isNotEmpty();
+        assertThat(result.stageFunnel().get(1).stage()).isEqualTo("Groom Checked");
+        assertThat(result.stageFunnel().get(2).stage()).isEqualTo("Arrived at Facility");
     }
 
     private AreaStallCountProjection createProjection(Long areaId, StallStatus status, Long count) {

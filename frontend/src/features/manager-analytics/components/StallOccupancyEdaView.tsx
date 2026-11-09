@@ -88,7 +88,7 @@ export const StallOccupancyEdaView: React.FC<StallOccupancyEdaViewProps> = ({ da
       {data.quarantineStressAlert && (
         <Notice tone="error">
           <span className="font-semibold">
-            Quarantine Buffer Warning: Buffer margin is {data.inflowBufferMargin} stall(s) ({data.quarantineAvailable} available vs. {data.awaitingArrivalAdmissions} admissions awaiting arrival). High risk of intake bottleneck.
+            Quarantine Alert: Buffer margin is {data.inflowBufferMargin} ({data.quarantineAvailable} available vs. {data.awaitingArrivalAdmissions} awaiting arrival).
           </span>
         </Notice>
       )}
@@ -101,7 +101,7 @@ export const StallOccupancyEdaView: React.FC<StallOccupancyEdaViewProps> = ({ da
             {data.overallRate.toFixed(1)}%
           </div>
           <span className="text-xs text-[var(--color-text-secondary)]">
-            {data.occupiedStalls} / {data.totalStalls} total stalls used
+            {data.occupiedStalls} / {data.totalStalls} stalls
           </span>
         </Panel>
 
@@ -111,7 +111,7 @@ export const StallOccupancyEdaView: React.FC<StallOccupancyEdaViewProps> = ({ da
             {data.quarantineRate.toFixed(1)}%
           </div>
           <span className="text-xs text-[var(--color-text-secondary)]">
-            {data.quarantineOccupied} / {data.quarantineTotal} isolation stalls
+            {data.quarantineOccupied} / {data.quarantineTotal} stalls
           </span>
         </Panel>
 
@@ -121,7 +121,7 @@ export const StallOccupancyEdaView: React.FC<StallOccupancyEdaViewProps> = ({ da
             {data.regularRate.toFixed(1)}%
           </div>
           <span className="text-xs text-[var(--color-text-secondary)]">
-            {data.regularOccupied} / {data.regularTotal} training stalls
+            {data.regularOccupied} / {data.regularTotal} stalls
           </span>
         </Panel>
 
@@ -135,21 +135,16 @@ export const StallOccupancyEdaView: React.FC<StallOccupancyEdaViewProps> = ({ da
             {data.inflowBufferMargin > 0 ? `+${data.inflowBufferMargin}` : data.inflowBufferMargin}
           </div>
           <span className="text-xs text-[var(--color-text-secondary)]">
-            {data.awaitingArrivalAdmissions} horses pending arrival
+            {data.awaitingArrivalAdmissions} pending arrival
           </span>
         </Panel>
       </div>
 
       {/* Barn Occupancy Chart */}
       <Panel padded className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Facility Capacity Breakdown by Barn & Area
-          </h3>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Dotted line marks 85% optimal capacity threshold. Amber bars denote Quarantine blocks.
-          </p>
-        </div>
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+          Facility Capacity Breakdown by Barn & Area
+        </h3>
 
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
