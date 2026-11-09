@@ -64,12 +64,12 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
           </span>
           <ModuleBadge moduleName={moduleName} />
           {item.success ? (
-            <span className="text-xs text-[var(--color-text-muted)]">
-              (Success)
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              (Completed)
             </span>
           ) : (
-            <span className="text-xs text-[var(--color-text-muted)]">
-              (Failed - {item.statusCode})
+            <span className="text-xs font-medium text-rose-600 dark:text-rose-400">
+              (Blocked / Rejected)
             </span>
           )}
         </div>
@@ -235,8 +235,11 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
               </table>
             </div>
           ) : (
-            <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs font-mono text-[var(--color-text-primary)] whitespace-pre-wrap break-all">
-              {parsed.raw || 'No change payload recorded for this operation.'}
+            <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2.5 text-xs text-[var(--color-text-primary)] leading-relaxed">
+              {parsed.raw ||
+                (item.success
+                  ? 'Operation completed successfully. No field values were modified.'
+                  : 'This operation was blocked by safety policy. No data was modified.')}
             </div>
           )}
         </div>

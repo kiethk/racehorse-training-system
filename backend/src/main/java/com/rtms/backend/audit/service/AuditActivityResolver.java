@@ -113,7 +113,19 @@ public class AuditActivityResolver {
 
         Matcher m;
 
-        // 0. AI Assistant & HITL
+        // 0. System Administration & Audit Maintenance
+        if (normalizedPath.contains("/manager/audit-logs/purge") || normalizedPath.contains("/audit-logs/purge")) {
+            return new ResolvedActivity(
+                    "Archive & Purge Audit Trail",
+                    "AuditLog",
+                    null,
+                    isSuccess
+                            ? "Manager successfully archived and purged eligible historical audit logs."
+                            : "Manager requested audit log purge, but the operation was blocked by safety policy (e.g. 30-day minimum retention rule BR-MGR-19 or invalid date range)."
+            );
+        }
+
+        // 0.1 AI Assistant & HITL
         if (normalizedPath.contains("/ai/chat") || normalizedPath.contains("/ai/conversations")) {
             return new ResolvedActivity(
                     "AI Assistant Consultation",
@@ -695,15 +707,17 @@ public class AuditActivityResolver {
         };
         String friendlyEntity = humanizeEntity(entityName);
         String actionTitle = "System".equalsIgnoreCase(entityName)
-                ? actionVerb + " Resource"
+                ? actionVerb + " Farm Setting"
                 : actionVerb + " " + friendlyEntity;
+        String details = isSuccess
+                ? "Successfully updated " + friendlyEntity.toLowerCase() + " record."
+                : "Attempted to update " + friendlyEntity.toLowerCase() + ", but the action was blocked by system policy.";
+
         return new ResolvedActivity(
                 actionTitle,
                 entityName,
                 null,
-                (isSuccess ? "Successfully processed " : "Attempted ")
-                        + actionVerb.toLowerCase() + " operation for " + friendlyEntity.toLowerCase()
-                        + statusSuffix
+                details
         );
     }
 
