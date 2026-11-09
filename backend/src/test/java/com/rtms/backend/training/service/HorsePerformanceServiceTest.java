@@ -301,7 +301,7 @@ class HorsePerformanceServiceTest {
                 .thenReturn(List.of(
                         workout(50L, today, null, null, 8),
                         workout(50L, today.minusDays(2), null, null, 6)));
-        HorseSpecialtyResponse noData = new HorseSpecialtyResponse(3, List.of(), null, List.of());
+        HorseSpecialtyResponse noData = new HorseSpecialtyResponse(3, new java.math.BigDecimal("7.0"), List.of(), null, List.of());
         when(specialtyService.getSpecialties(List.of(50L, 51L))).thenReturn(Map.of(50L, noData, 51L, noData));
 
         List<DashboardHorseResponse> dashboard = service.getDashboard(trainer);

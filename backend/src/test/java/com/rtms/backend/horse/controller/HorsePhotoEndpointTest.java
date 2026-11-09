@@ -165,7 +165,7 @@ class HorsePhotoEndpointTest {
         when(photoService.resolveImageUrls(eq(List.of(10L, 20L)), any())).thenReturn(Map.of());
 
         com.rtms.backend.training.dto.HorseSpecialtyResponse spec1 =
-                new com.rtms.backend.training.dto.HorseSpecialtyResponse(3, List.of(), null, List.of());
+                new com.rtms.backend.training.dto.HorseSpecialtyResponse(3, new java.math.BigDecimal("7.0"), List.of(), null, List.of());
         when(specialtyService.getSpecialties(eq(List.of(10L, 20L)))).thenReturn(Map.of(10L, spec1));
 
         com.rtms.backend.common.dto.ApiResponse<List<HorseResponse>> response =
