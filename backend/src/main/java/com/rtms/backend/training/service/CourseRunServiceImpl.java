@@ -251,7 +251,8 @@ public class CourseRunServiceImpl implements CourseRunService {
         settlement.settle();
         CourseRun courseRun = visibleCourseRun(courseRunId, currentUser);
         List<TrainingSession> sessions = sessionRepository.findByCourseRunIdOrderBySessionDateAscStartTimeAsc(courseRun.getId());
-        int total = (int) sessions.stream().filter(session -> session.getStatus() != SessionStatus.CANCELLED).count();
+        // Cancelled Sessions stay in the total: the total is what the course run was created with.
+        int total = sessions.size();
         List<TrainingWorkout> workouts = workoutRepository.findBySessionIdIn(sessions.stream().map(TrainingSession::getId).toList());
         Map<Long, String> names = horseNames(workouts);
         Map<Long, Long> attended = workouts.stream().filter(workout -> workout.getStatus() == WorkoutStatus.RAN)

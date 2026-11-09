@@ -7,20 +7,23 @@ import { clockOf, minutesOf, sessionStartOptions } from '../lib/timeline.ts';
 import { rangeForPreset, rangeLabel, shiftIsoDate, toIsoDate, tomorrowIso } from '../lib/dateRange.ts';
 
 describe('courseRunProgress', () => {
-  it('removes cancelled sessions from the denominator so the course run can reach 100%', () => {
-    const progress = courseRunProgress(11, 12, 1, 'COMPLETED');
-    assert.equal(progress.total, 11);
-    assert.equal(progress.percent, 100);
+  it('keeps cancelled sessions in the total, so a course run closed with 2 of 10 cancelled reads 8/10', () => {
+    const progress = courseRunProgress(8, 10, 2);
+    assert.equal(progress.total, 10);
+    assert.equal(progress.percent, 80);
   });
 
-  it('never divides by zero for an empty course run or one whose sessions are all cancelled', () => {
-    assert.deepEqual(courseRunProgress(0, 0, 0, 'COMPLETED'), { completed: 0, total: 0, cancelled: 0, percent: 0, allCancelled: false });
-    assert.equal(courseRunProgress(0, 4, 4, 'COMPLETED').percent, 0);
+  it('reaches 100% only when every session of the course run was held', () => {
+    assert.equal(courseRunProgress(10, 10, 0).percent, 100);
+  });
+
+  it('never divides by zero for an empty course run', () => {
+    assert.deepEqual(courseRunProgress(0, 0, 0), { completed: 0, total: 0, cancelled: 0, percent: 0, allCancelled: false });
   });
 
   it('flags a course run whose sessions are all cancelled', () => {
-    assert.equal(courseRunProgress(0, 6, 6, 'COMPLETED').allCancelled, true);
-    assert.equal(courseRunProgress(1, 6, 5, 'COMPLETED').allCancelled, false);
+    assert.equal(courseRunProgress(0, 6, 6).allCancelled, true);
+    assert.equal(courseRunProgress(1, 6, 5).allCancelled, false);
   });
 
   it('labels the cancelled count in the singular and plural', () => {
@@ -28,16 +31,10 @@ describe('courseRunProgress', () => {
     assert.equal(cancelledLabel(3), '3 sessions cancelled');
   });
 
-  it('keeps cancelled sessions in the count of a cancelled course run', () => {
-    const progress = courseRunProgress(3, 6, 3, 'CANCELLED');
+  it('reads a cancelled course run with the same formula: 3 held of 6 is 3/6', () => {
+    const progress = courseRunProgress(3, 6, 3);
     assert.equal(progress.total, 6);
     assert.equal(progress.percent, 50);
-    assert.equal(progress.allCancelled, false);
-    assert.equal(courseRunProgress(0, 6, 6, 'CANCELLED').allCancelled, true);
-  });
-
-  it('caps the percentage at 100', () => {
-    assert.equal(courseRunProgress(5, 3, 0, 'COMPLETED').percent, 100);
   });
 });
 

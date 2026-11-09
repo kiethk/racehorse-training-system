@@ -6,7 +6,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react';
 import { BackLink, Button, ConfirmDialog, DetailSkeleton, EmptyState, HorseAvatar, PageHeader, Panel, Pill, ProgressBar, ScreenLayout, Table, TBody, Td, Th, THead, Tr } from '@/components/ui';
 import { displayError, formatDate, formatTime } from '@/lib/display';
 import { toast } from '@/lib/toast';
-import { courseRunProgress } from '../../lib/courseRunProgress';
+import { cancelledLabel, courseRunProgress } from '../../lib/courseRunProgress';
 import { COURSE_RUN_STATUS, SESSION_STATUS } from '../../lib/status';
 import { trainingService } from '../../services/trainingService';
 import type { CourseRunDetail as CourseRunDetailData, CourseRunHorse } from '../../types';
@@ -62,7 +62,7 @@ export function CourseRunDetail({ courseRunId }: { courseRunId: number }) {
   if (!detail) return <DetailSkeleton />;
 
   const { courseRun, sessions } = detail;
-  const progress = courseRunProgress(courseRun.sessionsHeld, courseRun.sessionsTotal, courseRun.sessionsCancelled, courseRun.status);
+  const progress = courseRunProgress(courseRun.sessionsHeld, courseRun.sessionsTotal, courseRun.sessionsCancelled);
 
   return (
     <ScreenLayout variant="detail">
@@ -88,7 +88,10 @@ export function CourseRunDetail({ courseRunId }: { courseRunId: number }) {
           <span>{formatDate(courseRun.startDate)} – {formatDate(courseRun.endDate)}</span>
         </div>
         <ProgressBar label="Course run progress" value={progress.percent} />
-        <p className="text-xs text-[var(--color-text-muted)]">{progress.completed}/{progress.total} sessions</p>
+        <p className="text-xs text-[var(--color-text-muted)]">
+          {progress.completed}/{progress.total} sessions held
+          {progress.cancelled > 0 && ` · ${cancelledLabel(progress.cancelled)}`}
+        </p>
       </Panel>
 
       <Panel padded className="space-y-3">
@@ -116,9 +119,9 @@ export function CourseRunDetail({ courseRunId }: { courseRunId: number }) {
                     {horse.horseName}
                   </Link>
                 </div>
-                <div className="shrink-0" title="Sessions attended out of sessions held or still to come">
+                <div className="shrink-0" title="Sessions this horse ran out of every session of the course run">
                   <Pill tone="neutral" size="sm">
-                    {horse.attended} / {horse.total} sessions
+                    {horse.attended}/{horse.total} ran
                   </Pill>
                 </div>
               </li>

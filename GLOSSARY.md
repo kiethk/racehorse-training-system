@@ -44,8 +44,13 @@ _Avoid_: No-show, absent
 The morning hours, 06:00 to 10:00, in which every Session must start and end; Session start times fall on 15-minute steps.
 _Avoid_: Training hours, time slot
 
+**Course Run progress**:
+How many of a Course Run's Sessions have been Held, shown against all the Sessions the Course Run was created with (for example 5 of 10). Cancelled Sessions stay in the total and are never made up, so a Course Run that closed with cancellations never shows full (for example 8 of 10 with 2 cancelled).
+_Avoid_: Completion rate
+
 **Attendance**:
-How many of a Course's Sessions a horse took part in (its Workouts that Ran), shown against the Course total (for example 7 of 20). A missed Session is never made up: the horse simply goes on with its group.
+How many of a Course Run's Sessions a horse took part in (its Workouts that Ran), shown against the same total as the Course Run progress (for example 4 of 10). Sessions from before the horse joined, and Sessions or Workouts that were cancelled, stay in the total: the horse simply goes on with its group.
+_Avoid_: Presence
 
 **Course**:
 An ordered list of Exercises that a Training Group works through over a number of Sessions.

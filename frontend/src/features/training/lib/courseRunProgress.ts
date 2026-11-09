@@ -1,8 +1,6 @@
-import type { CourseRunStatus } from '../types';
-
 export interface CourseRunProgress {
   completed: number;
-  /** Sessions that still count: cancelled ones are removed unless the whole course run was cancelled. */
+  /** Every Session the course run was created with, cancelled ones included. */
   total: number;
   cancelled: number;
   percent: number;
@@ -11,19 +9,13 @@ export interface CourseRunProgress {
 }
 
 /**
- * Progress of a course run. Cancelled sessions leave the denominator, so a 12-session course run with 1 cancelled reaches 100% at
- * 11 completed sessions instead of hanging at 91% forever. A CANCELLED course run keeps them: it was dropped part-way, so
- * 3 held of 6 reads 3/6 (50%), not a misleading 3/3 (100%).
+ * Progress of a course run, or of one horse in it. The total is every Session the course run was created with, so a cancelled
+ * Session stays in it: a course run that closed with 2 of 10 cancelled reads 8/10 (80%), never full. The same formula serves a closed,
+ * a cancelled and a running course run.
  */
-export function courseRunProgress(
-  completed: number,
-  planned: number,
-  cancelled: number,
-  status: CourseRunStatus | 'NONE',
-): CourseRunProgress {
-  const total = status === 'CANCELLED' ? planned : Math.max(planned - cancelled, 0);
-  const percent = total === 0 ? 0 : Math.min(Math.round((completed / total) * 100), 100);
-  return { completed, total, cancelled, percent, allCancelled: completed === 0 && cancelled > 0 && cancelled >= planned };
+export function courseRunProgress(completed: number, planned: number, cancelled: number): CourseRunProgress {
+  const percent = planned === 0 ? 0 : Math.min(Math.round((completed / planned) * 100), 100);
+  return { completed, total: planned, cancelled, percent, allCancelled: completed === 0 && cancelled > 0 && cancelled >= planned };
 }
 
 /** "1 session cancelled" / "3 sessions cancelled". */

@@ -316,7 +316,7 @@ class GroupMidCourseIntegrationTest {
     }
 
     @Test
-    void aSessionCancelledAsAWholeLeavesTheDenominatorButAHorsesOwnCancelledWorkoutDoesNot() {
+    void aSessionCancelledAsAWholeStaysInTheTotalJustLikeAHorsesOwnCancelledWorkout() {
         List<TrainingSession> all = sessions.findByCourseRunIdOrderBySessionDateAscStartTimeAsc(courseRun.courseRun().id());
         all.get(1).setStatus(SessionStatus.CANCELLED);
         sessions.saveAndFlush(all.get(1));
@@ -328,7 +328,7 @@ class GroupMidCourseIntegrationTest {
         HorseAttendanceResponse line = attendanceService.getHistory(thunder.getId(), trainer).get(0);
 
         assertEquals(2, line.attended());
-        assertEquals(2, line.total());
+        assertEquals(3, line.total());
     }
 
     // ------------------------------------------------------------------ helpers

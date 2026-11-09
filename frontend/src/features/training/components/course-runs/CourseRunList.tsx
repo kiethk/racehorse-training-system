@@ -20,7 +20,7 @@ import {
 import { displayError, formatDate } from '@/lib/display';
 import { plural } from '../../lib/groupLifecycle';
 import { courseRunsByGroup, type CourseRunBlock } from '../../lib/courseRunBlocks';
-import { courseRunProgress } from '../../lib/courseRunProgress';
+import { cancelledLabel, courseRunProgress } from '../../lib/courseRunProgress';
 import { COURSE_RUN_STATUS } from '../../lib/status';
 import { trainingService } from '../../services/trainingService';
 import type { Course, CourseRunSummary, CourseRunStatus, TrainingGroup } from '../../types';
@@ -260,7 +260,7 @@ function GroupBlock({ block }: { block: CourseRunBlock }) {
 }
 
 function CourseRunCard({ courseRun }: { courseRun: CourseRunSummary }) {
-  const progress = courseRunProgress(courseRun.sessionsHeld, courseRun.sessionsTotal, courseRun.sessionsCancelled, courseRun.status);
+  const progress = courseRunProgress(courseRun.sessionsHeld, courseRun.sessionsTotal, courseRun.sessionsCancelled);
 
   return (
     <Link href={`/trainer/course-runs/${courseRun.id}`} className="block">
@@ -276,7 +276,10 @@ function CourseRunCard({ courseRun }: { courseRun: CourseRunSummary }) {
         </p>
         <div className="mt-auto space-y-1">
           <ProgressBar label="Course run progress" value={progress.percent} size="sm" />
-          <p className="text-xs text-[var(--color-text-muted)]">{progress.completed}/{progress.total} sessions</p>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {progress.completed}/{progress.total} sessions held
+            {progress.cancelled > 0 && ` · ${cancelledLabel(progress.cancelled)}`}
+          </p>
         </div>
       </Panel>
     </Link>

@@ -299,11 +299,9 @@ public class HorsePerformanceService {
         int total = courseRun.totalSessions() != null ? courseRun.totalSessions() : 0;
         int completed = courseRun.completedSessions().intValue();
         int cancelled = courseRun.cancelledSessions().intValue();
-        // Giống trang Course run: buổi bị hủy ra khỏi mẫu số (khóa 6 buổi hủy 2 đạt 100% khi tập đủ 4), trừ khi cả kế hoạch bị
-        // hủy giữa chừng: khi đó tập 3 trên 6 là 50%, không phải 100%.
-        // (Like the Course run page: cancelled sessions leave the denominator (a 6-session course run with 2 cancelled reaches 100%
-        // after 4), unless the whole course run was dropped part-way: then 3 held of 6 is 50%, not 100%.)
-        int counted = courseRun.status() == CourseRunStatus.CANCELLED ? total : Math.max(total - cancelled, 0);
+        // Mẫu số là MỌI buổi của kế hoạch lúc tạo, kể cả buổi bị hủy: khóa 6 buổi hủy 2, ngựa chạy 4 thì là 4/6, không bao giờ đủ.
+        // (The denominator is EVERY Session the course run was created with, cancelled ones included: a 6-session course run with 2
+        // cancelled and 4 ran reads 4/6, never full.)
 
         response.setCourseRunId(courseRun.courseRunId());
         response.setCourseRunStatus(courseRun.status().name());
@@ -313,7 +311,7 @@ public class HorsePerformanceService {
         response.setCompletedSessions(completed);
         response.setTotalSessions(total > 0 ? total : completed);
         response.setCancelledSessions(cancelled);
-        response.setProgressPercent(counted > 0 ? round1(Math.min(completed * 100.0 / counted, 100.0)) : 0.0);
+        response.setProgressPercent(total > 0 ? round1(Math.min(completed * 100.0 / total, 100.0)) : 0.0);
     }
 
     /** Điểm phong độ mới nhất và trung bình 30 ngày. (Latest rating and the 30-day average.) */

@@ -37,24 +37,24 @@ function newestHorseFirst(left: DashboardHorse, right: DashboardHorse): number {
 }
 
 /**
- * The third line of the course cell: the bar and the held/planned count, counted the same way as on the course run page.
- * Cancelled sessions are named in the tooltip to keep the row short.
+ * The third line of the course cell: the bar and how many of the course run's sessions this horse ran, out of every session the
+ * course run was created with. Cancelled sessions are named in the tooltip to keep the row short.
  */
 function CourseProgress({ horse }: { horse: DashboardHorse }) {
-  const progress = courseRunProgress(horse.completedSessions, horse.totalSessions, horse.cancelledSessions, horse.courseRunStatus);
+  const progress = courseRunProgress(horse.completedSessions, horse.totalSessions, horse.cancelledSessions);
   if (progress.allCancelled) {
     return <p className="text-xs text-[var(--color-text-muted)]">All {progress.cancelled} sessions cancelled</p>;
   }
   if (progress.total === 0) return null;
 
-  const count = <span className="shrink-0">{progress.completed}/{progress.total}</span>;
+  const count = <span className="shrink-0">{progress.completed}/{progress.total} ran</span>;
   return (
     <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
       <ProgressBar label={`${horse.horseName} course progress`} value={progress.percent} size="sm" tone="info" className="flex-1" />
       {progress.cancelled > 0 ? (
         <Tooltip content={cancelledLabel(progress.cancelled)}>
           <span tabIndex={0} className="shrink-0 rounded-[var(--radius-xs)] underline decoration-dotted outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">
-            {progress.completed}/{progress.total}
+            {progress.completed}/{progress.total} ran
           </span>
         </Tooltip>
       ) : count}

@@ -29,12 +29,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Cài đặt HorseAttendanceService. Đã học (X) là số Workout RAN của ngựa (đã ghi kết quả). Tổng (Y) là các buổi chưa bị
- * hủy của chính kế hoạch (kể cả buổi trước khi ngựa vào và buổi mà Workout riêng của ngựa bị hủy), không lấy từ Course nên sửa Course
- * về sau không làm đổi lịch sử cũ.
- * (Implements HorseAttendanceService. Attended (X) is the horse's Workouts that Ran (results recorded). Total (Y) is
- * the course run's own Sessions that were not cancelled (including Sessions before the horse joined and Sessions where only its own
- * Workout was cancelled), never taken from the Course, so editing a Course later does not rewrite old history.)
+ * Cài đặt HorseAttendanceService. Đã học (X) là số Workout RAN của ngựa (đã ghi kết quả). Tổng (Y) là MỌI buổi của chính kế hoạch lúc tạo,
+ * kể cả buổi bị hủy, buổi trước khi ngựa vào và buổi mà Workout riêng của ngựa bị hủy, nên con số cho thấy khóa cần bao nhiêu buổi.
+ * Không lấy từ Course nên sửa Course về sau không làm đổi lịch sử cũ.
+ * (Implements HorseAttendanceService. Attended (X) is the horse's Workouts that Ran (results recorded). Total (Y) is EVERY Session the
+ * course run was created with, cancelled ones included, Sessions before the horse joined and Sessions where only its own Workout was
+ * cancelled, so the number shows how many Sessions the course needs. Never taken from the Course, so editing a Course later does not
+ * rewrite old history.)
  */
 @Service
 public class HorseAttendanceServiceImpl implements HorseAttendanceService {
@@ -113,8 +114,8 @@ public class HorseAttendanceServiceImpl implements HorseAttendanceService {
             }
 
             Map<SessionStatus, Long> byStatus = counts.getOrDefault(courseRun.getId(), Map.of());
-            int total = byStatus.getOrDefault(SessionStatus.HELD, 0L).intValue()
-                    + byStatus.getOrDefault(SessionStatus.SCHEDULED, 0L).intValue();
+            // Cancelled Sessions stay in the total: the total is what the course run was created with.
+            int total = byStatus.values().stream().mapToInt(Long::intValue).sum();
             LocalDate joinedOn = courseRunWorkouts.stream()
                     .map(workout -> sessionsById.get(workout.getSessionId()).getSessionDate())
                     .min(Comparator.naturalOrder()).orElse(courseRun.getStartDate());

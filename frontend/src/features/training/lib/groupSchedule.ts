@@ -40,7 +40,7 @@ export function totalNeedingResult(sessions: SessionSummary[]): number {
   return sessions.reduce((sum, session) => sum + session.needsResultCount, 0);
 }
 
-/** "X of Y sessions" for a horse's Attendance line. */
+/** "X of Y ran" for a horse's Attendance line: Workouts that Ran out of every session of the course run. */
 export function attendanceLabel(attended: number, total: number): string {
-  return `${attended} of ${total} ${total === 1 ? 'session' : 'sessions'}`;
+  return `${attended} of ${total} ran`;
 }

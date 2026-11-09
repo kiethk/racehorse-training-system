@@ -398,13 +398,13 @@ class HorsePerformanceServiceTest {
     }
 
     @Test
-    @DisplayName("Dashboard progress leaves cancelled sessions out, like the Course run page")
-    void testDashboardProgressIgnoresCancelledSessions() {
+    @DisplayName("Dashboard progress keeps cancelled sessions in the total, so a closed course run with cancellations is never full")
+    void testDashboardProgressKeepsCancelledSessionsInTheTotal() {
         AuthenticatedUser owner = new AuthenticatedUser(5L, "owner@example.com", Roles.HORSE_OWNER);
         LocalDate today = LocalDate.now();
         when(courseRunRepository.findDashboardHorsesOfOwner(5L)).thenReturn(List.of(
                 new DashboardHorseRow(60L, "Mine", "Arabian", null)));
-        // 6-session course, 2 cancelled, 4 held: the course is done in full.
+        // 6-session course, 2 cancelled, 4 ran: the horse ran 4 of the 6 sessions the course needs.
         when(courseRunRepository.findDashboardCourseRuns(List.of(60L))).thenReturn(List.of(
                 new DashboardCourseRunRow(800L, 60L, CourseRunStatus.COMPLETED, today.minusDays(20), today.minusDays(2),
                         "Six sessions", 6, 4L, 2L)));
@@ -415,7 +415,7 @@ class HorsePerformanceServiceTest {
 
         assertEquals(4, row.getCompletedSessions());
         assertEquals(2, row.getCancelledSessions());
-        assertEquals(100.0, row.getProgressPercent());
+        assertEquals(66.7, row.getProgressPercent());
     }
 
     @Test

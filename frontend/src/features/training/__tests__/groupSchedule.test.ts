@@ -54,6 +54,6 @@ describe('totalNeedingResult', () => {
 });
 
 describe('attendanceLabel', () => {
-  it('reads as X of Y sessions', () => assert.equal(attendanceLabel(7, 20), '7 of 20 sessions'));
-  it('uses the singular for one session', () => assert.equal(attendanceLabel(0, 1), '0 of 1 session'));
+  it('reads as X of Y ran', () => assert.equal(attendanceLabel(7, 20), '7 of 20 ran'));
+  it('counts against every session, so a horse that missed none of one still reads 0 of 1 ran', () => assert.equal(attendanceLabel(0, 1), '0 of 1 ran'));
 });
