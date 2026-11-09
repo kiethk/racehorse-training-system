@@ -30,9 +30,6 @@ export function CorrelationBadge({ strength, pearsonR }: CorrelationBadgeProps) 
       >
         <span className="w-1.5 h-1.5 rounded-full bg-current" />
         <span>{info.qualitativeLabel}</span>
-        {info.tooltip.startsWith('Pearson r =') && !info.tooltip.includes('N/A') && (
-          <span className="text-[11px] font-mono opacity-85">({pearsonR > 0 ? `+${pearsonR.toFixed(2)}` : pearsonR.toFixed(2)})</span>
-        )}
       </div>
       <span className="text-[11px] text-[var(--color-text-secondary)] italic">
         {info.description}

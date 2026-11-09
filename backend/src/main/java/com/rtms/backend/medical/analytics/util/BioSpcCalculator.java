@@ -184,7 +184,7 @@ public final class BioSpcCalculator {
                         current.recordedAt(),
                         round(v, 2),
                         true,
-                        String.format("Critical: Value (%.2f) exceeds UCL (%.2f)", v, ucl)
+                        String.format("Critical: Value (%.2f) exceeds upper safe threshold (%.2f)", v, ucl)
                 ));
                 continue;
             } else if (v < lcl) {
@@ -193,7 +193,7 @@ public final class BioSpcCalculator {
                         current.recordedAt(),
                         round(v, 2),
                         true,
-                        String.format("Critical: Value (%.2f) below LCL (%.2f)", v, lcl)
+                        String.format("Critical: Value (%.2f) is below lower safe threshold (%.2f)", v, lcl)
                 ));
                 continue;
             }
@@ -226,7 +226,7 @@ public final class BioSpcCalculator {
                         current.recordedAt(),
                         round(v, 2),
                         true,
-                        String.format("Warning: 2 of 3 consecutive points above 2-sigma limit (%.2f)", uwl)
+                        String.format("Warning: 2 of 3 consecutive readings above warning threshold (%.2f)", uwl)
                 ));
             } else if (rule2Lower) {
                 result.add(new BioSpcPointDto(
@@ -234,7 +234,7 @@ public final class BioSpcCalculator {
                         current.recordedAt(),
                         round(v, 2),
                         true,
-                        String.format("Warning: 2 of 3 consecutive points below 2-sigma limit (%.2f)", lwl)
+                        String.format("Warning: 2 of 3 consecutive readings below warning threshold (%.2f)", lwl)
                 ));
             } else {
                 result.add(new BioSpcPointDto(

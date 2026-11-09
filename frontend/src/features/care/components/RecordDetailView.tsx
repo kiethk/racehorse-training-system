@@ -399,8 +399,7 @@ export function RecordDetailView({
           {recordIdShown ? (
             <Panel padded className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
-                <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-                  <Icon name="clipboard" size={16} className="text-[var(--color-primary)]" />
+                <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                   Clinical Record #{recordIdShown}
                 </h2>
               </div>
@@ -458,8 +457,7 @@ export function RecordDetailView({
 
           {/* 3. Vitals (latest telemetry) */}
           <Panel padded className="space-y-3">
-            <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-              <Icon name="heart-pulse" size={16} className="text-[var(--color-medical)]" />
+            <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
               Vitals
             </h2>
             {latestMetric ? (
@@ -524,8 +522,7 @@ export function RecordDetailView({
           {/* 4. Injury — list + button opening the 3D map modal */}
           <Panel padded className="space-y-3">
             <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-              <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-                <Icon name="alert-triangle" size={16} className="text-[var(--color-danger)]" />
+              <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                 Injury
               </h2>
               {markerData.length > 0 && (
@@ -622,8 +619,7 @@ export function RecordDetailView({
 
           {/* 5. Preventive care (backend protocol statuses) */}
           <Panel padded className="space-y-3">
-            <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-              <Icon name="shield" size={16} className="text-[var(--color-medical)]" />
+            <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
               Preventive Care
             </h2>
             {preventive && preventive.protocols.length > 0 ? (
@@ -661,8 +657,7 @@ export function RecordDetailView({
           {recordIdShown != null && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-                  <Icon name="pill" size={16} className="text-[var(--color-primary)]" />
+                <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                   Treatment Plans &amp; Prescriptions ({plans.length})
                 </h2>
                 <Button
@@ -750,14 +745,13 @@ export function RecordDetailView({
           {/* 7. Health metrics trend chart */}
           {metrics.length > 0 && (
             <Panel padded className="space-y-3">
-              <h2 className="text-sm font-bold text-[var(--color-text-primary)] flex items-center gap-1.5">
-                <Icon name="activity" size={16} className="text-[var(--color-primary)]" />
+              <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
                 Health Metrics Trend
               </h2>
               <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={metrics.map((m) => ({ ...m, date: formatDate(m.recordedAt) }))}>
-                    <CartesianGrid strokeDasharray="3 3" />
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                     <YAxis
                       yAxisId="left"

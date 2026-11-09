@@ -204,16 +204,16 @@ public class HorseEdaAnalyticsService {
         List<String> reasons = new ArrayList<>();
         if (isSpeedOutlier) {
             if (spd > speedDist.q3()) {
-                reasons.add(String.format(Locale.US, "Exceptional speed (%.1f km/h > Q3)", spd));
+                reasons.add(String.format(Locale.US, "Above typical workout speed (%.1f km/h)", spd));
             } else {
-                reasons.add(String.format(Locale.US, "Low speed anomaly (%.1f km/h < Q1)", spd));
+                reasons.add(String.format(Locale.US, "Below typical workout speed (%.1f km/h)", spd));
             }
         }
         if (isHrOutlier) {
             if (rec > hrDist.q3()) {
-                reasons.add(String.format(Locale.US, "High recovery heart rate anomaly (%.0f bpm > Q3)", rec));
+                reasons.add(String.format(Locale.US, "Elevated recovery heart rate (%.0f bpm)", rec));
             } else {
-                reasons.add(String.format(Locale.US, "Exceptional cardio recovery (%.0f bpm < Q1)", rec));
+                reasons.add(String.format(Locale.US, "Optimal cardio recovery (%.0f bpm)", rec));
             }
         }
         return String.join(" | ", reasons);

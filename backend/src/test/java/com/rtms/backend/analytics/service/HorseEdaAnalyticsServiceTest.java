@@ -92,7 +92,7 @@ class HorseEdaAnalyticsServiceTest {
         assertNotNull(res.correlation());
         assertTrue(res.correlation().pearsonR() > 0.8);
         assertTrue(res.points().get(4).isOutlier());
-        assertEquals("Exceptional speed (85.0 km/h > Q3) | High recovery heart rate anomaly (150 bpm > Q3)",
+        assertEquals("Above typical workout speed (85.0 km/h) | Elevated recovery heart rate (150 bpm)",
                 res.points().get(4).outlierReason());
     }
 
@@ -122,7 +122,7 @@ class HorseEdaAnalyticsServiceTest {
 
         assertNotNull(res);
         assertTrue(res.points().get(0).isOutlier());
-        assertEquals("Low speed anomaly (20.0 km/h < Q1) | Exceptional cardio recovery (60 bpm < Q1)",
+        assertEquals("Below typical workout speed (20.0 km/h) | Optimal cardio recovery (60 bpm)",
                 res.points().get(0).outlierReason());
     }
 

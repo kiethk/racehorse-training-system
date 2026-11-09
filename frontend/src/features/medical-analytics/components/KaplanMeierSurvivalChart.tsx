@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { Panel, Button, Spinner, Notice, Icon, Pill } from '@/components/ui';
+import { Panel, Button, Spinner, Notice, Pill } from '@/components/ui';
 import { medicalEdaService } from '../services/medicalEdaService';
 import type {
   SurvivalStratifyBy,
@@ -106,21 +106,18 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
       {/* Header & Stratification Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
         <div>
-          <div className="flex items-center gap-2">
-            <Icon name="activity" size={18} className="text-[var(--color-primary)]" />
-            <h3 className="text-base font-bold text-[var(--color-text-primary)]">
-              Injury Recovery Survival Analysis (Kaplan-Meier)
-            </h3>
-          </div>
+          <h3 className="text-base font-bold text-[var(--color-text-primary)]">
+            Injury Recovery Timeline by Treatment
+          </h3>
           <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-            Empirical product-limit estimator with right-censoring for time-to-recovery
+            Time required for horses to recover and return to full training.
           </p>
         </div>
 
         {/* Stratification Selector */}
         <div className="flex items-center gap-2">
           <label htmlFor="stratify-select" className="text-xs font-semibold text-[var(--color-text-secondary)]">
-            Stratify By:
+            Compare By:
           </label>
           <select
             id="stratify-select"
@@ -151,7 +148,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
         </div>
       ) : !data || data.strata.length === 0 ? (
         <div className="py-12 text-center text-xs text-[var(--color-text-muted)]">
-          No injury recovery records available for survival analysis.
+          No injury recovery records available for recovery timeline analysis.
         </div>
       ) : (
         <div className="space-y-4">
@@ -162,7 +159,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                 data={chartData}
                 margin={{ top: 15, right: 30, left: 10, bottom: 20 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #e5e7eb)" opacity={0.6} />
+                <CartesianGrid vertical={false} stroke="var(--color-border, #e5e7eb)" strokeDasharray="3 3" opacity={0.4} />
 
                 <XAxis
                   dataKey="day"
@@ -184,7 +181,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                   tick={{ fontSize: 11, fill: 'var(--color-text-muted, #6b7280)' }}
                   unit="%"
                   label={{
-                    value: 'Probability Not Recovered (%)',
+                    value: 'Horses Still Recovering (%)',
                     angle: -90,
                     position: 'insideLeft',
                     fontSize: 11,
@@ -227,19 +224,7 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                   wrapperStyle={{ paddingBottom: '10px', fontSize: '11px' }}
                 />
 
-                {/* 50% Median Recovery Reference Line */}
-                <ReferenceLine
-                  y={50}
-                  stroke="#9ca3af"
-                  strokeDasharray="4 4"
-                  strokeWidth={1}
-                  label={{
-                    value: '50% Median Recovery Threshold',
-                    fill: '#6b7280',
-                    fontSize: 10,
-                    position: 'insideBottomRight',
-                  }}
-                />
+                
 
                 {/* Stepped lines for each stratum */}
                 {data.strata.map((stratum, idx) => (
@@ -254,6 +239,19 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
                     activeDot={{ r: 5 }}
                   />
                 ))}
+                {/* 50% Median Recovery Reference Line */}
+                <ReferenceLine
+                  y={50}
+                  stroke="#9ca3af"
+                  strokeDasharray="4 4"
+                  strokeWidth={1}
+                  label={{
+                    value: 'Typical 50% Recovery Mark',
+                    fill: '#6b7280',
+                    fontSize: 10,
+                    position: 'insideBottomRight',
+                  }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -263,12 +261,12 @@ export const KaplanMeierSurvivalChart: React.FC = () => {
             <table className="w-full text-left text-xs text-[var(--color-text-primary)]">
               <thead className="bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)] font-semibold border-b border-[var(--color-border)]">
                 <tr>
-                  <th className="px-3 py-2">Stratum</th>
-                  <th className="px-3 py-2 text-right">Total Cases (N)</th>
+                  <th className="px-3 py-2">{stratifyBy === 'TREATMENT_PLAN' ? 'Treatment Plan' : 'Body Zone'}</th>
+                  <th className="px-3 py-2 text-right">Cases Under Care</th>
                   <th className="px-3 py-2 text-right">Recovered</th>
-                  <th className="px-3 py-2 text-right">Censored</th>
+                  <th className="px-3 py-2 text-right">Still Recovering</th>
                   <th className="px-3 py-2 text-right">Recovery Rate</th>
-                  <th className="px-3 py-2 text-right">Median Recovery Days</th>
+                  <th className="px-3 py-2 text-right">Typical Recovery (Days)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border)]">

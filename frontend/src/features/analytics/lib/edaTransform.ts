@@ -58,7 +58,7 @@ export function formatCorrelationStrength(strength: CorrelationStrength, pearson
         label: 'Zero / Insufficient Variance',
         qualitativeLabel: 'Zero / Insufficient variance',
         tone: 'neutral',
-        description: 'Uniform values observed. Correlation coefficient is mathematically undefined.',
+        description: 'Workouts currently have identical speeds or heart rates. Record varied sessions to calculate cardio fitness correlation.',
         tooltip: 'Pearson r = N/A (zero variance)',
       };
     case 'INSUFFICIENT_DATA':

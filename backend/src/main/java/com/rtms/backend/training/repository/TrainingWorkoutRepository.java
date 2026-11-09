@@ -276,4 +276,21 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
     List<com.rtms.backend.analytics.dto.FleetWorkoutSummaryRow> findFleetWorkoutSummaries(
             @Param("horseIds") java.util.Collection<Long> horseIds,
             @Param("since") java.time.LocalDate since);
+    @Query("""
+            SELECT new com.rtms.backend.analytics.dto.manager.TrainerWorkoutRow(
+                s.trainerId,
+                w.status,
+                w.performanceRating,
+                w.averageSpeedKmh,
+                w.recoveryHeartRate,
+                s.sessionDate,
+                w.horseId
+            )
+            FROM TrainingWorkout w
+            JOIN TrainingSession s ON w.sessionId = s.id
+            WHERE s.sessionDate >= :since
+            ORDER BY s.sessionDate ASC
+            """)
+    List<com.rtms.backend.analytics.dto.manager.TrainerWorkoutRow> findTrainerWorkoutsSince(
+            @Param("since") java.time.LocalDate since);
 }

@@ -28,6 +28,8 @@ import { PerformanceLineTrendCard } from './PerformanceLineTrendCard';
 import { BarnOccupancyWidget } from './BarnOccupancyWidget';
 import { FleetDistributionWidget } from './FleetDistributionWidget';
 import { ManagerActionCenter } from './ManagerActionCenter';
+import { ManagerEdaExecutiveCard } from '@/features/manager-analytics/components/ManagerEdaExecutiveCard';
+
 
 type HorseFilter = 'ALL' | 'ACTIVE' | 'ALERT';
 
@@ -288,6 +290,9 @@ export function ManagerDashboardView() {
           />
         </div>
       )}
+
+      {/* Executive Exploratory Analytics (EDA) */}
+      <ManagerEdaExecutiveCard />
 
       {/* Historical Performance & Health Trends */}
       <div className="space-y-4">

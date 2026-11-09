@@ -35,6 +35,7 @@ export function getNavigationForRole(role: Role): NavSection[] {
           id: 'operations',
           label: 'Operations',
           items: [
+            { id: 'operations-performance', label: 'Operations & Performance', icon: 'trending-up', href: '/manager/analytics' },
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/manager/admissions' },
             { id: 'horses', label: 'Horses', icon: 'horse', href: '/manager/horses' },
             { id: 'stable', label: 'Stable', icon: 'building', href: '/manager/stable' },
@@ -47,7 +48,6 @@ export function getNavigationForRole(role: Role): NavSection[] {
             { id: 'accounts', label: 'Accounts', icon: 'users', href: '/manager/accounts' },
             { id: 'access-control', label: 'Access Control', icon: 'shield', href: '/manager/access-control' },
             { id: 'audit-log', label: 'Audit Log', icon: 'file-text', href: '/manager/audit-log' },
-            { id: 'reports', label: 'Reports', icon: 'trending-up' },
           ],
         },
       ];
