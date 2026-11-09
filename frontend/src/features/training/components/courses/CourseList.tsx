@@ -115,7 +115,7 @@ export function CourseList() {
 
   return (
     <PageSection
-      title={`Training courses (${courses.length})`}
+      title={`Courses (${courses.length})`}
       actions={
         <Button variant="primary" size="sm" onClick={() => setShowForm((open) => !open)}>
           {showForm ? 'Close form' : 'Create course'}

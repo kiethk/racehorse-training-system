@@ -58,8 +58,8 @@ export function getNavigationForRole(role: Role): NavSection[] {
           id: 'training',
           label: 'Training',
           items: [
-            { id: 'training', label: 'Training', icon: 'target', href: '/trainer/courses' },
             { id: 'groups', label: 'Groups', icon: 'users', href: '/trainer/groups' },
+            { id: 'course-library', label: 'Course library', icon: 'file-text', href: '/trainer/courses' },
             { id: 'course-runs', label: 'Course runs', icon: 'layers', href: '/trainer/course-runs' },
             { id: 'schedule', label: 'Schedule', icon: 'calendar', href: '/trainer/schedule' },
           ],
