@@ -12,7 +12,7 @@ const PLOT_HEIGHT = HEIGHT - PADDING.top - PADDING.bottom;
 const BASELINE = PADDING.top + PLOT_HEIGHT;
 /** A guard so a wrong date range can never build a huge chart. */
 const MAX_PERIODS = 366;
-const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' };
+const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit' };
 
 export interface PeriodBarChartProps<T> {
   /** First day of the axis and the last day it must reach (YYYY-MM-DD). */

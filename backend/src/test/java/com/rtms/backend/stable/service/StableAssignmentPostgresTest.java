@@ -5,7 +5,7 @@ import com.rtms.backend.identity.repository.*;
 import com.rtms.backend.security.AuthenticatedUser;
 import com.rtms.backend.stable.dto.*;
 import com.rtms.backend.stable.repository.*;
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -47,7 +47,7 @@ class StableAssignmentPostgresTest {
     @Autowired UserRepository users;
     @Autowired GroomProfileRepository profiles;
     @Autowired HorseRepository horses;
-    @Autowired GroupWorkoutSyncService workouts;
+    @Autowired TrainingGroupService workouts;
     @Autowired com.rtms.backend.admission.service.AdmissionGroomReviewService admissionAllocation;
     @Autowired EntityManager em;
     @Autowired AreaTrainerAssignmentPolicy trainerPolicy;
@@ -114,8 +114,8 @@ class StableAssignmentPostgresTest {
     }
     long session() {
         return jdbc.queryForObject("""
-            INSERT INTO training_lots(trainer_id,subject_id,lot_date,start_time,end_time)
-            SELECT ?,id,CURRENT_DATE+1,'08:00','09:00' FROM subjects ORDER BY id LIMIT 1 RETURNING id
+            INSERT INTO training_lots(trainer_id,exercise_id,lot_date,start_time,end_time)
+            SELECT ?,id,CURRENT_DATE+1,'08:00','09:00' FROM exercises ORDER BY id LIMIT 1 RETURNING id
             """, Long.class, trainer1);
     }
     void workout(long horse, long session, long groom, String status) {

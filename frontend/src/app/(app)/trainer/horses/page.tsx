@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { LoadingScreen } from '@/components/ui';
-import { TrainerHorsesView } from '@/features/training/components/TrainerHorsesView';
+import { TrainerHorsesView } from '@/features/training/components/horses/TrainerHorsesView';
 
 export const metadata: Metadata = {
   title: 'Horses | Trainer | RTMS',

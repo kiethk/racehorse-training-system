@@ -10,11 +10,11 @@ export function formatDate(value: string | Date | null | undefined, options?: In
   if (!value) return '—';
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('en-GB', options ?? { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat('en-GB', options ?? { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
 }
 
 export function formatDateTime(value: string | Date | null | undefined): string {
-  return formatDate(value, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return formatDate(value, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 /** Trims a backend time such as "06:30:00" to "06:30". */

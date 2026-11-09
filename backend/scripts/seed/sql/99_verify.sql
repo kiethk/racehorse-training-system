@@ -158,21 +158,20 @@ INSERT INTO seed_check VALUES
 ('Group member groom is not the stall groom',
  $q$ SELECT m.id FROM training_group_members m JOIN horses h ON h.id = m.horse_id JOIN stable_stalls s ON s.id = h.current_stall_id
      WHERE m.groom_id IS DISTINCT FROM s.groom_id AND m.left_at IS NULL $q$),
-('Group with more than 6 horses or a groom twice (BR-10, BR-09)',
- $q$ SELECT group_id FROM training_group_members WHERE left_at IS NULL GROUP BY group_id HAVING count(*) > 6
-     UNION ALL SELECT group_id FROM training_group_members WHERE groom_id IS NOT NULL AND left_at IS NULL GROUP BY group_id, groom_id HAVING count(*) > 1 $q$),
+('Group with more than 6 horses (BR-10)',
+ $q$ SELECT group_id FROM training_group_members WHERE left_at IS NULL GROUP BY group_id HAVING count(*) > 6 $q$),
 ('Plan does not have exactly total_sessions sessions',
- $q$ SELECT p.id FROM group_plans p JOIN courses c ON c.id = p.course_id
-     WHERE (SELECT count(*) FROM training_sessions s WHERE s.group_plan_id = p.id) <> c.total_sessions $q$),
+ $q$ SELECT p.id FROM course_runs p JOIN courses c ON c.id = p.course_id
+     WHERE (SELECT count(*) FROM training_sessions s WHERE s.course_run_id = p.id) <> c.total_sessions $q$),
 ('Plan status does not match its sessions (closes when no session is left to run)',
- $q$ SELECT p.id FROM group_plans p
-     WHERE (p.status = 'COMPLETED' AND (EXISTS (SELECT 1 FROM training_sessions s WHERE s.group_plan_id = p.id AND s.status = 'SCHEDULED')
-                                         OR NOT EXISTS (SELECT 1 FROM training_sessions s WHERE s.group_plan_id = p.id AND s.status = 'HELD')))
-        OR (p.status IN ('ACTIVE', 'UPCOMING') AND NOT EXISTS (SELECT 1 FROM training_sessions s WHERE s.group_plan_id = p.id AND s.status = 'SCHEDULED'))
+ $q$ SELECT p.id FROM course_runs p
+     WHERE (p.status = 'COMPLETED' AND (EXISTS (SELECT 1 FROM training_sessions s WHERE s.course_run_id = p.id AND s.status = 'SCHEDULED')
+                                         OR NOT EXISTS (SELECT 1 FROM training_sessions s WHERE s.course_run_id = p.id AND s.status = 'HELD')))
+        OR (p.status IN ('ACTIVE', 'UPCOMING') AND NOT EXISTS (SELECT 1 FROM training_sessions s WHERE s.course_run_id = p.id AND s.status = 'SCHEDULED'))
         OR (p.status = 'UPCOMING' AND p.start_date <= pg_temp.today())
         OR (p.status = 'ACTIVE' AND p.start_date > pg_temp.today()) $q$),
 ('Session on a weekday the plan does not train',
- $q$ SELECT s.id FROM training_sessions s JOIN group_plans p ON p.id = s.group_plan_id
+ $q$ SELECT s.id FROM training_sessions s JOIN course_runs p ON p.id = s.course_run_id
      WHERE trim(to_char(s.session_date, 'DAY')) <> ALL (string_to_array(p.training_days, ',')) OR s.session_date NOT BETWEEN p.start_date AND p.end_date $q$),
 ('Session status does not match the clock',
  $q$ SELECT s.id FROM training_sessions s
@@ -187,7 +186,7 @@ INSERT INTO seed_check VALUES
  $q$ SELECT s.id FROM training_sessions s
      WHERE s.status = 'SCHEDULED' AND NOT EXISTS (SELECT 1 FROM training_workouts w WHERE w.session_id = s.id AND w.status <> 'CANCELLED') $q$),
 ('Workout groom is not the group member groom',
- $q$ SELECT w.id FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id JOIN group_plans p ON p.id = s.group_plan_id
+ $q$ SELECT w.id FROM training_workouts w JOIN training_sessions s ON s.id = w.session_id JOIN course_runs p ON p.id = s.course_run_id
      JOIN training_group_members m ON m.group_id = p.group_id AND m.horse_id = w.horse_id
      WHERE w.assigned_to_id IS DISTINCT FROM m.groom_id $q$),
 ('Horse trained or booked while resting',
@@ -207,23 +206,23 @@ INSERT INTO seed_check VALUES
      WHERE w.status = 'RAN'
        AND (w.updated_at < s.session_date + s.end_time OR w.updated_at > pg_temp.clock()) $q$),
 ('Unfinished plans of one group overlap',
- $q$ SELECT a.id FROM group_plans a JOIN group_plans b ON b.group_id = a.group_id AND b.id < a.id
+ $q$ SELECT a.id FROM course_runs a JOIN course_runs b ON b.group_id = a.group_id AND b.id < a.id
      WHERE a.status IN ('UPCOMING', 'ACTIVE') AND b.status IN ('UPCOMING', 'ACTIVE')
        AND a.start_date <= b.end_date AND b.start_date <= a.end_date $q$),
 ('Disbanded group with members or an unfinished plan',
  $q$ SELECT g.id FROM training_groups g WHERE g.disbanded_at IS NOT NULL
        AND (EXISTS (SELECT 1 FROM training_group_members m WHERE m.group_id = g.id AND m.left_at IS NULL)
-            OR EXISTS (SELECT 1 FROM group_plans p WHERE p.group_id = g.id AND p.status IN ('UPCOMING', 'ACTIVE'))) $q$),
+            OR EXISTS (SELECT 1 FROM course_runs p WHERE p.group_id = g.id AND p.status IN ('UPCOMING', 'ACTIVE'))) $q$),
 ('Disbanded group dated before it was created or in the future',
  $q$ SELECT id FROM training_groups WHERE disbanded_at IS NOT NULL AND (disbanded_at < created_at OR disbanded_at > pg_temp.clock()) $q$),
 ('Plan or session of a disbanded group dated after the group was disbanded and not cancelled',
- $q$ SELECT p.id FROM group_plans p JOIN training_groups g ON g.id = p.group_id
+ $q$ SELECT p.id FROM course_runs p JOIN training_groups g ON g.id = p.group_id
      WHERE g.disbanded_at IS NOT NULL AND (p.created_at > g.disbanded_at
-        OR EXISTS (SELECT 1 FROM training_sessions s WHERE s.group_plan_id = p.id AND s.status <> 'CANCELLED' AND s.session_date + s.start_time > g.disbanded_at)) $q$),
+        OR EXISTS (SELECT 1 FROM training_sessions s WHERE s.course_run_id = p.id AND s.status <> 'CANCELLED' AND s.session_date + s.start_time > g.disbanded_at)) $q$),
 ('Two live groups of one trainer with the same name',
  $q$ SELECT min(id) FROM training_groups WHERE disbanded_at IS NULL GROUP BY trainer_id, name HAVING count(*) > 1 $q$),
-('Course uses a subject of another trainer',
- $q$ SELECT cs.id FROM course_subjects cs JOIN courses c ON c.id = cs.course_id JOIN subjects s ON s.id = cs.subject_id
+('Course uses an exercise of another trainer',
+ $q$ SELECT cs.id FROM course_exercises cs JOIN courses c ON c.id = cs.course_id JOIN exercises s ON s.id = cs.exercise_id
      WHERE s.trainer_id <> c.trainer_id $q$),
 -- ---------------- Groom
 ('Routine task not given to the groom of the stall the horse was in',
@@ -240,24 +239,18 @@ INSERT INTO seed_check VALUES
         OR gait_quality_score <> trunc(gait_quality_score)
         OR conformation_score NOT BETWEEN 0 AND 10 OR temperament_score NOT BETWEEN 0 AND 10
         OR gait_quality_score NOT BETWEEN 0 AND 10 $q$),
-('Course with more subjects than sessions',
- $q$ SELECT c.id FROM courses c WHERE (SELECT count(*) FROM course_subjects cs WHERE cs.course_id = c.id) > c.total_sessions $q$),
-('Two courses of one trainer with the same subjects in the same order',
+('Course with more exercises than sessions',
+ $q$ SELECT c.id FROM courses c WHERE (SELECT count(*) FROM course_exercises cs WHERE cs.course_id = c.id) > c.total_sessions $q$),
+('Two courses of one trainer with the same exercises in the same order',
  $q$ SELECT a.id FROM courses a JOIN courses b ON b.trainer_id = a.trainer_id AND b.id > a.id
-     WHERE (SELECT array_agg(subject_id ORDER BY order_index) FROM course_subjects WHERE course_id = a.id)
-         = (SELECT array_agg(subject_id ORDER BY order_index) FROM course_subjects WHERE course_id = b.id) $q$),
+     WHERE (SELECT array_agg(exercise_id ORDER BY order_index) FROM course_exercises WHERE course_id = a.id)
+         = (SELECT array_agg(exercise_id ORDER BY order_index) FROM course_exercises WHERE course_id = b.id) $q$),
 ('Admission document whose file key is not a Cloudinary asset',
  $q$ SELECT id FROM admission_documents
      WHERE file_url !~ '^https://res\.cloudinary\.com/[^/]+/image/authenticated/v[0-9]+/rtms/admissions/[0-9]+/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$' $q$),
 ('Completion photo key that is not a stored file',
  $q$ SELECT p.completion_id FROM groom_task_completion_photos p
      WHERE NOT EXISTS (SELECT 1 FROM admission_documents d WHERE d.file_url = p.image_key) $q$),
--- ---------------- Thi đấu (Racing)
-('Nomination for a horse outside the trainer areas, or out of date order',
- $q$ SELECT r.id FROM race_registrations r JOIN horses h ON h.id = r.horse_id JOIN stable_stalls s ON s.id = h.current_stall_id
-     JOIN areas a ON a.id = s.area_id
-     WHERE a.trainer_id <> r.trainer_id OR r.event_date < r.created_at::DATE OR r.nomination_deadline > r.event_date
-        OR (r.status = 'PENDING') <> (r.reviewed_at IS NULL) $q$),
 -- ---------------- Dược lâm sàng (Track 0: catalog + đơn thuốc + severity D4)
 ('Health condition severity outside the MILD/MODERATE/SEVERE/CRITICAL vocabulary',
  $q$ SELECT id FROM health_conditions

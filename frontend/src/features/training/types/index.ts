@@ -1,4 +1,4 @@
-export type PlanStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+export type CourseRunStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 /** HELD: the Session took place but the Workout is not yet confirmed; RAN: results recorded, so the horse took part. */
 export type WorkoutStatus = 'SCHEDULED' | 'HELD' | 'RAN' | 'CANCELLED';
 export type SurfaceType = 'TURF' | 'DIRT' | 'SYNTHETIC';
@@ -13,13 +13,13 @@ export type TrainingDay =
   | 'SATURDAY'
   | 'SUNDAY';
 
-/** Group of a subject. A plain enum like surface type and intensity: it has no table of its own. */
-export type SubjectCategory = 'ENDURANCE' | 'SPEED' | 'GATE_START' | 'RECOVERY';
+/** Group of an exercise. A plain enum like surface type and intensity: it has no table of its own. */
+export type ExerciseCategory = 'ENDURANCE' | 'SPEED' | 'GATE_START' | 'RECOVERY';
 
-export interface Subject {
+export interface Exercise {
   id: number;
   trainerId?: number;
-  category: SubjectCategory;
+  category: ExerciseCategory;
   name: string;
   description: string | null;
   surfaceType: SurfaceType;
@@ -28,8 +28,8 @@ export interface Subject {
   durationMinutes: number;
 }
 
-export interface CreateSubjectRequest {
-  category: SubjectCategory;
+export interface CreateExerciseRequest {
+  category: ExerciseCategory;
   name: string;
   description?: string;
   surfaceType: SurfaceType;
@@ -38,8 +38,8 @@ export interface CreateSubjectRequest {
   durationMinutes: number;
 }
 
-export interface CourseSubjectItem {
-  subjectId: number;
+export interface CourseExerciseItem {
+  exerciseId: number;
   orderIndex: number;
 }
 
@@ -51,28 +51,28 @@ export interface Course {
   totalSessions: number;
 }
 
-export interface CourseSubjectResponse {
+export interface CourseExerciseResponse {
   id: number;
   courseId: number;
-  subjectId: number;
+  exerciseId: number;
   orderIndex: number;
-  subjectName: string;
+  exerciseName: string;
   durationMinutes: number;
 }
 
 export interface CourseDetailResponse {
   course: Course;
-  subjects: CourseSubjectResponse[];
+  exercises: CourseExerciseResponse[];
 }
 
 export interface CreateCourseRequest {
   name: string;
   targetGoal?: string;
   totalSessions: number;
-  subjects: CourseSubjectItem[];
+  exercises: CourseExerciseItem[];
 }
 
-/** Whether a horse can join the plan being previewed. Mirrors the backend enum PlanAvailability. */
+/** Whether a horse can join the course run being previewed. Mirrors the backend enum CourseRunAvailability. */
 export interface CompleteWorkoutRequest {
   actualDistanceMeters: number;
   actualDurationMinutes: number;
@@ -101,7 +101,7 @@ export interface HorseScheduleItem {
   sessionDate: string; // YYYY-MM-DD
   startTime: string; // "06:00:00"
   endTime: string;
-  subjectName: string;
+  exerciseName: string;
   sessionStatus: SessionStatus;
   workoutStatus: WorkoutStatus;
 }
@@ -109,7 +109,7 @@ export interface HorseScheduleItem {
 export interface HorseFitnessTrendItem {
   workoutId: number;
   date: string; // YYYY-MM-DD
-  subjectName: string;
+  exerciseName: string;
   distanceMeters: number | null;
   averageSpeedKmh: number | null;
   topSpeedKmh: number | null;
@@ -137,11 +137,11 @@ export interface TrainingRules {
   groupCapacity: number;
   /** A session only starts on multiples of this many minutes (00, 15, 30, 45). */
   sessionStartStepMinutes: number;
-  minSubjectDurationMinutes: number;
-  maxSubjectDurationMinutes: number;
+  minExerciseDurationMinutes: number;
+  maxExerciseDurationMinutes: number;
   maxCourseSessions: number;
-  maxCourseSubjects: number;
-  maxHorsesPerPlan: number;
+  maxCourseExercises: number;
+  maxHorsesPerCourseRun: number;
   /** A maximum heart rate above this raises an alert. */
   maxHeartRateLimit: number;
   /** An average heart rate above this raises an alert. */
@@ -169,9 +169,9 @@ export interface TrainingGroup {
   trainerId: number;
   members: GroupMember[];
   currentCourseName: string | null;
-  currentPlanStatus: PlanStatus | null;
-  currentPlanStartDate?: string | null;
-  currentPlanEndDate?: string | null;
+  currentCourseRunStatus: CourseRunStatus | null;
+  currentCourseRunStartDate?: string | null;
+  currentCourseRunEndDate?: string | null;
   disbanded: boolean;
 }
 
@@ -189,12 +189,12 @@ export interface CreateTrainingGroupRequest {
 }
 
 // ---------------------------------------------------------------------------
-// Group plans
+// Course runs
 // ---------------------------------------------------------------------------
 
 export type SessionStatus = 'SCHEDULED' | 'HELD' | 'CANCELLED';
 
-export interface GroupPlanRequest {
+export interface CourseRunRequest {
   groupId: number;
   courseId: number;
   startDate: string;
@@ -203,33 +203,33 @@ export interface GroupPlanRequest {
 
 export interface PlannedSession {
   date: string;
-  subjectName: string;
+  exerciseName: string;
   durationMinutes: number;
   /** Null when the day has no free slot. */
   startTime: string | null;
   endTime: string | null;
 }
 
-export interface PlanOverlap {
-  planId: number;
+export interface CourseRunOverlap {
+  courseRunId: number;
   courseName: string;
   startDate: string;
   endDate: string;
-  status: PlanStatus;
+  status: CourseRunStatus;
 }
 
-export interface GroupPlanPreview {
+export interface CourseRunPreview {
   startDate: string;
   endDate: string;
   memberCount: number;
   sessions: PlannedSession[];
   fullDates: string[];
-  overlaps: PlanOverlap[];
+  overlaps: CourseRunOverlap[];
   earliestFreeStart: string;
   canCreate: boolean;
 }
 
-export interface GroupPlanSummary {
+export interface CourseRunSummary {
   id: number;
   groupId: number | null;
   groupName: string | null;
@@ -238,58 +238,41 @@ export interface GroupPlanSummary {
   courseName: string;
   startDate: string;
   endDate: string;
-  status: PlanStatus;
+  status: CourseRunStatus;
   sessionsHeld: number;
   sessionsCancelled: number;
   sessionsTotal: number;
 }
 
-export interface PlanSessionItem {
-  id: number;
-  date: string;
-  startTime: string;
-  endTime: string;
-  subjectName: string;
-  status: SessionStatus;
-  horseCount: number;
-}
-
 export type SessionHorseOutcome = 'TO_RUN' | 'NEEDS_RESULT' | 'RAN' | 'CANCELLED' | 'DID_NOT_RUN';
 
-/** A horse of a plan with its Attendance (attended of total Sessions). */
-export interface PlanHorse {
+/** A horse of a course run with its Attendance (attended of total Sessions). */
+export interface CourseRunHorse {
   horseId: number;
   horseName: string;
   attended: number;
   total: number;
 }
 
-/** A horse in one Session of a plan with what became of it. */
-export interface SessionHorseOutcomeItem {
-  workoutId: number;
-  horseId: number;
-  horseName: string;
-  outcome: SessionHorseOutcome;
-}
-
-export interface GroupPlanDetail {
-  plan: GroupPlanSummary;
+/** A horse in one Session of a course run with what became of it. */
+export interface CourseRunDetail {
+  courseRun: CourseRunSummary;
   trainingDays: TrainingDay[];
-  sessions: PlanSessionItem[];
+  sessions: SessionSummary[];
 }
 
 // ---------------------------------------------------------------------------
 // Group sessions (schedule, results, attendance)
 // ---------------------------------------------------------------------------
 
-export interface ScheduleSession {
+export interface SessionSummary {
   id: number;
-  planId: number;
+  courseRunId: number;
   groupId: number | null;
   groupName: string | null;
   groupDisbanded: boolean;
   courseName: string;
-  subjectName: string;
+  exerciseName: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -297,6 +280,11 @@ export interface ScheduleSession {
   horseCount: number;
   /** Held Workouts that still have no recorded result. */
   needsResultCount: number;
+  /** The Trainer who leads the Session: an Owner or a Groom may see Sessions of several Trainers. */
+  trainerId: number;
+  trainerName: string | null;
+  /** The horses the viewer may see in this Session, not cancelled: an Owner or a Groom sees these instead of a group name. */
+  horseNames: string[];
 }
 
 export interface SessionHorse {
@@ -311,7 +299,7 @@ export interface SessionHorse {
 }
 
 export interface SessionDetail {
-  session: ScheduleSession;
+  session: SessionSummary;
   horses: SessionHorse[];
 }
 
@@ -332,11 +320,11 @@ export interface SessionWorkoutResult {
 }
 
 export interface HorseAttendance {
-  planId: number;
+  courseRunId: number;
   groupName: string | null;
   groupDisbanded: boolean;
   courseName: string;
-  planStatus: PlanStatus;
+  courseRunStatus: CourseRunStatus;
   startDate: string;
   endDate: string;
   attended: number;

@@ -21,8 +21,8 @@ import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.ManagerDashboardSummaryResponse;
 import com.rtms.backend.training.enums.TrainingDecision;
-import com.rtms.backend.training.enums.TrainingPlanStatus;
-import com.rtms.backend.training.repository.GroupPlanRepository;
+import com.rtms.backend.training.enums.CourseRunStatus;
+import com.rtms.backend.training.repository.CourseRunRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ class ManagerDashboardServiceTest {
     private HorseRepository horseRepository;
 
     @Mock
-    private GroupPlanRepository horseTrainingPlanRepository;
+    private CourseRunRepository horseTrainingPlanRepository;
 
     @Mock
     private AdmissionApplicationRepository admissionApplicationRepository;

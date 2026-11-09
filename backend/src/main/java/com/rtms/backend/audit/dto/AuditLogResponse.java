@@ -117,7 +117,7 @@ public class AuditLogResponse {
             if (upper.contains("STABLE") || upper.contains("STALL") || upper.contains("AREA") || upper.contains("GROOM")) return "STABLE";
             if (upper.contains("HORSE")) return "HORSES";
             if (upper.contains("USER") || upper.contains("STAFF") || upper.contains("ACCOUNT") || upper.contains("PROFILE")) return "STAFF";
-            if (upper.contains("TRAINING") || upper.contains("COURSE") || upper.contains("SUBJECT")
+            if (upper.contains("TRAINING") || upper.contains("COURSE") || upper.contains("SUBJECT") || upper.contains("EXERCISE")
                     || upper.contains("LOT") || upper.contains("WORKOUT") || upper.contains("RULE")) return "TRAINING";
             if (upper.contains("RACE") || upper.contains("RACING")) return "RACING";
         }
@@ -132,7 +132,7 @@ public class AuditLogResponse {
             if (p.contains("/stalls") || p.contains("/areas") || p.contains("/groom-daily-tasks")) return "STABLE";
             if (p.contains("/horses")) return "HORSES";
             if (p.contains("/staff") || p.contains("/users") || p.contains("/accounts")) return "STAFF";
-            if (p.contains("/training-plans") || p.contains("/courses") || p.contains("/subjects")
+            if (p.contains("/training-plans") || p.contains("/courses") || p.contains("/subjects") || p.contains("/exercises") || p.contains("/course-runs") || p.contains("/group-plans")
                     || p.contains("/lots") || p.contains("/workouts") || p.contains("/training-rules")) return "TRAINING";
             if (p.contains("/race-registrations")) return "RACING";
         }

@@ -32,10 +32,6 @@ export function ModuleBadge({ moduleName }: { moduleName: string | null | undefi
       style = 'border-teal-300 text-teal-800 dark:border-teal-700 dark:text-teal-300';
       dotColor = 'bg-teal-600';
       break;
-    case 'RACING':
-      style = 'border-rose-300 text-rose-800 dark:border-rose-700 dark:text-rose-300';
-      dotColor = 'bg-rose-600';
-      break;
     case 'AI':
       style = 'border-cyan-300 text-cyan-800 dark:border-cyan-700 dark:text-cyan-300';
       dotColor = 'bg-cyan-600';

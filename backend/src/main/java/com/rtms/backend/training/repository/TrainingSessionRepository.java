@@ -1,8 +1,8 @@
 package com.rtms.backend.training.repository;
 
-import com.rtms.backend.training.dto.PlanSessionCountRow;
-import com.rtms.backend.training.dto.SessionHorseNameRow;
-import com.rtms.backend.training.dto.SessionRow;
+import com.rtms.backend.training.repository.projection.CourseRunSessionCountRow;
+import com.rtms.backend.training.repository.projection.SessionHorseNameRow;
+import com.rtms.backend.training.repository.projection.SessionRow;
 import com.rtms.backend.training.entity.TrainingSession;
 import com.rtms.backend.training.enums.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -27,28 +27,28 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     @Query(value = "SELECT 1 FROM (SELECT pg_advisory_xact_lock(:key)) locked", nativeQuery = true)
     int lockSchedule(@Param("key") long key);
 
-    List<TrainingSession> findByGroupPlanIdOrderBySessionDateAscStartTimeAsc(Long groupPlanId);
+    List<TrainingSession> findByCourseRunIdOrderBySessionDateAscStartTimeAsc(Long courseRunId);
 
-    List<TrainingSession> findByGroupPlanIdInOrderBySessionDateAscStartTimeAsc(Collection<Long> groupPlanIds);
+    List<TrainingSession> findByCourseRunIdInOrderBySessionDateAscStartTimeAsc(Collection<Long> courseRunIds);
 
     /** Mọi buổi chưa hủy của Trainer trong một ngày, theo giờ tăng dần. (A trainer's non-cancelled Sessions of a day, ascending.) */
     List<TrainingSession> findByTrainerIdAndSessionDateAndStatusNotOrderByStartTimeAsc(
             Long trainerId, LocalDate sessionDate, SessionStatus status);
 
-    long countByGroupPlanIdAndStatus(Long groupPlanId, SessionStatus status);
+    long countByCourseRunIdAndStatus(Long courseRunId, SessionStatus status);
 
     /** Buổi chưa hủy của Trainer trong một khoảng ngày, một truy vấn cho cả khóa. (A trainer's non-cancelled Sessions over a date range, one query for the whole course.) */
     List<TrainingSession> findByTrainerIdAndSessionDateBetweenAndStatusNot(
             Long trainerId, LocalDate from, LocalDate to, SessionStatus status);
 
-    /** Số buổi của nhiều kế hoạch theo trạng thái bằng MỘT truy vấn. (Session counts of many plans per status in ONE query.) */
+    /** Số buổi của nhiều kế hoạch theo trạng thái bằng MỘT truy vấn. (Session counts of many course runs per status in ONE query.) */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.PlanSessionCountRow(s.groupPlanId, s.status, COUNT(s))
+           SELECT new com.rtms.backend.training.repository.projection.CourseRunSessionCountRow(s.courseRunId, s.status, COUNT(s))
            FROM TrainingSession s
-           WHERE s.groupPlanId IN :planIds
-           GROUP BY s.groupPlanId, s.status
+           WHERE s.courseRunId IN :courseRunIds
+           GROUP BY s.courseRunId, s.status
            """)
-    List<PlanSessionCountRow> countByPlanAndStatus(@Param("planIds") Collection<Long> planIds);
+    List<CourseRunSessionCountRow> countByCourseRunAndStatus(@Param("courseRunIds") Collection<Long> courseRunIds);
 
     /**
      * Buổi SCHEDULED đã hết giờ thành HELD bằng MỘT câu UPDATE; trả về số buổi đã đổi.
@@ -65,27 +65,27 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     /**
      * Hủy mọi buổi SCHEDULED CHƯA bắt đầu của một kế hoạch bằng MỘT câu UPDATE; trả về số buổi đã hủy.
-     * (Cancels every SCHEDULED Session of a plan that has NOT started with ONE UPDATE; returns how many were cancelled.)
+     * (Cancels every SCHEDULED Session of a course run that has NOT started with ONE UPDATE; returns how many were cancelled.)
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
            UPDATE TrainingSession s
            SET s.status = com.rtms.backend.training.enums.SessionStatus.CANCELLED
-           WHERE s.groupPlanId = :planId
+           WHERE s.courseRunId = :courseRunId
              AND s.status = com.rtms.backend.training.enums.SessionStatus.SCHEDULED
              AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > :time))
            """)
-    int cancelNotStartedOfPlan(@Param("planId") Long planId, @Param("today") LocalDate today, @Param("time") LocalTime time);
+    int cancelNotStartedOfCourseRun(@Param("courseRunId") Long courseRunId, @Param("today") LocalDate today, @Param("time") LocalTime time);
 
-    /** Buổi SCHEDULED CHƯA bắt đầu của các kế hoạch đã cho, theo thứ tự. (SCHEDULED Sessions of the given plans that have NOT started, in order.) */
+    /** Buổi SCHEDULED CHƯA bắt đầu của các kế hoạch đã cho, theo thứ tự. (SCHEDULED Sessions of the given course runs that have NOT started, in order.) */
     @Query("""
            SELECT s FROM TrainingSession s
-           WHERE s.groupPlanId IN :planIds
+           WHERE s.courseRunId IN :courseRunIds
              AND s.status = com.rtms.backend.training.enums.SessionStatus.SCHEDULED
              AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > :time))
            ORDER BY s.sessionDate, s.startTime
            """)
-    List<TrainingSession> findNotStartedOfPlans(@Param("planIds") Collection<Long> planIds,
+    List<TrainingSession> findNotStartedOfCourseRuns(@Param("courseRunIds") Collection<Long> courseRunIds,
                                                 @Param("today") LocalDate today, @Param("time") LocalTime time);
 
     List<TrainingSession> findByTrainerIdAndSessionDateBetweenOrderBySessionDateAscStartTimeAsc(
@@ -93,21 +93,28 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     List<TrainingSession> findBySessionDateBetweenOrderBySessionDateAscStartTimeAsc(LocalDate from, LocalDate to);
 
-    /** Buổi trong khoảng ngày có ít nhất một ngựa do Groom này dắt. (Sessions in a range with at least one horse this Groom leads.) */
+    /**
+     * Buổi trong khoảng ngày có ít nhất một ngựa do Groom này dắt và chưa bị hủy; ngựa đã rời nhóm (Workout bị hủy) không kéo buổi
+     * về lịch Groom.
+     * (Sessions in a range with at least one horse this Groom leads whose Workout is not cancelled; a horse that left the group
+     * (its Workout cancelled) does not pull the Session onto the Groom's calendar.)
+     */
     @Query("""
            SELECT DISTINCT s FROM TrainingSession s
            JOIN TrainingWorkout w ON w.sessionId = s.id
-           WHERE w.assignedToId = :groomId AND s.sessionDate BETWEEN :from AND :to
+           WHERE w.assignedToId = :groomId AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
+             AND s.sessionDate BETWEEN :from AND :to
            ORDER BY s.sessionDate, s.startTime
            """)
     List<TrainingSession> findOfGroom(@Param("groomId") Long groomId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 
-    /** Buổi trong khoảng ngày có ít nhất một ngựa của Owner này. (Sessions in a range with at least one horse of this Owner.) */
+    /** Buổi trong khoảng ngày có ít nhất một ngựa của Owner này chưa bị hủy Workout. (Sessions in a range with at least one horse of this Owner whose Workout is not cancelled.) */
     @Query("""
            SELECT DISTINCT s FROM TrainingSession s
            JOIN TrainingWorkout w ON w.sessionId = s.id
            JOIN Horse h ON w.horseId = h.id
-           WHERE h.ownerId = :ownerId AND s.sessionDate BETWEEN :from AND :to
+           WHERE h.ownerId = :ownerId AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
+             AND s.sessionDate BETWEEN :from AND :to
            ORDER BY s.sessionDate, s.startTime
            """)
     List<TrainingSession> findOfOwner(@Param("ownerId") Long ownerId, @Param("from") LocalDate from, @Param("to") LocalDate to);
@@ -119,14 +126,14 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     /** Phần SELECT dùng chung cho mọi truy vấn xem buổi. (SELECT part shared by every Session view query.) */
     String SESSION_ROW_SELECT = """
-            SELECT new com.rtms.backend.training.dto.SessionRow(
-                       s.id, s.trainerId, s.sessionDate, s.startTime, s.endTime, s.subjectId, sub.name,
+            SELECT new com.rtms.backend.training.repository.projection.SessionRow(
+                       s.id, s.trainerId, s.sessionDate, s.startTime, s.endTime, s.exerciseId, sub.name,
                        sub.durationMinutes, s.status,
                        (SELECT COUNT(w) FROM TrainingWorkout w
                         WHERE w.sessionId = s.id
                           AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED))
             FROM TrainingSession s
-            JOIN Subject sub ON s.subjectId = sub.id
+            JOIN Exercise sub ON s.exerciseId = sub.id
             """;
 
     /** Lịch của Trainer. includeCancelled = false thì ẩn buổi đã hủy. (A Trainer's schedule; cancelled Sessions hidden unless asked.) */
@@ -159,7 +166,7 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     /** Tên các ngựa còn hiệu lực trong NHIỀU buổi bằng MỘT truy vấn. (Names of active horses in MANY Sessions with ONE query.) */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.SessionHorseNameRow(w.sessionId, h.id, h.name)
+           SELECT new com.rtms.backend.training.repository.projection.SessionHorseNameRow(w.sessionId, h.id, h.name)
            FROM TrainingWorkout w
            JOIN Horse h ON w.horseId = h.id
            WHERE w.sessionId IN :sessionIds
@@ -170,7 +177,7 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     /** Như trên nhưng chỉ ngựa của một owner, để owner không thấy tên ngựa của chủ khác. (Same, but only one owner's horses.) */
     @Query("""
-           SELECT new com.rtms.backend.training.dto.SessionHorseNameRow(w.sessionId, h.id, h.name)
+           SELECT new com.rtms.backend.training.repository.projection.SessionHorseNameRow(w.sessionId, h.id, h.name)
            FROM TrainingWorkout w
            JOIN Horse h ON w.horseId = h.id
            WHERE w.sessionId IN :sessionIds

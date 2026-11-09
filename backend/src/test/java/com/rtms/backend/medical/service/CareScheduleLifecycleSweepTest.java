@@ -49,7 +49,7 @@ import com.rtms.backend.stable.repository.StableStallRepository;
 
 import com.rtms.backend.training.service.TrainingDecisionService;
 
-import com.rtms.backend.training.service.GroupWorkoutSyncService;
+import com.rtms.backend.training.service.TrainingGroupService;
 
 import jakarta.persistence.EntityManager;
 
@@ -127,7 +127,7 @@ class CareScheduleLifecycleSweepTest {
 
     @Mock private NotificationService notificationService;
 
-    @Mock private GroupWorkoutSyncService groupSync;
+    @Mock private TrainingGroupService groupSync;
 
     @Mock private PreventiveVaccinationService preventiveVaccinationService;
 

@@ -14,11 +14,10 @@ import com.rtms.backend.config.ApiException;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.dto.DashboardHorseRow;
+import com.rtms.backend.training.repository.projection.DashboardHorseRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
-import com.rtms.backend.training.service.HorseScopeService;
-import com.rtms.backend.training.service.HorseViewAccessService;
+import com.rtms.backend.training.service.TrainingAccessPolicy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,19 +38,16 @@ import java.util.stream.Collectors;
 public class HorseEdaAnalyticsService {
 
     private final TrainingWorkoutRepository workoutRepository;
-    private final HorseScopeService scopeService;
-    private final HorseViewAccessService accessService;
+    private final TrainingAccessPolicy accessPolicy;
     private final HorseRepository horseRepository;
 
     public HorseEdaAnalyticsService(
             TrainingWorkoutRepository workoutRepository,
-            HorseScopeService scopeService,
-            HorseViewAccessService accessService,
+            TrainingAccessPolicy accessPolicy,
             HorseRepository horseRepository
     ) {
         this.workoutRepository = workoutRepository;
-        this.scopeService = scopeService;
-        this.accessService = accessService;
+        this.accessPolicy = accessPolicy;
         this.horseRepository = horseRepository;
     }
 
@@ -63,7 +59,7 @@ public class HorseEdaAnalyticsService {
         int windowDays = (days != null && days > 0) ? days : 180;
         LocalDate since = LocalDate.now().minusDays(windowDays);
 
-        List<DashboardHorseRow> accessibleHorses = scopeService.horsesOf(currentUser);
+        List<DashboardHorseRow> accessibleHorses = accessPolicy.horsesOf(currentUser);
         if (accessibleHorses == null || accessibleHorses.isEmpty()) {
             return emptyFleetResponse();
         }
@@ -134,7 +130,7 @@ public class HorseEdaAnalyticsService {
      */
     @Transactional(readOnly = true)
     public IndividualHorseEdaResponse getIndividualEdaAnalytics(Long horseId, AuthenticatedUser currentUser, Integer days) {
-        accessService.assertCanViewHorse(horseId, currentUser);
+        accessPolicy.assertCanViewHorse(horseId, currentUser);
 
         Horse horse = horseRepository.findById(horseId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HORSE_NOT_FOUND", "Horse not found with ID: " + horseId));
@@ -180,7 +176,7 @@ public class HorseEdaAnalyticsService {
                 points.add(new IndividualWorkoutEdaPoint(
                         w.getWorkoutId(),
                         w.getDate() != null ? w.getDate().toString() : "N/A",
-                        w.getSubjectName() != null ? w.getSubjectName() : "Workout",
+                        w.getExerciseName() != null ? w.getExerciseName() : "Workout",
                         spd,
                         rec,
                         maxHr,

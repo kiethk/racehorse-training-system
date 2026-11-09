@@ -145,7 +145,7 @@ export function TodayChecklist({ horseId }: { horseId?: number }) {
           {entries.map((entry) =>
             entry.kind === 'block'
               ? <TaskBlock key={entry.key} block={entry} onComplete={setCompletingBlock} />
-              : <TaskRow key={entry.key} task={entry.task} />,
+              : <TaskRow key={entry.key} task={entry.task} horseNames={entry.horseNames} />,
           )}
         </div>
       )}

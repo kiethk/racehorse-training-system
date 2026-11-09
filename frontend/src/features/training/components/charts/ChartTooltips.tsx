@@ -21,7 +21,7 @@ export function WorkoutTooltip({ hover, rules }: { hover: WorkoutHover; rules: T
   return (
     <div className={cn(floating, 'border-[var(--color-border)]')} style={{ left: hover.x, top: hover.y - 10 }}>
       <p className="text-xs font-semibold text-[var(--color-text-primary)]">
-        {formatDate(item.date)} · {item.subjectName}
+        {formatDate(item.date)} · {item.exerciseName}
       </p>
       <div className="mt-1 space-y-0.5 text-xs text-[var(--color-text-secondary)]">
         <p>

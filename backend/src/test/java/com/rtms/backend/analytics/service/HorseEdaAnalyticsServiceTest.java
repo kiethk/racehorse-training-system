@@ -6,11 +6,10 @@ import com.rtms.backend.analytics.dto.IndividualHorseEdaResponse;
 import com.rtms.backend.horse.entity.Horse;
 import com.rtms.backend.horse.repository.HorseRepository;
 import com.rtms.backend.security.AuthenticatedUser;
-import com.rtms.backend.training.dto.DashboardHorseRow;
+import com.rtms.backend.training.repository.projection.DashboardHorseRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.repository.TrainingWorkoutRepository;
-import com.rtms.backend.training.service.HorseScopeService;
-import com.rtms.backend.training.service.HorseViewAccessService;
+import com.rtms.backend.training.service.TrainingAccessPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,10 +34,7 @@ class HorseEdaAnalyticsServiceTest {
     private TrainingWorkoutRepository workoutRepository;
 
     @Mock
-    private HorseScopeService scopeService;
-
-    @Mock
-    private HorseViewAccessService accessService;
+    private TrainingAccessPolicy accessPolicy;
 
     @Mock
     private HorseRepository horseRepository;
@@ -48,14 +44,14 @@ class HorseEdaAnalyticsServiceTest {
 
     @BeforeEach
     void setUp() {
-        edaService = new HorseEdaAnalyticsService(workoutRepository, scopeService, accessService, horseRepository);
+        edaService = new HorseEdaAnalyticsService(workoutRepository, accessPolicy, horseRepository);
         mockUser = new AuthenticatedUser(1L, "trainer@rtms.com", "HEAD_TRAINER");
     }
 
     @Test
     @DisplayName("getFleetEdaAnalytics returns empty stats when no horses accessible")
     void testGetFleetEdaAnalytics_EmptyHorses() {
-        when(scopeService.horsesOf(mockUser)).thenReturn(Collections.emptyList());
+        when(accessPolicy.horsesOf(mockUser)).thenReturn(Collections.emptyList());
 
         FleetEdaResponse res = edaService.getFleetEdaAnalytics(mockUser, 180);
 
@@ -75,7 +71,7 @@ class HorseEdaAnalyticsServiceTest {
                 new DashboardHorseRow(4L, "Desert Star", "Arabian", "A-04"),
                 new DashboardHorseRow(5L, "Shadow Runner", "Arabian", "A-05")
         );
-        when(scopeService.horsesOf(mockUser)).thenReturn(horses);
+        when(accessPolicy.horsesOf(mockUser)).thenReturn(horses);
 
         List<FleetWorkoutSummaryRow> summaries = List.of(
                 new FleetWorkoutSummaryRow(1L, 48.0, 92.0, 210),
@@ -110,7 +106,7 @@ class HorseEdaAnalyticsServiceTest {
                 new DashboardHorseRow(4L, "H4", "Thoroughbred", "A-04"),
                 new DashboardHorseRow(5L, "H5", "Thoroughbred", "A-05")
         );
-        when(scopeService.horsesOf(mockUser)).thenReturn(horses);
+        when(accessPolicy.horsesOf(mockUser)).thenReturn(horses);
 
         List<FleetWorkoutSummaryRow> summaries = List.of(
                 new FleetWorkoutSummaryRow(1L, 20.0, 60.0, 190), // lower outlier
@@ -164,6 +160,6 @@ class HorseEdaAnalyticsServiceTest {
         assertEquals(2, res.points().size());
         assertEquals("Workout", res.points().get(0).sessionName());
         assertEquals(2, res.speedStats().sampleSize());
-        verify(accessService).assertCanViewHorse(10L, mockUser);
+        verify(accessPolicy).assertCanViewHorse(10L, mockUser);
     }
 }
