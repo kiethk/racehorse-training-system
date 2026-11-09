@@ -50,6 +50,10 @@ public class AreaController {
         return ApiResponse.success(lifecycle.delete(id));
     }
 
+    public ApiResponse<Area> createArea(CreateAreaRequest request) {
+        return createArea(request, null);
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('AREA_CREATE')")
     public ApiResponse<Area> createArea(@Valid @RequestBody CreateAreaRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
@@ -91,6 +95,10 @@ public class AreaController {
      * Batch assignment endpoint for Manager Stable: assigns/unassigns/replaces
      * Trainers for Areas and Grooms for entire 3-stall blocks in a single transaction.
      */
+    public ApiResponse<StableAssignmentResponse> applyAssignments(BatchStableAssignmentRequest request) {
+        return applyAssignments(request, null);
+    }
+
     @RequestMapping(value = "/assignments", method = {RequestMethod.PUT, RequestMethod.POST})
     @PreAuthorize("hasAuthority('AREA_UPDATE') and hasAuthority('STALL_GROOM_ASSIGN')")
     public ApiResponse<StableAssignmentResponse> applyAssignments(
