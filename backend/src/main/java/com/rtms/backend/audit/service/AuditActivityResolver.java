@@ -102,9 +102,6 @@ public class AuditActivityResolver {
     private static final Pattern HORSE_EDIT_OWNER = Pattern.compile("^/api/owner/horses/(\\d+)/edit-requests/?$");
     private static final Pattern HORSE_EDIT_GROOM = Pattern.compile("^/api/groom/horse-edit-requests/(\\d+)/review/?$");
 
-    // Pattern definitions - Racing
-    private static final Pattern RACE_REGISTRATION = Pattern.compile("^/api/race-registrations/?.*$");
-
     public ResolvedActivity resolve(String method, String path, int statusCode) {
         String normalizedMethod = method == null ? "POST" : method.toUpperCase();
         String normalizedPath = path == null ? "" : path.trim();
@@ -675,16 +672,6 @@ public class AuditActivityResolver {
             );
         }
 
-        // 8. Racing
-        if (RACE_REGISTRATION.matcher(normalizedPath).matches()) {
-            return new ResolvedActivity(
-                    "Race Registration",
-                    "RaceRegistration",
-                    null,
-                    "Submitted horse race entry registration" + statusSuffix
-            );
-        }
-
         // Clean Fallback: Never display raw technical HTTP methods or /api/ URLs
         String entityName = guessEntity(normalizedPath);
         String actionVerb = switch (normalizedMethod) {
@@ -729,7 +716,6 @@ public class AuditActivityResolver {
         if (path.contains("/stalls") || path.contains("/areas")) return "Stable";
         if (path.contains("/care-schedules") || path.contains("/health-records") || path.contains("/preventive")) return "Medical";
         if (path.contains("/incidents")) return "IncidentReport";
-        if (path.contains("/race-registrations")) return "RaceRegistration";
         if (path.contains("/ai")) return "AI Assistant";
         return "System";
     }
@@ -744,7 +730,6 @@ public class AuditActivityResolver {
             case "TrainingWorkout" -> "Workout Session";
             case "TrainingRule" -> "Training Rules";
             case "IncidentReport" -> "Incident Report";
-            case "RaceRegistration" -> "Race Registration";
             case "StableStall" -> "Stable Stall";
             case "CareSchedule" -> "Medical Schedule";
             case "HealthRecord" -> "Health Record";

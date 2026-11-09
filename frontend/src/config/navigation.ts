@@ -68,10 +68,10 @@ export function getNavigationForRole(role: Role): NavSection[] {
           id: 'operations',
           label: 'Operations',
           items: [
+            { id: 'incidents', label: 'Incidents', icon: 'alert-triangle', href: '/trainer/incidents' },
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/trainer/admissions' },
             { id: 'stable', label: 'Stable', icon: 'building', href: '/trainer/stable' },
             { id: 'horses', label: 'Horses', icon: 'horse', href: '/trainer/horses' },
-            { id: 'racing', label: 'Racing', icon: 'flag', href: '/trainer/racing' },
           ],
         },
       ];
@@ -117,7 +117,6 @@ export function getNavigationForRole(role: Role): NavSection[] {
             { id: 'my-horses', label: 'My Horses', icon: 'horse', href: '/owner/horses' },
             { id: 'owner-schedule', label: 'Schedule', icon: 'calendar', href: '/owner/schedule' },
             { id: 'admissions', label: 'Admissions', icon: 'clipboard', href: '/owner/admissions' },
-            { id: 'racing', label: 'Racing', icon: 'flag' },
           ],
         },
       ];

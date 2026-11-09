@@ -13,7 +13,7 @@ import { PlanSessionHorses } from './PlanSessionHorses';
 import { StatusPill } from './StatusPill';
 import { isViewOnlyPlan } from '../lib/groupLifecycle';
 
-const DAY: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: 'short' };
+const DAY: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: '2-digit' };
 
 /** One Group Plan: its progress and every Session with its time, Subject and status. */
 export function GroupPlanDetail({ planId }: { planId: number }) {

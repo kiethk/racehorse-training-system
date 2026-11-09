@@ -5,7 +5,6 @@ import com.rtms.backend.identity.entity.User;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.training.dto.DashboardHorseRow;
 import com.rtms.backend.training.dto.DashboardPlanRow;
-import com.rtms.backend.training.dto.GroomConflictRow;
 import com.rtms.backend.training.dto.GroomWorkoutRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
@@ -185,16 +184,6 @@ class TrainingSessionQueriesIntegrationTest {
         assertEquals("Thunder", day.get(0).horseName());
         assertEquals("Sprint", day.get(0).subjectName());
         assertTrue(cancelledDay.isEmpty());
-    }
-
-    @Test
-    void groomConflictsNameTheSessionAndTheHorseInTheWay() {
-        // Giving Thunder to groom two would put two horses of groom two in the future Session.
-        List<GroomConflictRow> conflicts = workouts.findGroomConflicts(thunder.getId(), groomTwo.getId(), today);
-
-        assertEquals(1, conflicts.size());
-        assertEquals(ahead.getId(), conflicts.get(0).sessionId());
-        assertEquals("Blaze", conflicts.get(0).otherHorseName());
     }
 
     @Test

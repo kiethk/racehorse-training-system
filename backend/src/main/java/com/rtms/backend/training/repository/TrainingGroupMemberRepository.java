@@ -16,8 +16,6 @@ public interface TrainingGroupMemberRepository extends JpaRepository<TrainingGro
 
     List<TrainingGroupMember> findByGroupIdAndLeftAtIsNullOrderByJoinedAtAsc(Long groupId);
 
-    List<TrainingGroupMember> findByGroupIdInAndLeftAtIsNull(Collection<Long> groupIds);
-
     Optional<TrainingGroupMember> findByHorseIdAndLeftAtIsNull(Long horseId);
 
     List<TrainingGroupMember> findByHorseIdInAndLeftAtIsNull(Collection<Long> horseIds);

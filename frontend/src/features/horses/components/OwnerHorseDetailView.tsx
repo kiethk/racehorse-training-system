@@ -20,11 +20,9 @@ import {
 } from '@/components/ui';
 import { horseService } from '../services/horseService';
 import { trainingService } from '@/features/training/services/trainingService';
-import { racingService } from '@/features/racing/services/racingService';
 import { HorseSpecialtyBadges } from '../shared/components/HorseSpecialtyBadges';
 import { HorseOverviewPedigreeTable } from './HorseOverviewPedigreeTable';
 import { HorseHealthSummary } from './HorseHealthSummary';
-import { HorseRacingHistory } from './HorseRacingHistory';
 import { HorseAttendanceList } from '@/features/training/components/HorseAttendanceList';
 import { HorseFitnessTrendView } from '@/features/training/components/HorseFitnessTrendView';
 import { HorseScheduleView } from '@/features/training/components/HorseScheduleDialog';
@@ -38,7 +36,6 @@ import { normalizeFields } from '../lib/horseEdit';
 import type { HorseDocumentType } from '../types';
 import { toast } from '@/lib/toast';
 import type { HorseAlert } from '@/features/training/types';
-import type { RaceRegistrationResponse } from '@/features/racing/types';
 import { displayError, formatDate } from '@/lib/display';
 
 const tabs: TabItem[] = [
@@ -47,7 +44,6 @@ const tabs: TabItem[] = [
   { id: 'training-plans', label: 'Training plans', icon: 'clipboard' },
   { id: 'fitness-trends', label: 'Fitness & Trends', icon: 'activity' },
   { id: 'health', label: 'Health & Care', icon: 'heart-pulse' },
-  { id: 'racing', label: 'Racing History', icon: 'flag' },
 ];
 
 export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
@@ -64,9 +60,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
   // Health data
   const [healthMetrics, setHealthMetrics] = useState<HorseHealthMetric[]>([]);
   const [preventiveCare, setPreventiveCare] = useState<any[]>([]);
-
-  // Racing data
-  const [raceRegistrations, setRaceRegistrations] = useState<RaceRegistrationResponse[]>([]);
 
   // Documents and change requests
   const [documentSlots, setDocumentSlots] = useState<HorseDocumentSlot[]>([]);
@@ -92,7 +85,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         alertData,
         metricsData,
         preventiveData,
-        racingData,
         slotData,
         requestData,
       ] = await Promise.all([
@@ -102,7 +94,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
         trainingService.getHorseAlerts(horseId).catch(() => []),
         horseService.getHealthMetrics(horseId).catch(() => []),
         horseService.getPreventiveCare(horseId).catch(() => []),
-        racingService.listMine(horseId).catch(() => []),
         horseEditRequestService.documents(horseId).catch(() => []),
         horseEditRequestService.latest(horseId).catch(() => null),
       ]);
@@ -113,7 +104,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
       setAlerts(alertData);
       setHealthMetrics(metricsData);
       setPreventiveCare(preventiveData);
-      setRaceRegistrations(racingData);
       setDocumentSlots(slotData);
       setLatestRequest(requestData);
     } catch (cause) {
@@ -350,11 +340,6 @@ export function OwnerHorseDetailView({ horseId }: { horseId: number }) {
           metrics={healthMetrics}
           preventiveCare={preventiveCare}
         />
-      )}
-
-      {/* Tab 6: Racing History */}
-      {activeTab === 'racing' && (
-        <HorseRacingHistory registrations={raceRegistrations} />
       )}
 
       {editing && (

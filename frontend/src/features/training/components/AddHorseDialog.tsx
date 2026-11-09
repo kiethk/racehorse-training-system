@@ -9,7 +9,7 @@ import type { GroupCandidate, TrainingGroup } from '../types';
 
 /**
  * Lists the Trainer's horses for one group. A horse that cannot join is dimmed and says why in a tooltip, so the Trainer never
- * has to guess which rule (same groom, full group, already grouped, resting) stands in the way.
+ * has to guess which rule (full group, already grouped, resting) stands in the way.
  */
 export function AddHorseDialog({
   group,

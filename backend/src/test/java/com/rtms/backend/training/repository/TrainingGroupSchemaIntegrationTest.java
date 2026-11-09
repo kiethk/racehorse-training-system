@@ -117,11 +117,11 @@ class TrainingGroupSchemaIntegrationTest {
     }
 
     @Test
-    void twoHorsesOfTheSameGroomCannotShareAGroup() {
+    void twoHorsesOfTheSameGroomCanShareAGroup() {
         User groom = user("GROOM", "shared-groom");
         addMember(group, horse(), groom);
 
-        assertThrows(DataIntegrityViolationException.class, () -> addMember(group, horse(), groom));
+        assertDoesNotThrow(() -> addMember(group, horse(), groom));
     }
 
     @Test

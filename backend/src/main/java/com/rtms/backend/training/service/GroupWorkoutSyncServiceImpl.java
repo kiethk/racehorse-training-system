@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Cài đặt GroupWorkoutSyncService. Mọi hàm bắt đầu bằng settle() để "chưa bắt đầu" được xét theo đồng hồ hiện tại.
@@ -134,8 +133,6 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
         if (changing.isEmpty()) {
             return 0;
         }
-        assertNoGroomClash(changing, groomByHorse);
-
         changing.forEach(member -> member.setGroomId(groomByHorse.get(member.getHorseId())));
         memberRepository.saveAllAndFlush(changing);
 
@@ -145,24 +142,6 @@ public class GroupWorkoutSyncServiceImpl implements GroupWorkoutSyncService {
         future.forEach(workout -> workout.setAssignedToId(groomByHorse.get(workout.getHorseId())));
         workoutRepository.saveAllAndFlush(future);
         return future.size();
-    }
-
-    /** BR-09 trên phân bổ cuối cùng của từng nhóm bị ảnh hưởng. (BR-09 on the final allocation of every affected group.) */
-    private void assertNoGroomClash(List<TrainingGroupMember> changing, Map<Long, Long> groomByHorse) {
-        List<Long> groupIds = changing.stream().map(TrainingGroupMember::getGroupId).distinct().toList();
-        Map<Long, List<TrainingGroupMember>> byGroup = memberRepository.findByGroupIdInAndLeftAtIsNull(groupIds).stream()
-                .collect(Collectors.groupingBy(TrainingGroupMember::getGroupId));
-        for (Map.Entry<Long, List<TrainingGroupMember>> entry : byGroup.entrySet()) {
-            Map<Long, Integer> perGroom = new HashMap<>();
-            for (TrainingGroupMember member : entry.getValue()) {
-                Long groom = groomByHorse.containsKey(member.getHorseId())
-                        ? groomByHorse.get(member.getHorseId()) : member.getGroomId();
-                if (groom != null && perGroom.merge(groom, 1, Integer::sum) > 1) {
-                    throw new IllegalStateException("BR-09: a Groom cannot lead two horses in group #" + entry.getKey()
-                            + ". Choose another Groom or move a horse to another group.");
-                }
-            }
-        }
     }
 
     @Override

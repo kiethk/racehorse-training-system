@@ -36,7 +36,6 @@ import com.rtms.backend.stable.repository.AreaRepository;
 import com.rtms.backend.stable.repository.GroomDailyTaskRepository;
 import com.rtms.backend.stable.repository.StableStallRepository;
 import com.rtms.backend.stable.service.GroomDailyTaskService;
-import com.rtms.backend.training.dto.GroomConflictRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseSpecialtyResponse;
 import com.rtms.backend.training.dto.SessionHorseNameRow;
@@ -68,8 +67,6 @@ import com.rtms.backend.training.dto.SessionHorseResponse;
 import com.rtms.backend.training.dto.TrainingGroupResponse;
 import com.rtms.backend.training.dto.GroupMemberResponse;
 import com.rtms.backend.training.enums.SessionStatus;
-import com.rtms.backend.racing.entity.RaceRegistration;
-import com.rtms.backend.racing.repository.RaceRegistrationRepository;
 import com.rtms.backend.training.entity.Subject;
 import com.rtms.backend.training.repository.SubjectRepository;
 import com.rtms.backend.medical.entity.HorseHealthMetric;
@@ -151,7 +148,6 @@ public class AiToolExecutionService {
     private final CourseRepository courseRepository;
     private final AuditLogRepository auditLogRepository;
     private final CandidateHorseProfileRepository candidateHorseProfileRepository;
-    private final RaceRegistrationRepository raceRegistrationRepository;
     private final SubjectRepository subjectRepository;
     private final HorseHealthMetricRepository horseHealthMetricRepository;
     private final HorsePedigreeRepository horsePedigreeRepository;
@@ -187,7 +183,6 @@ public class AiToolExecutionService {
                                   @Autowired(required = false) CourseRepository courseRepository,
                                   @Autowired(required = false) AuditLogRepository auditLogRepository,
                                   @Autowired(required = false) CandidateHorseProfileRepository candidateHorseProfileRepository,
-                                  @Autowired(required = false) RaceRegistrationRepository raceRegistrationRepository,
                                   @Autowired(required = false) SubjectRepository subjectRepository,
                                   @Autowired(required = false) HorseHealthMetricRepository horseHealthMetricRepository,
                                   @Autowired(required = false) HorsePedigreeRepository horsePedigreeRepository,
@@ -221,7 +216,6 @@ public class AiToolExecutionService {
         this.courseRepository = courseRepository;
         this.auditLogRepository = auditLogRepository;
         this.candidateHorseProfileRepository = candidateHorseProfileRepository;
-        this.raceRegistrationRepository = raceRegistrationRepository;
         this.subjectRepository = subjectRepository;
         this.horseHealthMetricRepository = horseHealthMetricRepository;
         this.horsePedigreeRepository = horsePedigreeRepository;
@@ -279,9 +273,7 @@ public class AiToolExecutionService {
             case "getHorseSpecialtyAnalysis" -> handleGetHorseSpecialtyAnalysis(args, currentUser);
             case "getTrainerRiskAlerts" -> handleGetTrainerRiskAlerts(args, currentUser);
             case "getRacingReadinessAssessment" -> handleGetRacingReadinessAssessment(args);
-            case "checkGroomConflict" -> handleCheckGroomConflict(args);
             case "getTrainerAssignedGrooms" -> handleGetTrainerAssignedGrooms(currentUser);
-            case "getMyHorseRaceRegistrations" -> handleGetMyHorseRaceRegistrations(args, currentUser);
             case "getAssignedAdmissionReviews" -> handleGetAssignedAdmissionReviews(currentUser);
             case "getCourseCurriculumOverview" -> handleGetCourseCurriculumOverview();
             case "analyzeWorkoutLoadAndOvertrainingRisk" -> handleAnalyzeWorkoutLoadAndOvertrainingRisk(args);
@@ -1394,34 +1386,6 @@ public class AiToolExecutionService {
         return result;
     }
 
-    private Object handleCheckGroomConflict(Map<String, Object> args) {
-        Horse horse = resolveHorse(args);
-        Long horseId = horse != null ? horse.getId() : parseLong(args.get("horseId"));
-        Long groomId = parseLong(args.get("groomId"));
-
-        if (horseId == null || groomId == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARGS", "Thiếu thông tin ngựa hoặc groom");
-        }
-
-        LocalDate fromDate = parseDate(args.get("date"), LocalDate.now());
-        List<GroomConflictRow> conflicts = trainingWorkoutRepository.findGroomConflicts(horseId, groomId, fromDate);
-
-        String horseName = horse != null ? horse.getName() : "Ngựa #" + horseId;
-        String groomName = "Groom #" + groomId;
-        if (userRepository != null) {
-            groomName = userRepository.findById(groomId).map(User::getFullName).orElse(groomName);
-        }
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("horseName", horseName);
-        result.put("groomName", groomName);
-        result.put("inspectionDate", fromDate.toString());
-        result.put("hasScheduleConflict", !conflicts.isEmpty());
-        result.put("conflictShiftCount", conflicts.size());
-        result.put("conflictDetails", conflicts);
-        return result;
-    }
-
     private Object handleGetTrainerAssignedGrooms(AuthenticatedUser currentUser) {
         Long trainerId = currentUser.getUserId();
         List<Area> areas = areaRepository.findAll().stream()
@@ -1477,55 +1441,6 @@ public class AiToolExecutionService {
 
         return Map.of("trainerName", resolveUserName(currentUser, "Huấn luyện viên"), "totalCollaboratingGrooms", groomList.size(), "groomList", groomList
         );
-    }
-
-    private Object handleGetMyHorseRaceRegistrations(Map<String, Object> args, AuthenticatedUser currentUser) {
-        if (raceRegistrationRepository == null) {
-            Map<String, Object> emptyResp = new LinkedHashMap<>();
-            emptyResp.put("totalRaceRegistrations", 0);
-            emptyResp.put("raceList", Collections.emptyList());
-            return emptyResp;
-        }
-        Long trainerId = currentUser.getUserId();
-        Horse targetHorse = resolveHorse(args);
-        List<RaceRegistration> regs;
-        if (targetHorse != null) {
-            regs = raceRegistrationRepository.findByTrainerIdAndHorseIdOrderByCreatedAtDesc(trainerId, targetHorse.getId());
-        } else {
-            regs = raceRegistrationRepository.findByTrainerIdOrderByCreatedAtDesc(trainerId);
-        }
-
-        Map<Long, String> horseNames = horseRepository.findAll().stream()
-                .collect(Collectors.toMap(Horse::getId, Horse::getName, (a, b) -> a));
-
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (RaceRegistration r : regs) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("horseName", horseNames.getOrDefault(r.getHorseId(), "Chiến mã"));
-            item.put("raceName", r.getRaceName() != null ? r.getRaceName() : "Giải đua");
-            item.put("raceCategory", r.getRaceCategory() != null ? r.getRaceCategory() : "N/A");
-            item.put("location", r.getLocation() != null ? r.getLocation() : "Trường đua");
-            item.put("organizer", r.getOrganizer() != null ? r.getOrganizer() : "N/A");
-            item.put("distanceMeters", r.getDistanceMeters() != null ? r.getDistanceMeters() : BigDecimal.ZERO);
-            item.put("trackType", r.getTrackType() != null ? r.getTrackType() : "N/A");
-            item.put("eventDate", r.getEventDate() != null ? r.getEventDate().toString() : "N/A");
-            item.put("eventTime", r.getEventTime() != null ? r.getEventTime().toString() : "N/A");
-            item.put("nominationDeadline", r.getNominationDeadline() != null ? r.getNominationDeadline().toString() : "N/A");
-            item.put("jockeyName", r.getJockeyName() != null ? r.getJockeyName() : "Chưa chọn nài");
-            item.put("entryFee", r.getEntryFee() != null ? r.getEntryFee() : BigDecimal.ZERO);
-            item.put("prizeDetails", r.getPrizeDetails() != null ? r.getPrizeDetails() : "");
-            item.put("managerFeedback", r.getManagerFeedback() != null ? r.getManagerFeedback() : "");
-            item.put("registrationDate", r.getEventDate() != null ? r.getEventDate().toString() : (r.getCreatedAt() != null ? r.getCreatedAt().toString() : "N/A"));
-            item.put("status", r.getStatus() != null ? r.getStatus().name() : "PENDING");
-            item.put("notes", r.getTrainerNotes() != null ? r.getTrainerNotes() : (r.getSelectionReason() != null ? r.getSelectionReason() : ""));
-            item.put("actionUrl", r.getId() != null ? "/trainer/racing/" + r.getId() : "/trainer/racing");
-            result.add(item);
-        }
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("totalRaceRegistrations", result.size());
-        response.put("raceList", result);
-        response.put("actionUrl", "/trainer/racing");
-        return response;
     }
 
     private Object handleGetAssignedAdmissionReviews(AuthenticatedUser currentUser) {
@@ -1738,7 +1653,6 @@ public class AiToolExecutionService {
         result.put("preferredSurface", matSanUaThich);
         result.put("optimalSpeed", tocDoToiUu);
         result.put("recommendationReason", lyDoDeXuat);
-        result.put("actionUrl", "/trainer/racing");
         return result;
     }
 
@@ -1815,7 +1729,6 @@ private Object handleRecommendTrainerStrategy(Map<String, Object> args) {
         result.put("maDangKy", horse.getRegistrationNumber() != null ? horse.getRegistrationNumber() : "N/A");
         result.put("chienLuocCuLyVaSanDua", raceObj);
         result.put("dieuChinhBaiTapKeTiep", workoutObj);
-        result.put("actionUrl", "/trainer/racing");
         return result;
     }
 

@@ -411,7 +411,7 @@ public class GroomDailyTaskService {
                     w.horseId(),
                     w.horseName(),
                     "Training session · " + w.subjectName(),
-                    "Lead the horse to the track, assist the trainer, and bring the horse back after the session",
+                    null,
                     w.status().name(),
                     false));                      // Trainer mới là người đóng buổi tập
         }

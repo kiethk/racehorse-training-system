@@ -6,7 +6,7 @@ import { displayError, formatDate, formatNumber } from '@/lib/display';
 import { dashboardService } from '../../services/dashboardService';
 import type { PerformanceTrend, PerformanceWeek } from '../../types';
 
-const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' };
+const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit' };
 
 export function PerformanceLineTrendCard() {
   const [trend, setTrend] = useState<PerformanceTrend | null>(null);

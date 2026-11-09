@@ -9,9 +9,9 @@ import com.rtms.backend.training.dto.TrainingGroupResponse;
 import java.util.List;
 
 /**
- * Quản lý Training Group: nhóm chiến mã bền vững của một Trainer. Mọi luật thành viên (BR-09, BR-10, khu của Trainer, được
+ * Quản lý Training Group: nhóm chiến mã bền vững của một Trainer. Mọi luật thành viên (BR-10, khu của Trainer, được
  * phép tập) nằm ở đây và cũng được DB giữ.
- * (Management of Training Groups: the lasting groups of horses of one Trainer. Every membership rule (BR-09, BR-10, the
+ * (Management of Training Groups: the lasting groups of horses of one Trainer. Every membership rule (BR-10, the
  * Trainer's area, allowed to train) lives here and is also held by the DB.)
  */
 public interface TrainingGroupService {

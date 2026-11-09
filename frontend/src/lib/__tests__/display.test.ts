@@ -10,19 +10,20 @@ import {
   formatLocalDateIso,
 } from '../display.ts';
 
-test('formatDate renders en-GB short date or fallback', () => {
+test('formatDate renders a numeric dd/mm/yyyy date or fallback', () => {
   assert.equal(formatDate(null), '—');
   assert.equal(formatDate(undefined), '—');
   assert.equal(formatDate('invalid-date'), '—');
   // Fixed timestamp check
   const formatted = formatDate('2026-11-05T08:00:00Z');
-  assert.match(formatted, /\d{2}\s\w{3}\s2026/);
+  assert.match(formatted, /^\d{2}\/\d{2}\/2026$/);
+  assert.match(formatDate('2026-11-05T08:00:00Z', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }), /^\w{3},? \d{2}\/\d{2}\/2026$/);
 });
 
 test('formatDateTime renders en-GB date and time', () => {
   assert.equal(formatDateTime(null), '—');
   const formatted = formatDateTime('2026-11-05T08:30:00Z');
-  assert.match(formatted, /\d{2}\s\w{3}\s2026/);
+  assert.match(formatted, /^\d{2}\/\d{2}\/2026,? \d{2}:\d{2}$/);
 });
 
 test('formatTime slices time string to HH:mm', () => {

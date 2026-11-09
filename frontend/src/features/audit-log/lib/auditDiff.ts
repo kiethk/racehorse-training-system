@@ -112,7 +112,6 @@ export function resolveLogModule(
     if (e.includes('HORSE')) return 'HORSES';
     if (e.includes('USER') || e.includes('STAFF') || e.includes('ACCOUNT')) return 'STAFF';
     if (e.includes('TRAINING') || e.includes('COURSE') || e.includes('SUBJECT') || e.includes('LOT') || e.includes('WORKOUT')) return 'TRAINING';
-    if (e.includes('RACE')) return 'RACING';
   }
 
   // 2. Request path check
@@ -124,7 +123,6 @@ export function resolveLogModule(
     if (p.includes('/horses')) return 'HORSES';
     if (p.includes('/staff') || p.includes('/users') || p.includes('/accounts')) return 'STAFF';
     if (p.includes('/training-plans') || p.includes('/courses') || p.includes('/subjects') || p.includes('/lots') || p.includes('/workouts')) return 'TRAINING';
-    if (p.includes('/race-registrations')) return 'RACING';
   }
 
   // 3. Action check
@@ -136,7 +134,6 @@ export function resolveLogModule(
     if (a.includes('HORSE')) return 'HORSES';
     if (a.includes('STAFF') || a.includes('USER') || a.includes('ACCOUNT')) return 'STAFF';
     if (a.includes('TRAINING') || a.includes('WORKOUT') || a.includes('COURSE') || a.includes('LOT')) return 'TRAINING';
-    if (a.includes('RACE')) return 'RACING';
   }
 
   return 'SYSTEM';

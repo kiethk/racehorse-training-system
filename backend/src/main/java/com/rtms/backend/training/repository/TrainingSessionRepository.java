@@ -93,21 +93,28 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
 
     List<TrainingSession> findBySessionDateBetweenOrderBySessionDateAscStartTimeAsc(LocalDate from, LocalDate to);
 
-    /** Buổi trong khoảng ngày có ít nhất một ngựa do Groom này dắt. (Sessions in a range with at least one horse this Groom leads.) */
+    /**
+     * Buổi trong khoảng ngày có ít nhất một ngựa do Groom này dắt và chưa bị hủy; ngựa đã rời nhóm (Workout bị hủy) không kéo buổi
+     * về lịch Groom.
+     * (Sessions in a range with at least one horse this Groom leads whose Workout is not cancelled; a horse that left the group
+     * (its Workout cancelled) does not pull the Session onto the Groom's calendar.)
+     */
     @Query("""
            SELECT DISTINCT s FROM TrainingSession s
            JOIN TrainingWorkout w ON w.sessionId = s.id
-           WHERE w.assignedToId = :groomId AND s.sessionDate BETWEEN :from AND :to
+           WHERE w.assignedToId = :groomId AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
+             AND s.sessionDate BETWEEN :from AND :to
            ORDER BY s.sessionDate, s.startTime
            """)
     List<TrainingSession> findOfGroom(@Param("groomId") Long groomId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 
-    /** Buổi trong khoảng ngày có ít nhất một ngựa của Owner này. (Sessions in a range with at least one horse of this Owner.) */
+    /** Buổi trong khoảng ngày có ít nhất một ngựa của Owner này chưa bị hủy Workout. (Sessions in a range with at least one horse of this Owner whose Workout is not cancelled.) */
     @Query("""
            SELECT DISTINCT s FROM TrainingSession s
            JOIN TrainingWorkout w ON w.sessionId = s.id
            JOIN Horse h ON w.horseId = h.id
-           WHERE h.ownerId = :ownerId AND s.sessionDate BETWEEN :from AND :to
+           WHERE h.ownerId = :ownerId AND w.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
+             AND s.sessionDate BETWEEN :from AND :to
            ORDER BY s.sessionDate, s.startTime
            """)
     List<TrainingSession> findOfOwner(@Param("ownerId") Long ownerId, @Param("from") LocalDate from, @Param("to") LocalDate to);

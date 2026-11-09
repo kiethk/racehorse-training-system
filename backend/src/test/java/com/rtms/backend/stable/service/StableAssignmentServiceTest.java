@@ -169,7 +169,7 @@ class StableAssignmentServiceTest {
     }
     @Test void genuineWorkoutConflictDoesNotWriteAssignments() {
         when(horses.findByCurrentStallIdIn(anyList())).thenReturn(List.of(occupied(101, 50)));
-        when(workouts.reassignFutureWorkoutsToGrooms(anyMap())).thenThrow(new IllegalStateException("BR-09"));
+        when(workouts.reassignFutureWorkoutsToGrooms(anyMap())).thenThrow(new IllegalStateException("workout sync failed"));
         status(HttpStatus.CONFLICT, () -> apply(groom(1, 1, 200L)));
     }
     @Test void missingBaselineIsRejected() {

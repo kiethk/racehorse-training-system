@@ -1,6 +1,5 @@
 package com.rtms.backend.training.repository;
 
-import com.rtms.backend.training.dto.GroomConflictRow;
 import com.rtms.backend.training.dto.GroomWorkoutRow;
 import com.rtms.backend.training.dto.HorseFitnessTrendItemResponse;
 import com.rtms.backend.training.dto.HorseScheduleItemResponse;
@@ -83,28 +82,6 @@ public interface TrainingWorkoutRepository extends JpaRepository<TrainingWorkout
 
     /** Mọi Workout của chiến mã, mọi trạng thái. (Every Workout of a horse, any status.) */
     List<TrainingWorkout> findByHorseIdAndSessionIdIsNotNull(Long horseId);
-
-    /**
-     * Các Session mà Groom mới sẽ bị trùng (BR-09) nếu nhận con ngựa này, kèm tên con ngựa đang vướng. Một câu JOIN.
-     * (Sessions where the new Groom would clash (BR-09) if given this horse, with the name of the clashing horse. One JOIN.)
-     */
-    @Query("""
-           SELECT new com.rtms.backend.training.dto.GroomConflictRow(s.id, s.sessionDate, s.startTime, h.name)
-           FROM TrainingWorkout mine
-           JOIN TrainingSession s ON mine.sessionId = s.id
-           JOIN TrainingWorkout other ON other.sessionId = s.id
-           JOIN Horse h ON other.horseId = h.id
-           WHERE mine.horseId = :horseId
-             AND mine.status = com.rtms.backend.training.enums.WorkoutStatus.SCHEDULED
-             AND s.sessionDate >= :fromDate
-             AND other.assignedToId = :groomId
-             AND other.horseId <> :horseId
-             AND other.status <> com.rtms.backend.training.enums.WorkoutStatus.CANCELLED
-           ORDER BY s.sessionDate ASC, s.startTime ASC
-           """)
-    List<GroomConflictRow> findGroomConflicts(@Param("horseId") Long horseId,
-                                              @Param("groomId") Long groomId,
-                                              @Param("fromDate") LocalDate fromDate);
 
     /**
      * Lịch tập của MỘT con ngựa trong khoảng ngày, kể cả buổi đã hủy, theo thứ tự ngày rồi giờ.

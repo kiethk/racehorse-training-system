@@ -57,9 +57,6 @@ import com.rtms.backend.audit.entity.AuditLog;
 import com.rtms.backend.audit.repository.AuditLogRepository;
 import com.rtms.backend.admission.entity.CandidateHorseProfile;
 import com.rtms.backend.admission.repository.CandidateHorseProfileRepository;
-import com.rtms.backend.racing.entity.RaceRegistration;
-import com.rtms.backend.racing.enums.RaceRegistrationStatus;
-import com.rtms.backend.racing.repository.RaceRegistrationRepository;
 import com.rtms.backend.training.entity.Subject;
 import com.rtms.backend.training.enums.IntensityLevel;
 import com.rtms.backend.training.enums.SubjectCategory;
@@ -129,7 +126,6 @@ class AiToolExecutionServiceTest {
     private CourseRepository courseRepository;
     private AuditLogRepository auditLogRepository;
     private CandidateHorseProfileRepository candidateHorseProfileRepository;
-    private RaceRegistrationRepository raceRegistrationRepository;
     private SubjectRepository subjectRepository;
     private HorseHealthMetricRepository horseHealthMetricRepository;
     private HorsePedigreeRepository horsePedigreeRepository;
@@ -168,7 +164,6 @@ class AiToolExecutionServiceTest {
         courseRepository = Mockito.mock(CourseRepository.class);
         auditLogRepository = Mockito.mock(AuditLogRepository.class);
         candidateHorseProfileRepository = Mockito.mock(CandidateHorseProfileRepository.class);
-        raceRegistrationRepository = Mockito.mock(RaceRegistrationRepository.class);
         subjectRepository = Mockito.mock(SubjectRepository.class);
         horseHealthMetricRepository = Mockito.mock(HorseHealthMetricRepository.class);
         horsePedigreeRepository = Mockito.mock(HorsePedigreeRepository.class);
@@ -204,7 +199,6 @@ class AiToolExecutionServiceTest {
                 courseRepository,
                 auditLogRepository,
                 candidateHorseProfileRepository,
-                raceRegistrationRepository,
                 subjectRepository,
                 horseHealthMetricRepository,
                 horsePedigreeRepository,
@@ -1089,38 +1083,6 @@ class AiToolExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("HEAD_TRAINER gọi getMyHorseRaceRegistrations tra cứu đăng ký giải đua")
-    void testTrainer_GetMyHorseRaceRegistrations() {
-        AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
-
-        RaceRegistration reg = new RaceRegistration();
-        reg.setId(1L);
-        reg.setTrainerId(200L);
-        reg.setHorseId(10L);
-        reg.setRaceName("Cúp Mùa Xuân");
-        reg.setEventDate(LocalDate.of(2026, 11, 1));
-        reg.setStatus(RaceRegistrationStatus.APPROVED);
-        when(raceRegistrationRepository.findByTrainerIdOrderByCreatedAtDesc(200L)).thenReturn(List.of(reg));
-
-        Horse h = new Horse();
-        h.setId(10L);
-        h.setName("THUNDER");
-        when(horseRepository.findAll()).thenReturn(List.of(h));
-
-        Object result = toolExecutionService.executeTool("getMyHorseRaceRegistrations", Map.of(), trainer);
-        assertNotNull(result);
-        assertTrue(result instanceof Map<?, ?>);
-        Map<?, ?> response = (Map<?, ?>) result;
-        assertEquals(1, response.get("totalRaceRegistrations"));
-        List<?> list = (List<?>) response.get("raceList");
-        assertEquals(1, list.size());
-        Map<?, ?> item = (Map<?, ?>) list.get(0);
-        assertEquals("THUNDER", item.get("horseName"));
-        assertEquals("Cúp Mùa Xuân", item.get("raceName"));
-        assertEquals("/trainer/racing/1", item.get("actionUrl"));
-    }
-
-    @Test
     @DisplayName("HEAD_TRAINER gọi getAssignedAdmissionReviews tra cứu đơn chờ thẩm định")
     void testTrainer_GetAssignedAdmissionReviews() {
         AuthenticatedUser trainer = new AuthenticatedUser(200L, "trainer@rtms.com", "HEAD_TRAINER");
@@ -1490,7 +1452,6 @@ class AiToolExecutionServiceTest {
         assertTrue(map.get("recommendedDistance").toString().contains("Sprint"));
         assertTrue(map.get("preferredSurface").toString().contains("Turf"));
         assertEquals("60.5 km/h", map.get("optimalSpeed"));
-        assertEquals("/trainer/racing", map.get("actionUrl"));
     }
 
     @Test
@@ -1768,7 +1729,6 @@ class AiToolExecutionServiceTest {
         assertEquals("VN-THUNDER", map.get("maDangKy"));
         assertTrue(map.containsKey("chienLuocCuLyVaSanDua"));
         assertTrue(map.containsKey("dieuChinhBaiTapKeTiep"));
-        assertEquals("/trainer/racing", map.get("actionUrl"));
     }
 
     @Test

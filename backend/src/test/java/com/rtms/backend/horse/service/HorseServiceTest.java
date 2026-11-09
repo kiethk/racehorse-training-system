@@ -352,8 +352,8 @@ class HorseServiceTest {
     }
 
     @Test
-    @DisplayName("BR-09 khi đổi chuồng: vướng xung đột thì KHÔNG ghi gì")
-    void testAssignStall_Br09Conflict_DoesNotWrite() {
+    @DisplayName("Đổi Groom của buổi tập tương lai thất bại thì KHÔNG ghi gì")
+    void testAssignStall_WorkoutSyncFails_DoesNotWrite() {
         Horse horse = new Horse();
         horse.setId(9L);
         horse.setCurrentStallId(18L);
@@ -366,7 +366,7 @@ class HorseServiceTest {
         when(horseRepository.findById(9L)).thenReturn(Optional.of(horse));
         when(stableStallRepository.findActiveByIdForUpdate(6L)).thenReturn(Optional.of(newStall));
         when(horseRepository.findByCurrentStallId(6L)).thenReturn(Optional.empty());
-        doThrow(new IllegalStateException("Groom này đang dắt 'BOOSTER WINNER'"))
+        doThrow(new IllegalStateException("Không thể đổi Groom của các buổi tập"))
                 .when(workoutService).reassignFutureWorkoutsToGroom(9L, 4L);
 
         assertThrows(IllegalStateException.class, () -> horseService.assignStall(9L, 6L));

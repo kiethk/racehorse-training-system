@@ -219,27 +219,9 @@ public class DynamicToolRegistryService {
                         ))
                 ),
                 new AiToolDefinition(
-                        "checkGroomConflict",
-                        "Kiểm tra quy tắc BR-09 trước khi giao một Groom cho một ngựa: liệt kê các buổi sắp tới mà Groom đó đã dắt một ngựa khác trong cùng Nhóm huấn luyện (một Groom chỉ dắt một ngựa mỗi nhóm).",
-                        buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)"),
-                                "groomId", Map.of("type", "integer", "description", "ID của Groom cần kiểm tra"),
-                                "date", Map.of("type", "string", "description", "Ngày bắt đầu kiểm tra (YYYY-MM-DD, mặc định hôm nay)")
-                        ))
-                ),
-                new AiToolDefinition(
                         "getTrainerAssignedGrooms",
                         "Tra cứu danh sách nhân viên Groom phụ trách các khu vực/chuồng thuộc quản lý của huấn luyện viên bao gồm thông tin liên hệ (số điện thoại, email), các chuồng phụ trách và ngựa đang chăm sóc.",
                         buildParamSchema(Map.of())
-                ),
-                new AiToolDefinition(
-                        "getMyHorseRaceRegistrations",
-                        "Tra cứu các lượt đăng ký giải đua của ngựa thuộc quyền quản lý của HLV, xem trạng thái phê duyệt (PROPOSED, CONFIRMED, REJECTED).",
-                        buildParamSchema(Map.of(
-                                "horseId", Map.of("type", "integer", "description", "ID của ngựa (tùy chọn)"),
-                                "horseName", Map.of("type", "string", "description", "Tên ngựa (tùy chọn)")
-                        ))
                 ),
                 new AiToolDefinition(
                         "getAssignedAdmissionReviews",

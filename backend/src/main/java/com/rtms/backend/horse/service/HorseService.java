@@ -246,8 +246,7 @@ public class HorseService {
                 return horse;                      // vốn đã không ở chuồng nào
             }
 
-            // Buổi tập tương lai thành "chưa phân công". Không có người phụ
-            // trách thì không thể vướng BR-09, nên hàm này không ném lỗi.
+            // Buổi tập tương lai thành "chưa phân công".
             workoutService.reassignFutureWorkoutsToGroom(horseId, null);
 
             stableStallRepository.findById(horse.getCurrentStallId()).ifPresent(oldStall -> {
@@ -280,7 +279,7 @@ public class HorseService {
         //
         // Chuồng mới có thể do Groom khác phụ trách. Không đồng bộ thì buổi tập
         // vẫn treo ở Groom của chuồng CŨ.
-        // Gọi TRƯỚC khi ghi, để vướng BR-09 thì rollback toàn bộ.
+        // Gọi TRƯỚC khi ghi, để lỗi thì rollback toàn bộ.
         if (!stallId.equals(horse.getCurrentStallId())) {
             workoutService.reassignFutureWorkoutsToGroom(horseId, newStall.getGroomId());
         }

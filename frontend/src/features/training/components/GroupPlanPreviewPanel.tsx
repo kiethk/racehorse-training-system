@@ -7,7 +7,7 @@ import { PLAN_STATUS } from '../lib/status';
 import type { GroupPlanPreview } from '../types';
 import { StatusPill } from './StatusPill';
 
-const DAY: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: 'short' };
+const DAY: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: '2-digit' };
 
 /**
  * What assigning the course would do, before anything is saved: the period, the time of every Session, the days with no free

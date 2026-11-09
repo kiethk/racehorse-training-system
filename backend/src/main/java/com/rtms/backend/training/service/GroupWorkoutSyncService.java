@@ -35,15 +35,12 @@ public interface GroupWorkoutSyncService {
      * from the stall. Sessions already held keep the old Groom, which is history.)
      *
      * @return số Workout đã chuyển (number of Workouts moved)
-     * @throws IllegalStateException nếu hai thành viên của một nhóm sẽ cùng Groom, BR-09 (if two members of a group would share a Groom)
      */
     int reassignFutureWorkoutsToGroom(Long horseId, Long newGroomId);
 
     /**
-     * Như trên cho NHIỀU ngựa cùng lúc; kiểm tra phân bổ cuối cùng TRƯỚC khi đổi bất cứ thứ gì nên hoán đổi Groom giữa hai ngựa vẫn
-     * được. Giá trị null nghĩa là gỡ Groom.
-     * (Like the above for MANY horses at once; the final allocation is validated BEFORE anything changes, so swapping Grooms between
-     * two horses works. A null value removes the Groom.)
+     * Như trên cho NHIỀU ngựa cùng lúc. Giá trị null nghĩa là gỡ Groom.
+     * (Like the above for MANY horses at once. A null value removes the Groom.)
      */
     int reassignFutureWorkoutsToGrooms(java.util.Map<Long, Long> groomByHorse);
 

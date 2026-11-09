@@ -5,7 +5,7 @@ How a Trainer organises racehorses into fixed groups and runs them through cours
 ## Language
 
 **Training Group**:
-A named, lasting set of horses (at most 6) owned by one Trainer, going out on the track together on training days. A horse belongs to at most one Training Group at a time, and no two horses of the same Groom share one.
+A named, lasting set of horses (at most 6) owned by one Trainer, going out on the track together on training days. A horse belongs to at most one Training Group at a time; one Groom may lead several horses of the same group.
 _Avoid_: Lot, cohort, batch
 
 **Disbanded**:

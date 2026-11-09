@@ -144,7 +144,7 @@ export function SessionDetailContent({
             {session.groupDisbanded && <Pill tone="neutral" size="sm">Disbanded</Pill>}
           </div>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            {formatDate(session.date, { weekday: 'long', day: '2-digit', month: 'short' })} · {formatTime(session.startTime)}–{formatTime(session.endTime)}
+            {formatDate(session.date, { weekday: 'long', day: '2-digit', month: '2-digit' })} · {formatTime(session.startTime)}–{formatTime(session.endTime)}
           </p>
         </div>
         <div className="flex items-center gap-2">

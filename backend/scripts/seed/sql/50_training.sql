@@ -3,7 +3,7 @@
 -- (Subjects, courses, training groups, group plans, sessions and workouts of the 3 head trainers: ~13 weeks of history plus upcoming.)
 --
 -- Luật đang giữ (TrainingGroupService / GroupPlanService / SessionSettlementService, migration V202610311000):
---   - Nhóm tối đa 6 ngựa, mỗi ngựa một nhóm, không hai ngựa cùng Groom trong một nhóm (BR-10, BR-09); ngựa ELIGIBLE, không bị
+--   - Nhóm tối đa 6 ngựa, mỗi ngựa một nhóm (BR-10); ngựa ELIGIBLE, không bị
 --     chặn tập, trong khu của Trainer. Ngựa đang bị chặn tập không nằm trong nhóm nào.
 --   - Các Group Plan chưa đóng của một nhóm không chồng ngày; mỗi plan có đúng total_sessions buổi, xoay vòng bài của khóa,
 --     chỉ vào các thứ đã chọn.
@@ -14,7 +14,7 @@
 --   - Buổi đã ghi kết quả có đủ 7 chỉ số; điểm phong độ tính đúng công thức WorkoutPerformanceCalculator.
 -- Kịch bản demo có sẵn: Session đã HELD còn thiếu kết quả (nhãn "Cần ghi kết quả"), ngựa vào giữa khóa, ngựa bị bỏ riêng một buổi,
 -- ngựa "không chạy", Session bị hủy vì mưa, plan bị hủy giữa chừng, plan xếp hàng chờ sau plan đang chạy.
--- (Rules kept: group of at most 6 with one horse per groom and one group per horse, no overlapping unfinished plans per group,
+-- (Rules kept: group of at most 6 and one group per horse, no overlapping unfinished plans per group,
 -- Sessions on quarter hours inside the golden window placed first-fit per day, statuses follow the clock, blocking removes a horse
 -- from its group and cancels what has not started. Demo scenarios: a Held Session missing results, a mid-course joiner, one horse
 -- cancelled for a single Session, a horse that did not run, a rainy Session cancelled, a plan dropped part-way, a queued plan.)
@@ -200,8 +200,8 @@ BEGIN
     RETURN v_start;
 END $$ LANGUAGE plpgsql;
 
--- Chia các ngựa đã cho thành các nhóm tối đa 6 ngựa, không hai ngựa cùng Groom trong một nhóm. Ngựa đang bị chặn tập bỏ qua.
--- (Splits the horses into groups of at most 6 with no two horses of one groom. Horses blocked right now are skipped.)
+-- Chia các ngựa đã cho thành các nhóm tối đa 6 ngựa; seed chủ ý rải Groom khác nhau vào mỗi nhóm cho dữ liệu đa dạng (luật không bắt buộc). Ngựa đang bị chặn tập bỏ qua.
+-- (Splits the horses into groups of at most 6; the seed deliberately spreads grooms across a group for variety, the rules do not require it. Horses blocked right now are skipped.)
 CREATE FUNCTION pg_temp.make_groups(p_trainer TEXT, p_prefix TEXT, p_horses TEXT[]) RETURNS BIGINT[] AS $$
 DECLARE
     v_trainer BIGINT := pg_temp.uid(p_trainer);

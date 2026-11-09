@@ -45,9 +45,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Quản lý Training Group qua service trên PostgreSQL thật: luật thành viên (BR-09, BR-10, khu của Trainer, được phép
+ * Quản lý Training Group qua service trên PostgreSQL thật: luật thành viên (BR-10, khu của Trainer, được phép
  * tập), đổi tên, chuyển ngựa và truy vấn ứng viên. Mọi dữ liệu nằm trong một transaction rồi rollback.
- * (Training Group management through the service on a real PostgreSQL: membership rules (BR-09, BR-10, the Trainer's
+ * (Training Group management through the service on a real PostgreSQL: membership rules (BR-10, the Trainer's
  * area, allowed to train), rename, move, candidate query (disband is in GroupDisbandIntegrationTest). All data lives in one transaction that rolls back.)
  */
 @SpringBootTest
@@ -121,16 +121,16 @@ class TrainingGroupServiceIntegrationTest {
     }
 
     @Test
-    void twoHorsesOfTheSameGroomAreRefusedInOneGroup() {
+    void oneGroomMayLeadSeveralHorsesOfTheSameGroup() {
         User an = groom("An");
         Horse first = horse("Thunder", an);
         Horse second = horse("Echo", an);
         TrainingGroupResponse group = service.createGroup(
                 new CreateTrainingGroupRequest("Nhom 1", List.of(first.getId())), trainerPrincipal);
 
-        ApiException error = assertThrows(ApiException.class,
-                () -> service.addHorse(group.id(), second.getId(), trainerPrincipal));
-        assertEquals("GROOM_ALREADY_IN_GROUP", error.getErrorCode());
+        TrainingGroupResponse filled = service.addHorse(group.id(), second.getId(), trainerPrincipal);
+
+        assertEquals(List.of("An", "An"), filled.members().stream().map(m -> m.groomName()).toList());
     }
 
     @Test
@@ -268,7 +268,7 @@ class TrainingGroupServiceIntegrationTest {
     void candidatesExplainWhyAHorseCannotJoin() {
         User an = groom("An");
         Horse member = horse("Thunder", an);
-        Horse sameGroom = horse("Echo", an);
+        horse("Echo", an);
         Horse free = horse("Free", groom("Binh"));
         Horse inOther = horse("Taken", groom("Chi"));
         TrainingGroupResponse group = service.createGroup(
@@ -277,9 +277,7 @@ class TrainingGroupServiceIntegrationTest {
 
         List<GroupCandidateResponse> candidates = service.getCandidates(group.id(), trainerPrincipal);
 
-        GroupCandidateResponse echo = byName(candidates, "Echo");
-        assertFalse(echo.joinable());
-        assertTrue(echo.reason().contains("Thunder"));
+        assertTrue(byName(candidates, "Echo").joinable());
         assertTrue(byName(candidates, "Free").joinable());
         assertFalse(byName(candidates, "Taken").joinable());
         assertTrue(candidates.stream().noneMatch(c -> c.horseName().equals("Thunder")));

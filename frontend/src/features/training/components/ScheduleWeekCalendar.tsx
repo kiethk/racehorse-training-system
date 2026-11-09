@@ -60,7 +60,7 @@ function dayHeading(isoDate: string) {
   const date = new Date(year, month - 1, day);
   return {
     weekday: formatDate(date, { weekday: 'short' }),
-    day: formatDate(date, { day: '2-digit', month: 'short' }),
+    day: formatDate(date, { day: '2-digit', month: '2-digit' }),
   };
 }
 
@@ -189,9 +189,9 @@ export function ScheduleWeekCalendar({
     return map;
   }, [mode, horseItems, preloadedSessions, groupSessions, groupId, dates]);
 
-  const rangeLabel = `${formatDate(dates[0], { day: '2-digit', month: 'short' })} – ${formatDate(
+  const rangeLabel = `${formatDate(dates[0], { day: '2-digit', month: '2-digit' })} – ${formatDate(
     dates[SCHEDULE_DAYS - 1],
-    { day: '2-digit', month: 'short', year: 'numeric' },
+    { day: '2-digit', month: '2-digit', year: 'numeric' },
   )}`;
   const isCurrentWeek = currentWeekStart === mondayOf(today);
 

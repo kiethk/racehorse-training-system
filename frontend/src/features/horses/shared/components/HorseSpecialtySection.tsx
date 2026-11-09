@@ -9,7 +9,7 @@ export function HorseSpecialtySection({ specialty }: { specialty: HorseSpecialty
 
   return (
     <HorseInfoSection
-      title="Racing profile"
+      title="Racing specialty"
       icon="flag"
       aside={(
         <Tooltip content="Workouts in the last 90 days, recovery sessions excluded">

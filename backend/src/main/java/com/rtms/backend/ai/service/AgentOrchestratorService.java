@@ -463,7 +463,6 @@ public class AgentOrchestratorService {
                          - Lịch tập: `/trainer/schedule`
                          - Kế hoạch huấn luyện: `/trainer/plans` (hoặc `/trainer/plans/[id]`)
                          - Dashboard & Cảnh báo rủi ro: `/trainer/dashboard` (LƯU Ý: KHÔNG CÓ ROUTE `/trainer/risk-alerts`, chỉ dùng `/trainer/dashboard`)
-                         - Đăng ký đua & Thành tích: `/trainer/racing` (hoặc `/trainer/racing/[id]`)
                          - Thẩm định nhập đàn: `/trainer/admissions` (hoặc `/trainer/admissions/[id]`)
                          - Chuồng trại & Phân công: `/trainer/stable`
                          - Giáo trình khóa học: `/trainer/courses`
@@ -596,7 +595,6 @@ public class AgentOrchestratorService {
                      + Tra cứu ngựa thuộc quyền huấn luyện: Dùng `getTrainerHorses` -> để lấy danh sách tên và ID ngựa.
                      + Tra cứu khóa và Attendance của ngựa: Dùng `getTrainerPlansSummary` (đọc `progress` dạng X/Y).
                      + Lịch sử buổi tập đã diễn ra của một ngựa: Dùng `getWorkoutHistory` (đọc `outcome`).
-                     + Đăng ký giải đua: Dùng `getMyHorseRaceRegistrations` (đọc `totalRaceRegistrations`).
                      + Đơn tuyển nhận nhập đàn chờ thẩm định: Dùng `getAssignedAdmissionReviews` (đọc `pendingReviewCount`).
                       + Phân tích & Xếp hạng sở trường: Dùng `getHorseSpecialtyAnalysis` (đọc `rankedHorseList` và `specialtyCount`).
                 """;
@@ -935,21 +933,11 @@ public class AgentOrchestratorService {
             case "stageBreakdown" -> "Stage Breakdown";
 
             // Races
-            case "raceName" -> "Race Name";
-            case "raceCategory" -> "Race Category";
             case "location" -> "Racecourse / Location";
-            case "organizer" -> "Organizer";
             case "distanceMeters" -> "Distance (m)";
             case "trackType" -> "Track Type";
             case "eventDate" -> "Event Date";
             case "eventTime" -> "Start Time";
-            case "nominationDeadline" -> "Nomination Deadline";
-            case "jockeyName" -> "Jockey";
-            case "entryFee" -> "Entry Fee";
-            case "prizeDetails" -> "Prize Details";
-            case "registrationDate" -> "Registration Date";
-            case "totalRaceRegistrations" -> "Total Race Registrations";
-            case "raceList" -> "Race List";
 
             // Audit
             case "action" -> "Action";
@@ -1219,21 +1207,11 @@ public class AgentOrchestratorService {
             case "stageBreakdown" -> "Chi tiết theo giai đoạn";
 
             // Giải đua
-            case "raceName" -> "Tên giải đua";
-            case "raceCategory" -> "Hạng mục giải đua";
             case "location" -> "Địa điểm / Trường đua";
-            case "organizer" -> "Đơn vị tổ chức";
             case "distanceMeters" -> "Cự ly thi đấu (m)";
             case "trackType" -> "Mặt sân đua";
             case "eventDate" -> "Ngày thi đấu chính thức";
             case "eventTime" -> "Giờ xuất phát";
-            case "nominationDeadline" -> "Hạn chót đăng ký nộp hồ sơ";
-            case "jockeyName" -> "Nài ngựa";
-            case "entryFee" -> "Lệ phí tham gia";
-            case "prizeDetails" -> "Cơ cấu giải thưởng";
-            case "registrationDate" -> "Ngày đăng ký đua";
-            case "totalRaceRegistrations" -> "Tổng số giải đăng ký";
-            case "raceList" -> "Danh sách giải đua";
 
             // Nhật ký kiểm toán
             case "action" -> "Hành động thao tác";

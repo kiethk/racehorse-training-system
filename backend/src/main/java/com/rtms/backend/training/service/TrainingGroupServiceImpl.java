@@ -126,18 +126,14 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         Map<Long, HorseStallInfo> stallByHorse = stallInfo(candidateIds);
         Map<Long, TrainingGroupMember> membershipByHorse = memberRepository.findByHorseIdInAndLeftAtIsNull(candidateIds).stream()
                 .collect(Collectors.toMap(TrainingGroupMember::getHorseId, Function.identity()));
-        Map<Long, String> horseNamesInGroup = horseNames(memberHorseIds);
         Map<Long, String> groomNames = userNames(
                 stallByHorse.values().stream().map(HorseStallInfo::stallGroomId).collect(Collectors.toSet()));
-        Map<Long, Long> memberByGroom = groupMembers.stream().filter(m -> m.getGroomId() != null)
-                .collect(Collectors.toMap(TrainingGroupMember::getGroomId, TrainingGroupMember::getHorseId, (a, b) -> a));
 
         List<GroupCandidateResponse> result = new ArrayList<>();
         for (Long horseId : candidateIds) {
             Horse horse = horsesById.get(horseId);
             HorseStallInfo stall = stallByHorse.get(horseId);
-            String reason = candidateReason(horse, stall, membershipByHorse.get(horseId), groupMembers.size(), memberByGroom,
-                    horseNamesInGroup);
+            String reason = candidateReason(horse, stall, membershipByHorse.get(horseId), groupMembers.size());
             String groomName = stall == null ? null : groomNames.get(stall.stallGroomId());
             result.add(new GroupCandidateResponse(horseId, horse.getName(), groomName, reason == null, reason));
         }
@@ -251,9 +247,9 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
 
     /**
      * Thêm một chiến mã vào nhóm sau khi kiểm đủ luật: ngựa tồn tại, ở trong khu của Trainer, được phép tập, chuồng có Groom,
-     * chưa ở nhóm khác, nhóm chưa đủ 6 con (BR-10) và chưa có ngựa cùng Groom (BR-09).
+     * chưa ở nhóm khác và nhóm chưa đủ 6 con (BR-10). Một Groom được dắt nhiều ngựa trong cùng nhóm.
      * (Adds a horse to a group after checking every rule: the horse exists, is in the Trainer's area, may train, its stall has a
-     * Groom, it is in no other group, the group has fewer than 6 horses (BR-10) and no horse of the same Groom (BR-09).)
+     * Groom, it is in no other group and the group has fewer than 6 horses (BR-10). One Groom may lead several horses of a group.)
      */
     private void join(TrainingGroup group, Long horseId, AuthenticatedUser currentUser) {
         Horse horse = horseRepository.findById(horseId).orElseThrow(() ->
@@ -281,15 +277,6 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
             throw new ApiException(HttpStatus.CONFLICT, "GROUP_FULL", "Group '" + group.getName() + "' is full ("
                     + TrainingLimits.MAX_HORSES_PER_GROUP + " horses)!");
         }
-        Optional<TrainingGroupMember> sameGroom = groupMembers.stream()
-                .filter(m -> stall.stallGroomId().equals(m.getGroomId())).findFirst();
-        if (sameGroom.isPresent()) {
-            String other = horseNames(List.of(sameGroom.get().getHorseId())).get(sameGroom.get().getHorseId());
-            throw new ApiException(HttpStatus.CONFLICT, "GROOM_ALREADY_IN_GROUP", String.format(
-                    "Horse '%s' has the same groom as '%s', who is already in this group. A groom can lead only one horse per group!",
-                    horse.getName(), other));
-        }
-
         groupSync.assertCanJoin(group.getId());
 
         TrainingGroupMember member = new TrainingGroupMember();
@@ -323,8 +310,7 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
     }
 
     /** Lý do một chiến mã chưa vào được nhóm, hoặc null nếu vào được. (Why a horse cannot join the group yet, or null if it can.) */
-    private String candidateReason(Horse horse, HorseStallInfo stall, TrainingGroupMember membership, int groupSize,
-                                   Map<Long, Long> memberByGroom, Map<Long, String> horseNamesInGroup) {
+    private String candidateReason(Horse horse, HorseStallInfo stall, TrainingGroupMember membership, int groupSize) {
         if (!horse.canTrain()) {
             return "Not allowed to train";
         }
@@ -336,10 +322,6 @@ public class TrainingGroupServiceImpl implements TrainingGroupService {
         }
         if (groupSize >= TrainingLimits.MAX_HORSES_PER_GROUP) {
             return "The group is full";
-        }
-        Long sameGroomHorse = memberByGroom.get(stall.stallGroomId());
-        if (sameGroomHorse != null) {
-            return "Same groom as " + horseNamesInGroup.get(sameGroomHorse);
         }
         return null;
     }

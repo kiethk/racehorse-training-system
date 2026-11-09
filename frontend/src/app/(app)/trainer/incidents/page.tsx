@@ -1,17 +1,17 @@
 import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { TrainerRaceList } from '@/features/racing/components/TrainerRaceList';
+import { TrainerIncidentList } from '@/features/training/components/TrainerIncidentList';
 
 export const metadata: Metadata = {
-  title: 'Race nominations | Trainer | RTMS',
+  title: 'Incidents | Trainer | RTMS',
 };
 
-export default function TrainerRacingPage() {
+export default function TrainerIncidentsPage() {
   return (
     <RoleGuard allowedRoles={['HEAD_TRAINER']}>
       <PageContainer>
-        <TrainerRaceList />
+        <TrainerIncidentList />
       </PageContainer>
     </RoleGuard>
   );

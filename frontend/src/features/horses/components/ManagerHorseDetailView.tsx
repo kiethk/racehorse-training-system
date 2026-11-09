@@ -6,10 +6,8 @@ import { HorseProfileView } from '@/features/horses/shared/components/HorseProfi
 import type { Horse } from '@/features/stable/types';
 import type { HorseHealthMetric, HorsePedigree, HorseSpecialty } from '../types';
 import type { HorseAlert } from '@/features/training/types';
-import type { RaceRegistrationResponse } from '@/features/racing/types';
 import { horseService } from '../services/horseService';
 import { trainingService } from '@/features/training/services/trainingService';
-import { racingService } from '@/features/racing/services/racingService';
 import { ChangeHorseStatusModal } from './ChangeHorseStatusModal';
 import { StableTeamTab } from './StableTeamTab';
 import { HistoryTab } from './HistoryTab';
@@ -20,7 +18,6 @@ import { toIsoDate } from '@/features/training/lib/dateRange';
 import { HorsePedigreeCard } from './HorsePedigreeCard';
 import { HorseSpecialtySection } from '../shared/components/HorseSpecialtySection';
 import { HorseHealthSummary } from './HorseHealthSummary';
-import { HorseRacingHistory } from './HorseRacingHistory';
 
 interface ManagerHorseDetailViewProps {
   horseId: number;
@@ -29,7 +26,7 @@ interface ManagerHorseDetailViewProps {
 /**
  * 360-degree comprehensive horse detail view for Club Manager.
  * Combines Overview & Pedigree, Training schedule, Training plans, Fitness & Trends, Stable & Team,
- * Medical & Vet Care, Racing History, and Status History into an executive command view.
+ * Medical & Vet Care, Specialty, and Status History into an executive command view.
  * The training tabs are the same screens the Trainer and Owner see.
  */
 export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps) {
@@ -46,7 +43,6 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
   const [healthMetrics, setHealthMetrics] = useState<HorseHealthMetric[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [preventiveCare, setPreventiveCare] = useState<any[]>([]);
-  const [raceRegistrations, setRaceRegistrations] = useState<RaceRegistrationResponse[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -57,15 +53,13 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
       trainingService.getHorseAlerts(horseId).catch(() => []),
       horseService.getHealthMetrics(horseId).catch(() => []),
       horseService.getPreventiveCare(horseId).catch(() => []),
-      racingService.listMine(horseId).catch(() => []),
-    ]).then(([specialtyData, pedigreeData, alertData, metricsData, preventiveData, racingData]) => {
+    ]).then(([specialtyData, pedigreeData, alertData, metricsData, preventiveData]) => {
       if (!active) return;
       setSpecialty(specialtyData);
       setPedigree(pedigreeData);
       setAlerts(alertData);
       setHealthMetrics(metricsData);
       setPreventiveCare(preventiveData);
-      setRaceRegistrations(racingData);
     });
 
     return () => {
@@ -154,14 +148,9 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
             ),
           },
           {
-            id: 'racing',
-            label: 'Racing History',
-            content: (
-              <div className="space-y-6">
-                <HorseSpecialtySection specialty={specialty} />
-                <HorseRacingHistory registrations={raceRegistrations} />
-              </div>
-            ),
+            id: 'specialty',
+            label: 'Specialty',
+            content: <HorseSpecialtySection specialty={specialty} />,
           },
           {
             id: 'history',

@@ -158,9 +158,8 @@ INSERT INTO seed_check VALUES
 ('Group member groom is not the stall groom',
  $q$ SELECT m.id FROM training_group_members m JOIN horses h ON h.id = m.horse_id JOIN stable_stalls s ON s.id = h.current_stall_id
      WHERE m.groom_id IS DISTINCT FROM s.groom_id AND m.left_at IS NULL $q$),
-('Group with more than 6 horses or a groom twice (BR-10, BR-09)',
- $q$ SELECT group_id FROM training_group_members WHERE left_at IS NULL GROUP BY group_id HAVING count(*) > 6
-     UNION ALL SELECT group_id FROM training_group_members WHERE groom_id IS NOT NULL AND left_at IS NULL GROUP BY group_id, groom_id HAVING count(*) > 1 $q$),
+('Group with more than 6 horses (BR-10)',
+ $q$ SELECT group_id FROM training_group_members WHERE left_at IS NULL GROUP BY group_id HAVING count(*) > 6 $q$),
 ('Plan does not have exactly total_sessions sessions',
  $q$ SELECT p.id FROM group_plans p JOIN courses c ON c.id = p.course_id
      WHERE (SELECT count(*) FROM training_sessions s WHERE s.group_plan_id = p.id) <> c.total_sessions $q$),
@@ -252,12 +251,6 @@ INSERT INTO seed_check VALUES
 ('Completion photo key that is not a stored file',
  $q$ SELECT p.completion_id FROM groom_task_completion_photos p
      WHERE NOT EXISTS (SELECT 1 FROM admission_documents d WHERE d.file_url = p.image_key) $q$),
--- ---------------- Thi đấu (Racing)
-('Nomination for a horse outside the trainer areas, or out of date order',
- $q$ SELECT r.id FROM race_registrations r JOIN horses h ON h.id = r.horse_id JOIN stable_stalls s ON s.id = h.current_stall_id
-     JOIN areas a ON a.id = s.area_id
-     WHERE a.trainer_id <> r.trainer_id OR r.event_date < r.created_at::DATE OR r.nomination_deadline > r.event_date
-        OR (r.status = 'PENDING') <> (r.reviewed_at IS NULL) $q$),
 -- ---------------- Dược lâm sàng (Track 0: catalog + đơn thuốc + severity D4)
 ('Health condition severity outside the MILD/MODERATE/SEVERE/CRITICAL vocabulary',
  $q$ SELECT id FROM health_conditions

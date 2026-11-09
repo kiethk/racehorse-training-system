@@ -244,7 +244,7 @@ abstract class DemoSeedWorkflow {
         assertEquals(0L, count("admission_documents"));
         assertEquals(11L, count("users"));
         for (String table : List.of("horse_training_plans", "training_lots", "training_workouts", "groom_daily_tasks",
-                "health_records", "horse_health_metrics", "injury_records", "treatment_plans", "race_registrations")) {
+                "health_records", "horse_health_metrics", "injury_records", "treatment_plans")) {
             assertEquals(0L, count(table), "Unexpected existing dependencies in " + table);
         }
         List<String> manifest = Files.readAllLines(root.resolve("upload-manifest.csv"));
@@ -538,7 +538,7 @@ abstract class DemoSeedWorkflow {
         assertEquals(2L,jdbc.queryForObject("SELECT count(*) FROM stable_stalls WHERE status='RESERVED'",Long.class));
         assertEquals(46L,count("health_records")); assertEquals(44L,count("racing_readiness_assessments"));
         assertEquals(0L,jdbc.queryForObject("SELECT count(*) FROM admission_applications WHERE arrived_at<submitted_at OR vet_reviewed_at<arrived_at OR trainer_reviewed_at<vet_reviewed_at OR manager_reviewed_at<trainer_reviewed_at",Long.class));
-        for (String table:List.of("horse_training_plans","training_lots","training_workouts","groom_daily_tasks","race_registrations","horse_health_metrics")) assertEquals(0L,count(table));
+        for (String table:List.of("horse_training_plans","training_lots","training_workouts","groom_daily_tasks","horse_health_metrics")) assertEquals(0L,count(table));
         int checkedFiles=0;
         for (JsonNode p:profiles()) for (var row:jdbc.queryForList("SELECT file_url,original_file_name FROM admission_documents WHERE admission_id=?",admissionIds.get(text(p,"key")))) {
             String key=row.get("file_url").toString();

@@ -31,7 +31,7 @@ type View = 'today' | 'week' | 'needs-result' | 'horse';
 /** How far back the "Needs result" filter looks for Sessions whose results were never recorded. */
 const NEEDS_RESULT_LOOKBACK_DAYS = 90;
 
-const DAY_HEADING: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: 'short' };
+const DAY_HEADING: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: '2-digit' };
 
 /**
  * The schedule of group Sessions:
@@ -258,7 +258,7 @@ export function SchedulePage({ canManage }: { canManage: boolean }) {
                 onClick={() => handleDateChange(shiftIsoDate(selectedDate, -1))}
               />
               <span className="min-w-44 text-center text-sm font-semibold text-[var(--color-text-primary)]">
-                {formatDate(selectedDate, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                {formatDate(selectedDate, { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}
               </span>
               <IconButton
                 icon="chevron-right"
@@ -300,7 +300,7 @@ export function SchedulePage({ canManage }: { canManage: boolean }) {
             <Panel padded>
               <EmptyState
                 icon="calendar"
-                title={`No sessions on ${formatDate(selectedDate, { weekday: 'short', day: '2-digit', month: 'short' })}`}
+                title={`No sessions on ${formatDate(selectedDate, { weekday: 'short', day: '2-digit', month: '2-digit' })}`}
               />
             </Panel>
           ) : (
