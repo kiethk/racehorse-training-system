@@ -52,8 +52,12 @@ public class AreaController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('AREA_CREATE')")
-    public ApiResponse<Area> createArea(@Valid @RequestBody CreateAreaRequest request) {
+    public ApiResponse<Area> createArea(@Valid @RequestBody CreateAreaRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
         Area area = areaService.createArea(request.getType());
+        if (httpRequest != null) {
+            httpRequest.setAttribute("AUDIT_ENTITY_ID", area.getId());
+            httpRequest.setAttribute("AUDIT_ENTITY_NAME", "Area");
+        }
         return ApiResponse.success(area);
     }
 
@@ -90,7 +94,16 @@ public class AreaController {
     @RequestMapping(value = "/assignments", method = {RequestMethod.PUT, RequestMethod.POST})
     @PreAuthorize("hasAuthority('AREA_UPDATE') and hasAuthority('STALL_GROOM_ASSIGN')")
     public ApiResponse<StableAssignmentResponse> applyAssignments(
-            @Valid @RequestBody BatchStableAssignmentRequest request) {
+            @Valid @RequestBody BatchStableAssignmentRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
+        if (httpRequest != null) {
+            if (request.getTrainerAssignments() != null && !request.getTrainerAssignments().isEmpty()) {
+                httpRequest.setAttribute("AUDIT_ENTITY_ID", request.getTrainerAssignments().get(0).getAreaId());
+                httpRequest.setAttribute("AUDIT_ENTITY_NAME", "Area");
+            } else if (request.getGroomAssignments() != null && !request.getGroomAssignments().isEmpty()) {
+                httpRequest.setAttribute("AUDIT_ENTITY_ID", request.getGroomAssignments().get(0).getAreaId());
+                httpRequest.setAttribute("AUDIT_ENTITY_NAME", "Area");
+            }
+        }
         return ApiResponse.success(stableAssignmentService.applyAssignments(request));
     }
 

@@ -48,7 +48,7 @@ function formatAction(action: string | null, method?: string, path?: string): st
 export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModalProps) {
   if (!item) return null;
 
-  const parsed = parseAuditDetails(item.details, item.entityName, item.entityId);
+  const parsed = parseAuditDetails(item.details, item.entityName, item.entityId, item.requestPath);
   const actionTitle = formatAction(item.action, item.httpMethod, item.requestPath);
   const moduleName = resolveLogModule(item.module || parsed.module, item.entityName, item.requestPath, item.action);
 
@@ -135,24 +135,19 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
             <div>
               <span className="text-[var(--color-text-muted)]">Target: </span>
               {item.entityName ? (
-                parsed.targetUrl ? (
+                parsed.targetUrl && item.entityId != null ? (
                   <Link
                     href={parsed.targetUrl}
                     className="font-medium text-[var(--color-text-primary)] hover:underline inline-flex items-center gap-1"
-                    title={`View ${item.entityName} ${item.entityId != null ? '#' + item.entityId : ''}`}
+                    title={`View ${item.entityName} #${item.entityId}`}
                   >
                     <span>{item.entityName}</span>
-                    {item.entityId != null && (
-                      <span className="font-mono text-[var(--color-text-muted)]">#{item.entityId}</span>
-                    )}
+                    <span className="font-mono text-[var(--color-text-muted)]">#{item.entityId}</span>
                     <Icon name="external-link" className="size-3 opacity-60 ml-0.5" />
                   </Link>
                 ) : (
-                  <span className="font-medium text-[var(--color-text-primary)]">
+                  <span className="font-medium text-[var(--color-text-secondary)]">
                     {item.entityName}
-                    {item.entityId != null && (
-                      <span className="ml-1 font-mono text-[var(--color-text-muted)]">#{item.entityId}</span>
-                    )}
                   </span>
                 )
               ) : (
@@ -162,10 +157,18 @@ export function AuditLogDetailModal({ item, open, onClose }: AuditLogDetailModal
           </div>
         </div>
 
-        {/* Reason Callout (Clean, normal text) */}
+        {/* Reason Callout */}
         {parsed.reason && (
-          <div className="rounded border border-[var(--color-border)] px-3.5 py-2 text-xs text-[var(--color-text-primary)]">
-            <span className="font-semibold">Reason: </span>
+          <div
+            className={`rounded border px-3.5 py-2.5 text-xs ${
+              !item.success
+                ? 'border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 text-rose-900 dark:text-rose-200'
+                : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)]'
+            }`}
+          >
+            <span className={`font-semibold ${!item.success ? 'text-rose-700 dark:text-rose-400' : ''}`}>
+              {!item.success ? 'Failure Reason: ' : 'Reason: '}
+            </span>
             {parsed.reason}
           </div>
         )}

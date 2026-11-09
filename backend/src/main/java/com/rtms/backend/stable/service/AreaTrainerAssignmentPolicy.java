@@ -23,13 +23,19 @@ public class AreaTrainerAssignmentPolicy {
                     WHERE s.area_id=a.id) AS has_horses,
             EXISTS (SELECT 1 FROM stable_stalls s WHERE s.area_id=a.id
                     AND s.status IN ('OCCUPIED','RESERVED')) AS has_occupied_stalls,
-            (EXISTS (SELECT 1 FROM group_plans p WHERE p.trainer_id=a.trainer_id
-                     AND p.status IN ('UPCOMING','ACTIVE'))
-             OR EXISTS (SELECT 1 FROM training_sessions ts WHERE ts.trainer_id=a.trainer_id
-                        AND ts.status='SCHEDULED')
+            (EXISTS (SELECT 1 FROM group_plans p
+                     JOIN training_group_members tgm ON tgm.group_id=p.group_id AND tgm.left_at IS NULL
+                     JOIN horses h ON h.id=tgm.horse_id
+                     JOIN stable_stalls s ON s.id=h.current_stall_id
+                     WHERE p.trainer_id=a.trainer_id
+                       AND s.area_id=a.id
+                       AND p.status IN ('UPCOMING','ACTIVE'))
              OR EXISTS (SELECT 1 FROM training_workouts w
                         JOIN training_sessions ts ON ts.id=w.session_id
+                        JOIN horses h ON h.id=w.horse_id
+                        JOIN stable_stalls s ON s.id=h.current_stall_id
                         WHERE ts.trainer_id=a.trainer_id
+                          AND s.area_id=a.id
                           AND w.status='SCHEDULED' AND ts.status<>'CANCELLED')) AS has_training
         FROM areas a WHERE a.deleted_at IS NULL
         """;

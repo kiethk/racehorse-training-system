@@ -19,25 +19,39 @@ export interface ParsedAuditDetail {
 
 export function resolveEntityUrl(
   entityName?: string | null,
-  entityId?: number | null
+  entityId?: number | null,
+  requestPath?: string | null
 ): string | null {
-  if (!entityName) return null;
-  const normalized = entityName.toUpperCase();
+  if (!entityName && !requestPath) return null;
+  const normalized = (entityName || '').toUpperCase();
 
-  if (normalized === 'ADMISSIONAPPLICATION' || normalized === 'ADMISSION') {
-    return entityId != null ? `/manager/admissions/${entityId}` : '/manager/admissions';
+  // If entityId is null, try to extract from requestPath (e.g. /api/areas/7)
+  let resolvedId = entityId;
+  if (resolvedId == null && requestPath) {
+    const m = requestPath.match(/\/(?:areas|stalls|horses|admissions|accounts|staff|users)\/(\d+)/i);
+    if (m) {
+      resolvedId = Number(m[1]);
+    }
   }
 
-  if (normalized === 'HORSE') {
-    return entityId != null ? `/manager/horses/${entityId}` : '/manager/horses';
+  if (normalized === 'ADMISSIONAPPLICATION' || normalized === 'ADMISSION' || (requestPath && requestPath.includes('/admissions'))) {
+    return resolvedId != null ? `/manager/admissions/${resolvedId}` : '/manager/admissions';
   }
 
-  if (normalized === 'STABLESTALL' || normalized === 'STALL' || normalized === 'AREA') {
-    return '/manager/stable';
+  if (normalized === 'HORSE' || (requestPath && requestPath.includes('/horses'))) {
+    return resolvedId != null ? `/manager/horses/${resolvedId}` : '/manager/horses';
   }
 
-  if (normalized === 'USER' || normalized === 'STAFF') {
-    return entityId != null ? `/manager/accounts?userId=${entityId}` : '/manager/accounts';
+  if (normalized === 'STABLESTALL' || normalized === 'STALL' || (requestPath && requestPath.includes('/stalls'))) {
+    return resolvedId != null ? `/manager/stable?stallId=${resolvedId}` : '/manager/stable';
+  }
+
+  if (normalized === 'AREA' || normalized === 'STABLE' || (requestPath && requestPath.includes('/areas'))) {
+    return resolvedId != null ? `/manager/stable?areaId=${resolvedId}` : '/manager/stable';
+  }
+
+  if (normalized === 'USER' || normalized === 'STAFF' || (requestPath && (requestPath.includes('/staff') || requestPath.includes('/accounts')))) {
+    return resolvedId != null ? `/manager/accounts?userId=${resolvedId}` : '/manager/accounts';
   }
 
   return null;
@@ -78,6 +92,17 @@ export function resolveValueLink(field: string, value: string): string | null {
 
   // 3. Stall / Barn / Area references
   if (f.includes('stall') || f.includes('barn') || f.includes('area')) {
+    const idMatch = value.match(/#(\d+)/);
+    if (idMatch) {
+      if (f.includes('area') || f.includes('barn')) {
+        return `/manager/stable?areaId=${idMatch[1]}`;
+      }
+      return `/manager/stable?stallId=${idMatch[1]}`;
+    }
+    const stallCodeMatch = value.match(/\b([A-Z]-?\d{1,3})\b/i);
+    if (stallCodeMatch) {
+      return `/manager/stable?stallCode=${stallCodeMatch[1]}`;
+    }
     return `/manager/stable`;
   }
 
@@ -151,10 +176,11 @@ function formatValue(val: unknown): string {
 export function parseAuditDetails(
   details: string | null,
   entityName?: string | null,
-  entityId?: number | null
+  entityId?: number | null,
+  requestPath?: string | null
 ): ParsedAuditDetail {
   const rawText = details || '';
-  const fallbackUrl = resolveEntityUrl(entityName, entityId) ?? undefined;
+  const fallbackUrl = resolveEntityUrl(entityName, entityId, requestPath) ?? undefined;
 
   if (!details) {
     return {
@@ -194,7 +220,7 @@ export function parseAuditDetails(
 
         return {
           isJson: true,
-          raw: details,
+          raw: parsed.summary || details,
           summary: parsed.summary,
           reason: parsed.reason,
           module: parsed.module,
@@ -205,6 +231,20 @@ export function parseAuditDetails(
     } catch {
       // Fall through to plain text
     }
+  }
+
+  const reasonMatch = details.match(/(?: - Reason: |\nReason: | - reason: )(.*)$/i);
+  if (reasonMatch) {
+    const reason = reasonMatch[1].trim();
+    const summary = details.substring(0, reasonMatch.index).trim();
+    return {
+      isJson: false,
+      raw: summary,
+      summary,
+      reason,
+      targetUrl: fallbackUrl,
+      diffs: [],
+    };
   }
 
   return {

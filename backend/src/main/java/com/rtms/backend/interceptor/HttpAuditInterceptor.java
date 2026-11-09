@@ -65,9 +65,20 @@ public class HttpAuditInterceptor implements HandlerInterceptor {
 
         Long userId = resolveUserId();
         int statusCode = response.getStatus();
+        String failureReason = null;
+        if (statusCode >= 400) {
+            Object errorAttr = request.getAttribute("AUDIT_ERROR_MESSAGE");
+            if (errorAttr instanceof String err && !err.isBlank()) {
+                failureReason = err;
+            }
+        }
 
         try {
-            auditLogService.recordHttpRequest(userId, method, path, statusCode);
+            if (failureReason != null) {
+                auditLogService.recordHttpRequest(userId, method, path, statusCode, failureReason);
+            } else {
+                auditLogService.recordHttpRequest(userId, method, path, statusCode);
+            }
         } catch (Exception e) {
             // Audit must never disrupt the business response
             logger.error("Unexpected error in HttpAuditInterceptor for {} {}: {}", method, path, e.getMessage(), e);

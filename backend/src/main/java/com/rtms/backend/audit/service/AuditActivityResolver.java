@@ -121,7 +121,7 @@ public class AuditActivityResolver {
                     null,
                     isSuccess
                             ? "Manager successfully archived and purged eligible historical audit logs."
-                            : "Manager requested audit log purge, but the operation was blocked by safety policy (e.g. 30-day minimum retention rule BR-MGR-19 or invalid date range)."
+                            : "Manager requested audit log purge, but the operation was blocked by safety policy"
             );
         }
 
@@ -387,7 +387,7 @@ public class AuditActivityResolver {
         if (STABLE_ASSIGNMENTS.matcher(normalizedPath).matches()) {
             return new ResolvedActivity(
                     "Update Stable Assignments",
-                    "StableStall",
+                    "Area",
                     null,
                     "Manager updated area trainer assignments and groom stall assignments" + statusSuffix
             );
@@ -407,6 +407,16 @@ public class AuditActivityResolver {
                     "StableStall",
                     null,
                     "Created a new stable stall" + statusSuffix
+            );
+        }
+        if ((m = STABLE_AREAS_DETAIL.matcher(normalizedPath)).matches()) {
+            Long id = parseId(m.group(1));
+            String action = "DELETE".equals(normalizedMethod) ? "Remove Barn Area" : "Update Barn Area";
+            return new ResolvedActivity(
+                    action,
+                    "Area",
+                    id,
+                    ("DELETE".equals(normalizedMethod) ? "Manager removed barn area #" : "Manager updated barn area #") + id + statusSuffix
             );
         }
         if (STABLE_AREAS_BASE.matcher(normalizedPath).matches() && "POST".equals(normalizedMethod)) {
@@ -740,7 +750,8 @@ public class AuditActivityResolver {
         if (path.contains("/training-rules")) return "TrainingRule";
         if (path.contains("/horses")) return "Horse";
         if (path.contains("/staff") || path.contains("/users") || path.contains("/accounts")) return "Staff";
-        if (path.contains("/stalls") || path.contains("/areas")) return "Stable";
+        if (path.contains("/areas")) return "Area";
+        if (path.contains("/stalls")) return "StableStall";
         if (path.contains("/care-schedules") || path.contains("/health-records") || path.contains("/preventive")) return "Medical";
         if (path.contains("/incidents")) return "IncidentReport";
         if (path.contains("/race-registrations")) return "RaceRegistration";
@@ -759,6 +770,7 @@ public class AuditActivityResolver {
             case "TrainingRule" -> "Training Rules";
             case "IncidentReport" -> "Incident Report";
             case "RaceRegistration" -> "Race Registration";
+            case "Area" -> "Barn Area";
             case "StableStall" -> "Stable Stall";
             case "CareSchedule" -> "Medical Schedule";
             case "HealthRecord" -> "Health Record";

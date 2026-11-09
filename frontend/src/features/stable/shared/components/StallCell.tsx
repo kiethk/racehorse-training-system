@@ -93,6 +93,7 @@ export function StallCell({
 
   return (
     <SelectableCard
+      id={`stall-cell-${stall.id}`}
       selected={selected}
       dimmed={dimmed}
       empty={!horse}
@@ -108,7 +109,7 @@ export function StallCell({
               !horse && stall.status === 'RESERVED' && 'border-[var(--color-info)]/30 bg-[var(--color-info-soft)] text-[var(--color-info)]',
             ]
           : 'min-h-24 animate-in fade-in zoom-in-95 fill-mode-backwards duration-300',
-        highlighted && 'ring-2 ring-[var(--color-primary)] ring-offset-1 font-bold z-10 scale-[1.03] transition-transform'
+        (highlighted || selected) && 'ring-2 ring-[var(--color-primary)] ring-offset-1 font-bold z-10 scale-[1.05] transition-transform shadow-md'
       )}
       style={style}
     >

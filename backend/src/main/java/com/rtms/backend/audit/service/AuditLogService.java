@@ -128,6 +128,11 @@ public class AuditLogService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordHttpRequest(Long userId, String httpMethod, String requestPath, int statusCode) {
+        recordHttpRequest(userId, httpMethod, requestPath, statusCode, null);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordHttpRequest(Long userId, String httpMethod, String requestPath, int statusCode, String failureReason) {
         try {
             AuditLog log = new AuditLog();
 
@@ -142,10 +147,37 @@ public class AuditLogService {
 
             // Resolve business activity details
             var activity = activityResolver.resolve(httpMethod, requestPath, statusCode);
+            Long entityId = activity.entityId();
+            String entityName = activity.entityName();
+
+            try {
+                var attributes = RequestContextHolder.getRequestAttributes();
+                if (attributes instanceof ServletRequestAttributes servletAttrs) {
+                    HttpServletRequest req = servletAttrs.getRequest();
+                    if (entityId == null) {
+                        Object attrId = req.getAttribute("AUDIT_ENTITY_ID");
+                        if (attrId instanceof Long lid) entityId = lid;
+                        else if (attrId instanceof Number nid) entityId = nid.longValue();
+                    }
+                    if (req.getAttribute("AUDIT_ENTITY_NAME") instanceof String ename && !ename.isBlank()) {
+                        entityName = ename;
+                    }
+                }
+            } catch (Exception ignored) {}
+
             log.setAction(activity.action());
-            log.setEntityName(activity.entityName());
-            log.setEntityId(activity.entityId());
-            log.setDetails(activity.details());
+            log.setEntityName(entityName);
+            log.setEntityId(entityId);
+
+            if (statusCode >= 400 && failureReason != null && !failureReason.isBlank()) {
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("summary", activity.details());
+                payload.put("reason", failureReason);
+                payload.put("module", AuditLogResponse.resolveModule(activity.entityName(), activity.details(), requestPath, activity.action()));
+                log.setDetails(objectMapper.writeValueAsString(payload));
+            } else {
+                log.setDetails(activity.details());
+            }
 
             auditLogRepository.save(log);
         } catch (Exception e) {

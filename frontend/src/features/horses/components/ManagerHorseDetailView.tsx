@@ -18,7 +18,6 @@ import { HorseFitnessTrendView } from '@/features/training/components/HorseFitne
 import { HorseScheduleView } from '@/features/training/components/HorseScheduleDialog';
 import { toIsoDate } from '@/features/training/lib/dateRange';
 import { HorsePedigreeCard } from './HorsePedigreeCard';
-import { HorseSpecialtySection } from '../shared/components/HorseSpecialtySection';
 import { HorseHealthSummary } from './HorseHealthSummary';
 import { HorseRacingHistory } from './HorseRacingHistory';
 
@@ -79,7 +78,7 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
         horseId={horseId}
         returnTo="/manager/horses"
         backLabel="Back to horses"
-        showSpecialty={false}
+        showSpecialty={true}
         headerActions={({ horse, reload }) => {
           const isEligible = horse.currentStatus === 'ELIGIBLE';
           const isInactive = horse.currentStatus === 'INACTIVE';
@@ -156,12 +155,7 @@ export function ManagerHorseDetailView({ horseId }: ManagerHorseDetailViewProps)
           {
             id: 'racing',
             label: 'Racing History',
-            content: (
-              <div className="space-y-6">
-                <HorseSpecialtySection specialty={specialty} />
-                <HorseRacingHistory registrations={raceRegistrations} />
-              </div>
-            ),
+            content: <HorseRacingHistory registrations={raceRegistrations} />,
           },
           {
             id: 'history',

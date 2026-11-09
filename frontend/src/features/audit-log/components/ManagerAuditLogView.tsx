@@ -348,7 +348,7 @@ export function ManagerAuditLogView() {
               <TBody>
                 {data.content.map((log) => {
                   const displayAction = formatAction(log.action, log.httpMethod, log.requestPath);
-                  const targetEntityUrl = resolveEntityUrl(log.entityName, log.entityId);
+                  const targetEntityUrl = resolveEntityUrl(log.entityName, log.entityId, log.requestPath);
                   const moduleName = resolveLogModule(log.module, log.entityName, log.requestPath, log.action);
 
                   return (
@@ -398,28 +398,21 @@ export function ManagerAuditLogView() {
                       {/* 4. Target Entity with link */}
                       <Td className="px-5 py-3.5">
                         {log.entityName ? (
-                          targetEntityUrl ? (
+                          targetEntityUrl && log.entityId != null ? (
                             <Link
                               href={targetEntityUrl}
                               onClick={(e) => e.stopPropagation()}
                               className="font-medium text-sm text-[var(--color-primary)] hover:underline inline-flex items-center gap-1.5 max-w-[11rem] truncate"
-                              title={`View ${log.entityName} ${log.entityId != null ? '#' + log.entityId : ''}`}
+                              title={`View ${log.entityName} #${log.entityId}`}
                             >
                               <span>{log.entityName}</span>
-                              {log.entityId != null && (
-                                <span className="bg-[var(--color-primary-soft)] px-1.5 py-0.2 rounded font-mono text-[11px] font-semibold">
-                                  #{log.entityId}
-                                </span>
-                              )}
+                              <span className="bg-[var(--color-primary-soft)] px-1.5 py-0.2 rounded font-mono text-[11px] font-semibold">
+                                #{log.entityId}
+                              </span>
                             </Link>
                           ) : (
-                            <div className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-primary)]">
+                            <div className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)]">
                               <span>{log.entityName}</span>
-                              {log.entityId != null && (
-                                <span className="bg-[var(--color-surface-muted)] px-1.5 py-0.2 rounded font-mono text-[11px] text-[var(--color-text-secondary)]">
-                                  #{log.entityId}
-                                </span>
-                              )}
                             </div>
                           )
                         ) : (
