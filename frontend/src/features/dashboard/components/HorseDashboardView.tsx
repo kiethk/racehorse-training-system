@@ -22,7 +22,7 @@ import { displayError, formatNumber } from '@/lib/display';
 import { RATING_LEGEND, ratingDistribution } from '@/features/training/lib/rating';
 import { cancelledLabel, courseRunProgress } from '@/features/training/lib/courseRunProgress';
 import { COURSE_RUN_STATUS } from '@/features/training/lib/status';
-import { StatusPill } from '@/features/training/components/StatusPill';
+import { StatusPill } from '@/features/training/components/shared/StatusPill';
 import { dashboardService } from '../services/dashboardService';
 import type { DashboardHorse } from '../types';
 import { HealthTrendCard } from './HealthTrendCard';

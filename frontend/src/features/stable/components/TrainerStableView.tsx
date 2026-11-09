@@ -19,7 +19,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { horseService } from '@/features/horses/services/horseService';
 import type { HorseSpecialty } from '@/features/horses/types';
-import { ReportIncidentDialog } from '@/features/training/components/ReportIncidentDialog';
+import { ReportIncidentDialog } from '@/features/training/components/incidents/ReportIncidentDialog';
 import { displayError } from '@/lib/display';
 import { compareAreas } from '../lib/managerAssignments';
 import { stableApi } from '../services/stableService';

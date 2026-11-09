@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { Suspense } from 'react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { CourseRunWizard } from '@/features/training/components/CourseRunWizard';
+import { CourseRunWizard } from '@/features/training/components/course-runs/CourseRunWizard';
 
 export const metadata: Metadata = {
   title: 'Create course run | Trainer | RTMS',

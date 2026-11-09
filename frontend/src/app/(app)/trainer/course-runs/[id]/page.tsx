@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { CourseRunDetail } from '@/features/training/components/CourseRunDetail';
+import { CourseRunDetail } from '@/features/training/components/course-runs/CourseRunDetail';
 
 export const metadata: Metadata = {
   title: 'Course run details | Trainer | RTMS',
