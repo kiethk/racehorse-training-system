@@ -11,7 +11,7 @@ export interface StatusStyle {
 export const COURSE_RUN_STATUS: Record<CourseRunStatus | 'NONE', StatusStyle> = {
   UPCOMING: { label: 'Upcoming', tone: 'info' },
   ACTIVE: { label: 'In training', tone: 'primary' },
-  COMPLETED: { label: 'Completed', tone: 'success' },
+  COMPLETED: { label: 'Finished', tone: 'success' },
   CANCELLED: { label: 'Cancelled', tone: 'danger' },
   NONE: { label: 'No course run', tone: 'neutral' },
 };

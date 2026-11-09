@@ -164,7 +164,7 @@ export function CourseRunList() {
             <option value="">All statuses</option>
             <option value="UPCOMING">Upcoming</option>
             <option value="ACTIVE">Active</option>
-            <option value="COMPLETED">Completed</option>
+            <option value="COMPLETED">Finished</option>
             <option value="CANCELLED">Cancelled</option>
           </Select>
         </FormField>
