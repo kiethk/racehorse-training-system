@@ -9,16 +9,16 @@ A named, lasting set of horses (at most 6) owned by one Trainer, going out on th
 _Avoid_: Lot, cohort, batch
 
 **Disbanded**:
-The state of a Training Group its Trainer has closed for good: it keeps its name and its past Group Plans, but has no horses, takes no new horses and gets no new Group Plan. Disbanding is always the Trainer's own act, never a result of the group running empty. Disbanding a group that still has unfinished Group Plans cancels them in the same act. A group that never had a Group Plan is simply removed, leaving no trace.
+The state of a Training Group its Trainer has closed for good: it keeps its name and its past Course Runs, but has no horses, takes no new horses and gets no new Course Run. Disbanding is always the Trainer's own act, never a result of the group running empty. Disbanding a group that still has unfinished Course Runs cancels them in the same act. A group that never had a Course Run is simply removed, leaving no trace.
 _Avoid_: Deleted, cancelled, archived
 
-**Group Plan**:
+**Course Run**:
 A Training Group running one Course from a start date on chosen weekdays; it ends together for the whole group when its last Session finishes. Horses may join or leave while it runs.
-_Avoid_: Horse plan, enrollment
+_Avoid_: Group Plan, Class, Plan (kept for a possible long-term layer), Horse plan, enrollment
 
 **Session**:
-One outing of a Training Group on one day, running one Subject, with a start time found for that day.
-_Avoid_: Lot, class
+One outing of a Training Group on one day, running one Exercise, with a start time found for that day.
+_Avoid_: Lot, Class
 
 **Workout**:
 One horse's result within a Session.
@@ -33,7 +33,7 @@ The state of a Held Workout once its results are recorded; the recorded results 
 _Avoid_: Attended, present, completed
 
 **Cancel**:
-Withdrawing a Session, one horse's Workout, or a whole Group Plan before it begins; nothing is made up. Cancelling a single Workout keeps the horse in its Training Group and leaves its other Workouts alone.
+Withdrawing a Session, one horse's Workout, or a whole Course Run before it begins; nothing is made up. Cancelling a single Workout keeps the horse in its Training Group and leaves its other Workouts alone.
 _Avoid_: Skip, postpone
 
 **Did not run**:
@@ -48,10 +48,11 @@ _Avoid_: Training hours, time slot
 How many of a Course's Sessions a horse took part in (its Workouts that Ran), shown against the Course total (for example 7 of 20). A missed Session is never made up: the horse simply goes on with its group.
 
 **Course**:
-An ordered list of Subjects that a Training Group works through over a number of Sessions.
+An ordered list of Exercises that a Training Group works through over a number of Sessions.
 
-**Subject**:
+**Exercise**:
 A single exercise (distance, surface, intensity, duration) run in a Session.
+_Avoid_: Subject
 
 ### Incidents
 
